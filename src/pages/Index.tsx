@@ -5,16 +5,17 @@ import { TPVStatusTable } from "@/components/TPVStatusTable";
 import { DashboardStats } from "@/components/DashboardStats";
 import { TableFilters, useTableFilters } from "@/components/TableFilters";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Settings } from "lucide-react";
+import { Settings, Plus } from "lucide-react";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useState } from "react";
 import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
+import { Button } from "@/components/ui/button";
 
 const Index = () => {
   const filters = useTableFilters();
   const { openPeopleManagement } = usePeopleManagement();
   const [exchangeRateOpen, setExchangeRateOpen] = useState(false);
-
+  const [activeTab, setActiveTab] = useState("project-info");
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b bg-primary px-6 py-4 sticky top-0 z-50">
@@ -52,6 +53,15 @@ const Index = () => {
             onPersonFilterChange={filters.setPersonFilter}
             statusFilter={filters.statusFilter}
             onStatusFilterChange={filters.setStatusFilter}
+            search={filters.search}
+            onSearchChange={filters.setSearch}
+            rightSlot={
+              activeTab === "project-info" ? (
+                <Button size="sm" onClick={() => document.dispatchEvent(new CustomEvent("open-add-project"))}>
+                  <Plus className="h-4 w-4 mr-1" /> Nový projekt
+                </Button>
+              ) : undefined
+            }
           />
         </div>
       </div>
@@ -59,7 +69,7 @@ const Index = () => {
       <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6 flex-1">
         <DashboardStats />
 
-        <Tabs defaultValue="project-info" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="bg-card border">
             <TabsTrigger value="project-info" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               Project Info
@@ -73,13 +83,13 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="project-info">
-            <ProjectInfoTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} />
+            <ProjectInfoTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} />
           </TabsContent>
           <TabsContent value="pm-status">
-            <PMStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} />
+            <PMStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} />
           </TabsContent>
           <TabsContent value="tpv-status">
-            <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} />
+            <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} />
           </TabsContent>
         </Tabs>
       </main>

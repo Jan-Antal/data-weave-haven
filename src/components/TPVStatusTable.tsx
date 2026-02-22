@@ -3,7 +3,6 @@ import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { StatusBadge, RiskBadge, ProgressBar } from "./StatusBadge";
 import { InlineEditableCell } from "./InlineEditableCell";
 import { SortableHeader } from "./SortableHeader";
-import { TableSearchBar } from "./TableSearchBar";
 import { useProjects } from "@/hooks/useProjects";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
 import { useSortFilter } from "@/hooks/useSortFilter";
@@ -15,12 +14,13 @@ import { TableHeader, TableHead } from "@/components/ui/table";
 interface TPVStatusTableProps {
   personFilter: string | null;
   statusFilter: string[];
+  search: string;
 }
 
-export function TPVStatusTable({ personFilter, statusFilter }: TPVStatusTableProps) {
+export function TPVStatusTable({ personFilter, statusFilter, search: externalSearch }: TPVStatusTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const updateProject = useUpdateProject();
-  const { sorted, search, setSearch, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter });
+  const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [openProject, setOpenProject] = useState<{ project_id: string; project_name: string } | null>(null);
 
   const save = (id: string, field: string, value: string, oldValue: string) => {
@@ -37,7 +37,6 @@ export function TPVStatusTable({ personFilter, statusFilter }: TPVStatusTablePro
 
   return (
     <div>
-      <TableSearchBar value={search} onChange={setSearch} />
       <div className="rounded-lg border bg-card overflow-x-scroll always-scrollbar">
         <Table>
           <TableHeader>

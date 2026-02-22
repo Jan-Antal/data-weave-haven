@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "./StatusBadge";
 import { InlineEditableCell } from "./InlineEditableCell";
 import { CurrencyEditCell } from "./CurrencyEditCell";
 import { SortableHeader } from "./SortableHeader";
-import { TableSearchBar } from "./TableSearchBar";
 import { useProjects } from "@/hooks/useProjects";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
 import { useSortFilter } from "@/hooks/useSortFilter";
@@ -13,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
@@ -34,15 +32,22 @@ const emptyProject = {
 interface ProjectInfoTableProps {
   personFilter: string | null;
   statusFilter: string[];
+  search: string;
 }
 
-export function ProjectInfoTable({ personFilter, statusFilter }: ProjectInfoTableProps) {
+export function ProjectInfoTable({ personFilter, statusFilter, search: externalSearch }: ProjectInfoTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const updateProject = useUpdateProject();
-  const { sorted, search, setSearch, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter });
+  const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [addOpen, setAddOpen] = useState(false);
   const [newProj, setNewProj] = useState({ ...emptyProject });
   const qc = useQueryClient();
+
+  useEffect(() => {
+    const handleOpenAdd = () => setAddOpen(true);
+    document.addEventListener("open-add-project", handleOpenAdd);
+    return () => document.removeEventListener("open-add-project", handleOpenAdd);
+  }, []);
 
   const save = (id: string, field: string, value: string, oldValue: string) => {
     updateProject.mutate({ id, field, value, oldValue });
@@ -90,12 +95,6 @@ export function ProjectInfoTable({ personFilter, statusFilter }: ProjectInfoTabl
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
-        <TableSearchBar value={search} onChange={setSearch} />
-        <Button size="sm" onClick={() => setAddOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Nový projekt
-        </Button>
-      </div>
       <div className="rounded-lg border bg-card overflow-x-scroll always-scrollbar">
         <Table className="table-fixed">
           <TableHeader>
