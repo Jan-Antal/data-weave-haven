@@ -34,14 +34,12 @@ const PM_COLUMNS = [
   { key: "pm", label: "PM" },
   { key: "status", label: "Status" },
   { key: "risk", label: "Risk" },
-  { key: "datum_smluvni", label: "Smluvní" },
+  { key: "datum_smluvni", label: "Datum Smluvní" },
   { key: "zamereni", label: "Zaměření" },
   { key: "tpv_date", label: "TPV" },
   { key: "expedice", label: "Expedice" },
   { key: "predani", label: "Předání" },
   { key: "pm_poznamka", label: "Poznámka" },
-  { key: "prodejni_cena", label: "Prodejní cena" },
-  { key: "marze", label: "Marže" },
 ];
 
 const stageStatuses = ["Plánováno", "Probíhá", "Dokončeno", "Pozastaveno"];
@@ -251,8 +249,6 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
               {v("expedice") && <SortableHeader label="Expedice" column="expedice" {...sh} className="min-w-[90px]" />}
               {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} className="min-w-[90px]" />}
               {v("pm_poznamka") && <SortableHeader label="Poznámka" column="pm_poznamka" {...sh} className="min-w-[180px]" />}
-              {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="min-w-[120px] text-right" />}
-              {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} className="min-w-[70px] text-right" />}
               <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} />
             </TableRow>
           </TableHeader>
@@ -283,22 +279,6 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   {v("expedice") && <TableCell><InlineEditableCell value={p.expedice} type="date" onSave={(val) => save(p.id, "expedice", val, p.expedice || "")} /></TableCell>}
                   {v("predani") && <TableCell><InlineEditableCell value={p.predani} type="date" onSave={(val) => save(p.id, "predani", val, p.predani || "")} /></TableCell>}
                   {v("pm_poznamka") && <TableCell><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(val) => save(p.id, "pm_poznamka", val, p.pm_poznamka || "")} /></TableCell>}
-                  {v("prodejni_cena") && (
-                    <TableCell className="text-right">
-                      <CurrencyEditCell
-                        value={p.prodejni_cena}
-                        currency={p.currency || "CZK"}
-                        onSave={(amount, currency) => {
-                          const parsedAmount = amount === "" ? null : Number(amount);
-                          supabase.from("projects").update({ prodejni_cena: parsedAmount, currency } as any).eq("id", p.id).then(({ error }) => {
-                            if (error) toast({ title: "Chyba", description: error.message, variant: "destructive" });
-                            else { qc.invalidateQueries({ queryKey: ["projects"] }); toast({ title: "Uloženo" }); }
-                          });
-                        }}
-                      />
-                    </TableCell>
-                  )}
-                  {v("marze") && <TableCell className="text-right"><InlineEditableCell value={p.marze} onSave={(val) => save(p.id, "marze", val, p.marze || "")} /></TableCell>}
                   <TableCell className="w-10" />
                 </TableRow>
                 {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} />}
