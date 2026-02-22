@@ -194,15 +194,15 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
 
         <div className="border-t pt-3 mt-1">
           {!confirmDelete ? (
-            <Button variant="destructive" size="sm" onClick={() => setConfirmDelete(true)}>
+            <Button size="sm" className="bg-[#EA592A] hover:bg-[#EA592A]/90 text-white" onClick={() => setConfirmDelete(true)}>
               Smazat projekt
             </Button>
           ) : (
             <div className="space-y-2">
-              <p className="text-sm text-destructive">Opravdu chcete smazat tento projekt? Tato akce je nevratná.</p>
+              <p className="text-sm text-[#EA592A]">Opravdu chcete smazat tento projekt? Tato akce je nevratná.</p>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>Zrušit</Button>
-                <Button variant="destructive" size="sm" onClick={handleDelete}>Potvrdit smazání</Button>
+                <Button size="sm" className="bg-[#EA592A] hover:bg-[#EA592A]/90 text-white" onClick={handleDelete}>Potvrdit smazání</Button>
               </div>
             </div>
           )}
