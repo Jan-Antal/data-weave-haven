@@ -95,11 +95,11 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
   };
 
   const handleDelete = async () => {
-    const { error } = await supabase.from("projects").delete().eq("id", project.id);
+    const { error } = await supabase.from("projects").update({ deleted_at: new Date().toISOString() } as any).eq("id", project.id);
     if (error) {
       toast({ title: "Chyba", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Projekt smazán" });
+      toast({ title: "Projekt přesunut do koše" });
       qc.invalidateQueries({ queryKey: ["projects"] });
       onOpenChange(false);
     }

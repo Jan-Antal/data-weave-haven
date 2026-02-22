@@ -13,6 +13,7 @@ export function useProjectStages(projectId: string) {
         .from("project_stages")
         .select("*")
         .eq("project_id", projectId)
+        .is("deleted_at", null)
         .order("stage_order");
       if (error) throw error;
       return data as ProjectStage[];
@@ -59,7 +60,7 @@ export function useDeleteStage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id }: { id: string; projectId: string }) => {
-      const { error } = await supabase.from("project_stages").delete().eq("id", id);
+      const { error } = await supabase.from("project_stages").update({ deleted_at: new Date().toISOString() } as any).eq("id", id);
       if (error) throw error;
     },
     onSuccess: (_, { projectId }) => {

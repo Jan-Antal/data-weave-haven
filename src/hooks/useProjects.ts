@@ -11,6 +11,7 @@ export function useProjects() {
       const { data, error } = await supabase
         .from("projects")
         .select("*")
+        .is("deleted_at", null)
         .order("project_id");
       if (error) throw error;
       return data as Project[];
