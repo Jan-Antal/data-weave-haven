@@ -22,6 +22,7 @@ import { format, parse } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
+import { ProjectEditDialog } from "./ProjectEditDialog";
 
 const emptyProject = {
   project_id: "",
@@ -52,6 +53,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const [newProj, setNewProj] = useState({ ...emptyProject });
   const [datumWarning, setDatumWarning] = useState(false);
   const qc = useQueryClient();
+  const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
 
   useEffect(() => {
     const handleOpenAdd = () => setAddOpen(true);
@@ -131,7 +133,13 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
           <TableBody>
             {sorted.map((p) => (
               <TableRow key={p.id} className="hover:bg-muted/50 transition-colors">
-                <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>
+                <TableCell
+                  className="font-mono text-xs truncate cursor-pointer hover:underline text-primary"
+                  title={p.project_id}
+                  onClick={() => setEditProject(p)}
+                >
+                  {p.project_id}
+                </TableCell>
                 <TableCell>
                   <InlineEditableCell value={p.project_name} onSave={(v) => save(p.id, "project_name", v, p.project_name)} className="font-medium" />
                 </TableCell>
@@ -272,6 +280,12 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ProjectEditDialog
+        project={editProject}
+        open={!!editProject}
+        onOpenChange={(open) => { if (!open) setEditProject(null); }}
+      />
     </div>
   );
 }
