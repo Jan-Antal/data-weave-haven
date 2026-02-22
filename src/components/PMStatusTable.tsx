@@ -2,8 +2,11 @@ import { useState, Fragment } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge, RiskBadge } from "./StatusBadge";
 import { InlineEditableCell } from "./InlineEditableCell";
+import { SortableHeader } from "./SortableHeader";
+import { TableSearchBar } from "./TableSearchBar";
 import { useProjects } from "@/hooks/useProjects";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
+import { useSortFilter } from "@/hooks/useSortFilter";
 import { useProjectStages, useUpdateStage, useAddStage, useDeleteStage, useReorderStages } from "@/hooks/useProjectStages";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { statusOrder } from "@/data/projects";
@@ -36,19 +39,27 @@ function SortableStageRow({ stage, projectId, onDelete }: { stage: ProjectStage;
         </div>
       </TableCell>
       <TableCell className="font-mono text-xs pl-8">{stage.stage_name}</TableCell>
+      <TableCell>{/* project name - empty for stage */}</TableCell>
+      <TableCell>{/* klient */}</TableCell>
+      <TableCell>{/* pm */}</TableCell>
       <TableCell>
         <InlineEditableCell value={stage.status} type="select" options={stageStatuses} onSave={(v) => saveStage("status", v)} />
       </TableCell>
+      <TableCell>{/* risk */}</TableCell>
       <TableCell>
-        <InlineEditableCell value={stage.start_date} onSave={(v) => saveStage("start_date", v)} />
+        <InlineEditableCell value={stage.start_date} type="date" onSave={(v) => saveStage("start_date", v)} />
       </TableCell>
+      <TableCell>{/* zaměření */}</TableCell>
       <TableCell>
-        <InlineEditableCell value={stage.end_date} onSave={(v) => saveStage("end_date", v)} />
+        <InlineEditableCell value={stage.end_date} type="date" onSave={(v) => saveStage("end_date", v)} />
       </TableCell>
+      <TableCell>{/* expedice */}</TableCell>
+      <TableCell>{/* předání */}</TableCell>
       <TableCell>
         <InlineEditableCell value={stage.notes} onSave={(v) => saveStage("notes", v)} />
       </TableCell>
-      <TableCell colSpan={8}>
+      <TableCell>{/* prodejní cena */}</TableCell>
+      <TableCell>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(stage.id)}>
           <Trash2 className="h-3 w-3 text-destructive" />
         </Button>
@@ -118,7 +129,7 @@ function StagesSection({ projectId }: { projectId: string }) {
         </SortableContext>
       </DndContext>
       <TableRow className="bg-muted/20">
-        <TableCell colSpan={14}>
+        <TableCell colSpan={16}>
           <Button variant="ghost" size="sm" className="text-xs" onClick={handleAddOpen}>
             <Plus className="h-3 w-3 mr-1" /> Přidat etapu
           </Button>
@@ -147,9 +158,24 @@ function StagesSection({ projectId }: { projectId: string }) {
   );
 }
 
+function ExpandArrow({ projectId, isExpanded }: { projectId: string; isExpanded: boolean }) {
+  const { data: stages = [] } = useProjectStages(projectId);
+  const hasStages = stages.length > 0;
+
+  if (isExpanded) {
+    return <ChevronDown className={`h-4 w-4 ${hasStages ? "text-accent" : "text-muted-foreground"}`} />;
+  }
+  return (
+    <ChevronRight
+      className={`h-4 w-4 ${hasStages ? "text-accent fill-accent/20" : "text-muted-foreground/50"}`}
+    />
+  );
+}
+
 export function PMStatusTable() {
   const { data: projects = [], isLoading } = useProjects();
   const updateProject = useUpdateProject();
+  const { sorted, search, setSearch, sortCol, sortDir, toggleSort } = useSortFilter(projects);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggleExpand = (pid: string) => {
@@ -166,61 +192,66 @@ export function PMStatusTable() {
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Načítání...</div>;
 
+  const sh = { sortCol, sortDir, onSort: toggleSort };
+
   return (
-    <div className="rounded-lg border bg-card overflow-auto">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-primary/5">
-            <TableHead className="w-8"></TableHead>
-            <TableHead className="font-semibold min-w-[120px]">Project ID</TableHead>
-            <TableHead className="font-semibold min-w-[200px]">Project Name</TableHead>
-            <TableHead className="font-semibold min-w-[130px]">Klient</TableHead>
-            <TableHead className="font-semibold min-w-[130px]">PM</TableHead>
-            <TableHead className="font-semibold min-w-[110px]">Status</TableHead>
-            <TableHead className="font-semibold min-w-[80px]">Risk</TableHead>
-            <TableHead className="font-semibold min-w-[100px]">Smluvní</TableHead>
-            <TableHead className="font-semibold min-w-[100px]">Zaměření</TableHead>
-            <TableHead className="font-semibold min-w-[100px]">TPV</TableHead>
-            <TableHead className="font-semibold min-w-[100px]">Expedice</TableHead>
-            <TableHead className="font-semibold min-w-[100px]">Předání</TableHead>
-            <TableHead className="font-semibold min-w-[200px]">Poznámka</TableHead>
-            <TableHead className="font-semibold min-w-[120px] text-right">Prodejní cena</TableHead>
-            <TableHead className="font-semibold min-w-[70px] text-right">Marže</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {projects.map((p) => (
-            <Fragment key={p.id}>
-              <TableRow className="hover:bg-muted/50 transition-colors">
-                <TableCell className="w-8 cursor-pointer" onClick={() => toggleExpand(p.project_id)}>
-                  {expanded.has(p.project_id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                </TableCell>
-                <TableCell className="font-mono text-xs">{p.project_id}</TableCell>
-                <TableCell><InlineEditableCell value={p.project_name} onSave={(v) => save(p.id, "project_name", v, p.project_name)} className="font-medium" /></TableCell>
-                <TableCell><InlineEditableCell value={p.klient} onSave={(v) => save(p.id, "klient", v, p.klient || "")} /></TableCell>
-                <TableCell><InlineEditableCell value={p.pm} onSave={(v) => save(p.id, "pm", v, p.pm || "")} /></TableCell>
-                <TableCell>
-                  <InlineEditableCell value={p.status} type="select" options={statusOrder} onSave={(v) => save(p.id, "status", v, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} />
-                </TableCell>
-                <TableCell>
-                  <InlineEditableCell value={p.risk} type="select" options={["Low", "Medium", "High"]} onSave={(v) => save(p.id, "risk", v, p.risk || "")} displayValue={<RiskBadge level={p.risk || ""} />} />
-                </TableCell>
-                <TableCell><InlineEditableCell value={p.datum_smluvni} onSave={(v) => save(p.id, "datum_smluvni", v, p.datum_smluvni || "")} /></TableCell>
-                <TableCell><InlineEditableCell value={p.zamereni} onSave={(v) => save(p.id, "zamereni", v, p.zamereni || "")} /></TableCell>
-                <TableCell><InlineEditableCell value={p.tpv_date} onSave={(v) => save(p.id, "tpv_date", v, p.tpv_date || "")} /></TableCell>
-                <TableCell><InlineEditableCell value={p.expedice} onSave={(v) => save(p.id, "expedice", v, p.expedice || "")} /></TableCell>
-                <TableCell><InlineEditableCell value={p.predani} onSave={(v) => save(p.id, "predani", v, p.predani || "")} /></TableCell>
-                <TableCell><InlineEditableCell value={p.pm_poznamka} onSave={(v) => save(p.id, "pm_poznamka", v, p.pm_poznamka || "")} /></TableCell>
-                <TableCell className="text-right">
-                  <InlineEditableCell value={p.prodejni_cena} type="number" onSave={(v) => save(p.id, "prodejni_cena", v, String(p.prodejni_cena ?? ""))} displayValue={<span className="font-mono text-sm">{p.prodejni_cena ? new Intl.NumberFormat("cs-CZ").format(p.prodejni_cena) : "—"}</span>} />
-                </TableCell>
-                <TableCell className="text-right"><InlineEditableCell value={p.marze} onSave={(v) => save(p.id, "marze", v, p.marze || "")} /></TableCell>
-              </TableRow>
-              {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} />}
-            </Fragment>
-          ))}
-        </TableBody>
-      </Table>
+    <div>
+      <TableSearchBar value={search} onChange={setSearch} />
+      <div className="rounded-lg border bg-card overflow-auto always-scrollbar">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-primary/5">
+              <TableHead className="w-8"></TableHead>
+              <SortableHeader label="Project ID" column="project_id" {...sh} className="min-w-[120px]" />
+              <SortableHeader label="Project Name" column="project_name" {...sh} className="min-w-[200px]" />
+              <SortableHeader label="Klient" column="klient" {...sh} className="min-w-[130px]" />
+              <SortableHeader label="PM" column="pm" {...sh} className="min-w-[130px]" />
+              <SortableHeader label="Status" column="status" {...sh} className="min-w-[110px]" />
+              <SortableHeader label="Risk" column="risk" {...sh} className="min-w-[80px]" />
+              <SortableHeader label="Smluvní" column="datum_smluvni" {...sh} className="min-w-[100px]" />
+              <SortableHeader label="Zaměření" column="zamereni" {...sh} className="min-w-[100px]" />
+              <SortableHeader label="TPV" column="tpv_date" {...sh} className="min-w-[100px]" />
+              <SortableHeader label="Expedice" column="expedice" {...sh} className="min-w-[100px]" />
+              <SortableHeader label="Předání" column="predani" {...sh} className="min-w-[100px]" />
+              <SortableHeader label="Poznámka" column="pm_poznamka" {...sh} className="min-w-[200px]" />
+              <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="min-w-[120px] text-right" />
+              <SortableHeader label="Marže" column="marze" {...sh} className="min-w-[70px] text-right" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sorted.map((p) => (
+              <Fragment key={p.id}>
+                <TableRow className="hover:bg-muted/50 transition-colors">
+                  <TableCell className="w-8 cursor-pointer" onClick={() => toggleExpand(p.project_id)}>
+                    <ExpandArrow projectId={p.project_id} isExpanded={expanded.has(p.project_id)} />
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">{p.project_id}</TableCell>
+                  <TableCell><InlineEditableCell value={p.project_name} onSave={(v) => save(p.id, "project_name", v, p.project_name)} className="font-medium" /></TableCell>
+                  <TableCell><InlineEditableCell value={p.klient} onSave={(v) => save(p.id, "klient", v, p.klient || "")} /></TableCell>
+                  <TableCell><InlineEditableCell value={p.pm} onSave={(v) => save(p.id, "pm", v, p.pm || "")} /></TableCell>
+                  <TableCell>
+                    <InlineEditableCell value={p.status} type="select" options={statusOrder} onSave={(v) => save(p.id, "status", v, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} />
+                  </TableCell>
+                  <TableCell>
+                    <InlineEditableCell value={p.risk} type="select" options={["Low", "Medium", "High"]} onSave={(v) => save(p.id, "risk", v, p.risk || "")} displayValue={<RiskBadge level={p.risk || ""} />} />
+                  </TableCell>
+                  <TableCell><InlineEditableCell value={p.datum_smluvni} type="date" onSave={(v) => save(p.id, "datum_smluvni", v, p.datum_smluvni || "")} /></TableCell>
+                  <TableCell><InlineEditableCell value={p.zamereni} onSave={(v) => save(p.id, "zamereni", v, p.zamereni || "")} /></TableCell>
+                  <TableCell><InlineEditableCell value={p.tpv_date} type="date" onSave={(v) => save(p.id, "tpv_date", v, p.tpv_date || "")} /></TableCell>
+                  <TableCell><InlineEditableCell value={p.expedice} type="date" onSave={(v) => save(p.id, "expedice", v, p.expedice || "")} /></TableCell>
+                  <TableCell><InlineEditableCell value={p.predani} type="date" onSave={(v) => save(p.id, "predani", v, p.predani || "")} /></TableCell>
+                  <TableCell><InlineEditableCell value={p.pm_poznamka} onSave={(v) => save(p.id, "pm_poznamka", v, p.pm_poznamka || "")} /></TableCell>
+                  <TableCell className="text-right">
+                    <InlineEditableCell value={p.prodejni_cena} type="number" onSave={(v) => save(p.id, "prodejni_cena", v, String(p.prodejni_cena ?? ""))} displayValue={<span className="font-mono text-sm">{p.prodejni_cena ? new Intl.NumberFormat("cs-CZ").format(p.prodejni_cena) : "—"}</span>} />
+                  </TableCell>
+                  <TableCell className="text-right"><InlineEditableCell value={p.marze} onSave={(v) => save(p.id, "marze", v, p.marze || "")} /></TableCell>
+                </TableRow>
+                {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} />}
+              </Fragment>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
