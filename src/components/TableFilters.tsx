@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { X, ChevronDown } from "lucide-react";
 import { useAllPeople } from "@/hooks/usePeople";
 import { statusOrder } from "@/data/projects";
@@ -102,37 +102,95 @@ function PersonFilterDropdown({ value, onChange }: { value: string | null; onCha
   );
 }
 
-export function TableFilters({ personFilter, onPersonFilterChange, statusFilter, onStatusFilterChange }: TableFiltersProps) {
-  const toggleStatus = (status: string) => {
-    if (statusFilter.includes(status)) {
-      onStatusFilterChange(statusFilter.filter((s) => s !== status));
+function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filtered = statusOrder.filter((s) =>
+    s.toLowerCase().includes(search.toLowerCase())
+  );
+
+  useEffect(() => {
+    if (open) {
+      setSearch("");
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [open]);
+
+  const toggle = (status: string) => {
+    if (value.includes(status)) {
+      onChange(value.filter((s) => s !== status));
     } else {
-      onStatusFilterChange([...statusFilter, status]);
+      onChange([...value, status]);
     }
   };
 
+  const allSelected = value.length === statusOrder.length;
+  const label = allSelected ? "Všechny statusy" : `Status (${value.length})`;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 text-sm w-[180px] justify-between">
+          <span className="truncate">{label}</span>
+          <ChevronDown className="h-3 w-3 ml-1 flex-shrink-0" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[220px] p-1" align="start">
+        <Input
+          ref={inputRef}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Hledat status..."
+          className="h-7 text-xs mb-1"
+        />
+        <div className="max-h-[250px] overflow-y-auto">
+          {filtered.map((status) => (
+            <div
+              key={status}
+              className="flex items-center gap-2 px-2 py-1.5 text-xs rounded cursor-pointer hover:bg-accent hover:text-accent-foreground"
+              onClick={() => toggle(status)}
+            >
+              <Checkbox
+                checked={value.includes(status)}
+                onCheckedChange={() => toggle(status)}
+                className="h-3.5 w-3.5"
+              />
+              <span>{status}</span>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-1 border-t mt-1 pt-1 px-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs flex-1"
+            onClick={() => onChange([...statusOrder])}
+          >
+            Vybrat vše
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs flex-1"
+            onClick={() => onChange([])}
+          >
+            Zrušit vše
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export function TableFilters({ personFilter, onPersonFilterChange, statusFilter, onStatusFilterChange }: TableFiltersProps) {
   const hasActiveFilters = personFilter !== null || statusFilter.length !== statusOrder.length;
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <PersonFilterDropdown value={personFilter} onChange={onPersonFilterChange} />
-
-      {/* Status multi-select as badges */}
-      <div className="flex items-center gap-1 flex-wrap">
-        {statusOrder.map((status) => {
-          const active = statusFilter.includes(status);
-          return (
-            <Badge
-              key={status}
-              variant={active ? "default" : "outline"}
-              className={`cursor-pointer text-xs select-none ${active ? "bg-primary text-primary-foreground" : "opacity-50"}`}
-              onClick={() => toggleStatus(status)}
-            >
-              {status}
-            </Badge>
-          );
-        })}
-      </div>
+      <StatusFilterDropdown value={statusFilter} onChange={onStatusFilterChange} />
 
       {hasActiveFilters && (
         <Button
