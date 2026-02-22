@@ -177,13 +177,13 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
           <DialogHeader><DialogTitle>Nový projekt</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-x-4 gap-y-3">
             {/* Left column */}
-            <div><Label>Project ID *</Label><Input value={newProj.project_id} onChange={(e) => setNewProj(s => ({ ...s, project_id: e.target.value }))} /></div>
+            <div><Label>Project ID <span className="text-orange-500">*</span></Label><Input value={newProj.project_id} onChange={(e) => setNewProj(s => ({ ...s, project_id: e.target.value }))} /></div>
             {/* Right column */}
             <div>
-              <Label>Datum Smluvní <span className="text-destructive">*</span></Label>
+              <Label>Datum Smluvní <span className="text-foreground font-bold">*</span></Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !newProj.datum_smluvni && "text-muted-foreground")}>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !newProj.datum_smluvni && "text-muted-foreground", datumWarning && "border-destructive")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {newProj.datum_smluvni || "Vyberte datum"}
                   </Button>
@@ -205,7 +205,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
               {datumWarning && <p className="text-xs text-destructive mt-1">Datum smluvní je povinné</p>}
             </div>
 
-            <div><Label>Project Name *</Label><Input value={newProj.project_name} onChange={(e) => setNewProj(s => ({ ...s, project_name: e.target.value }))} /></div>
+            <div><Label>Project Name <span className="text-orange-500">*</span></Label><Input value={newProj.project_name} onChange={(e) => setNewProj(s => ({ ...s, project_name: e.target.value }))} /></div>
             <div>
               <Label>PM</Label>
               <PeopleSelectDropdown role="PM" value={newProj.pm} onValueChange={(v) => setNewProj(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
@@ -247,7 +247,19 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                 </Button>
               </div>
             </div>
-            <div className="col-span-2"><Label>Marže</Label><Input value={newProj.marze} onChange={(e) => setNewProj(s => ({ ...s, marze: e.target.value }))} /></div>
+            <div className="col-span-2">
+              <Label>Marže</Label>
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  className="no-spinners"
+                  value={newProj.marze}
+                  onChange={(e) => setNewProj(s => ({ ...s, marze: e.target.value }))}
+                  placeholder="0"
+                />
+                <span className="text-sm text-muted-foreground shrink-0">%</span>
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>Zrušit</Button>
