@@ -1,16 +1,6 @@
 import { Badge } from "@/components/ui/badge";
-import type { ProjectStatus, RiskLevel } from "@/data/projects";
-
-const statusStyles: Record<string, string> = {
-  "Příprava": "bg-muted text-muted-foreground",
-  "Engineering": "bg-info/15 text-info border-info/30",
-  "TPV": "bg-warning/15 text-warning-foreground border-warning/30",
-  "Výroba IN": "bg-accent/15 text-accent border-accent/30",
-  "Expedice": "bg-info/15 text-info border-info/30",
-  "Montáž": "bg-primary/10 text-primary border-primary/20",
-  "Fakturace": "bg-success/15 text-success border-success/30",
-  "Dokončeno": "bg-success/20 text-success border-success/40",
-};
+import type { RiskLevel } from "@/data/projects";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 
 const riskStyles: Record<string, string> = {
   "Low": "bg-success/15 text-success border-success/30",
@@ -18,9 +8,25 @@ const riskStyles: Record<string, string> = {
   "High": "bg-destructive/15 text-destructive border-destructive/30",
 };
 
-export function StatusBadge({ status }: { status: ProjectStatus | string }) {
+export function StatusBadge({ status }: { status: string }) {
+  const { data: options = [] } = useProjectStatusOptions();
+  const opt = options.find((o) => o.label === status);
+  const color = opt?.color;
+
+  if (color) {
+    return (
+      <Badge
+        variant="outline"
+        className="text-xs font-medium"
+        style={{ backgroundColor: `${color}20`, color, borderColor: `${color}50` }}
+      >
+        {status}
+      </Badge>
+    );
+  }
+
   return (
-    <Badge variant="outline" className={`text-xs font-medium ${statusStyles[status] || "bg-muted text-muted-foreground"}`}>
+    <Badge variant="outline" className="text-xs font-medium bg-muted text-muted-foreground">
       {status}
     </Badge>
   );

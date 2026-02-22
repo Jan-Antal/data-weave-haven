@@ -13,7 +13,7 @@ import { useUpdateProject } from "@/hooks/useProjectMutations";
 import { useSortFilter } from "@/hooks/useSortFilter";
 import { useProjectStages, useUpdateStage, useAddStage, useDeleteStage, useReorderStages } from "@/hooks/useProjectStages";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { statusOrder } from "@/data/projects";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -210,6 +210,8 @@ interface PMStatusTableProps {
 
 export function PMStatusTable({ personFilter, statusFilter, search: externalSearch }: PMStatusTableProps) {
   const { data: projects = [], isLoading } = useProjects();
+  const { data: statusOptions = [] } = useProjectStatusOptions();
+  const statusLabels = statusOptions.map((s) => s.label);
   const updateProject = useUpdateProject();
   const qc = useQueryClient();
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
@@ -266,7 +268,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   <TableCell><InlineEditableCell value={p.klient} onSave={(v) => save(p.id, "klient", v, p.klient || "")} /></TableCell>
                   <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(v) => save(p.id, "pm", v, p.pm || "")} /></TableCell>
                   <TableCell>
-                    <InlineEditableCell value={p.status} type="select" options={statusOrder} onSave={(v) => save(p.id, "status", v, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} />
+                    <InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(v) => save(p.id, "status", v, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} />
                   </TableCell>
                   <TableCell>
                     <InlineEditableCell value={p.risk} type="select" options={["Low", "Medium", "High"]} onSave={(v) => save(p.id, "risk", v, p.risk || "")} displayValue={<RiskBadge level={p.risk || ""} />} />
