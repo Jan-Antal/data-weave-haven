@@ -25,7 +25,9 @@ const TPV_COLUMNS = [
   { key: "status", label: "Status" },
   { key: "tpv_risk", label: "Risk" },
   { key: "zamereni", label: "Zaměření" },
-  { key: "datum_tpv", label: "Datum TPV" },
+  { key: "expedice", label: "Expedice" },
+  { key: "predani", label: "Předání" },
+  { key: "tpv_poznamka", label: "Poznámka" },
 ];
 
 interface TPVStatusTableProps {
@@ -74,7 +76,9 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
               {v("status") && <SortableHeader label="Status" column="status" {...sh} className="min-w-[110px]" />}
               {v("tpv_risk") && <SortableHeader label="Risk" column="tpv_risk" {...sh} className="min-w-[80px]" />}
               {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} className="min-w-[90px]" />}
-              {v("datum_tpv") && <SortableHeader label="Datum TPV" column="datum_tpv" {...sh} className="min-w-[90px]" />}
+              {v("expedice") && <SortableHeader label="Expedice" column="expedice" {...sh} className="min-w-[90px]" />}
+              {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} className="min-w-[90px]" />}
+              {v("tpv_poznamka") && <SortableHeader label="Poznámka" column="tpv_poznamka" {...sh} className="min-w-[180px]" />}
               <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} />
             </TableRow>
           </TableHeader>
@@ -111,7 +115,9 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                   </TableCell>
                 )}
                 {v("zamereni") && <TableCell><InlineEditableCell value={p.zamereni} type="date" onSave={(val) => save(p.id, "zamereni", val, p.zamereni || "")} /></TableCell>}
-                {v("datum_tpv") && <TableCell><InlineEditableCell value={p.datum_tpv} type="date" onSave={(val) => save(p.id, "datum_tpv", val, p.datum_tpv || "")} /></TableCell>}
+                {v("expedice") && <TableCell><InlineEditableCell value={p.expedice} type="date" onSave={(val) => save(p.id, "expedice", val, p.expedice || "")} /></TableCell>}
+                {v("predani") && <TableCell><InlineEditableCell value={p.predani} type="date" onSave={(val) => save(p.id, "predani", val, p.predani || "")} /></TableCell>}
+                {v("tpv_poznamka") && <TableCell><InlineEditableCell value={p.tpv_poznamka} type="textarea" onSave={(val) => save(p.id, "tpv_poznamka", val, p.tpv_poznamka || "")} /></TableCell>}
                 <TableCell className="w-10" />
               </TableRow>
             ))}

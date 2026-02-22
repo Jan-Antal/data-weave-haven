@@ -32,6 +32,7 @@ const PROJECT_INFO_COLUMNS = [
   { key: "klient", label: "Klient" },
   { key: "pm", label: "PM" },
   { key: "konstrukter", label: "Konstruktér" },
+  { key: "kalkulant", label: "Kalkulant" },
   { key: "status", label: "Status" },
   { key: "datum_smluvni", label: "Datum Smluvní" },
   { key: "prodejni_cena", label: "Prodejní cena" },
@@ -142,6 +143,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
               {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} className="w-[120px] min-w-[120px]" />}
               {v("pm") && <SortableHeader label="PM" column="pm" {...sh} className="w-[140px] min-w-[140px]" />}
               {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} className="w-[140px] min-w-[140px]" />}
+              {v("kalkulant") && <SortableHeader label="Kalkulant" column="kalkulant" {...sh} className="w-[140px] min-w-[140px]" />}
               {v("status") && <SortableHeader label="Status" column="status" {...sh} className="w-[110px] min-w-[110px]" />}
               {v("datum_smluvni") && <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} className="w-[90px] min-w-[90px]" />}
               {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="w-[140px] min-w-[140px] text-right" />}
@@ -162,6 +164,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                 {v("klient") && <TableCell><InlineEditableCell value={p.klient} onSave={(val) => save(p.id, "klient", val, p.klient || "")} /></TableCell>}
                 {v("pm") && <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(val) => save(p.id, "pm", val, p.pm || "")} /></TableCell>}
                 {v("konstrukter") && <TableCell><InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(val) => save(p.id, "konstrukter", val, p.konstrukter || "")} /></TableCell>}
+                {v("kalkulant") && <TableCell><InlineEditableCell value={p.kalkulant} type="people" peopleRole="Kalkulant" onSave={(val) => save(p.id, "kalkulant", val, p.kalkulant || "")} /></TableCell>}
                 {v("status") && (
                   <TableCell>
                     <InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(val) => save(p.id, "status", val, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} />
