@@ -10,6 +10,23 @@ import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { ChevronRight } from "lucide-react";
 import { TPVItemsView } from "./TPVItemsView";
 import { TableHeader, TableHead } from "@/components/ui/table";
+import { useColumnVisibility } from "@/hooks/useColumnVisibility";
+import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
+
+const TPV_COLUMNS = [
+  { key: "project_id", label: "Project ID", locked: true },
+  { key: "project_name", label: "Project Name", locked: true },
+  { key: "pm", label: "PM" },
+  { key: "klient", label: "Klient" },
+  { key: "konstrukter", label: "Konstruktér" },
+  { key: "narocnost", label: "Náročnost" },
+  { key: "hodiny_tpv", label: "Hodiny TPV" },
+  { key: "percent_tpv", label: "% Status" },
+  { key: "status", label: "Status" },
+  { key: "tpv_risk", label: "Risk" },
+  { key: "zamereni", label: "Zaměření" },
+  { key: "datum_tpv", label: "Datum TPV" },
+];
 
 interface TPVStatusTableProps {
   personFilter: string | null;
@@ -24,6 +41,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const updateProject = useUpdateProject();
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [openProject, setOpenProject] = useState<{ project_id: string; project_name: string } | null>(null);
+  const { isVisible, toggleColumn, columns } = useColumnVisibility("col-vis-tpv-status", TPV_COLUMNS);
 
   const save = (id: string, field: string, value: string, oldValue: string) => {
     updateProject.mutate({ id, field, value, oldValue });
@@ -36,6 +54,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   }
 
   const sh = { sortCol, sortDir, onSort: toggleSort };
+  const v = isVisible;
 
   return (
     <div>
@@ -44,18 +63,19 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
           <TableHeader>
             <TableRow className="bg-primary/5">
               <TableHead className="w-8"></TableHead>
-              <SortableHeader label="Project ID" column="project_id" {...sh} className="min-w-[130px]" />
-              <SortableHeader label="Project Name" column="project_name" {...sh} className="min-w-[180px]" />
-              <SortableHeader label="PM" column="pm" {...sh} className="min-w-[140px]" />
-              <SortableHeader label="Klient" column="klient" {...sh} className="min-w-[120px]" />
-              <SortableHeader label="Konstruktér" column="konstrukter" {...sh} className="min-w-[140px]" />
-              <SortableHeader label="Náročnost" column="narocnost" {...sh} className="min-w-[90px]" />
-              <SortableHeader label="Hodiny TPV" column="hodiny_tpv" {...sh} className="min-w-[90px]" />
-              <SortableHeader label="% Status" column="percent_tpv" {...sh} className="min-w-[120px]" />
-              <SortableHeader label="Status" column="status" {...sh} className="min-w-[110px]" />
-              <SortableHeader label="Risk" column="tpv_risk" {...sh} className="min-w-[80px]" />
-              <SortableHeader label="Zaměření" column="zamereni" {...sh} className="min-w-[90px]" />
-              <SortableHeader label="Datum TPV" column="datum_tpv" {...sh} className="min-w-[90px]" />
+              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} className="min-w-[130px]" />}
+              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} className="min-w-[180px]" />}
+              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} className="min-w-[140px]" />}
+              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} className="min-w-[120px]" />}
+              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} className="min-w-[140px]" />}
+              {v("narocnost") && <SortableHeader label="Náročnost" column="narocnost" {...sh} className="min-w-[90px]" />}
+              {v("hodiny_tpv") && <SortableHeader label="Hodiny TPV" column="hodiny_tpv" {...sh} className="min-w-[90px]" />}
+              {v("percent_tpv") && <SortableHeader label="% Status" column="percent_tpv" {...sh} className="min-w-[120px]" />}
+              {v("status") && <SortableHeader label="Status" column="status" {...sh} className="min-w-[110px]" />}
+              {v("tpv_risk") && <SortableHeader label="Risk" column="tpv_risk" {...sh} className="min-w-[80px]" />}
+              {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} className="min-w-[90px]" />}
+              {v("datum_tpv") && <SortableHeader label="Datum TPV" column="datum_tpv" {...sh} className="min-w-[90px]" />}
+              <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -64,26 +84,35 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                 <TableCell className="w-8 cursor-pointer" onClick={() => setOpenProject({ project_id: p.project_id, project_name: p.project_name })}>
                   <ChevronRight className="h-4 w-4" />
                 </TableCell>
-                <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>
-                <TableCell><InlineEditableCell value={p.project_name} onSave={(v) => save(p.id, "project_name", v, p.project_name)} className="font-medium" /></TableCell>
-                <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(v) => save(p.id, "pm", v, p.pm || "")} /></TableCell>
-                <TableCell><InlineEditableCell value={p.klient} onSave={(v) => save(p.id, "klient", v, p.klient || "")} /></TableCell>
-                <TableCell><InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(v) => save(p.id, "konstrukter", v, p.konstrukter || "")} /></TableCell>
-                <TableCell>
-                  <InlineEditableCell value={p.narocnost} type="select" options={["Low", "Medium", "High"]} onSave={(v) => save(p.id, "narocnost", v, p.narocnost || "")} displayValue={<RiskBadge level={p.narocnost || ""} />} />
-                </TableCell>
-                <TableCell><InlineEditableCell value={p.hodiny_tpv} onSave={(v) => save(p.id, "hodiny_tpv", v, p.hodiny_tpv || "")} /></TableCell>
-                <TableCell>
-                  <InlineEditableCell value={p.percent_tpv} type="number" onSave={(v) => save(p.id, "percent_tpv", v, String(p.percent_tpv ?? ""))} displayValue={<ProgressBar value={p.percent_tpv || 0} />} />
-                </TableCell>
-                <TableCell>
-                  <InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(v) => save(p.id, "status", v, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} />
-                </TableCell>
-                <TableCell>
-                  <InlineEditableCell value={p.tpv_risk} type="select" options={["Low", "Medium", "High"]} onSave={(v) => save(p.id, "tpv_risk", v, p.tpv_risk || "")} displayValue={<RiskBadge level={p.tpv_risk || ""} />} />
-                </TableCell>
-                <TableCell><InlineEditableCell value={p.zamereni} type="date" onSave={(v) => save(p.id, "zamereni", v, p.zamereni || "")} /></TableCell>
-                <TableCell><InlineEditableCell value={p.datum_tpv} type="date" onSave={(v) => save(p.id, "datum_tpv", v, p.datum_tpv || "")} /></TableCell>
+                {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
+                {v("project_name") && <TableCell><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" /></TableCell>}
+                {v("pm") && <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(val) => save(p.id, "pm", val, p.pm || "")} /></TableCell>}
+                {v("klient") && <TableCell><InlineEditableCell value={p.klient} onSave={(val) => save(p.id, "klient", val, p.klient || "")} /></TableCell>}
+                {v("konstrukter") && <TableCell><InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(val) => save(p.id, "konstrukter", val, p.konstrukter || "")} /></TableCell>}
+                {v("narocnost") && (
+                  <TableCell>
+                    <InlineEditableCell value={p.narocnost} type="select" options={["Low", "Medium", "High"]} onSave={(val) => save(p.id, "narocnost", val, p.narocnost || "")} displayValue={<RiskBadge level={p.narocnost || ""} />} />
+                  </TableCell>
+                )}
+                {v("hodiny_tpv") && <TableCell><InlineEditableCell value={p.hodiny_tpv} onSave={(val) => save(p.id, "hodiny_tpv", val, p.hodiny_tpv || "")} /></TableCell>}
+                {v("percent_tpv") && (
+                  <TableCell>
+                    <InlineEditableCell value={p.percent_tpv} type="number" onSave={(val) => save(p.id, "percent_tpv", val, String(p.percent_tpv ?? ""))} displayValue={<ProgressBar value={p.percent_tpv || 0} />} />
+                  </TableCell>
+                )}
+                {v("status") && (
+                  <TableCell>
+                    <InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(val) => save(p.id, "status", val, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} />
+                  </TableCell>
+                )}
+                {v("tpv_risk") && (
+                  <TableCell>
+                    <InlineEditableCell value={p.tpv_risk} type="select" options={["Low", "Medium", "High"]} onSave={(val) => save(p.id, "tpv_risk", val, p.tpv_risk || "")} displayValue={<RiskBadge level={p.tpv_risk || ""} />} />
+                  </TableCell>
+                )}
+                {v("zamereni") && <TableCell><InlineEditableCell value={p.zamereni} type="date" onSave={(val) => save(p.id, "zamereni", val, p.zamereni || "")} /></TableCell>}
+                {v("datum_tpv") && <TableCell><InlineEditableCell value={p.datum_tpv} type="date" onSave={(val) => save(p.id, "datum_tpv", val, p.datum_tpv || "")} /></TableCell>}
+                <TableCell className="w-10" />
               </TableRow>
             ))}
           </TableBody>

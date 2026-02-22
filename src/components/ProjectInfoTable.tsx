@@ -23,6 +23,21 @@ import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 import { ProjectEditDialog } from "./ProjectEditDialog";
+import { useColumnVisibility } from "@/hooks/useColumnVisibility";
+import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
+
+const PROJECT_INFO_COLUMNS = [
+  { key: "project_id", label: "Project ID", locked: true },
+  { key: "project_name", label: "Project Name", locked: true },
+  { key: "klient", label: "Klient" },
+  { key: "pm", label: "PM" },
+  { key: "konstrukter", label: "Konstruktér" },
+  { key: "status", label: "Status" },
+  { key: "datum_smluvni", label: "Datum Smluvní" },
+  { key: "prodejni_cena", label: "Prodejní cena" },
+  { key: "marze", label: "Marže" },
+  { key: "fakturace", label: "Fakturace" },
+];
 
 const emptyProject = {
   project_id: "",
@@ -56,6 +71,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const [datumWarning, setDatumWarning] = useState(false);
   const qc = useQueryClient();
   const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
+  const { isVisible, toggleColumn, columns } = useColumnVisibility("col-vis-project-info", PROJECT_INFO_COLUMNS);
 
   useEffect(() => {
     const handleOpenAdd = () => setAddOpen(true);
@@ -113,6 +129,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Načítání...</div>;
 
   const sh = { sortCol, sortDir, onSort: toggleSort };
+  const v = isVisible;
 
   return (
     <div>
@@ -120,65 +137,45 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
         <Table className="table-fixed">
           <TableHeader>
             <TableRow className="bg-primary/5">
-              <SortableHeader label="Project ID" column="project_id" {...sh} className="w-[130px] min-w-[130px]" />
-              <SortableHeader label="Project Name" column="project_name" {...sh} className="w-[180px] min-w-[180px]" />
-              <SortableHeader label="Klient" column="klient" {...sh} className="w-[120px] min-w-[120px]" />
-              <SortableHeader label="PM" column="pm" {...sh} className="w-[140px] min-w-[140px]" />
-              <SortableHeader label="Konstruktér" column="konstrukter" {...sh} className="w-[140px] min-w-[140px]" />
-              <SortableHeader label="Status" column="status" {...sh} className="w-[110px] min-w-[110px]" />
-              <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} className="w-[90px] min-w-[90px]" />
-              <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="w-[140px] min-w-[140px] text-right" />
-              <SortableHeader label="Marže" column="marze" {...sh} className="w-[80px] min-w-[80px] text-right" />
-              <SortableHeader label="Fakturace" column="fakturace" {...sh} className="w-[90px] min-w-[90px] text-right" />
+              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} className="w-[130px] min-w-[130px]" />}
+              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} className="w-[180px] min-w-[180px]" />}
+              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} className="w-[120px] min-w-[120px]" />}
+              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} className="w-[140px] min-w-[140px]" />}
+              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} className="w-[140px] min-w-[140px]" />}
+              {v("status") && <SortableHeader label="Status" column="status" {...sh} className="w-[110px] min-w-[110px]" />}
+              {v("datum_smluvni") && <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} className="w-[90px] min-w-[90px]" />}
+              {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="w-[140px] min-w-[140px] text-right" />}
+              {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} className="w-[80px] min-w-[80px] text-right" />}
+              {v("fakturace") && <SortableHeader label="Fakturace" column="fakturace" {...sh} className="w-[90px] min-w-[90px] text-right" />}
+              <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} />
             </TableRow>
           </TableHeader>
           <TableBody>
             {sorted.map((p) => (
               <TableRow key={p.id} className="hover:bg-muted/50 transition-colors">
-                <TableCell
-                  className="font-mono text-xs truncate cursor-pointer hover:underline text-primary"
-                  title={p.project_id}
-                  onClick={() => setEditProject(p)}
-                >
-                  {p.project_id}
-                </TableCell>
-                <TableCell>
-                  <InlineEditableCell value={p.project_name} onSave={(v) => save(p.id, "project_name", v, p.project_name)} className="font-medium" />
-                </TableCell>
-                <TableCell>
-                  <InlineEditableCell value={p.klient} onSave={(v) => save(p.id, "klient", v, p.klient || "")} />
-                </TableCell>
-                <TableCell>
-                  <InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(v) => save(p.id, "pm", v, p.pm || "")} />
-                </TableCell>
-                <TableCell>
-                  <InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(v) => save(p.id, "konstrukter", v, p.konstrukter || "")} />
-                </TableCell>
-                <TableCell>
-                  <InlineEditableCell
-                    value={p.status}
-                    type="select"
-                    options={statusLabels}
-                    onSave={(v) => save(p.id, "status", v, p.status || "")}
-                    displayValue={p.status ? <StatusBadge status={p.status} /> : "—"}
-                  />
-                </TableCell>
-                <TableCell>
-                  <InlineEditableCell value={p.datum_smluvni} type="date" onSave={(v) => save(p.id, "datum_smluvni", v, p.datum_smluvni || "")} />
-                </TableCell>
-                <TableCell className="text-right">
-                  <CurrencyEditCell
-                    value={p.prodejni_cena}
-                    currency={p.currency || "CZK"}
-                    onSave={(amount, currency) => saveCurrency(p.id, amount, currency, String(p.prodejni_cena ?? ""), p.currency || "CZK")}
-                  />
-                </TableCell>
-                <TableCell className="text-right">
-                  <InlineEditableCell value={p.marze} onSave={(v) => save(p.id, "marze", v, p.marze || "")} />
-                </TableCell>
-                <TableCell className="text-right">
-                  <InlineEditableCell value={p.fakturace} onSave={(v) => save(p.id, "fakturace", v, p.fakturace || "")} />
-                </TableCell>
+                {v("project_id") && (
+                  <TableCell className="font-mono text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => setEditProject(p)}>
+                    {p.project_id}
+                  </TableCell>
+                )}
+                {v("project_name") && <TableCell><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" /></TableCell>}
+                {v("klient") && <TableCell><InlineEditableCell value={p.klient} onSave={(val) => save(p.id, "klient", val, p.klient || "")} /></TableCell>}
+                {v("pm") && <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(val) => save(p.id, "pm", val, p.pm || "")} /></TableCell>}
+                {v("konstrukter") && <TableCell><InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(val) => save(p.id, "konstrukter", val, p.konstrukter || "")} /></TableCell>}
+                {v("status") && (
+                  <TableCell>
+                    <InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(val) => save(p.id, "status", val, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} />
+                  </TableCell>
+                )}
+                {v("datum_smluvni") && <TableCell><InlineEditableCell value={p.datum_smluvni} type="date" onSave={(val) => save(p.id, "datum_smluvni", val, p.datum_smluvni || "")} /></TableCell>}
+                {v("prodejni_cena") && (
+                  <TableCell className="text-right">
+                    <CurrencyEditCell value={p.prodejni_cena} currency={p.currency || "CZK"} onSave={(amount, currency) => saveCurrency(p.id, amount, currency, String(p.prodejni_cena ?? ""), p.currency || "CZK")} />
+                  </TableCell>
+                )}
+                {v("marze") && <TableCell className="text-right"><InlineEditableCell value={p.marze} onSave={(val) => save(p.id, "marze", val, p.marze || "")} /></TableCell>}
+                {v("fakturace") && <TableCell className="text-right"><InlineEditableCell value={p.fakturace} onSave={(val) => save(p.id, "fakturace", val, p.fakturace || "")} /></TableCell>}
+                <TableCell className="w-10" />
               </TableRow>
             ))}
           </TableBody>
@@ -189,9 +186,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader><DialogTitle>Nový projekt</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-            {/* Left column */}
             <div><Label>Project ID <span className="text-orange-500">*</span></Label><Input value={newProj.project_id} onChange={(e) => setNewProj(s => ({ ...s, project_id: e.target.value }))} /></div>
-            {/* Right column */}
             <div>
               <Label>Datum Smluvní <span className="text-foreground font-bold">*</span></Label>
               <Popover>
@@ -221,18 +216,18 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
             <div><Label>Project Name <span className="text-orange-500">*</span></Label><Input value={newProj.project_name} onChange={(e) => setNewProj(s => ({ ...s, project_name: e.target.value }))} /></div>
             <div>
               <Label>PM</Label>
-              <PeopleSelectDropdown role="PM" value={newProj.pm} onValueChange={(v) => setNewProj(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
+              <PeopleSelectDropdown role="PM" value={newProj.pm} onValueChange={(val) => setNewProj(s => ({ ...s, pm: val }))} placeholder="Vyberte PM" />
             </div>
 
             <div><Label>Klient</Label><Input value={newProj.klient} onChange={(e) => setNewProj(s => ({ ...s, klient: e.target.value }))} /></div>
             <div>
               <Label>Konstruktér</Label>
-              <PeopleSelectDropdown role="Konstruktér" value={newProj.konstrukter} onValueChange={(v) => setNewProj(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
+              <PeopleSelectDropdown role="Konstruktér" value={newProj.konstrukter} onValueChange={(val) => setNewProj(s => ({ ...s, konstrukter: val }))} placeholder="Vyberte konstruktéra" />
             </div>
 
             <div>
               <Label>Status</Label>
-              <Select value={newProj.status} onValueChange={(v) => setNewProj(s => ({ ...s, status: v }))}>
+              <Select value={newProj.status} onValueChange={(val) => setNewProj(s => ({ ...s, status: val }))}>
                 <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
                 <SelectContent className="z-[99999]">
                   {statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -241,21 +236,14 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
             </div>
             <div>
               <Label>Kalkulant</Label>
-              <PeopleSelectDropdown role="Kalkulant" value={newProj.kalkulant} onValueChange={(v) => setNewProj(s => ({ ...s, kalkulant: v }))} placeholder="Vyberte kalkulanta" />
+              <PeopleSelectDropdown role="Kalkulant" value={newProj.kalkulant} onValueChange={(val) => setNewProj(s => ({ ...s, kalkulant: val }))} placeholder="Vyberte kalkulanta" />
             </div>
 
-            {/* Full width below */}
             <div className="col-span-2">
               <Label>Prodejní cena</Label>
               <div className="flex items-center gap-1">
                 <Input type="number" className="no-spinners" value={newProj.prodejni_cena} onChange={(e) => setNewProj(s => ({ ...s, prodejni_cena: e.target.value }))} />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-10 px-3 font-mono shrink-0"
-                  onClick={() => setNewProj(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
-                >
+                <Button type="button" variant="outline" size="sm" className="h-10 px-3 font-mono shrink-0" onClick={() => setNewProj(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}>
                   {newProj.currency}
                 </Button>
               </div>
@@ -263,13 +251,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
             <div className="col-span-2">
               <Label>Marže</Label>
               <div className="flex items-center gap-1">
-                <Input
-                  type="number"
-                  className="no-spinners"
-                  value={newProj.marze}
-                  onChange={(e) => setNewProj(s => ({ ...s, marze: e.target.value }))}
-                  placeholder="0"
-                />
+                <Input type="number" className="no-spinners" value={newProj.marze} onChange={(e) => setNewProj(s => ({ ...s, marze: e.target.value }))} placeholder="0" />
                 <span className="text-sm text-muted-foreground shrink-0">%</span>
               </div>
             </div>
