@@ -14,7 +14,232 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      project_stages: {
+        Row: {
+          created_at: string
+          end_date: string | null
+          id: string
+          notes: string | null
+          project_id: string
+          stage_name: string
+          stage_order: number | null
+          start_date: string | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          project_id: string
+          stage_name: string
+          stage_order?: number | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          project_id?: string
+          stage_name?: string
+          stage_order?: number | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_stages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["project_id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          architekt: string | null
+          contract_link: string | null
+          created_at: string
+          currency: string | null
+          datum_objednavky: string | null
+          datum_smluvni: string | null
+          datum_tpv: string | null
+          dm: string | null
+          expedice: string | null
+          fakturace: string | null
+          fee_proposal_link: string | null
+          hodiny_tpv: string | null
+          id: string
+          is_active: boolean | null
+          kalkulant: string | null
+          klient: string | null
+          konstrukter: string | null
+          link_cn: string | null
+          location: string | null
+          marze: string | null
+          material: number | null
+          narocnost: string | null
+          percent_tpv: number | null
+          pm: string | null
+          pm_poznamka: string | null
+          predani: string | null
+          prodejni_cena: number | null
+          project_id: string
+          project_name: string
+          risk: string | null
+          smluvni: string | null
+          status: string | null
+          subdodavky: number | null
+          tpv_cost: number | null
+          tpv_date: string | null
+          tpv_poznamka: string | null
+          tpv_risk: string | null
+          updated_at: string
+          velikost_zakazky: string | null
+          vyroba: number | null
+          zamereni: string | null
+        }
+        Insert: {
+          architekt?: string | null
+          contract_link?: string | null
+          created_at?: string
+          currency?: string | null
+          datum_objednavky?: string | null
+          datum_smluvni?: string | null
+          datum_tpv?: string | null
+          dm?: string | null
+          expedice?: string | null
+          fakturace?: string | null
+          fee_proposal_link?: string | null
+          hodiny_tpv?: string | null
+          id?: string
+          is_active?: boolean | null
+          kalkulant?: string | null
+          klient?: string | null
+          konstrukter?: string | null
+          link_cn?: string | null
+          location?: string | null
+          marze?: string | null
+          material?: number | null
+          narocnost?: string | null
+          percent_tpv?: number | null
+          pm?: string | null
+          pm_poznamka?: string | null
+          predani?: string | null
+          prodejni_cena?: number | null
+          project_id: string
+          project_name: string
+          risk?: string | null
+          smluvni?: string | null
+          status?: string | null
+          subdodavky?: number | null
+          tpv_cost?: number | null
+          tpv_date?: string | null
+          tpv_poznamka?: string | null
+          tpv_risk?: string | null
+          updated_at?: string
+          velikost_zakazky?: string | null
+          vyroba?: number | null
+          zamereni?: string | null
+        }
+        Update: {
+          architekt?: string | null
+          contract_link?: string | null
+          created_at?: string
+          currency?: string | null
+          datum_objednavky?: string | null
+          datum_smluvni?: string | null
+          datum_tpv?: string | null
+          dm?: string | null
+          expedice?: string | null
+          fakturace?: string | null
+          fee_proposal_link?: string | null
+          hodiny_tpv?: string | null
+          id?: string
+          is_active?: boolean | null
+          kalkulant?: string | null
+          klient?: string | null
+          konstrukter?: string | null
+          link_cn?: string | null
+          location?: string | null
+          marze?: string | null
+          material?: number | null
+          narocnost?: string | null
+          percent_tpv?: number | null
+          pm?: string | null
+          pm_poznamka?: string | null
+          predani?: string | null
+          prodejni_cena?: number | null
+          project_id?: string
+          project_name?: string
+          risk?: string | null
+          smluvni?: string | null
+          status?: string | null
+          subdodavky?: number | null
+          tpv_cost?: number | null
+          tpv_date?: string | null
+          tpv_poznamka?: string | null
+          tpv_risk?: string | null
+          updated_at?: string
+          velikost_zakazky?: string | null
+          vyroba?: number | null
+          zamereni?: string | null
+        }
+        Relationships: []
+      }
+      tpv_items: {
+        Row: {
+          accepted_date: string | null
+          created_at: string
+          id: string
+          item_name: string
+          item_type: string | null
+          notes: string | null
+          project_id: string
+          sent_date: string | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          accepted_date?: string | null
+          created_at?: string
+          id?: string
+          item_name: string
+          item_type?: string | null
+          notes?: string | null
+          project_id: string
+          sent_date?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          accepted_date?: string | null
+          created_at?: string
+          id?: string
+          item_name?: string
+          item_type?: string | null
+          notes?: string | null
+          project_id?: string
+          sent_date?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tpv_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["project_id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
