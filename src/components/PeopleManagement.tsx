@@ -85,7 +85,7 @@ interface PeopleManagementProps {
 export function PeopleManagement({ open, onOpenChange }: PeopleManagementProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" style={{ zIndex: 9999 }}>
         <DialogHeader>
           <DialogTitle>Správa osob</DialogTitle>
         </DialogHeader>
