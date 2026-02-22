@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import type { Tables } from "@/integrations/supabase/types";
 
-export type TPVItem = Tables<"tpv_items">;
+export type TPVItem = Tables<"tpv_items"> & { konstrukter?: string | null };
 
 export function useTPVItems(projectId: string) {
   return useQuery({
@@ -24,13 +25,34 @@ export function useTPVItems(projectId: string) {
 export function useUpdateTPVItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, field, value }: { id: string; field: string; value: any; projectId: string }) => {
+    mutationFn: async ({ id, field, value, oldValue }: { id: string; field: string; value: any; projectId: string; oldValue?: string }) => {
       const { error } = await supabase.from("tpv_items").update({ [field]: value } as any).eq("id", id);
       if (error) throw error;
+      return { id, field, oldValue };
     },
-    onSuccess: (_, { projectId }) => {
+    onSuccess: (result, { projectId }) => {
       qc.invalidateQueries({ queryKey: ["tpv_items", projectId] });
-      toast({ title: "Uloženo" });
+      const { id, field, oldValue } = result;
+
+      if (oldValue !== undefined) {
+        const { dismiss } = toast({
+          title: "Uloženo",
+          action: (
+            <ToastAction altText="Zpět" onClick={() => {
+              supabase.from("tpv_items").update({ [field]: oldValue } as any).eq("id", id).then(() => {
+                qc.invalidateQueries({ queryKey: ["tpv_items", projectId] });
+                toast({ title: "Vráceno zpět" });
+              });
+              dismiss();
+            }}>
+              Zpět
+            </ToastAction>
+          ),
+        });
+        setTimeout(() => dismiss(), 5000);
+      } else {
+        toast({ title: "Uloženo" });
+      }
     },
     onError: () => {
       toast({ title: "Chyba", variant: "destructive" });
