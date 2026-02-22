@@ -4,9 +4,13 @@ import { PMStatusTable } from "@/components/PMStatusTable";
 import { TPVStatusTable } from "@/components/TPVStatusTable";
 import { DashboardStats } from "@/components/DashboardStats";
 import { TableFilters, useTableFilters } from "@/components/TableFilters";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Settings } from "lucide-react";
+import { usePeopleManagement } from "@/components/PeopleManagementContext";
 
 const Index = () => {
   const filters = useTableFilters();
+  const { openPeopleManagement } = usePeopleManagement();
 
   return (
     <div className="min-h-screen bg-background">
@@ -19,6 +23,19 @@ const Index = () => {
             <span className="text-primary-foreground/40 text-sm">|</span>
             <span className="text-primary-foreground/70 text-sm font-sans">Project Info 2026</span>
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+                <Settings className="h-5 w-5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={openPeopleManagement}>
+                Správa osob
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
