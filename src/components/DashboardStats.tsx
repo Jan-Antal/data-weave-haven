@@ -1,4 +1,4 @@
-import { projectInfoData, pmStatusData } from "@/data/projects";
+import { useProjects } from "@/hooks/useProjects";
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -11,10 +11,12 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
 }
 
 export function DashboardStats() {
-  const totalProjects = projectInfoData.length;
-  const activeProjects = projectInfoData.filter(p => !["Dokončeno", "Fakturace"].includes(p.status)).length;
-  const totalValue = projectInfoData.reduce((sum, p) => sum + (p.currency === "CZK" ? p.prodejniCena : p.prodejniCena * 25), 0);
-  const highRisk = pmStatusData.filter(p => p.riskLevel === "High").length;
+  const { data: projects = [] } = useProjects();
+
+  const totalProjects = projects.length;
+  const activeProjects = projects.filter(p => !["Dokončeno", "Fakturace"].includes(p.status || "")).length;
+  const totalValue = projects.reduce((sum, p) => sum + (p.currency === "EUR" ? (p.prodejni_cena || 0) * 25 : (p.prodejni_cena || 0)), 0);
+  const highRisk = projects.filter(p => p.risk === "High").length;
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

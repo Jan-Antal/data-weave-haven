@@ -1,6 +1,6 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "./StatusBadge";
-import { projectInfoData } from "@/data/projects";
+import { useProjects } from "@/hooks/useProjects";
 
 function formatCurrency(value: number | null, currency: string) {
   if (value === null || value === 0) return "—";
@@ -12,6 +12,10 @@ function formatCurrency(value: number | null, currency: string) {
 }
 
 export function ProjectInfoTable() {
+  const { data: projects = [], isLoading } = useProjects();
+
+  if (isLoading) return <div className="p-8 text-center text-muted-foreground">Načítání...</div>;
+
   return (
     <div className="rounded-lg border bg-card overflow-auto">
       <Table>
@@ -30,16 +34,16 @@ export function ProjectInfoTable() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {projectInfoData.map((p) => (
+          {projects.map((p) => (
             <TableRow key={p.id} className="hover:bg-muted/50 transition-colors">
-              <TableCell className="font-mono text-xs">{p.projectId}</TableCell>
-              <TableCell className="font-medium">{p.projectName}</TableCell>
-              <TableCell>{p.klient}</TableCell>
-              <TableCell>{p.pm}</TableCell>
+              <TableCell className="font-mono text-xs">{p.project_id}</TableCell>
+              <TableCell className="font-medium">{p.project_name}</TableCell>
+              <TableCell>{p.klient || "—"}</TableCell>
+              <TableCell>{p.pm || "—"}</TableCell>
               <TableCell>{p.konstrukter || "—"}</TableCell>
-              <TableCell><StatusBadge status={p.status} /></TableCell>
-              <TableCell>{p.datumSmluvni || "—"}</TableCell>
-              <TableCell className="text-right font-mono text-sm">{formatCurrency(p.prodejniCena, p.currency)}</TableCell>
+              <TableCell>{p.status ? <StatusBadge status={p.status} /> : "—"}</TableCell>
+              <TableCell>{p.datum_smluvni || "—"}</TableCell>
+              <TableCell className="text-right font-mono text-sm">{formatCurrency(p.prodejni_cena, p.currency || "CZK")}</TableCell>
               <TableCell className="text-right">{p.marze || "—"}</TableCell>
               <TableCell className="text-right">{p.fakturace || "—"}</TableCell>
             </TableRow>

@@ -1,8 +1,12 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge, RiskBadge, ProgressBar } from "./StatusBadge";
-import { tpvStatusData } from "@/data/projects";
+import { useProjects } from "@/hooks/useProjects";
 
 export function TPVStatusTable() {
+  const { data: projects = [], isLoading } = useProjects();
+
+  if (isLoading) return <div className="p-8 text-center text-muted-foreground">Načítání...</div>;
+
   return (
     <div className="rounded-lg border bg-card overflow-auto">
       <Table>
@@ -23,20 +27,20 @@ export function TPVStatusTable() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {tpvStatusData.map((p, i) => (
-            <TableRow key={i} className="hover:bg-muted/50 transition-colors">
-              <TableCell className="font-mono text-xs">{p.projectId}</TableCell>
-              <TableCell className="font-medium">{p.projectName}</TableCell>
+          {projects.map((p) => (
+            <TableRow key={p.id} className="hover:bg-muted/50 transition-colors">
+              <TableCell className="font-mono text-xs">{p.project_id}</TableCell>
+              <TableCell className="font-medium">{p.project_name}</TableCell>
               <TableCell>{p.pm || "—"}</TableCell>
-              <TableCell>{p.klient}</TableCell>
+              <TableCell>{p.klient || "—"}</TableCell>
               <TableCell>{p.konstrukter || "—"}</TableCell>
-              <TableCell><RiskBadge level={p.narocnost} /></TableCell>
-              <TableCell>{p.hodinyTPV || "—"}</TableCell>
-              <TableCell><ProgressBar value={p.percentStatus} /></TableCell>
+              <TableCell><RiskBadge level={p.narocnost || ""} /></TableCell>
+              <TableCell>{p.hodiny_tpv || "—"}</TableCell>
+              <TableCell><ProgressBar value={p.percent_tpv || 0} /></TableCell>
               <TableCell>{p.status ? <StatusBadge status={p.status} /> : "—"}</TableCell>
-              <TableCell><RiskBadge level={p.riskLevel} /></TableCell>
-              <TableCell>{p.datumZamereni || "—"}</TableCell>
-              <TableCell>{p.datumTPV || "—"}</TableCell>
+              <TableCell><RiskBadge level={p.tpv_risk || ""} /></TableCell>
+              <TableCell>{p.zamereni || "—"}</TableCell>
+              <TableCell>{p.datum_tpv || "—"}</TableCell>
             </TableRow>
           ))}
         </TableBody>
