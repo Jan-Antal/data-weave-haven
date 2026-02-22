@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { X, ChevronDown } from "lucide-react";
 import { useAllPeople } from "@/hooks/usePeople";
 import { statusOrder } from "@/data/projects";
 import { cn } from "@/lib/utils";
+import { TableSearchBar } from "./TableSearchBar";
 
 interface TableFiltersProps {
   personFilter: string | null;
@@ -25,6 +26,7 @@ export function useTableFilters() {
   const [statusFilter, setStatusFilter] = useState<string[]>(
     statusOrder.filter((s) => !defaultHiddenStatuses.includes(s))
   );
+  const [search, setSearch] = useState("");
 
   const hasActiveFilters = personFilter !== null || statusFilter.length !== statusOrder.length;
 
@@ -38,6 +40,8 @@ export function useTableFilters() {
     setPersonFilter,
     statusFilter,
     setStatusFilter,
+    search,
+    setSearch,
     hasActiveFilters,
     clearFilters,
   };
@@ -189,27 +193,38 @@ function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: 
   );
 }
 
-export function TableFilters({ personFilter, onPersonFilterChange, statusFilter, onStatusFilterChange }: TableFiltersProps) {
+interface FullTableFiltersProps extends TableFiltersProps {
+  search: string;
+  onSearchChange: (value: string) => void;
+  rightSlot?: React.ReactNode;
+}
+
+export function TableFilters({ personFilter, onPersonFilterChange, statusFilter, onStatusFilterChange, search, onSearchChange, rightSlot }: FullTableFiltersProps) {
   const hasActiveFilters = personFilter !== null || statusFilter.length !== statusOrder.length;
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <PersonFilterDropdown value={personFilter} onChange={onPersonFilterChange} />
-      <StatusFilterDropdown value={statusFilter} onChange={onStatusFilterChange} />
-
-      {hasActiveFilters && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 text-xs"
-          onClick={() => {
-            onPersonFilterChange(null);
-            onStatusFilterChange([...statusOrder]);
-          }}
-        >
-          <X className="h-3 w-3 mr-1" /> Zrušit filtry
-        </Button>
-      )}
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2">
+        <PersonFilterDropdown value={personFilter} onChange={onPersonFilterChange} />
+        <StatusFilterDropdown value={statusFilter} onChange={onStatusFilterChange} />
+        {hasActiveFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => {
+              onPersonFilterChange(null);
+              onStatusFilterChange([...statusOrder]);
+            }}
+          >
+            <X className="h-3 w-3 mr-1" /> Zrušit filtry
+          </Button>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <TableSearchBar value={search} onChange={onSearchChange} />
+        {rightSlot}
+      </div>
     </div>
   );
 }

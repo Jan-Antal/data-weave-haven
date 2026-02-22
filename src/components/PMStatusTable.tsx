@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { SortableHeader } from "./SortableHeader";
-import { TableSearchBar } from "./TableSearchBar";
+
 import { useProjects } from "@/hooks/useProjects";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
 import { useSortFilter } from "@/hooks/useSortFilter";
@@ -205,13 +205,14 @@ function ExpandArrow({ projectId, isExpanded }: { projectId: string; isExpanded:
 interface PMStatusTableProps {
   personFilter: string | null;
   statusFilter: string[];
+  search: string;
 }
 
-export function PMStatusTable({ personFilter, statusFilter }: PMStatusTableProps) {
+export function PMStatusTable({ personFilter, statusFilter, search: externalSearch }: PMStatusTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const updateProject = useUpdateProject();
   const qc = useQueryClient();
-  const { sorted, search, setSearch, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter });
+  const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggleExpand = (pid: string) => {
@@ -232,7 +233,6 @@ export function PMStatusTable({ personFilter, statusFilter }: PMStatusTableProps
 
   return (
     <div>
-      <TableSearchBar value={search} onChange={setSearch} />
       <div className="rounded-lg border bg-card overflow-x-scroll always-scrollbar">
         <Table>
           <TableHeader>
