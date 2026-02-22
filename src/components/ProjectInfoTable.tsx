@@ -77,7 +77,10 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
 
   const handleAddProject = async () => {
     if (!newProj.project_id || !newProj.project_name) return;
-    setDatumWarning(!newProj.datum_smluvni);
+    if (!newProj.datum_smluvni && !datumWarning) {
+      setDatumWarning(true);
+      return;
+    }
     const { error } = await supabase.from("projects").insert({
       project_id: newProj.project_id,
       project_name: newProj.project_name,
@@ -263,7 +266,9 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>Zrušit</Button>
-            <Button onClick={handleAddProject} disabled={!newProj.project_id || !newProj.project_name}>Vytvořit</Button>
+            <Button onClick={handleAddProject} disabled={!newProj.project_id || !newProj.project_name}>
+              {datumWarning && !newProj.datum_smluvni ? "Přesto vytvořit" : "Vytvořit"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
