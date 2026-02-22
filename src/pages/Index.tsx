@@ -107,7 +107,6 @@ const Index = () => {
       <ExchangeRateSettings open={exchangeRateOpen} onOpenChange={setExchangeRateOpen} />
       <TPVStatusSettings open={tpvStatusOpen} onOpenChange={setTPVStatusOpen} />
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
-      <TPVStatusSettings open={tpvStatusOpen} onOpenChange={setTPVStatusOpen} />
     </div>
   );
 };
