@@ -34,48 +34,53 @@ function SortableStageRow({ stage, project, onDelete }: { stage: ProjectStage; p
   };
 
   return (
-    <TableRow ref={setNodeRef} style={style} className="bg-muted/30">
+    <TableRow ref={setNodeRef} style={style} className="bg-muted/30 h-9">
       <TableCell className="w-8">
         <div {...attributes} {...listeners} className="cursor-grab">
           <GripVertical className="h-4 w-4 text-muted-foreground" />
         </div>
       </TableCell>
-      {/* Název etapy */}
+      {/* Název etapy - editable text */}
       <TableCell>
         <InlineEditableCell value={stage.stage_name} onSave={(v) => saveStage("stage_name", v)} />
       </TableCell>
       {/* Project Name - inherited, read-only */}
-      <TableCell className="text-muted-foreground">{project.project_name}</TableCell>
+      <TableCell className="text-muted-foreground truncate" title={project.project_name}>{project.project_name}</TableCell>
       {/* Klient - inherited, read-only */}
-      <TableCell className="text-muted-foreground">{project.klient || "—"}</TableCell>
-      {/* PM - editable from people */}
+      <TableCell className="text-muted-foreground truncate" title={project.klient || ""}>{project.klient || "—"}</TableCell>
+      {/* PM - editable people dropdown */}
       <TableCell>
         <InlineEditableCell value={stage.notes} type="people" peopleRole="PM" onSave={(v) => saveStage("notes", v)} />
       </TableCell>
-      {/* Status */}
+      {/* Status - editable select */}
       <TableCell>
         <InlineEditableCell value={stage.status} type="select" options={stageStatuses} onSave={(v) => saveStage("status", v)} />
       </TableCell>
-      {/* Risk */}
+      {/* Risk - editable dropdown */}
       <TableCell>
-        {/* Risk not in stage schema - show parent */}
-        <span className="text-muted-foreground text-xs">{project.risk ? <RiskBadge level={project.risk} /> : "—"}</span>
+        <InlineEditableCell
+          value={project.risk}
+          type="select"
+          options={["Low", "Medium", "High"]}
+          onSave={() => {}}
+          displayValue={project.risk ? <RiskBadge level={project.risk} /> : "—"}
+        />
       </TableCell>
       {/* Smluvní - inherited, read-only */}
-      <TableCell className="text-muted-foreground">{project.datum_smluvni || "—"}</TableCell>
-      {/* Zaměření */}
+      <TableCell className="text-muted-foreground truncate" title={project.datum_smluvni || ""}>{project.datum_smluvni || "—"}</TableCell>
+      {/* Zaměření - editable date */}
       <TableCell>
         <InlineEditableCell value={stage.start_date} type="date" onSave={(v) => saveStage("start_date", v)} />
       </TableCell>
-      {/* TPV */}
+      {/* TPV - editable date */}
       <TableCell>
         <InlineEditableCell value={stage.end_date} type="date" onSave={(v) => saveStage("end_date", v)} />
       </TableCell>
-      {/* Expedice - not in stage schema */}
+      {/* Expedice - editable date (stored in notes for now, or show parent) */}
       <TableCell className="text-muted-foreground">—</TableCell>
-      {/* Předání - not in stage schema */}
+      {/* Předání - editable date */}
       <TableCell className="text-muted-foreground">—</TableCell>
-      {/* Poznámka - we repurpose notes for PM, so leave blank */}
+      {/* Poznámka */}
       <TableCell>—</TableCell>
       {/* Prodejní cena */}
       <TableCell>—</TableCell>
@@ -149,9 +154,9 @@ function StagesSection({ projectId, project }: { projectId: string; project: Pro
           ))}
         </SortableContext>
       </DndContext>
-      <TableRow className="bg-muted/20">
+      <TableRow className="bg-muted/20 h-9">
         <TableCell colSpan={16}>
-          <Button variant="ghost" size="sm" className="text-xs" onClick={handleAddOpen}>
+          <Button variant="ghost" size="sm" className="text-xs h-6" onClick={handleAddOpen}>
             <Plus className="h-3 w-3 mr-1" /> Přidat etapu
           </Button>
         </TableCell>
@@ -228,18 +233,18 @@ export function PMStatusTable({ personFilter, statusFilter }: PMStatusTableProps
           <TableHeader>
             <TableRow className="bg-primary/5">
               <TableHead className="w-8"></TableHead>
-              <SortableHeader label="Project ID" column="project_id" {...sh} className="min-w-[120px]" />
-              <SortableHeader label="Project Name" column="project_name" {...sh} className="min-w-[200px]" />
-              <SortableHeader label="Klient" column="klient" {...sh} className="min-w-[130px]" />
-              <SortableHeader label="PM" column="pm" {...sh} className="min-w-[130px]" />
+              <SortableHeader label="Project ID" column="project_id" {...sh} className="min-w-[130px]" />
+              <SortableHeader label="Project Name" column="project_name" {...sh} className="min-w-[180px]" />
+              <SortableHeader label="Klient" column="klient" {...sh} className="min-w-[120px]" />
+              <SortableHeader label="PM" column="pm" {...sh} className="min-w-[140px]" />
               <SortableHeader label="Status" column="status" {...sh} className="min-w-[110px]" />
               <SortableHeader label="Risk" column="risk" {...sh} className="min-w-[80px]" />
-              <SortableHeader label="Smluvní" column="datum_smluvni" {...sh} className="min-w-[100px]" />
-              <SortableHeader label="Zaměření" column="zamereni" {...sh} className="min-w-[100px]" />
-              <SortableHeader label="TPV" column="tpv_date" {...sh} className="min-w-[100px]" />
-              <SortableHeader label="Expedice" column="expedice" {...sh} className="min-w-[100px]" />
-              <SortableHeader label="Předání" column="predani" {...sh} className="min-w-[100px]" />
-              <SortableHeader label="Poznámka" column="pm_poznamka" {...sh} className="min-w-[200px]" />
+              <SortableHeader label="Smluvní" column="datum_smluvni" {...sh} className="min-w-[90px]" />
+              <SortableHeader label="Zaměření" column="zamereni" {...sh} className="min-w-[90px]" />
+              <SortableHeader label="TPV" column="tpv_date" {...sh} className="min-w-[90px]" />
+              <SortableHeader label="Expedice" column="expedice" {...sh} className="min-w-[90px]" />
+              <SortableHeader label="Předání" column="predani" {...sh} className="min-w-[90px]" />
+              <SortableHeader label="Poznámka" column="pm_poznamka" {...sh} className="min-w-[180px]" />
               <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="min-w-[120px] text-right" />
               <SortableHeader label="Marže" column="marze" {...sh} className="min-w-[70px] text-right" />
             </TableRow>
@@ -247,11 +252,11 @@ export function PMStatusTable({ personFilter, statusFilter }: PMStatusTableProps
           <TableBody>
             {sorted.map((p) => (
               <Fragment key={p.id}>
-                <TableRow className="hover:bg-muted/50 transition-colors">
+                <TableRow className="hover:bg-muted/50 transition-colors h-9">
                   <TableCell className="w-8 cursor-pointer" onClick={() => toggleExpand(p.project_id)}>
                     <ExpandArrow projectId={p.project_id} isExpanded={expanded.has(p.project_id)} />
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{p.project_id}</TableCell>
+                  <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>
                   <TableCell><InlineEditableCell value={p.project_name} onSave={(v) => save(p.id, "project_name", v, p.project_name)} className="font-medium" /></TableCell>
                   <TableCell><InlineEditableCell value={p.klient} onSave={(v) => save(p.id, "klient", v, p.klient || "")} /></TableCell>
                   <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(v) => save(p.id, "pm", v, p.pm || "")} /></TableCell>
@@ -266,7 +271,7 @@ export function PMStatusTable({ personFilter, statusFilter }: PMStatusTableProps
                   <TableCell><InlineEditableCell value={p.tpv_date} type="date" onSave={(v) => save(p.id, "tpv_date", v, p.tpv_date || "")} /></TableCell>
                   <TableCell><InlineEditableCell value={p.expedice} type="date" onSave={(v) => save(p.id, "expedice", v, p.expedice || "")} /></TableCell>
                   <TableCell><InlineEditableCell value={p.predani} type="date" onSave={(v) => save(p.id, "predani", v, p.predani || "")} /></TableCell>
-                  <TableCell><InlineEditableCell value={p.pm_poznamka} onSave={(v) => save(p.id, "pm_poznamka", v, p.pm_poznamka || "")} /></TableCell>
+                  <TableCell><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(v) => save(p.id, "pm_poznamka", v, p.pm_poznamka || "")} /></TableCell>
                   <TableCell className="text-right">
                     <InlineEditableCell value={p.prodejni_cena} type="number" onSave={(v) => save(p.id, "prodejni_cena", v, String(p.prodejni_cena ?? ""))} displayValue={<span className="font-mono text-sm">{p.prodejni_cena ? new Intl.NumberFormat("cs-CZ").format(p.prodejni_cena) : "—"}</span>} />
                   </TableCell>

@@ -43,27 +43,27 @@ export function TPVStatusTable({ personFilter, statusFilter }: TPVStatusTablePro
           <TableHeader>
             <TableRow className="bg-primary/5">
               <TableHead className="w-8"></TableHead>
-              <SortableHeader label="Project ID" column="project_id" {...sh} className="min-w-[120px]" />
-              <SortableHeader label="Project Name" column="project_name" {...sh} className="min-w-[200px]" />
-              <SortableHeader label="PM" column="pm" {...sh} className="min-w-[130px]" />
-              <SortableHeader label="Klient" column="klient" {...sh} className="min-w-[130px]" />
-              <SortableHeader label="Konstruktér" column="konstrukter" {...sh} className="min-w-[150px]" />
+              <SortableHeader label="Project ID" column="project_id" {...sh} className="min-w-[130px]" />
+              <SortableHeader label="Project Name" column="project_name" {...sh} className="min-w-[180px]" />
+              <SortableHeader label="PM" column="pm" {...sh} className="min-w-[140px]" />
+              <SortableHeader label="Klient" column="klient" {...sh} className="min-w-[120px]" />
+              <SortableHeader label="Konstruktér" column="konstrukter" {...sh} className="min-w-[140px]" />
               <SortableHeader label="Náročnost" column="narocnost" {...sh} className="min-w-[90px]" />
               <SortableHeader label="Hodiny TPV" column="hodiny_tpv" {...sh} className="min-w-[90px]" />
               <SortableHeader label="% Status" column="percent_tpv" {...sh} className="min-w-[120px]" />
               <SortableHeader label="Status" column="status" {...sh} className="min-w-[110px]" />
               <SortableHeader label="Risk" column="tpv_risk" {...sh} className="min-w-[80px]" />
-              <SortableHeader label="Zaměření" column="zamereni" {...sh} className="min-w-[100px]" />
-              <SortableHeader label="Datum TPV" column="datum_tpv" {...sh} className="min-w-[100px]" />
+              <SortableHeader label="Zaměření" column="zamereni" {...sh} className="min-w-[90px]" />
+              <SortableHeader label="Datum TPV" column="datum_tpv" {...sh} className="min-w-[90px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {sorted.map((p) => (
-              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors">
+              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors h-9">
                 <TableCell className="w-8 cursor-pointer" onClick={() => setOpenProject({ project_id: p.project_id, project_name: p.project_name })}>
                   <ChevronRight className="h-4 w-4" />
                 </TableCell>
-                <TableCell className="font-mono text-xs">{p.project_id}</TableCell>
+                <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>
                 <TableCell><InlineEditableCell value={p.project_name} onSave={(v) => save(p.id, "project_name", v, p.project_name)} className="font-medium" /></TableCell>
                 <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(v) => save(p.id, "pm", v, p.pm || "")} /></TableCell>
                 <TableCell><InlineEditableCell value={p.klient} onSave={(v) => save(p.id, "klient", v, p.klient || "")} /></TableCell>

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useTPVItems, useUpdateTPVItem, useAddTPVItem, useDeleteTPVItems, useBulkUpdateTPVStatus, useBulkInsertTPVItems } from "@/hooks/useTPVItems";
+import { useProjects } from "@/hooks/useProjects";
 import { ArrowLeft, Plus, Upload, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -22,6 +23,8 @@ interface Props {
 
 export function TPVItemsView({ projectId, projectName, onBack }: Props) {
   const { data: items = [], isLoading } = useTPVItems(projectId);
+  const { data: projects = [] } = useProjects();
+  const parentProject = projects.find(p => p.project_id === projectId);
   const updateItem = useUpdateTPVItem();
   const addItem = useAddTPVItem();
   const deleteItems = useDeleteTPVItems();
@@ -145,27 +148,37 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
               <TableHead className="w-10"><Checkbox checked={items.length > 0 && selected.size === items.length} onCheckedChange={toggleAll} /></TableHead>
               <TableHead className="font-semibold min-w-[200px]">Název</TableHead>
               <TableHead className="font-semibold min-w-[120px]">Typ</TableHead>
+              <TableHead className="font-semibold min-w-[140px]">Konstruktér</TableHead>
               <TableHead className="font-semibold min-w-[160px]">Status</TableHead>
-              <TableHead className="font-semibold min-w-[110px]">Odesláno</TableHead>
-              <TableHead className="font-semibold min-w-[110px]">Přijato</TableHead>
+              <TableHead className="font-semibold min-w-[90px]">Odesláno</TableHead>
+              <TableHead className="font-semibold min-w-[90px]">Přijato</TableHead>
               <TableHead className="font-semibold min-w-[200px]">Poznámka</TableHead>
               <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Načítání...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Načítání...</TableCell></TableRow>
             ) : items.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Žádné položky</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Žádné položky</TableCell></TableRow>
             ) : items.map(item => (
-              <TableRow key={item.id} className={`hover:bg-muted/50 transition-colors ${selected.has(item.id) ? "bg-primary/5" : ""}`}>
+              <TableRow key={item.id} className={`hover:bg-muted/50 transition-colors h-9 ${selected.has(item.id) ? "bg-primary/5" : ""}`}>
                 <TableCell><Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} /></TableCell>
                 <TableCell><InlineEditableCell value={item.item_name} onSave={(v) => updateItem.mutate({ id: item.id, field: "item_name", value: v, projectId })} className="font-medium" /></TableCell>
                 <TableCell><InlineEditableCell value={item.item_type} onSave={(v) => updateItem.mutate({ id: item.id, field: "item_type", value: v, projectId })} /></TableCell>
+                <TableCell>
+                  <InlineEditableCell
+                    value={parentProject?.konstrukter || ""}
+                    type="people"
+                    peopleRole="Konstruktér"
+                    onSave={() => {}}
+                    displayValue={<span className="text-xs truncate">{parentProject?.konstrukter || "—"}</span>}
+                  />
+                </TableCell>
                 <TableCell><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} onSave={(v) => updateItem.mutate({ id: item.id, field: "status", value: v, projectId })} /></TableCell>
                 <TableCell><InlineEditableCell value={item.sent_date} onSave={(v) => updateItem.mutate({ id: item.id, field: "sent_date", value: v, projectId })} /></TableCell>
                 <TableCell><InlineEditableCell value={item.accepted_date} onSave={(v) => updateItem.mutate({ id: item.id, field: "accepted_date", value: v, projectId })} /></TableCell>
-                <TableCell><InlineEditableCell value={item.notes} onSave={(v) => updateItem.mutate({ id: item.id, field: "notes", value: v, projectId })} /></TableCell>
+                <TableCell><InlineEditableCell value={item.notes} type="textarea" onSave={(v) => updateItem.mutate({ id: item.id, field: "notes", value: v, projectId })} /></TableCell>
                 <TableCell>
                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDeleteIds([item.id])}>
                     <Trash2 className="h-3 w-3 text-destructive" />

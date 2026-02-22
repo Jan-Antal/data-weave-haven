@@ -17,6 +17,9 @@ interface TableFiltersProps {
 
 const defaultHiddenStatuses = ["Dokončeno", "Fakturace"];
 
+// "Bez statusu" is a virtual filter option
+const BEZ_STATUSU = "__bez_statusu__";
+
 export function useTableFilters() {
   const [personFilter, setPersonFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string[]>(
@@ -107,9 +110,11 @@ function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: 
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const filtered = statusOrder.filter((s) =>
-    s.toLowerCase().includes(search.toLowerCase())
-  );
+  const allOptions = [...statusOrder, BEZ_STATUSU];
+  const filtered = allOptions.filter((s) => {
+    const label = s === BEZ_STATUSU ? "Bez statusu" : s;
+    return label.toLowerCase().includes(search.toLowerCase());
+  });
 
   useEffect(() => {
     if (open) {
@@ -126,7 +131,7 @@ function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: 
     }
   };
 
-  const allSelected = value.length === statusOrder.length;
+  const allSelected = value.length === allOptions.length;
   const label = allSelected ? "Všechny statusy" : `Status (${value.length})`;
 
   return (
@@ -157,7 +162,7 @@ function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: 
                 onCheckedChange={() => toggle(status)}
                 className="h-3.5 w-3.5"
               />
-              <span>{status}</span>
+              <span>{status === BEZ_STATUSU ? "Bez statusu" : status}</span>
             </div>
           ))}
         </div>
@@ -166,7 +171,7 @@ function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: 
             variant="ghost"
             size="sm"
             className="h-6 text-xs flex-1"
-            onClick={() => onChange([...statusOrder])}
+            onClick={() => onChange([...allOptions])}
           >
             Vybrat vše
           </Button>
@@ -208,3 +213,5 @@ export function TableFilters({ personFilter, onPersonFilterChange, statusFilter,
     </div>
   );
 }
+
+export { BEZ_STATUSU };

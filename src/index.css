@@ -114,6 +114,26 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  /* Sticky scrollbar at bottom of viewport */
+  .sticky-scrollbar {
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+  .sticky-scrollbar::-webkit-scrollbar {
+    height: 10px;
+    position: sticky;
+    bottom: 0;
+  }
+  .sticky-scrollbar::-webkit-scrollbar-track {
+    @apply bg-muted rounded-full;
+  }
+  .sticky-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+  }
+  .sticky-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+
   /* Hide number input spinners */
   input[type="number"].no-spinners::-webkit-inner-spin-button,
   input[type="number"].no-spinners::-webkit-outer-spin-button {

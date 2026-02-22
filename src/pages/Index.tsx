@@ -13,8 +13,8 @@ const Index = () => {
   const { openPeopleManagement } = usePeopleManagement();
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-primary px-6 py-4">
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="border-b bg-primary px-6 py-4 sticky top-0 z-50">
         <div className="max-w-[1600px] mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-serif text-primary-foreground tracking-wide">
@@ -39,15 +39,19 @@ const Index = () => {
         </div>
       </header>
 
-      <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6">
-        <DashboardStats />
+      <div className="sticky top-[65px] z-40 bg-background border-b px-6 py-3">
+        <div className="max-w-[1600px] mx-auto">
+          <TableFilters
+            personFilter={filters.personFilter}
+            onPersonFilterChange={filters.setPersonFilter}
+            statusFilter={filters.statusFilter}
+            onStatusFilterChange={filters.setStatusFilter}
+          />
+        </div>
+      </div>
 
-        <TableFilters
-          personFilter={filters.personFilter}
-          onPersonFilterChange={filters.setPersonFilter}
-          statusFilter={filters.statusFilter}
-          onStatusFilterChange={filters.setStatusFilter}
-        />
+      <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6 flex-1">
+        <DashboardStats />
 
         <Tabs defaultValue="project-info" className="space-y-4">
           <TabsList className="bg-card border">
