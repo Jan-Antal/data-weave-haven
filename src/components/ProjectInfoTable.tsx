@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "./StatusBadge";
 import { InlineEditableCell } from "./InlineEditableCell";
+import { CurrencyEditCell } from "./CurrencyEditCell";
 import { SortableHeader } from "./SortableHeader";
 import { TableSearchBar } from "./TableSearchBar";
 import { useProjects } from "@/hooks/useProjects";
@@ -16,15 +17,6 @@ import { Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
-
-function formatCurrency(value: number | null, currency: string) {
-  if (value === null || value === 0) return "—";
-  return new Intl.NumberFormat(currency === "EUR" ? "de-DE" : "cs-CZ", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 const emptyProject = {
   project_id: "",
@@ -54,6 +46,18 @@ export function ProjectInfoTable({ personFilter, statusFilter }: ProjectInfoTabl
 
   const save = (id: string, field: string, value: string, oldValue: string) => {
     updateProject.mutate({ id, field, value, oldValue });
+  };
+
+  const saveCurrency = (id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => {
+    const parsedAmount = amount === "" ? null : Number(amount);
+    supabase.from("projects").update({ prodejni_cena: parsedAmount, currency } as any).eq("id", id).then(({ error }) => {
+      if (error) {
+        toast({ title: "Chyba", description: error.message, variant: "destructive" });
+      } else {
+        qc.invalidateQueries({ queryKey: ["projects"] });
+        toast({ title: "Uloženo" });
+      }
+    });
   };
 
   const handleAddProject = async () => {
@@ -103,7 +107,7 @@ export function ProjectInfoTable({ personFilter, statusFilter }: ProjectInfoTabl
               <SortableHeader label="Konstruktér" column="konstrukter" {...sh} className="w-[140px] min-w-[140px]" />
               <SortableHeader label="Status" column="status" {...sh} className="w-[110px] min-w-[110px]" />
               <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} className="w-[90px] min-w-[90px]" />
-              <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="w-[120px] min-w-[120px] text-right" />
+              <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="w-[140px] min-w-[140px] text-right" />
               <SortableHeader label="Marže" column="marze" {...sh} className="w-[80px] min-w-[80px] text-right" />
               <SortableHeader label="Fakturace" column="fakturace" {...sh} className="w-[90px] min-w-[90px] text-right" />
             </TableRow>
@@ -137,11 +141,10 @@ export function ProjectInfoTable({ personFilter, statusFilter }: ProjectInfoTabl
                   <InlineEditableCell value={p.datum_smluvni} type="date" onSave={(v) => save(p.id, "datum_smluvni", v, p.datum_smluvni || "")} />
                 </TableCell>
                 <TableCell className="text-right">
-                  <InlineEditableCell
+                  <CurrencyEditCell
                     value={p.prodejni_cena}
-                    type="number"
-                    onSave={(v) => save(p.id, "prodejni_cena", v, String(p.prodejni_cena ?? ""))}
-                    displayValue={<span className="font-mono text-sm">{formatCurrency(p.prodejni_cena, p.currency || "CZK")}</span>}
+                    currency={p.currency || "CZK"}
+                    onSave={(amount, currency) => saveCurrency(p.id, amount, currency, String(p.prodejni_cena ?? ""), p.currency || "CZK")}
                   />
                 </TableCell>
                 <TableCell className="text-right">

@@ -2,6 +2,10 @@ import { useState, Fragment } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge, RiskBadge } from "./StatusBadge";
 import { InlineEditableCell } from "./InlineEditableCell";
+import { CurrencyEditCell } from "./CurrencyEditCell";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 import { SortableHeader } from "./SortableHeader";
 import { TableSearchBar } from "./TableSearchBar";
 import { useProjects } from "@/hooks/useProjects";
@@ -206,6 +210,7 @@ interface PMStatusTableProps {
 export function PMStatusTable({ personFilter, statusFilter }: PMStatusTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const updateProject = useUpdateProject();
+  const qc = useQueryClient();
   const { sorted, search, setSearch, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter });
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -273,7 +278,17 @@ export function PMStatusTable({ personFilter, statusFilter }: PMStatusTableProps
                   <TableCell><InlineEditableCell value={p.predani} type="date" onSave={(v) => save(p.id, "predani", v, p.predani || "")} /></TableCell>
                   <TableCell><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(v) => save(p.id, "pm_poznamka", v, p.pm_poznamka || "")} /></TableCell>
                   <TableCell className="text-right">
-                    <InlineEditableCell value={p.prodejni_cena} type="number" onSave={(v) => save(p.id, "prodejni_cena", v, String(p.prodejni_cena ?? ""))} displayValue={<span className="font-mono text-sm">{p.prodejni_cena ? new Intl.NumberFormat("cs-CZ").format(p.prodejni_cena) : "—"}</span>} />
+                    <CurrencyEditCell
+                      value={p.prodejni_cena}
+                      currency={p.currency || "CZK"}
+                      onSave={(amount, currency) => {
+                        const parsedAmount = amount === "" ? null : Number(amount);
+                        supabase.from("projects").update({ prodejni_cena: parsedAmount, currency } as any).eq("id", p.id).then(({ error }) => {
+                          if (error) toast({ title: "Chyba", description: error.message, variant: "destructive" });
+                          else { qc.invalidateQueries({ queryKey: ["projects"] }); toast({ title: "Uloženo" }); }
+                        });
+                      }}
+                    />
                   </TableCell>
                   <TableCell className="text-right"><InlineEditableCell value={p.marze} onSave={(v) => save(p.id, "marze", v, p.marze || "")} /></TableCell>
                 </TableRow>
