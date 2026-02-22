@@ -112,6 +112,30 @@ export type Database = {
           },
         ]
       }
+      project_status_options: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           architekt: string | null
@@ -302,18 +326,21 @@ export type Database = {
       }
       tpv_status_options: {
         Row: {
+          color: string
           created_at: string
           id: string
           label: string
           sort_order: number
         }
         Insert: {
+          color?: string
           created_at?: string
           id?: string
           label: string
           sort_order?: number
         }
         Update: {
+          color?: string
           created_at?: string
           id?: string
           label?: string
