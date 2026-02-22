@@ -31,6 +31,12 @@ export function PeopleSelect({ role, value, onValueChange, open, onOpenChange }:
     if (open) setSearch("");
   }, [open]);
 
+  const handleOpenMgmt = () => {
+    // Close popover first, then open management dialog after a tick
+    onOpenChange?.(false);
+    setTimeout(() => setMgmtOpen(true), 100);
+  };
+
   return (
     <>
       <Popover open={open} onOpenChange={onOpenChange}>
@@ -72,10 +78,7 @@ export function PeopleSelect({ role, value, onValueChange, open, onOpenChange }:
           </div>
           <div
             className="px-2 py-1.5 text-xs rounded cursor-pointer hover:bg-accent hover:text-accent-foreground font-medium flex items-center gap-1 border-t mt-1 pt-1"
-            onClick={() => {
-              onOpenChange?.(false);
-              setMgmtOpen(true);
-            }}
+            onClick={handleOpenMgmt}
           >
             <Plus className="h-3 w-3" /> Přidat osobu
           </div>
