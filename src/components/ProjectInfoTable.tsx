@@ -31,7 +31,7 @@ const emptyProject = {
   pm: "",
   konstrukter: "",
   kalkulant: "",
-  status: "",
+  status: "Příprava",
   datum_smluvni: "",
   prodejni_cena: "",
   currency: "CZK",

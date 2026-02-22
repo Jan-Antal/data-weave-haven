@@ -16,10 +16,7 @@ interface TableFiltersProps {
   onStatusFilterChange: (values: string[]) => void;
 }
 
-const defaultHiddenStatuses = ["Dokončeno", "Fakturace"];
-
-// "Bez statusu" is a virtual filter option
-const BEZ_STATUSU = "__bez_statusu__";
+const defaultHiddenStatuses = ["Dokončeno"];
 
 export function useTableFilters() {
   const [personFilter, setPersonFilter] = useState<string | null>(null);
@@ -114,11 +111,10 @@ function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: 
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const allOptions = [...statusOrder, BEZ_STATUSU];
-  const filtered = allOptions.filter((s) => {
-    const label = s === BEZ_STATUSU ? "Bez statusu" : s;
-    return label.toLowerCase().includes(search.toLowerCase());
-  });
+  const allOptions = [...statusOrder];
+  const filtered = allOptions.filter((s) =>
+    s.toLowerCase().includes(search.toLowerCase())
+  );
 
   useEffect(() => {
     if (open) {
@@ -135,7 +131,7 @@ function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: 
     }
   };
 
-  const allSelected = value.length === allOptions.length;
+  const allSelected = value.length === statusOrder.length;
   const label = allSelected ? "Všechny statusy" : `Status (${value.length})`;
 
   return (
@@ -166,7 +162,7 @@ function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: 
                 onCheckedChange={() => toggle(status)}
                 className="h-3.5 w-3.5"
               />
-              <span>{status === BEZ_STATUSU ? "Bez statusu" : status}</span>
+              <span>{status}</span>
             </div>
           ))}
         </div>
@@ -229,4 +225,4 @@ export function TableFilters({ personFilter, onPersonFilterChange, statusFilter,
   );
 }
 
-export { BEZ_STATUSU };
+
