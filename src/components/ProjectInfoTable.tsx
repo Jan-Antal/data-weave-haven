@@ -96,22 +96,22 @@ export function ProjectInfoTable({ personFilter, statusFilter }: ProjectInfoTabl
         <Table className="table-fixed">
           <TableHeader>
             <TableRow className="bg-primary/5">
-              <SortableHeader label="Project ID" column="project_id" {...sh} className="w-[120px]" />
-              <SortableHeader label="Project Name" column="project_name" {...sh} className="w-[200px]" />
-              <SortableHeader label="Klient" column="klient" {...sh} className="w-[130px]" />
-              <SortableHeader label="PM" column="pm" {...sh} className="w-[130px]" />
-              <SortableHeader label="Konstruktér" column="konstrukter" {...sh} className="w-[130px]" />
-              <SortableHeader label="Status" column="status" {...sh} className="w-[110px]" />
-              <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} className="w-[110px]" />
-              <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="w-[120px] text-right" />
-              <SortableHeader label="Marže" column="marze" {...sh} className="w-[80px] text-right" />
-              <SortableHeader label="Fakturace" column="fakturace" {...sh} className="w-[90px] text-right" />
+              <SortableHeader label="Project ID" column="project_id" {...sh} className="w-[130px] min-w-[130px]" />
+              <SortableHeader label="Project Name" column="project_name" {...sh} className="w-[180px] min-w-[180px]" />
+              <SortableHeader label="Klient" column="klient" {...sh} className="w-[120px] min-w-[120px]" />
+              <SortableHeader label="PM" column="pm" {...sh} className="w-[140px] min-w-[140px]" />
+              <SortableHeader label="Konstruktér" column="konstrukter" {...sh} className="w-[140px] min-w-[140px]" />
+              <SortableHeader label="Status" column="status" {...sh} className="w-[110px] min-w-[110px]" />
+              <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} className="w-[90px] min-w-[90px]" />
+              <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="w-[120px] min-w-[120px] text-right" />
+              <SortableHeader label="Marže" column="marze" {...sh} className="w-[80px] min-w-[80px] text-right" />
+              <SortableHeader label="Fakturace" column="fakturace" {...sh} className="w-[90px] min-w-[90px] text-right" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {sorted.map((p) => (
               <TableRow key={p.id} className="hover:bg-muted/50 transition-colors">
-                <TableCell className="font-mono text-xs">{p.project_id}</TableCell>
+                <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>
                 <TableCell>
                   <InlineEditableCell value={p.project_name} onSave={(v) => save(p.id, "project_name", v, p.project_name)} className="font-medium" />
                 </TableCell>

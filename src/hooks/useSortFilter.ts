@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 
 type SortDir = "asc" | "desc" | null;
 
+const BEZ_STATUSU = "__bez_statusu__";
+
 interface ExternalFilters {
   personFilter?: string | null;
   statusFilter?: string[];
@@ -38,11 +40,14 @@ export function useSortFilter<T extends Record<string, any>>(data: T[], external
     // Status filter
     if (externalFilters?.statusFilter && externalFilters.statusFilter.length > 0) {
       const allowed = externalFilters.statusFilter;
+      const showNoStatus = allowed.includes(BEZ_STATUSU);
       result = result.filter(row => {
         const status = row.status;
-        if (!status) return true; // show rows without status
+        if (!status) return showNoStatus;
         return allowed.includes(status);
       });
+    } else if (externalFilters?.statusFilter && externalFilters.statusFilter.length === 0) {
+      result = [];
     }
 
     // Text search
