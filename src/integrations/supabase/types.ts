@@ -65,6 +65,7 @@ export type Database = {
       project_stages: {
         Row: {
           created_at: string
+          deleted_at: string | null
           end_date: string | null
           id: string
           notes: string | null
@@ -77,6 +78,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
           end_date?: string | null
           id?: string
           notes?: string | null
@@ -89,6 +91,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
           end_date?: string | null
           id?: string
           notes?: string | null
@@ -118,6 +121,7 @@ export type Database = {
           datum_objednavky: string | null
           datum_smluvni: string | null
           datum_tpv: string | null
+          deleted_at: string | null
           dm: string | null
           expedice: string | null
           fakturace: string | null
@@ -161,6 +165,7 @@ export type Database = {
           datum_objednavky?: string | null
           datum_smluvni?: string | null
           datum_tpv?: string | null
+          deleted_at?: string | null
           dm?: string | null
           expedice?: string | null
           fakturace?: string | null
@@ -204,6 +209,7 @@ export type Database = {
           datum_objednavky?: string | null
           datum_smluvni?: string | null
           datum_tpv?: string | null
+          deleted_at?: string | null
           dm?: string | null
           expedice?: string | null
           fakturace?: string | null
@@ -245,6 +251,7 @@ export type Database = {
         Row: {
           accepted_date: string | null
           created_at: string
+          deleted_at: string | null
           id: string
           item_name: string
           item_type: string | null
@@ -258,6 +265,7 @@ export type Database = {
         Insert: {
           accepted_date?: string | null
           created_at?: string
+          deleted_at?: string | null
           id?: string
           item_name: string
           item_type?: string | null
@@ -271,6 +279,7 @@ export type Database = {
         Update: {
           accepted_date?: string | null
           created_at?: string
+          deleted_at?: string | null
           id?: string
           item_name?: string
           item_type?: string | null
@@ -317,7 +326,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      purge_soft_deleted_records: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

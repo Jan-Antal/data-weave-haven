@@ -10,6 +10,7 @@ import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useState } from "react";
 import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
 import { TPVStatusSettings } from "@/components/TPVStatusSettings";
+import { RecycleBin } from "@/components/RecycleBin";
 import { Button } from "@/components/ui/button";
 
 const Index = () => {
@@ -17,6 +18,7 @@ const Index = () => {
   const { openPeopleManagement } = usePeopleManagement();
   const [exchangeRateOpen, setExchangeRateOpen] = useState(false);
   const [tpvStatusOpen, setTPVStatusOpen] = useState(false);
+  const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("project-info");
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -44,6 +46,9 @@ const Index = () => {
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTPVStatusOpen(true)}>
                 Správa TPV statusů
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setRecycleBinOpen(true)}>
+                Koš
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </DropdownMenuContent>
@@ -100,6 +105,8 @@ const Index = () => {
       </main>
 
       <ExchangeRateSettings open={exchangeRateOpen} onOpenChange={setExchangeRateOpen} />
+      <TPVStatusSettings open={tpvStatusOpen} onOpenChange={setTPVStatusOpen} />
+      <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
       <TPVStatusSettings open={tpvStatusOpen} onOpenChange={setTPVStatusOpen} />
     </div>
   );

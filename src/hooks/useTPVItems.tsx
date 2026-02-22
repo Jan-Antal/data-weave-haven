@@ -14,6 +14,7 @@ export function useTPVItems(projectId: string) {
         .from("tpv_items")
         .select("*")
         .eq("project_id", projectId)
+        .is("deleted_at", null)
         .order("created_at");
       if (error) throw error;
       return data as TPVItem[];
@@ -81,7 +82,7 @@ export function useDeleteTPVItems() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ ids, projectId }: { ids: string[]; projectId: string }) => {
-      const { error } = await supabase.from("tpv_items").delete().in("id", ids);
+      const { error } = await supabase.from("tpv_items").update({ deleted_at: new Date().toISOString() } as any).in("id", ids);
       if (error) throw error;
       return projectId;
     },
