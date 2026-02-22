@@ -1,11 +1,10 @@
-import { useState } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { useState, useRef, useEffect } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { usePeople, useAddPerson } from "@/hooks/usePeople";
-import { Plus } from "lucide-react";
+import { usePeople } from "@/hooks/usePeople";
+import { PeopleManagement } from "./PeopleManagement";
+import { Plus, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface PeopleSelectProps {
   role: "PM" | "Konstruktér" | "Kalkulant";
@@ -17,61 +16,73 @@ interface PeopleSelectProps {
 
 export function PeopleSelect({ role, value, onValueChange, open, onOpenChange }: PeopleSelectProps) {
   const { data: people = [] } = usePeople(role);
-  const addPerson = useAddPerson();
-  const [addOpen, setAddOpen] = useState(false);
-  const [newName, setNewName] = useState("");
+  const [search, setSearch] = useState("");
+  const [mgmtOpen, setMgmtOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleAdd = () => {
-    if (!newName.trim()) return;
-    addPerson.mutate({ name: newName.trim(), role }, {
-      onSuccess: (data) => {
-        setAddOpen(false);
-        setNewName("");
-        onValueChange(data.name);
-      },
-    });
-  };
+  const filtered = people.filter((p) =>
+    p.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  useEffect(() => {
+    if (open && inputRef.current) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+    if (open) setSearch("");
+  }, [open]);
 
   return (
     <>
-      <Select
-        value={value}
-        onValueChange={(v) => {
-          if (v === "__add__") {
-            setAddOpen(true);
-            return;
-          }
-          onValueChange(v);
-        }}
-        open={open}
-        onOpenChange={onOpenChange}
-      >
-        <SelectTrigger className="h-7 text-xs w-full">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {people.map((p) => (
-            <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
-          ))}
-          <SelectItem value="__add__" className="text-accent font-medium">
-            <span className="flex items-center gap-1"><Plus className="h-3 w-3" /> Přidat osobu</span>
-          </SelectItem>
-        </SelectContent>
-      </Select>
-
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Nová osoba ({role})</DialogTitle></DialogHeader>
-          <div>
-            <Label>Jméno</Label>
-            <Input value={newName} onChange={(e) => setNewName(e.target.value)} autoFocus onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }} />
+      <Popover open={open} onOpenChange={onOpenChange}>
+        <PopoverTrigger asChild>
+          <div className={cn(
+            "h-7 flex items-center justify-between text-xs px-2 border rounded cursor-pointer bg-background",
+            "hover:bg-muted/50"
+          )}>
+            <span className="truncate">{value || "—"}</span>
+            <ChevronDown className="h-3 w-3 ml-1 flex-shrink-0 text-muted-foreground" />
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Zrušit</Button>
-            <Button onClick={handleAdd} disabled={!newName.trim()}>Přidat</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </PopoverTrigger>
+        <PopoverContent className="w-[200px] p-1" align="start">
+          <Input
+            ref={inputRef}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Hledat..."
+            className="h-7 text-xs mb-1"
+          />
+          <div className="max-h-[200px] overflow-y-auto">
+            {filtered.map((p) => (
+              <div
+                key={p.id}
+                className={cn(
+                  "px-2 py-1.5 text-xs rounded cursor-pointer hover:bg-accent hover:text-accent-foreground",
+                  p.name === value && "bg-accent text-accent-foreground"
+                )}
+                onClick={() => {
+                  onValueChange(p.name);
+                }}
+              >
+                {p.name}
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <div className="px-2 py-1.5 text-xs text-muted-foreground">Nenalezeno</div>
+            )}
+          </div>
+          <div
+            className="px-2 py-1.5 text-xs rounded cursor-pointer hover:bg-accent hover:text-accent-foreground font-medium flex items-center gap-1 border-t mt-1 pt-1"
+            onClick={() => {
+              onOpenChange?.(false);
+              setMgmtOpen(true);
+            }}
+          >
+            <Plus className="h-3 w-3" /> Přidat osobu
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <PeopleManagement open={mgmtOpen} onOpenChange={setMgmtOpen} />
     </>
   );
 }
