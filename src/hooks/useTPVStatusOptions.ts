@@ -5,6 +5,7 @@ import { toast } from "@/hooks/use-toast";
 export interface TPVStatusOption {
   id: string;
   label: string;
+  color: string;
   sort_order: number;
   created_at: string;
 }

@@ -9,7 +9,7 @@ import { Settings, Plus } from "lucide-react";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useState } from "react";
 import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
-import { TPVStatusSettings } from "@/components/TPVStatusSettings";
+import { StatusManagement } from "@/components/StatusManagement";
 import { RecycleBin } from "@/components/RecycleBin";
 import { Button } from "@/components/ui/button";
 
@@ -17,7 +17,7 @@ const Index = () => {
   const filters = useTableFilters();
   const { openPeopleManagement } = usePeopleManagement();
   const [exchangeRateOpen, setExchangeRateOpen] = useState(false);
-  const [tpvStatusOpen, setTPVStatusOpen] = useState(false);
+  const [statusMgmtOpen, setStatusMgmtOpen] = useState(false);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("project-info");
   return (
@@ -44,8 +44,8 @@ const Index = () => {
               <DropdownMenuItem onClick={() => setExchangeRateOpen(true)}>
                 Kurzovní lístek
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTPVStatusOpen(true)}>
-                Správa TPV statusů
+              <DropdownMenuItem onClick={() => setStatusMgmtOpen(true)}>
+                Správa statusů
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setRecycleBinOpen(true)}>
                 Koš
@@ -105,7 +105,7 @@ const Index = () => {
       </main>
 
       <ExchangeRateSettings open={exchangeRateOpen} onOpenChange={setExchangeRateOpen} />
-      <TPVStatusSettings open={tpvStatusOpen} onOpenChange={setTPVStatusOpen} />
+      <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
     </div>
   );

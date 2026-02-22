@@ -7,7 +7,7 @@ import { SortableHeader } from "./SortableHeader";
 import { useProjects } from "@/hooks/useProjects";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
 import { useSortFilter } from "@/hooks/useSortFilter";
-import { statusOrder } from "@/data/projects";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,8 @@ interface ProjectInfoTableProps {
 
 export function ProjectInfoTable({ personFilter, statusFilter, search: externalSearch }: ProjectInfoTableProps) {
   const { data: projects = [], isLoading } = useProjects();
+  const { data: statusOptions = [] } = useProjectStatusOptions();
+  const statusLabels = statusOptions.map((s) => s.label);
   const updateProject = useUpdateProject();
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [addOpen, setAddOpen] = useState(false);
@@ -156,7 +158,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                   <InlineEditableCell
                     value={p.status}
                     type="select"
-                    options={statusOrder}
+                    options={statusLabels}
                     onSave={(v) => save(p.id, "status", v, p.status || "")}
                     displayValue={p.status ? <StatusBadge status={p.status} /> : "—"}
                   />
@@ -233,7 +235,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
               <Select value={newProj.status} onValueChange={(v) => setNewProj(s => ({ ...s, status: v }))}>
                 <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
                 <SelectContent className="z-[99999]">
-                  {statusOrder.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

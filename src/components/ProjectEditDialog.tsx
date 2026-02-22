@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
-import { statusOrder } from "@/data/projects";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 
 interface Project {
@@ -38,6 +38,8 @@ interface ProjectEditDialogProps {
 
 export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDialogProps) {
   const qc = useQueryClient();
+  const { data: statusOptions = [] } = useProjectStatusOptions();
+  const statusLabels = statusOptions.map((s) => s.label);
   const [form, setForm] = useState({
     project_name: "",
     klient: "",
@@ -159,7 +161,7 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
             <Select value={form.status} onValueChange={(v) => setForm(s => ({ ...s, status: v }))}>
               <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
               <SelectContent className="z-[99999]">
-                {statusOrder.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

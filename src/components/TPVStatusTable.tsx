@@ -6,7 +6,7 @@ import { SortableHeader } from "./SortableHeader";
 import { useProjects } from "@/hooks/useProjects";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
 import { useSortFilter } from "@/hooks/useSortFilter";
-import { statusOrder } from "@/data/projects";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { ChevronRight } from "lucide-react";
 import { TPVItemsView } from "./TPVItemsView";
 import { TableHeader, TableHead } from "@/components/ui/table";
@@ -19,6 +19,8 @@ interface TPVStatusTableProps {
 
 export function TPVStatusTable({ personFilter, statusFilter, search: externalSearch }: TPVStatusTableProps) {
   const { data: projects = [], isLoading } = useProjects();
+  const { data: statusOptions = [] } = useProjectStatusOptions();
+  const statusLabels = statusOptions.map((s) => s.label);
   const updateProject = useUpdateProject();
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [openProject, setOpenProject] = useState<{ project_id: string; project_name: string } | null>(null);
@@ -75,7 +77,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                   <InlineEditableCell value={p.percent_tpv} type="number" onSave={(v) => save(p.id, "percent_tpv", v, String(p.percent_tpv ?? ""))} displayValue={<ProgressBar value={p.percent_tpv || 0} />} />
                 </TableCell>
                 <TableCell>
-                  <InlineEditableCell value={p.status} type="select" options={statusOrder} onSave={(v) => save(p.id, "status", v, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} />
+                  <InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(v) => save(p.id, "status", v, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} />
                 </TableCell>
                 <TableCell>
                   <InlineEditableCell value={p.tpv_risk} type="select" options={["Low", "Medium", "High"]} onSave={(v) => save(p.id, "tpv_risk", v, p.tpv_risk || "")} displayValue={<RiskBadge level={p.tpv_risk || ""} />} />

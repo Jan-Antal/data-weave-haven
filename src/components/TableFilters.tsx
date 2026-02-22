@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { X, ChevronDown } from "lucide-react";
 import { useAllPeople } from "@/hooks/usePeople";
-import { statusOrder } from "@/data/projects";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { cn } from "@/lib/utils";
 import { TableSearchBar } from "./TableSearchBar";
 
@@ -19,17 +19,27 @@ interface TableFiltersProps {
 const defaultHiddenStatuses = ["Dokončeno"];
 
 export function useTableFilters() {
+  const { data: statusOptions = [] } = useProjectStatusOptions();
   const [personFilter, setPersonFilter] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string[]>(
-    statusOrder.filter((s) => !defaultHiddenStatuses.includes(s))
-  );
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [search, setSearch] = useState("");
+  const [initialized, setInitialized] = useState(false);
 
-  const hasActiveFilters = personFilter !== null || statusFilter.length !== statusOrder.length;
+  // Initialize status filter once options are loaded
+  useEffect(() => {
+    if (statusOptions.length > 0 && !initialized) {
+      const allLabels = statusOptions.map((s) => s.label);
+      setStatusFilter(allLabels.filter((s) => !defaultHiddenStatuses.includes(s)));
+      setInitialized(true);
+    }
+  }, [statusOptions, initialized]);
+
+  const allLabels = statusOptions.map((s) => s.label);
+  const hasActiveFilters = personFilter !== null || (initialized && statusFilter.length !== allLabels.length);
 
   const clearFilters = () => {
     setPersonFilter(null);
-    setStatusFilter([...statusOrder]);
+    setStatusFilter([...allLabels]);
   };
 
   return {
@@ -107,12 +117,13 @@ function PersonFilterDropdown({ value, onChange }: { value: string | null; onCha
 }
 
 function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const { data: statusOptions = [] } = useProjectStatusOptions();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const allOptions = [...statusOrder];
-  const filtered = allOptions.filter((s) =>
+  const allLabels = statusOptions.map((s) => s.label);
+  const filtered = allLabels.filter((s) =>
     s.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -131,7 +142,7 @@ function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: 
     }
   };
 
-  const allSelected = value.length === statusOrder.length;
+  const allSelected = value.length === allLabels.length;
   const label = allSelected ? "Všechny statusy" : `Status (${value.length})`;
 
   return (
@@ -171,7 +182,7 @@ function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: 
             variant="ghost"
             size="sm"
             className="h-6 text-xs flex-1"
-            onClick={() => onChange([...allOptions])}
+            onClick={() => onChange([...allLabels])}
           >
             Vybrat vše
           </Button>
@@ -196,7 +207,9 @@ interface FullTableFiltersProps extends TableFiltersProps {
 }
 
 export function TableFilters({ personFilter, onPersonFilterChange, statusFilter, onStatusFilterChange, search, onSearchChange, rightSlot }: FullTableFiltersProps) {
-  const hasActiveFilters = personFilter !== null || statusFilter.length !== statusOrder.length;
+  const { data: statusOptions = [] } = useProjectStatusOptions();
+  const allLabels = statusOptions.map((s) => s.label);
+  const hasActiveFilters = personFilter !== null || statusFilter.length !== allLabels.length;
 
   return (
     <div className="flex items-center justify-between gap-2">
@@ -210,7 +223,7 @@ export function TableFilters({ personFilter, onPersonFilterChange, statusFilter,
             className="h-7 text-xs"
             onClick={() => {
               onPersonFilterChange(null);
-              onStatusFilterChange([...statusOrder]);
+              onStatusFilterChange([...allLabels]);
             }}
           >
             <X className="h-3 w-3 mr-1" /> Zrušit filtry
@@ -224,5 +237,3 @@ export function TableFilters({ personFilter, onPersonFilterChange, statusFilter,
     </div>
   );
 }
-
-
