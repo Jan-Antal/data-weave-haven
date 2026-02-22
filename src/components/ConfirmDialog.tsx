@@ -20,7 +20,7 @@ interface ConfirmDialogProps {
 export function ConfirmDialog({ open, onConfirm, onCancel, title = "Opravdu smazat?", description = "Tato akce je nevratná." }: ConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
-      <AlertDialogContent>
+      <AlertDialogContent className="z-[99999]">
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
