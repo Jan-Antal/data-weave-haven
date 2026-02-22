@@ -1,8 +1,12 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge, RiskBadge } from "./StatusBadge";
-import { pmStatusData } from "@/data/projects";
+import { useProjects } from "@/hooks/useProjects";
 
 export function PMStatusTable() {
+  const { data: projects = [], isLoading } = useProjects();
+
+  if (isLoading) return <div className="p-8 text-center text-muted-foreground">Načítání...</div>;
+
   return (
     <div className="rounded-lg border bg-card overflow-auto">
       <Table>
@@ -25,22 +29,22 @@ export function PMStatusTable() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {pmStatusData.map((p, i) => (
-            <TableRow key={i} className="hover:bg-muted/50 transition-colors">
-              <TableCell className="font-mono text-xs">{p.projectId}</TableCell>
-              <TableCell className="font-medium">{p.projectName}</TableCell>
-              <TableCell>{p.klient}</TableCell>
-              <TableCell>{p.pm}</TableCell>
-              <TableCell><StatusBadge status={p.status} /></TableCell>
-              <TableCell><RiskBadge level={p.riskLevel} /></TableCell>
-              <TableCell>{p.datumSmluvni || "—"}</TableCell>
-              <TableCell>{p.datumZamereni || "—"}</TableCell>
-              <TableCell>{p.datumTPV || "—"}</TableCell>
-              <TableCell>{p.datumExpedice || "—"}</TableCell>
-              <TableCell>{p.datumPredani || "—"}</TableCell>
-              <TableCell className="text-xs max-w-[200px] truncate" title={p.poznamka}>{p.poznamka || "—"}</TableCell>
+          {projects.map((p) => (
+            <TableRow key={p.id} className="hover:bg-muted/50 transition-colors">
+              <TableCell className="font-mono text-xs">{p.project_id}</TableCell>
+              <TableCell className="font-medium">{p.project_name}</TableCell>
+              <TableCell>{p.klient || "—"}</TableCell>
+              <TableCell>{p.pm || "—"}</TableCell>
+              <TableCell>{p.status ? <StatusBadge status={p.status} /> : "—"}</TableCell>
+              <TableCell><RiskBadge level={p.risk || ""} /></TableCell>
+              <TableCell>{p.datum_smluvni || "—"}</TableCell>
+              <TableCell>{p.zamereni || "—"}</TableCell>
+              <TableCell>{p.tpv_date || "—"}</TableCell>
+              <TableCell>{p.expedice || "—"}</TableCell>
+              <TableCell>{p.predani || "—"}</TableCell>
+              <TableCell className="text-xs max-w-[200px] truncate" title={p.pm_poznamka || ""}>{p.pm_poznamka || "—"}</TableCell>
               <TableCell className="text-right font-mono text-sm">
-                {p.prodejniCena ? new Intl.NumberFormat("cs-CZ").format(p.prodejniCena) : "—"}
+                {p.prodejni_cena ? new Intl.NumberFormat("cs-CZ").format(p.prodejni_cena) : "—"}
               </TableCell>
               <TableCell className="text-right">{p.marze || "—"}</TableCell>
             </TableRow>
