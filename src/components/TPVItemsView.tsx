@@ -9,11 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useTPVItems, useUpdateTPVItem, useAddTPVItem, useDeleteTPVItems, useBulkUpdateTPVStatus, useBulkInsertTPVItems } from "@/hooks/useTPVItems";
-import { useProjects } from "@/hooks/useProjects";
+import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
 import { ArrowLeft, Plus, Upload, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
-
-const TPV_STATUSES = ["V přípravě", "Odesláno klientovi", "1. připomínky", "2. kolo", "Přijato"];
 
 interface Props {
   projectId: string;
@@ -23,8 +21,9 @@ interface Props {
 
 export function TPVItemsView({ projectId, projectName, onBack }: Props) {
   const { data: items = [], isLoading } = useTPVItems(projectId);
-  const { data: projects = [] } = useProjects();
-  const parentProject = projects.find(p => p.project_id === projectId);
+  const { data: statusOptions = [] } = useTPVStatusOptions();
+  const TPV_STATUSES = statusOptions.map(o => o.label);
+  
   const updateItem = useUpdateTPVItem();
   const addItem = useAddTPVItem();
   const deleteItems = useDeleteTPVItems();
@@ -104,6 +103,10 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
     setBulkStatusValue("");
   };
 
+  const saveField = (itemId: string, field: string, value: string, oldValue: string) => {
+    updateItem.mutate({ id: itemId, field, value, projectId, oldValue });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
@@ -164,21 +167,20 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
             ) : items.map(item => (
               <TableRow key={item.id} className={`hover:bg-muted/50 transition-colors h-9 ${selected.has(item.id) ? "bg-primary/5" : ""}`}>
                 <TableCell><Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} /></TableCell>
-                <TableCell><InlineEditableCell value={item.item_name} onSave={(v) => updateItem.mutate({ id: item.id, field: "item_name", value: v, projectId })} className="font-medium" /></TableCell>
-                <TableCell><InlineEditableCell value={item.item_type} onSave={(v) => updateItem.mutate({ id: item.id, field: "item_type", value: v, projectId })} /></TableCell>
+                <TableCell><InlineEditableCell value={item.item_name} onSave={(v) => saveField(item.id, "item_name", v, item.item_name)} className="font-medium" /></TableCell>
+                <TableCell><InlineEditableCell value={item.item_type} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} /></TableCell>
                 <TableCell>
                   <InlineEditableCell
-                    value={parentProject?.konstrukter || ""}
+                    value={item.konstrukter || ""}
                     type="people"
                     peopleRole="Konstruktér"
-                    onSave={() => {}}
-                    displayValue={<span className="text-xs truncate">{parentProject?.konstrukter || "—"}</span>}
+                    onSave={(v) => saveField(item.id, "konstrukter", v, item.konstrukter || "")}
                   />
                 </TableCell>
-                <TableCell><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} onSave={(v) => updateItem.mutate({ id: item.id, field: "status", value: v, projectId })} /></TableCell>
-                <TableCell><InlineEditableCell value={item.sent_date} onSave={(v) => updateItem.mutate({ id: item.id, field: "sent_date", value: v, projectId })} /></TableCell>
-                <TableCell><InlineEditableCell value={item.accepted_date} onSave={(v) => updateItem.mutate({ id: item.id, field: "accepted_date", value: v, projectId })} /></TableCell>
-                <TableCell><InlineEditableCell value={item.notes} type="textarea" onSave={(v) => updateItem.mutate({ id: item.id, field: "notes", value: v, projectId })} /></TableCell>
+                <TableCell><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} onSave={(v) => saveField(item.id, "status", v, item.status || "")} /></TableCell>
+                <TableCell><InlineEditableCell value={item.sent_date} onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} /></TableCell>
+                <TableCell><InlineEditableCell value={item.accepted_date} onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} /></TableCell>
+                <TableCell><InlineEditableCell value={item.notes} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} /></TableCell>
                 <TableCell>
                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDeleteIds([item.id])}>
                     <Trash2 className="h-3 w-3 text-destructive" />

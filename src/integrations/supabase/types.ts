@@ -248,6 +248,7 @@ export type Database = {
           id: string
           item_name: string
           item_type: string | null
+          konstrukter: string | null
           notes: string | null
           project_id: string
           sent_date: string | null
@@ -260,6 +261,7 @@ export type Database = {
           id?: string
           item_name: string
           item_type?: string | null
+          konstrukter?: string | null
           notes?: string | null
           project_id: string
           sent_date?: string | null
@@ -272,6 +274,7 @@ export type Database = {
           id?: string
           item_name?: string
           item_type?: string | null
+          konstrukter?: string | null
           notes?: string | null
           project_id?: string
           sent_date?: string | null
@@ -287,6 +290,27 @@ export type Database = {
             referencedColumns: ["project_id"]
           },
         ]
+      }
+      tpv_status_options: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
       }
     }
     Views: {
