@@ -21,7 +21,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, parse } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { usePeople } from "@/hooks/usePeople";
+import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 
 const emptyProject = {
   project_id: "",
@@ -51,9 +51,6 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const [addOpen, setAddOpen] = useState(false);
   const [newProj, setNewProj] = useState({ ...emptyProject });
   const [datumWarning, setDatumWarning] = useState(false);
-  const { data: pmPeople = [] } = usePeople("PM");
-  const { data: konstrukterPeople = [] } = usePeople("Konstruktér");
-  const { data: kalkulantPeople = [] } = usePeople("Kalkulant");
   const qc = useQueryClient();
 
   useEffect(() => {
@@ -211,23 +208,13 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
             <div><Label>Project Name *</Label><Input value={newProj.project_name} onChange={(e) => setNewProj(s => ({ ...s, project_name: e.target.value }))} /></div>
             <div>
               <Label>PM</Label>
-              <Select value={newProj.pm} onValueChange={(v) => setNewProj(s => ({ ...s, pm: v }))}>
-                <SelectTrigger><SelectValue placeholder="Vyberte PM" /></SelectTrigger>
-                <SelectContent className="z-[99999]">
-                  {pmPeople.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <PeopleSelectDropdown role="PM" value={newProj.pm} onValueChange={(v) => setNewProj(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
             </div>
 
             <div><Label>Klient</Label><Input value={newProj.klient} onChange={(e) => setNewProj(s => ({ ...s, klient: e.target.value }))} /></div>
             <div>
               <Label>Konstruktér</Label>
-              <Select value={newProj.konstrukter} onValueChange={(v) => setNewProj(s => ({ ...s, konstrukter: v }))}>
-                <SelectTrigger><SelectValue placeholder="Vyberte konstruktéra" /></SelectTrigger>
-                <SelectContent className="z-[99999]">
-                  {konstrukterPeople.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <PeopleSelectDropdown role="Konstruktér" value={newProj.konstrukter} onValueChange={(v) => setNewProj(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
             </div>
 
             <div>
@@ -241,12 +228,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
             </div>
             <div>
               <Label>Kalkulant</Label>
-              <Select value={newProj.kalkulant} onValueChange={(v) => setNewProj(s => ({ ...s, kalkulant: v }))}>
-                <SelectTrigger><SelectValue placeholder="Vyberte kalkulanta" /></SelectTrigger>
-                <SelectContent className="z-[99999]">
-                  {kalkulantPeople.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <PeopleSelectDropdown role="Kalkulant" value={newProj.kalkulant} onValueChange={(v) => setNewProj(s => ({ ...s, kalkulant: v }))} placeholder="Vyberte kalkulanta" />
             </div>
 
             {/* Full width below */}
