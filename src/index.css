@@ -95,6 +95,34 @@
     @apply bg-background text-foreground font-sans;
   }
 
+  /* Always show scrollbar for Mac users */
+  .always-scrollbar::-webkit-scrollbar {
+    height: 10px;
+  }
+  .always-scrollbar::-webkit-scrollbar-track {
+    @apply bg-muted rounded-full;
+  }
+  .always-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+  }
+  .always-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+  .always-scrollbar {
+    overflow-x: auto !important;
+    scrollbar-width: thin;
+  }
+
+  /* Hide number input spinners */
+  input[type="number"].no-spinners::-webkit-inner-spin-button,
+  input[type="number"].no-spinners::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"].no-spinners {
+    -moz-appearance: textfield;
+  }
+
   h1, h2, h3, h4, h5, h6 {
     @apply font-serif;
   }

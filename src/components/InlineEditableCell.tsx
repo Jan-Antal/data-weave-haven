@@ -1,11 +1,16 @@
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon } from "lucide-react";
+import { format, parse, isValid } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface InlineEditableCellProps {
   value: string | number | null;
   onSave: (value: string) => void;
-  type?: "text" | "number" | "select";
+  type?: "text" | "number" | "select" | "date";
   options?: string[];
   className?: string;
   displayValue?: React.ReactNode;
@@ -79,6 +84,44 @@ export function InlineEditableCell({
       );
     }
 
+    if (type === "date") {
+      const dateStr = String(value ?? "");
+      let selected: Date | undefined;
+      // Try parsing common date formats
+      for (const fmt of ["yyyy-MM-dd", "d.M.yyyy", "dd.MM.yyyy", "d/M/yyyy"]) {
+        try {
+          const d = parse(dateStr, fmt, new Date());
+          if (isValid(d)) { selected = d; break; }
+        } catch { /* skip */ }
+      }
+
+      return (
+        <Popover open={true} onOpenChange={(open) => { if (!open) setEditing(false); }}>
+          <PopoverTrigger asChild>
+            <div className="h-7 flex items-center text-xs px-1 border rounded cursor-pointer">
+              <CalendarIcon className="h-3 w-3 mr-1 text-muted-foreground" />
+              {selected ? format(selected, "d.M.yyyy") : dateStr || "—"}
+            </div>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={selected}
+              onSelect={(d) => {
+                if (d) {
+                  const formatted = format(d, "d.M.yyyy");
+                  setEditing(false);
+                  const original = String(value ?? "");
+                  if (formatted !== original) onSave(formatted);
+                }
+              }}
+              className={cn("p-3 pointer-events-auto")}
+            />
+          </PopoverContent>
+        </Popover>
+      );
+    }
+
     return (
       <Input
         ref={inputRef}
@@ -87,7 +130,7 @@ export function InlineEditableCell({
         onKeyDown={handleKeyDown}
         onBlur={handleSave}
         type={type === "number" ? "number" : "text"}
-        className="h-7 text-xs px-1 py-0"
+        className={cn("h-7 text-xs px-1 py-0", type === "number" && "no-spinners")}
       />
     );
   }
