@@ -176,48 +176,12 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
       </div>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader><DialogTitle>Nový projekt</DialogTitle></DialogHeader>
-          <div className="grid gap-3 max-h-[60vh] overflow-y-auto pr-1">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            {/* Left column */}
             <div><Label>Project ID *</Label><Input value={newProj.project_id} onChange={(e) => setNewProj(s => ({ ...s, project_id: e.target.value }))} /></div>
-            <div><Label>Project Name *</Label><Input value={newProj.project_name} onChange={(e) => setNewProj(s => ({ ...s, project_name: e.target.value }))} /></div>
-            <div><Label>Klient</Label><Input value={newProj.klient} onChange={(e) => setNewProj(s => ({ ...s, klient: e.target.value }))} /></div>
-            <div>
-              <Label>PM</Label>
-              <Select value={newProj.pm} onValueChange={(v) => setNewProj(s => ({ ...s, pm: v }))}>
-                <SelectTrigger><SelectValue placeholder="Vyberte PM" /></SelectTrigger>
-                <SelectContent>
-                  {pmPeople.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Konstruktér</Label>
-              <Select value={newProj.konstrukter} onValueChange={(v) => setNewProj(s => ({ ...s, konstrukter: v }))}>
-                <SelectTrigger><SelectValue placeholder="Vyberte konstruktéra" /></SelectTrigger>
-                <SelectContent>
-                  {konstrukterPeople.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Kalkulant</Label>
-              <Select value={newProj.kalkulant} onValueChange={(v) => setNewProj(s => ({ ...s, kalkulant: v }))}>
-                <SelectTrigger><SelectValue placeholder="Vyberte kalkulanta" /></SelectTrigger>
-                <SelectContent>
-                  {kalkulantPeople.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Status</Label>
-              <Select value={newProj.status} onValueChange={(v) => setNewProj(s => ({ ...s, status: v }))}>
-                <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
-                <SelectContent>
-                  {statusOrder.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Right column */}
             <div>
               <Label>Datum Smluvní <span className="text-destructive">*</span></Label>
               <Popover>
@@ -227,7 +191,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                     {newProj.datum_smluvni || "Vyberte datum"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-[10000]" align="start">
+                <PopoverContent className="w-auto p-0 z-[99999]" align="start">
                   <Calendar
                     mode="single"
                     selected={newProj.datum_smluvni ? parse(newProj.datum_smluvni, "d.M.yyyy", new Date()) : undefined}
@@ -243,7 +207,50 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
               </Popover>
               {datumWarning && <p className="text-xs text-destructive mt-1">Datum smluvní je povinné</p>}
             </div>
+
+            <div><Label>Project Name *</Label><Input value={newProj.project_name} onChange={(e) => setNewProj(s => ({ ...s, project_name: e.target.value }))} /></div>
             <div>
+              <Label>PM</Label>
+              <Select value={newProj.pm} onValueChange={(v) => setNewProj(s => ({ ...s, pm: v }))}>
+                <SelectTrigger><SelectValue placeholder="Vyberte PM" /></SelectTrigger>
+                <SelectContent className="z-[99999]">
+                  {pmPeople.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div><Label>Klient</Label><Input value={newProj.klient} onChange={(e) => setNewProj(s => ({ ...s, klient: e.target.value }))} /></div>
+            <div>
+              <Label>Konstruktér</Label>
+              <Select value={newProj.konstrukter} onValueChange={(v) => setNewProj(s => ({ ...s, konstrukter: v }))}>
+                <SelectTrigger><SelectValue placeholder="Vyberte konstruktéra" /></SelectTrigger>
+                <SelectContent className="z-[99999]">
+                  {konstrukterPeople.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Status</Label>
+              <Select value={newProj.status} onValueChange={(v) => setNewProj(s => ({ ...s, status: v }))}>
+                <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
+                <SelectContent className="z-[99999]">
+                  {statusOrder.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Kalkulant</Label>
+              <Select value={newProj.kalkulant} onValueChange={(v) => setNewProj(s => ({ ...s, kalkulant: v }))}>
+                <SelectTrigger><SelectValue placeholder="Vyberte kalkulanta" /></SelectTrigger>
+                <SelectContent className="z-[99999]">
+                  {kalkulantPeople.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Full width below */}
+            <div className="col-span-2">
               <Label>Prodejní cena</Label>
               <div className="flex items-center gap-1">
                 <Input type="number" className="no-spinners" value={newProj.prodejni_cena} onChange={(e) => setNewProj(s => ({ ...s, prodejni_cena: e.target.value }))} />
@@ -258,8 +265,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                 </Button>
               </div>
             </div>
-            <div><Label>Marže</Label><Input value={newProj.marze} onChange={(e) => setNewProj(s => ({ ...s, marze: e.target.value }))} /></div>
-            <div><Label>Fakturace</Label><Input value={newProj.fakturace} onChange={(e) => setNewProj(s => ({ ...s, fakturace: e.target.value }))} /></div>
+            <div className="col-span-2"><Label>Marže</Label><Input value={newProj.marze} onChange={(e) => setNewProj(s => ({ ...s, marze: e.target.value }))} /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>Zrušit</Button>
