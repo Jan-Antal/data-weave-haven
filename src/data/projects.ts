@@ -8,7 +8,8 @@ export type ProjectStatus =
   | "Montáž" 
   | "Fakturace" 
   | "Dokončeno"
-  | "Reklamace";
+  | "Reklamace"
+  | "Archiv";
 
 export type RiskLevel = "Low" | "Medium" | "High";
 
@@ -22,4 +23,5 @@ export const statusOrder: ProjectStatus[] = [
   "Fakturace",
   "Dokončeno",
   "Reklamace",
+  "Archiv",
 ];

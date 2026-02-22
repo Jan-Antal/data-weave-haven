@@ -15,6 +15,13 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format, parse } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { usePeople } from "@/hooks/usePeople";
 
 const emptyProject = {
   project_id: "",
@@ -22,9 +29,11 @@ const emptyProject = {
   klient: "",
   pm: "",
   konstrukter: "",
+  kalkulant: "",
   status: "",
   datum_smluvni: "",
   prodejni_cena: "",
+  currency: "CZK",
   marze: "",
   fakturace: "",
 };
@@ -41,6 +50,10 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [addOpen, setAddOpen] = useState(false);
   const [newProj, setNewProj] = useState({ ...emptyProject });
+  const [datumWarning, setDatumWarning] = useState(false);
+  const { data: pmPeople = [] } = usePeople("PM");
+  const { data: konstrukterPeople = [] } = usePeople("Konstruktér");
+  const { data: kalkulantPeople = [] } = usePeople("Kalkulant");
   const qc = useQueryClient();
 
   useEffect(() => {
@@ -67,15 +80,18 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
 
   const handleAddProject = async () => {
     if (!newProj.project_id || !newProj.project_name) return;
+    setDatumWarning(!newProj.datum_smluvni);
     const { error } = await supabase.from("projects").insert({
       project_id: newProj.project_id,
       project_name: newProj.project_name,
       klient: newProj.klient || null,
       pm: newProj.pm || null,
       konstrukter: newProj.konstrukter || null,
+      kalkulant: newProj.kalkulant || null,
       status: newProj.status || null,
       datum_smluvni: newProj.datum_smluvni || null,
       prodejni_cena: newProj.prodejni_cena ? Number(newProj.prodejni_cena) : null,
+      currency: newProj.currency || "CZK",
       marze: newProj.marze || null,
       fakturace: newProj.fakturace || null,
     });
@@ -86,6 +102,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
       qc.invalidateQueries({ queryKey: ["projects"] });
       setAddOpen(false);
       setNewProj({ ...emptyProject });
+      setDatumWarning(false);
     }
   };
 
@@ -161,15 +178,86 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Nový projekt</DialogTitle></DialogHeader>
-          <div className="grid gap-3">
+          <div className="grid gap-3 max-h-[60vh] overflow-y-auto pr-1">
             <div><Label>Project ID *</Label><Input value={newProj.project_id} onChange={(e) => setNewProj(s => ({ ...s, project_id: e.target.value }))} /></div>
             <div><Label>Project Name *</Label><Input value={newProj.project_name} onChange={(e) => setNewProj(s => ({ ...s, project_name: e.target.value }))} /></div>
             <div><Label>Klient</Label><Input value={newProj.klient} onChange={(e) => setNewProj(s => ({ ...s, klient: e.target.value }))} /></div>
-            <div><Label>PM</Label><Input value={newProj.pm} onChange={(e) => setNewProj(s => ({ ...s, pm: e.target.value }))} /></div>
-            <div><Label>Konstruktér</Label><Input value={newProj.konstrukter} onChange={(e) => setNewProj(s => ({ ...s, konstrukter: e.target.value }))} /></div>
-            <div><Label>Status</Label><Input value={newProj.status} onChange={(e) => setNewProj(s => ({ ...s, status: e.target.value }))} /></div>
-            <div><Label>Datum Smluvní</Label><Input value={newProj.datum_smluvni} onChange={(e) => setNewProj(s => ({ ...s, datum_smluvni: e.target.value }))} /></div>
-            <div><Label>Prodejní cena</Label><Input type="number" className="no-spinners" value={newProj.prodejni_cena} onChange={(e) => setNewProj(s => ({ ...s, prodejni_cena: e.target.value }))} /></div>
+            <div>
+              <Label>PM</Label>
+              <Select value={newProj.pm} onValueChange={(v) => setNewProj(s => ({ ...s, pm: v }))}>
+                <SelectTrigger><SelectValue placeholder="Vyberte PM" /></SelectTrigger>
+                <SelectContent>
+                  {pmPeople.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Konstruktér</Label>
+              <Select value={newProj.konstrukter} onValueChange={(v) => setNewProj(s => ({ ...s, konstrukter: v }))}>
+                <SelectTrigger><SelectValue placeholder="Vyberte konstruktéra" /></SelectTrigger>
+                <SelectContent>
+                  {konstrukterPeople.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Kalkulant</Label>
+              <Select value={newProj.kalkulant} onValueChange={(v) => setNewProj(s => ({ ...s, kalkulant: v }))}>
+                <SelectTrigger><SelectValue placeholder="Vyberte kalkulanta" /></SelectTrigger>
+                <SelectContent>
+                  {kalkulantPeople.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select value={newProj.status} onValueChange={(v) => setNewProj(s => ({ ...s, status: v }))}>
+                <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
+                <SelectContent>
+                  {statusOrder.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Datum Smluvní <span className="text-destructive">*</span></Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !newProj.datum_smluvni && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {newProj.datum_smluvni || "Vyberte datum"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 z-[10000]" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={newProj.datum_smluvni ? parse(newProj.datum_smluvni, "d.M.yyyy", new Date()) : undefined}
+                    onSelect={(d) => {
+                      if (d) {
+                        setNewProj(s => ({ ...s, datum_smluvni: format(d, "d.M.yyyy") }));
+                        setDatumWarning(false);
+                      }
+                    }}
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+              {datumWarning && <p className="text-xs text-destructive mt-1">Datum smluvní je povinné</p>}
+            </div>
+            <div>
+              <Label>Prodejní cena</Label>
+              <div className="flex items-center gap-1">
+                <Input type="number" className="no-spinners" value={newProj.prodejni_cena} onChange={(e) => setNewProj(s => ({ ...s, prodejni_cena: e.target.value }))} />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-10 px-3 font-mono shrink-0"
+                  onClick={() => setNewProj(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
+                >
+                  {newProj.currency}
+                </Button>
+              </div>
+            </div>
             <div><Label>Marže</Label><Input value={newProj.marze} onChange={(e) => setNewProj(s => ({ ...s, marze: e.target.value }))} /></div>
             <div><Label>Fakturace</Label><Input value={newProj.fakturace} onChange={(e) => setNewProj(s => ({ ...s, fakturace: e.target.value }))} /></div>
           </div>
