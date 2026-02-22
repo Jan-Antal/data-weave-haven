@@ -1,6 +1,9 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "./StatusBadge";
+import { InlineEditableCell } from "./InlineEditableCell";
 import { useProjects } from "@/hooks/useProjects";
+import { useUpdateProject } from "@/hooks/useProjectMutations";
+import { statusOrder } from "@/data/projects";
 
 function formatCurrency(value: number | null, currency: string) {
   if (value === null || value === 0) return "—";
@@ -13,6 +16,11 @@ function formatCurrency(value: number | null, currency: string) {
 
 export function ProjectInfoTable() {
   const { data: projects = [], isLoading } = useProjects();
+  const updateProject = useUpdateProject();
+
+  const save = (id: string, field: string, value: string, oldValue: string) => {
+    updateProject.mutate({ id, field, value, oldValue });
+  };
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Načítání...</div>;
 
@@ -37,15 +45,44 @@ export function ProjectInfoTable() {
           {projects.map((p) => (
             <TableRow key={p.id} className="hover:bg-muted/50 transition-colors">
               <TableCell className="font-mono text-xs">{p.project_id}</TableCell>
-              <TableCell className="font-medium">{p.project_name}</TableCell>
-              <TableCell>{p.klient || "—"}</TableCell>
-              <TableCell>{p.pm || "—"}</TableCell>
-              <TableCell>{p.konstrukter || "—"}</TableCell>
-              <TableCell>{p.status ? <StatusBadge status={p.status} /> : "—"}</TableCell>
-              <TableCell>{p.datum_smluvni || "—"}</TableCell>
-              <TableCell className="text-right font-mono text-sm">{formatCurrency(p.prodejni_cena, p.currency || "CZK")}</TableCell>
-              <TableCell className="text-right">{p.marze || "—"}</TableCell>
-              <TableCell className="text-right">{p.fakturace || "—"}</TableCell>
+              <TableCell>
+                <InlineEditableCell value={p.project_name} onSave={(v) => save(p.id, "project_name", v, p.project_name)} className="font-medium" />
+              </TableCell>
+              <TableCell>
+                <InlineEditableCell value={p.klient} onSave={(v) => save(p.id, "klient", v, p.klient || "")} />
+              </TableCell>
+              <TableCell>
+                <InlineEditableCell value={p.pm} onSave={(v) => save(p.id, "pm", v, p.pm || "")} />
+              </TableCell>
+              <TableCell>
+                <InlineEditableCell value={p.konstrukter} onSave={(v) => save(p.id, "konstrukter", v, p.konstrukter || "")} />
+              </TableCell>
+              <TableCell>
+                <InlineEditableCell
+                  value={p.status}
+                  type="select"
+                  options={statusOrder}
+                  onSave={(v) => save(p.id, "status", v, p.status || "")}
+                  displayValue={p.status ? <StatusBadge status={p.status} /> : "—"}
+                />
+              </TableCell>
+              <TableCell>
+                <InlineEditableCell value={p.datum_smluvni} onSave={(v) => save(p.id, "datum_smluvni", v, p.datum_smluvni || "")} />
+              </TableCell>
+              <TableCell className="text-right">
+                <InlineEditableCell
+                  value={p.prodejni_cena}
+                  type="number"
+                  onSave={(v) => save(p.id, "prodejni_cena", v, String(p.prodejni_cena ?? ""))}
+                  displayValue={<span className="font-mono text-sm">{formatCurrency(p.prodejni_cena, p.currency || "CZK")}</span>}
+                />
+              </TableCell>
+              <TableCell className="text-right">
+                <InlineEditableCell value={p.marze} onSave={(v) => save(p.id, "marze", v, p.marze || "")} />
+              </TableCell>
+              <TableCell className="text-right">
+                <InlineEditableCell value={p.fakturace} onSave={(v) => save(p.id, "fakturace", v, p.fakturace || "")} />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
