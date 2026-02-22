@@ -7,10 +7,13 @@ import { TableFilters, useTableFilters } from "@/components/TableFilters";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Settings } from "lucide-react";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
+import { useState } from "react";
+import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
 
 const Index = () => {
   const filters = useTableFilters();
   const { openPeopleManagement } = usePeopleManagement();
+  const [exchangeRateOpen, setExchangeRateOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -32,6 +35,9 @@ const Index = () => {
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={openPeopleManagement}>
                 Správa osob
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setExchangeRateOpen(true)}>
+                Kurzovní lístek
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </DropdownMenuContent>
@@ -77,6 +83,8 @@ const Index = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      <ExchangeRateSettings open={exchangeRateOpen} onOpenChange={setExchangeRateOpen} />
     </div>
   );
 };
