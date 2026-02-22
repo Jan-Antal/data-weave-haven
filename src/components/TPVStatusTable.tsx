@@ -12,10 +12,15 @@ import { ChevronRight } from "lucide-react";
 import { TPVItemsView } from "./TPVItemsView";
 import { TableHeader, TableHead } from "@/components/ui/table";
 
-export function TPVStatusTable() {
+interface TPVStatusTableProps {
+  personFilter: string | null;
+  statusFilter: string[];
+}
+
+export function TPVStatusTable({ personFilter, statusFilter }: TPVStatusTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const updateProject = useUpdateProject();
-  const { sorted, search, setSearch, sortCol, sortDir, toggleSort } = useSortFilter(projects);
+  const { sorted, search, setSearch, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter });
   const [openProject, setOpenProject] = useState<{ project_id: string; project_name: string } | null>(null);
 
   const save = (id: string, field: string, value: string, oldValue: string) => {
@@ -33,7 +38,7 @@ export function TPVStatusTable() {
   return (
     <div>
       <TableSearchBar value={search} onChange={setSearch} />
-      <div className="rounded-lg border bg-card overflow-auto always-scrollbar">
+      <div className="rounded-lg border bg-card overflow-x-scroll always-scrollbar">
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
@@ -60,9 +65,9 @@ export function TPVStatusTable() {
                 </TableCell>
                 <TableCell className="font-mono text-xs">{p.project_id}</TableCell>
                 <TableCell><InlineEditableCell value={p.project_name} onSave={(v) => save(p.id, "project_name", v, p.project_name)} className="font-medium" /></TableCell>
-                <TableCell><InlineEditableCell value={p.pm} onSave={(v) => save(p.id, "pm", v, p.pm || "")} /></TableCell>
+                <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(v) => save(p.id, "pm", v, p.pm || "")} /></TableCell>
                 <TableCell><InlineEditableCell value={p.klient} onSave={(v) => save(p.id, "klient", v, p.klient || "")} /></TableCell>
-                <TableCell><InlineEditableCell value={p.konstrukter} onSave={(v) => save(p.id, "konstrukter", v, p.konstrukter || "")} /></TableCell>
+                <TableCell><InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(v) => save(p.id, "konstrukter", v, p.konstrukter || "")} /></TableCell>
                 <TableCell>
                   <InlineEditableCell value={p.narocnost} type="select" options={["Low", "Medium", "High"]} onSave={(v) => save(p.id, "narocnost", v, p.narocnost || "")} displayValue={<RiskBadge level={p.narocnost || ""} />} />
                 </TableCell>
@@ -76,7 +81,7 @@ export function TPVStatusTable() {
                 <TableCell>
                   <InlineEditableCell value={p.tpv_risk} type="select" options={["Low", "Medium", "High"]} onSave={(v) => save(p.id, "tpv_risk", v, p.tpv_risk || "")} displayValue={<RiskBadge level={p.tpv_risk || ""} />} />
                 </TableCell>
-                <TableCell><InlineEditableCell value={p.zamereni} onSave={(v) => save(p.id, "zamereni", v, p.zamereni || "")} /></TableCell>
+                <TableCell><InlineEditableCell value={p.zamereni} type="date" onSave={(v) => save(p.id, "zamereni", v, p.zamereni || "")} /></TableCell>
                 <TableCell><InlineEditableCell value={p.datum_tpv} type="date" onSave={(v) => save(p.id, "datum_tpv", v, p.datum_tpv || "")} /></TableCell>
               </TableRow>
             ))}

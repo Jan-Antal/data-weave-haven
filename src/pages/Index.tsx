@@ -3,11 +3,13 @@ import { ProjectInfoTable } from "@/components/ProjectInfoTable";
 import { PMStatusTable } from "@/components/PMStatusTable";
 import { TPVStatusTable } from "@/components/TPVStatusTable";
 import { DashboardStats } from "@/components/DashboardStats";
+import { TableFilters, useTableFilters } from "@/components/TableFilters";
 
 const Index = () => {
+  const filters = useTableFilters();
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b bg-primary px-6 py-4">
         <div className="max-w-[1600px] mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -20,9 +22,15 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Main content */}
       <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6">
         <DashboardStats />
+
+        <TableFilters
+          personFilter={filters.personFilter}
+          onPersonFilterChange={filters.setPersonFilter}
+          statusFilter={filters.statusFilter}
+          onStatusFilterChange={filters.setStatusFilter}
+        />
 
         <Tabs defaultValue="project-info" className="space-y-4">
           <TabsList className="bg-card border">
@@ -38,13 +46,13 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="project-info">
-            <ProjectInfoTable />
+            <ProjectInfoTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} />
           </TabsContent>
           <TabsContent value="pm-status">
-            <PMStatusTable />
+            <PMStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} />
           </TabsContent>
           <TabsContent value="tpv-status">
-            <TPVStatusTable />
+            <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} />
           </TabsContent>
         </Tabs>
       </main>

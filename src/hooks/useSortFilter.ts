@@ -2,7 +2,12 @@ import { useState, useMemo } from "react";
 
 type SortDir = "asc" | "desc" | null;
 
-export function useSortFilter<T extends Record<string, any>>(data: T[]) {
+interface ExternalFilters {
+  personFilter?: string | null;
+  statusFilter?: string[];
+}
+
+export function useSortFilter<T extends Record<string, any>>(data: T[], externalFilters?: ExternalFilters) {
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
   const [search, setSearch] = useState("");
@@ -18,12 +23,38 @@ export function useSortFilter<T extends Record<string, any>>(data: T[]) {
   };
 
   const filtered = useMemo(() => {
-    if (!search) return data;
-    const q = search.toLowerCase();
-    return data.filter(row =>
-      Object.values(row).some(v => v != null && String(v).toLowerCase().includes(q))
-    );
-  }, [data, search]);
+    let result = data;
+
+    // Person filter: show projects where person appears in pm, konstrukter, or kalkulant
+    if (externalFilters?.personFilter) {
+      const person = externalFilters.personFilter;
+      result = result.filter(row =>
+        [row.pm, row.konstrukter, row.kalkulant].some(
+          (v) => v && String(v).includes(person)
+        )
+      );
+    }
+
+    // Status filter
+    if (externalFilters?.statusFilter && externalFilters.statusFilter.length > 0) {
+      const allowed = externalFilters.statusFilter;
+      result = result.filter(row => {
+        const status = row.status;
+        if (!status) return true; // show rows without status
+        return allowed.includes(status);
+      });
+    }
+
+    // Text search
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(row =>
+        Object.values(row).some(v => v != null && String(v).toLowerCase().includes(q))
+      );
+    }
+
+    return result;
+  }, [data, search, externalFilters?.personFilter, externalFilters?.statusFilter]);
 
   const sorted = useMemo(() => {
     if (!sortCol || !sortDir) return filtered;

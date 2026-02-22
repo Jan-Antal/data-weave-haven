@@ -109,8 +109,9 @@
     @apply bg-muted-foreground/50;
   }
   .always-scrollbar {
-    overflow-x: auto !important;
-    scrollbar-width: thin;
+    overflow-x: scroll !important;
+    scrollbar-width: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Hide number input spinners */
