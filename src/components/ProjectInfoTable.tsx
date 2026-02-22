@@ -39,10 +39,15 @@ const emptyProject = {
   fakturace: "",
 };
 
-export function ProjectInfoTable() {
+interface ProjectInfoTableProps {
+  personFilter: string | null;
+  statusFilter: string[];
+}
+
+export function ProjectInfoTable({ personFilter, statusFilter }: ProjectInfoTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const updateProject = useUpdateProject();
-  const { sorted, search, setSearch, sortCol, sortDir, toggleSort } = useSortFilter(projects);
+  const { sorted, search, setSearch, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter });
   const [addOpen, setAddOpen] = useState(false);
   const [newProj, setNewProj] = useState({ ...emptyProject });
   const qc = useQueryClient();
@@ -87,7 +92,7 @@ export function ProjectInfoTable() {
           <Plus className="h-4 w-4 mr-1" /> Nový projekt
         </Button>
       </div>
-      <div className="rounded-lg border bg-card overflow-auto always-scrollbar">
+      <div className="rounded-lg border bg-card overflow-x-scroll always-scrollbar">
         <Table className="table-fixed">
           <TableHeader>
             <TableRow className="bg-primary/5">
@@ -106,20 +111,20 @@ export function ProjectInfoTable() {
           <TableBody>
             {sorted.map((p) => (
               <TableRow key={p.id} className="hover:bg-muted/50 transition-colors">
-                <TableCell className="font-mono text-xs w-[120px]">{p.project_id}</TableCell>
-                <TableCell className="w-[200px]">
+                <TableCell className="font-mono text-xs">{p.project_id}</TableCell>
+                <TableCell>
                   <InlineEditableCell value={p.project_name} onSave={(v) => save(p.id, "project_name", v, p.project_name)} className="font-medium" />
                 </TableCell>
-                <TableCell className="w-[130px]">
+                <TableCell>
                   <InlineEditableCell value={p.klient} onSave={(v) => save(p.id, "klient", v, p.klient || "")} />
                 </TableCell>
-                <TableCell className="w-[130px]">
-                  <InlineEditableCell value={p.pm} onSave={(v) => save(p.id, "pm", v, p.pm || "")} />
+                <TableCell>
+                  <InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(v) => save(p.id, "pm", v, p.pm || "")} />
                 </TableCell>
-                <TableCell className="w-[130px]">
-                  <InlineEditableCell value={p.konstrukter} onSave={(v) => save(p.id, "konstrukter", v, p.konstrukter || "")} />
+                <TableCell>
+                  <InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(v) => save(p.id, "konstrukter", v, p.konstrukter || "")} />
                 </TableCell>
-                <TableCell className="w-[110px]">
+                <TableCell>
                   <InlineEditableCell
                     value={p.status}
                     type="select"
@@ -128,10 +133,10 @@ export function ProjectInfoTable() {
                     displayValue={p.status ? <StatusBadge status={p.status} /> : "—"}
                   />
                 </TableCell>
-                <TableCell className="w-[110px]">
+                <TableCell>
                   <InlineEditableCell value={p.datum_smluvni} type="date" onSave={(v) => save(p.id, "datum_smluvni", v, p.datum_smluvni || "")} />
                 </TableCell>
-                <TableCell className="text-right w-[120px]">
+                <TableCell className="text-right">
                   <InlineEditableCell
                     value={p.prodejni_cena}
                     type="number"
@@ -139,10 +144,10 @@ export function ProjectInfoTable() {
                     displayValue={<span className="font-mono text-sm">{formatCurrency(p.prodejni_cena, p.currency || "CZK")}</span>}
                   />
                 </TableCell>
-                <TableCell className="text-right w-[80px]">
+                <TableCell className="text-right">
                   <InlineEditableCell value={p.marze} onSave={(v) => save(p.id, "marze", v, p.marze || "")} />
                 </TableCell>
-                <TableCell className="text-right w-[90px]">
+                <TableCell className="text-right">
                   <InlineEditableCell value={p.fakturace} onSave={(v) => save(p.id, "fakturace", v, p.fakturace || "")} />
                 </TableCell>
               </TableRow>
@@ -162,7 +167,7 @@ export function ProjectInfoTable() {
             <div><Label>Konstruktér</Label><Input value={newProj.konstrukter} onChange={(e) => setNewProj(s => ({ ...s, konstrukter: e.target.value }))} /></div>
             <div><Label>Status</Label><Input value={newProj.status} onChange={(e) => setNewProj(s => ({ ...s, status: e.target.value }))} /></div>
             <div><Label>Datum Smluvní</Label><Input value={newProj.datum_smluvni} onChange={(e) => setNewProj(s => ({ ...s, datum_smluvni: e.target.value }))} /></div>
-            <div><Label>Prodejní cena</Label><Input type="number" value={newProj.prodejni_cena} onChange={(e) => setNewProj(s => ({ ...s, prodejni_cena: e.target.value }))} /></div>
+            <div><Label>Prodejní cena</Label><Input type="number" className="no-spinners" value={newProj.prodejni_cena} onChange={(e) => setNewProj(s => ({ ...s, prodejni_cena: e.target.value }))} /></div>
             <div><Label>Marže</Label><Input value={newProj.marze} onChange={(e) => setNewProj(s => ({ ...s, marze: e.target.value }))} /></div>
             <div><Label>Fakturace</Label><Input value={newProj.fakturace} onChange={(e) => setNewProj(s => ({ ...s, fakturace: e.target.value }))} /></div>
           </div>

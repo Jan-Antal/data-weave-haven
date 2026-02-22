@@ -19,16 +19,18 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { ProjectStage } from "@/hooks/useProjectStages";
+import type { Project } from "@/hooks/useProjects";
 
-function SortableStageRow({ stage, projectId, onDelete }: { stage: ProjectStage; projectId: string; onDelete: (id: string) => void }) {
+const stageStatuses = ["Plánováno", "Probíhá", "Dokončeno", "Pozastaveno"];
+
+function SortableStageRow({ stage, project, onDelete }: { stage: ProjectStage; project: Project; onDelete: (id: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
   const updateStage = useUpdateStage();
 
   const style = { transform: CSS.Transform.toString(transform), transition };
-  const stageStatuses = ["Plánováno", "Probíhá", "Dokončeno", "Pozastaveno"];
 
   const saveStage = (field: string, value: string) => {
-    updateStage.mutate({ id: stage.id, field, value, projectId });
+    updateStage.mutate({ id: stage.id, field, value, projectId: project.project_id });
   };
 
   return (
@@ -38,27 +40,46 @@ function SortableStageRow({ stage, projectId, onDelete }: { stage: ProjectStage;
           <GripVertical className="h-4 w-4 text-muted-foreground" />
         </div>
       </TableCell>
-      <TableCell className="font-mono text-xs pl-8">{stage.stage_name}</TableCell>
-      <TableCell>{/* project name - empty for stage */}</TableCell>
-      <TableCell>{/* klient */}</TableCell>
-      <TableCell>{/* pm */}</TableCell>
+      {/* Název etapy */}
+      <TableCell>
+        <InlineEditableCell value={stage.stage_name} onSave={(v) => saveStage("stage_name", v)} />
+      </TableCell>
+      {/* Project Name - inherited, read-only */}
+      <TableCell className="text-muted-foreground">{project.project_name}</TableCell>
+      {/* Klient - inherited, read-only */}
+      <TableCell className="text-muted-foreground">{project.klient || "—"}</TableCell>
+      {/* PM - editable from people */}
+      <TableCell>
+        <InlineEditableCell value={stage.notes} type="people" peopleRole="PM" onSave={(v) => saveStage("notes", v)} />
+      </TableCell>
+      {/* Status */}
       <TableCell>
         <InlineEditableCell value={stage.status} type="select" options={stageStatuses} onSave={(v) => saveStage("status", v)} />
       </TableCell>
-      <TableCell>{/* risk */}</TableCell>
+      {/* Risk */}
+      <TableCell>
+        {/* Risk not in stage schema - show parent */}
+        <span className="text-muted-foreground text-xs">{project.risk ? <RiskBadge level={project.risk} /> : "—"}</span>
+      </TableCell>
+      {/* Smluvní - inherited, read-only */}
+      <TableCell className="text-muted-foreground">{project.datum_smluvni || "—"}</TableCell>
+      {/* Zaměření */}
       <TableCell>
         <InlineEditableCell value={stage.start_date} type="date" onSave={(v) => saveStage("start_date", v)} />
       </TableCell>
-      <TableCell>{/* zaměření */}</TableCell>
+      {/* TPV */}
       <TableCell>
         <InlineEditableCell value={stage.end_date} type="date" onSave={(v) => saveStage("end_date", v)} />
       </TableCell>
-      <TableCell>{/* expedice */}</TableCell>
-      <TableCell>{/* předání */}</TableCell>
-      <TableCell>
-        <InlineEditableCell value={stage.notes} onSave={(v) => saveStage("notes", v)} />
-      </TableCell>
-      <TableCell>{/* prodejní cena */}</TableCell>
+      {/* Expedice - not in stage schema */}
+      <TableCell className="text-muted-foreground">—</TableCell>
+      {/* Předání - not in stage schema */}
+      <TableCell className="text-muted-foreground">—</TableCell>
+      {/* Poznámka - we repurpose notes for PM, so leave blank */}
+      <TableCell>—</TableCell>
+      {/* Prodejní cena */}
+      <TableCell>—</TableCell>
+      {/* Marže */}
       <TableCell>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(stage.id)}>
           <Trash2 className="h-3 w-3 text-destructive" />
@@ -68,7 +89,7 @@ function SortableStageRow({ stage, projectId, onDelete }: { stage: ProjectStage;
   );
 }
 
-function StagesSection({ projectId }: { projectId: string }) {
+function StagesSection({ projectId, project }: { projectId: string; project: Project }) {
   const { data: stages = [] } = useProjectStages(projectId);
   const addStage = useAddStage();
   const deleteStage = useDeleteStage();
@@ -124,7 +145,7 @@ function StagesSection({ projectId }: { projectId: string }) {
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={stages.map(s => s.id)} strategy={verticalListSortingStrategy}>
           {stages.map(stage => (
-            <SortableStageRow key={stage.id} stage={stage} projectId={projectId} onDelete={(id) => setDeleteId(id)} />
+            <SortableStageRow key={stage.id} stage={stage} project={project} onDelete={(id) => setDeleteId(id)} />
           ))}
         </SortableContext>
       </DndContext>
@@ -172,10 +193,15 @@ function ExpandArrow({ projectId, isExpanded }: { projectId: string; isExpanded:
   );
 }
 
-export function PMStatusTable() {
+interface PMStatusTableProps {
+  personFilter: string | null;
+  statusFilter: string[];
+}
+
+export function PMStatusTable({ personFilter, statusFilter }: PMStatusTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const updateProject = useUpdateProject();
-  const { sorted, search, setSearch, sortCol, sortDir, toggleSort } = useSortFilter(projects);
+  const { sorted, search, setSearch, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter });
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggleExpand = (pid: string) => {
@@ -197,7 +223,7 @@ export function PMStatusTable() {
   return (
     <div>
       <TableSearchBar value={search} onChange={setSearch} />
-      <div className="rounded-lg border bg-card overflow-auto always-scrollbar">
+      <div className="rounded-lg border bg-card overflow-x-scroll always-scrollbar">
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
@@ -228,7 +254,7 @@ export function PMStatusTable() {
                   <TableCell className="font-mono text-xs">{p.project_id}</TableCell>
                   <TableCell><InlineEditableCell value={p.project_name} onSave={(v) => save(p.id, "project_name", v, p.project_name)} className="font-medium" /></TableCell>
                   <TableCell><InlineEditableCell value={p.klient} onSave={(v) => save(p.id, "klient", v, p.klient || "")} /></TableCell>
-                  <TableCell><InlineEditableCell value={p.pm} onSave={(v) => save(p.id, "pm", v, p.pm || "")} /></TableCell>
+                  <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(v) => save(p.id, "pm", v, p.pm || "")} /></TableCell>
                   <TableCell>
                     <InlineEditableCell value={p.status} type="select" options={statusOrder} onSave={(v) => save(p.id, "status", v, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} />
                   </TableCell>
@@ -236,7 +262,7 @@ export function PMStatusTable() {
                     <InlineEditableCell value={p.risk} type="select" options={["Low", "Medium", "High"]} onSave={(v) => save(p.id, "risk", v, p.risk || "")} displayValue={<RiskBadge level={p.risk || ""} />} />
                   </TableCell>
                   <TableCell><InlineEditableCell value={p.datum_smluvni} type="date" onSave={(v) => save(p.id, "datum_smluvni", v, p.datum_smluvni || "")} /></TableCell>
-                  <TableCell><InlineEditableCell value={p.zamereni} onSave={(v) => save(p.id, "zamereni", v, p.zamereni || "")} /></TableCell>
+                  <TableCell><InlineEditableCell value={p.zamereni} type="date" onSave={(v) => save(p.id, "zamereni", v, p.zamereni || "")} /></TableCell>
                   <TableCell><InlineEditableCell value={p.tpv_date} type="date" onSave={(v) => save(p.id, "tpv_date", v, p.tpv_date || "")} /></TableCell>
                   <TableCell><InlineEditableCell value={p.expedice} type="date" onSave={(v) => save(p.id, "expedice", v, p.expedice || "")} /></TableCell>
                   <TableCell><InlineEditableCell value={p.predani} type="date" onSave={(v) => save(p.id, "predani", v, p.predani || "")} /></TableCell>
@@ -246,7 +272,7 @@ export function PMStatusTable() {
                   </TableCell>
                   <TableCell className="text-right"><InlineEditableCell value={p.marze} onSave={(v) => save(p.id, "marze", v, p.marze || "")} /></TableCell>
                 </TableRow>
-                {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} />}
+                {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} />}
               </Fragment>
             ))}
           </TableBody>
