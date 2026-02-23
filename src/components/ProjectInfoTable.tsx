@@ -25,6 +25,7 @@ import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 import { ProjectEditDialog } from "./ProjectEditDialog";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
+import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
 
 const PROJECT_INFO_COLUMNS = [
@@ -74,6 +75,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const qc = useQueryClient();
   const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
   const { isVisible, toggleColumn, columns } = useColumnVisibility("col-vis-project-info", PROJECT_INFO_COLUMNS);
+  const { getLabel, isCustom, updateLabel, resetLabel } = useColumnLabels("project-info");
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck();
   useEffect(() => {
     const handleOpenAdd = () => setAddOpen(true);
@@ -130,8 +132,9 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Načítání...</div>;
 
-  const sh = { sortCol, sortDir, onSort: toggleSort };
+  const sh = { sortCol, sortDir, onSort: toggleSort, onRename: (key: string, name: string) => updateLabel.mutate({ columnKey: key, label: name }), onResetLabel: (key: string) => resetLabel.mutate({ columnKey: key }) };
   const v = isVisible;
+  const cl = (key: string, def: string) => ({ customLabel: getLabel(key, def), isCustom: isCustom(key) });
 
   return (
     <div>
@@ -139,17 +142,17 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
         <Table className="table-fixed">
           <TableHeader>
             <TableRow className="bg-primary/5">
-              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} className="w-[130px] min-w-[130px]" />}
-              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} className="w-[180px] min-w-[180px]" />}
-              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} className="w-[120px] min-w-[120px]" />}
-              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} className="w-[140px] min-w-[140px]" />}
-              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} className="w-[140px] min-w-[140px]" />}
-              {v("kalkulant") && <SortableHeader label="Kalkulant" column="kalkulant" {...sh} className="w-[140px] min-w-[140px]" />}
-              {v("status") && <SortableHeader label="Status" column="status" {...sh} className="w-[110px] min-w-[110px]" />}
-              {v("datum_smluvni") && <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} className="w-[90px] min-w-[90px]" />}
-              {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="w-[140px] min-w-[140px] text-right" />}
-              {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} className="w-[80px] min-w-[80px] text-right" />}
-              {v("fakturace") && <SortableHeader label="Fakturace" column="fakturace" {...sh} className="w-[90px] min-w-[90px] text-right" />}
+              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} {...cl("project_id", "Project ID")} className="w-[130px] min-w-[130px]" />}
+              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} {...cl("project_name", "Project Name")} className="w-[180px] min-w-[180px]" />}
+              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} {...cl("klient", "Klient")} className="w-[120px] min-w-[120px]" />}
+              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} {...cl("pm", "PM")} className="w-[140px] min-w-[140px]" />}
+              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} {...cl("konstrukter", "Konstruktér")} className="w-[140px] min-w-[140px]" />}
+              {v("kalkulant") && <SortableHeader label="Kalkulant" column="kalkulant" {...sh} {...cl("kalkulant", "Kalkulant")} className="w-[140px] min-w-[140px]" />}
+              {v("status") && <SortableHeader label="Status" column="status" {...sh} {...cl("status", "Status")} className="w-[110px] min-w-[110px]" />}
+              {v("datum_smluvni") && <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} {...cl("datum_smluvni", "Datum Smluvní")} className="w-[90px] min-w-[90px]" />}
+              {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} {...cl("prodejni_cena", "Prodejní cena")} className="w-[140px] min-w-[140px] text-right" />}
+              {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} {...cl("marze", "Marže")} className="w-[80px] min-w-[80px] text-right" />}
+              {v("fakturace") && <SortableHeader label="Fakturace" column="fakturace" {...sh} {...cl("fakturace", "Fakturace")} className="w-[90px] min-w-[90px] text-right" />}
               <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} />
             </TableRow>
           </TableHeader>
