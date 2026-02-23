@@ -194,14 +194,14 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
               <p style={{ fontSize: 10 }} className="uppercase tracking-wider" >
                 <span style={{ color: "#999" }}>Aktivní zakázky</span>
               </p>
-              <p className="font-serif font-bold leading-none mt-1" style={{ fontSize: 48 }}>{activeCount}</p>
+              <p className="font-serif font-bold leading-none mt-1" style={{ fontSize: 28 }}>{activeCount}</p>
             </div>
             <div className="my-3" style={{ borderTop: "1px solid #f0ede8" }} />
             <div className="flex-1 flex flex-col justify-center">
               <p style={{ fontSize: 10 }} className="uppercase tracking-wider">
                 <span style={{ color: "#999" }}>Celková hodnota</span>
               </p>
-              <p className="font-serif font-bold mt-1" style={{ fontSize: 22 }}>{formatNumber(totalValueCZK)} Kč</p>
+              <p className="font-serif font-bold mt-1" style={{ fontSize: 28 }}>{formatNumber(totalValueCZK)} Kč</p>
               <p style={{ fontSize: 10, color: "#aaa" }} className="mt-0.5">aktivní, v CZK</p>
             </div>
           </div>
