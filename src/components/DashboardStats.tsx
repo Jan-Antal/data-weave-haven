@@ -62,9 +62,10 @@ interface DashboardStatsProps {
   search?: string;
   riskHighlight: RiskHighlightType;
   onRiskHighlightChange: (v: RiskHighlightType) => void;
+  activeTab?: string;
 }
 
-export function DashboardStats({ personFilter, statusFilter, search, riskHighlight, onRiskHighlightChange }: DashboardStatsProps) {
+export function DashboardStats({ personFilter, statusFilter, search, riskHighlight, onRiskHighlightChange, activeTab }: DashboardStatsProps) {
   const { data: projects = [] } = useProjects();
   const { data: rates = [] } = useExchangeRates();
 
@@ -150,22 +151,25 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
     return { overdue, upcoming, highRisk };
   }, [activeProjects]);
 
-  // PM workload data
-  const pmData = useMemo(() => {
+  const isTPV = activeTab === "tpv-status";
+
+  // PM / Konstruktér workload data
+  const workloadData = useMemo(() => {
+    const field = isTPV ? "konstrukter" : "pm";
     const agg: Record<string, { count: number; valueCZK: number }> = {};
     activeProjects.forEach((p) => {
-      const pm = p.pm || "Nepřiřazeno";
-      if (!agg[pm]) agg[pm] = { count: 0, valueCZK: 0 };
-      agg[pm].count += 1;
+      const person = (p as any)[field] || "Nepřiřazeno";
+      if (!agg[person]) agg[person] = { count: 0, valueCZK: 0 };
+      agg[person].count += 1;
       const amount = p.prodejni_cena || 0;
       if (amount > 0) {
         const currency = p.currency || "CZK";
         if (currency === "CZK") {
-          agg[pm].valueCZK += amount;
+          agg[person].valueCZK += amount;
         } else {
           const year = getProjectYear(p.datum_smluvni);
           const rate = getExchangeRate(rates, year);
-          agg[pm].valueCZK += amount * rate;
+          agg[person].valueCZK += amount * rate;
         }
       }
     });
@@ -176,7 +180,7 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
       ...entry,
       fill: PM_GREENS[i % PM_GREENS.length],
     }));
-  }, [activeProjects, rates]);
+  }, [activeProjects, rates, isTPV]);
 
   const toggleRisk = (type: RiskHighlightType) => {
     onRiskHighlightChange(riskHighlight === type ? null : type);
@@ -286,16 +290,16 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
             </div>
           </div>
 
-          {/* Card 4: Vytížení PM */}
+          {/* Card 4: Vytížení PM / Konstruktér */}
           <div className="rounded-lg border bg-card px-4 py-3 flex flex-col" style={{ width: "25%", minWidth: 180 }}>
-            <p style={{ fontSize: 10, color: "#999" }} className="uppercase tracking-wider mb-1">Vytížení PM</p>
+            <p style={{ fontSize: 10, color: "#999" }} className="uppercase tracking-wider mb-1">{isTPV ? "Vytížení Konstruktér" : "Vytížení PM"}</p>
             <div className="flex-1 min-h-0 flex items-center gap-2">
               {/* Donut */}
               <div className="relative" style={{ width: 110, height: 110, flexShrink: 0 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={pmData}
+                      data={workloadData}
                       dataKey="value"
                       nameKey="name"
                       cx="50%"
@@ -305,7 +309,7 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
                       paddingAngle={2}
                       strokeWidth={0}
                     >
-                      {pmData.map((entry, i) => (
+                      {workloadData.map((entry, i) => (
                         <Cell key={i} fill={entry.fill} />
                       ))}
                     </Pie>
@@ -318,7 +322,7 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
               </div>
               {/* Legend */}
               <div className="flex flex-col gap-0.5 overflow-hidden min-w-0">
-                {pmData.map((entry) => (
+                {workloadData.map((entry) => (
                   <div key={entry.name} className="flex items-center gap-1.5 whitespace-nowrap" style={{ fontSize: 11 }}>
                     <span className="inline-block rounded-full shrink-0" style={{ width: 7, height: 7, backgroundColor: entry.fill }} />
                     <span className="text-muted-foreground truncate" style={{ maxWidth: 90 }}>{entry.name}</span>
