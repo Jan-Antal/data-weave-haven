@@ -78,24 +78,21 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   return (
     <div>
       <div className="rounded-lg border bg-card overflow-x-scroll always-scrollbar">
-        <Table>
+        <Table className="table-fixed">
           <TableHeader>
             <TableRow className="bg-primary/5">
-              <TableHead className="w-8"></TableHead>
-              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} className="w-[110px] min-w-[110px]" />}
-              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} className="w-[200px] min-w-[200px]" />}
-              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} className="w-[130px] min-w-[130px]" />}
-              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} className="w-[130px] min-w-[130px]" />}
-              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} className="w-[130px] min-w-[130px]" />}
-              {v("narocnost") && <SortableHeader label="Náročnost" column="narocnost" {...sh} className="w-[90px] min-w-[90px]" />}
-              {v("hodiny_tpv") && <SortableHeader label="Hodiny TPV" column="hodiny_tpv" {...sh} className="w-[90px] min-w-[90px]" />}
-              {v("percent_tpv") && <SortableHeader label="% Status" column="percent_tpv" {...sh} className="w-[120px] min-w-[120px]" />}
-              {v("status") && <SortableHeader label="Status" column="status" {...sh} className="w-[110px] min-w-[110px]" />}
-              {v("tpv_risk") && <SortableHeader label="Risk" column="tpv_risk" {...sh} className="w-[80px] min-w-[80px]" />}
-              {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} className="w-[100px] min-w-[100px]" />}
-              {v("expedice") && <SortableHeader label="Expedice" column="expedice" {...sh} className="w-[100px] min-w-[100px]" />}
-              {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} className="w-[100px] min-w-[100px]" />}
-              {v("tpv_poznamka") && <SortableHeader label="Poznámka" column="tpv_poznamka" {...sh} className="w-[160px] min-w-[160px]" />}
+              <TableHead className="w-[32px]"></TableHead>
+              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} className="w-[100px]" />}
+              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} className="w-[190px]" />}
+              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} className="w-[120px]" />}
+              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} className="w-[120px]" />}
+              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} className="w-[120px]" />}
+              {v("narocnost") && <SortableHeader label="Náročnost" column="narocnost" {...sh} className="w-[85px]" />}
+              {v("hodiny_tpv") && <SortableHeader label="Hodiny TPV" column="hodiny_tpv" {...sh} className="w-[85px]" />}
+              {v("percent_tpv") && <SortableHeader label="% Status" column="percent_tpv" {...sh} className="w-[100px]" />}
+              {v("status") && <SortableHeader label="Status" column="status" {...sh} className="w-[105px]" />}
+              {v("tpv_risk") && <SortableHeader label="Risk" column="tpv_risk" {...sh} className="w-[85px]" />}
+              {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} className="w-[95px]" />}
               <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} />
             </TableRow>
           </TableHeader>
@@ -103,7 +100,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
             {sorted.map((p) => (
               <TableRow key={p.id} className="hover:bg-muted/50 transition-colors h-9">
                 <TableCell
-                  className="w-8 cursor-pointer"
+                  className="w-[32px] cursor-pointer"
                   onClick={() => setActiveProject({ projectId: p.project_id, projectName: p.project_name })}
                 >
                   <ExpandArrow projectId={p.project_id} />
@@ -138,7 +135,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                 {v("expedice") && <TableCell><InlineEditableCell value={p.expedice} type="date" onSave={(val) => save(p.id, "expedice", val, p.expedice || "")} /></TableCell>}
                 {v("predani") && <TableCell><InlineEditableCell value={p.predani} type="date" onSave={(val) => save(p.id, "predani", val, p.predani || "")} /></TableCell>}
                 {v("tpv_poznamka") && <TableCell><InlineEditableCell value={p.tpv_poznamka} type="textarea" onSave={(val) => save(p.id, "tpv_poznamka", val, p.tpv_poznamka || "")} /></TableCell>}
-                <TableCell className="w-10 sticky right-0 bg-card" />
+                <TableCell className="w-[32px] sticky right-0 bg-card" />
               </TableRow>
             ))}
           </TableBody>
