@@ -195,8 +195,8 @@ export function InlineEditableCell({
             className={cn(
               "cursor-pointer hover:bg-muted/80 rounded px-1 py-0.5 overflow-hidden",
               isTextarea
-                ? "h-9 leading-[1.3] text-xs whitespace-normal line-clamp-2 flex items-center"
-                : "h-7 leading-7 truncate whitespace-nowrap",
+                ? "h-7 leading-[1.3] text-xs whitespace-normal line-clamp-2 flex items-center"
+                : "h-7 leading-7 truncate whitespace-nowrap text-xs",
               className
             )}
             onClick={() => {
