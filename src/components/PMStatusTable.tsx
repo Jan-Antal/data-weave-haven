@@ -26,7 +26,8 @@ import type { ProjectStage } from "@/hooks/useProjectStages";
 import type { Project } from "@/hooks/useProjects";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
-
+import { useColumnLabels } from "@/hooks/useColumnLabels";
+import { cn } from "@/lib/utils";
 
 const PM_COLUMNS = [
   { key: "project_id", label: "Project ID", locked: true },
@@ -204,6 +205,21 @@ interface PMStatusTableProps {
   search: string;
 }
 
+const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
+  project_id: { minWidth: 90 },
+  project_name: { minWidth: 160, flex: 2 },
+  klient: { minWidth: 100, flex: 1 },
+  pm: { minWidth: 110, flex: 1 },
+  status: { minWidth: 100 },
+  risk: { minWidth: 75 },
+  datum_smluvni: { minWidth: 90 },
+  zamereni: { minWidth: 90 },
+  tpv_date: { minWidth: 90 },
+  expedice: { minWidth: 90 },
+  predani: { minWidth: 90 },
+  pm_poznamka: { minWidth: 140, flex: 1 },
+};
+
 export function PMStatusTable({ personFilter, statusFilter, search: externalSearch }: PMStatusTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
@@ -213,7 +229,8 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { isVisible, toggleColumn, columns } = useColumnVisibility("col-vis-pm-status", PM_COLUMNS);
-  
+  const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("pm-status");
+  const [editMode, setEditMode] = useState(false);
 
   const toggleExpand = (pid: string) => {
     setExpanded(prev => {
@@ -232,25 +249,43 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const sh = { sortCol, sortDir, onSort: toggleSort };
   const v = isVisible;
 
+  const colStyle = (key: string) => {
+    const w = getWidth(key);
+    const base = DEFAULT_STYLES[key] || {};
+    return w ? { ...base, width: w, minWidth: w } : base;
+  };
+
+  const editProps = (key: string, defaultLabel: string) => ({
+    editMode,
+    customLabel: getLabel(key, defaultLabel),
+    onLabelChange: (newLabel: string) => updateLabel(key, newLabel),
+    onWidthChange: (newWidth: number) => updateWidth(key, newWidth),
+  });
+
   return (
     <div>
-      <div className="rounded-lg border bg-card overflow-x-scroll always-scrollbar">
+      {editMode && (
+        <div className="bg-accent/10 border border-accent/30 text-accent text-xs font-medium px-3 py-1.5 rounded-t-lg">
+          Režim úpravy sloupců
+        </div>
+      )}
+      <div className={cn("rounded-lg border bg-card overflow-x-scroll always-scrollbar", editMode && "rounded-t-none border-t-0")}>
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
               <TableHead style={{ minWidth: 32, width: 32 }} className="shrink-0"></TableHead>
-              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} style={{ minWidth: 90 }} />}
-              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={{ minWidth: 160, flex: 2 }} />}
-              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} style={{ minWidth: 110, flex: 1 }} />}
-              {v("status") && <SortableHeader label="Status" column="status" {...sh} style={{ minWidth: 100 }} />}
-              {v("risk") && <SortableHeader label="Risk" column="risk" {...sh} style={{ minWidth: 75 }} />}
-              {v("datum_smluvni") && <SortableHeader label="Smluvní" column="datum_smluvni" {...sh} style={{ minWidth: 90 }} />}
-              {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} style={{ minWidth: 90 }} />}
-              {v("tpv_date") && <SortableHeader label="TPV" column="tpv_date" {...sh} style={{ minWidth: 90 }} />}
-              {v("expedice") && <SortableHeader label="Expedice" column="expedice" {...sh} style={{ minWidth: 90 }} />}
-              {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} style={{ minWidth: 90 }} />}
-              {v("pm_poznamka") && <SortableHeader label="Poznámka" column="pm_poznamka" {...sh} style={{ minWidth: 140, flex: 1 }} />}
-              <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} />
+              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} style={colStyle("project_id")} {...editProps("project_id", "Project ID")} />}
+              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={colStyle("project_name")} {...editProps("project_name", "Project Name")} />}
+              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} style={colStyle("pm")} {...editProps("pm", "PM")} />}
+              {v("status") && <SortableHeader label="Status" column="status" {...sh} style={colStyle("status")} {...editProps("status", "Status")} />}
+              {v("risk") && <SortableHeader label="Risk" column="risk" {...sh} style={colStyle("risk")} {...editProps("risk", "Risk")} />}
+              {v("datum_smluvni") && <SortableHeader label="Smluvní" column="datum_smluvni" {...sh} style={colStyle("datum_smluvni")} {...editProps("datum_smluvni", "Smluvní")} />}
+              {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} style={colStyle("zamereni")} {...editProps("zamereni", "Zaměření")} />}
+              {v("tpv_date") && <SortableHeader label="TPV" column="tpv_date" {...sh} style={colStyle("tpv_date")} {...editProps("tpv_date", "TPV")} />}
+              {v("expedice") && <SortableHeader label="Expedice" column="expedice" {...sh} style={colStyle("expedice")} {...editProps("expedice", "Expedice")} />}
+              {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} style={colStyle("predani")} {...editProps("predani", "Předání")} />}
+              {v("pm_poznamka") && <SortableHeader label="Poznámka" column="pm_poznamka" {...sh} style={colStyle("pm_poznamka")} {...editProps("pm_poznamka", "Poznámka")} />}
+              <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} editMode={editMode} onToggleEditMode={() => setEditMode(!editMode)} />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -262,7 +297,6 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   </TableCell>
                   {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
                   {v("project_name") && <TableCell className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" /></TableCell>}
-                  {v("pm") && <TableCell className="truncate"><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(val) => save(p.id, "pm", val, p.pm || "")} /></TableCell>}
                   {v("pm") && <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(val) => save(p.id, "pm", val, p.pm || "")} /></TableCell>}
                   {v("status") && (
                     <TableCell>
@@ -280,7 +314,6 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   {v("expedice") && <TableCell><InlineEditableCell value={p.expedice} type="date" onSave={(val) => save(p.id, "expedice", val, p.expedice || "")} /></TableCell>}
                   {v("predani") && <TableCell><InlineEditableCell value={p.predani} type="date" onSave={(val) => save(p.id, "predani", val, p.predani || "")} /></TableCell>}
                   {v("pm_poznamka") && <TableCell><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(val) => save(p.id, "pm_poznamka", val, p.pm_poznamka || "")} /></TableCell>}
-                  <TableCell className="w-[32px] sticky right-0 bg-card" />
                 </TableRow>
                 {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} />}
               </Fragment>

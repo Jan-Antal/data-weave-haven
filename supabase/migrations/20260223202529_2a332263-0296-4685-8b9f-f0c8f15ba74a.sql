@@ -1,0 +1,1 @@
+ALTER TABLE public.column_labels ADD COLUMN IF NOT EXISTS width integer;

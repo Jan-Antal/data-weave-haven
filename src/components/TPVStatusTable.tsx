@@ -12,7 +12,8 @@ import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { useTPVItems } from "@/hooks/useTPVItems";
 import { TPVItemsView } from "./TPVItemsView";
-
+import { useColumnLabels } from "@/hooks/useColumnLabels";
+import { cn } from "@/lib/utils";
 
 const TPV_COLUMNS = [
   { key: "project_id", label: "Project ID", locked: true },
@@ -45,6 +46,23 @@ interface TPVStatusTableProps {
   search: string;
 }
 
+const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
+  project_id: { minWidth: 90 },
+  project_name: { minWidth: 160, flex: 2 },
+  pm: { minWidth: 110, flex: 1 },
+  klient: { minWidth: 100, flex: 1 },
+  konstrukter: { minWidth: 110, flex: 1 },
+  narocnost: { minWidth: 85 },
+  hodiny_tpv: { minWidth: 85 },
+  percent_tpv: { minWidth: 100 },
+  status: { minWidth: 100 },
+  tpv_risk: { minWidth: 75 },
+  zamereni: { minWidth: 90 },
+  expedice: { minWidth: 90 },
+  predani: { minWidth: 90 },
+  tpv_poznamka: { minWidth: 140, flex: 1 },
+};
+
 export function TPVStatusTable({ personFilter, statusFilter, search: externalSearch }: TPVStatusTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
@@ -52,7 +70,8 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const updateProject = useUpdateProject();
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const { isVisible, toggleColumn, columns } = useColumnVisibility("col-vis-tpv-status", TPV_COLUMNS);
-  
+  const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("tpv-status");
+  const [editMode, setEditMode] = useState(false);
 
   const [activeProject, setActiveProject] = useState<{ projectId: string; projectName: string } | null>(null);
 
@@ -75,25 +94,46 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const sh = { sortCol, sortDir, onSort: toggleSort };
   const v = isVisible;
 
+  const colStyle = (key: string) => {
+    const w = getWidth(key);
+    const base = DEFAULT_STYLES[key] || {};
+    return w ? { ...base, width: w, minWidth: w } : base;
+  };
+
+  const editProps = (key: string, defaultLabel: string) => ({
+    editMode,
+    customLabel: getLabel(key, defaultLabel),
+    onLabelChange: (newLabel: string) => updateLabel(key, newLabel),
+    onWidthChange: (newWidth: number) => updateWidth(key, newWidth),
+  });
+
   return (
     <div>
-      <div className="rounded-lg border bg-card overflow-x-scroll always-scrollbar">
+      {editMode && (
+        <div className="bg-accent/10 border border-accent/30 text-accent text-xs font-medium px-3 py-1.5 rounded-t-lg">
+          Režim úpravy sloupců
+        </div>
+      )}
+      <div className={cn("rounded-lg border bg-card overflow-x-scroll always-scrollbar", editMode && "rounded-t-none border-t-0")}>
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
               <TableHead style={{ minWidth: 32, width: 32 }} className="shrink-0"></TableHead>
-              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} style={{ minWidth: 90 }} />}
-              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={{ minWidth: 160, flex: 2 }} />}
-              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} style={{ minWidth: 110, flex: 1 }} />}
-              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} style={{ minWidth: 100, flex: 1 }} />}
-              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} style={{ minWidth: 110, flex: 1 }} />}
-              {v("narocnost") && <SortableHeader label="Náročnost" column="narocnost" {...sh} style={{ minWidth: 85 }} />}
-              {v("hodiny_tpv") && <SortableHeader label="Hodiny TPV" column="hodiny_tpv" {...sh} style={{ minWidth: 85 }} />}
-              {v("percent_tpv") && <SortableHeader label="% Status" column="percent_tpv" {...sh} style={{ minWidth: 100 }} />}
-              {v("status") && <SortableHeader label="Status" column="status" {...sh} style={{ minWidth: 100 }} />}
-              {v("tpv_risk") && <SortableHeader label="Risk" column="tpv_risk" {...sh} style={{ minWidth: 75 }} />}
-              {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} style={{ minWidth: 90 }} />}
-              <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} />
+              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} style={colStyle("project_id")} {...editProps("project_id", "Project ID")} />}
+              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={colStyle("project_name")} {...editProps("project_name", "Project Name")} />}
+              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} style={colStyle("pm")} {...editProps("pm", "PM")} />}
+              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} style={colStyle("klient")} {...editProps("klient", "Klient")} />}
+              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} style={colStyle("konstrukter")} {...editProps("konstrukter", "Konstruktér")} />}
+              {v("narocnost") && <SortableHeader label="Náročnost" column="narocnost" {...sh} style={colStyle("narocnost")} {...editProps("narocnost", "Náročnost")} />}
+              {v("hodiny_tpv") && <SortableHeader label="Hodiny TPV" column="hodiny_tpv" {...sh} style={colStyle("hodiny_tpv")} {...editProps("hodiny_tpv", "Hodiny TPV")} />}
+              {v("percent_tpv") && <SortableHeader label="% Status" column="percent_tpv" {...sh} style={colStyle("percent_tpv")} {...editProps("percent_tpv", "% Status")} />}
+              {v("status") && <SortableHeader label="Status" column="status" {...sh} style={colStyle("status")} {...editProps("status", "Status")} />}
+              {v("tpv_risk") && <SortableHeader label="Risk" column="tpv_risk" {...sh} style={colStyle("tpv_risk")} {...editProps("tpv_risk", "Risk")} />}
+              {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} style={colStyle("zamereni")} {...editProps("zamereni", "Zaměření")} />}
+              {v("expedice") && <SortableHeader label="Expedice" column="expedice" {...sh} style={colStyle("expedice")} {...editProps("expedice", "Expedice")} />}
+              {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} style={colStyle("predani")} {...editProps("predani", "Předání")} />}
+              {v("tpv_poznamka") && <SortableHeader label="Poznámka" column="tpv_poznamka" {...sh} style={colStyle("tpv_poznamka")} {...editProps("tpv_poznamka", "Poznámka")} />}
+              <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} editMode={editMode} onToggleEditMode={() => setEditMode(!editMode)} />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -135,7 +175,6 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                 {v("expedice") && <TableCell><InlineEditableCell value={p.expedice} type="date" onSave={(val) => save(p.id, "expedice", val, p.expedice || "")} /></TableCell>}
                 {v("predani") && <TableCell><InlineEditableCell value={p.predani} type="date" onSave={(val) => save(p.id, "predani", val, p.predani || "")} /></TableCell>}
                 {v("tpv_poznamka") && <TableCell><InlineEditableCell value={p.tpv_poznamka} type="textarea" onSave={(val) => save(p.id, "tpv_poznamka", val, p.tpv_poznamka || "")} /></TableCell>}
-                <TableCell className="w-[32px] sticky right-0 bg-card" />
               </TableRow>
             ))}
           </TableBody>

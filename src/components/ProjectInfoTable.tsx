@@ -26,6 +26,7 @@ import { ProjectEditDialog } from "./ProjectEditDialog";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
+import { useColumnLabels } from "@/hooks/useColumnLabels";
 
 const PROJECT_INFO_COLUMNS = [
   { key: "project_id", label: "Project ID", locked: true },
@@ -62,6 +63,20 @@ interface ProjectInfoTableProps {
   search: string;
 }
 
+const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
+  project_id: { minWidth: 90 },
+  project_name: { minWidth: 160, flex: 2 },
+  klient: { minWidth: 100, flex: 1 },
+  pm: { minWidth: 110, flex: 1 },
+  konstrukter: { minWidth: 110, flex: 1 },
+  kalkulant: { minWidth: 110, flex: 1 },
+  status: { minWidth: 100 },
+  datum_smluvni: { minWidth: 90 },
+  prodejni_cena: { minWidth: 110 },
+  marze: { minWidth: 60 },
+  fakturace: { minWidth: 65 },
+};
+
 export function ProjectInfoTable({ personFilter, statusFilter, search: externalSearch }: ProjectInfoTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
@@ -75,6 +90,9 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
   const { isVisible, toggleColumn, columns } = useColumnVisibility("col-vis-project-info", PROJECT_INFO_COLUMNS);
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck();
+  const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("project-info");
+  const [editMode, setEditMode] = useState(false);
+
   useEffect(() => {
     const handleOpenAdd = () => setAddOpen(true);
     document.addEventListener("open-add-project", handleOpenAdd);
@@ -133,31 +151,49 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const sh = { sortCol, sortDir, onSort: toggleSort };
   const v = isVisible;
 
+  const colStyle = (key: string) => {
+    const w = getWidth(key);
+    const base = DEFAULT_STYLES[key] || {};
+    return w ? { ...base, width: w, minWidth: w } : base;
+  };
+
+  const editProps = (key: string, defaultLabel: string) => ({
+    editMode,
+    customLabel: getLabel(key, defaultLabel),
+    onLabelChange: (newLabel: string) => updateLabel(key, newLabel),
+    onWidthChange: (newWidth: number) => updateWidth(key, newWidth),
+  });
+
   return (
     <div>
-      <div className="rounded-lg border bg-card overflow-x-scroll always-scrollbar">
+      {editMode && (
+        <div className="bg-accent/10 border border-accent/30 text-accent text-xs font-medium px-3 py-1.5 rounded-t-lg">
+          Režim úpravy sloupců
+        </div>
+      )}
+      <div className={cn("rounded-lg border bg-card overflow-x-scroll always-scrollbar", editMode && "rounded-t-none border-t-0")}>
         <Table>
           <TableHeader>
-          <TableRow className="bg-primary/5">
+            <TableRow className="bg-primary/5">
               <TableHead style={{ minWidth: 32, width: 32 }} className="shrink-0"></TableHead>
-              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} style={{ minWidth: 90 }} />}
-              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={{ minWidth: 160, flex: 2 }} />}
-              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} style={{ minWidth: 100, flex: 1 }} />}
-              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} style={{ minWidth: 110, flex: 1 }} />}
-              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} style={{ minWidth: 110, flex: 1 }} />}
-              {v("kalkulant") && <SortableHeader label="Kalkulant" column="kalkulant" {...sh} style={{ minWidth: 110, flex: 1 }} />}
-              {v("status") && <SortableHeader label="Status" column="status" {...sh} style={{ minWidth: 100 }} />}
-              {v("datum_smluvni") && <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} style={{ minWidth: 90 }} />}
-              {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="text-right" style={{ minWidth: 110 }} />}
-              {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} className="text-right" style={{ minWidth: 60 }} />}
-              {v("fakturace") && <SortableHeader label="Fakturace" column="fakturace" {...sh} className="text-right" style={{ minWidth: 65 }} />}
-              <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} />
+              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} style={colStyle("project_id")} {...editProps("project_id", "Project ID")} />}
+              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={colStyle("project_name")} {...editProps("project_name", "Project Name")} />}
+              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} style={colStyle("klient")} {...editProps("klient", "Klient")} />}
+              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} style={colStyle("pm")} {...editProps("pm", "PM")} />}
+              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} style={colStyle("konstrukter")} {...editProps("konstrukter", "Konstruktér")} />}
+              {v("kalkulant") && <SortableHeader label="Kalkulant" column="kalkulant" {...sh} style={colStyle("kalkulant")} {...editProps("kalkulant", "Kalkulant")} />}
+              {v("status") && <SortableHeader label="Status" column="status" {...sh} style={colStyle("status")} {...editProps("status", "Status")} />}
+              {v("datum_smluvni") && <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} style={colStyle("datum_smluvni")} {...editProps("datum_smluvni", "Datum Smluvní")} />}
+              {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="text-right" style={colStyle("prodejni_cena")} {...editProps("prodejni_cena", "Prodejní cena")} />}
+              {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} className="text-right" style={colStyle("marze")} {...editProps("marze", "Marže")} />}
+              {v("fakturace") && <SortableHeader label="Fakturace" column="fakturace" {...sh} className="text-right" style={colStyle("fakturace")} {...editProps("fakturace", "Fakturace")} />}
+              <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} editMode={editMode} onToggleEditMode={() => setEditMode(!editMode)} />
             </TableRow>
           </TableHeader>
           <TableBody>
             {sorted.map((p) => (
               <TableRow key={p.id} className="hover:bg-muted/50 transition-colors">
-                <TableCell className="w-[32px]" />
+                <TableCell style={{ minWidth: 32, width: 32 }} />
                 {v("project_id") && (
                   <TableCell className="font-mono text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => setEditProject(p)}>
                     {p.project_id}
@@ -181,7 +217,6 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                 )}
                 {v("marze") && <TableCell className="text-right"><InlineEditableCell value={p.marze} onSave={(val) => save(p.id, "marze", val, p.marze || "")} /></TableCell>}
                 {v("fakturace") && <TableCell className="text-right"><InlineEditableCell value={p.fakturace} onSave={(val) => save(p.id, "fakturace", val, p.fakturace || "")} /></TableCell>}
-                <TableCell className="w-[32px] sticky right-0 bg-card" />
               </TableRow>
             ))}
           </TableBody>
@@ -193,7 +228,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
           <DialogHeader><DialogTitle>Nový projekt</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-x-4 gap-y-3">
             <div>
-              <Label>Project ID <span className="text-orange-500">*</span></Label>
+              <Label>Project ID <span className="text-[hsl(var(--accent))]">*</span></Label>
               <Input
                 value={newProj.project_id}
                 onChange={(e) => { setNewProj(s => ({ ...s, project_id: e.target.value })); resetIdCheck(); }}
@@ -227,7 +262,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
               {datumWarning && <p className="text-xs text-destructive mt-1">Datum smluvní je povinné</p>}
             </div>
 
-            <div><Label>Project Name <span className="text-orange-500">*</span></Label><Input value={newProj.project_name} onChange={(e) => setNewProj(s => ({ ...s, project_name: e.target.value }))} /></div>
+            <div><Label>Project Name <span className="text-[hsl(var(--accent))]">*</span></Label><Input value={newProj.project_name} onChange={(e) => setNewProj(s => ({ ...s, project_name: e.target.value }))} /></div>
             <div>
               <Label>PM</Label>
               <PeopleSelectDropdown role="PM" value={newProj.pm} onValueChange={(val) => setNewProj(s => ({ ...s, pm: val }))} placeholder="Vyberte PM" />

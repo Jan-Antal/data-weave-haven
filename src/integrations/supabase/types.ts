@@ -22,6 +22,7 @@ export type Database = {
           id: string
           tab: string
           updated_at: string
+          width: number | null
         }
         Insert: {
           column_key: string
@@ -30,6 +31,7 @@ export type Database = {
           id?: string
           tab: string
           updated_at?: string
+          width?: number | null
         }
         Update: {
           column_key?: string
@@ -38,6 +40,7 @@ export type Database = {
           id?: string
           tab?: string
           updated_at?: string
+          width?: number | null
         }
         Relationships: []
       }
