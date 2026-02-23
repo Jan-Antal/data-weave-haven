@@ -40,7 +40,7 @@ export function DashboardStats() {
   const highRisk = projects.filter(p => p.risk === "High").length;
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       <StatCard label="Celkem zakázek" value={totalProjects.toString()} />
       <StatCard label="Aktivní zakázky" value={activeProjects.toString()} />
       <StatCard
