@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, KeyRound } from "lucide-react";
 import type { AppRole } from "@/hooks/useAuth";
 
 interface UserRow {
@@ -41,6 +41,10 @@ export function UserManagement({ open, onOpenChange }: Props) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [resetTarget, setResetTarget] = useState<string | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [resetError, setResetError] = useState("");
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -140,6 +144,31 @@ export function UserManagement({ open, onOpenChange }: Props) {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!resetTarget || !resetPassword.trim()) {
+      setResetError("Heslo je povinné");
+      return;
+    }
+    setResetSubmitting(true);
+    setResetError("");
+    try {
+      const { data, error } = await supabase.functions.invoke("update-user", {
+        body: { user_id: resetTarget, password: resetPassword },
+      });
+      if (error || data?.error) {
+        setResetError(data?.error || error?.message || "Chyba při změně hesla");
+      } else {
+        toast({ title: "Heslo bylo změněno" });
+        setResetTarget(null);
+        setResetPassword("");
+      }
+    } catch (e: any) {
+      setResetError(e.message || "Neočekávaná chyba");
+    } finally {
+      setResetSubmitting(false);
+    }
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -158,17 +187,17 @@ export function UserManagement({ open, onOpenChange }: Props) {
                   <TableHead className="min-w-[180px]">Email</TableHead>
                   <TableHead className="w-[140px]">Role</TableHead>
                   <TableHead className="w-[80px] text-center">Aktivní</TableHead>
-                  <TableHead className="w-[48px]" />
+                  <TableHead className="w-[80px]" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Načítání...</TableCell>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Načítání...</TableCell>
                   </TableRow>
                 ) : users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Žádní uživatelé</TableCell>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Žádní uživatelé</TableCell>
                   </TableRow>
                 ) : (
                   users.map((u) => (
@@ -190,7 +219,14 @@ export function UserManagement({ open, onOpenChange }: Props) {
                       <TableCell className="text-center">
                         <Switch checked={u.is_active} onCheckedChange={(v) => handleToggleActive(u.id, v)} />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="flex gap-1">
+                        <button
+                          onClick={() => { setResetTarget(u.id); setResetPassword(""); setResetError(""); }}
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                          title="Reset hesla"
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => setDeleteTarget(u.id)}
                           className="text-muted-foreground hover:text-destructive transition-colors"
@@ -259,6 +295,35 @@ export function UserManagement({ open, onOpenChange }: Props) {
             <Button variant="outline" onClick={() => { setAddOpen(false); setFieldErrors({}); setSubmitError(""); }}>Zrušit</Button>
             <Button onClick={handleAddUser} disabled={submitting}>
               {submitting ? "Vytvářím..." : "Vytvořit"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={resetTarget !== null} onOpenChange={(v) => { if (!v) { setResetTarget(null); setResetPassword(""); setResetError(""); } }}>
+        <DialogContent className="z-[99999] max-w-sm" style={{ zIndex: 99999 }}>
+          <DialogHeader>
+            <DialogTitle>Reset hesla</DialogTitle>
+          </DialogHeader>
+          {resetError && (
+            <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded px-3 py-2">
+              {resetError}
+            </div>
+          )}
+          <div>
+            <Label>Nové heslo</Label>
+            <Input
+              type="text"
+              value={resetPassword}
+              onChange={(e) => { setResetPassword(e.target.value); setResetError(""); }}
+              placeholder="Zadejte nové heslo..."
+            />
+          </div>
+          <div className="flex justify-end gap-2 mt-2">
+            <Button variant="outline" onClick={() => { setResetTarget(null); setResetPassword(""); setResetError(""); }}>Zrušit</Button>
+            <Button onClick={handleResetPassword} disabled={resetSubmitting || !resetPassword.trim()}>
+              {resetSubmitting ? "Ukládám..." : "Uložit nové heslo"}
             </Button>
           </div>
         </DialogContent>

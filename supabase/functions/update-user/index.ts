@@ -48,13 +48,24 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { user_id, full_name, role, is_active } = await req.json();
+    const { user_id, full_name, role, is_active, password } = await req.json();
 
     if (!user_id) {
       return new Response(JSON.stringify({ error: "Missing user_id" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Update password if provided
+    if (password !== undefined) {
+      const { error: pwError } = await adminClient.auth.admin.updateUserById(user_id, { password });
+      if (pwError) {
+        return new Response(JSON.stringify({ error: pwError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     // Update profile
@@ -68,7 +79,6 @@ Deno.serve(async (req) => {
 
     // Update role if provided
     if (role !== undefined) {
-      // Delete existing roles and insert new one
       await adminClient.from("user_roles").delete().eq("user_id", user_id);
       await adminClient.from("user_roles").insert({ user_id, role });
     }
