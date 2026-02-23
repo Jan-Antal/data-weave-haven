@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "./StatusBadge";
 import { InlineEditableCell } from "./InlineEditableCell";
@@ -25,6 +25,7 @@ import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 import { ProjectEditDialog } from "./ProjectEditDialog";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
+import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
 
 const PROJECT_INFO_COLUMNS = [
   { key: "project_id", label: "Project ID", locked: true },
@@ -73,7 +74,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const qc = useQueryClient();
   const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
   const { isVisible, toggleColumn, columns } = useColumnVisibility("col-vis-project-info", PROJECT_INFO_COLUMNS);
-
+  const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck();
   useEffect(() => {
     const handleOpenAdd = () => setAddOpen(true);
     document.addEventListener("open-add-project", handleOpenAdd);
@@ -189,7 +190,15 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader><DialogTitle>Nový projekt</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-            <div><Label>Project ID <span className="text-orange-500">*</span></Label><Input value={newProj.project_id} onChange={(e) => setNewProj(s => ({ ...s, project_id: e.target.value }))} /></div>
+            <div>
+              <Label>Project ID <span className="text-orange-500">*</span></Label>
+              <Input
+                value={newProj.project_id}
+                onChange={(e) => { setNewProj(s => ({ ...s, project_id: e.target.value })); resetIdCheck(); }}
+                onBlur={() => checkProjectId(newProj.project_id)}
+              />
+              {idExists && <p className="text-xs text-destructive mt-1">Toto ID již existuje</p>}
+            </div>
             <div>
               <Label>Datum Smluvní <span className="text-foreground font-bold">*</span></Label>
               <Popover>
@@ -260,8 +269,8 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Zrušit</Button>
-            <Button onClick={handleAddProject} disabled={!newProj.project_id || !newProj.project_name}>
+            <Button variant="outline" onClick={() => { setAddOpen(false); resetIdCheck(); }}>Zrušit</Button>
+            <Button onClick={handleAddProject} disabled={!newProj.project_id || !newProj.project_name || idExists}>
               {datumWarning && !newProj.datum_smluvni ? "Přesto vytvořit" : "Vytvořit"}
             </Button>
           </DialogFooter>

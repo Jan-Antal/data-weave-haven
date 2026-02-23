@@ -14,6 +14,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
+import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
 
 interface Project {
   id: string;
@@ -41,6 +42,7 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const statusLabels = statusOptions.map((s) => s.label);
   const [form, setForm] = useState({
+    project_id: "",
     project_name: "",
     klient: "",
     pm: "",
@@ -53,10 +55,12 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
     marze: "",
   });
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck(project?.id);
 
   useEffect(() => {
     if (project && open) {
       setForm({
+        project_id: project.project_id || "",
         project_name: project.project_name || "",
         klient: project.klient || "",
         pm: project.pm || "",
@@ -69,13 +73,16 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
         marze: project.marze || "",
       });
       setConfirmDelete(false);
+      resetIdCheck();
     }
-  }, [project, open]);
+  }, [project, open, resetIdCheck]);
 
   if (!project) return null;
 
   const handleSave = async () => {
+    if (idExists) return;
     const { error } = await supabase.from("projects").update({
+      project_id: form.project_id,
       project_name: form.project_name,
       klient: form.klient || null,
       pm: form.pm || null,
@@ -114,7 +121,18 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <div>
             <Label>Project ID</Label>
-            <Input value={project.project_id} disabled className="bg-muted" />
+            <Input
+              value={form.project_id}
+              onChange={(e) => setForm(s => ({ ...s, project_id: e.target.value }))}
+              onBlur={() => {
+                if (form.project_id !== project.project_id) {
+                  checkProjectId(form.project_id);
+                } else {
+                  resetIdCheck();
+                }
+              }}
+            />
+            {idExists && <p className="text-xs text-destructive mt-1">Toto ID již existuje</p>}
           </div>
           <div>
             <Label>Datum Smluvní</Label>
@@ -212,7 +230,7 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Zavřít</Button>
-          <Button onClick={handleSave}>Uložit</Button>
+          <Button onClick={handleSave} disabled={idExists || !form.project_id}>Uložit</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
