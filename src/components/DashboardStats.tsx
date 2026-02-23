@@ -163,62 +163,58 @@ export function DashboardStats({ personFilter, statusFilter, search }: Dashboard
       </button>
 
       {!collapsed && (
-        <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-          {/* ROW 1 */}
-          <div className="flex gap-4">
-            {/* Column 1 — narrow stats */}
-            <div className="flex flex-col gap-4 w-[180px] shrink-0">
-              <div className="rounded-lg border bg-card p-4 flex-1">
-                <p className="text-xs text-muted-foreground">Aktivní zakázky</p>
-                <p className="text-3xl font-serif font-bold mt-1">{activeCount}</p>
-              </div>
-              <div className="rounded-lg border bg-card p-4 flex-1">
-                <p className="text-xs text-muted-foreground">Celková hodnota</p>
-                <p className="text-lg font-serif font-bold mt-1">
-                  {formatNumber(totalValueCZK)} Kč
-                </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">aktivní, v CZK</p>
-              </div>
-            </div>
+        <div className="flex gap-3 animate-in fade-in slide-in-from-top-2 duration-200" style={{ height: 180 }}>
+          {/* Aktivní zakázky ~10% */}
+          <div className="rounded-lg border bg-card p-4 flex flex-col justify-center" style={{ width: "10%", minWidth: 100 }}>
+            <p className="text-xs text-muted-foreground">Aktivní zakázky</p>
+            <p className="text-3xl font-serif font-bold mt-1">{activeCount}</p>
+          </div>
 
-            {/* Column 2 — Pipeline chart */}
-            <div className="rounded-lg border bg-card p-4 flex-1 min-w-0">
-              <p className="text-xs text-muted-foreground mb-3">Pipeline zakázek</p>
-              <div className="h-[140px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={pipelineData} margin={{ top: 20, right: 10, left: 10, bottom: 0 }}>
-                    <XAxis
-                      dataKey="name"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          {/* Celková hodnota ~15% */}
+          <div className="rounded-lg border bg-card p-4 flex flex-col justify-center" style={{ width: "15%", minWidth: 130 }}>
+            <p className="text-xs text-muted-foreground">Celková hodnota</p>
+            <p className="text-lg font-serif font-bold mt-1">{formatNumber(totalValueCZK)} Kč</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">aktivní, v CZK</p>
+          </div>
+
+          {/* Pipeline ~40% */}
+          <div className="rounded-lg border bg-card p-3 flex flex-col min-w-0" style={{ width: "40%" }}>
+            <p className="text-xs text-muted-foreground mb-1">Pipeline zakázek</p>
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={pipelineData} margin={{ top: 16, right: 4, left: 4, bottom: 0 }}>
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    interval={0}
+                  />
+                  <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={36}>
+                    {pipelineData.map((entry, i) => (
+                      <Cell key={i} fill={entry.fill} />
+                    ))}
+                    <LabelList
+                      dataKey="count"
+                      position="top"
+                      style={{ fontSize: 11, fontWeight: 600, fill: "hsl(var(--foreground))" }}
                     />
-                    <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={48}>
-                      {pipelineData.map((entry, i) => (
-                        <Cell key={i} fill={entry.fill} />
-                      ))}
-                      <LabelList
-                        dataKey="count"
-                        position="top"
-                        style={{ fontSize: 12, fontWeight: 600, fill: "hsl(var(--foreground))" }}
-                      />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
-          {/* ROW 2 — PM workload */}
-          {pmData.length > 0 && (
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-xs text-muted-foreground mb-3">Vytížení PM</p>
-              <div style={{ height: Math.max(80, pmData.length * 32 + 16) }}>
+          {/* Vytížení PM ~35% */}
+          <div className="rounded-lg border bg-card p-3 flex flex-col min-w-0" style={{ width: "35%" }}>
+            <p className="text-xs text-muted-foreground mb-1">Vytížení PM</p>
+            <div className="flex-1 min-h-0">
+              {pmData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={pmData}
                     layout="vertical"
-                    margin={{ top: 0, right: 40, left: 0, bottom: 0 }}
+                    margin={{ top: 0, right: 30, left: 0, bottom: 0 }}
                   >
                     <XAxis type="number" hide />
                     <YAxis
@@ -226,24 +222,26 @@ export function DashboardStats({ personFilter, statusFilter, search }: Dashboard
                       dataKey="name"
                       axisLine={false}
                       tickLine={false}
-                      width={120}
-                      tick={{ fontSize: 12, fill: "hsl(var(--foreground))" }}
+                      width={90}
+                      tick={{ fontSize: 11, fill: "hsl(var(--foreground))" }}
                     />
-                    <Bar dataKey="count" radius={[0, 4, 4, 0]} maxBarSize={22}>
+                    <Bar dataKey="count" radius={[0, 3, 3, 0]} maxBarSize={18}>
                       {pmData.map((entry, i) => (
                         <Cell key={i} fill={getPmBarColor(entry.count)} />
                       ))}
                       <LabelList
                         dataKey="count"
                         position="right"
-                        style={{ fontSize: 12, fontWeight: 600, fill: "hsl(var(--foreground))" }}
+                        style={{ fontSize: 11, fontWeight: 600, fill: "hsl(var(--foreground))" }}
                       />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-4">Žádná data</p>
+              )}
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>
