@@ -25,6 +25,24 @@ const Index = () => {
   const [userMgmtOpen, setUserMgmtOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("project-info");
   const [riskHighlight, setRiskHighlight] = useState<RiskHighlightType>(null);
+  const [savedStatusFilter, setSavedStatusFilter] = useState<string[] | null>(null);
+
+  const TPV_ACTIVE_STATUSES = ["Příprava", "Engineering", "TPV"];
+
+  const handleTabChange = (tab: string) => {
+    if (tab === "tpv-status" && activeTab !== "tpv-status") {
+      // Entering TPV tab: save current filter, apply TPV filter
+      setSavedStatusFilter(filters.statusFilter);
+      filters.setStatusFilter(TPV_ACTIVE_STATUSES);
+    } else if (tab !== "tpv-status" && activeTab === "tpv-status") {
+      // Leaving TPV tab: restore saved filter
+      if (savedStatusFilter !== null) {
+        filters.setStatusFilter(savedStatusFilter);
+        setSavedStatusFilter(null);
+      }
+    }
+    setActiveTab(tab);
+  };
   const { profile, signOut, canAccessSettings, canCreateProject, isAdmin } = useAuth();
 
   return (
@@ -110,7 +128,7 @@ const Index = () => {
       <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6 flex-1">
         <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRiskHighlightChange={setRiskHighlight} activeTab={activeTab} />
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList className="bg-card border">
             <TabsTrigger value="project-info" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               Project Info
