@@ -187,16 +187,45 @@ export function InlineEditableCell({
   const textContent = String(value ?? "");
   const isTextarea = type === "textarea";
 
+  if (isTextarea) {
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <div
+            className={cn(
+              "cursor-pointer hover:bg-muted/80 rounded px-1 py-0.5 overflow-hidden h-7 leading-7 truncate whitespace-nowrap text-xs",
+              className
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditValue(String(value ?? ""));
+              setEditing(true);
+            }}
+          >
+            {displayValue ?? (value !== null && value !== undefined && value !== "" ? String(value) : "—")}
+          </div>
+        </PopoverTrigger>
+        {textContent && textContent !== "—" && (
+          <PopoverContent
+            side="bottom"
+            align="start"
+            className="w-[280px] p-2 text-xs leading-relaxed whitespace-pre-wrap"
+            onPointerDownOutside={(e) => e.preventDefault()}
+          >
+            {textContent}
+          </PopoverContent>
+        )}
+      </Popover>
+    );
+  }
+
   return (
     <TooltipProvider delayDuration={300}>
       <Tooltip>
         <TooltipTrigger asChild>
           <div
             className={cn(
-              "cursor-pointer hover:bg-muted/80 rounded px-1 py-0.5 overflow-hidden",
-              isTextarea
-                ? "h-7 leading-[1.3] text-xs whitespace-normal line-clamp-2 flex items-center"
-                : "h-7 leading-7 truncate whitespace-nowrap text-xs",
+              "cursor-pointer hover:bg-muted/80 rounded px-1 py-0.5 overflow-hidden h-7 leading-7 truncate whitespace-nowrap text-xs",
               className
             )}
             onClick={() => {
