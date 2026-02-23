@@ -119,42 +119,66 @@ export type Database = {
       project_stages: {
         Row: {
           created_at: string
+          datum_smluvni: string | null
           deleted_at: string | null
           end_date: string | null
+          expedice: string | null
           id: string
           notes: string | null
+          pm: string | null
+          pm_poznamka: string | null
+          predani: string | null
           project_id: string
+          risk: string | null
           stage_name: string
           stage_order: number | null
           start_date: string | null
           status: string | null
+          tpv_date: string | null
           updated_at: string
+          zamereni: string | null
         }
         Insert: {
           created_at?: string
+          datum_smluvni?: string | null
           deleted_at?: string | null
           end_date?: string | null
+          expedice?: string | null
           id?: string
           notes?: string | null
+          pm?: string | null
+          pm_poznamka?: string | null
+          predani?: string | null
           project_id: string
+          risk?: string | null
           stage_name: string
           stage_order?: number | null
           start_date?: string | null
           status?: string | null
+          tpv_date?: string | null
           updated_at?: string
+          zamereni?: string | null
         }
         Update: {
           created_at?: string
+          datum_smluvni?: string | null
           deleted_at?: string | null
           end_date?: string | null
+          expedice?: string | null
           id?: string
           notes?: string | null
+          pm?: string | null
+          pm_poznamka?: string | null
+          predani?: string | null
           project_id?: string
+          risk?: string | null
           stage_name?: string
           stage_order?: number | null
           start_date?: string | null
           status?: string | null
+          tpv_date?: string | null
           updated_at?: string
+          zamereni?: string | null
         }
         Relationships: [
           {
