@@ -55,18 +55,43 @@ export function SortableHeader({
     e.preventDefault();
     e.stopPropagation();
     const startX = e.clientX;
-    const startWidth = thRef.current?.getBoundingClientRect().width || 100;
+    const th = thRef.current;
+    if (!th) return;
+    const startWidth = th.getBoundingClientRect().width;
+
+    // Force table-layout: fixed on the parent table so widths are respected
+    const table = th.closest("table");
+    if (table) {
+      table.style.tableLayout = "fixed";
+    }
+
+    // Find the column index of this th
+    const row = th.parentElement;
+    const colIndex = row ? Array.from(row.children).indexOf(th) : -1;
 
     const handleMouseMove = (moveE: MouseEvent) => {
-      const newWidth = Math.max(50, startWidth + moveE.clientX - startX);
-      if (thRef.current) {
-        thRef.current.style.width = `${newWidth}px`;
-        thRef.current.style.minWidth = `${newWidth}px`;
+      const newWidth = Math.max(40, startWidth + moveE.clientX - startX);
+      th.style.width = `${newWidth}px`;
+      th.style.minWidth = `${newWidth}px`;
+      th.style.maxWidth = `${newWidth}px`;
+
+      // Apply to all cells in the same column
+      if (table && colIndex >= 0) {
+        const rows = table.querySelectorAll("tr");
+        rows.forEach((tr) => {
+          const cell = tr.children[colIndex] as HTMLElement | undefined;
+          if (cell && cell !== th) {
+            cell.style.width = `${newWidth}px`;
+            cell.style.minWidth = `${newWidth}px`;
+            cell.style.maxWidth = `${newWidth}px`;
+            cell.style.overflow = "hidden";
+          }
+        });
       }
     };
 
     const handleMouseUp = (upE: MouseEvent) => {
-      const finalWidth = Math.max(50, startWidth + upE.clientX - startX);
+      const finalWidth = Math.max(40, startWidth + upE.clientX - startX);
       onWidthChange?.(Math.round(finalWidth));
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
@@ -96,7 +121,7 @@ export function SortableHeader({
         editMode ? "cursor-default border-b-2 border-accent" : "cursor-pointer",
         className
       )}
-      style={style}
+      style={{ ...style, overflow: "hidden" }}
       onClick={handleClick}
     >
       <div className="flex items-center gap-1 pr-2">
