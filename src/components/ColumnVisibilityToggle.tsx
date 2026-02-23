@@ -22,7 +22,7 @@ export function ColumnVisibilityToggle({
   onToggleEditMode,
 }: ColumnVisibilityToggleProps) {
   return (
-    <TableHead className="w-[32px] min-w-[32px] p-0 sticky right-0 bg-card z-20">
+    <TableHead className="w-[32px] min-w-[32px] p-0 sticky right-0 z-20" style={{ background: 'linear-gradient(hsl(var(--primary) / 0.05), hsl(var(--primary) / 0.05)), hsl(var(--card))' }}>
       <Popover>
         <PopoverTrigger asChild>
           <button
