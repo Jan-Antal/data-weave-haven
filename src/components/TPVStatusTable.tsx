@@ -15,6 +15,7 @@ import { TPVItemsView } from "./TPVItemsView";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
 
 const TPV_COLUMNS = [
   { key: "project_id", label: "Project ID", locked: true },
@@ -45,6 +46,7 @@ interface TPVStatusTableProps {
   personFilter: string | null;
   statusFilter: string[];
   search: string;
+  riskHighlight?: import("@/hooks/useRiskHighlight").RiskHighlightType;
 }
 
 const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
@@ -64,7 +66,7 @@ const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
   tpv_poznamka: { minWidth: 140, flex: 1 },
 };
 
-export function TPVStatusTable({ personFilter, statusFilter, search: externalSearch }: TPVStatusTableProps) {
+export function TPVStatusTable({ personFilter, statusFilter, search: externalSearch, riskHighlight }: TPVStatusTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const statusLabels = statusOptions.map((s) => s.label);
@@ -140,7 +142,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
           </TableHeader>
           <TableBody>
             {sorted.map((p) => (
-              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors h-9">
+              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors h-9" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { borderLeft: `3px solid ${c}` } : {}; })()}>
                 <TableCell
                   className="w-[32px] cursor-pointer"
                   onClick={() => setActiveProject({ projectId: p.project_id, projectName: p.project_name })}

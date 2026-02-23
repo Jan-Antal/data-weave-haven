@@ -1,18 +1,16 @@
 import { useMemo, useState, useEffect } from "react";
 import { useProjects } from "@/hooks/useProjects";
 import { useExchangeRates, getExchangeRate } from "@/hooks/useExchangeRates";
-import { usePeople } from "@/hooks/usePeople";
 import { parseAppDate } from "@/lib/dateFormat";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { RiskHighlightType } from "@/hooks/useRiskHighlight";
 import {
   BarChart,
   Bar,
   XAxis,
-  YAxis,
   ResponsiveContainer,
   Cell,
   LabelList,
-  CartesianGrid,
 } from "recharts";
 
 const STORAGE_KEY = "dashboard-collapsed";
@@ -51,22 +49,17 @@ function formatNumber(v: number): string {
   }).format(v);
 }
 
-function getPmBarColor(count: number): string {
-  if (count > 12) return "hsl(0, 70%, 55%)";
-  if (count > 8) return "#EA592A";
-  return "#52b04a";
-}
-
 interface DashboardStatsProps {
   personFilter?: string | null;
   statusFilter?: string[];
   search?: string;
+  riskHighlight: RiskHighlightType;
+  onRiskHighlightChange: (v: RiskHighlightType) => void;
 }
 
-export function DashboardStats({ personFilter, statusFilter, search }: DashboardStatsProps) {
+export function DashboardStats({ personFilter, statusFilter, search, riskHighlight, onRiskHighlightChange }: DashboardStatsProps) {
   const { data: projects = [] } = useProjects();
   const { data: rates = [] } = useExchangeRates();
-  const { data: people = [] } = usePeople();
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -111,7 +104,7 @@ export function DashboardStats({ personFilter, statusFilter, search }: Dashboard
     return list;
   }, [projects, personFilter, statusFilter, search]);
 
-  // Active projects (not Dokončeno, not in trash)
+  // Active projects (not Dokončeno/Fakturace)
   const activeProjects = useMemo(
     () => filtered.filter((p) => !EXCLUDED_STATUSES.includes(p.status || "")),
     [filtered]
@@ -140,18 +133,41 @@ export function DashboardStats({ personFilter, statusFilter, search }: Dashboard
     }));
   }, [filtered]);
 
-  // PM workload data
-  const pmData = useMemo(() => {
-    const counts: Record<string, number> = {};
+  // Risk & deadlines counts
+  const riskCounts = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const in14 = new Date(now);
+    in14.setDate(in14.getDate() + 14);
+
+    let overdue = 0;
+    let upcoming = 0;
+    let highRisk = 0;
+
     activeProjects.forEach((p) => {
-      if (p.pm) {
-        counts[p.pm] = (counts[p.pm] || 0) + 1;
+      if (p.datum_smluvni) {
+        const d = parseAppDate(p.datum_smluvni);
+        if (d) {
+          d.setHours(0, 0, 0, 0);
+          if (d < now) overdue++;
+          else if (d <= in14) upcoming++;
+        }
       }
+      if (p.risk === "High") highRisk++;
     });
-    return Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
+
+    return { overdue, upcoming, highRisk };
   }, [activeProjects]);
+
+  const toggleRisk = (type: RiskHighlightType) => {
+    onRiskHighlightChange(riskHighlight === type ? null : type);
+  };
+
+  const riskRows: { key: RiskHighlightType; color: string; label: string; count: number }[] = [
+    { key: "overdue", color: "hsl(0, 70%, 55%)", label: "Po termínu", count: riskCounts.overdue },
+    { key: "upcoming", color: "#EA592A", label: "Termín do 14 dní", count: riskCounts.upcoming },
+    { key: "high-risk", color: "#EAB308", label: "Vysoké riziko", count: riskCounts.highRisk },
+  ];
 
   return (
     <div className="space-y-2">
@@ -179,9 +195,9 @@ export function DashboardStats({ personFilter, statusFilter, search }: Dashboard
             </div>
           </div>
 
-          {/* Pipeline ~40% */}
-          <div className="rounded-lg border bg-card p-3 flex flex-col min-w-0" style={{ width: "40%" }}>
-            <p className="text-xs text-muted-foreground mb-1">Pipeline zakázek</p>
+          {/* Pipeline ~45% */}
+          <div className="rounded-lg border bg-card p-3 flex flex-col min-w-0" style={{ width: "45%" }}>
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Pipeline zakázek</p>
             <div className="flex-1 min-h-0">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={pipelineData} margin={{ top: 16, right: 4, left: 4, bottom: 0 }}>
@@ -207,41 +223,32 @@ export function DashboardStats({ personFilter, statusFilter, search }: Dashboard
             </div>
           </div>
 
-          {/* Vytížení PM ~35% */}
-          <div className="rounded-lg border bg-card p-3 flex flex-col min-w-0" style={{ width: "35%" }}>
-            <p className="text-xs text-muted-foreground mb-1">Vytížení PM</p>
-            <div className="flex-1 min-h-0">
-              {pmData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={pmData}
-                    layout="vertical"
-                    margin={{ top: 0, right: 30, left: 0, bottom: 0 }}
-                  >
-                    <XAxis type="number" hide />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      axisLine={false}
-                      tickLine={false}
-                      width={90}
-                      tick={{ fontSize: 11, fill: "hsl(var(--foreground))" }}
+          {/* Riziko & Termíny ~35% */}
+          <div className="rounded-lg border bg-card p-4 flex flex-col" style={{ width: "35%", minWidth: 180 }}>
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-3">Riziko & Termíny</p>
+            <div className="flex flex-col gap-2 flex-1 justify-center">
+              {riskRows.map(({ key, color, label, count }) => (
+                <button
+                  key={key}
+                  onClick={() => toggleRisk(key)}
+                  className={`flex items-center justify-between px-3 py-1.5 rounded-md transition-colors text-sm ${
+                    riskHighlight === key
+                      ? "bg-muted ring-1 ring-border"
+                      : "hover:bg-muted/50"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: color }}
                     />
-                    <Bar dataKey="count" radius={[0, 3, 3, 0]} maxBarSize={18}>
-                      {pmData.map((entry, i) => (
-                        <Cell key={i} fill={getPmBarColor(entry.count)} />
-                      ))}
-                      <LabelList
-                        dataKey="count"
-                        position="right"
-                        style={{ fontSize: 11, fontWeight: 600, fill: "hsl(var(--foreground))" }}
-                      />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <p className="text-xs text-muted-foreground mt-4">Žádná data</p>
-              )}
+                    <span className="text-foreground">{label}</span>
+                  </span>
+                  <span className="font-bold tabular-nums" style={{ color }}>
+                    {count}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
