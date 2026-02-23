@@ -11,11 +11,12 @@ import {
   ResponsiveContainer,
   Cell,
   LabelList,
+  PieChart,
+  Pie,
 } from "recharts";
 
 const STORAGE_KEY = "dashboard-collapsed";
 
-// Pipeline: status value → display label
 const PIPELINE_STAGES: { status: string; label: string }[] = [
   { status: "Příprava", label: "Příprava" },
   { status: "Engineering", label: "Konstrukce" },
@@ -35,6 +36,12 @@ const PIPELINE_COLORS: Record<string, string> = {
   "Montáž": "#256422",
   "Reklamace": "#EA592A",
 };
+
+const PM_GREENS = [
+  "#1a3a1a", "#256422", "#2d7a2d", "#3a8a36", "#48a344",
+  "#52b04a", "#6bc462", "#7cc576", "#93d48e", "#a7d9a2",
+  "#bce6b8", "#d4f0d0",
+];
 
 function getProjectYear(datumSmluvni: string | null): number {
   if (!datumSmluvni) return new Date().getFullYear();
@@ -75,36 +82,25 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
     } catch {}
   }, [collapsed]);
 
-  // Filter projects based on active table filters
   const filtered = useMemo(() => {
     let list = projects;
-
     if (personFilter) {
       list = list.filter(
-        (p) =>
-          p.pm === personFilter ||
-          p.konstrukter === personFilter ||
-          p.kalkulant === personFilter
+        (p) => p.pm === personFilter || p.konstrukter === personFilter || p.kalkulant === personFilter
       );
     }
-
     if (statusFilter && statusFilter.length > 0) {
       list = list.filter((p) => statusFilter.includes(p.status || ""));
     }
-
     if (search) {
       const q = search.toLowerCase();
       list = list.filter((p) =>
-        Object.values(p).some(
-          (v) => typeof v === "string" && v.toLowerCase().includes(q)
-        )
+        Object.values(p).some((v) => typeof v === "string" && v.toLowerCase().includes(q))
       );
     }
-
     return list;
   }, [projects, personFilter, statusFilter, search]);
 
-  // Active projects (not Dokončeno/Fakturace)
   const activeProjects = useMemo(
     () => filtered.filter((p) => !EXCLUDED_STATUSES.includes(p.status || "")),
     [filtered]
@@ -124,7 +120,6 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
     }, 0);
   }, [activeProjects, rates]);
 
-  // Pipeline data
   const pipelineData = useMemo(() => {
     return PIPELINE_STAGES.map(({ status, label }) => ({
       name: label,
@@ -133,17 +128,14 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
     }));
   }, [filtered]);
 
-  // Risk & deadlines counts
   const riskCounts = useMemo(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     const in14 = new Date(now);
     in14.setDate(in14.getDate() + 14);
-
     let overdue = 0;
     let upcoming = 0;
     let highRisk = 0;
-
     activeProjects.forEach((p) => {
       if (p.datum_smluvni) {
         const d = parseAppDate(p.datum_smluvni);
@@ -155,18 +147,33 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
       }
       if (p.risk === "High") highRisk++;
     });
-
     return { overdue, upcoming, highRisk };
+  }, [activeProjects]);
+
+  // PM workload data
+  const pmData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    activeProjects.forEach((p) => {
+      const pm = p.pm || "Nepřiřazeno";
+      counts[pm] = (counts[pm] || 0) + 1;
+    });
+    const sorted = Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+    return sorted.map((entry, i) => ({
+      ...entry,
+      fill: PM_GREENS[i % PM_GREENS.length],
+    }));
   }, [activeProjects]);
 
   const toggleRisk = (type: RiskHighlightType) => {
     onRiskHighlightChange(riskHighlight === type ? null : type);
   };
 
-  const riskRows: { key: RiskHighlightType; color: string; label: string; count: number }[] = [
-    { key: "overdue", color: "hsl(0, 70%, 55%)", label: "Po termínu", count: riskCounts.overdue },
-    { key: "upcoming", color: "#EA592A", label: "Termín do 14 dní", count: riskCounts.upcoming },
-    { key: "high-risk", color: "#EAB308", label: "Vysoké riziko", count: riskCounts.highRisk },
+  const riskRows: { key: RiskHighlightType; color: string; bgTint: string; label: string; count: number }[] = [
+    { key: "overdue", color: "hsl(0, 70%, 55%)", bgTint: "hsla(0, 70%, 55%, 0.06)", label: "Po termínu", count: riskCounts.overdue },
+    { key: "upcoming", color: "#EA592A", bgTint: "transparent", label: "Termín do 14 dní", count: riskCounts.upcoming },
+    { key: "high-risk", color: "#EAB308", bgTint: "transparent", label: "Vysoké riziko", count: riskCounts.highRisk },
   ];
 
   return (
@@ -180,32 +187,36 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
       </button>
 
       {!collapsed && (
-        <div className="flex gap-3 animate-in fade-in slide-in-from-top-2 duration-200" style={{ height: 180 }}>
-          {/* Aktivní zakázky + Celková hodnota combined ~20% */}
-          <div className="rounded-lg border bg-card p-4 flex flex-col justify-center" style={{ width: "20%", minWidth: 150 }}>
+        <div className="flex gap-3 animate-in fade-in slide-in-from-top-2 duration-200" style={{ height: 190 }}>
+          {/* Card 1: Aktivní zakázky + Celková hodnota */}
+          <div className="rounded-lg border bg-card py-5 px-5 flex flex-col justify-center" style={{ width: "18%", minWidth: 140 }}>
             <div className="flex-1 flex flex-col justify-center">
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Aktivní zakázky</p>
-              <p className="text-3xl font-serif font-bold mt-0.5">{activeCount}</p>
+              <p style={{ fontSize: 10 }} className="uppercase tracking-wider" >
+                <span style={{ color: "#999" }}>Aktivní zakázky</span>
+              </p>
+              <p className="font-serif font-bold leading-none mt-1" style={{ fontSize: 48 }}>{activeCount}</p>
             </div>
-            <div className="border-t border-border my-2" />
+            <div className="my-3" style={{ borderTop: "1px solid #f0ede8" }} />
             <div className="flex-1 flex flex-col justify-center">
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Celková hodnota</p>
-              <p className="text-lg font-serif font-bold mt-0.5">{formatNumber(totalValueCZK)} Kč</p>
-              <p className="text-[11px] text-muted-foreground">aktivní, v CZK</p>
+              <p style={{ fontSize: 10 }} className="uppercase tracking-wider">
+                <span style={{ color: "#999" }}>Celková hodnota</span>
+              </p>
+              <p className="font-serif font-bold mt-1" style={{ fontSize: 22 }}>{formatNumber(totalValueCZK)} Kč</p>
+              <p style={{ fontSize: 10, color: "#aaa" }} className="mt-0.5">aktivní, v CZK</p>
             </div>
           </div>
 
-          {/* Pipeline ~45% */}
-          <div className="rounded-lg border bg-card p-3 flex flex-col min-w-0" style={{ width: "45%" }}>
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Pipeline zakázek</p>
-            <div className="flex-1 min-h-0">
+          {/* Card 2: Pipeline */}
+          <div className="rounded-lg border bg-card p-3 flex flex-col min-w-0" style={{ width: "35%" }}>
+            <p style={{ fontSize: 10, color: "#999" }} className="uppercase tracking-wider mb-1">Pipeline zakázek</p>
+            <div className="flex-1 min-h-0 flex items-center">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={pipelineData} margin={{ top: 16, right: 4, left: 4, bottom: 0 }}>
+                <BarChart data={pipelineData} margin={{ top: 18, right: 4, left: 4, bottom: 0 }}>
                   <XAxis
                     dataKey="name"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    tick={{ fontSize: 10, fill: "#999" }}
                     interval={0}
                   />
                   <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={36}>
@@ -215,7 +226,7 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
                     <LabelList
                       dataKey="count"
                       position="top"
-                      style={{ fontSize: 11, fontWeight: 600, fill: "hsl(var(--foreground))" }}
+                      style={{ fontSize: 11, fontWeight: 700, fill: "hsl(var(--foreground))" }}
                     />
                   </Bar>
                 </BarChart>
@@ -223,32 +234,83 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
             </div>
           </div>
 
-          {/* Riziko & Termíny ~35% */}
-          <div className="rounded-lg border bg-card p-4 flex flex-col" style={{ width: "35%", minWidth: 180 }}>
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-3">Riziko & Termíny</p>
-            <div className="flex flex-col gap-2 flex-1 justify-center">
-              {riskRows.map(({ key, color, label, count }) => (
+          {/* Card 3: Riziko & Termíny */}
+          <div className="rounded-lg border bg-card px-4 py-3 flex flex-col" style={{ width: "22%", minWidth: 160 }}>
+            <p style={{ fontSize: 10, color: "#999" }} className="uppercase tracking-wider mb-2">Riziko & Termíny</p>
+            <div className="flex flex-col gap-0.5">
+              {riskRows.map(({ key, color, bgTint, label, count }) => (
                 <button
                   key={key}
                   onClick={() => toggleRisk(key)}
-                  className={`flex items-center justify-between px-3 py-1.5 rounded-md transition-colors text-sm ${
-                    riskHighlight === key
-                      ? "bg-muted ring-1 ring-border"
-                      : "hover:bg-muted/50"
+                  className={`flex items-center justify-between px-2.5 rounded-md transition-colors ${
+                    riskHighlight === key ? "ring-1 ring-border" : ""
                   }`}
+                  style={{
+                    height: 36,
+                    backgroundColor: riskHighlight === key ? "hsl(var(--muted))" : bgTint,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (riskHighlight !== key) e.currentTarget.style.backgroundColor = "#f9f7f4";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (riskHighlight !== key) e.currentTarget.style.backgroundColor = bgTint;
+                  }}
                 >
                   <span className="flex items-center gap-2">
                     <span
-                      className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: color }}
+                      className="inline-block rounded-full shrink-0"
+                      style={{ width: 8, height: 8, backgroundColor: color }}
                     />
-                    <span className="text-foreground">{label}</span>
+                    <span style={{ fontSize: 13 }} className="text-foreground">{label}</span>
                   </span>
-                  <span className="font-bold tabular-nums" style={{ color }}>
+                  <span className="font-bold tabular-nums" style={{ fontSize: 18, color }}>
                     {count}
                   </span>
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Card 4: Vytížení PM */}
+          <div className="rounded-lg border bg-card px-4 py-3 flex flex-col" style={{ width: "25%", minWidth: 180 }}>
+            <p style={{ fontSize: 10, color: "#999" }} className="uppercase tracking-wider mb-1">Vytížení PM</p>
+            <div className="flex-1 min-h-0 flex items-center gap-2">
+              {/* Donut */}
+              <div className="relative" style={{ width: 110, height: 110, flexShrink: 0 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pmData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={30}
+                      outerRadius={50}
+                      paddingAngle={2}
+                      strokeWidth={0}
+                    >
+                      {pmData.map((entry, i) => (
+                        <Cell key={i} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                {/* Center count */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <span className="font-serif font-bold" style={{ fontSize: 20 }}>{activeCount}</span>
+                </div>
+              </div>
+              {/* Legend */}
+              <div className="flex flex-col gap-0.5 overflow-hidden min-w-0">
+                {pmData.map((entry) => (
+                  <div key={entry.name} className="flex items-center gap-1.5 whitespace-nowrap" style={{ fontSize: 11 }}>
+                    <span className="inline-block rounded-full shrink-0" style={{ width: 7, height: 7, backgroundColor: entry.fill }} />
+                    <span className="text-muted-foreground truncate">{entry.name}</span>
+                    <span className="font-bold text-foreground ml-auto">{entry.value}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
