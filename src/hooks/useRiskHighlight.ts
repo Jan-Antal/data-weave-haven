@@ -19,9 +19,9 @@ export function getProjectRiskColor(
 
   const severity = getProjectRiskSeverity(project);
 
-  if (activeHighlight === "overdue" && severity === "overdue") return "hsl(0, 70%, 55%)";
-  if (activeHighlight === "upcoming" && severity === "upcoming") return "#EA592A";
-  if (activeHighlight === "high-risk" && (project.risk === "High")) return "#EAB308";
+  if (activeHighlight === "overdue" && severity === "overdue") return "#fde8e8";
+  if (activeHighlight === "upcoming" && severity === "upcoming") return "#fef0e0";
+  if (activeHighlight === "high-risk" && (project.risk === "High")) return "#fefae0";
 
   return null;
 }

@@ -295,7 +295,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
           <TableBody>
             {sorted.map((p) => (
               <Fragment key={p.id}>
-                <TableRow className="hover:bg-muted/50 transition-colors h-9" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { borderLeft: `3px solid ${c}` } : {}; })()}>
+                <TableRow className="hover:bg-muted/50 transition-colors h-9" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { backgroundColor: c } : {}; })()}>
                   <TableCell className="w-[32px] cursor-pointer" onClick={() => toggleExpand(p.project_id)}>
                     <ExpandArrow projectId={p.project_id} isExpanded={expanded.has(p.project_id)} />
                   </TableCell>
