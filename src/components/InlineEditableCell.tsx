@@ -259,6 +259,11 @@ export function InlineEditableCell({
   const textContent = String(value ?? "");
   const isTextarea = type === "textarea";
 
+  // For date cells, format the stored value for display
+  const displayStr = type === "date" && textContent
+    ? (() => { const d = parseAppDate(textContent); return d ? formatAppDate(d) : textContent; })()
+    : textContent;
+
   if (isTextarea) {
     return (
       <TextareaCellWithTooltip
@@ -288,7 +293,7 @@ export function InlineEditableCell({
               setEditing(true);
             }}
           >
-            {displayValue ?? (value !== null && value !== undefined && value !== "" ? String(value) : "—")}
+            {displayValue ?? (value !== null && value !== undefined && value !== "" ? displayStr : "—")}
           </div>
         </TooltipTrigger>
         {textContent && textContent !== "—" && (
