@@ -26,7 +26,7 @@ import type { ProjectStage } from "@/hooks/useProjectStages";
 import type { Project } from "@/hooks/useProjects";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
-import { useColumnLabels } from "@/hooks/useColumnLabels";
+
 
 const PM_COLUMNS = [
   { key: "project_id", label: "Project ID", locked: true },
@@ -213,7 +213,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { isVisible, toggleColumn, columns } = useColumnVisibility("col-vis-pm-status", PM_COLUMNS);
-  const { getLabel, isCustom, updateLabel, resetLabel } = useColumnLabels("pm-status");
+  
 
   const toggleExpand = (pid: string) => {
     setExpanded(prev => {
@@ -229,9 +229,8 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Načítání...</div>;
 
-  const sh = { sortCol, sortDir, onSort: toggleSort, onRename: (key: string, name: string) => updateLabel.mutate({ columnKey: key, label: name }), onResetLabel: (key: string) => resetLabel.mutate({ columnKey: key }) };
+  const sh = { sortCol, sortDir, onSort: toggleSort };
   const v = isVisible;
-  const cl = (key: string, def: string) => ({ customLabel: getLabel(key, def), isCustom: isCustom(key) });
 
   return (
     <div>
@@ -240,18 +239,18 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
           <TableHeader>
             <TableRow className="bg-primary/5">
               <TableHead className="w-8"></TableHead>
-              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} {...cl("project_id", "Project ID")} className="min-w-[130px]" />}
-              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} {...cl("project_name", "Project Name")} className="min-w-[180px]" />}
-              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} {...cl("klient", "Klient")} className="min-w-[120px]" />}
-              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} {...cl("pm", "PM")} className="min-w-[140px]" />}
-              {v("status") && <SortableHeader label="Status" column="status" {...sh} {...cl("status", "Status")} className="min-w-[110px]" />}
-              {v("risk") && <SortableHeader label="Risk" column="risk" {...sh} {...cl("risk", "Risk")} className="min-w-[80px]" />}
-              {v("datum_smluvni") && <SortableHeader label="Smluvní" column="datum_smluvni" {...sh} {...cl("datum_smluvni", "Smluvní")} className="min-w-[90px]" />}
-              {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} {...cl("zamereni", "Zaměření")} className="min-w-[90px]" />}
-              {v("tpv_date") && <SortableHeader label="TPV" column="tpv_date" {...sh} {...cl("tpv_date", "TPV")} className="min-w-[90px]" />}
-              {v("expedice") && <SortableHeader label="Expedice" column="expedice" {...sh} {...cl("expedice", "Expedice")} className="min-w-[90px]" />}
-              {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} {...cl("predani", "Předání")} className="min-w-[90px]" />}
-              {v("pm_poznamka") && <SortableHeader label="Poznámka" column="pm_poznamka" {...sh} {...cl("pm_poznamka", "Poznámka")} className="min-w-[175px]" />}
+              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} className="min-w-[130px]" />}
+              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} className="min-w-[180px]" />}
+              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} className="min-w-[120px]" />}
+              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} className="min-w-[140px]" />}
+              {v("status") && <SortableHeader label="Status" column="status" {...sh} className="min-w-[110px]" />}
+              {v("risk") && <SortableHeader label="Risk" column="risk" {...sh} className="min-w-[80px]" />}
+              {v("datum_smluvni") && <SortableHeader label="Smluvní" column="datum_smluvni" {...sh} className="min-w-[90px]" />}
+              {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} className="min-w-[90px]" />}
+              {v("tpv_date") && <SortableHeader label="TPV" column="tpv_date" {...sh} className="min-w-[90px]" />}
+              {v("expedice") && <SortableHeader label="Expedice" column="expedice" {...sh} className="min-w-[90px]" />}
+              {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} className="min-w-[90px]" />}
+              {v("pm_poznamka") && <SortableHeader label="Poznámka" column="pm_poznamka" {...sh} className="min-w-[175px]" />}
               <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} />
             </TableRow>
           </TableHeader>
