@@ -91,6 +91,7 @@ interface InlineEditableCellProps {
   className?: string;
   displayValue?: React.ReactNode;
   peopleRole?: "PM" | "Konstruktér" | "Kalkulant";
+  readOnly?: boolean;
 }
 
 export function InlineEditableCell({
@@ -101,6 +102,7 @@ export function InlineEditableCell({
   className = "",
   displayValue,
   peopleRole,
+  readOnly = false,
 }: InlineEditableCellProps) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(String(value ?? ""));
@@ -143,7 +145,7 @@ export function InlineEditableCell({
     }
   };
 
-  if (editing) {
+  if (editing && !readOnly) {
     if (type === "people" && peopleRole) {
       return (
         <PeopleSelect
@@ -272,6 +274,7 @@ export function InlineEditableCell({
         textContent={textContent}
         className={className}
         onStartEdit={() => {
+          if (readOnly) return;
           setEditValue(String(value ?? ""));
           setEditing(true);
         }}
@@ -285,10 +288,12 @@ export function InlineEditableCell({
         <TooltipTrigger asChild>
           <div
             className={cn(
-              "cursor-pointer hover:bg-muted/80 rounded px-1 py-0.5 overflow-hidden h-7 leading-7 truncate whitespace-nowrap text-xs",
+              "rounded px-1 py-0.5 overflow-hidden h-7 leading-7 truncate whitespace-nowrap text-xs",
+              !readOnly && "cursor-pointer hover:bg-muted/80",
               className
             )}
             onClick={() => {
+              if (readOnly) return;
               setEditValue(String(value ?? ""));
               setEditing(true);
             }}

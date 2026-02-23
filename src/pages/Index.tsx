@@ -5,13 +5,15 @@ import { TPVStatusTable } from "@/components/TPVStatusTable";
 import { DashboardStats } from "@/components/DashboardStats";
 import { TableFilters, useTableFilters } from "@/components/TableFilters";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Settings, Plus } from "lucide-react";
+import { Settings, Plus, LogOut, User } from "lucide-react";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useState } from "react";
 import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
 import { StatusManagement } from "@/components/StatusManagement";
 import { RecycleBin } from "@/components/RecycleBin";
+import { UserManagement } from "@/components/UserManagement";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 
 const Index = () => {
   const filters = useTableFilters();
@@ -19,7 +21,10 @@ const Index = () => {
   const [exchangeRateOpen, setExchangeRateOpen] = useState(false);
   const [statusMgmtOpen, setStatusMgmtOpen] = useState(false);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
+  const [userMgmtOpen, setUserMgmtOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("project-info");
+  const { profile, signOut, canAccessSettings, canCreateProject, isAdmin } = useAuth();
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b bg-primary px-6 py-4 sticky top-0 z-50">
@@ -31,28 +36,52 @@ const Index = () => {
             <span className="text-primary-foreground/40 text-sm">|</span>
             <span className="text-primary-foreground/70 text-sm font-sans">Project Info 2026</span>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
-                <Settings className="h-5 w-5" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={openPeopleManagement}>
-                Správa osob
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setExchangeRateOpen(true)}>
-                Kurzovní lístek
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusMgmtOpen(true)}>
-                Správa statusů
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setRecycleBinOpen(true)}>
-                Koš
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2">
+            {/* User dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors text-sm">
+                  <User className="h-4 w-4" />
+                  <span className="font-sans">{profile?.full_name || profile?.email || "Uživatel"}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={signOut}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Odhlásit se
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Settings gear - admin only */}
+            {canAccessSettings && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+                    <Settings className="h-5 w-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setUserMgmtOpen(true)}>
+                    Správa uživatelů
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={openPeopleManagement}>
+                    Správa osob
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setExchangeRateOpen(true)}>
+                    Kurzovní lístek
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusMgmtOpen(true)}>
+                    Správa statusů
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setRecycleBinOpen(true)}>
+                    Koš
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
       </header>
 
@@ -66,9 +95,11 @@ const Index = () => {
             search={filters.search}
             onSearchChange={filters.setSearch}
             rightSlot={
-              <Button size="sm" onClick={() => document.dispatchEvent(new CustomEvent("open-add-project"))}>
-                <Plus className="h-4 w-4 mr-1" /> Nový projekt
-              </Button>
+              canCreateProject ? (
+                <Button size="sm" onClick={() => document.dispatchEvent(new CustomEvent("open-add-project"))}>
+                  <Plus className="h-4 w-4 mr-1" /> Nový projekt
+                </Button>
+              ) : undefined
             }
           />
         </div>
@@ -105,6 +136,7 @@ const Index = () => {
       <ExchangeRateSettings open={exchangeRateOpen} onOpenChange={setExchangeRateOpen} />
       <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
+      <UserManagement open={userMgmtOpen} onOpenChange={setUserMgmtOpen} />
     </div>
   );
 };

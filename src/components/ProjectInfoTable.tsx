@@ -27,6 +27,7 @@ import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
+import { useAuth } from "@/hooks/useAuth";
 
 const PROJECT_INFO_COLUMNS = [
   { key: "project_id", label: "Project ID", locked: true },
@@ -92,6 +93,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck();
   const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("project-info");
   const [editMode, setEditMode] = useState(false);
+  const { canEdit, canEditColumns, canDeleteProject, isViewer } = useAuth();
 
   useEffect(() => {
     const handleOpenAdd = () => setAddOpen(true);
@@ -187,7 +189,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
               {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="text-right" style={colStyle("prodejni_cena")} {...editProps("prodejni_cena", "Prodejní cena")} />}
               {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} className="text-right" style={colStyle("marze")} {...editProps("marze", "Marže")} />}
               {v("fakturace") && <SortableHeader label="Fakturace" column="fakturace" {...sh} className="text-right" style={colStyle("fakturace")} {...editProps("fakturace", "Fakturace")} />}
-              <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} editMode={editMode} onToggleEditMode={() => setEditMode(!editMode)} />
+              <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -199,24 +201,24 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                     {p.project_id}
                   </TableCell>
                 )}
-                {v("project_name") && <TableCell><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" /></TableCell>}
-                {v("klient") && <TableCell><InlineEditableCell value={p.klient} onSave={(val) => save(p.id, "klient", val, p.klient || "")} /></TableCell>}
-                {v("pm") && <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(val) => save(p.id, "pm", val, p.pm || "")} /></TableCell>}
-                {v("konstrukter") && <TableCell><InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(val) => save(p.id, "konstrukter", val, p.konstrukter || "")} /></TableCell>}
-                {v("kalkulant") && <TableCell><InlineEditableCell value={p.kalkulant} type="people" peopleRole="Kalkulant" onSave={(val) => save(p.id, "kalkulant", val, p.kalkulant || "")} /></TableCell>}
+                {v("project_name") && <TableCell><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
+                {v("klient") && <TableCell><InlineEditableCell value={p.klient} onSave={(val) => save(p.id, "klient", val, p.klient || "")} readOnly={!canEdit} /></TableCell>}
+                {v("pm") && <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(val) => save(p.id, "pm", val, p.pm || "")} readOnly={!canEdit} /></TableCell>}
+                {v("konstrukter") && <TableCell><InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(val) => save(p.id, "konstrukter", val, p.konstrukter || "")} readOnly={!canEdit} /></TableCell>}
+                {v("kalkulant") && <TableCell><InlineEditableCell value={p.kalkulant} type="people" peopleRole="Kalkulant" onSave={(val) => save(p.id, "kalkulant", val, p.kalkulant || "")} readOnly={!canEdit} /></TableCell>}
                 {v("status") && (
                   <TableCell>
-                    <InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(val) => save(p.id, "status", val, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} />
+                    <InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(val) => save(p.id, "status", val, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} readOnly={!canEdit} />
                   </TableCell>
                 )}
-                {v("datum_smluvni") && <TableCell><InlineEditableCell value={p.datum_smluvni} type="date" onSave={(val) => save(p.id, "datum_smluvni", val, p.datum_smluvni || "")} /></TableCell>}
+                {v("datum_smluvni") && <TableCell><InlineEditableCell value={p.datum_smluvni} type="date" onSave={(val) => save(p.id, "datum_smluvni", val, p.datum_smluvni || "")} readOnly={!canEdit} /></TableCell>}
                 {v("prodejni_cena") && (
                   <TableCell className="text-right">
                     <CurrencyEditCell value={p.prodejni_cena} currency={p.currency || "CZK"} onSave={(amount, currency) => saveCurrency(p.id, amount, currency, String(p.prodejni_cena ?? ""), p.currency || "CZK")} />
                   </TableCell>
                 )}
-                {v("marze") && <TableCell className="text-right"><InlineEditableCell value={p.marze} onSave={(val) => save(p.id, "marze", val, p.marze || "")} /></TableCell>}
-                {v("fakturace") && <TableCell className="text-right"><InlineEditableCell value={p.fakturace} onSave={(val) => save(p.id, "fakturace", val, p.fakturace || "")} /></TableCell>}
+                {v("marze") && <TableCell className="text-right"><InlineEditableCell value={p.marze} onSave={(val) => save(p.id, "marze", val, p.marze || "")} readOnly={!canEdit} /></TableCell>}
+                {v("fakturace") && <TableCell className="text-right"><InlineEditableCell value={p.fakturace} onSave={(val) => save(p.id, "fakturace", val, p.fakturace || "")} readOnly={!canEdit} /></TableCell>}
               </TableRow>
             ))}
           </TableBody>

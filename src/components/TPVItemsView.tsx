@@ -12,6 +12,7 @@ import { useTPVItems, useUpdateTPVItem, useAddTPVItem, useDeleteTPVItems, useBul
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
 import { ArrowLeft, Plus, Upload, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Props {
   projectId: string;
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function TPVItemsView({ projectId, projectName, onBack }: Props) {
+  const { canManageTPV, canEdit } = useAuth();
   const { data: items = [], isLoading } = useTPVItems(projectId);
   const { data: statusOptions = [] } = useTPVStatusOptions();
   const TPV_STATUSES = statusOptions.map(o => o.label);
@@ -115,15 +117,19 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
         </Button>
         <span className="text-sm font-serif font-bold">{projectId} — {projectName}</span>
         <span className="text-muted-foreground/40 text-sm">|</span>
-        <Button size="sm" variant="outline" onClick={() => { setNewItem({ item_name: "", item_type: "", status: "", sent_date: "", accepted_date: "", notes: "" }); setAddOpen(true); }}>
-          <Plus className="h-3 w-3 mr-1" /> Přidat položku
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
-          <Upload className="h-3 w-3 mr-1" /> Import z Excelu
-        </Button>
-        <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileSelect} />
+        {canManageTPV && (
+          <>
+            <Button size="sm" variant="outline" onClick={() => { setNewItem({ item_name: "", item_type: "", status: "", sent_date: "", accepted_date: "", notes: "" }); setAddOpen(true); }}>
+              <Plus className="h-3 w-3 mr-1" /> Přidat položku
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
+              <Upload className="h-3 w-3 mr-1" /> Import z Excelu
+            </Button>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileSelect} />
+          </>
+        )}
 
-        {selected.size > 0 && (
+        {selected.size > 0 && canManageTPV && (
           <div className="flex items-center gap-2 ml-4 border-l pl-4">
             <span className="text-sm text-muted-foreground">{selected.size} vybráno</span>
             <Select value={bulkStatusValue} onValueChange={setBulkStatusValue}>
@@ -164,25 +170,29 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
               <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Žádné položky</TableCell></TableRow>
             ) : items.map(item => (
               <TableRow key={item.id} className={`hover:bg-muted/50 transition-colors h-9 ${selected.has(item.id) ? "bg-primary/5" : ""}`}>
-                <TableCell><Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} /></TableCell>
-                <TableCell><InlineEditableCell value={item.item_name} onSave={(v) => saveField(item.id, "item_name", v, item.item_name)} className="font-medium" /></TableCell>
-                <TableCell><InlineEditableCell value={item.item_type} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} /></TableCell>
+                {canManageTPV && <TableCell><Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} /></TableCell>}
+                {!canManageTPV && <TableCell />}
+                <TableCell><InlineEditableCell value={item.item_name} onSave={(v) => saveField(item.id, "item_name", v, item.item_name)} className="font-medium" readOnly={!canManageTPV} /></TableCell>
+                <TableCell><InlineEditableCell value={item.item_type} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} readOnly={!canManageTPV} /></TableCell>
                 <TableCell>
                   <InlineEditableCell
                     value={item.konstrukter || ""}
                     type="people"
                     peopleRole="Konstruktér"
                     onSave={(v) => saveField(item.id, "konstrukter", v, item.konstrukter || "")}
+                    readOnly={!canManageTPV}
                   />
                 </TableCell>
-                <TableCell><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} onSave={(v) => saveField(item.id, "status", v, item.status || "")} /></TableCell>
-                <TableCell><InlineEditableCell value={item.sent_date} onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} /></TableCell>
-                <TableCell><InlineEditableCell value={item.accepted_date} onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} /></TableCell>
-                <TableCell><InlineEditableCell value={item.notes} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} /></TableCell>
+                <TableCell><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} onSave={(v) => saveField(item.id, "status", v, item.status || "")} readOnly={!canManageTPV} /></TableCell>
+                <TableCell><InlineEditableCell value={item.sent_date} onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>
+                <TableCell><InlineEditableCell value={item.accepted_date} onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>
+                <TableCell><InlineEditableCell value={item.notes} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} readOnly={!canManageTPV} /></TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDeleteIds([item.id])}>
-                    <Trash2 className="h-3 w-3 text-destructive" />
-                  </Button>
+                  {canManageTPV && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDeleteIds([item.id])}>
+                      <Trash2 className="h-3 w-3 text-destructive" />
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

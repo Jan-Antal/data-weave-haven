@@ -28,6 +28,7 @@ import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 const PM_COLUMNS = [
   { key: "project_id", label: "Project ID", locked: true },
@@ -231,6 +232,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const { isVisible, toggleColumn, columns } = useColumnVisibility("col-vis-pm-status", PM_COLUMNS);
   const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("pm-status");
   const [editMode, setEditMode] = useState(false);
+  const { canEdit, canEditColumns } = useAuth();
 
   const toggleExpand = (pid: string) => {
     setExpanded(prev => {
@@ -285,7 +287,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
               {v("expedice") && <SortableHeader label="Expedice" column="expedice" {...sh} style={colStyle("expedice")} {...editProps("expedice", "Expedice")} />}
               {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} style={colStyle("predani")} {...editProps("predani", "Předání")} />}
               {v("pm_poznamka") && <SortableHeader label="Poznámka" column="pm_poznamka" {...sh} style={colStyle("pm_poznamka")} {...editProps("pm_poznamka", "Poznámka")} />}
-              <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} editMode={editMode} onToggleEditMode={() => setEditMode(!editMode)} />
+              <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -296,24 +298,24 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                     <ExpandArrow projectId={p.project_id} isExpanded={expanded.has(p.project_id)} />
                   </TableCell>
                   {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
-                  {v("project_name") && <TableCell className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" /></TableCell>}
-                  {v("pm") && <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(val) => save(p.id, "pm", val, p.pm || "")} /></TableCell>}
+                  {v("project_name") && <TableCell className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
+                  {v("pm") && <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(val) => save(p.id, "pm", val, p.pm || "")} readOnly={!canEdit} /></TableCell>}
                   {v("status") && (
                     <TableCell>
-                      <InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(val) => save(p.id, "status", val, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} />
+                      <InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(val) => save(p.id, "status", val, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} readOnly={!canEdit} />
                     </TableCell>
                   )}
                   {v("risk") && (
                     <TableCell>
-                      <InlineEditableCell value={p.risk} type="select" options={["Low", "Medium", "High"]} onSave={(val) => save(p.id, "risk", val, p.risk || "")} displayValue={<RiskBadge level={p.risk || ""} />} />
+                      <InlineEditableCell value={p.risk} type="select" options={["Low", "Medium", "High"]} onSave={(val) => save(p.id, "risk", val, p.risk || "")} displayValue={<RiskBadge level={p.risk || ""} />} readOnly={!canEdit} />
                     </TableCell>
                   )}
-                  {v("datum_smluvni") && <TableCell><InlineEditableCell value={p.datum_smluvni} type="date" onSave={(val) => save(p.id, "datum_smluvni", val, p.datum_smluvni || "")} /></TableCell>}
-                  {v("zamereni") && <TableCell><InlineEditableCell value={p.zamereni} type="date" onSave={(val) => save(p.id, "zamereni", val, p.zamereni || "")} /></TableCell>}
-                  {v("tpv_date") && <TableCell><InlineEditableCell value={p.tpv_date} type="date" onSave={(val) => save(p.id, "tpv_date", val, p.tpv_date || "")} /></TableCell>}
-                  {v("expedice") && <TableCell><InlineEditableCell value={p.expedice} type="date" onSave={(val) => save(p.id, "expedice", val, p.expedice || "")} /></TableCell>}
-                  {v("predani") && <TableCell><InlineEditableCell value={p.predani} type="date" onSave={(val) => save(p.id, "predani", val, p.predani || "")} /></TableCell>}
-                  {v("pm_poznamka") && <TableCell><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(val) => save(p.id, "pm_poznamka", val, p.pm_poznamka || "")} /></TableCell>}
+                  {v("datum_smluvni") && <TableCell><InlineEditableCell value={p.datum_smluvni} type="date" onSave={(val) => save(p.id, "datum_smluvni", val, p.datum_smluvni || "")} readOnly={!canEdit} /></TableCell>}
+                  {v("zamereni") && <TableCell><InlineEditableCell value={p.zamereni} type="date" onSave={(val) => save(p.id, "zamereni", val, p.zamereni || "")} readOnly={!canEdit} /></TableCell>}
+                  {v("tpv_date") && <TableCell><InlineEditableCell value={p.tpv_date} type="date" onSave={(val) => save(p.id, "tpv_date", val, p.tpv_date || "")} readOnly={!canEdit} /></TableCell>}
+                  {v("expedice") && <TableCell><InlineEditableCell value={p.expedice} type="date" onSave={(val) => save(p.id, "expedice", val, p.expedice || "")} readOnly={!canEdit} /></TableCell>}
+                  {v("predani") && <TableCell><InlineEditableCell value={p.predani} type="date" onSave={(val) => save(p.id, "predani", val, p.predani || "")} readOnly={!canEdit} /></TableCell>}
+                  {v("pm_poznamka") && <TableCell><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(val) => save(p.id, "pm_poznamka", val, p.pm_poznamka || "")} readOnly={!canEdit} /></TableCell>}
                 </TableRow>
                 {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} />}
               </Fragment>
