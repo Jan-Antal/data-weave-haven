@@ -110,7 +110,7 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
   };
 
   return (
-    <div>
+    <div className="w-full min-w-0">
       <div className="flex items-center gap-2 flex-wrap mb-4">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Zpět
