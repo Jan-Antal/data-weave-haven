@@ -151,21 +151,23 @@ export function InlineEditableCell({
 
     if (type === "textarea") {
       return (
-        <Textarea
-          ref={textareaRef}
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={handleSave}
-          className="text-xs px-1 py-1 w-full min-h-[1.75rem] resize-none"
-          rows={Math.max(2, editValue.split("\n").length)}
-          style={{ height: "auto" }}
-          onInput={(e) => {
-            const el = e.currentTarget;
-            el.style.height = "auto";
-            el.style.height = el.scrollHeight + "px";
-          }}
-        />
+        <Popover open={true} onOpenChange={(open) => { if (!open) handleSave(); }}>
+          <PopoverTrigger asChild>
+            <div className="h-7 flex items-center text-xs px-1 truncate cursor-pointer">
+              {editValue || "—"}
+            </div>
+          </PopoverTrigger>
+          <PopoverContent className="w-[280px] p-1" align="start" side="bottom">
+            <Textarea
+              ref={textareaRef}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="text-xs px-2 py-1.5 w-full min-h-[80px] resize-none border-0 focus-visible:ring-1"
+              rows={4}
+            />
+          </PopoverContent>
+        </Popover>
       );
     }
 
@@ -183,13 +185,20 @@ export function InlineEditableCell({
   }
 
   const textContent = String(value ?? "");
+  const isTextarea = type === "textarea";
 
   return (
     <TooltipProvider delayDuration={300}>
       <Tooltip>
         <TooltipTrigger asChild>
           <div
-            className={`cursor-pointer hover:bg-muted/80 rounded px-1 py-0.5 h-7 leading-7 truncate whitespace-nowrap overflow-hidden ${className}`}
+            className={cn(
+              "cursor-pointer hover:bg-muted/80 rounded px-1 py-0.5 overflow-hidden",
+              isTextarea
+                ? "h-9 leading-[1.3] text-xs whitespace-normal line-clamp-2 flex items-center"
+                : "h-7 leading-7 truncate whitespace-nowrap",
+              className
+            )}
             onClick={() => {
               setEditValue(String(value ?? ""));
               setEditing(true);
@@ -199,7 +208,7 @@ export function InlineEditableCell({
           </div>
         </TooltipTrigger>
         {textContent && textContent !== "—" && (
-          <TooltipContent side="bottom" className="max-w-[300px] text-xs">
+          <TooltipContent side="bottom" className="max-w-[300px] text-xs whitespace-pre-wrap">
             {textContent}
           </TooltipContent>
         )}
