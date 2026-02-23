@@ -38,6 +38,9 @@ export function UserManagement({ open, onOpenChange }: Props) {
   const [addOpen, setAddOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [newUser, setNewUser] = useState({ full_name: "", email: "", password: "", role: "viewer" as AppRole });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -60,29 +63,43 @@ export function UserManagement({ open, onOpenChange }: Props) {
     setLoading(false);
   };
 
-  useEffect(() => {
-    if (open) fetchUsers();
-  }, [open]);
-
   const handleAddUser = async () => {
-    if (!newUser.email || !newUser.password || !newUser.full_name) return;
+    const errors: Record<string, string> = {};
+    if (!newUser.full_name.trim()) errors.full_name = "Jméno je povinné";
+    if (!newUser.email.trim()) errors.email = "Email je povinný";
+    if (!newUser.password.trim()) errors.password = "Heslo je povinné";
+    if (!newUser.role) errors.role = "Role je povinná";
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
 
-    const { data, error } = await supabase.functions.invoke("create-user", {
-      body: {
-        email: newUser.email,
-        password: newUser.password,
-        full_name: newUser.full_name,
-        role: newUser.role,
-      },
-    });
+    setSubmitting(true);
+    setSubmitError("");
 
-    if (error || data?.error) {
-      toast({ title: "Chyba", description: data?.error || error?.message, variant: "destructive" });
-    } else {
-      toast({ title: "Uživatel vytvořen" });
-      setAddOpen(false);
-      setNewUser({ full_name: "", email: "", password: "", role: "viewer" });
-      fetchUsers();
+    try {
+      const { data, error } = await supabase.functions.invoke("create-user", {
+        body: {
+          email: newUser.email.trim(),
+          password: newUser.password,
+          full_name: newUser.full_name.trim(),
+          role: newUser.role,
+        },
+      });
+
+      if (error) {
+        setSubmitError(error.message || "Chyba při vytváření uživatele");
+      } else if (data?.error) {
+        setSubmitError(data.error);
+      } else {
+        toast({ title: "Uživatel vytvořen" });
+        setAddOpen(false);
+        setNewUser({ full_name: "", email: "", password: "", role: "viewer" });
+        setFieldErrors({});
+        fetchUsers();
+      }
+    } catch (e: any) {
+      setSubmitError(e.message || "Neočekávaná chyba");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -202,23 +219,31 @@ export function UserManagement({ open, onOpenChange }: Props) {
           <DialogHeader>
             <DialogTitle>Nový uživatel</DialogTitle>
           </DialogHeader>
+          {submitError && (
+            <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded px-3 py-2">
+              {submitError}
+            </div>
+          )}
           <div className="grid gap-3">
             <div>
               <Label>Celé jméno</Label>
-              <Input value={newUser.full_name} onChange={(e) => setNewUser((s) => ({ ...s, full_name: e.target.value }))} />
+              <Input value={newUser.full_name} onChange={(e) => { setNewUser((s) => ({ ...s, full_name: e.target.value })); setFieldErrors((f) => ({ ...f, full_name: "" })); }} className={fieldErrors.full_name ? "border-destructive" : ""} />
+              {fieldErrors.full_name && <p className="text-xs text-destructive mt-1">{fieldErrors.full_name}</p>}
             </div>
             <div>
               <Label>Email</Label>
-              <Input type="email" value={newUser.email} onChange={(e) => setNewUser((s) => ({ ...s, email: e.target.value }))} />
+              <Input type="email" value={newUser.email} onChange={(e) => { setNewUser((s) => ({ ...s, email: e.target.value })); setFieldErrors((f) => ({ ...f, email: "" })); }} className={fieldErrors.email ? "border-destructive" : ""} />
+              {fieldErrors.email && <p className="text-xs text-destructive mt-1">{fieldErrors.email}</p>}
             </div>
             <div>
               <Label>Heslo</Label>
-              <Input type="password" value={newUser.password} onChange={(e) => setNewUser((s) => ({ ...s, password: e.target.value }))} />
+              <Input type="password" value={newUser.password} onChange={(e) => { setNewUser((s) => ({ ...s, password: e.target.value })); setFieldErrors((f) => ({ ...f, password: "" })); }} className={fieldErrors.password ? "border-destructive" : ""} />
+              {fieldErrors.password && <p className="text-xs text-destructive mt-1">{fieldErrors.password}</p>}
             </div>
             <div>
               <Label>Role</Label>
-              <Select value={newUser.role} onValueChange={(v) => setNewUser((s) => ({ ...s, role: v as AppRole }))}>
-                <SelectTrigger>
+              <Select value={newUser.role} onValueChange={(v) => { setNewUser((s) => ({ ...s, role: v as AppRole })); setFieldErrors((f) => ({ ...f, role: "" })); }}>
+                <SelectTrigger className={fieldErrors.role ? "border-destructive" : ""}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -227,11 +252,14 @@ export function UserManagement({ open, onOpenChange }: Props) {
                   ))}
                 </SelectContent>
               </Select>
+              {fieldErrors.role && <p className="text-xs text-destructive mt-1">{fieldErrors.role}</p>}
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-2">
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Zrušit</Button>
-            <Button onClick={handleAddUser} disabled={!newUser.email || !newUser.password || !newUser.full_name}>Vytvořit</Button>
+            <Button variant="outline" onClick={() => { setAddOpen(false); setFieldErrors({}); setSubmitError(""); }}>Zrušit</Button>
+            <Button onClick={handleAddUser} disabled={submitting}>
+              {submitting ? "Vytvářím..." : "Vytvořit"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
