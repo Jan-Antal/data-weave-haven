@@ -12,7 +12,7 @@ interface ColumnVisibilityToggleProps {
 
 export function ColumnVisibilityToggle({ columns, isVisible, toggleColumn }: ColumnVisibilityToggleProps) {
   return (
-    <TableHead className="w-10 min-w-[40px] p-0 sticky right-0 bg-card z-20">
+    <TableHead className="w-[32px] p-0 sticky right-0 bg-card z-20">
       <Popover>
         <PopoverTrigger asChild>
           <button

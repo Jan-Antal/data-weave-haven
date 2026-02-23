@@ -235,22 +235,21 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   return (
     <div>
       <div className="rounded-lg border bg-card overflow-x-scroll always-scrollbar">
-        <Table>
+        <Table className="table-fixed">
           <TableHeader>
             <TableRow className="bg-primary/5">
-              <TableHead className="w-8"></TableHead>
-              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} className="w-[110px] min-w-[110px]" />}
-              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} className="w-[200px] min-w-[200px]" />}
-              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} className="w-[130px] min-w-[130px]" />}
-              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} className="w-[130px] min-w-[130px]" />}
-              {v("status") && <SortableHeader label="Status" column="status" {...sh} className="w-[110px] min-w-[110px]" />}
-              {v("risk") && <SortableHeader label="Risk" column="risk" {...sh} className="w-[80px] min-w-[80px]" />}
-              {v("datum_smluvni") && <SortableHeader label="Smluvní" column="datum_smluvni" {...sh} className="w-[100px] min-w-[100px]" />}
-              {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} className="w-[100px] min-w-[100px]" />}
-              {v("tpv_date") && <SortableHeader label="TPV" column="tpv_date" {...sh} className="w-[100px] min-w-[100px]" />}
-              {v("expedice") && <SortableHeader label="Expedice" column="expedice" {...sh} className="w-[100px] min-w-[100px]" />}
-              {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} className="w-[100px] min-w-[100px]" />}
-              {v("pm_poznamka") && <SortableHeader label="Poznámka" column="pm_poznamka" {...sh} className="w-[160px] min-w-[160px]" />}
+              <TableHead className="w-[32px]"></TableHead>
+              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} className="w-[100px]" />}
+              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} className="w-[190px]" />}
+              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} className="w-[120px]" />}
+              {v("status") && <SortableHeader label="Status" column="status" {...sh} className="w-[105px]" />}
+              {v("risk") && <SortableHeader label="Risk" column="risk" {...sh} className="w-[85px]" />}
+              {v("datum_smluvni") && <SortableHeader label="Smluvní" column="datum_smluvni" {...sh} className="w-[95px]" />}
+              {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} className="w-[95px]" />}
+              {v("tpv_date") && <SortableHeader label="TPV" column="tpv_date" {...sh} className="w-[95px]" />}
+              {v("expedice") && <SortableHeader label="Expedice" column="expedice" {...sh} className="w-[95px]" />}
+              {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} className="w-[95px]" />}
+              {v("pm_poznamka") && <SortableHeader label="Poznámka" column="pm_poznamka" {...sh} className="w-[160px]" />}
               <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} />
             </TableRow>
           </TableHeader>
@@ -258,12 +257,12 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
             {sorted.map((p) => (
               <Fragment key={p.id}>
                 <TableRow className="hover:bg-muted/50 transition-colors h-9">
-                  <TableCell className="w-8 cursor-pointer" onClick={() => toggleExpand(p.project_id)}>
+                  <TableCell className="w-[32px] cursor-pointer" onClick={() => toggleExpand(p.project_id)}>
                     <ExpandArrow projectId={p.project_id} isExpanded={expanded.has(p.project_id)} />
                   </TableCell>
                   {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
-                  {v("project_name") && <TableCell><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" /></TableCell>}
-                  {v("klient") && <TableCell><InlineEditableCell value={p.klient} onSave={(val) => save(p.id, "klient", val, p.klient || "")} /></TableCell>}
+                  {v("project_name") && <TableCell className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" /></TableCell>}
+                  {v("pm") && <TableCell className="truncate"><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(val) => save(p.id, "pm", val, p.pm || "")} /></TableCell>}
                   {v("pm") && <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(val) => save(p.id, "pm", val, p.pm || "")} /></TableCell>}
                   {v("status") && (
                     <TableCell>
@@ -281,7 +280,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   {v("expedice") && <TableCell><InlineEditableCell value={p.expedice} type="date" onSave={(val) => save(p.id, "expedice", val, p.expedice || "")} /></TableCell>}
                   {v("predani") && <TableCell><InlineEditableCell value={p.predani} type="date" onSave={(val) => save(p.id, "predani", val, p.predani || "")} /></TableCell>}
                   {v("pm_poznamka") && <TableCell><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(val) => save(p.id, "pm_poznamka", val, p.pm_poznamka || "")} /></TableCell>}
-                  <TableCell className="w-10 sticky right-0 bg-card" />
+                  <TableCell className="w-[32px] sticky right-0 bg-card" />
                 </TableRow>
                 {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} />}
               </Fragment>

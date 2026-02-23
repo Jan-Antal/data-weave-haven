@@ -139,25 +139,25 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
         <Table className="table-fixed">
           <TableHeader>
           <TableRow className="bg-primary/5">
-              <TableHead className="w-8 min-w-[32px]"></TableHead>
-              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} className="w-[110px] min-w-[110px]" />}
-              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} className="w-[200px] min-w-[200px]" />}
-              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} className="w-[130px] min-w-[130px]" />}
-              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} className="w-[130px] min-w-[130px]" />}
-              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} className="w-[130px] min-w-[130px]" />}
-              {v("kalkulant") && <SortableHeader label="Kalkulant" column="kalkulant" {...sh} className="w-[130px] min-w-[130px]" />}
-              {v("status") && <SortableHeader label="Status" column="status" {...sh} className="w-[110px] min-w-[110px]" />}
-              {v("datum_smluvni") && <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} className="w-[100px] min-w-[100px]" />}
-              {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="w-[120px] min-w-[120px] text-right" />}
-              {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} className="w-[70px] min-w-[70px] text-right" />}
-              {v("fakturace") && <SortableHeader label="Fakturace" column="fakturace" {...sh} className="w-[80px] min-w-[80px] text-right" />}
+              <TableHead className="w-[32px]"></TableHead>
+              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} className="w-[100px]" />}
+              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} className="w-[190px]" />}
+              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} className="w-[120px]" />}
+              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} className="w-[120px]" />}
+              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} className="w-[120px]" />}
+              {v("kalkulant") && <SortableHeader label="Kalkulant" column="kalkulant" {...sh} className="w-[120px]" />}
+              {v("status") && <SortableHeader label="Status" column="status" {...sh} className="w-[105px]" />}
+              {v("datum_smluvni") && <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} className="w-[95px]" />}
+              {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="w-[115px] text-right" />}
+              {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} className="w-[65px] text-right" />}
+              {v("fakturace") && <SortableHeader label="Fakturace" column="fakturace" {...sh} className="w-[75px] text-right" />}
               <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} />
             </TableRow>
           </TableHeader>
           <TableBody>
             {sorted.map((p) => (
               <TableRow key={p.id} className="hover:bg-muted/50 transition-colors">
-                <TableCell className="w-8 min-w-[32px]" />
+                <TableCell className="w-[32px]" />
                 {v("project_id") && (
                   <TableCell className="font-mono text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => setEditProject(p)}>
                     {p.project_id}
@@ -181,7 +181,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                 )}
                 {v("marze") && <TableCell className="text-right"><InlineEditableCell value={p.marze} onSave={(val) => save(p.id, "marze", val, p.marze || "")} /></TableCell>}
                 {v("fakturace") && <TableCell className="text-right"><InlineEditableCell value={p.fakturace} onSave={(val) => save(p.id, "fakturace", val, p.fakturace || "")} /></TableCell>}
-                <TableCell className="w-10 sticky right-0 bg-card" />
+                <TableCell className="w-[32px] sticky right-0 bg-card" />
               </TableRow>
             ))}
           </TableBody>
