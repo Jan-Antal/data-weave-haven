@@ -66,11 +66,9 @@ const Index = () => {
             search={filters.search}
             onSearchChange={filters.setSearch}
             rightSlot={
-              activeTab === "project-info" ? (
-                <Button size="sm" onClick={() => document.dispatchEvent(new CustomEvent("open-add-project"))}>
-                  <Plus className="h-4 w-4 mr-1" /> Nový projekt
-                </Button>
-              ) : undefined
+              <Button size="sm" onClick={() => document.dispatchEvent(new CustomEvent("open-add-project"))}>
+                <Plus className="h-4 w-4 mr-1" /> Nový projekt
+              </Button>
             }
           />
         </div>
@@ -92,13 +90,13 @@ const Index = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="project-info">
+          <TabsContent value="project-info" forceMount className={activeTab !== "project-info" ? "hidden" : ""}>
             <ProjectInfoTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} />
           </TabsContent>
-          <TabsContent value="pm-status">
+          <TabsContent value="pm-status" forceMount className={activeTab !== "pm-status" ? "hidden" : ""}>
             <PMStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} />
           </TabsContent>
-          <TabsContent value="tpv-status">
+          <TabsContent value="tpv-status" forceMount className={activeTab !== "tpv-status" ? "hidden" : ""}>
             <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} />
           </TabsContent>
         </Tabs>
