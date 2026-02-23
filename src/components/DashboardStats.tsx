@@ -206,7 +206,10 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
               <p style={{ fontSize: 10 }} className="uppercase tracking-wider" >
                 <span style={{ color: "#999" }}>Aktivní zakázky</span>
               </p>
-              <p className="font-serif font-bold leading-none mt-1" style={{ fontSize: 28 }}>{activeCount}</p>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="font-serif font-bold leading-none" style={{ fontSize: 28 }}>{activeCount}</span>
+                <span style={{ fontSize: 13, color: "#999" }}>ø {activeCount > 0 ? formatNumber(Math.round(totalValueCZK / activeCount)) : "—"} Kč</span>
+              </div>
             </div>
             <div className="my-3" style={{ borderTop: "1px solid #f0ede8" }} />
             <div className="flex-1 flex flex-col justify-center">
