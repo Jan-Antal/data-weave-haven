@@ -48,7 +48,7 @@ const PM_COLUMNS = [
 
 const stageStatuses = ["Plánováno", "Probíhá", "Dokončeno", "Pozastaveno"];
 
-function SortableStageRow({ stage, project, onDelete }: { stage: ProjectStage; project: Project; onDelete: (id: string) => void }) {
+function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit }: { stage: ProjectStage; project: Project; onDelete: (id: string) => void; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
   const updateStage = useUpdateStage();
 
@@ -58,38 +58,54 @@ function SortableStageRow({ stage, project, onDelete }: { stage: ProjectStage; p
     updateStage.mutate({ id: stage.id, field, value, projectId: project.project_id });
   };
 
+  const v = isVisible;
+
   return (
-    <TableRow ref={setNodeRef} style={style} className="bg-muted/30 h-9">
-      <TableCell className="w-8">
-        <div {...attributes} {...listeners} className="cursor-grab">
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
+    <TableRow ref={setNodeRef} style={style} className="bg-muted/20 h-9">
+      <TableCell className="w-[32px]">
+        <div {...attributes} {...listeners} className="cursor-grab pl-2">
+          <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
         </div>
       </TableCell>
-      <TableCell>
-        <InlineEditableCell value={stage.stage_name} onSave={(v) => saveStage("stage_name", v)} />
-      </TableCell>
-      <TableCell className="text-muted-foreground truncate" title={project.project_name}>{project.project_name}</TableCell>
-      <TableCell className="text-muted-foreground truncate" title={project.klient || ""}>{project.klient || "—"}</TableCell>
-      <TableCell>
-        <InlineEditableCell value={stage.notes} type="people" peopleRole="PM" onSave={(v) => saveStage("notes", v)} />
-      </TableCell>
-      <TableCell>
-        <InlineEditableCell value={stage.status} type="select" options={stageStatuses} onSave={(v) => saveStage("status", v)} />
-      </TableCell>
-      <TableCell>
-        <InlineEditableCell value={project.risk} type="select" options={["Low", "Medium", "High"]} onSave={() => {}} displayValue={project.risk ? <RiskBadge level={project.risk} /> : "—"} />
-      </TableCell>
-      <TableCell className="text-muted-foreground truncate" title={project.datum_smluvni || ""}>{project.datum_smluvni || "—"}</TableCell>
-      <TableCell>
-        <InlineEditableCell value={stage.start_date} type="date" onSave={(v) => saveStage("start_date", v)} />
-      </TableCell>
-      <TableCell>
-        <InlineEditableCell value={stage.end_date} type="date" onSave={(v) => saveStage("end_date", v)} />
-      </TableCell>
-      <TableCell className="text-muted-foreground">—</TableCell>
-      <TableCell className="text-muted-foreground">—</TableCell>
-      <TableCell>—</TableCell>
-      <TableCell>—</TableCell>
+      {v("project_id") && (
+        <TableCell className="font-mono text-xs truncate pl-4 text-muted-foreground">
+          <InlineEditableCell value={stage.stage_name} onSave={(val) => saveStage("stage_name", val)} readOnly={!canEdit} />
+        </TableCell>
+      )}
+      {v("project_name") && (
+        <TableCell className="truncate text-muted-foreground text-xs" title={project.project_name}>{project.project_name}</TableCell>
+      )}
+      {v("pm") && (
+        <TableCell><InlineEditableCell value={stage.pm} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} /></TableCell>
+      )}
+      {v("status") && (
+        <TableCell>
+          <InlineEditableCell value={stage.status} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={stage.status ? <StatusBadge status={stage.status} /> : "—"} readOnly={!canEdit} />
+        </TableCell>
+      )}
+      {v("risk") && (
+        <TableCell>
+          <InlineEditableCell value={stage.risk} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("risk", val)} displayValue={<RiskBadge level={stage.risk || ""} />} readOnly={!canEdit} />
+        </TableCell>
+      )}
+      {v("datum_smluvni") && (
+        <TableCell><InlineEditableCell value={stage.datum_smluvni} type="date" onSave={(val) => saveStage("datum_smluvni", val)} readOnly={!canEdit} /></TableCell>
+      )}
+      {v("zamereni") && (
+        <TableCell><InlineEditableCell value={stage.zamereni} type="date" onSave={(val) => saveStage("zamereni", val)} readOnly={!canEdit} /></TableCell>
+      )}
+      {v("tpv_date") && (
+        <TableCell><InlineEditableCell value={stage.tpv_date} type="date" onSave={(val) => saveStage("tpv_date", val)} readOnly={!canEdit} /></TableCell>
+      )}
+      {v("expedice") && (
+        <TableCell><InlineEditableCell value={stage.expedice} type="date" onSave={(val) => saveStage("expedice", val)} readOnly={!canEdit} /></TableCell>
+      )}
+      {v("predani") && (
+        <TableCell><InlineEditableCell value={stage.predani} type="date" onSave={(val) => saveStage("predani", val)} readOnly={!canEdit} /></TableCell>
+      )}
+      {v("pm_poznamka") && (
+        <TableCell><InlineEditableCell value={stage.pm_poznamka} type="textarea" onSave={(val) => saveStage("pm_poznamka", val)} readOnly={!canEdit} /></TableCell>
+      )}
       <TableCell>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(stage.id)}>
           <Trash2 className="h-3 w-3 text-destructive" />
@@ -99,7 +115,7 @@ function SortableStageRow({ stage, project, onDelete }: { stage: ProjectStage; p
   );
 }
 
-function StagesSection({ projectId, project }: { projectId: string; project: Project }) {
+function StagesSection({ projectId, project, isVisible, statusLabels, canEdit }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean }) {
   const { data: stages = [] } = useProjectStages(projectId);
   const addStage = useAddStage();
   const deleteStage = useDeleteStage();
@@ -155,7 +171,7 @@ function StagesSection({ projectId, project }: { projectId: string; project: Pro
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={stages.map(s => s.id)} strategy={verticalListSortingStrategy}>
           {stages.map(stage => (
-            <SortableStageRow key={stage.id} stage={stage} project={project} onDelete={(id) => setDeleteId(id)} />
+            <SortableStageRow key={stage.id} stage={stage} project={project} onDelete={(id) => setDeleteId(id)} isVisible={isVisible} statusLabels={statusLabels} canEdit={canEdit} />
           ))}
         </SortableContext>
       </DndContext>
@@ -319,7 +335,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   {v("predani") && <TableCell><InlineEditableCell value={p.predani} type="date" onSave={(val) => save(p.id, "predani", val, p.predani || "")} readOnly={!canEdit} /></TableCell>}
                   {v("pm_poznamka") && <TableCell><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(val) => save(p.id, "pm_poznamka", val, p.pm_poznamka || "")} readOnly={!canEdit} /></TableCell>}
                 </TableRow>
-                {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} />}
+                {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} isVisible={v} statusLabels={statusLabels} canEdit={canEdit} />}
               </Fragment>
             ))}
           </TableBody>
