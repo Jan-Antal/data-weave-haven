@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, KeyboardEvent } from "react";
+import { useState, useRef, useEffect, useCallback, KeyboardEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,6 +9,79 @@ import { format, parse, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { PeopleSelect } from "./PeopleSelect";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { createPortal } from "react-dom";
+
+function TextareaCellWithTooltip({
+  value,
+  displayValue,
+  textContent,
+  className,
+  onStartEdit,
+}: {
+  value: string | number | null;
+  displayValue?: React.ReactNode;
+  textContent: string;
+  className: string;
+  onStartEdit: () => void;
+}) {
+  const cellRef = useRef<HTMLDivElement>(null);
+  const [tooltip, setTooltip] = useState<{ top: number; left: number } | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showTooltip = useCallback(() => {
+    if (!cellRef.current || !textContent || textContent === "—") return;
+    const rect = cellRef.current.getBoundingClientRect();
+    setTooltip({ top: rect.bottom + 4, left: rect.left });
+  }, [textContent]);
+
+  const hideTooltip = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null;
+    setTooltip(null);
+  }, []);
+
+  const handleMouseEnter = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(showTooltip, 300);
+  }, [showTooltip]);
+
+  const handleMouseLeave = useCallback(() => {
+    hideTooltip();
+  }, [hideTooltip]);
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  return (
+    <>
+      <div
+        ref={cellRef}
+        className={cn(
+          "cursor-pointer hover:bg-muted/80 rounded px-1 py-0.5 overflow-hidden h-7 leading-7 truncate whitespace-nowrap text-xs",
+          className
+        )}
+        onClick={onStartEdit}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        {displayValue ?? (value !== null && value !== undefined && value !== "" ? String(value) : "—")}
+      </div>
+      {tooltip && createPortal(
+        <div
+          style={{
+            position: "fixed",
+            top: tooltip.top,
+            left: tooltip.left,
+            zIndex: 9999,
+          }}
+          className="max-w-[350px] rounded border border-border bg-muted p-2 text-xs leading-relaxed whitespace-pre-wrap shadow-md"
+        >
+          {textContent}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
 
 interface InlineEditableCellProps {
   value: string | number | null;
@@ -194,34 +267,16 @@ export function InlineEditableCell({
 
   if (isTextarea) {
     return (
-      <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div
-              className={cn(
-                "cursor-pointer hover:bg-muted/80 rounded px-1 py-0.5 overflow-hidden h-7 leading-7 truncate whitespace-nowrap text-xs",
-                className
-              )}
-              onClick={() => {
-                setEditValue(String(value ?? ""));
-                setEditing(true);
-              }}
-            >
-              {displayValue ?? (value !== null && value !== undefined && value !== "" ? String(value) : "—")}
-            </div>
-          </TooltipTrigger>
-          {textContent && textContent !== "—" && (
-            <TooltipContent
-              side="bottom"
-              align="start"
-              alignOffset={0}
-              className="max-w-[280px] p-2 text-xs leading-relaxed whitespace-pre-wrap"
-            >
-              {textContent}
-            </TooltipContent>
-          )}
-        </Tooltip>
-      </TooltipProvider>
+      <TextareaCellWithTooltip
+        value={value}
+        displayValue={displayValue}
+        textContent={textContent}
+        className={className}
+        onStartEdit={() => {
+          setEditValue(String(value ?? ""));
+          setEditing(true);
+        }}
+      />
     );
   }
 
