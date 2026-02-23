@@ -136,21 +136,21 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   return (
     <div>
       <div className="rounded-lg border bg-card overflow-x-scroll always-scrollbar">
-        <Table className="table-fixed">
+        <Table>
           <TableHeader>
           <TableRow className="bg-primary/5">
-              <TableHead className="w-[32px]"></TableHead>
-              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} className="w-[100px]" />}
-              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} className="w-[190px]" />}
-              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} className="w-[120px]" />}
-              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} className="w-[120px]" />}
-              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} className="w-[120px]" />}
-              {v("kalkulant") && <SortableHeader label="Kalkulant" column="kalkulant" {...sh} className="w-[120px]" />}
-              {v("status") && <SortableHeader label="Status" column="status" {...sh} className="w-[105px]" />}
-              {v("datum_smluvni") && <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} className="w-[95px]" />}
-              {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="w-[115px] text-right" />}
-              {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} className="w-[65px] text-right" />}
-              {v("fakturace") && <SortableHeader label="Fakturace" column="fakturace" {...sh} className="w-[75px] text-right" />}
+              <TableHead style={{ minWidth: 32, width: 32 }} className="shrink-0"></TableHead>
+              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} style={{ minWidth: 90 }} />}
+              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={{ minWidth: 160, flex: 2 }} />}
+              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} style={{ minWidth: 100, flex: 1 }} />}
+              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} style={{ minWidth: 110, flex: 1 }} />}
+              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} style={{ minWidth: 110, flex: 1 }} />}
+              {v("kalkulant") && <SortableHeader label="Kalkulant" column="kalkulant" {...sh} style={{ minWidth: 110, flex: 1 }} />}
+              {v("status") && <SortableHeader label="Status" column="status" {...sh} style={{ minWidth: 100 }} />}
+              {v("datum_smluvni") && <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} style={{ minWidth: 90 }} />}
+              {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="text-right" style={{ minWidth: 110 }} />}
+              {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} className="text-right" style={{ minWidth: 60 }} />}
+              {v("fakturace") && <SortableHeader label="Fakturace" column="fakturace" {...sh} className="text-right" style={{ minWidth: 65 }} />}
               <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} />
             </TableRow>
           </TableHeader>
