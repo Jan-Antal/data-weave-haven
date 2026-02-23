@@ -42,6 +42,7 @@ const PM_COLUMNS = [
   { key: "zamereni", label: "Zaměření" },
   { key: "tpv_date", label: "TPV" },
   { key: "expedice", label: "Expedice" },
+  { key: "montaz", label: "Montáž" },
   { key: "predani", label: "Předání" },
   { key: "pm_poznamka", label: "Poznámka", locked: false },
 ];
@@ -75,6 +76,9 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
       {v("project_name") && (
         <TableCell className="truncate text-muted-foreground text-xs" title={project.project_name}>{project.project_name}</TableCell>
       )}
+      {v("klient") && (
+        <TableCell className="truncate text-muted-foreground text-xs" title={project.klient || ""}>{project.klient || "—"}</TableCell>
+      )}
       {v("pm") && (
         <TableCell><InlineEditableCell value={stage.pm} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} /></TableCell>
       )}
@@ -99,6 +103,9 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
       )}
       {v("expedice") && (
         <TableCell><InlineEditableCell value={stage.expedice} type="date" onSave={(val) => saveStage("expedice", val)} readOnly={!canEdit} /></TableCell>
+      )}
+      {v("montaz") && (
+        <TableCell><InlineEditableCell value={(stage as any).montaz} type="date" onSave={(val) => saveStage("montaz", val)} readOnly={!canEdit} /></TableCell>
       )}
       {v("predani") && (
         <TableCell><InlineEditableCell value={stage.predani} type="date" onSave={(val) => saveStage("predani", val)} readOnly={!canEdit} /></TableCell>
@@ -235,6 +242,7 @@ const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
   zamereni: { minWidth: 90 },
   tpv_date: { minWidth: 90 },
   expedice: { minWidth: 90 },
+  montaz: { minWidth: 90 },
   predani: { minWidth: 90 },
   pm_poznamka: { minWidth: 140, flex: 1 },
 };
@@ -296,6 +304,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
               <TableHead style={{ minWidth: 32, width: 32 }} className="shrink-0"></TableHead>
               {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} style={colStyle("project_id")} {...editProps("project_id", "Project ID")} />}
               {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={colStyle("project_name")} {...editProps("project_name", "Project Name")} />}
+              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} style={colStyle("klient")} {...editProps("klient", "Klient")} />}
               {v("pm") && <SortableHeader label="PM" column="pm" {...sh} style={colStyle("pm")} {...editProps("pm", "PM")} />}
               {v("status") && <SortableHeader label="Status" column="status" {...sh} style={colStyle("status")} {...editProps("status", "Status")} />}
               {v("risk") && <SortableHeader label="Risk" column="risk" {...sh} style={colStyle("risk")} {...editProps("risk", "Risk")} />}
@@ -303,6 +312,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
               {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} style={colStyle("zamereni")} {...editProps("zamereni", "Zaměření")} />}
               {v("tpv_date") && <SortableHeader label="TPV" column="tpv_date" {...sh} style={colStyle("tpv_date")} {...editProps("tpv_date", "TPV")} />}
               {v("expedice") && <SortableHeader label="Expedice" column="expedice" {...sh} style={colStyle("expedice")} {...editProps("expedice", "Expedice")} />}
+              {v("montaz") && <SortableHeader label="Montáž" column="montaz" {...sh} style={colStyle("montaz")} {...editProps("montaz", "Montáž")} />}
               {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} style={colStyle("predani")} {...editProps("predani", "Předání")} />}
               {v("pm_poznamka") && <SortableHeader label="Poznámka" column="pm_poznamka" {...sh} style={colStyle("pm_poznamka")} {...editProps("pm_poznamka", "Poznámka")} />}
               <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
@@ -317,6 +327,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   </TableCell>
                   {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
                   {v("project_name") && <TableCell className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
+                  {v("klient") && <TableCell><InlineEditableCell value={p.klient} onSave={(val) => save(p.id, "klient", val, p.klient || "")} readOnly={!canEdit} /></TableCell>}
                   {v("pm") && <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(val) => save(p.id, "pm", val, p.pm || "")} readOnly={!canEdit} /></TableCell>}
                   {v("status") && (
                     <TableCell>
@@ -332,6 +343,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   {v("zamereni") && <TableCell><InlineEditableCell value={p.zamereni} type="date" onSave={(val) => save(p.id, "zamereni", val, p.zamereni || "")} readOnly={!canEdit} /></TableCell>}
                   {v("tpv_date") && <TableCell><InlineEditableCell value={p.tpv_date} type="date" onSave={(val) => save(p.id, "tpv_date", val, p.tpv_date || "")} readOnly={!canEdit} /></TableCell>}
                   {v("expedice") && <TableCell><InlineEditableCell value={p.expedice} type="date" onSave={(val) => save(p.id, "expedice", val, p.expedice || "")} readOnly={!canEdit} /></TableCell>}
+                  {v("montaz") && <TableCell><InlineEditableCell value={(p as any).montaz} type="date" onSave={(val) => save(p.id, "montaz", val, (p as any).montaz || "")} readOnly={!canEdit} /></TableCell>}
                   {v("predani") && <TableCell><InlineEditableCell value={p.predani} type="date" onSave={(val) => save(p.id, "predani", val, p.predani || "")} readOnly={!canEdit} /></TableCell>}
                   {v("pm_poznamka") && <TableCell><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(val) => save(p.id, "pm_poznamka", val, p.pm_poznamka || "")} readOnly={!canEdit} /></TableCell>}
                 </TableRow>

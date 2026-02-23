@@ -124,6 +124,7 @@ export type Database = {
           end_date: string | null
           expedice: string | null
           id: string
+          montaz: string | null
           notes: string | null
           pm: string | null
           pm_poznamka: string | null
@@ -145,6 +146,7 @@ export type Database = {
           end_date?: string | null
           expedice?: string | null
           id?: string
+          montaz?: string | null
           notes?: string | null
           pm?: string | null
           pm_poznamka?: string | null
@@ -166,6 +168,7 @@ export type Database = {
           end_date?: string | null
           expedice?: string | null
           id?: string
+          montaz?: string | null
           notes?: string | null
           pm?: string | null
           pm_poznamka?: string | null
@@ -238,6 +241,7 @@ export type Database = {
           location: string | null
           marze: string | null
           material: number | null
+          montaz: string | null
           narocnost: string | null
           percent_tpv: number | null
           pm: string | null
@@ -282,6 +286,7 @@ export type Database = {
           location?: string | null
           marze?: string | null
           material?: number | null
+          montaz?: string | null
           narocnost?: string | null
           percent_tpv?: number | null
           pm?: string | null
@@ -326,6 +331,7 @@ export type Database = {
           location?: string | null
           marze?: string | null
           material?: number | null
+          montaz?: string | null
           narocnost?: string | null
           percent_tpv?: number | null
           pm?: string | null
