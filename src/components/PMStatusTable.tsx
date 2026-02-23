@@ -39,7 +39,7 @@ const PM_COLUMNS = [
   { key: "tpv_date", label: "TPV" },
   { key: "expedice", label: "Expedice" },
   { key: "predani", label: "Předání" },
-  { key: "pm_poznamka", label: "Poznámka" },
+  { key: "pm_poznamka", label: "Poznámka", locked: false },
 ];
 
 const stageStatuses = ["Plánováno", "Probíhá", "Dokončeno", "Pozastaveno"];
@@ -248,7 +248,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
               {v("tpv_date") && <SortableHeader label="TPV" column="tpv_date" {...sh} className="min-w-[90px]" />}
               {v("expedice") && <SortableHeader label="Expedice" column="expedice" {...sh} className="min-w-[90px]" />}
               {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} className="min-w-[90px]" />}
-              {v("pm_poznamka") && <SortableHeader label="Poznámka" column="pm_poznamka" {...sh} className="min-w-[180px]" />}
+              {v("pm_poznamka") && <SortableHeader label="Poznámka" column="pm_poznamka" {...sh} className="min-w-[200px]" />}
               <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} />
             </TableRow>
           </TableHeader>

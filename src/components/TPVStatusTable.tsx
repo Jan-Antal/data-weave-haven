@@ -320,7 +320,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
               {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} className="min-w-[90px]" />}
               {v("expedice") && <SortableHeader label="Expedice" column="expedice" {...sh} className="min-w-[90px]" />}
               {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} className="min-w-[90px]" />}
-              {v("tpv_poznamka") && <SortableHeader label="Poznámka" column="tpv_poznamka" {...sh} className="min-w-[180px]" />}
+              {v("tpv_poznamka") && <SortableHeader label="Poznámka" column="tpv_poznamka" {...sh} className="min-w-[200px]" />}
               <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} />
             </TableRow>
           </TableHeader>
