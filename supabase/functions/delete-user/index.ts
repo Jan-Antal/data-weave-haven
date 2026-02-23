@@ -38,10 +38,9 @@ Deno.serve(async (req) => {
       .from("user_roles")
       .select("role")
       .eq("user_id", caller.id)
-      .eq("role", "admin")
       .single();
 
-    if (!roleData) {
+    if (!roleData || (roleData.role !== "admin" && roleData.role !== "owner")) {
       return new Response(JSON.stringify({ error: "Admin access required" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -52,6 +51,20 @@ Deno.serve(async (req) => {
 
     if (!user_id) {
       return new Response(JSON.stringify({ error: "Missing user_id" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Prevent deleting the owner
+    const { data: targetRole } = await adminClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user_id)
+      .single();
+
+    if (targetRole?.role === "owner") {
+      return new Response(JSON.stringify({ error: "Cannot delete the Owner. Transfer ownership first." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
