@@ -214,6 +214,7 @@ export function InlineEditableCell({
             <TooltipContent
               side="bottom"
               align="start"
+              alignOffset={0}
               className="max-w-[280px] p-2 text-xs leading-relaxed whitespace-pre-wrap"
             >
               {textContent}
