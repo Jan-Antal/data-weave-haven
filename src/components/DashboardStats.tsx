@@ -17,13 +17,13 @@ import {
 
 const STORAGE_KEY = "dashboard-collapsed";
 
-const PIPELINE_STAGES: { status: string; label: string }[] = [
-  { status: "Příprava", label: "Příprava" },
-  { status: "Engineering", label: "Konstrukce" },
-  { status: "Výroba IN", label: "Výroba" },
-  { status: "Expedice", label: "Expedice" },
-  { status: "Montáž", label: "Montáž" },
-  { status: "Reklamace", label: "Reklamace" },
+const PIPELINE_STAGES: { statuses: string[]; label: string }[] = [
+  { statuses: ["Příprava"], label: "Příprava" },
+  { statuses: ["Engineering", "TPV"], label: "Konstrukce" },
+  { statuses: ["Výroba IN"], label: "Výroba" },
+  { statuses: ["Expedice"], label: "Expedice" },
+  { statuses: ["Montáž"], label: "Montáž" },
+  { statuses: ["Reklamace"], label: "Reklamace" },
 ];
 
 const EXCLUDED_STATUSES = ["Fakturace", "Dokončeno"];
@@ -122,9 +122,9 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
   }, [activeProjects, rates]);
 
   const pipelineData = useMemo(() => {
-    return PIPELINE_STAGES.map(({ status, label }) => ({
+    return PIPELINE_STAGES.map(({ statuses, label }) => ({
       name: label,
-      count: filtered.filter((p) => p.status === status).length,
+      count: filtered.filter((p) => statuses.includes(p.status || "")).length,
       fill: PIPELINE_COLORS[label] || "#6b7280",
     }));
   }, [filtered]);
@@ -152,7 +152,7 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
   }, [activeProjects]);
 
   const isTPV = activeTab === "tpv-status";
-  const KONSTRUKTER_ACTIVE_STATUSES = ["Příprava", "Engineering"];
+  const KONSTRUKTER_ACTIVE_STATUSES = ["Příprava", "Engineering", "TPV"];
 
   // PM / Konstruktér workload data
   const workloadData = useMemo(() => {
