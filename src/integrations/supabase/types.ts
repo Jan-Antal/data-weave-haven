@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      column_labels: {
+        Row: {
+          column_key: string
+          created_at: string
+          custom_label: string
+          id: string
+          tab: string
+          updated_at: string
+        }
+        Insert: {
+          column_key: string
+          created_at?: string
+          custom_label: string
+          id?: string
+          tab: string
+          updated_at?: string
+        }
+        Update: {
+          column_key?: string
+          created_at?: string
+          custom_label?: string
+          id?: string
+          tab?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       exchange_rates: {
         Row: {
           created_at: string
