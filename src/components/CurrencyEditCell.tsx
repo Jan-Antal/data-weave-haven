@@ -82,7 +82,7 @@ export function CurrencyEditCell({ value, currency, onSave, className = "" }: Cu
         <TooltipTrigger asChild>
           <div
             className={cn(
-              "cursor-pointer hover:bg-muted/80 rounded px-1 py-0.5 h-7 leading-7 truncate whitespace-nowrap overflow-hidden font-mono text-sm",
+              "cursor-pointer hover:bg-muted/80 rounded px-1 py-0.5 h-7 leading-7 truncate whitespace-nowrap overflow-hidden font-mono text-xs",
               className
             )}
             onClick={() => {
