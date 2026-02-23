@@ -1,0 +1,1 @@
+ALTER TABLE public.projects ADD CONSTRAINT projects_project_id_unique UNIQUE (project_id);
