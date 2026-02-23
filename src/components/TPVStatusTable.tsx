@@ -78,21 +78,21 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   return (
     <div>
       <div className="rounded-lg border bg-card overflow-x-scroll always-scrollbar">
-        <Table className="table-fixed">
+        <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
-              <TableHead className="w-[32px]"></TableHead>
-              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} className="w-[100px]" />}
-              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} className="w-[190px]" />}
-              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} className="w-[120px]" />}
-              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} className="w-[120px]" />}
-              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} className="w-[120px]" />}
-              {v("narocnost") && <SortableHeader label="Náročnost" column="narocnost" {...sh} className="w-[85px]" />}
-              {v("hodiny_tpv") && <SortableHeader label="Hodiny TPV" column="hodiny_tpv" {...sh} className="w-[85px]" />}
-              {v("percent_tpv") && <SortableHeader label="% Status" column="percent_tpv" {...sh} className="w-[100px]" />}
-              {v("status") && <SortableHeader label="Status" column="status" {...sh} className="w-[105px]" />}
-              {v("tpv_risk") && <SortableHeader label="Risk" column="tpv_risk" {...sh} className="w-[85px]" />}
-              {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} className="w-[95px]" />}
+              <TableHead style={{ minWidth: 32, width: 32 }} className="shrink-0"></TableHead>
+              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} style={{ minWidth: 90 }} />}
+              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={{ minWidth: 160, flex: 2 }} />}
+              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} style={{ minWidth: 110, flex: 1 }} />}
+              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} style={{ minWidth: 100, flex: 1 }} />}
+              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} style={{ minWidth: 110, flex: 1 }} />}
+              {v("narocnost") && <SortableHeader label="Náročnost" column="narocnost" {...sh} style={{ minWidth: 85 }} />}
+              {v("hodiny_tpv") && <SortableHeader label="Hodiny TPV" column="hodiny_tpv" {...sh} style={{ minWidth: 85 }} />}
+              {v("percent_tpv") && <SortableHeader label="% Status" column="percent_tpv" {...sh} style={{ minWidth: 100 }} />}
+              {v("status") && <SortableHeader label="Status" column="status" {...sh} style={{ minWidth: 100 }} />}
+              {v("tpv_risk") && <SortableHeader label="Risk" column="tpv_risk" {...sh} style={{ minWidth: 75 }} />}
+              {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} style={{ minWidth: 90 }} />}
               <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} />
             </TableRow>
           </TableHeader>

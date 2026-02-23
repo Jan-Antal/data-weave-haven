@@ -8,6 +8,7 @@ interface SortableHeaderProps {
   sortDir: "asc" | "desc" | null;
   onSort: (col: string) => void;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 export function SortableHeader({
@@ -17,12 +18,14 @@ export function SortableHeader({
   sortDir,
   onSort,
   className = "",
+  style,
 }: SortableHeaderProps) {
   const active = sortCol === column;
 
   return (
     <TableHead
       className={`font-semibold cursor-pointer select-none hover:bg-muted/50 ${className}`}
+      style={style}
       onClick={() => onSort(column)}
     >
       <div className="flex items-center gap-1">
