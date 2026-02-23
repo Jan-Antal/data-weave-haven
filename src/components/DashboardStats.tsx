@@ -165,17 +165,18 @@ export function DashboardStats({ personFilter, statusFilter, search }: Dashboard
 
       {!collapsed && (
         <div className="flex gap-3 animate-in fade-in slide-in-from-top-2 duration-200" style={{ height: 180 }}>
-          {/* Aktivní zakázky ~10% */}
-          <div className="rounded-lg border bg-card p-4 flex flex-col justify-center" style={{ width: "10%", minWidth: 100 }}>
-            <p className="text-xs text-muted-foreground">Aktivní zakázky</p>
-            <p className="text-3xl font-serif font-bold mt-1">{activeCount}</p>
-          </div>
-
-          {/* Celková hodnota ~15% */}
-          <div className="rounded-lg border bg-card p-4 flex flex-col justify-center" style={{ width: "15%", minWidth: 130 }}>
-            <p className="text-xs text-muted-foreground">Celková hodnota</p>
-            <p className="text-lg font-serif font-bold mt-1">{formatNumber(totalValueCZK)} Kč</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">aktivní, v CZK</p>
+          {/* Aktivní zakázky + Celková hodnota combined ~20% */}
+          <div className="rounded-lg border bg-card p-4 flex flex-col justify-center" style={{ width: "20%", minWidth: 150 }}>
+            <div className="flex-1 flex flex-col justify-center">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Aktivní zakázky</p>
+              <p className="text-3xl font-serif font-bold mt-0.5">{activeCount}</p>
+            </div>
+            <div className="border-t border-border my-2" />
+            <div className="flex-1 flex flex-col justify-center">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Celková hodnota</p>
+              <p className="text-lg font-serif font-bold mt-0.5">{formatNumber(totalValueCZK)} Kč</p>
+              <p className="text-[11px] text-muted-foreground">aktivní, v CZK</p>
+            </div>
           </div>
 
           {/* Pipeline ~40% */}
