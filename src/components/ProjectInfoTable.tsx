@@ -18,7 +18,7 @@ import { toast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format, parse } from "date-fns";
+import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
@@ -211,10 +211,10 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                 <PopoverContent className="w-auto p-0 z-[99999]" align="start">
                   <Calendar
                     mode="single"
-                    selected={newProj.datum_smluvni ? parse(newProj.datum_smluvni, "d.M.yyyy", new Date()) : undefined}
+                    selected={newProj.datum_smluvni ? parseAppDate(newProj.datum_smluvni) : undefined}
                     onSelect={(d) => {
                       if (d) {
-                        setNewProj(s => ({ ...s, datum_smluvni: format(d, "d.M.yyyy") }));
+                        setNewProj(s => ({ ...s, datum_smluvni: formatAppDate(d) }));
                         setDatumWarning(false);
                       }
                     }}

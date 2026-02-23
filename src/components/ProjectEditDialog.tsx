@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format, parse } from "date-fns";
+import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -146,9 +146,9 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
               <PopoverContent className="w-auto p-0 z-[99999]" align="start">
                 <Calendar
                   mode="single"
-                  selected={form.datum_smluvni ? parse(form.datum_smluvni, "d.M.yyyy", new Date()) : undefined}
+                  selected={form.datum_smluvni ? parseAppDate(form.datum_smluvni) : undefined}
                   onSelect={(d) => {
-                    if (d) setForm(s => ({ ...s, datum_smluvni: format(d, "d.M.yyyy") }));
+                    if (d) setForm(s => ({ ...s, datum_smluvni: formatAppDate(d) }));
                   }}
                   className="p-3 pointer-events-auto"
                 />

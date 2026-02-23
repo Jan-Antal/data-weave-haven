@@ -33,7 +33,7 @@ function RecordRow({ record, table, nameField, idField }: { record: any; table: 
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const displayName = idField ? `${record[idField]} — ${record[nameField]}` : record[nameField];
-  const deletedAt = record.deleted_at ? format(new Date(record.deleted_at), "d.M.yyyy HH:mm") : "";
+  const deletedAt = record.deleted_at ? format(new Date(record.deleted_at), "dd-MMM-yy HH:mm") : "";
 
   const handleRestore = async () => {
     const { error } = await supabase.from(table as any).update({ deleted_at: null } as any).eq("id", record.id);
