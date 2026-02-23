@@ -142,7 +142,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
           </TableHeader>
           <TableBody>
             {sorted.map((p) => (
-              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors h-9" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { borderLeft: `3px solid ${c}` } : {}; })()}>
+              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors h-9" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { backgroundColor: c } : {}; })()}>
                 <TableCell
                   className="w-[32px] cursor-pointer"
                   onClick={() => setActiveProject({ projectId: p.project_id, projectName: p.project_name })}

@@ -196,7 +196,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
           </TableHeader>
           <TableBody>
             {sorted.map((p) => (
-              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { borderLeft: `3px solid ${c}` } : {}; })()}>
+              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { backgroundColor: c } : {}; })()}>
                 <TableCell style={{ minWidth: 32, width: 32 }} />
                 {v("project_id") && (
                   <TableCell className="font-mono text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => setEditProject(p)}>
