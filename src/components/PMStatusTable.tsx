@@ -29,6 +29,7 @@ import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
 
 const PM_COLUMNS = [
   { key: "project_id", label: "Project ID", locked: true },
@@ -204,6 +205,7 @@ interface PMStatusTableProps {
   personFilter: string | null;
   statusFilter: string[];
   search: string;
+  riskHighlight?: import("@/hooks/useRiskHighlight").RiskHighlightType;
 }
 
 const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
@@ -221,7 +223,7 @@ const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
   pm_poznamka: { minWidth: 140, flex: 1 },
 };
 
-export function PMStatusTable({ personFilter, statusFilter, search: externalSearch }: PMStatusTableProps) {
+export function PMStatusTable({ personFilter, statusFilter, search: externalSearch, riskHighlight }: PMStatusTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const statusLabels = statusOptions.map((s) => s.label);
@@ -293,7 +295,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
           <TableBody>
             {sorted.map((p) => (
               <Fragment key={p.id}>
-                <TableRow className="hover:bg-muted/50 transition-colors h-9">
+                <TableRow className="hover:bg-muted/50 transition-colors h-9" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { borderLeft: `3px solid ${c}` } : {}; })()}>
                   <TableCell className="w-[32px] cursor-pointer" onClick={() => toggleExpand(p.project_id)}>
                     <ExpandArrow projectId={p.project_id} isExpanded={expanded.has(p.project_id)} />
                   </TableCell>

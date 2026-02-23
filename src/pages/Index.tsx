@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Settings, Plus, LogOut, User } from "lucide-react";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useState } from "react";
+import { RiskHighlightType } from "@/hooks/useRiskHighlight";
 import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
 import { StatusManagement } from "@/components/StatusManagement";
 import { RecycleBin } from "@/components/RecycleBin";
@@ -23,6 +24,7 @@ const Index = () => {
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [userMgmtOpen, setUserMgmtOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("project-info");
+  const [riskHighlight, setRiskHighlight] = useState<RiskHighlightType>(null);
   const { profile, signOut, canAccessSettings, canCreateProject, isAdmin } = useAuth();
 
   return (
@@ -106,7 +108,7 @@ const Index = () => {
       </div>
 
       <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6 flex-1">
-        <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} />
+        <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRiskHighlightChange={setRiskHighlight} />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="bg-card border">
@@ -122,13 +124,13 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="project-info" forceMount className={activeTab !== "project-info" ? "hidden" : ""}>
-            <ProjectInfoTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} />
+            <ProjectInfoTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
           </TabsContent>
           <TabsContent value="pm-status" forceMount className={activeTab !== "pm-status" ? "hidden" : ""}>
-            <PMStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} />
+            <PMStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
           </TabsContent>
           <TabsContent value="tpv-status" forceMount className={activeTab !== "tpv-status" ? "hidden" : ""}>
-            <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} />
+            <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
           </TabsContent>
         </Tabs>
       </main>

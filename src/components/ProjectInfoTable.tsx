@@ -28,6 +28,7 @@ import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { useAuth } from "@/hooks/useAuth";
+import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
 
 const PROJECT_INFO_COLUMNS = [
   { key: "project_id", label: "Project ID", locked: true },
@@ -62,6 +63,7 @@ interface ProjectInfoTableProps {
   personFilter: string | null;
   statusFilter: string[];
   search: string;
+  riskHighlight?: import("@/hooks/useRiskHighlight").RiskHighlightType;
 }
 
 const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
@@ -78,7 +80,7 @@ const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
   fakturace: { minWidth: 65 },
 };
 
-export function ProjectInfoTable({ personFilter, statusFilter, search: externalSearch }: ProjectInfoTableProps) {
+export function ProjectInfoTable({ personFilter, statusFilter, search: externalSearch, riskHighlight }: ProjectInfoTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const statusLabels = statusOptions.map((s) => s.label);
@@ -194,7 +196,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
           </TableHeader>
           <TableBody>
             {sorted.map((p) => (
-              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors">
+              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { borderLeft: `3px solid ${c}` } : {}; })()}>
                 <TableCell style={{ minWidth: 32, width: 32 }} />
                 {v("project_id") && (
                   <TableCell className="font-mono text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => setEditProject(p)}>
