@@ -152,19 +152,31 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
 
   // PM workload data
   const pmData = useMemo(() => {
-    const counts: Record<string, number> = {};
+    const agg: Record<string, { count: number; valueCZK: number }> = {};
     activeProjects.forEach((p) => {
       const pm = p.pm || "Nepřiřazeno";
-      counts[pm] = (counts[pm] || 0) + 1;
+      if (!agg[pm]) agg[pm] = { count: 0, valueCZK: 0 };
+      agg[pm].count += 1;
+      const amount = p.prodejni_cena || 0;
+      if (amount > 0) {
+        const currency = p.currency || "CZK";
+        if (currency === "CZK") {
+          agg[pm].valueCZK += amount;
+        } else {
+          const year = getProjectYear(p.datum_smluvni);
+          const rate = getExchangeRate(rates, year);
+          agg[pm].valueCZK += amount * rate;
+        }
+      }
     });
-    const sorted = Object.entries(counts)
-      .map(([name, value]) => ({ name, value }))
+    const sorted = Object.entries(agg)
+      .map(([name, { count, valueCZK }]) => ({ name, value: count, valueCZK }))
       .sort((a, b) => b.value - a.value);
     return sorted.map((entry, i) => ({
       ...entry,
       fill: PM_GREENS[i % PM_GREENS.length],
     }));
-  }, [activeProjects]);
+  }, [activeProjects, rates]);
 
   const toggleRisk = (type: RiskHighlightType) => {
     onRiskHighlightChange(riskHighlight === type ? null : type);
@@ -306,8 +318,12 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
                 {pmData.map((entry) => (
                   <div key={entry.name} className="flex items-center gap-1.5 whitespace-nowrap" style={{ fontSize: 11 }}>
                     <span className="inline-block rounded-full shrink-0" style={{ width: 7, height: 7, backgroundColor: entry.fill }} />
-                    <span className="text-muted-foreground truncate">{entry.name}</span>
-                    <span className="font-bold text-foreground ml-auto">{entry.value}</span>
+                    <span className="text-muted-foreground truncate" style={{ maxWidth: 90 }}>{entry.name}</span>
+                    <span className="font-bold text-foreground">{entry.value}</span>
+                    <span className="text-muted-foreground" style={{ fontSize: 10 }}>|</span>
+                    <span className="font-bold text-foreground">
+                      {entry.valueCZK > 0 ? `${formatNumber(entry.valueCZK)} Kč` : "—"}
+                    </span>
                   </div>
                 ))}
               </div>
