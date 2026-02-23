@@ -152,12 +152,16 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
   }, [activeProjects]);
 
   const isTPV = activeTab === "tpv-status";
+  const KONSTRUKTER_ACTIVE_STATUSES = ["Příprava", "Engineering"];
 
   // PM / Konstruktér workload data
   const workloadData = useMemo(() => {
     const field = isTPV ? "konstrukter" : "pm";
+    const source = isTPV
+      ? activeProjects.filter((p) => KONSTRUKTER_ACTIVE_STATUSES.includes(p.status || ""))
+      : activeProjects;
     const agg: Record<string, { count: number; valueCZK: number }> = {};
-    activeProjects.forEach((p) => {
+    source.forEach((p) => {
       const person = (p as any)[field] || "Nepřiřazeno";
       if (!agg[person]) agg[person] = { count: 0, valueCZK: 0 };
       agg[person].count += 1;
@@ -317,7 +321,7 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
                 </ResponsiveContainer>
                 {/* Center count */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <span className="font-serif font-bold" style={{ fontSize: 20 }}>{activeCount}</span>
+                  <span className="font-serif font-bold" style={{ fontSize: 20 }}>{workloadData.reduce((s, d) => s + d.value, 0)}</span>
                 </div>
               </div>
               {/* Legend */}
