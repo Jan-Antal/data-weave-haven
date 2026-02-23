@@ -7,7 +7,7 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
@@ -34,27 +34,67 @@ Deno.serve(async (req) => {
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
-    const { data: roleData } = await adminClient
+    
+    // Check caller role - allow owner or admin
+    const { data: callerRole } = await adminClient
       .from("user_roles")
       .select("role")
       .eq("user_id", caller.id)
-      .eq("role", "admin")
       .single();
 
-    if (!roleData) {
+    const callerRoleValue = callerRole?.role;
+    if (callerRoleValue !== "admin" && callerRoleValue !== "owner") {
       return new Response(JSON.stringify({ error: "Admin access required" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { user_id, full_name, role, is_active, password } = await req.json();
+    const body = await req.json();
+    const { user_id, full_name, role, is_active, password, transfer_ownership_to } = body;
+
+    // Handle ownership transfer
+    if (transfer_ownership_to) {
+      if (callerRoleValue !== "owner") {
+        return new Response(JSON.stringify({ error: "Only the Owner can transfer ownership" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Set new owner
+      await adminClient.from("user_roles").delete().eq("user_id", transfer_ownership_to);
+      await adminClient.from("user_roles").insert({ user_id: transfer_ownership_to, role: "owner" });
+
+      // Demote current owner to admin
+      await adminClient.from("user_roles").delete().eq("user_id", caller.id);
+      await adminClient.from("user_roles").insert({ user_id: caller.id, role: "admin" });
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (!user_id) {
       return new Response(JSON.stringify({ error: "Missing user_id" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Prevent changing the owner's role via normal role update
+    if (role !== undefined) {
+      const { data: targetRole } = await adminClient
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user_id)
+        .single();
+      if (targetRole?.role === "owner") {
+        return new Response(JSON.stringify({ error: "Cannot change Owner role. Use Transfer Ownership instead." }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     // Update password if provided
@@ -83,7 +123,7 @@ Deno.serve(async (req) => {
       await adminClient.from("user_roles").insert({ user_id, role });
     }
 
-    // If deactivating, optionally ban the user
+    // If deactivating, ban the user
     if (is_active === false) {
       await adminClient.auth.admin.updateUserById(user_id, { ban_duration: "876600h" });
     } else if (is_active === true) {

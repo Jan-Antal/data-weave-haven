@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Trash2, KeyRound } from "lucide-react";
+import { Plus, Trash2, KeyRound, ArrowRightLeft } from "lucide-react";
 import type { AppRole } from "@/hooks/useAuth";
 
 interface UserRow {
@@ -21,11 +21,15 @@ interface UserRow {
 }
 
 const ROLE_LABELS: Record<AppRole, string> = {
+  owner: "Owner",
   admin: "Admin",
   pm: "PM",
   konstrukter: "Konstruktér",
   viewer: "Viewer",
 };
+
+// Roles assignable via dropdown (owner excluded — can only be set via transfer)
+const ASSIGNABLE_ROLES: AppRole[] = ["admin", "pm", "konstrukter", "viewer"];
 
 interface Props {
   open: boolean;
@@ -45,6 +49,9 @@ export function UserManagement({ open, onOpenChange }: Props) {
   const [resetPassword, setResetPassword] = useState("");
   const [resetSubmitting, setResetSubmitting] = useState(false);
   const [resetError, setResetError] = useState("");
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferTarget, setTransferTarget] = useState<string>("");
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -66,6 +73,10 @@ export function UserManagement({ open, onOpenChange }: Props) {
     }
     setLoading(false);
   };
+
+  useEffect(() => {
+    if (open) fetchUsers();
+  }, [open]);
 
   const handleAddUser = async () => {
     const errors: Record<string, string> = {};
@@ -169,6 +180,31 @@ export function UserManagement({ open, onOpenChange }: Props) {
     }
   };
 
+  const handleTransferOwnership = async () => {
+    if (!transferTarget) return;
+    setTransferSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("update-user", {
+        body: { transfer_ownership_to: transferTarget },
+      });
+      if (error || data?.error) {
+        toast({ title: "Chyba", description: data?.error || error?.message, variant: "destructive" });
+      } else {
+        toast({ title: "Vlastnictví předáno" });
+        setTransferOpen(false);
+        setTransferTarget("");
+        fetchUsers();
+      }
+    } catch (e: any) {
+      toast({ title: "Chyba", description: e.message, variant: "destructive" });
+    } finally {
+      setTransferSubmitting(false);
+    }
+  };
+
+  const isOwner = (u: UserRow) => u.role === "owner";
+  const nonOwnerUsers = users.filter((u) => u.role !== "owner");
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -193,11 +229,11 @@ export function UserManagement({ open, onOpenChange }: Props) {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Načítání...</TableCell>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Načítání...</TableCell>
                   </TableRow>
                 ) : users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Žádní uživatelé</TableCell>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Žádní uživatelé</TableCell>
                   </TableRow>
                 ) : (
                   users.map((u) => (
@@ -205,19 +241,27 @@ export function UserManagement({ open, onOpenChange }: Props) {
                       <TableCell className="text-sm">{u.full_name || "—"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
                       <TableCell>
-                        <Select value={u.role ?? ""} onValueChange={(v) => handleUpdateRole(u.id, v as AppRole)}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {(Object.keys(ROLE_LABELS) as AppRole[]).map((r) => (
-                              <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {isOwner(u) ? (
+                          <span className="inline-flex items-center h-8 px-3 text-xs font-semibold text-primary">Owner</span>
+                        ) : (
+                          <Select value={u.role ?? ""} onValueChange={(v) => handleUpdateRole(u.id, v as AppRole)}>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ASSIGNABLE_ROLES.map((r) => (
+                                <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
                       </TableCell>
                       <TableCell className="text-center">
-                        <Switch checked={u.is_active} onCheckedChange={(v) => handleToggleActive(u.id, v)} />
+                        {isOwner(u) ? (
+                          <Switch checked={true} disabled />
+                        ) : (
+                          <Switch checked={u.is_active} onCheckedChange={(v) => handleToggleActive(u.id, v)} />
+                        )}
                       </TableCell>
                       <TableCell className="flex gap-1">
                         <button
@@ -227,12 +271,22 @@ export function UserManagement({ open, onOpenChange }: Props) {
                         >
                           <KeyRound className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => setDeleteTarget(u.id)}
-                          className="text-muted-foreground hover:text-destructive transition-colors"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {isOwner(u) ? (
+                          <button
+                            onClick={() => { setTransferOpen(true); setTransferTarget(""); }}
+                            className="text-muted-foreground hover:text-primary transition-colors"
+                            title="Předat vlastnictví"
+                          >
+                            <ArrowRightLeft className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setDeleteTarget(u.id)}
+                            className="text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -283,7 +337,7 @@ export function UserManagement({ open, onOpenChange }: Props) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(ROLE_LABELS) as AppRole[]).map((r) => (
+                  {ASSIGNABLE_ROLES.map((r) => (
                     <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
                   ))}
                 </SelectContent>
@@ -324,6 +378,39 @@ export function UserManagement({ open, onOpenChange }: Props) {
             <Button variant="outline" onClick={() => { setResetTarget(null); setResetPassword(""); setResetError(""); }}>Zrušit</Button>
             <Button onClick={handleResetPassword} disabled={resetSubmitting || !resetPassword.trim()}>
               {resetSubmitting ? "Ukládám..." : "Uložit nové heslo"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transfer Ownership Dialog */}
+      <Dialog open={transferOpen} onOpenChange={(v) => { if (!v) { setTransferOpen(false); setTransferTarget(""); } }}>
+        <DialogContent className="z-[99999] max-w-sm" style={{ zIndex: 99999 }}>
+          <DialogHeader>
+            <DialogTitle>Předat vlastnictví</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Vyberte uživatele, kterému chcete předat roli Owner. Vaše role bude změněna na Admin.
+          </p>
+          <div>
+            <Label>Nový Owner</Label>
+            <Select value={transferTarget} onValueChange={setTransferTarget}>
+              <SelectTrigger>
+                <SelectValue placeholder="Vyberte uživatele..." />
+              </SelectTrigger>
+              <SelectContent>
+                {nonOwnerUsers.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.full_name || u.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2 mt-2">
+            <Button variant="outline" onClick={() => { setTransferOpen(false); setTransferTarget(""); }}>Zrušit</Button>
+            <Button onClick={handleTransferOwnership} disabled={transferSubmitting || !transferTarget}>
+              {transferSubmitting ? "Předávám..." : "Předat vlastnictví"}
             </Button>
           </div>
         </DialogContent>
