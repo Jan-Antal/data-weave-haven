@@ -1,7 +1,7 @@
 import { useProjects } from "@/hooks/useProjects";
 import { useExchangeRates, getExchangeRate } from "@/hooks/useExchangeRates";
 import { formatCurrency } from "@/lib/currency";
-import { parse, isValid } from "date-fns";
+import { parseAppDate } from "@/lib/dateFormat";
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -15,13 +15,8 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
 
 function getProjectYear(datumSmluvni: string | null): number {
   if (!datumSmluvni) return new Date().getFullYear();
-  for (const fmt of ["d.M.yyyy", "dd.MM.yyyy", "yyyy-MM-dd"]) {
-    try {
-      const d = parse(datumSmluvni, fmt, new Date());
-      if (isValid(d)) return d.getFullYear();
-    } catch { /* skip */ }
-  }
-  return new Date().getFullYear();
+  const d = parseAppDate(datumSmluvni);
+  return d ? d.getFullYear() : new Date().getFullYear();
 }
 
 export function DashboardStats() {

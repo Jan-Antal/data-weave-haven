@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
-import { format, parse, isValid } from "date-fns";
+import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
 import { cn } from "@/lib/utils";
 import { PeopleSelect } from "./PeopleSelect";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -187,20 +187,14 @@ export function InlineEditableCell({
 
     if (type === "date") {
       const dateStr = String(value ?? "");
-      let selected: Date | undefined;
-      for (const fmt of ["yyyy-MM-dd", "d.M.yyyy", "dd.MM.yyyy", "d/M/yyyy"]) {
-        try {
-          const d = parse(dateStr, fmt, new Date());
-          if (isValid(d)) { selected = d; break; }
-        } catch { /* skip */ }
-      }
+      const selected = parseAppDate(dateStr);
 
       return (
         <Popover open={true} onOpenChange={(open) => { if (!open) setEditing(false); }}>
           <PopoverTrigger asChild>
             <div className="h-7 flex items-center text-xs px-1 border rounded cursor-pointer overflow-hidden">
               <CalendarIcon className="h-3 w-3 mr-1 flex-shrink-0 text-muted-foreground" />
-              <span className="truncate">{selected ? format(selected, "d.M.yyyy") : dateStr || "—"}</span>
+              <span className="truncate">{selected ? formatAppDate(selected) : dateStr || "—"}</span>
             </div>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
@@ -209,7 +203,7 @@ export function InlineEditableCell({
               selected={selected}
               onSelect={(d) => {
                 if (d) {
-                  const formatted = format(d, "d.M.yyyy");
+                  const formatted = formatAppDate(d);
                   setEditing(false);
                   const original = String(value ?? "");
                   if (formatted !== original) onSave(formatted);
