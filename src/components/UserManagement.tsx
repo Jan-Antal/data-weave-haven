@@ -198,7 +198,7 @@ export function UserManagement({ open, onOpenChange }: Props) {
 
       {/* Add User Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent style={{ zIndex: 10000 }}>
+        <DialogContent className="z-[99999]" style={{ zIndex: 99999 }}>
           <DialogHeader>
             <DialogTitle>Nový uživatel</DialogTitle>
           </DialogHeader>
