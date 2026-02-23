@@ -5,6 +5,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const VALID_ROLES = ["admin", "pm", "konstrukter", "viewer"];
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -62,6 +64,13 @@ Deno.serve(async (req) => {
         });
       }
 
+      if (typeof transfer_ownership_to !== "string" || transfer_ownership_to.length < 1) {
+        return new Response(JSON.stringify({ error: "Invalid transfer target" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       // Set new owner
       await adminClient.from("user_roles").delete().eq("user_id", transfer_ownership_to);
       await adminClient.from("user_roles").insert({ user_id: transfer_ownership_to, role: "owner" });
@@ -82,8 +91,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Prevent changing the owner's role via normal role update
+    // Validate role if provided
     if (role !== undefined) {
+      if (!VALID_ROLES.includes(role)) {
+        return new Response(JSON.stringify({ error: "Invalid role" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const { data: targetRole } = await adminClient
         .from("user_roles")
         .select("role")
@@ -97,11 +113,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Update password if provided
+    // Validate and update password if provided
     if (password !== undefined) {
+      if (typeof password !== "string" || password.length < 8 || password.length > 72) {
+        return new Response(JSON.stringify({ error: "Password must be between 8 and 72 characters" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const { error: pwError } = await adminClient.auth.admin.updateUserById(user_id, { password });
       if (pwError) {
-        return new Response(JSON.stringify({ error: pwError.message }), {
+        console.error("Password update failed:", pwError);
+        return new Response(JSON.stringify({ error: "Unable to update password" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -111,8 +134,25 @@ Deno.serve(async (req) => {
     // Update profile
     if (full_name !== undefined || is_active !== undefined) {
       const updateData: Record<string, any> = {};
-      if (full_name !== undefined) updateData.full_name = full_name;
-      if (is_active !== undefined) updateData.is_active = is_active;
+      if (full_name !== undefined) {
+        const trimmedName = String(full_name).trim();
+        if (trimmedName.length < 1 || trimmedName.length > 100) {
+          return new Response(JSON.stringify({ error: "Full name must be between 1 and 100 characters" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        updateData.full_name = trimmedName;
+      }
+      if (is_active !== undefined) {
+        if (typeof is_active !== "boolean") {
+          return new Response(JSON.stringify({ error: "is_active must be a boolean" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        updateData.is_active = is_active;
+      }
       
       await adminClient.from("profiles").update(updateData).eq("id", user_id);
     }
@@ -134,7 +174,8 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("Update user error:", error);
+    return new Response(JSON.stringify({ error: "An unexpected error occurred" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

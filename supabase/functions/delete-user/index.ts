@@ -49,8 +49,8 @@ Deno.serve(async (req) => {
 
     const { user_id } = await req.json();
 
-    if (!user_id) {
-      return new Response(JSON.stringify({ error: "Missing user_id" }), {
+    if (!user_id || typeof user_id !== "string") {
+      return new Response(JSON.stringify({ error: "Missing or invalid user_id" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -80,7 +80,8 @@ Deno.serve(async (req) => {
 
     const { error } = await adminClient.auth.admin.deleteUser(user_id);
     if (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
+      console.error("User deletion failed:", error);
+      return new Response(JSON.stringify({ error: "Unable to delete user" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -90,7 +91,8 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("Delete user error:", error);
+    return new Response(JSON.stringify({ error: "An unexpected error occurred" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
