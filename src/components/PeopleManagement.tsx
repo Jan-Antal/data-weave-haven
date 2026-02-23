@@ -121,7 +121,7 @@ export function PeopleManagement({ open, onOpenChange }: PeopleManagementProps) 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden" style={{ zIndex: 9999 }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
           <div className="px-5 pt-5 pb-3 space-y-3 border-b">
             <DialogHeader>
               <DialogTitle>Správa osob</DialogTitle>
