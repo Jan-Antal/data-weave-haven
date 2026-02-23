@@ -80,18 +80,26 @@ export function SortableHeader({
     document.addEventListener("mouseup", handleMouseUp);
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (editMode || editing) {
+      e.stopPropagation();
+      return;
+    }
+    onSort(column);
+  };
+
   return (
     <TableHead
       ref={thRef}
       className={cn(
-        "font-semibold cursor-pointer select-none hover:bg-muted/50 relative",
-        editMode && "border-b-2 border-accent",
+        "font-semibold select-none hover:bg-muted/50 relative",
+        editMode ? "cursor-default border-b-2 border-accent" : "cursor-pointer",
         className
       )}
       style={style}
-      onClick={() => !editing && onSort(column)}
+      onClick={handleClick}
     >
-      <div className="flex items-center gap-1 pr-1">
+      <div className="flex items-center gap-1 pr-2">
         {editing ? (
           <input
             autoFocus
@@ -114,13 +122,13 @@ export function SortableHeader({
             {displayLabel}
           </span>
         )}
-        {!editing && active && sortDir === "asc" && <ArrowUp className="h-3 w-3 shrink-0" />}
-        {!editing && active && sortDir === "desc" && <ArrowDown className="h-3 w-3 shrink-0" />}
-        {!editing && !active && <ArrowUpDown className="h-3 w-3 opacity-30 shrink-0" />}
+        {!editing && !editMode && active && sortDir === "asc" && <ArrowUp className="h-3 w-3 shrink-0" />}
+        {!editing && !editMode && active && sortDir === "desc" && <ArrowDown className="h-3 w-3 shrink-0" />}
+        {!editing && !editMode && !active && <ArrowUpDown className="h-3 w-3 opacity-30 shrink-0" />}
       </div>
       {editMode && (
         <div
-          className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-accent/50 hover:bg-accent hover:w-1.5 transition-all z-10"
+          className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize bg-accent/40 hover:bg-accent transition-colors z-10"
           onMouseDown={handleResizeStart}
         />
       )}
