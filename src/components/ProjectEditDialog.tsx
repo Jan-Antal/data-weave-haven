@@ -15,6 +15,7 @@ import { toast } from "@/hooks/use-toast";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Project {
   id: string;
@@ -40,6 +41,7 @@ interface ProjectEditDialogProps {
 export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDialogProps) {
   const qc = useQueryClient();
   const { data: statusOptions = [] } = useProjectStatusOptions();
+  const { canEdit, canDeleteProject } = useAuth();
   const statusLabels = statusOptions.map((s) => s.label);
   const [form, setForm] = useState({
     project_id: "",
@@ -212,25 +214,27 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
           </div>
         </div>
 
-        <div className="border-t pt-3 mt-1">
-          {!confirmDelete ? (
-            <Button size="sm" className="bg-[#EA592A] hover:bg-[#EA592A]/90 text-white" onClick={() => setConfirmDelete(true)}>
-              Smazat projekt
-            </Button>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-sm text-[#EA592A]">Opravdu chcete smazat tento projekt? Tato akce je nevratná.</p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>Zrušit</Button>
-                <Button size="sm" className="bg-[#EA592A] hover:bg-[#EA592A]/90 text-white" onClick={handleDelete}>Potvrdit smazání</Button>
+        {canDeleteProject && (
+          <div className="border-t pt-3 mt-1">
+            {!confirmDelete ? (
+              <Button size="sm" className="bg-[#EA592A] hover:bg-[#EA592A]/90 text-white" onClick={() => setConfirmDelete(true)}>
+                Smazat projekt
+              </Button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-[#EA592A]">Opravdu chcete smazat tento projekt? Tato akce je nevratná.</p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>Zrušit</Button>
+                  <Button size="sm" className="bg-[#EA592A] hover:bg-[#EA592A]/90 text-white" onClick={handleDelete}>Potvrdit smazání</Button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Zavřít</Button>
-          <Button onClick={handleSave} disabled={idExists || !form.project_id}>Uložit</Button>
+          {canEdit && <Button onClick={handleSave} disabled={idExists || !form.project_id}>Uložit</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>
