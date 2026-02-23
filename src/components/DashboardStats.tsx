@@ -17,23 +17,24 @@ import {
 
 const STORAGE_KEY = "dashboard-collapsed";
 
-const PIPELINE_STATUSES = [
-  "Příprava",
-  "Konstruktér",
-  "Výroba",
-  "Montáž",
-  "Předání",
-  "Reklamace",
+// Pipeline: status value → display label
+const PIPELINE_STAGES: { status: string; label: string }[] = [
+  { status: "Příprava", label: "Příprava" },
+  { status: "Engineering", label: "Konstrukce" },
+  { status: "Výroba IN", label: "Výroba" },
+  { status: "Expedice", label: "Expedice" },
+  { status: "Montáž", label: "Montáž" },
+  { status: "Reklamace", label: "Reklamace" },
 ];
 
 const EXCLUDED_STATUSES = ["Fakturace", "Dokončeno"];
 
 const PIPELINE_COLORS: Record<string, string> = {
   "Příprava": "#a7d9a2",
-  "Konstruktér": "#7cc576",
+  "Konstrukce": "#7cc576",
   "Výroba": "#52b04a",
-  "Montáž": "#3a8a36",
-  "Předání": "#256422",
+  "Expedice": "#3a8a36",
+  "Montáž": "#256422",
   "Reklamace": "#EA592A",
 };
 
@@ -132,10 +133,10 @@ export function DashboardStats({ personFilter, statusFilter, search }: Dashboard
 
   // Pipeline data
   const pipelineData = useMemo(() => {
-    return PIPELINE_STATUSES.map((status) => ({
-      name: status,
+    return PIPELINE_STAGES.map(({ status, label }) => ({
+      name: label,
       count: filtered.filter((p) => p.status === status).length,
-      fill: PIPELINE_COLORS[status] || "#6b7280",
+      fill: PIPELINE_COLORS[label] || "#6b7280",
     }));
   }, [filtered]);
 
