@@ -108,15 +108,13 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4">
+    <div>
+      <div className="flex items-center gap-2 flex-wrap mb-4">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Zpět
         </Button>
-        <h2 className="text-lg font-serif font-bold">{projectId} — {projectName}</h2>
-      </div>
-
-      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-sm font-serif font-bold">{projectId} — {projectName}</span>
+        <span className="text-muted-foreground/40 text-sm">|</span>
         <Button size="sm" variant="outline" onClick={() => { setNewItem({ item_name: "", item_type: "", status: "", sent_date: "", accepted_date: "", notes: "" }); setAddOpen(true); }}>
           <Plus className="h-3 w-3 mr-1" /> Přidat položku
         </Button>
