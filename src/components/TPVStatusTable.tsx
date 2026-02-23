@@ -44,10 +44,10 @@ function ExpandArrow({ projectId, isExpanded }: { projectId: string; isExpanded:
   const hasItems = items.length > 0;
 
   if (isExpanded) {
-    return <ChevronDown className={`h-4 w-4 ${hasItems ? "text-accent" : "text-muted-foreground"}`} />;
+    return <ChevronDown className={`h-5 w-5 stroke-[3] ${hasItems ? "text-accent" : "text-muted-foreground"}`} />;
   }
   return (
-    <ChevronRight className={`h-4 w-4 ${hasItems ? "text-accent fill-accent/20" : "text-muted-foreground/50"}`} />
+    <ChevronRight className={`h-5 w-5 stroke-[3] ${hasItems ? "text-accent fill-accent/20" : "text-muted-foreground/50"}`} />
   );
 }
 
