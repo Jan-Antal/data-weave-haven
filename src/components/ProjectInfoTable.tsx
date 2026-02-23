@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { StatusBadge } from "./StatusBadge";
+import { StatusBadge, RiskBadge } from "./StatusBadge";
 import { InlineEditableCell } from "./InlineEditableCell";
 import { CurrencyEditCell } from "./CurrencyEditCell";
 import { SortableHeader } from "./SortableHeader";
@@ -34,14 +34,25 @@ const PROJECT_INFO_COLUMNS = [
   { key: "project_id", label: "Project ID", locked: true },
   { key: "project_name", label: "Project Name", locked: true },
   { key: "klient", label: "Klient" },
+  { key: "location", label: "Lokace" },
   { key: "pm", label: "PM" },
   { key: "konstrukter", label: "Konstruktér" },
   { key: "kalkulant", label: "Kalkulant" },
+  { key: "architekt", label: "Architekt" },
+  { key: "dm", label: "DM" },
   { key: "status", label: "Status" },
+  { key: "risk", label: "Risk" },
   { key: "datum_smluvni", label: "Datum Smluvní" },
+  { key: "datum_objednavky", label: "Datum Objednávky" },
   { key: "prodejni_cena", label: "Prodejní cena" },
   { key: "marze", label: "Marže" },
   { key: "fakturace", label: "Fakturace" },
+  { key: "velikost_zakazky", label: "Velikost zakázky" },
+  { key: "narocnost", label: "Náročnost" },
+  { key: "contract_link", label: "Smlouva (odkaz)" },
+  { key: "fee_proposal_link", label: "Fee Proposal (odkaz)" },
+  { key: "link_cn", label: "CN (odkaz)" },
+  { key: "smluvni", label: "Smluvní" },
 ];
 
 const emptyProject = {
@@ -70,14 +81,25 @@ const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
   project_id: { minWidth: 90 },
   project_name: { minWidth: 160, flex: 2 },
   klient: { minWidth: 100, flex: 1 },
+  location: { minWidth: 100, flex: 1 },
   pm: { minWidth: 110, flex: 1 },
   konstrukter: { minWidth: 110, flex: 1 },
   kalkulant: { minWidth: 110, flex: 1 },
+  architekt: { minWidth: 110, flex: 1 },
+  dm: { minWidth: 110, flex: 1 },
   status: { minWidth: 100 },
+  risk: { minWidth: 75 },
   datum_smluvni: { minWidth: 90 },
+  datum_objednavky: { minWidth: 90 },
   prodejni_cena: { minWidth: 110 },
   marze: { minWidth: 60 },
   fakturace: { minWidth: 65 },
+  velikost_zakazky: { minWidth: 100 },
+  narocnost: { minWidth: 90 },
+  contract_link: { minWidth: 120 },
+  fee_proposal_link: { minWidth: 120 },
+  link_cn: { minWidth: 120 },
+  smluvni: { minWidth: 90 },
 };
 
 export function ProjectInfoTable({ personFilter, statusFilter, search: externalSearch, riskHighlight }: ProjectInfoTableProps) {
@@ -183,14 +205,25 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
               {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} style={colStyle("project_id")} {...editProps("project_id", "Project ID")} />}
               {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={colStyle("project_name")} {...editProps("project_name", "Project Name")} />}
               {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} style={colStyle("klient")} {...editProps("klient", "Klient")} />}
+              {v("location") && <SortableHeader label="Lokace" column="location" {...sh} style={colStyle("location")} {...editProps("location", "Lokace")} />}
               {v("pm") && <SortableHeader label="PM" column="pm" {...sh} style={colStyle("pm")} {...editProps("pm", "PM")} />}
               {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} style={colStyle("konstrukter")} {...editProps("konstrukter", "Konstruktér")} />}
               {v("kalkulant") && <SortableHeader label="Kalkulant" column="kalkulant" {...sh} style={colStyle("kalkulant")} {...editProps("kalkulant", "Kalkulant")} />}
+              {v("architekt") && <SortableHeader label="Architekt" column="architekt" {...sh} style={colStyle("architekt")} {...editProps("architekt", "Architekt")} />}
+              {v("dm") && <SortableHeader label="DM" column="dm" {...sh} style={colStyle("dm")} {...editProps("dm", "DM")} />}
               {v("status") && <SortableHeader label="Status" column="status" {...sh} style={colStyle("status")} {...editProps("status", "Status")} />}
+              {v("risk") && <SortableHeader label="Risk" column="risk" {...sh} style={colStyle("risk")} {...editProps("risk", "Risk")} />}
               {v("datum_smluvni") && <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} style={colStyle("datum_smluvni")} {...editProps("datum_smluvni", "Datum Smluvní")} />}
+              {v("datum_objednavky") && <SortableHeader label="Datum Objednávky" column="datum_objednavky" {...sh} style={colStyle("datum_objednavky")} {...editProps("datum_objednavky", "Datum Objednávky")} />}
               {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="text-right" style={colStyle("prodejni_cena")} {...editProps("prodejni_cena", "Prodejní cena")} />}
               {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} className="text-right" style={colStyle("marze")} {...editProps("marze", "Marže")} />}
               {v("fakturace") && <SortableHeader label="Fakturace" column="fakturace" {...sh} className="text-right" style={colStyle("fakturace")} {...editProps("fakturace", "Fakturace")} />}
+              {v("velikost_zakazky") && <SortableHeader label="Velikost zakázky" column="velikost_zakazky" {...sh} style={colStyle("velikost_zakazky")} {...editProps("velikost_zakazky", "Velikost zakázky")} />}
+              {v("narocnost") && <SortableHeader label="Náročnost" column="narocnost" {...sh} style={colStyle("narocnost")} {...editProps("narocnost", "Náročnost")} />}
+              {v("contract_link") && <SortableHeader label="Smlouva" column="contract_link" {...sh} style={colStyle("contract_link")} {...editProps("contract_link", "Smlouva")} />}
+              {v("fee_proposal_link") && <SortableHeader label="Fee Proposal" column="fee_proposal_link" {...sh} style={colStyle("fee_proposal_link")} {...editProps("fee_proposal_link", "Fee Proposal")} />}
+              {v("link_cn") && <SortableHeader label="CN" column="link_cn" {...sh} style={colStyle("link_cn")} {...editProps("link_cn", "CN")} />}
+              {v("smluvni") && <SortableHeader label="Smluvní" column="smluvni" {...sh} style={colStyle("smluvni")} {...editProps("smluvni", "Smluvní")} />}
               <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
             </TableRow>
           </TableHeader>
@@ -205,15 +238,24 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                 )}
                 {v("project_name") && <TableCell><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
                 {v("klient") && <TableCell><InlineEditableCell value={p.klient} onSave={(val) => save(p.id, "klient", val, p.klient || "")} readOnly={!canEdit} /></TableCell>}
+                {v("location") && <TableCell><InlineEditableCell value={p.location} onSave={(val) => save(p.id, "location", val, p.location || "")} readOnly={!canEdit} /></TableCell>}
                 {v("pm") && <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(val) => save(p.id, "pm", val, p.pm || "")} readOnly={!canEdit} /></TableCell>}
                 {v("konstrukter") && <TableCell><InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(val) => save(p.id, "konstrukter", val, p.konstrukter || "")} readOnly={!canEdit} /></TableCell>}
                 {v("kalkulant") && <TableCell><InlineEditableCell value={p.kalkulant} type="people" peopleRole="Kalkulant" onSave={(val) => save(p.id, "kalkulant", val, p.kalkulant || "")} readOnly={!canEdit} /></TableCell>}
+                {v("architekt") && <TableCell><InlineEditableCell value={p.architekt} onSave={(val) => save(p.id, "architekt", val, p.architekt || "")} readOnly={!canEdit} /></TableCell>}
+                {v("dm") && <TableCell><InlineEditableCell value={p.dm} onSave={(val) => save(p.id, "dm", val, p.dm || "")} readOnly={!canEdit} /></TableCell>}
                 {v("status") && (
                   <TableCell>
                     <InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(val) => save(p.id, "status", val, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} readOnly={!canEdit} />
                   </TableCell>
                 )}
+                {v("risk") && (
+                  <TableCell>
+                    <InlineEditableCell value={p.risk} type="select" options={["Low", "Medium", "High"]} onSave={(val) => save(p.id, "risk", val, p.risk || "")} displayValue={<RiskBadge level={p.risk || ""} />} readOnly={!canEdit} />
+                  </TableCell>
+                )}
                 {v("datum_smluvni") && <TableCell><InlineEditableCell value={p.datum_smluvni} type="date" onSave={(val) => save(p.id, "datum_smluvni", val, p.datum_smluvni || "")} readOnly={!canEdit} /></TableCell>}
+                {v("datum_objednavky") && <TableCell><InlineEditableCell value={p.datum_objednavky} type="date" onSave={(val) => save(p.id, "datum_objednavky", val, p.datum_objednavky || "")} readOnly={!canEdit} /></TableCell>}
                 {v("prodejni_cena") && (
                   <TableCell className="text-right">
                     <CurrencyEditCell value={p.prodejni_cena} currency={p.currency || "CZK"} onSave={(amount, currency) => saveCurrency(p.id, amount, currency, String(p.prodejni_cena ?? ""), p.currency || "CZK")} />
@@ -221,6 +263,12 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                 )}
                 {v("marze") && <TableCell className="text-right"><InlineEditableCell value={p.marze} onSave={(val) => save(p.id, "marze", val, p.marze || "")} readOnly={!canEdit} /></TableCell>}
                 {v("fakturace") && <TableCell className="text-right"><InlineEditableCell value={p.fakturace} onSave={(val) => save(p.id, "fakturace", val, p.fakturace || "")} readOnly={!canEdit} /></TableCell>}
+                {v("velikost_zakazky") && <TableCell><InlineEditableCell value={p.velikost_zakazky} onSave={(val) => save(p.id, "velikost_zakazky", val, p.velikost_zakazky || "")} readOnly={!canEdit} /></TableCell>}
+                {v("narocnost") && <TableCell><InlineEditableCell value={p.narocnost} onSave={(val) => save(p.id, "narocnost", val, p.narocnost || "")} readOnly={!canEdit} /></TableCell>}
+                {v("contract_link") && <TableCell><InlineEditableCell value={p.contract_link} onSave={(val) => save(p.id, "contract_link", val, p.contract_link || "")} readOnly={!canEdit} /></TableCell>}
+                {v("fee_proposal_link") && <TableCell><InlineEditableCell value={p.fee_proposal_link} onSave={(val) => save(p.id, "fee_proposal_link", val, p.fee_proposal_link || "")} readOnly={!canEdit} /></TableCell>}
+                {v("link_cn") && <TableCell><InlineEditableCell value={p.link_cn} onSave={(val) => save(p.id, "link_cn", val, p.link_cn || "")} readOnly={!canEdit} /></TableCell>}
+                {v("smluvni") && <TableCell><InlineEditableCell value={p.smluvni} onSave={(val) => save(p.id, "smluvni", val, p.smluvni || "")} readOnly={!canEdit} /></TableCell>}
               </TableRow>
             ))}
           </TableBody>
