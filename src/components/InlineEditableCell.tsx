@@ -151,13 +151,18 @@ export function InlineEditableCell({
 
     if (type === "textarea") {
       return (
-        <Popover open={true} onOpenChange={(open) => { if (!open) handleSave(); }}>
+        <Popover open={true} onOpenChange={(open) => { if (!open) { handleSave(); } }}>
           <PopoverTrigger asChild>
             <div className="h-7 flex items-center text-xs px-1 truncate cursor-pointer">
               {editValue || "—"}
             </div>
           </PopoverTrigger>
-          <PopoverContent className="w-[280px] p-1" align="start" side="bottom">
+          <PopoverContent
+            className="w-[280px] p-1"
+            align="start"
+            side="bottom"
+            onEscapeKeyDown={(e) => { e.preventDefault(); handleCancel(); }}
+          >
             <Textarea
               ref={textareaRef}
               value={editValue}
@@ -189,33 +194,33 @@ export function InlineEditableCell({
 
   if (isTextarea) {
     return (
-      <Popover>
-        <PopoverTrigger asChild>
-          <div
-            className={cn(
-              "cursor-pointer hover:bg-muted/80 rounded px-1 py-0.5 overflow-hidden h-7 leading-7 truncate whitespace-nowrap text-xs",
-              className
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              setEditValue(String(value ?? ""));
-              setEditing(true);
-            }}
-          >
-            {displayValue ?? (value !== null && value !== undefined && value !== "" ? String(value) : "—")}
-          </div>
-        </PopoverTrigger>
-        {textContent && textContent !== "—" && (
-          <PopoverContent
-            side="bottom"
-            align="start"
-            className="w-[280px] p-2 text-xs leading-relaxed whitespace-pre-wrap"
-            onPointerDownOutside={(e) => e.preventDefault()}
-          >
-            {textContent}
-          </PopoverContent>
-        )}
-      </Popover>
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              className={cn(
+                "cursor-pointer hover:bg-muted/80 rounded px-1 py-0.5 overflow-hidden h-7 leading-7 truncate whitespace-nowrap text-xs",
+                className
+              )}
+              onClick={() => {
+                setEditValue(String(value ?? ""));
+                setEditing(true);
+              }}
+            >
+              {displayValue ?? (value !== null && value !== undefined && value !== "" ? String(value) : "—")}
+            </div>
+          </TooltipTrigger>
+          {textContent && textContent !== "—" && (
+            <TooltipContent
+              side="bottom"
+              align="start"
+              className="max-w-[280px] p-2 text-xs leading-relaxed whitespace-pre-wrap"
+            >
+              {textContent}
+            </TooltipContent>
+          )}
+        </Tooltip>
+      </TooltipProvider>
     );
   }
 
