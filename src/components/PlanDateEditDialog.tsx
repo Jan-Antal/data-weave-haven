@@ -1,0 +1,156 @@
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon, Trash2 } from "lucide-react";
+import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
+import { cn } from "@/lib/utils";
+import { useUpdateProject } from "@/hooks/useProjectMutations";
+import type { Project } from "@/hooks/useProjects";
+
+const DATE_FIELDS = [
+  { key: "datum_objednavky", label: "Datum Objednání" },
+  { key: "datum_smluvni", label: "Datum Smluvní" },
+  { key: "tpv_date", label: "TPV" },
+  { key: "expedice", label: "Expedice" },
+  { key: "predani", label: "Předání" },
+] as const;
+
+type FieldKey = (typeof DATE_FIELDS)[number]["key"];
+
+interface PlanDateEditDialogProps {
+  project: Project | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function PlanDateEditDialog({ project, open, onOpenChange }: PlanDateEditDialogProps) {
+  const updateProject = useUpdateProject();
+  const [values, setValues] = useState<Record<FieldKey, string | null>>({
+    datum_objednavky: null,
+    datum_smluvni: null,
+    tpv_date: null,
+    expedice: null,
+    predani: null,
+  });
+  const [openPickers, setOpenPickers] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (project && open) {
+      setValues({
+        datum_objednavky: project.datum_objednavky ?? null,
+        datum_smluvni: project.datum_smluvni ?? null,
+        tpv_date: project.tpv_date ?? null,
+        expedice: project.expedice ?? null,
+        predani: project.predani ?? null,
+      });
+    }
+  }, [project, open]);
+
+  if (!project) return null;
+
+  const handleSave = async () => {
+    for (const f of DATE_FIELDS) {
+      const oldVal = (project as any)[f.key] ?? "";
+      const newVal = values[f.key] ?? "";
+      if (oldVal !== newVal) {
+        updateProject.mutate({
+          id: project.id,
+          field: f.key,
+          value: newVal,
+          oldValue: oldVal,
+        });
+      }
+    }
+    onOpenChange(false);
+  };
+
+  const isWeekend = (date: Date) => {
+    const day = date.getDay();
+    return day === 0 || day === 6;
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[400px]">
+        <DialogHeader>
+          <DialogTitle className="text-sm font-semibold">
+            {project.project_id} — {project.project_name}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-3 py-2">
+          {DATE_FIELDS.map((f) => {
+            const raw = values[f.key];
+            const parsed = raw ? parseAppDate(raw) : undefined;
+
+            return (
+              <div key={f.key} className="flex items-center gap-2">
+                <span className="text-xs font-medium w-[120px] shrink-0">{f.label}</span>
+                <Popover
+                  open={openPickers[f.key] || false}
+                  onOpenChange={(o) => setOpenPickers((prev) => ({ ...prev, [f.key]: o }))}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "h-8 w-[140px] justify-start text-left font-normal text-xs",
+                        !parsed && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                      {parsed ? formatAppDate(parsed) : "—"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={parsed}
+                      defaultMonth={parsed || new Date()}
+                      onSelect={(date) => {
+                        setValues((prev) => ({
+                          ...prev,
+                          [f.key]: date ? formatAppDate(date) : null,
+                        }));
+                        setOpenPickers((prev) => ({ ...prev, [f.key]: false }));
+                      }}
+                      disabled={isWeekend}
+                      weekStartsOn={1}
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                    <div className="border-t px-3 py-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-destructive hover:text-destructive w-full justify-start"
+                        onClick={() => {
+                          setValues((prev) => ({ ...prev, [f.key]: null }));
+                          setOpenPickers((prev) => ({ ...prev, [f.key]: false }));
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3 mr-1.5" />
+                        Smazat datum
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            );
+          })}
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            Zrušit
+          </Button>
+          <Button size="sm" onClick={handleSave}>
+            Uložit
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
