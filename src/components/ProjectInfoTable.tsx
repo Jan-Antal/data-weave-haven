@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { StatusBadge, RiskBadge } from "./StatusBadge";
 import { InlineEditableCell } from "./InlineEditableCell";
 import { CurrencyEditCell } from "./CurrencyEditCell";
 import { SortableHeader } from "./SortableHeader";
@@ -23,37 +22,12 @@ import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 import { ProjectEditDialog } from "./ProjectEditDialog";
-import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { useAuth } from "@/hooks/useAuth";
 import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
-
-const PROJECT_INFO_COLUMNS = [
-  { key: "project_id", label: "Project ID", locked: true },
-  { key: "project_name", label: "Project Name", locked: true },
-  { key: "klient", label: "Klient" },
-  { key: "location", label: "Lokace" },
-  { key: "pm", label: "PM" },
-  { key: "konstrukter", label: "Konstruktér" },
-  { key: "kalkulant", label: "Kalkulant" },
-  { key: "architekt", label: "Architekt" },
-  { key: "dm", label: "DM" },
-  { key: "status", label: "Status" },
-  { key: "risk", label: "Risk" },
-  { key: "datum_smluvni", label: "Datum Smluvní" },
-  { key: "datum_objednavky", label: "Datum Objednávky" },
-  { key: "prodejni_cena", label: "Prodejní cena" },
-  { key: "marze", label: "Marže" },
-  { key: "fakturace", label: "Fakturace" },
-  { key: "velikost_zakazky", label: "Velikost zakázky" },
-  { key: "narocnost", label: "Náročnost" },
-  { key: "contract_link", label: "Smlouva (odkaz)" },
-  { key: "fee_proposal_link", label: "Fee Proposal (odkaz)" },
-  { key: "link_cn", label: "CN (odkaz)" },
-  { key: "smluvni", label: "Smluvní" },
-];
+import { useAllColumnVisibility } from "./ColumnVisibilityContext";
 
 const emptyProject = {
   project_id: "",
@@ -82,24 +56,13 @@ const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
   project_name: { minWidth: 160, flex: 2 },
   klient: { minWidth: 100, flex: 1 },
   location: { minWidth: 100, flex: 1 },
-  pm: { minWidth: 110, flex: 1 },
-  konstrukter: { minWidth: 110, flex: 1 },
   kalkulant: { minWidth: 110, flex: 1 },
   architekt: { minWidth: 110, flex: 1 },
-  dm: { minWidth: 110, flex: 1 },
-  status: { minWidth: 100 },
-  risk: { minWidth: 75 },
   datum_smluvni: { minWidth: 90 },
   datum_objednavky: { minWidth: 90 },
   prodejni_cena: { minWidth: 110 },
   marze: { minWidth: 60 },
-  fakturace: { minWidth: 65 },
-  velikost_zakazky: { minWidth: 100 },
-  narocnost: { minWidth: 90 },
-  contract_link: { minWidth: 120 },
-  fee_proposal_link: { minWidth: 120 },
   link_cn: { minWidth: 120 },
-  smluvni: { minWidth: 90 },
 };
 
 export function ProjectInfoTable({ personFilter, statusFilter, search: externalSearch, riskHighlight }: ProjectInfoTableProps) {
@@ -113,7 +76,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const [datumWarning, setDatumWarning] = useState(false);
   const qc = useQueryClient();
   const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
-  const { isVisible, toggleColumn, columns } = useColumnVisibility("col-vis-project-info", PROJECT_INFO_COLUMNS);
+  const { projectInfo: { isVisible, columns } } = useAllColumnVisibility();
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck();
   const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("project-info");
   const [editMode, setEditMode] = useState(false);
@@ -206,25 +169,14 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
               {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={colStyle("project_name")} {...editProps("project_name", "Project Name")} />}
               {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} style={colStyle("klient")} {...editProps("klient", "Klient")} />}
               {v("location") && <SortableHeader label="Lokace" column="location" {...sh} style={colStyle("location")} {...editProps("location", "Lokace")} />}
-              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} style={colStyle("pm")} {...editProps("pm", "PM")} />}
-              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} style={colStyle("konstrukter")} {...editProps("konstrukter", "Konstruktér")} />}
               {v("kalkulant") && <SortableHeader label="Kalkulant" column="kalkulant" {...sh} style={colStyle("kalkulant")} {...editProps("kalkulant", "Kalkulant")} />}
               {v("architekt") && <SortableHeader label="Architekt" column="architekt" {...sh} style={colStyle("architekt")} {...editProps("architekt", "Architekt")} />}
-              {v("dm") && <SortableHeader label="DM" column="dm" {...sh} style={colStyle("dm")} {...editProps("dm", "DM")} />}
-              {v("status") && <SortableHeader label="Status" column="status" {...sh} style={colStyle("status")} {...editProps("status", "Status")} />}
-              {v("risk") && <SortableHeader label="Risk" column="risk" {...sh} style={colStyle("risk")} {...editProps("risk", "Risk")} />}
               {v("datum_smluvni") && <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} style={colStyle("datum_smluvni")} {...editProps("datum_smluvni", "Datum Smluvní")} />}
               {v("datum_objednavky") && <SortableHeader label="Datum Objednávky" column="datum_objednavky" {...sh} style={colStyle("datum_objednavky")} {...editProps("datum_objednavky", "Datum Objednávky")} />}
               {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="text-right" style={colStyle("prodejni_cena")} {...editProps("prodejni_cena", "Prodejní cena")} />}
               {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} className="text-right" style={colStyle("marze")} {...editProps("marze", "Marže")} />}
-              {v("fakturace") && <SortableHeader label="Fakturace" column="fakturace" {...sh} className="text-right" style={colStyle("fakturace")} {...editProps("fakturace", "Fakturace")} />}
-              {v("velikost_zakazky") && <SortableHeader label="Velikost zakázky" column="velikost_zakazky" {...sh} style={colStyle("velikost_zakazky")} {...editProps("velikost_zakazky", "Velikost zakázky")} />}
-              {v("narocnost") && <SortableHeader label="Náročnost" column="narocnost" {...sh} style={colStyle("narocnost")} {...editProps("narocnost", "Náročnost")} />}
-              {v("contract_link") && <SortableHeader label="Smlouva" column="contract_link" {...sh} style={colStyle("contract_link")} {...editProps("contract_link", "Smlouva")} />}
-              {v("fee_proposal_link") && <SortableHeader label="Fee Proposal" column="fee_proposal_link" {...sh} style={colStyle("fee_proposal_link")} {...editProps("fee_proposal_link", "Fee Proposal")} />}
               {v("link_cn") && <SortableHeader label="CN" column="link_cn" {...sh} style={colStyle("link_cn")} {...editProps("link_cn", "CN")} />}
-              {v("smluvni") && <SortableHeader label="Smluvní" column="smluvni" {...sh} style={colStyle("smluvni")} {...editProps("smluvni", "Smluvní")} />}
-              <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
+              <ColumnVisibilityToggle editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -239,21 +191,8 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                 {v("project_name") && <TableCell><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
                 {v("klient") && <TableCell><InlineEditableCell value={p.klient} onSave={(val) => save(p.id, "klient", val, p.klient || "")} readOnly={!canEdit} /></TableCell>}
                 {v("location") && <TableCell><InlineEditableCell value={p.location} onSave={(val) => save(p.id, "location", val, p.location || "")} readOnly={!canEdit} /></TableCell>}
-                {v("pm") && <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(val) => save(p.id, "pm", val, p.pm || "")} readOnly={!canEdit} /></TableCell>}
-                {v("konstrukter") && <TableCell><InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(val) => save(p.id, "konstrukter", val, p.konstrukter || "")} readOnly={!canEdit} /></TableCell>}
                 {v("kalkulant") && <TableCell><InlineEditableCell value={p.kalkulant} type="people" peopleRole="Kalkulant" onSave={(val) => save(p.id, "kalkulant", val, p.kalkulant || "")} readOnly={!canEdit} /></TableCell>}
                 {v("architekt") && <TableCell><InlineEditableCell value={p.architekt} onSave={(val) => save(p.id, "architekt", val, p.architekt || "")} readOnly={!canEdit} /></TableCell>}
-                {v("dm") && <TableCell><InlineEditableCell value={p.dm} onSave={(val) => save(p.id, "dm", val, p.dm || "")} readOnly={!canEdit} /></TableCell>}
-                {v("status") && (
-                  <TableCell>
-                    <InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(val) => save(p.id, "status", val, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} readOnly={!canEdit} />
-                  </TableCell>
-                )}
-                {v("risk") && (
-                  <TableCell>
-                    <InlineEditableCell value={p.risk} type="select" options={["Low", "Medium", "High"]} onSave={(val) => save(p.id, "risk", val, p.risk || "")} displayValue={<RiskBadge level={p.risk || ""} />} readOnly={!canEdit} />
-                  </TableCell>
-                )}
                 {v("datum_smluvni") && <TableCell><InlineEditableCell value={p.datum_smluvni} type="date" onSave={(val) => save(p.id, "datum_smluvni", val, p.datum_smluvni || "")} readOnly={!canEdit} /></TableCell>}
                 {v("datum_objednavky") && <TableCell><InlineEditableCell value={p.datum_objednavky} type="date" onSave={(val) => save(p.id, "datum_objednavky", val, p.datum_objednavky || "")} readOnly={!canEdit} /></TableCell>}
                 {v("prodejni_cena") && (
@@ -262,13 +201,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                   </TableCell>
                 )}
                 {v("marze") && <TableCell className="text-right"><InlineEditableCell value={p.marze} onSave={(val) => save(p.id, "marze", val, p.marze || "")} readOnly={!canEdit} /></TableCell>}
-                {v("fakturace") && <TableCell className="text-right"><InlineEditableCell value={p.fakturace} onSave={(val) => save(p.id, "fakturace", val, p.fakturace || "")} readOnly={!canEdit} /></TableCell>}
-                {v("velikost_zakazky") && <TableCell><InlineEditableCell value={p.velikost_zakazky} onSave={(val) => save(p.id, "velikost_zakazky", val, p.velikost_zakazky || "")} readOnly={!canEdit} /></TableCell>}
-                {v("narocnost") && <TableCell><InlineEditableCell value={p.narocnost} onSave={(val) => save(p.id, "narocnost", val, p.narocnost || "")} readOnly={!canEdit} /></TableCell>}
-                {v("contract_link") && <TableCell><InlineEditableCell value={p.contract_link} onSave={(val) => save(p.id, "contract_link", val, p.contract_link || "")} readOnly={!canEdit} /></TableCell>}
-                {v("fee_proposal_link") && <TableCell><InlineEditableCell value={p.fee_proposal_link} onSave={(val) => save(p.id, "fee_proposal_link", val, p.fee_proposal_link || "")} readOnly={!canEdit} /></TableCell>}
                 {v("link_cn") && <TableCell><InlineEditableCell value={p.link_cn} onSave={(val) => save(p.id, "link_cn", val, p.link_cn || "")} readOnly={!canEdit} /></TableCell>}
-                {v("smluvni") && <TableCell><InlineEditableCell value={p.smluvni} onSave={(val) => save(p.id, "smluvni", val, p.smluvni || "")} readOnly={!canEdit} /></TableCell>}
               </TableRow>
             ))}
           </TableBody>
@@ -283,94 +216,91 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
               <Label>Project ID <span className="text-[hsl(var(--accent))]">*</span></Label>
               <Input
                 value={newProj.project_id}
-                onChange={(e) => { setNewProj(s => ({ ...s, project_id: e.target.value })); resetIdCheck(); }}
-                onBlur={() => checkProjectId(newProj.project_id)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setNewProj((p) => ({ ...p, project_id: val }));
+                  if (val.length >= 2) checkProjectId(val);
+                  else resetIdCheck();
+                }}
+                className={idExists ? "border-destructive" : ""}
               />
-              {idExists && <p className="text-xs text-destructive mt-1">Toto ID již existuje</p>}
+              {idExists && <p className="text-destructive text-xs mt-1">Toto ID již existuje</p>}
             </div>
             <div>
-              <Label>Datum Smluvní <span className="text-foreground font-bold">*</span></Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !newProj.datum_smluvni && "text-muted-foreground", datumWarning && "border-destructive")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {newProj.datum_smluvni || "Vyberte datum"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-[99999]" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={newProj.datum_smluvni ? parseAppDate(newProj.datum_smluvni) : undefined}
-                    onSelect={(d) => {
-                      if (d) {
-                        setNewProj(s => ({ ...s, datum_smluvni: formatAppDate(d) }));
-                        setDatumWarning(false);
-                      }
-                    }}
-                    className="p-3 pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-              {datumWarning && <p className="text-xs text-destructive mt-1">Datum smluvní je povinné</p>}
+              <Label>Project Name <span className="text-[hsl(var(--accent))]">*</span></Label>
+              <Input value={newProj.project_name} onChange={(e) => setNewProj((p) => ({ ...p, project_name: e.target.value }))} />
             </div>
-
-            <div><Label>Project Name <span className="text-[hsl(var(--accent))]">*</span></Label><Input value={newProj.project_name} onChange={(e) => setNewProj(s => ({ ...s, project_name: e.target.value }))} /></div>
+            <div>
+              <Label>Klient</Label>
+              <Input value={newProj.klient} onChange={(e) => setNewProj((p) => ({ ...p, klient: e.target.value }))} />
+            </div>
             <div>
               <Label>PM</Label>
-              <PeopleSelectDropdown role="PM" value={newProj.pm} onValueChange={(val) => setNewProj(s => ({ ...s, pm: val }))} placeholder="Vyberte PM" />
+              <PeopleSelectDropdown value={newProj.pm} onValueChange={(val) => setNewProj((p) => ({ ...p, pm: val }))} role="PM" />
             </div>
-
-            <div><Label>Klient</Label><Input value={newProj.klient} onChange={(e) => setNewProj(s => ({ ...s, klient: e.target.value }))} /></div>
             <div>
               <Label>Konstruktér</Label>
-              <PeopleSelectDropdown role="Konstruktér" value={newProj.konstrukter} onValueChange={(val) => setNewProj(s => ({ ...s, konstrukter: val }))} placeholder="Vyberte konstruktéra" />
+              <PeopleSelectDropdown value={newProj.konstrukter} onValueChange={(val) => setNewProj((p) => ({ ...p, konstrukter: val }))} role="Konstruktér" />
             </div>
-
+            <div>
+              <Label>Kalkulant</Label>
+              <PeopleSelectDropdown value={newProj.kalkulant} onValueChange={(val) => setNewProj((p) => ({ ...p, kalkulant: val }))} role="Kalkulant" />
+            </div>
             <div>
               <Label>Status</Label>
-              <Select value={newProj.status} onValueChange={(val) => setNewProj(s => ({ ...s, status: val }))}>
-                <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
-                <SelectContent className="z-[99999]">
-                  {statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              <Select value={newProj.status} onValueChange={(val) => setNewProj((p) => ({ ...p, status: val }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {statusLabels.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>Kalkulant</Label>
-              <PeopleSelectDropdown role="Kalkulant" value={newProj.kalkulant} onValueChange={(val) => setNewProj(s => ({ ...s, kalkulant: val }))} placeholder="Vyberte kalkulanta" />
+              <Label>Datum smluvní</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !newProj.datum_smluvni && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {newProj.datum_smluvni ? formatAppDate(parseAppDate(newProj.datum_smluvni)!) : "Vyberte datum"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 z-[9999]" align="start">
+                  <Calendar mode="single" selected={newProj.datum_smluvni ? parseAppDate(newProj.datum_smluvni) : undefined} onSelect={(date) => { if (date) { const iso = date.toISOString().split("T")[0]; setNewProj((p) => ({ ...p, datum_smluvni: iso })); } }} />
+                </PopoverContent>
+              </Popover>
+              {datumWarning && <p className="text-[hsl(var(--accent))] text-xs mt-1">Datum smluvní není vyplněn. Klikněte znovu pro uložení bez data.</p>}
             </div>
-
-            <div className="col-span-2">
+            <div>
               <Label>Prodejní cena</Label>
-              <div className="flex items-center gap-1">
-                <Input type="number" className="no-spinners" value={newProj.prodejni_cena} onChange={(e) => setNewProj(s => ({ ...s, prodejni_cena: e.target.value }))} />
-                <Button type="button" variant="outline" size="sm" className="h-10 px-3 font-mono shrink-0" onClick={() => setNewProj(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}>
-                  {newProj.currency}
-                </Button>
-              </div>
+              <Input type="number" value={newProj.prodejni_cena} onChange={(e) => setNewProj((p) => ({ ...p, prodejni_cena: e.target.value }))} />
             </div>
-            <div className="col-span-2">
+            <div>
+              <Label>Měna</Label>
+              <Select value={newProj.currency} onValueChange={(val) => setNewProj((p) => ({ ...p, currency: val }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CZK">CZK</SelectItem>
+                  <SelectItem value="EUR">EUR</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label>Marže</Label>
-              <div className="flex items-center gap-1">
-                <Input type="number" className="no-spinners" value={newProj.marze} onChange={(e) => setNewProj(s => ({ ...s, marze: e.target.value }))} placeholder="0" />
-                <span className="text-sm text-muted-foreground shrink-0">%</span>
-              </div>
+              <Input value={newProj.marze} onChange={(e) => setNewProj((p) => ({ ...p, marze: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Fakturace</Label>
+              <Input value={newProj.fakturace} onChange={(e) => setNewProj((p) => ({ ...p, fakturace: e.target.value }))} />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setAddOpen(false); resetIdCheck(); }}>Zrušit</Button>
-            <Button onClick={handleAddProject} disabled={!newProj.project_id || !newProj.project_name || idExists}>
-              {datumWarning && !newProj.datum_smluvni ? "Přesto vytvořit" : "Vytvořit"}
-            </Button>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => { setAddOpen(false); setDatumWarning(false); resetIdCheck(); }}>Zrušit</Button>
+            <Button onClick={handleAddProject} disabled={!newProj.project_id || !newProj.project_name || idExists}>Vytvořit projekt</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <ProjectEditDialog
-        project={editProject}
-        open={!!editProject}
-        onOpenChange={(open) => { if (!open) setEditProject(null); }}
-      />
+      {editProject && <ProjectEditDialog project={editProject} open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }} />}
     </div>
   );
 }

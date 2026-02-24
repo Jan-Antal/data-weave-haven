@@ -2,6 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectInfoTable } from "@/components/ProjectInfoTable";
 import { PMStatusTable } from "@/components/PMStatusTable";
 import { TPVStatusTable } from "@/components/TPVStatusTable";
+import { ColumnVisibilityProvider } from "@/components/ColumnVisibilityContext";
 import { DashboardStats } from "@/components/DashboardStats";
 import { TableFilters, useTableFilters } from "@/components/TableFilters";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -46,6 +47,7 @@ const Index = () => {
   const { profile, signOut, canAccessSettings, canCreateProject, isAdmin } = useAuth();
 
   return (
+    <ColumnVisibilityProvider>
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b bg-primary px-6 py-4 sticky top-0 z-50">
         <div className="max-w-[1600px] mx-auto flex items-center justify-between">
@@ -158,6 +160,7 @@ const Index = () => {
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
       <UserManagement open={userMgmtOpen} onOpenChange={setUserMgmtOpen} />
     </div>
+    </ColumnVisibilityProvider>
   );
 };
 

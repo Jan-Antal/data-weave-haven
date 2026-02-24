@@ -2,12 +2,7 @@ import { useState, Fragment } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge, RiskBadge } from "./StatusBadge";
 import { InlineEditableCell } from "./InlineEditableCell";
-import { CurrencyEditCell } from "./CurrencyEditCell";
-import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "@/hooks/use-toast";
 import { SortableHeader } from "./SortableHeader";
-
 import { useProjects } from "@/hooks/useProjects";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
 import { useSortFilter } from "@/hooks/useSortFilter";
@@ -24,28 +19,15 @@ import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalList
 import { CSS } from "@dnd-kit/utilities";
 import type { ProjectStage } from "@/hooks/useProjectStages";
 import type { Project } from "@/hooks/useProjects";
-import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
-
-const PM_COLUMNS = [
-  { key: "project_id", label: "Project ID", locked: true },
-  { key: "project_name", label: "Project Name", locked: true },
-  { key: "klient", label: "Klient" },
-  { key: "pm", label: "PM" },
-  { key: "status", label: "Status" },
-  { key: "risk", label: "Risk" },
-  { key: "datum_smluvni", label: "Datum Smluvní" },
-  { key: "zamereni", label: "Zaměření" },
-  { key: "tpv_date", label: "TPV" },
-  { key: "expedice", label: "Expedice" },
-  { key: "montaz", label: "Montáž" },
-  { key: "predani", label: "Předání" },
-  { key: "pm_poznamka", label: "Poznámka", locked: false },
-];
+import { useAllColumnVisibility } from "./ColumnVisibilityContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 const stageStatuses = ["Plánováno", "Probíhá", "Dokončeno", "Pozastaveno"];
 
@@ -76,9 +58,6 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
       {v("project_name") && (
         <TableCell className="truncate text-muted-foreground text-xs" title={project.project_name}>{project.project_name}</TableCell>
       )}
-      {v("klient") && (
-        <TableCell className="truncate text-muted-foreground text-xs" title={project.klient || ""}>{project.klient || "—"}</TableCell>
-      )}
       {v("pm") && (
         <TableCell><InlineEditableCell value={stage.pm} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} /></TableCell>
       )}
@@ -91,9 +70,6 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
         <TableCell>
           <InlineEditableCell value={stage.risk} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("risk", val)} displayValue={<RiskBadge level={stage.risk || ""} />} readOnly={!canEdit} />
         </TableCell>
-      )}
-      {v("datum_smluvni") && (
-        <TableCell><InlineEditableCell value={stage.datum_smluvni} type="date" onSave={(val) => saveStage("datum_smluvni", val)} readOnly={!canEdit} /></TableCell>
       )}
       {v("zamereni") && (
         <TableCell><InlineEditableCell value={stage.zamereni} type="date" onSave={(val) => saveStage("zamereni", val)} readOnly={!canEdit} /></TableCell>
@@ -234,11 +210,9 @@ interface PMStatusTableProps {
 const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
   project_id: { minWidth: 90 },
   project_name: { minWidth: 160, flex: 2 },
-  klient: { minWidth: 100, flex: 1 },
   pm: { minWidth: 110, flex: 1 },
   status: { minWidth: 100 },
   risk: { minWidth: 75 },
-  datum_smluvni: { minWidth: 90 },
   zamereni: { minWidth: 90 },
   tpv_date: { minWidth: 90 },
   expedice: { minWidth: 90 },
@@ -255,7 +229,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const qc = useQueryClient();
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const { isVisible, toggleColumn, columns } = useColumnVisibility("col-vis-pm-status", PM_COLUMNS);
+  const { pmStatus: { isVisible, columns } } = useAllColumnVisibility();
   const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("pm-status");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns } = useAuth();
@@ -304,18 +278,16 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
               <TableHead style={{ minWidth: 32, width: 32 }} className="shrink-0"></TableHead>
               {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} style={colStyle("project_id")} {...editProps("project_id", "Project ID")} />}
               {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={colStyle("project_name")} {...editProps("project_name", "Project Name")} />}
-              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} style={colStyle("klient")} {...editProps("klient", "Klient")} />}
               {v("pm") && <SortableHeader label="PM" column="pm" {...sh} style={colStyle("pm")} {...editProps("pm", "PM")} />}
               {v("status") && <SortableHeader label="Status" column="status" {...sh} style={colStyle("status")} {...editProps("status", "Status")} />}
               {v("risk") && <SortableHeader label="Risk" column="risk" {...sh} style={colStyle("risk")} {...editProps("risk", "Risk")} />}
-              {v("datum_smluvni") && <SortableHeader label="Smluvní" column="datum_smluvni" {...sh} style={colStyle("datum_smluvni")} {...editProps("datum_smluvni", "Smluvní")} />}
               {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} style={colStyle("zamereni")} {...editProps("zamereni", "Zaměření")} />}
               {v("tpv_date") && <SortableHeader label="TPV" column="tpv_date" {...sh} style={colStyle("tpv_date")} {...editProps("tpv_date", "TPV")} />}
               {v("expedice") && <SortableHeader label="Expedice" column="expedice" {...sh} style={colStyle("expedice")} {...editProps("expedice", "Expedice")} />}
               {v("montaz") && <SortableHeader label="Montáž" column="montaz" {...sh} style={colStyle("montaz")} {...editProps("montaz", "Montáž")} />}
               {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} style={colStyle("predani")} {...editProps("predani", "Předání")} />}
-              {v("pm_poznamka") && <SortableHeader label="Poznámka" column="pm_poznamka" {...sh} style={colStyle("pm_poznamka")} {...editProps("pm_poznamka", "Poznámka")} />}
-              <ColumnVisibilityToggle columns={columns} isVisible={isVisible} toggleColumn={toggleColumn} editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
+              {v("pm_poznamka") && <SortableHeader label="Poznámka PM" column="pm_poznamka" {...sh} style={colStyle("pm_poznamka")} {...editProps("pm_poznamka", "Poznámka PM")} />}
+              <ColumnVisibilityToggle editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -327,7 +299,6 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   </TableCell>
                   {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
                   {v("project_name") && <TableCell className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-                  {v("klient") && <TableCell><InlineEditableCell value={p.klient} onSave={(val) => save(p.id, "klient", val, p.klient || "")} readOnly={!canEdit} /></TableCell>}
                   {v("pm") && <TableCell><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(val) => save(p.id, "pm", val, p.pm || "")} readOnly={!canEdit} /></TableCell>}
                   {v("status") && (
                     <TableCell>
@@ -339,7 +310,6 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                       <InlineEditableCell value={p.risk} type="select" options={["Low", "Medium", "High"]} onSave={(val) => save(p.id, "risk", val, p.risk || "")} displayValue={<RiskBadge level={p.risk || ""} />} readOnly={!canEdit} />
                     </TableCell>
                   )}
-                  {v("datum_smluvni") && <TableCell><InlineEditableCell value={p.datum_smluvni} type="date" onSave={(val) => save(p.id, "datum_smluvni", val, p.datum_smluvni || "")} readOnly={!canEdit} /></TableCell>}
                   {v("zamereni") && <TableCell><InlineEditableCell value={p.zamereni} type="date" onSave={(val) => save(p.id, "zamereni", val, p.zamereni || "")} readOnly={!canEdit} /></TableCell>}
                   {v("tpv_date") && <TableCell><InlineEditableCell value={p.tpv_date} type="date" onSave={(val) => save(p.id, "tpv_date", val, p.tpv_date || "")} readOnly={!canEdit} /></TableCell>}
                   {v("expedice") && <TableCell><InlineEditableCell value={p.expedice} type="date" onSave={(val) => save(p.id, "expedice", val, p.expedice || "")} readOnly={!canEdit} /></TableCell>}
