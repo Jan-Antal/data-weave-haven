@@ -8,16 +8,13 @@ import type { Project } from "@/hooks/useProjects";
 import { ALL_COLUMNS } from "./ColumnVisibilityContext";
 
 // ── Centralised column-width system ─────────────────────────────────
-// Requirement: date cols 100px, project_id 110px, project_name flex min 200px,
-// short cols 80px, others auto min 120px.
-
 const DATE_KEYS = new Set([
   "datum_smluvni", "datum_objednavky", "zamereni",
   "tpv_date", "expedice", "montaz", "predani",
 ]);
 const SHORT_KEYS = new Set(["marze", "link_cn", "risk", "percent_tpv", "narocnost"]);
 
-export function getColumnStyle(key: string, customWidth?: number): React.CSSProperties {
+export function getColumnStyle(key: string, customWidth?: number | null): React.CSSProperties {
   if (customWidth) return { width: customWidth, minWidth: customWidth };
   if (key === "project_id") return { width: 110, minWidth: 110, maxWidth: 110 };
   if (key === "project_name") return { minWidth: 200 };
@@ -35,57 +32,90 @@ export function getColumnLabel(key: string): string {
   return LABEL_MAP[key] ?? key;
 }
 
-// All toggleable column keys (used to find cross-tab columns)
-const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
-
-// ── Cross-tab header rendering ──────────────────────────────────────
-interface CrossTabHeadersProps {
-  nativeKeys: string[];
-  isVisible: (key: string) => boolean;
+// ── Render a single header by key ───────────────────────────────────
+interface HeaderProps {
+  colKey: string;
   sortCol: string | null;
   sortDir: "asc" | "desc" | null;
   onSort: (col: string) => void;
   getLabel: (key: string, def: string) => string;
-  getWidth: (key: string) => number | undefined;
+  getWidth: (key: string) => number | null;
+  editMode: boolean;
+  updateLabel: (key: string, label: string) => void;
+  updateWidth: (key: string, width: number) => void;
+}
+
+export function renderColumnHeader(props: HeaderProps) {
+  const { colKey: key, sortCol, sortDir, onSort, getLabel, getWidth, editMode, updateLabel, updateWidth } = props;
+  const defaultLabel = getColumnLabel(key);
+  const style = getColumnStyle(key, getWidth(key));
+  const isRight = key === "prodejni_cena" || key === "marze";
+  return (
+    <SortableHeader
+      key={key}
+      label={defaultLabel}
+      column={key}
+      sortCol={sortCol}
+      sortDir={sortDir}
+      onSort={onSort}
+      style={style}
+      className={isRight ? "text-right" : ""}
+      editMode={editMode}
+      customLabel={getLabel(key, defaultLabel)}
+      onLabelChange={(v: string) => updateLabel(key, v)}
+      onWidthChange={(w: number) => updateWidth(key, w)}
+    />
+  );
+}
+
+// ── Render a single cell by key ─────────────────────────────────────
+interface CellProps {
+  colKey: string;
+  project: Project;
+  save: (id: string, field: string, value: string, oldValue: string) => void;
+  canEdit: boolean;
+  statusLabels: string[];
+  saveCurrency?: (id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => void;
+}
+
+export function renderColumnCell(props: CellProps) {
+  const { colKey: key, project: p, save, canEdit, statusLabels, saveCurrency } = props;
+  return renderCell(key, p, save, canEdit, statusLabels, saveCurrency);
+}
+
+// ── Cross-tab header rendering (kept for backward compat) ───────────
+interface CrossTabHeadersProps {
+  nativeKeys: string[];
+  isVisible: (key: string) => boolean;
+  orderedKeys: string[];
+  sortCol: string | null;
+  sortDir: "asc" | "desc" | null;
+  onSort: (col: string) => void;
+  getLabel: (key: string, def: string) => string;
+  getWidth: (key: string) => number | null;
   editMode: boolean;
   updateLabel: (key: string, label: string) => void;
   updateWidth: (key: string, width: number) => void;
 }
 
 export function renderCrossTabHeaders({
-  nativeKeys, isVisible,
+  nativeKeys, isVisible, orderedKeys,
   sortCol, sortDir, onSort,
   getLabel, getWidth, editMode, updateLabel, updateWidth,
 }: CrossTabHeadersProps) {
-  return ALL_KEYS
+  return orderedKeys
     .filter((k) => !nativeKeys.includes(k) && isVisible(k))
-    .map((key) => {
-      const defaultLabel = getColumnLabel(key);
-      const style = getColumnStyle(key, getWidth(key));
-      const isRight = key === "prodejni_cena" || key === "marze";
-      return (
-        <SortableHeader
-          key={key}
-          label={defaultLabel}
-          column={key}
-          sortCol={sortCol}
-          sortDir={sortDir}
-          onSort={onSort}
-          style={style}
-          className={isRight ? "text-right" : ""}
-          editMode={editMode}
-          customLabel={getLabel(key, defaultLabel)}
-          onLabelChange={(v: string) => updateLabel(key, v)}
-          onWidthChange={(w: number) => updateWidth(key, w)}
-        />
-      );
-    });
+    .map((key) => renderColumnHeader({
+      colKey: key, sortCol, sortDir, onSort,
+      getLabel, getWidth, editMode, updateLabel, updateWidth,
+    }));
 }
 
 // ── Cross-tab cell rendering ────────────────────────────────────────
 interface CrossTabCellsProps {
   nativeKeys: string[];
   isVisible: (key: string) => boolean;
+  orderedKeys: string[];
   project: Project;
   save: (id: string, field: string, value: string, oldValue: string) => void;
   canEdit: boolean;
@@ -94,9 +124,9 @@ interface CrossTabCellsProps {
 }
 
 export function renderCrossTabCells({
-  nativeKeys, isVisible, project: p, save, canEdit, statusLabels, saveCurrency,
+  nativeKeys, isVisible, orderedKeys, project: p, save, canEdit, statusLabels, saveCurrency,
 }: CrossTabCellsProps) {
-  return ALL_KEYS
+  return orderedKeys
     .filter((k) => !nativeKeys.includes(k) && isVisible(k))
     .map((key) => renderCell(key, p, save, canEdit, statusLabels, saveCurrency));
 }

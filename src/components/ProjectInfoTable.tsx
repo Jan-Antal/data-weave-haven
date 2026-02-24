@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { InlineEditableCell } from "./InlineEditableCell";
 import { CurrencyEditCell } from "./CurrencyEditCell";
@@ -27,10 +27,11 @@ import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { useAuth } from "@/hooks/useAuth";
 import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
-import { useAllColumnVisibility, PROJECT_INFO_NATIVE } from "./ColumnVisibilityContext";
-import { getColumnStyle, renderCrossTabHeaders, renderCrossTabCells } from "./CrossTabColumns";
+import { useAllColumnVisibility, PROJECT_INFO_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
+import { getColumnStyle, renderColumnHeader, renderColumnCell } from "./CrossTabColumns";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...PROJECT_INFO_NATIVE];
+const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
 
 const emptyProject = {
   project_id: "",
@@ -67,9 +68,14 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
   const { projectInfo: { isVisible } } = useAllColumnVisibility();
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck();
-  const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("project-info");
+  const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys } = useColumnLabels("project-info");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns, canDeleteProject, isViewer } = useAuth();
+
+  // Get ordered keys for this tab's native columns (excluding locked project_id, project_name)
+  const orderedNativeKeys = useMemo(() => getOrderedKeys(PROJECT_INFO_NATIVE), [getOrderedKeys]);
+  // Get ordered keys for ALL columns to determine cross-tab order
+  const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
 
   useEffect(() => {
     const handleOpenAdd = () => setAddOpen(true);
@@ -126,16 +132,25 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Načítání...</div>;
 
-  const sh = { sortCol, sortDir, onSort: toggleSort };
   const v = isVisible;
   const cs = (key: string) => getColumnStyle(key, getWidth(key));
 
-  const editProps = (key: string, defaultLabel: string) => ({
+  const headerProps = (key: string) => ({
+    colKey: key,
+    sortCol,
+    sortDir,
+    onSort: toggleSort,
+    getLabel,
+    getWidth,
     editMode,
-    customLabel: getLabel(key, defaultLabel),
-    onLabelChange: (newLabel: string) => updateLabel(key, newLabel),
-    onWidthChange: (newWidth: number) => updateWidth(key, newWidth),
+    updateLabel,
+    updateWidth,
   });
+
+  // Visible native columns in persisted order
+  const visibleNative = orderedNativeKeys.filter((k) => v(k));
+  // Visible cross-tab columns in persisted order
+  const visibleCross = orderedAllKeys.filter((k) => !NATIVE_KEYS.includes(k) && v(k));
 
   return (
     <div>
@@ -149,18 +164,10 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
           <TableHeader>
             <TableRow className="bg-primary/5">
               <TableHead style={{ minWidth: 32, width: 32 }} className="shrink-0"></TableHead>
-              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} style={cs("project_id")} {...editProps("project_id", "Project ID")} />}
-              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={cs("project_name")} {...editProps("project_name", "Project Name")} />}
-              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} style={cs("klient")} {...editProps("klient", "Klient")} />}
-              {v("location") && <SortableHeader label="Lokace" column="location" {...sh} style={cs("location")} {...editProps("location", "Lokace")} />}
-              {v("kalkulant") && <SortableHeader label="Kalkulant" column="kalkulant" {...sh} style={cs("kalkulant")} {...editProps("kalkulant", "Kalkulant")} />}
-              {v("architekt") && <SortableHeader label="Architekt" column="architekt" {...sh} style={cs("architekt")} {...editProps("architekt", "Architekt")} />}
-              {v("datum_smluvni") && <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} style={cs("datum_smluvni")} {...editProps("datum_smluvni", "Datum Smluvní")} />}
-              {v("datum_objednavky") && <SortableHeader label="Datum Objednávky" column="datum_objednavky" {...sh} style={cs("datum_objednavky")} {...editProps("datum_objednavky", "Datum Objednávky")} />}
-              {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="text-right" style={cs("prodejni_cena")} {...editProps("prodejni_cena", "Prodejní cena")} />}
-              {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} className="text-right" style={cs("marze")} {...editProps("marze", "Marže")} />}
-              {v("link_cn") && <SortableHeader label="CN" column="link_cn" {...sh} style={cs("link_cn")} {...editProps("link_cn", "CN")} />}
-              {renderCrossTabHeaders({ nativeKeys: NATIVE_KEYS, isVisible: v, sortCol, sortDir, onSort: toggleSort, getLabel, getWidth, editMode, updateLabel, updateWidth })}
+              {v("project_id") && renderColumnHeader(headerProps("project_id"))}
+              {v("project_name") && renderColumnHeader(headerProps("project_name"))}
+              {visibleNative.map((key) => renderColumnHeader(headerProps(key)))}
+              {visibleCross.map((key) => renderColumnHeader(headerProps(key)))}
               <ColumnVisibilityToggle tabKey="projectInfo" editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
             </TableRow>
           </TableHeader>
@@ -174,20 +181,8 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                   </TableCell>
                 )}
                 {v("project_name") && <TableCell><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-                {v("klient") && <TableCell><InlineEditableCell value={p.klient} onSave={(val) => save(p.id, "klient", val, p.klient || "")} readOnly={!canEdit} /></TableCell>}
-                {v("location") && <TableCell><InlineEditableCell value={p.location} onSave={(val) => save(p.id, "location", val, p.location || "")} readOnly={!canEdit} /></TableCell>}
-                {v("kalkulant") && <TableCell><InlineEditableCell value={p.kalkulant} type="people" peopleRole="Kalkulant" onSave={(val) => save(p.id, "kalkulant", val, p.kalkulant || "")} readOnly={!canEdit} /></TableCell>}
-                {v("architekt") && <TableCell><InlineEditableCell value={p.architekt} onSave={(val) => save(p.id, "architekt", val, p.architekt || "")} readOnly={!canEdit} /></TableCell>}
-                {v("datum_smluvni") && <TableCell><InlineEditableCell value={p.datum_smluvni} type="date" onSave={(val) => save(p.id, "datum_smluvni", val, p.datum_smluvni || "")} readOnly={!canEdit} /></TableCell>}
-                {v("datum_objednavky") && <TableCell><InlineEditableCell value={p.datum_objednavky} type="date" onSave={(val) => save(p.id, "datum_objednavky", val, p.datum_objednavky || "")} readOnly={!canEdit} /></TableCell>}
-                {v("prodejni_cena") && (
-                  <TableCell className="text-right">
-                    <CurrencyEditCell value={p.prodejni_cena} currency={p.currency || "CZK"} onSave={(amount, currency) => saveCurrency(p.id, amount, currency, String(p.prodejni_cena ?? ""), p.currency || "CZK")} />
-                  </TableCell>
-                )}
-                {v("marze") && <TableCell className="text-right"><InlineEditableCell value={p.marze} onSave={(val) => save(p.id, "marze", val, p.marze || "")} readOnly={!canEdit} /></TableCell>}
-                {v("link_cn") && <TableCell><InlineEditableCell value={p.link_cn} onSave={(val) => save(p.id, "link_cn", val, p.link_cn || "")} readOnly={!canEdit} /></TableCell>}
-                {renderCrossTabCells({ nativeKeys: NATIVE_KEYS, isVisible: v, project: p, save, canEdit, statusLabels, saveCurrency })}
+                {visibleNative.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, saveCurrency }))}
+                {visibleCross.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, saveCurrency }))}
               </TableRow>
             ))}
           </TableBody>

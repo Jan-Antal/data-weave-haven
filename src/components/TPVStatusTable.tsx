@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from "@/components/ui/table";
 import { RiskBadge, ProgressBar } from "./StatusBadge";
 import { InlineEditableCell } from "./InlineEditableCell";
@@ -15,10 +15,11 @@ import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
-import { useAllColumnVisibility, TPV_NATIVE } from "./ColumnVisibilityContext";
-import { getColumnStyle, renderCrossTabHeaders, renderCrossTabCells } from "./CrossTabColumns";
+import { useAllColumnVisibility, TPV_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
+import { getColumnStyle, renderColumnHeader, renderColumnCell } from "./CrossTabColumns";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...TPV_NATIVE];
+const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
 
 function ExpandArrow({ projectId }: { projectId: string }) {
   const { data: items = [] } = useTPVItems(projectId);
@@ -42,10 +43,13 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const updateProject = useUpdateProject();
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const { tpvStatus: { isVisible } } = useAllColumnVisibility();
-  const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("tpv-status");
+  const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys } = useColumnLabels("tpv-status");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns } = useAuth();
   const [activeProject, setActiveProject] = useState<{ projectId: string; projectName: string } | null>(null);
+
+  const orderedNativeKeys = useMemo(() => getOrderedKeys(TPV_NATIVE), [getOrderedKeys]);
+  const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
 
   const save = (id: string, field: string, value: string, oldValue: string) => {
     updateProject.mutate({ id, field, value, oldValue });
@@ -63,16 +67,22 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Načítání...</div>;
 
-  const sh = { sortCol, sortDir, onSort: toggleSort };
   const v = isVisible;
-  const cs = (key: string) => getColumnStyle(key, getWidth(key));
 
-  const editProps = (key: string, defaultLabel: string) => ({
+  const headerProps = (key: string) => ({
+    colKey: key,
+    sortCol,
+    sortDir,
+    onSort: toggleSort,
+    getLabel,
+    getWidth,
     editMode,
-    customLabel: getLabel(key, defaultLabel),
-    onLabelChange: (newLabel: string) => updateLabel(key, newLabel),
-    onWidthChange: (newWidth: number) => updateWidth(key, newWidth),
+    updateLabel,
+    updateWidth,
   });
+
+  const visibleNative = orderedNativeKeys.filter((k) => v(k));
+  const visibleCross = orderedAllKeys.filter((k) => !NATIVE_KEYS.includes(k) && v(k));
 
   return (
     <div>
@@ -86,14 +96,10 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
           <TableHeader>
             <TableRow className="bg-primary/5">
               <TableHead style={{ minWidth: 32, width: 32 }} className="shrink-0"></TableHead>
-              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} style={cs("project_id")} {...editProps("project_id", "Project ID")} />}
-              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={cs("project_name")} {...editProps("project_name", "Project Name")} />}
-              {v("konstrukter") && <SortableHeader label="Konstruktér" column="konstrukter" {...sh} style={cs("konstrukter")} {...editProps("konstrukter", "Konstruktér")} />}
-              {v("narocnost") && <SortableHeader label="Náročnost" column="narocnost" {...sh} style={cs("narocnost")} {...editProps("narocnost", "Náročnost")} />}
-              {v("hodiny_tpv") && <SortableHeader label="Hodiny TPV" column="hodiny_tpv" {...sh} style={cs("hodiny_tpv")} {...editProps("hodiny_tpv", "Hodiny TPV")} />}
-              {v("percent_tpv") && <SortableHeader label="% Rozpracovanost" column="percent_tpv" {...sh} style={cs("percent_tpv")} {...editProps("percent_tpv", "% Rozpracovanost")} />}
-              {v("tpv_poznamka") && <SortableHeader label="Poznámka TPV" column="tpv_poznamka" {...sh} style={cs("tpv_poznamka")} {...editProps("tpv_poznamka", "Poznámka TPV")} />}
-              {renderCrossTabHeaders({ nativeKeys: NATIVE_KEYS, isVisible: v, sortCol, sortDir, onSort: toggleSort, getLabel, getWidth, editMode, updateLabel, updateWidth })}
+              {v("project_id") && renderColumnHeader(headerProps("project_id"))}
+              {v("project_name") && renderColumnHeader(headerProps("project_name"))}
+              {visibleNative.map((key) => renderColumnHeader(headerProps(key)))}
+              {visibleCross.map((key) => renderColumnHeader(headerProps(key)))}
               <ColumnVisibilityToggle tabKey="tpvStatus" editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
             </TableRow>
           </TableHeader>
@@ -108,20 +114,8 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                 </TableCell>
                 {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
                 {v("project_name") && <TableCell><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-                {v("konstrukter") && <TableCell><InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(val) => save(p.id, "konstrukter", val, p.konstrukter || "")} readOnly={!canEdit} /></TableCell>}
-                {v("narocnost") && (
-                  <TableCell>
-                    <InlineEditableCell value={p.narocnost} type="select" options={["Low", "Medium", "High"]} onSave={(val) => save(p.id, "narocnost", val, p.narocnost || "")} displayValue={<RiskBadge level={p.narocnost || ""} />} readOnly={!canEdit} />
-                  </TableCell>
-                )}
-                {v("hodiny_tpv") && <TableCell><InlineEditableCell value={p.hodiny_tpv} onSave={(val) => save(p.id, "hodiny_tpv", val, p.hodiny_tpv || "")} readOnly={!canEdit} /></TableCell>}
-                {v("percent_tpv") && (
-                  <TableCell>
-                    <InlineEditableCell value={p.percent_tpv} type="number" onSave={(val) => save(p.id, "percent_tpv", val, String(p.percent_tpv ?? ""))} displayValue={<ProgressBar value={p.percent_tpv || 0} />} readOnly={!canEdit} />
-                  </TableCell>
-                )}
-                {v("tpv_poznamka") && <TableCell><InlineEditableCell value={p.tpv_poznamka} type="textarea" onSave={(val) => save(p.id, "tpv_poznamka", val, p.tpv_poznamka || "")} readOnly={!canEdit} /></TableCell>}
-                {renderCrossTabCells({ nativeKeys: NATIVE_KEYS, isVisible: v, project: p, save, canEdit, statusLabels })}
+                {visibleNative.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels }))}
+                {visibleCross.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels }))}
               </TableRow>
             ))}
           </TableBody>
