@@ -2,6 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectInfoTable } from "@/components/ProjectInfoTable";
 import { PMStatusTable } from "@/components/PMStatusTable";
 import { TPVStatusTable } from "@/components/TPVStatusTable";
+import { PlanView } from "@/components/PlanView";
 import { ColumnVisibilityProvider } from "@/components/ColumnVisibilityContext";
 import { DashboardStats } from "@/components/DashboardStats";
 import { TableFilters, useTableFilters } from "@/components/TableFilters";
@@ -131,17 +132,25 @@ const Index = () => {
         <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRiskHighlightChange={setRiskHighlight} activeTab={activeTab} />
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-          <TabsList className="bg-card border">
-            <TabsTrigger value="project-info" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              Project Info
-            </TabsTrigger>
-            <TabsTrigger value="pm-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              PM Status
-            </TabsTrigger>
-            <TabsTrigger value="tpv-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              TPV Status
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex items-center gap-2">
+            <TabsList className="bg-card border">
+              <TabsTrigger value="project-info" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Project Info
+              </TabsTrigger>
+              <TabsTrigger value="pm-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                PM Status
+              </TabsTrigger>
+              <TabsTrigger value="tpv-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                TPV Status
+              </TabsTrigger>
+            </TabsList>
+            <div className="w-px h-6 bg-border mx-1" />
+            <TabsList className="bg-card border">
+              <TabsTrigger value="plan" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                📅 Plán
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="project-info" forceMount className={activeTab !== "project-info" ? "hidden" : ""}>
             <ProjectInfoTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
@@ -151,6 +160,9 @@ const Index = () => {
           </TabsContent>
           <TabsContent value="tpv-status" forceMount className={activeTab !== "tpv-status" ? "hidden" : ""}>
             <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
+          </TabsContent>
+          <TabsContent value="plan" forceMount className={activeTab !== "plan" ? "hidden" : ""}>
+            <PlanView personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} />
           </TabsContent>
         </Tabs>
       </main>
