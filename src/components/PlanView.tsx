@@ -322,14 +322,16 @@ function getStageBarData(stage: ProjectStage, project: Project, statusColorMap: 
 
 // ── Milestone Diamond ───────────────────────────────────────────────
 function MilestoneDiamond({
-  date, color, label, name, origin, dayPx, midY, yOffset, small,
+  date, color, label, name, origin, dayPx, midY, yOffset, small, labelRow,
 }: {
   date: Date; color: string; label: string; name: string;
   origin: Date; dayPx: number; midY: number; yOffset: number; small?: boolean;
+  labelRow?: number;
 }) {
   const x = dayOffset(date, origin, dayPx);
   const size = small ? 7 : DIAMOND_SIZE;
-  const labelAbove = yOffset <= 0;
+  // Label above bar: row 0 → top 0, row 1 → top 10
+  const labelTop = (labelRow ?? 0) === 1 ? 10 : 0;
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -355,8 +357,9 @@ function MilestoneDiamond({
       <span
         className="absolute text-[9px] font-medium whitespace-nowrap pointer-events-none"
         style={{
-          left: x + size / 2 + 2,
-          top: labelAbove ? midY + yOffset - 14 : midY + yOffset + size / 2 + 2,
+          left: x,
+          top: labelTop,
+          transform: "translateX(-50%)",
           color,
           zIndex: 11,
         }}
@@ -659,12 +662,11 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
 
           {sorted.map((p) => {
             const isExp = expanded.has(p.project_id);
-            const statusColor = statusColorMap[p.status || ""] || "#6b7280";
             const warnings = projectWarnings[p.project_id] || [];
             return (
               <div key={p.id}>
                 <div
-                  className="flex items-center gap-1.5 px-3 border-b hover:bg-muted/30 transition-colors"
+                  className="flex items-center gap-1 px-3 border-b hover:bg-muted/30 transition-colors"
                   style={{ height: ROW_HEIGHT }}
                 >
                   <div
@@ -673,10 +675,11 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                   >
                     <ExpandButton projectId={p.project_id} expanded={isExp} onClick={() => {}} />
                   </div>
-                  <StatusDot color={statusColor} />
-                  {warnings.length > 0 && <WarningIcon warnings={warnings} />}
-                  <span className="text-xs font-mono text-muted-foreground whitespace-nowrap" style={{ width: 110, flexShrink: 0 }}>{p.project_id}</span>
-                  <span className="text-xs font-medium truncate flex-1 min-w-0">{p.project_name}</span>
+                  <span className="text-xs font-mono text-muted-foreground whitespace-nowrap shrink-0" style={{ width: 80 }}>{p.project_id}</span>
+                  <div className="flex items-center gap-1 flex-1 min-w-0">
+                    <span className="text-xs font-medium truncate min-w-0" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.project_name}</span>
+                    {warnings.length > 0 && <WarningIcon warnings={warnings} />}
+                  </div>
                 </div>
                 {isExp && <SubstageLeftRows projectId={p.project_id} />}
               </div>
@@ -711,10 +714,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                   ))}
                 </div>
               )}
-              {/* Today label — inside the sticky header */}
-              <div className="absolute z-30 text-[9px] font-bold pointer-events-none" style={{ left: todayX, bottom: 2, color: "#e74c3c", transform: "translateX(-50%)" }}>
-                Dnes
-              </div>
+              {/* Dnes label removed from header — now inline in chart area */}
             </div>
 
             {/* Rows */}
@@ -779,9 +779,16 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                     })}
 
                     {/* Milestone diamonds */}
-                    {barData.diamonds.map((m, i) => (
-                      <MilestoneDiamond key={i} date={m.date} color={m.color} label={m.label} name={m.name} origin={timelineStart} dayPx={dayPx} midY={midY} yOffset={m.yOffset} />
-                    ))}
+                    {barData.diamonds.map((m, i, arr) => {
+                      // Alternate label rows when diamonds are close
+                      let labelRow = 0;
+                      if (i > 0 && Math.abs(differenceInDays(m.date, arr[i - 1].date)) <= 4) {
+                        labelRow = i % 2;
+                      }
+                      return (
+                        <MilestoneDiamond key={i} date={m.date} color={m.color} label={m.label} name={m.name} origin={timelineStart} dayPx={dayPx} midY={midY} yOffset={m.yOffset} labelRow={labelRow} />
+                      );
+                    })}
                   </div>
 
                   {/* Substage rows */}
@@ -792,11 +799,17 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
               );
             })}
 
-            {/* Today vertical line */}
+            {/* Today vertical line + inline Dnes label */}
             <div
               className="absolute top-0 bottom-0 z-20 pointer-events-none"
               style={{ left: todayX, width: 2, backgroundColor: "#e74c3c" }}
             />
+            <span
+              className="absolute z-30 pointer-events-none"
+              style={{ left: todayX - 36, top: 4, fontSize: 9, fontWeight: 700, color: "#e74c3c", whiteSpace: "nowrap" }}
+            >
+              Dnes ▶
+            </span>
           </div>
         </div>
       </div>
