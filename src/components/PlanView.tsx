@@ -17,6 +17,12 @@ const PHASE_COLORS = {
   dokonceno: "#adb5bd",
 };
 
+const PHASE_LABELS: Record<string, string> = {
+  [PHASE_COLORS.konstrukce]: "Konstrukce",
+  [PHASE_COLORS.vyroba]: "Výroba",
+  [PHASE_COLORS.montaz]: "Montáž",
+};
+
 const MILESTONE_COLORS = {
   tpv_date: "#52b788",
   expedice: "#f4a261",
@@ -430,7 +436,8 @@ function SubstageRow({
         const w = dayOffset(seg.end, origin, dayPx) - x;
         if (w <= 0) return null;
         const wkLabel = weeksLabel(seg.start, seg.end);
-        return (
+        const phaseLabel = PHASE_LABELS[seg.color];
+        const segDiv = (
           <div
             key={i}
             style={{
@@ -445,6 +452,15 @@ function SubstageRow({
               <span className="absolute inset-0 flex items-center justify-center text-[9px] font-medium text-white/90 leading-none">{wkLabel}</span>
             )}
           </div>
+        );
+        if (!phaseLabel) return segDiv;
+        return (
+          <TooltipProvider key={i} delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>{segDiv}</TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">{phaseLabel}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         );
       })}
       {barData.diamonds.map((m, i, arr) => {
@@ -737,7 +753,8 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                       const segW = Math.max(w, 4);
                       const wkLabel = weeksLabel(seg.start, seg.end);
 
-                      return (
+                      const phaseLabel = PHASE_LABELS[seg.color];
+                      const segDiv = (
                         <div
                           key={`seg-${i}`}
                           style={{
@@ -758,6 +775,15 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                             </span>
                           )}
                         </div>
+                      );
+                      if (!phaseLabel) return segDiv;
+                      return (
+                        <TooltipProvider key={`seg-${i}`} delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>{segDiv}</TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">{phaseLabel}</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       );
                     })}
 
