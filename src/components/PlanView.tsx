@@ -28,10 +28,15 @@ const CZECH_MONTHS = [
   "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec",
 ];
 
+const CZECH_MONTHS_SHORT = [
+  "Led", "Úno", "Bře", "Dub", "Kvě", "Čvn",
+  "Čvc", "Srp", "Zář", "Říj", "Lis", "Pro",
+];
+
 const ROW_HEIGHT = 48;
 const SUBSTAGE_ROW_HEIGHT = 36;
 const LEFT_PANEL_WIDTH = 280;
-const BAR_HEIGHT = 18;
+const BAR_HEIGHT = 16;
 const SUBSTAGE_BAR_HEIGHT = 10;
 const DIAMOND_SIZE = 10;
 const OVERLAP_THRESHOLD_DAYS = 4;
@@ -439,12 +444,12 @@ function SubstageRow({
         return (
           <div
             key={i}
-            className="absolute rounded-sm"
             style={{
-              left: x, top: midY - SUBSTAGE_BAR_HEIGHT / 2,
+              position: "absolute",
+              left: x, top: 16 - SUBSTAGE_BAR_HEIGHT / 2,
               width: Math.max(w, 4), height: SUBSTAGE_BAR_HEIGHT,
-              backgroundColor: seg.color, opacity: 0.65,
-              zIndex: 5,
+              background: seg.color, opacity: 0.65,
+              zIndex: 2, borderRadius: 4,
             }}
           >
             {w > 32 && wkLabel && (
@@ -483,6 +488,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
   const { sorted } = useSortFilter(projects, { personFilter, statusFilter }, search);
   const zoom = zoomProp ?? ("3M" as ZoomLevel);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [containerWidth, setContainerWidth] = useState(0);
 
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
@@ -495,14 +501,27 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
   }, [statusOptions]);
 
   const today = useMemo(() => new Date(), []);
-  const dayPx = ZOOM_DAY_PX[zoom];
-  const monthsHalf = ZOOM_MONTHS[zoom] / 2;
 
+  // For 1R: measure container width and compute dayPx to fit 12 months
+  useEffect(() => {
+    if (rightRef.current) {
+      const w = rightRef.current.clientWidth;
+      setContainerWidth(w);
+    }
+  }, [zoom]);
+
+  const monthsHalf = ZOOM_MONTHS[zoom] / 2;
   const timelineStart = useMemo(() => startOfMonth(addMonths(today, -monthsHalf)), [today, monthsHalf]);
   const timelineEnd = useMemo(() => addMonths(today, monthsHalf + 1), [today, monthsHalf]);
-
   const totalDays = differenceInDays(timelineEnd, timelineStart);
-  const timelineWidth = totalDays * dayPx;
+
+  // For 1R, compute dayPx to fit screen; otherwise use fixed
+  const dayPx = zoom === "1R" && containerWidth > 0
+    ? containerWidth / totalDays
+    : ZOOM_DAY_PX[zoom];
+  const timelineWidth = zoom === "1R" && containerWidth > 0
+    ? containerWidth
+    : totalDays * dayPx;
 
   // Month columns
   const months = useMemo(() => {
@@ -513,11 +532,19 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
       const end = next < timelineEnd ? next : timelineEnd;
       const startX = dayOffset(d, timelineStart, dayPx);
       const w = dayOffset(end, timelineStart, dayPx) - startX;
-      result.push({ label: CZECH_MONTHS[d.getMonth()], startX, width: w, date: d });
+      let label: string;
+      if (zoom === "1R") {
+        label = CZECH_MONTHS_SHORT[d.getMonth()];
+      } else if (zoom === "6M") {
+        label = CZECH_MONTHS[d.getMonth()];
+      } else {
+        label = `${CZECH_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+      }
+      result.push({ label, startX, width: w, date: d });
       d = next;
     }
     return result;
-  }, [timelineStart, timelineEnd, dayPx]);
+  }, [timelineStart, timelineEnd, dayPx, zoom]);
 
   // Week columns — only for 3M and 6M
   const showWeeks = zoom !== "1R";
@@ -625,8 +652,8 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
         </div>
 
         {/* RIGHT PANEL — TIMELINE */}
-        <div ref={rightRef} onScroll={handleRightScroll} className="overflow-auto flex-1 relative">
-          <div style={{ width: timelineWidth, position: "relative" }}>
+        <div ref={rightRef} onScroll={handleRightScroll} className={`flex-1 relative ${zoom === "1R" ? "overflow-y-auto overflow-x-hidden" : "overflow-auto"}`}>
+          <div style={{ width: timelineWidth, minWidth: timelineWidth, position: "relative" }}>
             {/* Timeline header */}
             <div className="sticky top-0 z-20 bg-card border-b" style={{ height: HEADER_HEIGHT, position: "relative" }}>
               {/* Month row */}
@@ -634,10 +661,10 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                 {months.map((m, i) => (
                   <div
                     key={i}
-                    className="border-r text-[11px] font-medium text-muted-foreground flex items-center justify-center shrink-0"
+                    className={`border-r font-medium text-muted-foreground flex items-center justify-center shrink-0 ${zoom === "1R" ? "text-[10px]" : "text-[11px]"}`}
                     style={{ width: m.width }}
                   >
-                    {m.label} {m.date.getFullYear()}
+                    {m.label}
                   </div>
                 ))}
               </div>
@@ -696,6 +723,16 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                       const hatchId = seg.hatch ? `hatch-${hatchCounter++}` : undefined;
                       const isDashed = seg.dashed;
 
+                      // Use single 'background' prop to avoid backgroundColor/background conflicts
+                      let bg: string;
+                      if (seg.hatch && hatchId) {
+                        bg = `url(#${hatchId})`;
+                      } else if (isDashed) {
+                        bg = `${seg.color}33`;
+                      } else {
+                        bg = seg.color;
+                      }
+
                       return (
                         <React.Fragment key={`seg-${i}`}>
                           {seg.hatch && hatchId && <HatchPattern id={hatchId} color1={seg.hatch.color1} color2={seg.hatch.color2} />}
@@ -703,23 +740,19 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                             style={{
                               position: "absolute",
                               left: x,
-                              top: "50%",
-                              transform: "translateY(-50%)",
+                              top: 16,
                               width: segW,
-                              height: 16,
-                              backgroundColor: isDashed ? `${seg.color}33` : (seg.hatch ? undefined : seg.color),
-                              background: seg.hatch && hatchId ? `url(#${hatchId})` : undefined,
+                              height: BAR_HEIGHT,
+                              background: bg,
                               opacity: isDashed ? 0.45 : 1,
                               zIndex: 2,
                               borderRadius: 4,
                               minWidth: 4,
-                              ...(isDashed ? {
-                                border: `2px dashed ${seg.color}`,
-                              } : {}),
+                              border: isDashed ? `2px dashed ${seg.color}` : undefined,
                             }}
                           >
                             {segW > 32 && wkLabel && (
-                              <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-white leading-none drop-shadow-sm">
+                              <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 600, color: "white", lineHeight: 1 }}>
                                 {wkLabel}
                               </span>
                             )}
