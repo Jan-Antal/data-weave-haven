@@ -699,10 +699,8 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                     <ExpandButton projectId={p.project_id} expanded={isExp} onClick={() => {}} />
                   </div>
                   <span className="text-xs font-mono text-muted-foreground whitespace-nowrap shrink-0" style={{ width: 80 }}>{p.project_id}</span>
-                  <div className="flex items-center gap-1 flex-1 min-w-0">
-                    <span className="text-xs font-medium truncate min-w-0" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.project_name}</span>
-                    {warnings.length > 0 && <WarningIcon warnings={warnings} />}
-                  </div>
+                  {warnings.length > 0 && <WarningIcon warnings={warnings} />}
+                  <span className="text-xs font-medium truncate flex-1 min-w-0" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.project_name}</span>
                 </div>
                 {isExp && <SubstageLeftRows projectId={p.project_id} />}
               </div>
