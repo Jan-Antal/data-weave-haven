@@ -80,31 +80,28 @@ interface MilestoneWarning {
   message: string;
 }
 
-function validateMilestones(p: { tpv_date?: string | null; expedice?: string | null; predani?: string | null }): MilestoneWarning[] {
+function getBarWarnings(
+  S: Date | null, E: Date | null,
+  TPV: Date | null, EXP: Date | null, PRE: Date | null,
+): MilestoneWarning[] {
   const warnings: MilestoneWarning[] = [];
-  const tpv = parseDateField(p.tpv_date);
-  const exp = parseDateField(p.expedice);
-  const pred = parseDateField(p.predani);
+  if (!S && E) {
+    warnings.push({ message: "Chybí datum objednávky a milníky" });
+    return warnings;
+  }
+  if (!S || !E) return warnings;
 
-  // Check missing milestones if at least one exists
-  const hasAny = tpv || exp || pred;
-  if (hasAny) {
-    if (!tpv) warnings.push({ message: "Chybí datum TPV" });
-    if (!exp) warnings.push({ message: "Chybí datum Expedice" });
-    if (!pred) warnings.push({ message: "Chybí datum Předání" });
-  }
+  // S + E exist
+  const hasTPV = !!TPV;
+  const hasEXP = !!EXP;
 
-  // Check order
-  if (tpv && exp && exp.getTime() < tpv.getTime()) {
-    warnings.push({ message: "Expedice je před TPV" });
+  if (!hasTPV && !hasEXP) {
+    warnings.push({ message: "Chybí milníky TPV a Expedice" });
+  } else if (!hasTPV) {
+    warnings.push({ message: "Chybí milník TPV" });
+  } else if (!hasEXP) {
+    warnings.push({ message: "Chybí milník Expedice" });
   }
-  if (exp && pred && pred.getTime() < exp.getTime()) {
-    warnings.push({ message: "Předání je před Expedicí" });
-  }
-  if (tpv && pred && pred.getTime() < tpv.getTime()) {
-    warnings.push({ message: "Předání je před TPV" });
-  }
-
   return warnings;
 }
 
@@ -113,8 +110,6 @@ interface Segment {
   start: Date;
   end: Date;
   color: string;
-  hatch?: { color1: string; color2: string };
-  dashed?: boolean;
 }
 
 interface Diamond {
@@ -130,116 +125,151 @@ interface BarData {
   diamonds: Diamond[];
   connectorLine?: { startX: Date; endX: Date };
   hasWarning: boolean;
+  warnings: MilestoneWarning[];
 }
 
-function getProjectBarData(p: Project, statusColorMap: Record<string, string>): BarData {
-  const barStart = parseDateField(p.datum_objednavky);
-  const barEnd = parseDateField(p.datum_smluvni);
-  const tpv = parseDateField(p.tpv_date);
-  const expedice = parseDateField(p.expedice);
-  const predani = parseDateField(p.predani);
-
-  console.log(`[PlanView] ${p.project_id}: objednavky="${p.datum_objednavky}"→${barStart}, smluvni="${p.datum_smluvni}"→${barEnd}, tpv=${tpv}, exp=${expedice}, pred=${predani}`);
-
-  const warnings = validateMilestones(p);
-  const hasWarning = warnings.length > 0;
-
-  const milestoneDates: { key: string; date: Date; color: string; name: string }[] = [];
-  if (tpv) milestoneDates.push({ key: "tpv_date", date: tpv, color: MILESTONE_COLORS.tpv_date, name: "TPV" });
-  if (expedice) milestoneDates.push({ key: "expedice", date: expedice, color: MILESTONE_COLORS.expedice, name: "Expedice" });
-  if (predani) milestoneDates.push({ key: "predani", date: predani, color: MILESTONE_COLORS.predani, name: "Předání" });
-  milestoneDates.sort((a, b) => a.date.getTime() - b.date.getTime());
-
-  // Stagger overlapping milestone diamonds
-  const diamonds: Diamond[] = milestoneDates.map((m, i, arr) => {
+function makeDiamonds(items: { date: Date; color: string; name: string }[]): Diamond[] {
+  const sorted = [...items].sort((a, b) => a.date.getTime() - b.date.getTime());
+  return sorted.map((m, i, arr) => {
     let yOffset = 0;
     if (i > 0 && Math.abs(differenceInDays(m.date, arr[i - 1].date)) <= OVERLAP_THRESHOLD_DAYS) {
       const offsets = [0, -10, 10];
       yOffset = offsets[i % 3] || 0;
     }
-    return {
-      date: m.date,
-      color: m.color,
-      label: formatMilestoneLabel(m.date),
-      name: m.name,
-      yOffset,
-    };
+    return { date: m.date, color: m.color, label: formatMilestoneLabel(m.date), name: m.name, yOffset };
   });
+}
 
-  // Connector line between milestones
-  let connectorLine: { startX: Date; endX: Date } | undefined;
-  if (milestoneDates.length >= 2) {
-    connectorLine = {
-      startX: milestoneDates[0].date,
-      endX: milestoneDates[milestoneDates.length - 1].date,
+function getProjectBarData(p: Project, _statusColorMap: Record<string, string>): BarData {
+  const S = parseDateField(p.datum_objednavky);
+  const E = parseDateField(p.datum_smluvni);
+  const TPV = parseDateField(p.tpv_date);
+  const EXP = parseDateField(p.expedice);
+  const PRE = parseDateField(p.predani);
+
+  const warnings = getBarWarnings(S, E, TPV, EXP, PRE);
+  const hasWarning = warnings.length > 0;
+
+  const empty: BarData = { segments: [], diamonds: [], hasWarning, warnings };
+
+  // No end date at all → nothing to render
+  if (!E) return empty;
+
+  // Helper to build diamonds list
+  const dItems: { date: Date; color: string; name: string }[] = [];
+
+  // CASE 1 — Only E exists (no S)
+  if (!S) {
+    dItems.push({ date: E, color: MILESTONE_COLORS.predani, name: "Předání" });
+    return { ...empty, diamonds: makeDiamonds(dItems) };
+  }
+
+  // From here S + E both exist
+  const safeE = differenceInDays(E, S) < 7 ? addDays(S, 7) : E;
+
+  // CASE 2 — S + E only (no milestones)
+  if (!TPV && !EXP && !PRE) {
+    dItems.push({ date: safeE, color: MILESTONE_COLORS.predani, name: "Předání" });
+    return {
+      segments: [{ start: S, end: safeE, color: PHASE_COLORS.dokonceno }],
+      diamonds: makeDiamonds(dItems),
+      hasWarning, warnings,
     };
   }
 
-  // CASE 1: Both dates exist → full segmented bar
-  if (barStart && barEnd) {
-    let s = barStart;
-    let e = barEnd;
-    if (differenceInDays(e, s) < 7) e = addDays(s, 7);
-
-    if (milestoneDates.length === 0) {
-      // No milestones → single bar in first phase color
-      console.log(`[PlanView] ${p.project_id}: BOTH dates, no milestones, single bar`);
-      return { segments: [{ start: s, end: e, color: PHASE_COLORS.konstrukce }], diamonds, connectorLine, hasWarning };
-    }
-
-    // Clamp milestones to bar range for segmentation
-    const clampedMilestones = milestoneDates.map(m => ({
-      ...m,
-      date: m.date < s ? s : m.date > e ? e : m.date,
-    }));
-
-    const allPoints = [s, ...clampedMilestones.map((m) => m.date), e];
-    allPoints.sort((a, b) => a.getTime() - b.getTime());
-    const uniquePoints: Date[] = [allPoints[0]];
-    for (let i = 1; i < allPoints.length; i++) {
-      if (allPoints[i].getTime() !== allPoints[i - 1].getTime()) uniquePoints.push(allPoints[i]);
-    }
-
-    const colorSequence = [PHASE_COLORS.konstrukce, PHASE_COLORS.vyroba, PHASE_COLORS.montaz, PHASE_COLORS.dokonceno];
-    const segments: Segment[] = [];
-    let colorIdx = 0;
-
-    for (let i = 0; i < uniquePoints.length - 1; i++) {
-      const segStart = uniquePoints[i];
-      const segEnd = uniquePoints[i + 1];
-      const color = colorSequence[Math.min(colorIdx, colorSequence.length - 1)];
-      const daysBetween = differenceInDays(segEnd, segStart);
-      let hatch: { color1: string; color2: string } | undefined;
-      if (daysBetween <= OVERLAP_THRESHOLD_DAYS && daysBetween >= 0 && colorIdx > 0) {
-        hatch = { color1: colorSequence[Math.min(colorIdx - 1, colorSequence.length - 1)], color2: color };
-      }
-      segments.push({ start: segStart, end: segEnd, color, hatch });
-      if (tpv && segEnd.getTime() === tpv.getTime()) colorIdx = Math.max(colorIdx, 1);
-      else if (expedice && segEnd.getTime() === expedice.getTime()) colorIdx = Math.max(colorIdx, 2);
-      else if (predani && segEnd.getTime() === predani.getTime()) colorIdx = Math.max(colorIdx, 3);
-    }
-
-    console.log(`[PlanView] ${p.project_id}: BOTH dates → ${segments.length} segments`);
-    return { segments, diamonds, connectorLine, hasWarning };
+  // CASE 7 — S + E + PRE only (no TPV, no EXP)
+  if (!TPV && !EXP && PRE) {
+    dItems.push({ date: PRE, color: MILESTONE_COLORS.predani, name: "Předání" });
+    return {
+      segments: [{ start: S, end: safeE, color: PHASE_COLORS.dokonceno }],
+      diamonds: makeDiamonds(dItems),
+      hasWarning, warnings,
+    };
   }
 
-  // CASE 2: Only datum_objednavky → dashed bar extending 90 days forward
-  if (barStart && !barEnd) {
-    const e = addDays(barStart, 90);
-    console.log(`[PlanView] ${p.project_id}: ONLY objednavky → dashed bar 90d forward`);
-    return { segments: [{ start: barStart, end: e, color: PHASE_COLORS.konstrukce, dashed: true }], diamonds, connectorLine, hasWarning };
+  // CASE 6 — S + E + EXP only (no TPV)
+  if (!TPV && EXP && !PRE) {
+    dItems.push({ date: EXP, color: MILESTONE_COLORS.expedice, name: "Expedice" });
+    dItems.push({ date: safeE, color: MILESTONE_COLORS.predani, name: "Předání" });
+    return {
+      segments: [
+        { start: S, end: EXP, color: PHASE_COLORS.vyroba },
+        { start: EXP, end: safeE, color: PHASE_COLORS.montaz },
+      ],
+      diamonds: makeDiamonds(dItems),
+      hasWarning, warnings,
+    };
   }
 
-  // CASE 3: Only datum_smluvni → dashed bar starting 90 days before
-  if (!barStart && barEnd) {
-    const s = addDays(barEnd, -90);
-    console.log(`[PlanView] ${p.project_id}: ONLY smluvni → dashed bar 90d back`);
-    return { segments: [{ start: s, end: barEnd, color: PHASE_COLORS.konstrukce, dashed: true }], diamonds, connectorLine, hasWarning };
+  // CASE 3 — S + E + TPV only
+  if (TPV && !EXP && !PRE) {
+    dItems.push({ date: TPV, color: MILESTONE_COLORS.tpv_date, name: "TPV" });
+    dItems.push({ date: safeE, color: MILESTONE_COLORS.predani, name: "Předání" });
+    return {
+      segments: [
+        { start: S, end: TPV, color: PHASE_COLORS.konstrukce },
+        { start: TPV, end: safeE, color: PHASE_COLORS.dokonceno },
+      ],
+      diamonds: makeDiamonds(dItems),
+      hasWarning, warnings,
+    };
   }
 
-  // CASE 4: Neither date exists → no bar, only milestones + connector
-  console.log(`[PlanView] ${p.project_id}: NO dates, milestones only`);
-  return { segments: [], diamonds, connectorLine, hasWarning };
+  // CASE 4 — S + E + TPV + EXP (no PRE)
+  if (TPV && EXP && !PRE) {
+    dItems.push({ date: TPV, color: MILESTONE_COLORS.tpv_date, name: "TPV" });
+    dItems.push({ date: EXP, color: MILESTONE_COLORS.expedice, name: "Expedice" });
+    dItems.push({ date: safeE, color: MILESTONE_COLORS.predani, name: "Předání" });
+    return {
+      segments: [
+        { start: S, end: TPV, color: PHASE_COLORS.konstrukce },
+        { start: TPV, end: EXP, color: PHASE_COLORS.vyroba },
+        { start: EXP, end: safeE, color: PHASE_COLORS.montaz },
+      ],
+      diamonds: makeDiamonds(dItems),
+      hasWarning, warnings,
+    };
+  }
+
+  // CASE 5 — S + E + TPV + EXP + PRE (all present)
+  if (TPV && EXP && PRE) {
+    dItems.push({ date: TPV, color: MILESTONE_COLORS.tpv_date, name: "TPV" });
+    dItems.push({ date: EXP, color: MILESTONE_COLORS.expedice, name: "Expedice" });
+    dItems.push({ date: PRE, color: MILESTONE_COLORS.predani, name: "Předání" });
+    return {
+      segments: [
+        { start: S, end: TPV, color: PHASE_COLORS.konstrukce },
+        { start: TPV, end: EXP, color: PHASE_COLORS.vyroba },
+        { start: EXP, end: PRE, color: PHASE_COLORS.montaz },
+        { start: PRE, end: safeE, color: PHASE_COLORS.dokonceno },
+      ],
+      diamonds: makeDiamonds(dItems),
+      hasWarning, warnings,
+    };
+  }
+
+  // Remaining edge cases (e.g. TPV + PRE no EXP, or EXP + PRE no TPV)
+  // Build segments generically
+  const segs: Segment[] = [];
+  const pts: Date[] = [S];
+  if (TPV) { dItems.push({ date: TPV, color: MILESTONE_COLORS.tpv_date, name: "TPV" }); pts.push(TPV); }
+  if (EXP) { dItems.push({ date: EXP, color: MILESTONE_COLORS.expedice, name: "Expedice" }); pts.push(EXP); }
+  if (PRE) { dItems.push({ date: PRE, color: MILESTONE_COLORS.predani, name: "Předání" }); pts.push(PRE); }
+  pts.push(safeE);
+  pts.sort((a, b) => a.getTime() - b.getTime());
+
+  const colorSeq = [PHASE_COLORS.konstrukce, PHASE_COLORS.vyroba, PHASE_COLORS.montaz, PHASE_COLORS.dokonceno];
+  for (let i = 0; i < pts.length - 1; i++) {
+    if (pts[i].getTime() === pts[i + 1].getTime()) continue;
+    segs.push({ start: pts[i], end: pts[i + 1], color: colorSeq[Math.min(i, 3)] });
+  }
+
+  const allDiamonds = makeDiamonds(dItems);
+  const connectorLine = allDiamonds.length >= 2
+    ? { startX: allDiamonds[0].date, endX: allDiamonds[allDiamonds.length - 1].date }
+    : undefined;
+
+  return { segments: segs, diamonds: allDiamonds, connectorLine, hasWarning, warnings };
 }
 
 function getStageBarData(stage: ProjectStage, project: Project, statusColorMap: Record<string, string>): BarData {
@@ -268,13 +298,13 @@ function getStageBarData(stage: ProjectStage, project: Project, statusColorMap: 
     connectorLine = { startX: milestoneDates[0].date, endX: milestoneDates[milestoneDates.length - 1].date };
   }
 
-  if (!barStart && !barEnd) return { segments: [], diamonds, connectorLine, hasWarning: false };
+  if (!barStart && !barEnd) return { segments: [], diamonds, connectorLine, hasWarning: false, warnings: [] };
 
   const s = barStart ?? barEnd!;
   const e = barEnd ?? addDays(s, 30);
 
   if (milestoneDates.length === 0) {
-    return { segments: [{ start: s, end: e, color: PHASE_COLORS.konstrukce }], diamonds, connectorLine, hasWarning: false };
+    return { segments: [{ start: s, end: e, color: PHASE_COLORS.konstrukce }], diamonds, connectorLine, hasWarning: false, warnings: [] };
   }
 
   const allPoints = [s, ...milestoneDates.map((m) => m.date), e].sort((a, b) => a.getTime() - b.getTime());
@@ -287,7 +317,7 @@ function getStageBarData(stage: ProjectStage, project: Project, statusColorMap: 
     ci++;
   }
 
-  return { segments, diamonds, connectorLine, hasWarning: false };
+  return { segments, diamonds, connectorLine, hasWarning: false, warnings: [] };
 }
 
 // ── Milestone Diamond ───────────────────────────────────────────────
@@ -591,13 +621,16 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
     });
   };
 
-  let hatchCounter = 0;
-
   // Pre-compute warnings for left panel
   const projectWarnings = useMemo(() => {
     const map: Record<string, MilestoneWarning[]> = {};
     for (const p of sorted) {
-      map[p.project_id] = validateMilestones(p);
+      const S = parseDateField(p.datum_objednavky);
+      const E = parseDateField(p.datum_smluvni);
+      const TPV = parseDateField(p.tpv_date);
+      const EXP = parseDateField(p.expedice);
+      const PRE = parseDateField(p.predani);
+      map[p.project_id] = getBarWarnings(S, E, TPV, EXP, PRE);
     }
     return map;
   }, [sorted]);
@@ -720,44 +753,28 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                       const w = dayOffset(seg.end, timelineStart, dayPx) - x;
                       const segW = Math.max(w, 4);
                       const wkLabel = weeksLabel(seg.start, seg.end);
-                      const hatchId = seg.hatch ? `hatch-${hatchCounter++}` : undefined;
-                      const isDashed = seg.dashed;
-
-                      // Use single 'background' prop to avoid backgroundColor/background conflicts
-                      let bg: string;
-                      if (seg.hatch && hatchId) {
-                        bg = `url(#${hatchId})`;
-                      } else if (isDashed) {
-                        bg = `${seg.color}33`;
-                      } else {
-                        bg = seg.color;
-                      }
 
                       return (
-                        <React.Fragment key={`seg-${i}`}>
-                          {seg.hatch && hatchId && <HatchPattern id={hatchId} color1={seg.hatch.color1} color2={seg.hatch.color2} />}
-                          <div
-                            style={{
-                              position: "absolute",
-                              left: x,
-                              top: 16,
-                              width: segW,
-                              height: BAR_HEIGHT,
-                              background: bg,
-                              opacity: isDashed ? 0.45 : 1,
-                              zIndex: 2,
-                              borderRadius: 4,
-                              minWidth: 4,
-                              border: isDashed ? `2px dashed ${seg.color}` : undefined,
-                            }}
-                          >
-                            {segW > 32 && wkLabel && (
-                              <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 600, color: "white", lineHeight: 1 }}>
-                                {wkLabel}
-                              </span>
-                            )}
-                          </div>
-                        </React.Fragment>
+                        <div
+                          key={`seg-${i}`}
+                          style={{
+                            position: "absolute",
+                            left: x,
+                            top: 16,
+                            width: segW,
+                            height: BAR_HEIGHT,
+                            background: seg.color,
+                            zIndex: 2,
+                            borderRadius: 4,
+                            minWidth: 4,
+                          }}
+                        >
+                          {segW > 32 && wkLabel && (
+                            <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 600, color: "white", lineHeight: 1 }}>
+                              {wkLabel}
+                            </span>
+                          )}
+                        </div>
                       );
                     })}
 
