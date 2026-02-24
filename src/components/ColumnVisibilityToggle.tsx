@@ -29,7 +29,8 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface Props {
   tabKey: "projectInfo" | "pmStatus" | "tpvStatus";
@@ -46,6 +47,41 @@ const TAB_TO_LABEL_KEY: Record<string, string> = {
 // All toggleable keys in their default order
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
 const LABEL_MAP = Object.fromEntries(ALL_COLUMNS.map((c) => [c.key, c.label]));
+
+// Map tab key to its native group label for default-expand logic
+const TAB_TO_GROUP_LABEL: Record<string, string> = {
+  projectInfo: "Project Info",
+  pmStatus: "PM Status",
+  tpvStatus: "TPV Status",
+};
+
+function useCollapsedGroups(tabKey: string) {
+  const storageKey = `col-panel-collapsed-${tabKey}`;
+  const defaultGroup = TAB_TO_GROUP_LABEL[tabKey];
+
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    // Default: own group expanded, others collapsed
+    const init: Record<string, boolean> = {};
+    COLUMN_GROUPS.forEach((g) => {
+      init[g.label] = g.label !== defaultGroup;
+    });
+    return init;
+  });
+
+  const toggle = useCallback((label: string) => {
+    setCollapsed((prev) => {
+      const next = { ...prev, [label]: !prev[label] };
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    });
+  }, [storageKey]);
+
+  return { collapsed, toggle };
+}
 
 function SortableColumnRow({
   colKey,
@@ -94,7 +130,8 @@ export function ColumnVisibilityToggle({ tabKey, editMode, onToggleEditMode }: P
   const state: ColumnVisibilityState = allVis[tabKey];
   const { canEditColumns } = useAuth();
   const labelKey = TAB_TO_LABEL_KEY[tabKey];
-  const { getOrderedKeys, updateOrder } = useColumnLabels(labelKey);
+  const { getLabel, getOrderedKeys, updateOrder } = useColumnLabels(labelKey);
+  const { collapsed, toggle: toggleGroup } = useCollapsedGroups(tabKey);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -123,6 +160,12 @@ export function ColumnVisibilityToggle({ tabKey, editMode, onToggleEditMode }: P
     const newOrder = arrayMove(orderedKeys, oldIndex, newIndex);
     updateOrder(newOrder);
   };
+
+  /** Resolve the display label for a column key — uses DB custom label if set */
+  const resolveLabel = useCallback(
+    (key: string) => getLabel(key, LABEL_MAP[key] || key),
+    [getLabel]
+  );
 
   return (
     <TableHead
@@ -177,22 +220,31 @@ export function ColumnVisibilityToggle({ tabKey, editMode, onToggleEditMode }: P
                 <SortableContext items={orderedKeys} strategy={verticalListSortingStrategy}>
                   {COLUMN_GROUPS.map((group) => {
                     const groupKeys = group.keys.filter((k) => orderedKeys.includes(k));
-                    // Sort group keys by the global order
                     const sortedGroupKeys = groupKeys.sort(
                       (a, b) => orderedKeys.indexOf(a) - orderedKeys.indexOf(b)
                     );
                     if (sortedGroupKeys.length === 0) return null;
+                    const isCollapsed = !!collapsed[group.label];
 
                     return (
                       <div key={group.label} className="mb-2">
-                        <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-2 py-1">
+                        <button
+                          type="button"
+                          onClick={() => toggleGroup(group.label)}
+                          className="flex items-center gap-1 w-full text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-2 py-1 hover:bg-muted/30 rounded transition-colors"
+                        >
+                          {isCollapsed ? (
+                            <ChevronRight className="h-3 w-3 shrink-0" />
+                          ) : (
+                            <ChevronDown className="h-3 w-3 shrink-0" />
+                          )}
                           {group.label}
-                        </div>
-                        {sortedGroupKeys.map((key) => (
+                        </button>
+                        {!isCollapsed && sortedGroupKeys.map((key) => (
                           <SortableColumnRow
                             key={key}
                             colKey={key}
-                            label={LABEL_MAP[key] || key}
+                            label={resolveLabel(key)}
                             checked={state.isVisible(key)}
                             onToggle={() => state.toggleColumn(key)}
                             canDrag={true}
@@ -210,13 +262,23 @@ export function ColumnVisibilityToggle({ tabKey, editMode, onToggleEditMode }: P
                   (c) => !c.locked && group.keys.includes(c.key)
                 );
                 if (groupCols.length === 0) return null;
+                const isCollapsed = !!collapsed[group.label];
 
                 return (
                   <div key={group.label} className="mb-2">
-                    <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-2 py-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(group.label)}
+                      className="flex items-center gap-1 w-full text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-2 py-1 hover:bg-muted/30 rounded transition-colors"
+                    >
+                      {isCollapsed ? (
+                        <ChevronRight className="h-3 w-3 shrink-0" />
+                      ) : (
+                        <ChevronDown className="h-3 w-3 shrink-0" />
+                      )}
                       {group.label}
-                    </div>
-                    {groupCols.map((col) => (
+                    </button>
+                    {!isCollapsed && groupCols.map((col) => (
                       <label
                         key={col.key}
                         className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer text-sm"
@@ -225,7 +287,7 @@ export function ColumnVisibilityToggle({ tabKey, editMode, onToggleEditMode }: P
                           checked={state.isVisible(col.key)}
                           onCheckedChange={() => state.toggleColumn(col.key)}
                         />
-                        <span>{col.label}</span>
+                        <span>{resolveLabel(col.key)}</span>
                       </label>
                     ))}
                   </div>
