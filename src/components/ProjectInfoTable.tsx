@@ -51,17 +51,18 @@ interface ProjectInfoTableProps {
   riskHighlight?: import("@/hooks/useRiskHighlight").RiskHighlightType;
 }
 
+const DATE_COL: React.CSSProperties = { width: 100, minWidth: 100, maxWidth: 100 };
 const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
-  project_id: { minWidth: 90 },
-  project_name: { minWidth: 160, flex: 2 },
-  klient: { minWidth: 100, flex: 1 },
-  location: { minWidth: 100, flex: 1 },
-  kalkulant: { minWidth: 110, flex: 1 },
-  architekt: { minWidth: 110, flex: 1 },
-  datum_smluvni: { minWidth: 90 },
-  datum_objednavky: { minWidth: 90 },
-  prodejni_cena: { minWidth: 110 },
-  marze: { minWidth: 60 },
+  project_id: { width: 90, minWidth: 90 },
+  project_name: { minWidth: 180 },
+  klient: { minWidth: 100 },
+  location: { minWidth: 100 },
+  kalkulant: { minWidth: 110 },
+  architekt: { minWidth: 110 },
+  datum_smluvni: DATE_COL,
+  datum_objednavky: DATE_COL,
+  prodejni_cena: { width: 120, minWidth: 110 },
+  marze: { width: 70, minWidth: 60 },
   link_cn: { minWidth: 120 },
 };
 

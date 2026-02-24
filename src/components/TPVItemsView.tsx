@@ -155,10 +155,10 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
               <TableHead className="w-10"><Checkbox checked={items.length > 0 && selected.size === items.length} onCheckedChange={toggleAll} /></TableHead>
               <TableHead className="font-semibold min-w-[200px]">Název</TableHead>
               <TableHead className="font-semibold min-w-[120px]">Typ</TableHead>
-              <TableHead className="font-semibold min-w-[140px]">Konstruktér</TableHead>
-              <TableHead className="font-semibold min-w-[160px]">Status</TableHead>
-              <TableHead className="font-semibold min-w-[90px]">Odesláno</TableHead>
-              <TableHead className="font-semibold min-w-[90px]">Přijato</TableHead>
+              <TableHead className="font-semibold min-w-[120px]">Konstruktér</TableHead>
+              <TableHead className="font-semibold min-w-[140px]">Status</TableHead>
+              <TableHead className="font-semibold" style={{ width: 100, minWidth: 100, maxWidth: 100 }}>Odesláno</TableHead>
+              <TableHead className="font-semibold" style={{ width: 100, minWidth: 100, maxWidth: 100 }}>Přijato</TableHead>
               <TableHead className="font-semibold min-w-[200px]">Poznámka</TableHead>
               <TableHead className="w-10"></TableHead>
             </TableRow>

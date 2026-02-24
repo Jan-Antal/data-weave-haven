@@ -32,13 +32,13 @@ interface TPVStatusTableProps {
 }
 
 const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
-  project_id: { minWidth: 90 },
-  project_name: { minWidth: 160, flex: 2 },
-  konstrukter: { minWidth: 110, flex: 1 },
-  narocnost: { minWidth: 85 },
-  hodiny_tpv: { minWidth: 85 },
-  percent_tpv: { minWidth: 100 },
-  tpv_poznamka: { minWidth: 140, flex: 1 },
+  project_id: { width: 90, minWidth: 90 },
+  project_name: { minWidth: 180 },
+  konstrukter: { minWidth: 110 },
+  narocnost: { width: 90, minWidth: 85 },
+  hodiny_tpv: { width: 90, minWidth: 85 },
+  percent_tpv: { width: 110, minWidth: 100 },
+  tpv_poznamka: { minWidth: 140 },
 };
 
 export function TPVStatusTable({ personFilter, statusFilter, search: externalSearch, riskHighlight }: TPVStatusTableProps) {
