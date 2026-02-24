@@ -4,12 +4,10 @@ import { useProjectStages, ProjectStage } from "@/hooks/useProjectStages";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { useSortFilter } from "@/hooks/useSortFilter";
 import { parseAppDate } from "@/lib/dateFormat";
-import { ProjectEditDialog } from "./ProjectEditDialog";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { format, differenceInDays, addDays, startOfWeek, startOfMonth, addMonths, getISOWeek, isSameMonth } from "date-fns";
-import { cs } from "date-fns/locale";
+import { format, differenceInDays, addDays, startOfWeek, startOfMonth, addMonths, getISOWeek } from "date-fns";
 
 // ── Constants ───────────────────────────────────────────────────────
 const PHASE_COLORS = {
@@ -50,8 +48,9 @@ interface PlanViewProps {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 function parseDateField(val: string | null | undefined): Date | null {
-  if (!val) return null;
-  return parseAppDate(val) ?? null;
+  if (!val || val.trim() === "") return null;
+  const d = parseAppDate(val.trim());
+  return d ?? null;
 }
 
 function dayOffset(date: Date, origin: Date, dayPx: number): number {
@@ -59,113 +58,13 @@ function dayOffset(date: Date, origin: Date, dayPx: number): number {
 }
 
 function formatMilestoneLabel(d: Date): string {
-  return format(d, "dd-MMM", { locale: undefined }).replace(/\./g, "");
+  return format(d, "dd-MMM").replace(/\./g, "");
 }
 
 function weeksLabel(startDate: Date, endDate: Date): string {
   const days = differenceInDays(endDate, startDate);
   const weeks = Math.round(days / 7);
   return weeks > 0 ? `${weeks}t` : "";
-}
-
-// ── Substage loader ─────────────────────────────────────────────────
-function SubstageRows({
-  projectId,
-  project,
-  origin,
-  dayPx,
-  timelineWidth,
-  statusColorMap,
-}: {
-  projectId: string;
-  project: Project;
-  origin: Date;
-  dayPx: number;
-  timelineWidth: number;
-  statusColorMap: Record<string, string>;
-}) {
-  const { data: stages = [] } = useProjectStages(projectId);
-  if (stages.length === 0) return null;
-
-  return (
-    <>
-      {stages.map((stage) => (
-        <SubstageRow
-          key={stage.id}
-          stage={stage}
-          project={project}
-          origin={origin}
-          dayPx={dayPx}
-          timelineWidth={timelineWidth}
-          statusColorMap={statusColorMap}
-        />
-      ))}
-    </>
-  );
-}
-
-function SubstageRow({
-  stage,
-  project,
-  origin,
-  dayPx,
-  timelineWidth,
-  statusColorMap,
-}: {
-  stage: ProjectStage;
-  project: Project;
-  origin: Date;
-  dayPx: number;
-  timelineWidth: number;
-  statusColorMap: Record<string, string>;
-}) {
-  const milestones = getStageBarData(stage, project, statusColorMap);
-  const midY = SUBSTAGE_ROW_HEIGHT / 2;
-
-  return (
-    <div style={{ height: SUBSTAGE_ROW_HEIGHT, position: "relative", width: timelineWidth }}>
-      {milestones.segments.map((seg, i) => {
-        const x = dayOffset(seg.start, origin, dayPx);
-        const w = dayOffset(seg.end, origin, dayPx) - x;
-        if (w <= 0) return null;
-        const wkLabel = weeksLabel(seg.start, seg.end);
-        return (
-          <div
-            key={i}
-            className="absolute rounded-sm"
-            style={{
-              left: x,
-              top: midY - SUBSTAGE_BAR_HEIGHT / 2,
-              width: Math.max(w, 2),
-              height: SUBSTAGE_BAR_HEIGHT,
-              backgroundColor: seg.color,
-              opacity: 0.65,
-            }}
-          >
-            {w > 32 && wkLabel && (
-              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-medium text-white/90 leading-none">
-                {wkLabel}
-              </span>
-            )}
-          </div>
-        );
-      })}
-      {milestones.diamonds.map((m, i) => (
-        <MilestoneDiamond
-          key={i}
-          date={m.date}
-          color={m.color}
-          label={m.label}
-          name={m.name}
-          origin={origin}
-          dayPx={dayPx}
-          midY={midY}
-          yOffset={m.yOffset}
-          small
-        />
-      ))}
-    </div>
-  );
 }
 
 // ── Bar data computation ────────────────────────────────────────────
@@ -200,8 +99,6 @@ function getProjectBarData(p: Project, statusColorMap: Record<string, string>): 
   if (tpv) milestoneDates.push({ key: "tpv_date", date: tpv, color: MILESTONE_COLORS.tpv_date, name: "TPV" });
   if (expedice) milestoneDates.push({ key: "expedice", date: expedice, color: MILESTONE_COLORS.expedice, name: "Expedice" });
   if (predani) milestoneDates.push({ key: "predani", date: predani, color: MILESTONE_COLORS.predani, name: "Předání" });
-
-  // Sort milestones chronologically
   milestoneDates.sort((a, b) => a.date.getTime() - b.date.getTime());
 
   // Stagger overlapping milestone diamonds
@@ -220,68 +117,44 @@ function getProjectBarData(p: Project, statusColorMap: Record<string, string>): 
     };
   });
 
-  if (!barStart || !barEnd) {
-    // No date range — show single segment if we have any dates
-    if (barStart || barEnd) {
-      const s = barStart ?? barEnd!;
-      const e = barEnd ?? addDays(barStart!, 30);
-      const color = statusColorMap[p.status || ""] || "#6b7280";
-      return { segments: [{ start: s, end: e, color }], diamonds };
-    }
+  // Determine effective start & end
+  const effectiveStart = barStart ?? (milestoneDates.length > 0 ? milestoneDates[0].date : null);
+  const effectiveEnd = barEnd ?? (milestoneDates.length > 0 ? milestoneDates[milestoneDates.length - 1].date : null);
+
+  if (!effectiveStart && !effectiveEnd) {
     return { segments: [], diamonds };
   }
 
-  // Build phase segments
-  const phasePoints = [barStart];
-  const phaseColors: string[] = [];
+  const s = effectiveStart ?? effectiveEnd!;
+  const e = effectiveEnd ?? addDays(s, 30);
 
-  if (tpv) {
-    phaseColors.push(PHASE_COLORS.konstrukce);
-    phasePoints.push(tpv);
-  }
-  if (expedice) {
-    if (!tpv) phaseColors.push(PHASE_COLORS.konstrukce);
-    phaseColors.push(PHASE_COLORS.vyroba);
-    if (!tpv) phasePoints.push(expedice);
-    else phasePoints.push(expedice);
-  }
-  if (predani) {
-    if (!tpv && !expedice) phaseColors.push(PHASE_COLORS.konstrukce);
-    else if (!expedice) phaseColors.push(PHASE_COLORS.vyroba);
-    phaseColors.push(PHASE_COLORS.montaz);
-    phasePoints.push(predani);
-  }
-
-  // Final segment to barEnd
-  phaseColors.push(PHASE_COLORS.dokonceno);
-  phasePoints.push(barEnd);
-
-  // If no milestones at all, single bar
+  // If no milestones, single bar in status color
   if (milestoneDates.length === 0) {
     const color = statusColorMap[p.status || ""] || "#6b7280";
-    return { segments: [{ start: barStart, end: barEnd, color }], diamonds };
+    return { segments: [{ start: s, end: e, color }], diamonds };
   }
 
-  // Rebuild segments properly
-  const segments: Segment[] = [];
-  const allPoints = [barStart];
-  if (tpv) allPoints.push(tpv);
-  if (expedice) allPoints.push(expedice);
-  if (predani) allPoints.push(predani);
-  allPoints.push(barEnd);
-  // Sort + dedup
+  // Build allPoints: start + milestone dates + end, sorted & deduped
+  const allPoints = [s, ...milestoneDates.map((m) => m.date), e];
   allPoints.sort((a, b) => a.getTime() - b.getTime());
+  // Dedup
+  const uniquePoints: Date[] = [allPoints[0]];
+  for (let i = 1; i < allPoints.length; i++) {
+    if (allPoints[i].getTime() !== allPoints[i - 1].getTime()) {
+      uniquePoints.push(allPoints[i]);
+    }
+  }
 
   const colorSequence = [PHASE_COLORS.konstrukce, PHASE_COLORS.vyroba, PHASE_COLORS.montaz, PHASE_COLORS.dokonceno];
+  const segments: Segment[] = [];
   let colorIdx = 0;
 
-  for (let i = 0; i < allPoints.length - 1; i++) {
-    const s = allPoints[i];
-    const e = allPoints[i + 1];
+  for (let i = 0; i < uniquePoints.length - 1; i++) {
+    const segStart = uniquePoints[i];
+    const segEnd = uniquePoints[i + 1];
     const color = colorSequence[Math.min(colorIdx, colorSequence.length - 1)];
 
-    // Check for hatch pattern (overlapping milestones)
-    const daysBetween = differenceInDays(e, s);
+    const daysBetween = differenceInDays(segEnd, segStart);
     let hatch: { color1: string; color2: string } | undefined;
     if (daysBetween <= OVERLAP_THRESHOLD_DAYS && daysBetween >= 0 && colorIdx > 0) {
       hatch = {
@@ -290,26 +163,28 @@ function getProjectBarData(p: Project, statusColorMap: Record<string, string>): 
       };
     }
 
-    segments.push({ start: s, end: e, color, hatch });
+    segments.push({ start: segStart, end: segEnd, color, hatch });
 
     // Advance color when we hit a milestone
-    if (tpv && e.getTime() === tpv.getTime()) colorIdx = 1;
-    else if (expedice && e.getTime() === expedice.getTime()) colorIdx = 2;
-    else if (predani && e.getTime() === predani.getTime()) colorIdx = 3;
+    if (tpv && segEnd.getTime() === tpv.getTime()) colorIdx = Math.max(colorIdx, 1);
+    else if (expedice && segEnd.getTime() === expedice.getTime()) colorIdx = Math.max(colorIdx, 2);
+    else if (predani && segEnd.getTime() === predani.getTime()) colorIdx = Math.max(colorIdx, 3);
   }
 
   return { segments, diamonds };
 }
 
 function getStageBarData(stage: ProjectStage, project: Project, statusColorMap: Record<string, string>): BarData {
-  // Stages use their own dates or fall back to project dates
-  const barStart = parseDateField(stage.datum_smluvni) ?? parseDateField(project.datum_objednavky);
-  const barEnd = parseDateField(project.datum_smluvni);
+  const barStart = parseDateField(stage.start_date) ?? parseDateField(stage.datum_smluvni) ?? parseDateField(project.datum_objednavky);
+  const barEnd = parseDateField(stage.end_date) ?? parseDateField(project.datum_smluvni);
   const tpv = parseDateField(stage.tpv_date);
   const expedice = parseDateField(stage.expedice);
   const predani = parseDateField(stage.predani);
 
-  if (!barStart || !barEnd) return { segments: [], diamonds: [] };
+  if (!barStart && !barEnd) return { segments: [], diamonds: [] };
+
+  const s = barStart ?? barEnd!;
+  const e = barEnd ?? addDays(s, 30);
 
   const milestoneDates: { date: Date; color: string; name: string }[] = [];
   if (tpv) milestoneDates.push({ date: tpv, color: MILESTONE_COLORS.tpv_date, name: "TPV" });
@@ -327,15 +202,18 @@ function getStageBarData(stage: ProjectStage, project: Project, statusColorMap: 
 
   if (milestoneDates.length === 0) {
     const color = statusColorMap[stage.status || ""] || "#6b7280";
-    return { segments: [{ start: barStart, end: barEnd, color }], diamonds };
+    return { segments: [{ start: s, end: e, color }], diamonds };
   }
 
-  const allPoints = [barStart, ...milestoneDates.map((m) => m.date), barEnd].sort((a, b) => a.getTime() - b.getTime());
+  const allPoints = [s, ...milestoneDates.map((m) => m.date), e].sort((a, b) => a.getTime() - b.getTime());
   const colorSequence = [PHASE_COLORS.konstrukce, PHASE_COLORS.vyroba, PHASE_COLORS.montaz, PHASE_COLORS.dokonceno];
   const segments: Segment[] = [];
   let ci = 0;
   for (let i = 0; i < allPoints.length - 1; i++) {
-    segments.push({ start: allPoints[i], end: allPoints[i + 1], color: colorSequence[Math.min(ci, 3)] });
+    if (i > 0 && allPoints[i].getTime() === allPoints[i - 1].getTime()) continue;
+    const nextIdx = i + 1;
+    if (nextIdx >= allPoints.length) break;
+    segments.push({ start: allPoints[i], end: allPoints[nextIdx], color: colorSequence[Math.min(ci, 3)] });
     ci++;
   }
 
@@ -367,7 +245,6 @@ function MilestoneDiamond({
               backgroundColor: color,
               transform: "rotate(45deg)",
               zIndex: 10,
-              cursor: "pointer",
             }}
           />
         </TooltipTrigger>
@@ -375,7 +252,6 @@ function MilestoneDiamond({
           <span className="font-medium">{name}</span>: {format(date, "dd-MMM-yy")}
         </TooltipContent>
       </Tooltip>
-      {/* Date label */}
       <span
         className="absolute text-[9px] font-medium whitespace-nowrap pointer-events-none"
         style={{
@@ -405,30 +281,77 @@ function HatchPattern({ id, color1, color2 }: { id: string; color1: string; colo
   );
 }
 
-// ── Substage expand button (with data check) ────────────────────────
+// ── Substage loader ─────────────────────────────────────────────────
+function SubstageRows({
+  projectId, project, origin, dayPx, timelineWidth, statusColorMap,
+}: {
+  projectId: string; project: Project; origin: Date; dayPx: number;
+  timelineWidth: number; statusColorMap: Record<string, string>;
+}) {
+  const { data: stages = [] } = useProjectStages(projectId);
+  if (stages.length === 0) return null;
+  return (
+    <>
+      {stages.map((stage) => (
+        <SubstageRow key={stage.id} stage={stage} project={project} origin={origin} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} />
+      ))}
+    </>
+  );
+}
+
+function SubstageRow({
+  stage, project, origin, dayPx, timelineWidth, statusColorMap,
+}: {
+  stage: ProjectStage; project: Project; origin: Date; dayPx: number;
+  timelineWidth: number; statusColorMap: Record<string, string>;
+}) {
+  const barData = getStageBarData(stage, project, statusColorMap);
+  const midY = SUBSTAGE_ROW_HEIGHT / 2;
+
+  return (
+    <div style={{ height: SUBSTAGE_ROW_HEIGHT, position: "relative", width: timelineWidth }}>
+      {barData.segments.map((seg, i) => {
+        const x = dayOffset(seg.start, origin, dayPx);
+        const w = dayOffset(seg.end, origin, dayPx) - x;
+        if (w <= 0) return null;
+        const wkLabel = weeksLabel(seg.start, seg.end);
+        return (
+          <div
+            key={i}
+            className="absolute rounded-sm"
+            style={{
+              left: x, top: midY - SUBSTAGE_BAR_HEIGHT / 2,
+              width: Math.max(w, 2), height: SUBSTAGE_BAR_HEIGHT,
+              backgroundColor: seg.color, opacity: 0.65,
+            }}
+          >
+            {w > 32 && wkLabel && (
+              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-medium text-white/90 leading-none">{wkLabel}</span>
+            )}
+          </div>
+        );
+      })}
+      {barData.diamonds.map((m, i) => (
+        <MilestoneDiamond key={i} date={m.date} color={m.color} label={m.label} name={m.name} origin={origin} dayPx={dayPx} midY={midY} yOffset={m.yOffset} small />
+      ))}
+    </div>
+  );
+}
+
+// ── Substage expand button ──────────────────────────────────────────
 function ExpandButton({ projectId, expanded, onClick }: { projectId: string; expanded: boolean; onClick: () => void }) {
   const { data: stages = [] } = useProjectStages(projectId);
   if (stages.length === 0) return <div style={{ width: 20 }} />;
-
   return (
     <button onClick={onClick} className="p-0 shrink-0">
-      {expanded ? (
-        <ChevronDown className="h-4 w-4 text-accent stroke-[3]" />
-      ) : (
-        <ChevronRight className="h-4 w-4 text-accent stroke-[3]" />
-      )}
+      {expanded ? <ChevronDown className="h-4 w-4 text-accent stroke-[3]" /> : <ChevronRight className="h-4 w-4 text-accent stroke-[3]" />}
     </button>
   );
 }
 
 // ── StatusDot ───────────────────────────────────────────────────────
 function StatusDot({ color }: { color: string }) {
-  return (
-    <div
-      className="shrink-0 rounded-full"
-      style={{ width: 8, height: 8, backgroundColor: color }}
-    />
-  );
+  return <div className="shrink-0 rounded-full" style={{ width: 8, height: 8, backgroundColor: color }} />;
 }
 
 // ── Main PlanView ───────────────────────────────────────────────────
@@ -438,32 +361,23 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
   const { sorted } = useSortFilter(projects, { personFilter, statusFilter }, search);
   const [zoom, setZoom] = useState<ZoomLevel>("6M");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [editProject, setEditProject] = useState<Project | null>(null);
 
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
   const syncing = useRef(false);
 
-  // Status color map
   const statusColorMap = useMemo(() => {
     const m: Record<string, string> = {};
     for (const o of statusOptions) m[o.label] = o.color;
     return m;
   }, [statusOptions]);
 
-  // Timeline range
   const today = useMemo(() => new Date(), []);
   const dayPx = ZOOM_DAY_PX[zoom];
   const monthsHalf = ZOOM_MONTHS[zoom] / 2;
 
-  const timelineStart = useMemo(() => {
-    const d = addMonths(today, -monthsHalf);
-    return startOfMonth(d);
-  }, [today, monthsHalf]);
-
-  const timelineEnd = useMemo(() => {
-    return addMonths(today, monthsHalf + 1);
-  }, [today, monthsHalf]);
+  const timelineStart = useMemo(() => startOfMonth(addMonths(today, -monthsHalf)), [today, monthsHalf]);
+  const timelineEnd = useMemo(() => addMonths(today, monthsHalf + 1), [today, monthsHalf]);
 
   const totalDays = differenceInDays(timelineEnd, timelineStart);
   const timelineWidth = totalDays * dayPx;
@@ -477,56 +391,43 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
       const end = next < timelineEnd ? next : timelineEnd;
       const startX = dayOffset(d, timelineStart, dayPx);
       const w = dayOffset(end, timelineStart, dayPx) - startX;
-      result.push({
-        label: CZECH_MONTHS[d.getMonth()],
-        startX,
-        width: w,
-        date: d,
-      });
+      result.push({ label: CZECH_MONTHS[d.getMonth()], startX, width: w, date: d });
       d = next;
     }
     return result;
   }, [timelineStart, timelineEnd, dayPx]);
 
-  // Week columns
+  // Week columns — only for 3M and 6M
+  const showWeeks = zoom !== "1R";
   const weeks = useMemo(() => {
+    if (!showWeeks) return [];
     const result: { label: string; x: number }[] = [];
     let d = startOfWeek(timelineStart, { weekStartsOn: 1 });
     if (d < timelineStart) d = addDays(d, 7);
     while (d < timelineEnd) {
-      const weekNum = getISOWeek(d);
-      result.push({
-        label: `T${weekNum}`,
-        x: dayOffset(d, timelineStart, dayPx),
-      });
+      result.push({ label: `T${getISOWeek(d)}`, x: dayOffset(d, timelineStart, dayPx) });
       d = addDays(d, 7);
     }
     return result;
-  }, [timelineStart, timelineEnd, dayPx]);
+  }, [timelineStart, timelineEnd, dayPx, showWeeks]);
 
-  // Today line position
   const todayX = dayOffset(today, timelineStart, dayPx);
 
   // Sync scroll
   const handleLeftScroll = useCallback(() => {
     if (syncing.current) return;
     syncing.current = true;
-    if (rightRef.current && leftRef.current) {
-      rightRef.current.scrollTop = leftRef.current.scrollTop;
-    }
+    if (rightRef.current && leftRef.current) rightRef.current.scrollTop = leftRef.current.scrollTop;
     syncing.current = false;
   }, []);
 
   const handleRightScroll = useCallback(() => {
     if (syncing.current) return;
     syncing.current = true;
-    if (leftRef.current && rightRef.current) {
-      leftRef.current.scrollTop = rightRef.current.scrollTop;
-    }
+    if (leftRef.current && rightRef.current) leftRef.current.scrollTop = rightRef.current.scrollTop;
     syncing.current = false;
   }, []);
 
-  // Auto-scroll timeline to center today on mount
   useEffect(() => {
     if (rightRef.current) {
       rightRef.current.scrollLeft = Math.max(0, todayX - rightRef.current.clientWidth / 2);
@@ -541,25 +442,19 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
     });
   };
 
-  // Hatch pattern IDs
   let hatchCounter = 0;
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Načítání...</div>;
 
-  const HEADER_HEIGHT = 52;
+  const HEADER_HEIGHT = showWeeks ? 52 : 32;
+  const weekFontClass = zoom === "3M" ? "text-[9px] text-muted-foreground/60" : "text-[8px] text-muted-foreground/40";
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       {/* Zoom toolbar */}
       <div className="flex items-center justify-end gap-1 px-3 py-2 border-b bg-muted/30">
         {(["3M", "6M", "1R"] as ZoomLevel[]).map((z) => (
-          <Button
-            key={z}
-            variant={zoom === z ? "default" : "outline"}
-            size="sm"
-            className="text-xs h-7 px-3"
-            onClick={() => setZoom(z)}
-          >
+          <Button key={z} variant={zoom === z ? "default" : "outline"} size="sm" className="text-xs h-7 px-3" onClick={() => setZoom(z)}>
             {z}
           </Button>
         ))}
@@ -573,9 +468,10 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
           className="overflow-y-auto overflow-x-hidden border-r shrink-0"
           style={{ width: LEFT_PANEL_WIDTH, scrollbarWidth: "none" }}
         >
-          {/* Header spacer */}
-          <div style={{ height: HEADER_HEIGHT }} className="border-b bg-muted/20 flex items-end px-3 pb-1">
-            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Projekty</span>
+          {/* Header */}
+          <div style={{ height: HEADER_HEIGHT }} className="border-b bg-muted/20 flex items-end px-3 pb-1 gap-2">
+            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide" style={{ width: 90, flexShrink: 0 }}>ID</span>
+            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide flex-1">Název</span>
           </div>
 
           {sorted.map((p) => {
@@ -584,28 +480,18 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
             return (
               <div key={p.id}>
                 <div
-                  className="flex items-center gap-2 px-3 border-b hover:bg-muted/30 transition-colors cursor-pointer"
+                  className="flex items-center gap-2 px-3 border-b hover:bg-muted/30 transition-colors"
                   style={{ height: ROW_HEIGHT }}
-                  onClick={() => setEditProject(p)}
                 >
                   <div
                     className="shrink-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleExpand(p.project_id);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); toggleExpand(p.project_id); }}
                   >
-                    <ExpandButton
-                      projectId={p.project_id}
-                      expanded={isExp}
-                      onClick={() => {}}
-                    />
+                    <ExpandButton projectId={p.project_id} expanded={isExp} onClick={() => {}} />
                   </div>
                   <StatusDot color={statusColor} />
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <span className="text-xs font-mono text-muted-foreground truncate">{p.project_id}</span>
-                    <span className="text-xs font-medium truncate">{p.project_name}</span>
-                  </div>
+                  <span className="text-xs font-mono text-muted-foreground truncate" style={{ width: 70, flexShrink: 0 }}>{p.project_id}</span>
+                  <span className="text-xs font-medium truncate flex-1 min-w-0">{p.project_name}</span>
                 </div>
                 {isExp && <SubstageLeftRows projectId={p.project_id} />}
               </div>
@@ -614,45 +500,36 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
         </div>
 
         {/* RIGHT PANEL — TIMELINE */}
-        <div
-          ref={rightRef}
-          onScroll={handleRightScroll}
-          className="overflow-auto flex-1 relative"
-        >
+        <div ref={rightRef} onScroll={handleRightScroll} className="overflow-auto flex-1 relative">
           <div style={{ width: timelineWidth, position: "relative" }}>
             {/* Timeline header */}
             <div className="sticky top-0 z-20 bg-card border-b" style={{ height: HEADER_HEIGHT }}>
               {/* Month row */}
-              <div className="flex" style={{ height: 28 }}>
+              <div className="flex" style={{ height: showWeeks ? 28 : HEADER_HEIGHT }}>
                 {months.map((m, i) => (
                   <div
                     key={i}
                     className="border-r text-[11px] font-medium text-muted-foreground flex items-center justify-center shrink-0"
-                    style={{ width: m.width, left: m.startX }}
+                    style={{ width: m.width }}
                   >
                     {m.label} {m.date.getFullYear()}
                   </div>
                 ))}
               </div>
-              {/* Week row */}
-              <div className="relative" style={{ height: 24 }}>
-                {weeks.map((w, i) => (
-                  <span
-                    key={i}
-                    className="absolute text-[9px] text-muted-foreground/50 font-medium"
-                    style={{ left: w.x + 2, top: 4 }}
-                  >
-                    {w.label}
-                  </span>
-                ))}
-              </div>
+              {/* Week row — only for 3M, 6M */}
+              {showWeeks && (
+                <div className="relative" style={{ height: 24 }}>
+                  {weeks.map((w, i) => (
+                    <span key={i} className={`absolute font-medium ${weekFontClass}`} style={{ left: w.x + 2, top: 4 }}>
+                      {w.label}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Today label */}
-            <div
-              className="absolute z-30 text-[9px] font-bold"
-              style={{ left: todayX - 12, top: 2, color: "#e74c3c" }}
-            >
+            <div className="absolute z-30 text-[9px] font-bold" style={{ left: todayX - 12, top: 2, color: "#e74c3c" }}>
               Dnes
             </div>
 
@@ -665,17 +542,17 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
               return (
                 <div key={p.id}>
                   <div
-                    className="relative border-b hover:bg-muted/10 transition-colors cursor-pointer"
+                    className="relative border-b hover:bg-muted/10 transition-colors"
                     style={{ height: ROW_HEIGHT, width: timelineWidth }}
-                    onClick={() => setEditProject(p)}
                   >
                     {/* Week grid lines */}
                     {weeks.map((w, i) => (
-                      <div
-                        key={i}
-                        className="absolute top-0 bottom-0 border-l border-border/20"
-                        style={{ left: w.x }}
-                      />
+                      <div key={i} className="absolute top-0 bottom-0 border-l border-border/20" style={{ left: w.x }} />
+                    ))}
+
+                    {/* Month grid lines for 1R view */}
+                    {!showWeeks && months.map((m, i) => (
+                      <div key={`mg-${i}`} className="absolute top-0 bottom-0 border-l border-border/20" style={{ left: m.startX }} />
                     ))}
 
                     {/* Segments */}
@@ -688,9 +565,7 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
 
                       return (
                         <div key={i}>
-                          {seg.hatch && hatchId && (
-                            <HatchPattern id={hatchId} color1={seg.hatch.color1} color2={seg.hatch.color2} />
-                          )}
+                          {seg.hatch && hatchId && <HatchPattern id={hatchId} color1={seg.hatch.color1} color2={seg.hatch.color2} />}
                           <div
                             className="absolute rounded-sm"
                             style={{
@@ -700,6 +575,7 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
                               height: BAR_HEIGHT,
                               backgroundColor: seg.hatch ? undefined : seg.color,
                               background: seg.hatch && hatchId ? `url(#${hatchId})` : undefined,
+                              zIndex: 5,
                             }}
                           >
                             {w > 32 && wkLabel && (
@@ -714,30 +590,13 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
 
                     {/* Milestone diamonds */}
                     {barData.diamonds.map((m, i) => (
-                      <MilestoneDiamond
-                        key={i}
-                        date={m.date}
-                        color={m.color}
-                        label={m.label}
-                        name={m.name}
-                        origin={timelineStart}
-                        dayPx={dayPx}
-                        midY={midY}
-                        yOffset={m.yOffset}
-                      />
+                      <MilestoneDiamond key={i} date={m.date} color={m.color} label={m.label} name={m.name} origin={timelineStart} dayPx={dayPx} midY={midY} yOffset={m.yOffset} />
                     ))}
                   </div>
 
                   {/* Substage rows */}
                   {isExp && (
-                    <SubstageRows
-                      projectId={p.project_id}
-                      project={p}
-                      origin={timelineStart}
-                      dayPx={dayPx}
-                      timelineWidth={timelineWidth}
-                      statusColorMap={statusColorMap}
-                    />
+                    <SubstageRows projectId={p.project_id} project={p} origin={timelineStart} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} />
                   )}
                 </div>
               );
@@ -746,23 +605,11 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
             {/* Today vertical line */}
             <div
               className="absolute top-0 bottom-0 z-20 pointer-events-none"
-              style={{
-                left: todayX,
-                width: 2,
-                backgroundColor: "#e74c3c",
-              }}
+              style={{ left: todayX, width: 2, backgroundColor: "#e74c3c" }}
             />
           </div>
         </div>
       </div>
-
-      {editProject && (
-        <ProjectEditDialog
-          project={editProject}
-          open={!!editProject}
-          onOpenChange={(open) => { if (!open) setEditProject(null); }}
-        />
-      )}
     </div>
   );
 }
@@ -773,11 +620,7 @@ function SubstageLeftRows({ projectId }: { projectId: string }) {
   return (
     <>
       {stages.map((stage) => (
-        <div
-          key={stage.id}
-          className="flex items-center gap-2 pl-8 pr-3 border-b bg-muted/10"
-          style={{ height: SUBSTAGE_ROW_HEIGHT }}
-        >
+        <div key={stage.id} className="flex items-center gap-2 pl-8 pr-3 border-b bg-muted/10" style={{ height: SUBSTAGE_ROW_HEIGHT }}>
           <span className="text-[10px] text-muted-foreground truncate">{stage.stage_name}</span>
         </div>
       ))}
