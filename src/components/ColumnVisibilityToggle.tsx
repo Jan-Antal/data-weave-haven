@@ -37,7 +37,7 @@ export function ColumnVisibilityToggle({
             )}
           </button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-60 p-0 z-[9999] bg-popover border shadow-md max-h-[70vh] flex flex-col">
+        <PopoverContent align="end" side="bottom" avoidCollisions collisionPadding={16} sideOffset={4} className="w-60 p-0 z-[9999] bg-popover border shadow-md flex flex-col" style={{ maxHeight: 'calc(100vh - 120px)' }}>
           {onToggleEditMode && (
             <div className="p-2 pb-0 shrink-0">
               <Button
