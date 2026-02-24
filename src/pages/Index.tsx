@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectInfoTable } from "@/components/ProjectInfoTable";
 import { PMStatusTable } from "@/components/PMStatusTable";
@@ -148,49 +149,34 @@ const Index = () => {
             </TabsList>
 
             {/* Plán + Zoom unified tile */}
-            <div
-              className="flex items-center"
-              style={{
-                border: "1px solid #e0ddd8",
-                borderRadius: 8,
-                background: "white",
-                overflow: "hidden",
-              }}
-            >
+            <div className="inline-flex h-10 items-center rounded-md bg-card border p-1">
               {activeTab === "plan" && (
                 <>
                   {(["3M", "6M", "1R"] as ZoomLevel[]).map((z) => (
                     <button
                       key={z}
                       onClick={() => setPlanZoom(z)}
-                      className="text-[11px] font-medium transition-colors"
-                      style={{
-                        height: 32,
-                        padding: "0 10px",
-                        background: planZoom === z ? "#e0ddd8" : "transparent",
-                        color: planZoom === z ? "#1f2d26" : "#555",
-                        border: "none",
-                        cursor: "pointer",
-                      }}
+                      className={cn(
+                        "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
+                        planZoom === z
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
                     >
                       {z}
                     </button>
                   ))}
-                  <div style={{ width: 1, height: 16, background: "#ddd", margin: "0 4px", flexShrink: 0 }} />
+                  <div className="w-px h-4 bg-border mx-1 shrink-0" />
                 </>
               )}
               <button
                 onClick={() => handleTabChange("plan")}
-                className="text-sm font-medium transition-colors"
-                style={{
-                  height: 32,
-                  padding: "0 12px",
-                  background: activeTab === "plan" ? "#1f2d26" : "transparent",
-                  color: activeTab === "plan" ? "white" : "#555",
-                  border: "none",
-                  cursor: "pointer",
-                  borderRadius: activeTab !== "plan" ? 7 : 0,
-                }}
+                className={cn(
+                  "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
+                  activeTab === "plan"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
               >
                 📅 Plán
               </button>
