@@ -176,7 +176,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
               {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="text-right" style={colStyle("prodejni_cena")} {...editProps("prodejni_cena", "Prodejní cena")} />}
               {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} className="text-right" style={colStyle("marze")} {...editProps("marze", "Marže")} />}
               {v("link_cn") && <SortableHeader label="CN" column="link_cn" {...sh} style={colStyle("link_cn")} {...editProps("link_cn", "CN")} />}
-              <ColumnVisibilityToggle editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
+              <ColumnVisibilityToggle tabKey="projectInfo" editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
             </TableRow>
           </TableHeader>
           <TableBody>

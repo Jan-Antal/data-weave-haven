@@ -6,13 +6,14 @@ export interface ColumnDef {
   locked?: boolean; // Cannot be hidden
 }
 
-export function useColumnVisibility(storageKey: string, columns: ColumnDef[]) {
+export function useColumnVisibility(storageKey: string, columns: ColumnDef[], defaultHidden?: string[]) {
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem(storageKey);
-      return stored ? new Set(JSON.parse(stored)) : new Set();
+      if (stored) return new Set(JSON.parse(stored));
+      return new Set(defaultHidden ?? []);
     } catch {
-      return new Set();
+      return new Set(defaultHidden ?? []);
     }
   });
 
