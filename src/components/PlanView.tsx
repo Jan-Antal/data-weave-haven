@@ -666,15 +666,15 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
               return (
                 <div key={p.id}>
                   <div
-                    className="relative border-b hover:bg-muted/10 transition-colors"
-                    style={{ height: ROW_HEIGHT, width: timelineWidth }}
+                    className="border-b hover:bg-muted/10 transition-colors"
+                    style={{ position: "relative", overflow: "visible", height: ROW_HEIGHT, width: timelineWidth }}
                   >
                     {/* Grid lines */}
                     {showWeeks && weeks.map((w, i) => (
-                      <div key={i} className="absolute top-0 bottom-0 border-l border-border/20" style={{ left: w.x }} />
+                      <div key={i} className="absolute top-0 bottom-0 border-l border-border/20" style={{ left: w.x, zIndex: 1 }} />
                     ))}
                     {!showWeeks && months.map((m, i) => (
-                      <div key={`mg-${i}`} className="absolute top-0 bottom-0 border-l border-border/20" style={{ left: m.startX }} />
+                      <div key={`mg-${i}`} className="absolute top-0 bottom-0 border-l border-border/20" style={{ left: m.startX, zIndex: 1 }} />
                     ))}
 
                     {/* Connector line between milestones */}
@@ -700,19 +700,21 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                         <React.Fragment key={`seg-${i}`}>
                           {seg.hatch && hatchId && <HatchPattern id={hatchId} color1={seg.hatch.color1} color2={seg.hatch.color2} />}
                           <div
-                            className="absolute rounded-sm"
                             style={{
+                              position: "absolute",
                               left: x,
-                              top: midY - BAR_HEIGHT / 2,
+                              top: "50%",
+                              transform: "translateY(-50%)",
                               width: segW,
-                              height: BAR_HEIGHT,
-                              backgroundColor: seg.hatch ? undefined : seg.color,
+                              height: 16,
+                              backgroundColor: isDashed ? `${seg.color}33` : (seg.hatch ? undefined : seg.color),
                               background: seg.hatch && hatchId ? `url(#${hatchId})` : undefined,
                               opacity: isDashed ? 0.45 : 1,
-                              zIndex: 5,
+                              zIndex: 2,
+                              borderRadius: 4,
+                              minWidth: 4,
                               ...(isDashed ? {
                                 border: `2px dashed ${seg.color}`,
-                                backgroundColor: `${seg.color}33`,
                               } : {}),
                             }}
                           >
