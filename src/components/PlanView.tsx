@@ -523,6 +523,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
 
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
+  const timelineHeaderRef = useRef<HTMLDivElement>(null);
   const syncing = useRef(false);
 
   const statusColorMap = useMemo(() => {
@@ -615,7 +616,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
 
   const todayX = dayOffset(today, timelineStart, dayPx);
 
-  // Sync scroll
+  // Sync scroll — vertical: left ↔ right body; horizontal: right body → header
   const handleLeftScroll = useCallback(() => {
     if (syncing.current) return;
     syncing.current = true;
@@ -627,12 +628,15 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
     if (syncing.current) return;
     syncing.current = true;
     if (leftRef.current && rightRef.current) leftRef.current.scrollTop = rightRef.current.scrollTop;
+    if (timelineHeaderRef.current && rightRef.current) timelineHeaderRef.current.scrollLeft = rightRef.current.scrollLeft;
     syncing.current = false;
   }, []);
 
   useEffect(() => {
     if (rightRef.current) {
-      rightRef.current.scrollLeft = Math.max(0, todayX - rightRef.current.clientWidth / 2);
+      const scrollLeft = Math.max(0, todayX - rightRef.current.clientWidth / 2);
+      rightRef.current.scrollLeft = scrollLeft;
+      if (timelineHeaderRef.current) timelineHeaderRef.current.scrollLeft = scrollLeft;
     }
   }, [todayX, zoom]);
 
@@ -665,22 +669,57 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
 
   return (
     <>
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div className="rounded-lg border bg-card overflow-hidden flex flex-col" style={{ height: "calc(100vh - 280px)", minHeight: 400 }}>
 
-      <div className="flex" style={{ height: "calc(100vh - 340px)", minHeight: 400 }}>
-        {/* LEFT PANEL */}
+      {/* PART 1 — FIXED HEADER ROW (never scrolls vertically) */}
+      <div className="flex shrink-0 border-b">
+        {/* Left panel header */}
+        <div className="border-r shrink-0 bg-card flex items-end px-3 pb-1 gap-2" style={{ width: LEFT_PANEL_WIDTH, height: HEADER_HEIGHT }}>
+          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide" style={{ width: 110, flexShrink: 0 }}>ID</span>
+          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide flex-1">Název</span>
+        </div>
+        {/* Timeline header — horizontal scroll synced with body */}
+        <div
+          ref={timelineHeaderRef}
+          className="flex-1 overflow-hidden bg-card"
+          style={{ height: HEADER_HEIGHT }}
+        >
+          <div style={{ width: timelineWidth, minWidth: timelineWidth, position: "relative" }}>
+            {/* Month row */}
+            <div className="flex" style={{ height: showWeeks ? 28 : HEADER_HEIGHT }}>
+              {months.map((m, i) => (
+                <div
+                  key={i}
+                  className={`border-r font-medium text-muted-foreground flex items-center justify-center shrink-0 ${zoom === "1R" ? "text-[10px]" : "text-[11px]"}`}
+                  style={{ width: m.width }}
+                >
+                  {m.label}
+                </div>
+              ))}
+            </div>
+            {/* Week row — only for 3M, 6M */}
+            {showWeeks && (
+              <div className="relative" style={{ height: 24 }}>
+                {weeks.map((w, i) => (
+                  <span key={i} className={`absolute font-medium ${weekFontClass}`} style={{ left: w.x + 2, top: 4 }}>
+                    {w.label}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* PART 2 — SCROLLABLE BODY */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left panel rows — scrolls vertically only */}
         <div
           ref={leftRef}
           onScroll={handleLeftScroll}
           className="overflow-y-auto overflow-x-hidden border-r shrink-0"
           style={{ width: LEFT_PANEL_WIDTH, scrollbarWidth: "none" }}
         >
-          {/* Header */}
-          <div style={{ height: HEADER_HEIGHT, position: "sticky", top: 0, zIndex: 20 }} className="border-b bg-muted/20 flex items-end px-3 pb-1 gap-2 bg-card">
-            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide" style={{ width: 110, flexShrink: 0 }}>ID</span>
-            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide flex-1">Název</span>
-          </div>
-
           {sorted.map((p) => {
             const isExp = expanded.has(p.project_id);
             const warnings = projectWarnings[p.project_id] || [];
@@ -706,36 +745,9 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
           })}
         </div>
 
-        {/* RIGHT PANEL — TIMELINE */}
+        {/* Right panel — timeline body, scrolls both ways */}
         <div ref={rightRef} onScroll={handleRightScroll} className={`flex-1 relative ${zoom === "1R" ? "overflow-y-auto overflow-x-hidden" : "overflow-auto"}`}>
           <div style={{ width: timelineWidth, minWidth: timelineWidth, position: "relative" }}>
-            {/* Timeline header */}
-            <div className="sticky top-0 z-20 bg-card border-b" style={{ height: HEADER_HEIGHT, position: "relative" }}>
-              {/* Month row */}
-              <div className="flex" style={{ height: showWeeks ? 28 : HEADER_HEIGHT }}>
-                {months.map((m, i) => (
-                  <div
-                    key={i}
-                    className={`border-r font-medium text-muted-foreground flex items-center justify-center shrink-0 ${zoom === "1R" ? "text-[10px]" : "text-[11px]"}`}
-                    style={{ width: m.width }}
-                  >
-                    {m.label}
-                  </div>
-                ))}
-              </div>
-              {/* Week row — only for 3M, 6M */}
-              {showWeeks && (
-                <div className="relative" style={{ height: 24 }}>
-                  {weeks.map((w, i) => (
-                    <span key={i} className={`absolute font-medium ${weekFontClass}`} style={{ left: w.x + 2, top: 4 }}>
-                      {w.label}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {/* Dnes label removed from header — now inline in chart area */}
-            </div>
-
             {/* Rows */}
             {sorted.map((p) => {
               const barData = getProjectBarData(p, statusColorMap);
