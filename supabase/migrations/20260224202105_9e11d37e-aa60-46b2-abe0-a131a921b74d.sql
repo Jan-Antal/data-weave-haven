@@ -1,0 +1,1 @@
+ALTER TABLE public.column_labels ADD COLUMN IF NOT EXISTS display_order integer DEFAULT NULL;

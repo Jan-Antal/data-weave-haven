@@ -108,8 +108,16 @@ export function ColumnVisibilityToggle({ tabKey, editMode, onToggleEditMode }: P
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = orderedKeys.indexOf(active.id as string);
-    const newIndex = orderedKeys.indexOf(over.id as string);
+    const activeKey = active.id as string;
+    const overKey = over.id as string;
+
+    // Find which group both belong to — only allow within-group reorder
+    const activeGroup = COLUMN_GROUPS.find((g) => g.keys.includes(activeKey));
+    const overGroup = COLUMN_GROUPS.find((g) => g.keys.includes(overKey));
+    if (!activeGroup || !overGroup || activeGroup !== overGroup) return;
+
+    const oldIndex = orderedKeys.indexOf(activeKey);
+    const newIndex = orderedKeys.indexOf(overKey);
     if (oldIndex === -1 || newIndex === -1) return;
 
     const newOrder = arrayMove(orderedKeys, oldIndex, newIndex);

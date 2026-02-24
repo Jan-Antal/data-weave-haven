@@ -69,20 +69,26 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
   const { projectInfo: { isVisible } } = useAllColumnVisibility();
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck();
-  const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, updateOrder } = useColumnLabels("project-info");
+  const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("project-info");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns, canDeleteProject, isViewer } = useAuth();
 
-  // Persisted order from DB
+  // Persisted group order from DB (for side panel)
   const orderedNativeKeys = useMemo(() => getOrderedKeys(PROJECT_INFO_NATIVE), [getOrderedKeys]);
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
 
-  // Local draft order for edit mode — all visible non-locked keys in one flat list
-  const allVisibleKeys = useMemo(() => {
+  // All visible keys in their group order
+  const allVisibleGroupOrder = useMemo(() => {
     const native = orderedNativeKeys.filter((k) => isVisible(k));
     const cross = orderedAllKeys.filter((k) => !NATIVE_KEYS.includes(k) && isVisible(k));
     return [...native, ...cross];
   }, [orderedNativeKeys, orderedAllKeys, isVisible]);
+
+  // Display order (independent horizontal table order)
+  const allVisibleKeys = useMemo(
+    () => getDisplayOrderedKeys(allVisibleGroupOrder),
+    [getDisplayOrderedKeys, allVisibleGroupOrder]
+  );
 
   const [localOrder, setLocalOrder] = useState<string[]>(allVisibleKeys);
 
@@ -93,14 +99,14 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
 
   const handleToggleEditMode = useCallback(async () => {
     if (editMode) {
-      // Exiting edit mode — save the order to DB, await so query refetches before state resets
-      await updateOrder(localOrder);
+      // Exiting edit mode — save the display order to DB
+      await updateDisplayOrder(localOrder);
     } else {
       // Entering edit mode — snapshot current order
       setLocalOrder(allVisibleKeys);
     }
     setEditMode(!editMode);
-  }, [editMode, localOrder, allVisibleKeys, updateOrder]);
+  }, [editMode, localOrder, allVisibleKeys, updateDisplayOrder]);
 
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 

@@ -44,7 +44,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const updateProject = useUpdateProject();
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const { tpvStatus: { isVisible } } = useAllColumnVisibility();
-  const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, updateOrder } = useColumnLabels("tpv-status");
+  const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("tpv-status");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns } = useAuth();
   const [activeProject, setActiveProject] = useState<{ projectId: string; projectName: string } | null>(null);
@@ -52,11 +52,16 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const orderedNativeKeys = useMemo(() => getOrderedKeys(TPV_NATIVE), [getOrderedKeys]);
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
 
-  const allVisibleKeys = useMemo(() => {
+  const allVisibleGroupOrder = useMemo(() => {
     const native = orderedNativeKeys.filter((k) => isVisible(k));
     const cross = orderedAllKeys.filter((k) => !NATIVE_KEYS.includes(k) && isVisible(k));
     return [...native, ...cross];
   }, [orderedNativeKeys, orderedAllKeys, isVisible]);
+
+  const allVisibleKeys = useMemo(
+    () => getDisplayOrderedKeys(allVisibleGroupOrder),
+    [getDisplayOrderedKeys, allVisibleGroupOrder]
+  );
 
   const [localOrder, setLocalOrder] = useState<string[]>(allVisibleKeys);
 
@@ -66,12 +71,12 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
 
   const handleToggleEditMode = useCallback(async () => {
     if (editMode) {
-      await updateOrder(localOrder);
+      await updateDisplayOrder(localOrder);
     } else {
       setLocalOrder(allVisibleKeys);
     }
     setEditMode(!editMode);
-  }, [editMode, localOrder, allVisibleKeys, updateOrder]);
+  }, [editMode, localOrder, allVisibleKeys, updateDisplayOrder]);
 
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 

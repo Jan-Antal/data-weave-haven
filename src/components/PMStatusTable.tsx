@@ -200,18 +200,23 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { pmStatus: { isVisible } } = useAllColumnVisibility();
-  const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, updateOrder } = useColumnLabels("pm-status");
+  const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("pm-status");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns } = useAuth();
 
   const orderedNativeKeys = useMemo(() => getOrderedKeys(PM_NATIVE), [getOrderedKeys]);
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
 
-  const allVisibleKeys = useMemo(() => {
+  const allVisibleGroupOrder = useMemo(() => {
     const native = orderedNativeKeys.filter((k) => isVisible(k));
     const cross = orderedAllKeys.filter((k) => !NATIVE_KEYS.includes(k) && isVisible(k));
     return [...native, ...cross];
   }, [orderedNativeKeys, orderedAllKeys, isVisible]);
+
+  const allVisibleKeys = useMemo(
+    () => getDisplayOrderedKeys(allVisibleGroupOrder),
+    [getDisplayOrderedKeys, allVisibleGroupOrder]
+  );
 
   const [localOrder, setLocalOrder] = useState<string[]>(allVisibleKeys);
 
@@ -221,12 +226,12 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
 
   const handleToggleEditMode = useCallback(async () => {
     if (editMode) {
-      await updateOrder(localOrder);
+      await updateDisplayOrder(localOrder);
     } else {
       setLocalOrder(allVisibleKeys);
     }
     setEditMode(!editMode);
-  }, [editMode, localOrder, allVisibleKeys, updateOrder]);
+  }, [editMode, localOrder, allVisibleKeys, updateDisplayOrder]);
 
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 

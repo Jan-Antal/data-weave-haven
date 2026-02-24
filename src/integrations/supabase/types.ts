@@ -19,6 +19,7 @@ export type Database = {
           column_key: string
           created_at: string
           custom_label: string
+          display_order: number | null
           id: string
           sort_order: number | null
           tab: string
@@ -29,6 +30,7 @@ export type Database = {
           column_key: string
           created_at?: string
           custom_label: string
+          display_order?: number | null
           id?: string
           sort_order?: number | null
           tab: string
@@ -39,6 +41,7 @@ export type Database = {
           column_key?: string
           created_at?: string
           custom_label?: string
+          display_order?: number | null
           id?: string
           sort_order?: number | null
           tab?: string
