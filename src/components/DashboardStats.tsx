@@ -224,7 +224,7 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
               <p style={{ fontSize: 10 }} className="uppercase tracking-wider">
                 <span style={{ color: "#999" }}>Celková hodnota</span>
               </p>
-              <p className="font-serif font-bold mt-1" style={{ fontSize: 28 }}>{formatNumber(totalValueCZK)} Kč</p>
+              <p className="font-serif font-bold mt-1 whitespace-nowrap" style={{ fontSize: "clamp(18px, 2vw, 28px)" }}>{formatNumber(totalValueCZK)} Kč</p>
               <p style={{ fontSize: 10, color: "#aaa" }} className="mt-0.5">aktivní, v CZK</p>
             </div>
           </div>
