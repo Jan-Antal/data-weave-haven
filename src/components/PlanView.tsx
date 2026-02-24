@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { PlanDateEditDialog } from "@/components/PlanDateEditDialog";
 import { useProjects, Project } from "@/hooks/useProjects";
 import { useProjectStages, ProjectStage } from "@/hooks/useProjectStages";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
@@ -519,6 +520,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
   const zoom = zoomProp ?? ("3M" as ZoomLevel);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [containerWidth, setContainerWidth] = useState(0);
+  const [editProject, setEditProject] = useState<Project | null>(null);
 
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
@@ -663,6 +665,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
   const weekFontClass = zoom === "3M" ? "text-[9px] text-muted-foreground/60" : "text-[8px] text-muted-foreground/40";
 
   return (
+    <>
     <div className="rounded-lg border bg-card overflow-hidden">
 
       <div className="flex" style={{ height: "calc(100vh - 340px)", minHeight: 400 }}>
@@ -694,9 +697,9 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                   >
                     <ExpandButton projectId={p.project_id} expanded={isExp} onClick={() => {}} />
                   </div>
-                  <span className="text-xs font-mono text-muted-foreground whitespace-nowrap shrink-0" style={{ width: 80 }}>{p.project_id}</span>
+                  <span className="text-xs font-mono text-muted-foreground whitespace-nowrap shrink-0 cursor-pointer hover:underline" style={{ width: 80 }} onClick={() => setEditProject(p)}>{p.project_id}</span>
                   {warnings.length > 0 && <WarningIcon warnings={warnings} />}
-                  <span className="text-xs font-medium truncate flex-1 min-w-0" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.project_name}</span>
+                  <span className="text-xs font-medium truncate flex-1 min-w-0 cursor-pointer hover:underline" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} onClick={() => setEditProject(p)}>{p.project_name}</span>
                 </div>
                 {isExp && <SubstageLeftRows projectId={p.project_id} project={p} statusColorMap={statusColorMap} />}
               </div>
@@ -841,6 +844,13 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
         </div>
       </div>
     </div>
+
+      <PlanDateEditDialog
+        project={editProject}
+        open={!!editProject}
+        onOpenChange={(open) => { if (!open) setEditProject(null); }}
+      />
+    </>
   );
 }
 
