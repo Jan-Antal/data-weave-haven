@@ -17,16 +17,32 @@ const PHASE_COLORS = {
   dokonceno: "#adb5bd",
 };
 
+const MILESTONE_COLORS = {
+  tpv_date: "#a8d5b5",
+  expedice: "#f9c89a",
+  predani: "#f2a993",
+};
+
+const PHASE_COLORS_LIGHT = {
+  konstrukce: "#a8d5b5",
+  vyroba: "#f9c89a",
+  montaz: "#f2a993",
+  dokonceno: "#d6dadd",
+};
+
+const MILESTONE_COLORS_SOLID = {
+  tpv_date: "#52b788",
+  expedice: "#f4a261",
+  predani: "#e76f51",
+};
+
 const PHASE_LABELS: Record<string, string> = {
   [PHASE_COLORS.konstrukce]: "Konstrukce",
   [PHASE_COLORS.vyroba]: "Výroba",
   [PHASE_COLORS.montaz]: "Montáž",
-};
-
-const MILESTONE_COLORS = {
-  tpv_date: "#52b788",
-  expedice: "#f4a261",
-  predani: "#e76f51",
+  [PHASE_COLORS_LIGHT.konstrukce]: "Konstrukce",
+  [PHASE_COLORS_LIGHT.vyroba]: "Výroba",
+  [PHASE_COLORS_LIGHT.montaz]: "Montáž",
 };
 
 const CZECH_MONTHS = [
@@ -155,6 +171,8 @@ function getBarDataFromFields(
   expedice: string | null | undefined,
   predani: string | null | undefined,
   _statusColorMap: Record<string, string>,
+  phaseColors = PHASE_COLORS,
+  milestoneColors = MILESTONE_COLORS,
 ): BarData {
   const S = parseDateField(datumObjednavky);
   const E = parseDateField(datumSmluvni);
@@ -173,7 +191,7 @@ function getBarDataFromFields(
 
   // CASE 1
   if (!S) {
-    dItems.push({ date: E, color: MILESTONE_COLORS.predani, name: "Předání" });
+    dItems.push({ date: E, color: milestoneColors.predani, name: "Předání" });
     return { ...empty, diamonds: makeDiamonds(dItems) };
   }
 
@@ -181,24 +199,24 @@ function getBarDataFromFields(
 
   // CASE 2
   if (!TPV && !EXP && !PRE) {
-    dItems.push({ date: safeE, color: MILESTONE_COLORS.predani, name: "Předání" });
-    return { segments: [{ start: S, end: safeE, color: PHASE_COLORS.dokonceno }], diamonds: makeDiamonds(dItems), hasWarning, warnings };
+    dItems.push({ date: safeE, color: milestoneColors.predani, name: "Předání" });
+    return { segments: [{ start: S, end: safeE, color: phaseColors.dokonceno }], diamonds: makeDiamonds(dItems), hasWarning, warnings };
   }
 
   // CASE 7
   if (!TPV && !EXP && PRE) {
-    dItems.push({ date: PRE, color: MILESTONE_COLORS.predani, name: "Předání" });
-    return { segments: [{ start: S, end: safeE, color: PHASE_COLORS.dokonceno }], diamonds: makeDiamonds(dItems), hasWarning, warnings };
+    dItems.push({ date: PRE, color: milestoneColors.predani, name: "Předání" });
+    return { segments: [{ start: S, end: safeE, color: phaseColors.dokonceno }], diamonds: makeDiamonds(dItems), hasWarning, warnings };
   }
 
   // CASE 6
   if (!TPV && EXP && !PRE) {
-    dItems.push({ date: EXP, color: MILESTONE_COLORS.expedice, name: "Expedice" });
-    dItems.push({ date: safeE, color: MILESTONE_COLORS.predani, name: "Předání" });
+    dItems.push({ date: EXP, color: milestoneColors.expedice, name: "Expedice" });
+    dItems.push({ date: safeE, color: milestoneColors.predani, name: "Předání" });
     return {
       segments: [
-        { start: S, end: EXP, color: PHASE_COLORS.vyroba },
-        { start: EXP, end: safeE, color: PHASE_COLORS.montaz },
+        { start: S, end: EXP, color: phaseColors.vyroba },
+        { start: EXP, end: safeE, color: phaseColors.montaz },
       ],
       diamonds: makeDiamonds(dItems), hasWarning, warnings,
     };
@@ -206,12 +224,12 @@ function getBarDataFromFields(
 
   // CASE 3
   if (TPV && !EXP && !PRE) {
-    dItems.push({ date: TPV, color: MILESTONE_COLORS.tpv_date, name: "TPV" });
-    dItems.push({ date: safeE, color: MILESTONE_COLORS.predani, name: "Předání" });
+    dItems.push({ date: TPV, color: milestoneColors.tpv_date, name: "TPV" });
+    dItems.push({ date: safeE, color: milestoneColors.predani, name: "Předání" });
     return {
       segments: [
-        { start: S, end: TPV, color: PHASE_COLORS.konstrukce },
-        { start: TPV, end: safeE, color: PHASE_COLORS.dokonceno },
+        { start: S, end: TPV, color: phaseColors.konstrukce },
+        { start: TPV, end: safeE, color: phaseColors.dokonceno },
       ],
       diamonds: makeDiamonds(dItems), hasWarning, warnings,
     };
@@ -219,14 +237,14 @@ function getBarDataFromFields(
 
   // CASE 4
   if (TPV && EXP && !PRE) {
-    dItems.push({ date: TPV, color: MILESTONE_COLORS.tpv_date, name: "TPV" });
-    dItems.push({ date: EXP, color: MILESTONE_COLORS.expedice, name: "Expedice" });
-    dItems.push({ date: safeE, color: MILESTONE_COLORS.predani, name: "Předání" });
+    dItems.push({ date: TPV, color: milestoneColors.tpv_date, name: "TPV" });
+    dItems.push({ date: EXP, color: milestoneColors.expedice, name: "Expedice" });
+    dItems.push({ date: safeE, color: milestoneColors.predani, name: "Předání" });
     return {
       segments: [
-        { start: S, end: TPV, color: PHASE_COLORS.konstrukce },
-        { start: TPV, end: EXP, color: PHASE_COLORS.vyroba },
-        { start: EXP, end: safeE, color: PHASE_COLORS.montaz },
+        { start: S, end: TPV, color: phaseColors.konstrukce },
+        { start: TPV, end: EXP, color: phaseColors.vyroba },
+        { start: EXP, end: safeE, color: phaseColors.montaz },
       ],
       diamonds: makeDiamonds(dItems), hasWarning, warnings,
     };
@@ -234,15 +252,15 @@ function getBarDataFromFields(
 
   // CASE 5
   if (TPV && EXP && PRE) {
-    dItems.push({ date: TPV, color: MILESTONE_COLORS.tpv_date, name: "TPV" });
-    dItems.push({ date: EXP, color: MILESTONE_COLORS.expedice, name: "Expedice" });
-    dItems.push({ date: PRE, color: MILESTONE_COLORS.predani, name: "Předání" });
+    dItems.push({ date: TPV, color: milestoneColors.tpv_date, name: "TPV" });
+    dItems.push({ date: EXP, color: milestoneColors.expedice, name: "Expedice" });
+    dItems.push({ date: PRE, color: milestoneColors.predani, name: "Předání" });
     return {
       segments: [
-        { start: S, end: TPV, color: PHASE_COLORS.konstrukce },
-        { start: TPV, end: EXP, color: PHASE_COLORS.vyroba },
-        { start: EXP, end: PRE, color: PHASE_COLORS.montaz },
-        { start: PRE, end: safeE, color: PHASE_COLORS.dokonceno },
+        { start: S, end: TPV, color: phaseColors.konstrukce },
+        { start: TPV, end: EXP, color: phaseColors.vyroba },
+        { start: EXP, end: PRE, color: phaseColors.montaz },
+        { start: PRE, end: safeE, color: phaseColors.dokonceno },
       ],
       diamonds: makeDiamonds(dItems), hasWarning, warnings,
     };
@@ -251,13 +269,13 @@ function getBarDataFromFields(
   // Remaining edge cases
   const segs: Segment[] = [];
   const pts: Date[] = [S];
-  if (TPV) { dItems.push({ date: TPV, color: MILESTONE_COLORS.tpv_date, name: "TPV" }); pts.push(TPV); }
-  if (EXP) { dItems.push({ date: EXP, color: MILESTONE_COLORS.expedice, name: "Expedice" }); pts.push(EXP); }
-  if (PRE) { dItems.push({ date: PRE, color: MILESTONE_COLORS.predani, name: "Předání" }); pts.push(PRE); }
+  if (TPV) { dItems.push({ date: TPV, color: milestoneColors.tpv_date, name: "TPV" }); pts.push(TPV); }
+  if (EXP) { dItems.push({ date: EXP, color: milestoneColors.expedice, name: "Expedice" }); pts.push(EXP); }
+  if (PRE) { dItems.push({ date: PRE, color: milestoneColors.predani, name: "Předání" }); pts.push(PRE); }
   pts.push(safeE);
   pts.sort((a, b) => a.getTime() - b.getTime());
 
-  const colorSeq = [PHASE_COLORS.konstrukce, PHASE_COLORS.vyroba, PHASE_COLORS.montaz, PHASE_COLORS.dokonceno];
+  const colorSeq = [phaseColors.konstrukce, phaseColors.vyroba, phaseColors.montaz, phaseColors.dokonceno];
   for (let i = 0; i < pts.length - 1; i++) {
     if (pts[i].getTime() === pts[i + 1].getTime()) continue;
     segs.push({ start: pts[i], end: pts[i + 1], color: colorSeq[Math.min(i, 3)] });
@@ -276,10 +294,9 @@ function getProjectBarData(p: Project, statusColorMap: Record<string, string>): 
 }
 
 function getStageBarData(stage: ProjectStage, project: Project, statusColorMap: Record<string, string>): BarData {
-  // Use stage's own dates, falling back to parent's datum_objednavky for start and datum_smluvni for end
   const datumObjednavky = stage.start_date ?? project.datum_objednavky;
   const datumSmluvni = stage.end_date ?? stage.datum_smluvni ?? project.datum_smluvni;
-  return getBarDataFromFields(datumObjednavky, datumSmluvni, stage.tpv_date, stage.expedice, stage.predani, statusColorMap);
+  return getBarDataFromFields(datumObjednavky, datumSmluvni, stage.tpv_date, stage.expedice, stage.predani, statusColorMap, PHASE_COLORS_LIGHT, MILESTONE_COLORS_SOLID);
 }
 
 // ── Milestone Diamond ───────────────────────────────────────────────
@@ -295,28 +312,15 @@ function MilestoneDiamond({
   // Label above bar: row 0 → top 0, row 1 → top 10
   const labelTop = (labelRow ?? 0) === 1 ? 10 : 0;
 
-  const diamondStyle: React.CSSProperties = small
-    ? {
-        left: x - size / 2,
-        top: midY - size / 2 + yOffset,
-        width: size,
-        height: size,
-        backgroundColor: color,
-        opacity: 0.85,
-        transform: "rotate(45deg)",
-        zIndex: 10,
-      }
-    : {
-        left: x - size / 2,
-        top: midY - size / 2 + yOffset,
-        width: size,
-        height: size,
-        backgroundColor: "white",
-        border: `2.5px solid ${color}`,
-        boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
-        transform: "rotate(45deg)",
-        zIndex: 10,
-      };
+  const diamondStyle: React.CSSProperties = {
+    left: x - size / 2,
+    top: midY - size / 2 + yOffset,
+    width: size,
+    height: size,
+    backgroundColor: color,
+    transform: "rotate(45deg)",
+    zIndex: 10,
+  };
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -459,7 +463,7 @@ function SubstageRow({
               position: "absolute",
               left: x, top: midY - SUBSTAGE_BAR_HEIGHT / 2,
               width: Math.max(w, 4), height: SUBSTAGE_BAR_HEIGHT,
-              background: seg.color, opacity: 0.65,
+              background: seg.color,
               zIndex: 2, borderRadius: 4,
             }}
           >
