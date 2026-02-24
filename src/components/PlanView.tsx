@@ -545,7 +545,30 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
 
   const monthsHalf = ZOOM_MONTHS[zoom] / 2;
   const timelineStart = useMemo(() => startOfMonth(addMonths(today, -monthsHalf)), [today, monthsHalf]);
-  const timelineEnd = useMemo(() => addMonths(today, monthsHalf + 1), [today, monthsHalf]);
+
+  // For 3M: extend end to cover all project dates
+  const maxProjectDate = useMemo(() => {
+    if (zoom !== "3M") return null;
+    let max: Date | null = null;
+    for (const p of sorted) {
+      const fields = [p.datum_smluvni, p.datum_objednavky, p.tpv_date, p.expedice, p.predani];
+      for (const f of fields) {
+        const d = parseDateField(f);
+        if (d && (!max || d > max)) max = d;
+      }
+    }
+    return max;
+  }, [sorted, zoom]);
+
+  const timelineEnd = useMemo(() => {
+    const defaultEnd = addMonths(today, monthsHalf + 1);
+    if (zoom === "3M" && maxProjectDate && maxProjectDate > defaultEnd) {
+      // Extend to one month past the furthest date
+      return addMonths(startOfMonth(maxProjectDate), 2);
+    }
+    return defaultEnd;
+  }, [today, monthsHalf, zoom, maxProjectDate]);
+
   const totalDays = differenceInDays(timelineEnd, timelineStart);
 
   // For 1R, compute dayPx to fit screen; otherwise use fixed
