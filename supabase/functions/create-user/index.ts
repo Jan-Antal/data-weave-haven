@@ -53,10 +53,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { email, password, full_name, role } = await req.json();
+    const { email, full_name, role } = await req.json();
 
-    // Validate required fields
-    if (!email || !password || !full_name || !role) {
+    // Validate required fields (no password needed — invite flow)
+    if (!email || !full_name || !role) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -66,14 +66,6 @@ Deno.serve(async (req) => {
     // Validate email
     if (typeof email !== "string" || !EMAIL_REGEX.test(email) || email.length > 255) {
       return new Response(JSON.stringify({ error: "Invalid email format" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Validate password
-    if (typeof password !== "string" || password.length < 8 || password.length > 72) {
-      return new Response(JSON.stringify({ error: "Password must be between 8 and 72 characters" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -96,23 +88,35 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Create user with admin API
-    const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name: trimmedName },
+    // Invite user by email (sends invite email, no password needed)
+    const { data: newUser, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
+      data: { full_name: trimmedName },
+      redirectTo: "https://id-preview--ce3e87ee-9f18-44df-921b-691cc44882ec.lovable.app/accept-invite",
     });
 
-    if (createError) {
-      console.error("User creation failed:", createError);
-      return new Response(JSON.stringify({ error: "Unable to create user" }), {
+    if (inviteError) {
+      console.error("User invite failed:", inviteError);
+      return new Response(JSON.stringify({ error: "Unable to invite user: " + inviteError.message }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Assign role
+    // Save profile immediately
+    const { error: profileError } = await adminClient
+      .from("profiles")
+      .upsert({
+        id: newUser.user.id,
+        email: email,
+        full_name: trimmedName,
+        is_active: true,
+      }, { onConflict: "id" });
+
+    if (profileError) {
+      console.error("Profile save failed:", profileError);
+    }
+
+    // Assign role immediately
     const { error: roleError } = await adminClient
       .from("user_roles")
       .insert({ user_id: newUser.user.id, role });
