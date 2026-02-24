@@ -291,9 +291,32 @@ function MilestoneDiamond({
   labelRow?: number;
 }) {
   const x = dayOffset(date, origin, dayPx);
-  const size = small ? 7 : DIAMOND_SIZE;
+  const size = small ? 8 : 12;
   // Label above bar: row 0 → top 0, row 1 → top 10
   const labelTop = (labelRow ?? 0) === 1 ? 10 : 0;
+
+  const diamondStyle: React.CSSProperties = small
+    ? {
+        left: x - size / 2,
+        top: midY - size / 2 + yOffset,
+        width: size,
+        height: size,
+        backgroundColor: color,
+        opacity: 0.85,
+        transform: "rotate(45deg)",
+        zIndex: 10,
+      }
+    : {
+        left: x - size / 2,
+        top: midY - size / 2 + yOffset,
+        width: size,
+        height: size,
+        backgroundColor: "white",
+        border: `2.5px solid ${color}`,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
+        transform: "rotate(45deg)",
+        zIndex: 10,
+      };
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -301,15 +324,7 @@ function MilestoneDiamond({
         <TooltipTrigger asChild>
           <div
             className="absolute"
-            style={{
-              left: x - size / 2,
-              top: midY - size / 2 + yOffset,
-              width: size,
-              height: size,
-              backgroundColor: color,
-              transform: "rotate(45deg)",
-              zIndex: 10,
-            }}
+            style={diamondStyle}
           />
         </TooltipTrigger>
         <TooltipContent side="top" className="text-xs">
