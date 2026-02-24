@@ -47,6 +47,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
 
   const renderStageCell = (key: string) => {
     switch (key) {
+      case "datum_smluvni": return <TableCell key={key}><span className="text-xs text-muted-foreground px-1">{project.datum_smluvni || "—"}</span></TableCell>;
       case "pm": return <TableCell key={key}><InlineEditableCell value={stage.pm} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} /></TableCell>;
       case "status": return <TableCell key={key}><InlineEditableCell value={stage.status} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={stage.status ? <StatusBadge status={stage.status} /> : "—"} readOnly={!canEdit} /></TableCell>;
       case "risk": return <TableCell key={key}><InlineEditableCell value={stage.risk} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("risk", val)} displayValue={<RiskBadge level={stage.risk || ""} />} readOnly={!canEdit} /></TableCell>;

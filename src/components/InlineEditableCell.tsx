@@ -190,6 +190,7 @@ export function InlineEditableCell({
     if (type === "date") {
       const dateStr = String(value ?? "");
       const selected = parseAppDate(dateStr);
+      const defaultMonth = selected ?? new Date();
 
       return (
         <Popover open={true} onOpenChange={(open) => { if (!open) setEditing(false); }}>
@@ -203,6 +204,7 @@ export function InlineEditableCell({
             <Calendar
               mode="single"
               selected={selected}
+              defaultMonth={defaultMonth}
               onSelect={(d) => {
                 if (d) {
                   const formatted = formatAppDate(d);
@@ -213,6 +215,20 @@ export function InlineEditableCell({
               }}
               className={cn("p-3 pointer-events-auto")}
             />
+            {selected && (
+              <div className="border-t px-3 py-2">
+                <button
+                  type="button"
+                  className="text-xs text-destructive hover:underline"
+                  onClick={() => {
+                    setEditing(false);
+                    onSave("");
+                  }}
+                >
+                  Smazat datum
+                </button>
+              </div>
+            )}
           </PopoverContent>
         </Popover>
       );
