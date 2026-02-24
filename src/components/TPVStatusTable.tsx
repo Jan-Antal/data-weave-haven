@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from "@/components/ui/table";
 import { RiskBadge, ProgressBar } from "./StatusBadge";
 import { InlineEditableCell } from "./InlineEditableCell";
@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
 import { useAllColumnVisibility, TPV_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
 import { getColumnStyle, renderColumnHeader, renderColumnCell } from "./CrossTabColumns";
+import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...TPV_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
@@ -43,13 +44,36 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const updateProject = useUpdateProject();
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const { tpvStatus: { isVisible } } = useAllColumnVisibility();
-  const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys } = useColumnLabels("tpv-status");
+  const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, updateOrder } = useColumnLabels("tpv-status");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns } = useAuth();
   const [activeProject, setActiveProject] = useState<{ projectId: string; projectName: string } | null>(null);
 
   const orderedNativeKeys = useMemo(() => getOrderedKeys(TPV_NATIVE), [getOrderedKeys]);
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
+
+  const allVisibleKeys = useMemo(() => {
+    const native = orderedNativeKeys.filter((k) => isVisible(k));
+    const cross = orderedAllKeys.filter((k) => !NATIVE_KEYS.includes(k) && isVisible(k));
+    return [...native, ...cross];
+  }, [orderedNativeKeys, orderedAllKeys, isVisible]);
+
+  const [localOrder, setLocalOrder] = useState<string[]>(allVisibleKeys);
+
+  useEffect(() => {
+    if (!editMode) setLocalOrder(allVisibleKeys);
+  }, [allVisibleKeys, editMode]);
+
+  const handleToggleEditMode = useCallback(() => {
+    if (editMode) {
+      updateOrder(localOrder);
+    } else {
+      setLocalOrder(allVisibleKeys);
+    }
+    setEditMode(!editMode);
+  }, [editMode, localOrder, allVisibleKeys, updateOrder]);
+
+  const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 
   const save = (id: string, field: string, value: string, oldValue: string) => {
     updateProject.mutate({ id, field, value, oldValue });
@@ -79,10 +103,14 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
     editMode,
     updateLabel,
     updateWidth,
+    ...(editMode ? {
+      dragProps: getDragProps(key),
+      dropIndicator: dropTarget?.key === key ? dropTarget.side : null,
+      isDragging: dragKey === key,
+    } : {}),
   });
 
-  const visibleNative = orderedNativeKeys.filter((k) => v(k));
-  const visibleCross = orderedAllKeys.filter((k) => !NATIVE_KEYS.includes(k) && v(k));
+  const renderKeys = editMode ? localOrder : allVisibleKeys;
 
   return (
     <div>
@@ -98,9 +126,8 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
               <TableHead style={{ minWidth: 32, width: 32 }} className="shrink-0"></TableHead>
               {v("project_id") && renderColumnHeader(headerProps("project_id"))}
               {v("project_name") && renderColumnHeader(headerProps("project_name"))}
-              {visibleNative.map((key) => renderColumnHeader(headerProps(key)))}
-              {visibleCross.map((key) => renderColumnHeader(headerProps(key)))}
-              <ColumnVisibilityToggle tabKey="tpvStatus" editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
+              {renderKeys.map((key) => renderColumnHeader(headerProps(key)))}
+              <ColumnVisibilityToggle tabKey="tpvStatus" editMode={editMode} onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined} />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -114,8 +141,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                 </TableCell>
                 {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
                 {v("project_name") && <TableCell><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-                {visibleNative.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels }))}
-                {visibleCross.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels }))}
+                {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels }))}
               </TableRow>
             ))}
           </TableBody>

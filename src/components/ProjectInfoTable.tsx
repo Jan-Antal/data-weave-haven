@@ -29,6 +29,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
 import { useAllColumnVisibility, PROJECT_INFO_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
 import { getColumnStyle, renderColumnHeader, renderColumnCell } from "./CrossTabColumns";
+import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...PROJECT_INFO_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
@@ -68,14 +69,40 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
   const { projectInfo: { isVisible } } = useAllColumnVisibility();
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck();
-  const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys } = useColumnLabels("project-info");
+  const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, updateOrder } = useColumnLabels("project-info");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns, canDeleteProject, isViewer } = useAuth();
 
-  // Get ordered keys for this tab's native columns (excluding locked project_id, project_name)
+  // Persisted order from DB
   const orderedNativeKeys = useMemo(() => getOrderedKeys(PROJECT_INFO_NATIVE), [getOrderedKeys]);
-  // Get ordered keys for ALL columns to determine cross-tab order
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
+
+  // Local draft order for edit mode — all visible non-locked keys in one flat list
+  const allVisibleKeys = useMemo(() => {
+    const native = orderedNativeKeys.filter((k) => isVisible(k));
+    const cross = orderedAllKeys.filter((k) => !NATIVE_KEYS.includes(k) && isVisible(k));
+    return [...native, ...cross];
+  }, [orderedNativeKeys, orderedAllKeys, isVisible]);
+
+  const [localOrder, setLocalOrder] = useState<string[]>(allVisibleKeys);
+
+  // Sync local order when not in edit mode or when visible keys change
+  useEffect(() => {
+    if (!editMode) setLocalOrder(allVisibleKeys);
+  }, [allVisibleKeys, editMode]);
+
+  const handleToggleEditMode = useCallback(() => {
+    if (editMode) {
+      // Exiting edit mode — save the order to DB
+      updateOrder(localOrder);
+    } else {
+      // Entering edit mode — snapshot current order
+      setLocalOrder(allVisibleKeys);
+    }
+    setEditMode(!editMode);
+  }, [editMode, localOrder, allVisibleKeys, updateOrder]);
+
+  const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 
   useEffect(() => {
     const handleOpenAdd = () => setAddOpen(true);
@@ -133,7 +160,6 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Načítání...</div>;
 
   const v = isVisible;
-  const cs = (key: string) => getColumnStyle(key, getWidth(key));
 
   const headerProps = (key: string) => ({
     colKey: key,
@@ -145,12 +171,15 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     editMode,
     updateLabel,
     updateWidth,
+    ...(editMode ? {
+      dragProps: getDragProps(key),
+      dropIndicator: dropTarget?.key === key ? dropTarget.side : null,
+      isDragging: dragKey === key,
+    } : {}),
   });
 
-  // Visible native columns in persisted order
-  const visibleNative = orderedNativeKeys.filter((k) => v(k));
-  // Visible cross-tab columns in persisted order
-  const visibleCross = orderedAllKeys.filter((k) => !NATIVE_KEYS.includes(k) && v(k));
+  // In edit mode use local order, otherwise use DB order
+  const renderKeys = editMode ? localOrder : allVisibleKeys;
 
   return (
     <div>
@@ -166,9 +195,8 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
               <TableHead style={{ minWidth: 32, width: 32 }} className="shrink-0"></TableHead>
               {v("project_id") && renderColumnHeader(headerProps("project_id"))}
               {v("project_name") && renderColumnHeader(headerProps("project_name"))}
-              {visibleNative.map((key) => renderColumnHeader(headerProps(key)))}
-              {visibleCross.map((key) => renderColumnHeader(headerProps(key)))}
-              <ColumnVisibilityToggle tabKey="projectInfo" editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
+              {renderKeys.map((key) => renderColumnHeader(headerProps(key)))}
+              <ColumnVisibilityToggle tabKey="projectInfo" editMode={editMode} onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined} />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -181,8 +209,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                   </TableCell>
                 )}
                 {v("project_name") && <TableCell><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-                {visibleNative.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, saveCurrency }))}
-                {visibleCross.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, saveCurrency }))}
+                {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, saveCurrency }))}
               </TableRow>
             ))}
           </TableBody>
