@@ -91,10 +91,10 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     if (!editMode) setLocalOrder(allVisibleKeys);
   }, [allVisibleKeys, editMode]);
 
-  const handleToggleEditMode = useCallback(() => {
+  const handleToggleEditMode = useCallback(async () => {
     if (editMode) {
-      // Exiting edit mode — save the order to DB
-      updateOrder(localOrder);
+      // Exiting edit mode — save the order to DB, await so query refetches before state resets
+      await updateOrder(localOrder);
     } else {
       // Entering edit mode — snapshot current order
       setLocalOrder(allVisibleKeys);
