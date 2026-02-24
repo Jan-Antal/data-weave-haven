@@ -219,9 +219,9 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
     if (!editMode) setLocalOrder(allVisibleKeys);
   }, [allVisibleKeys, editMode]);
 
-  const handleToggleEditMode = useCallback(() => {
+  const handleToggleEditMode = useCallback(async () => {
     if (editMode) {
-      updateOrder(localOrder);
+      await updateOrder(localOrder);
     } else {
       setLocalOrder(allVisibleKeys);
     }

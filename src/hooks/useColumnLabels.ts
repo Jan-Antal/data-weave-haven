@@ -137,7 +137,7 @@ export function useColumnLabels(tab: string) {
         }
       });
       await Promise.all(promises);
-      qc.invalidateQueries({ queryKey: ["column-labels", tab] });
+      await qc.invalidateQueries({ queryKey: ["column-labels", tab] });
     },
     [data, tab, qc]
   );
