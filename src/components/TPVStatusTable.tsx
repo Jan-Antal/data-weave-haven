@@ -103,7 +103,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
               {v("hodiny_tpv") && <SortableHeader label="Hodiny TPV" column="hodiny_tpv" {...sh} style={colStyle("hodiny_tpv")} {...editProps("hodiny_tpv", "Hodiny TPV")} />}
               {v("percent_tpv") && <SortableHeader label="% Rozpracovanost" column="percent_tpv" {...sh} style={colStyle("percent_tpv")} {...editProps("percent_tpv", "% Rozpracovanost")} />}
               {v("tpv_poznamka") && <SortableHeader label="Poznámka TPV" column="tpv_poznamka" {...sh} style={colStyle("tpv_poznamka")} {...editProps("tpv_poznamka", "Poznámka TPV")} />}
-              <ColumnVisibilityToggle editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
+              <ColumnVisibilityToggle tabKey="tpvStatus" editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
             </TableRow>
           </TableHeader>
           <TableBody>

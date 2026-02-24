@@ -287,7 +287,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
               {v("montaz") && <SortableHeader label="Montáž" column="montaz" {...sh} style={colStyle("montaz")} {...editProps("montaz", "Montáž")} />}
               {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} style={colStyle("predani")} {...editProps("predani", "Předání")} />}
               {v("pm_poznamka") && <SortableHeader label="Poznámka PM" column="pm_poznamka" {...sh} style={colStyle("pm_poznamka")} {...editProps("pm_poznamka", "Poznámka PM")} />}
-              <ColumnVisibilityToggle editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
+              <ColumnVisibilityToggle tabKey="pmStatus" editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
             </TableRow>
           </TableHeader>
           <TableBody>
