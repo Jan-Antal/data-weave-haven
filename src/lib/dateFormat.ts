@@ -26,6 +26,13 @@ export function formatAppDate(d: Date): string {
 /** Try to parse a date string using known formats */
 export function parseAppDate(dateStr: string): Date | undefined {
   if (!dateStr) return undefined;
+
+  // Handle ISO timestamp with timezone (Supabase format): 2026-02-15T23:00:00.000Z
+  if (dateStr.includes('T')) {
+    const d = new Date(dateStr);
+    return isValid(d) && d.getFullYear() > 1900 ? d : undefined;
+  }
+
   for (const fmt of PARSE_FORMATS) {
     try {
       const d = parse(dateStr, fmt, new Date());
