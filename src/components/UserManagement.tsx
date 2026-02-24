@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Trash2, KeyRound, ArrowRightLeft } from "lucide-react";
+import { Plus, Trash2, KeyRound, ArrowRightLeft, Link2 } from "lucide-react";
 import type { AppRole } from "@/hooks/useAuth";
 
 interface UserRow {
@@ -52,6 +52,26 @@ export function UserManagement({ open, onOpenChange }: Props) {
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferTarget, setTransferTarget] = useState<string>("");
   const [transferSubmitting, setTransferSubmitting] = useState(false);
+  const [copyingLinkId, setCopyingLinkId] = useState<string | null>(null);
+
+  const handleCopyInviteLink = async (userId: string) => {
+    setCopyingLinkId(userId);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-invite-link", {
+        body: { user_id: userId },
+      });
+      if (error || data?.error) {
+        toast({ title: "Chyba", description: data?.error || error?.message, variant: "destructive" });
+      } else if (data?.link) {
+        await navigator.clipboard.writeText(data.link);
+        toast({ title: "Odkaz zkopírován do schránky" });
+      }
+    } catch (e: any) {
+      toast({ title: "Chyba", description: e.message, variant: "destructive" });
+    } finally {
+      setCopyingLinkId(null);
+    }
+  };
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -103,11 +123,16 @@ export function UserManagement({ open, onOpenChange }: Props) {
       } else if (data?.error) {
         setSubmitError(data.error);
       } else {
+        const userId = data?.user?.id;
         toast({ title: `Pozvánka odeslána na ${newUser.email.trim()}` });
         setAddOpen(false);
         setNewUser({ full_name: "", email: "", role: "viewer" });
         setFieldErrors({});
         fetchUsers();
+        // Auto-copy invite link after creation
+        if (userId) {
+          handleCopyInviteLink(userId);
+        }
       }
     } catch (e: any) {
       setSubmitError(e.message || "Neočekávaná chyba");
@@ -261,7 +286,15 @@ export function UserManagement({ open, onOpenChange }: Props) {
                           <Switch checked={u.is_active} onCheckedChange={(v) => handleToggleActive(u.id, v)} />
                         )}
                       </TableCell>
-                      <TableCell className="flex gap-1">
+                        <TableCell className="flex gap-1">
+                        <button
+                          onClick={() => handleCopyInviteLink(u.id)}
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                          title="Kopírovat odkaz pozvánky"
+                          disabled={copyingLinkId === u.id}
+                        >
+                          <Link2 className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => { setResetTarget(u.id); setResetPassword(""); setResetError(""); }}
                           className="text-muted-foreground hover:text-foreground transition-colors"
