@@ -8,6 +8,7 @@ interface ColumnLabelRow {
   width: number | null;
   sort_order: number;
   display_order: number | null;
+  visible: boolean;
 }
 
 export function useColumnLabels(tab: string) {
@@ -17,7 +18,7 @@ export function useColumnLabels(tab: string) {
     queryKey: ["column-labels", tab],
     queryFn: async () => {
       const { data, error } = await (supabase.from("column_labels") as any)
-        .select("column_key, custom_label, width, sort_order, display_order")
+        .select("column_key, custom_label, width, sort_order, display_order, visible")
         .eq("tab", tab);
       if (error) throw error;
       return (data || []) as ColumnLabelRow[];
@@ -193,5 +194,61 @@ export function useColumnLabels(tab: string) {
     [data, tab, qc]
   );
 
-  return { getLabel, getWidth, isCustomLabel, updateLabel, updateWidth, getOrderedKeys, updateOrder, getOrderMap, getDisplayOrderedKeys, updateDisplayOrder };
+  /** Returns a map of column_key → visible for all columns that have a DB entry */
+  const getVisibilityMap = useCallback((): Record<string, boolean> => {
+    const map: Record<string, boolean> = {};
+    for (const d of data) {
+      map[d.column_key] = d.visible;
+    }
+    return map;
+  }, [data]);
+
+  /** Persist visibility for a single column */
+  const updateVisibility = useCallback(
+    async (key: string, visible: boolean) => {
+      const existing = data.find((d) => d.column_key === key);
+      if (existing) {
+        await (supabase.from("column_labels") as any)
+          .update({ visible })
+          .eq("tab", tab)
+          .eq("column_key", key);
+      } else {
+        await (supabase.from("column_labels") as any).insert({
+          tab,
+          column_key: key,
+          custom_label: "",
+          visible,
+        });
+      }
+      await qc.invalidateQueries({ queryKey: ["column-labels", tab] });
+    },
+    [data, tab, qc]
+  );
+
+  /** Persist visibility for multiple columns at once */
+  const updateVisibilityBatch = useCallback(
+    async (visMap: Record<string, boolean>) => {
+      const promises = Object.entries(visMap).map(([key, visible]) => {
+        const existing = data.find((d) => d.column_key === key);
+        if (existing) {
+          return (supabase.from("column_labels") as any)
+            .update({ visible })
+            .eq("tab", tab)
+            .eq("column_key", key);
+        } else {
+          return (supabase.from("column_labels") as any).insert({
+            tab,
+            column_key: key,
+            custom_label: "",
+            visible,
+          });
+        }
+      });
+      await Promise.all(promises);
+      await qc.invalidateQueries({ queryKey: ["column-labels", tab] });
+    },
+    [data, tab, qc]
+  );
+
+  return { getLabel, getWidth, isCustomLabel, updateLabel, updateWidth, getOrderedKeys, updateOrder, getOrderMap, getDisplayOrderedKeys, updateDisplayOrder, getVisibilityMap, updateVisibility, updateVisibilityBatch };
 }

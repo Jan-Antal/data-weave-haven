@@ -256,7 +256,7 @@ export function ColumnVisibilityToggle({ tabKey, editMode, onToggleEditMode }: P
                 </SortableContext>
               </DndContext>
             ) : (
-              // Non-admin: simple checkboxes, no drag
+              // Non-admin: read-only view, no drag, no toggle
               COLUMN_GROUPS.map((group) => {
                 const groupCols = state.columns.filter(
                   (c) => !c.locked && group.keys.includes(c.key)
@@ -281,11 +281,11 @@ export function ColumnVisibilityToggle({ tabKey, editMode, onToggleEditMode }: P
                     {!isCollapsed && groupCols.map((col) => (
                       <label
                         key={col.key}
-                        className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer text-sm"
+                        className="flex items-center gap-2 px-2 py-1 rounded text-sm text-muted-foreground"
                       >
                         <Checkbox
                           checked={state.isVisible(col.key)}
-                          onCheckedChange={() => state.toggleColumn(col.key)}
+                          disabled
                         />
                         <span>{resolveLabel(col.key)}</span>
                       </label>

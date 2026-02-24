@@ -1,8 +1,9 @@
-import { createContext, useContext, ReactNode } from "react";
+import { createContext, useContext, ReactNode, useMemo, useCallback } from "react";
 import { useColumnVisibility, ColumnDef } from "@/hooks/useColumnVisibility";
+import { useColumnLabels } from "@/hooks/useColumnLabels";
+import { useAuth } from "@/hooks/useAuth";
 
 // ── Master column registry ─────────────────────────────────────────
-// Every toggleable column in the app. Locked columns are separate.
 export const ALL_COLUMNS: ColumnDef[] = [
   { key: "klient", label: "Klient" },
   { key: "location", label: "Lokace" },
@@ -78,10 +79,34 @@ interface ColumnVisibilityContextType {
 
 const Ctx = createContext<ColumnVisibilityContextType | null>(null);
 
+function useTabVisibility(tabLabelKey: string, nativeKeys: string[]) {
+  const { getVisibilityMap, updateVisibility } = useColumnLabels(tabLabelKey);
+  const { canEditColumns } = useAuth();
+
+  const dbVisMap = useMemo(() => getVisibilityMap(), [getVisibilityMap]);
+
+  const onDbToggle = useCallback(
+    (key: string, visible: boolean) => {
+      if (canEditColumns) {
+        updateVisibility(key, visible);
+      }
+    },
+    [canEditColumns, updateVisibility]
+  );
+
+  return useColumnVisibility(
+    `col-vis-${tabLabelKey}`,
+    FULL_COLUMNS,
+    defaultHidden(nativeKeys),
+    dbVisMap,
+    canEditColumns ? onDbToggle : undefined
+  );
+}
+
 export function ColumnVisibilityProvider({ children }: { children: ReactNode }) {
-  const projectInfo = useColumnVisibility("col-vis-project-info", FULL_COLUMNS, defaultHidden(PROJECT_INFO_NATIVE));
-  const pmStatus = useColumnVisibility("col-vis-pm-status", FULL_COLUMNS, defaultHidden(PM_NATIVE));
-  const tpvStatus = useColumnVisibility("col-vis-tpv-status", FULL_COLUMNS, defaultHidden(TPV_NATIVE));
+  const projectInfo = useTabVisibility("project-info", PROJECT_INFO_NATIVE);
+  const pmStatus = useTabVisibility("pm-status", PM_NATIVE);
+  const tpvStatus = useTabVisibility("tpv-status", TPV_NATIVE);
 
   return (
     <Ctx.Provider value={{ projectInfo, pmStatus, tpvStatus }}>
