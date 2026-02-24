@@ -18,9 +18,9 @@ const PHASE_COLORS = {
 };
 
 const MILESTONE_COLORS = {
-  tpv_date: "#a8d5b5",
-  expedice: "#f9c89a",
-  predani: "#f2a993",
+  tpv_date: "#52b788",
+  expedice: "#f4a261",
+  predani: "#e76f51",
 };
 
 const PHASE_COLORS_LIGHT = {
