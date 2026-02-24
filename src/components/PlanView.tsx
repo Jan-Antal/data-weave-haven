@@ -140,7 +140,7 @@ interface Diamond {
   color: string;
   label: string;
   name: string;
-  yOffset: number;
+  priority: number; // higher = renders on top (Předání=3 > Expedice=2 > TPV=1)
 }
 
 interface BarData {
@@ -151,16 +151,17 @@ interface BarData {
   warnings: MilestoneWarning[];
 }
 
+const MILESTONE_PRIORITY: Record<string, number> = { "TPV": 1, "Expedice": 2, "Předání": 3 };
+
 function makeDiamonds(items: { date: Date; color: string; name: string }[]): Diamond[] {
   const sorted = [...items].sort((a, b) => a.date.getTime() - b.date.getTime());
-  return sorted.map((m, i, arr) => {
-    let yOffset = 0;
-    if (i > 0 && Math.abs(differenceInDays(m.date, arr[i - 1].date)) <= OVERLAP_THRESHOLD_DAYS) {
-      const offsets = [0, -10, 10];
-      yOffset = offsets[i % 3] || 0;
-    }
-    return { date: m.date, color: m.color, label: formatMilestoneLabel(m.date), name: m.name, yOffset };
-  });
+  return sorted.map((m) => ({
+    date: m.date,
+    color: m.color,
+    label: formatMilestoneLabel(m.date),
+    name: m.name,
+    priority: MILESTONE_PRIORITY[m.name] ?? 0,
+  }));
 }
 
 
@@ -302,25 +303,23 @@ function getStageBarData(stage: ProjectStage, project: Project, statusColorMap: 
 
 // ── Milestone Diamond ───────────────────────────────────────────────
 function MilestoneDiamond({
-  date, color, label, name, origin, dayPx, midY, yOffset, small, labelRow,
+  date, color, label, name, origin, dayPx, midY, small, showLabel, zIndex,
 }: {
   date: Date; color: string; label: string; name: string;
-  origin: Date; dayPx: number; midY: number; yOffset: number; small?: boolean;
-  labelRow?: number;
+  origin: Date; dayPx: number; midY: number; small?: boolean;
+  showLabel?: boolean; zIndex?: number;
 }) {
   const x = dayOffset(date, origin, dayPx);
   const size = small ? 8 : 12;
-  // Label above bar: row 0 → top 0, row 1 → top 10
-  const labelTop = (labelRow ?? 0) === 1 ? 10 : 0;
 
   const diamondStyle: React.CSSProperties = {
     left: x - size / 2,
-    top: midY - size / 2 + yOffset,
+    top: midY - size / 2,
     width: size,
     height: size,
     backgroundColor: color,
     transform: "rotate(45deg)",
-    zIndex: 10,
+    zIndex: zIndex ?? 10,
   };
 
   return (
@@ -336,18 +335,20 @@ function MilestoneDiamond({
           <span className="font-medium">{name}</span>: {format(date, "dd-MMM-yy")}
         </TooltipContent>
       </Tooltip>
-      <span
-        className="absolute text-[9px] font-medium whitespace-nowrap pointer-events-none"
-        style={{
-          left: x,
-          top: labelTop,
-          transform: "translateX(-50%)",
-          color,
-          zIndex: 11,
-        }}
-      >
-        {label}
-      </span>
+      {(showLabel !== false) && (
+        <span
+          className="absolute text-[9px] font-medium whitespace-nowrap pointer-events-none"
+          style={{
+            left: x,
+            top: 0,
+            transform: "translateX(-50%)",
+            color,
+            zIndex: (zIndex ?? 10) + 1,
+          }}
+        >
+          {label}
+        </span>
+      )}
     </TooltipProvider>
   );
 }
@@ -484,12 +485,10 @@ function SubstageRow({
         );
       })}
       {barData.diamonds.map((m, i, arr) => {
-        let labelRow = 0;
-        if (i > 0 && Math.abs(differenceInDays(m.date, arr[i - 1].date)) <= 4) {
-          labelRow = i % 2;
-        }
+        // Hide label if a later diamond is within 5 days
+        const showLabel = !arr.some((other, j) => j > i && Math.abs(differenceInDays(other.date, m.date)) <= 5);
         return (
-          <MilestoneDiamond key={i} date={m.date} color={m.color} label={m.label} name={m.name} origin={origin} dayPx={dayPx} midY={midY} yOffset={m.yOffset} small labelRow={labelRow} />
+          <MilestoneDiamond key={i} date={m.date} color={m.color} label={m.label} name={m.name} origin={origin} dayPx={dayPx} midY={midY} small showLabel={showLabel} zIndex={10 + m.priority} />
         );
       })}
     </div>
@@ -810,13 +809,9 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
 
                     {/* Milestone diamonds */}
                     {barData.diamonds.map((m, i, arr) => {
-                      // Alternate label rows when diamonds are close
-                      let labelRow = 0;
-                      if (i > 0 && Math.abs(differenceInDays(m.date, arr[i - 1].date)) <= 4) {
-                        labelRow = i % 2;
-                      }
+                      const showLabel = !arr.some((other, j) => j > i && Math.abs(differenceInDays(other.date, m.date)) <= 5);
                       return (
-                        <MilestoneDiamond key={i} date={m.date} color={m.color} label={m.label} name={m.name} origin={timelineStart} dayPx={dayPx} midY={midY} yOffset={m.yOffset} labelRow={labelRow} />
+                        <MilestoneDiamond key={i} date={m.date} color={m.color} label={m.label} name={m.name} origin={timelineStart} dayPx={dayPx} midY={midY} showLabel={showLabel} zIndex={10 + m.priority} />
                       );
                     })}
                   </div>
