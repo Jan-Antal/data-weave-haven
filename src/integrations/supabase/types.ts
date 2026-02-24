@@ -24,6 +24,7 @@ export type Database = {
           sort_order: number | null
           tab: string
           updated_at: string
+          visible: boolean | null
           width: number | null
         }
         Insert: {
@@ -35,6 +36,7 @@ export type Database = {
           sort_order?: number | null
           tab: string
           updated_at?: string
+          visible?: boolean | null
           width?: number | null
         }
         Update: {
@@ -46,6 +48,7 @@ export type Database = {
           sort_order?: number | null
           tab?: string
           updated_at?: string
+          visible?: boolean | null
           width?: number | null
         }
         Relationships: []
