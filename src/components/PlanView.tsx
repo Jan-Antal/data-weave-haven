@@ -272,87 +272,52 @@ function getProjectBarData(p: Project, _statusColorMap: Record<string, string>):
   return { segments: segs, diamonds: allDiamonds, connectorLine, hasWarning, warnings };
 }
 
-function getStageBarData(stage: ProjectStage, project: Project, _statusColorMap: Record<string, string>): BarData {
-  // S = stage's own start_date, fallback to parent's datum_objednavky
-  const S = parseDateField(stage.start_date) ?? parseDateField(project.datum_objednavky);
-  // E = stage's datum_smluvni, fallback to end_date, then parent's datum_smluvni
-  const E = parseDateField(stage.datum_smluvni) ?? parseDateField(stage.end_date) ?? parseDateField(project.datum_smluvni);
-  const TPV = parseDateField(stage.tpv_date);
-  const EXP = parseDateField(stage.expedice);
-  const PRE = parseDateField(stage.predani);
+function getStageBarData(stage: ProjectStage, project: Project, statusColorMap: Record<string, string>): BarData {
+  const barStart = parseDateField(stage.start_date) ?? parseDateField(stage.datum_smluvni) ?? parseDateField(project.datum_objednavky);
+  const barEnd = parseDateField(stage.end_date) ?? parseDateField(project.datum_smluvni);
+  const tpv = parseDateField(stage.tpv_date);
+  const expedice = parseDateField(stage.expedice);
+  const predani = parseDateField(stage.predani);
 
-  const warnings = getBarWarnings(S, E, TPV, EXP, PRE);
-  const hasWarning = warnings.length > 0;
-  const empty: BarData = { segments: [], diamonds: [], hasWarning, warnings };
+  const milestoneDates: { date: Date; color: string; name: string }[] = [];
+  if (tpv) milestoneDates.push({ date: tpv, color: MILESTONE_COLORS.tpv_date, name: "TPV" });
+  if (expedice) milestoneDates.push({ date: expedice, color: MILESTONE_COLORS.expedice, name: "Expedice" });
+  if (predani) milestoneDates.push({ date: predani, color: MILESTONE_COLORS.predani, name: "Předání" });
+  milestoneDates.sort((a, b) => a.date.getTime() - b.date.getTime());
 
-  if (!E) return empty;
+  const diamonds: Diamond[] = milestoneDates.map((m, i, arr) => {
+    let yOffset = 0;
+    if (i > 0 && Math.abs(differenceInDays(m.date, arr[i - 1].date)) <= OVERLAP_THRESHOLD_DAYS) {
+      yOffset = i % 2 === 1 ? -8 : 8;
+    }
+    return { date: m.date, color: m.color, label: formatMilestoneLabel(m.date), name: m.name, yOffset };
+  });
 
-  const dItems: { date: Date; color: string; name: string }[] = [];
-
-  // CASE 1 — Only E (no S)
-  if (!S) {
-    dItems.push({ date: E, color: MILESTONE_COLORS.predani, name: "Předání" });
-    return { ...empty, diamonds: makeDiamonds(dItems) };
+  let connectorLine: { startX: Date; endX: Date } | undefined;
+  if (milestoneDates.length >= 2) {
+    connectorLine = { startX: milestoneDates[0].date, endX: milestoneDates[milestoneDates.length - 1].date };
   }
 
-  const safeE = differenceInDays(E, S) < 7 ? addDays(S, 7) : E;
+  if (!barStart && !barEnd) return { segments: [], diamonds, connectorLine, hasWarning: false, warnings: [] };
 
-  // CASE 2 — S + E only
-  if (!TPV && !EXP && !PRE) {
-    dItems.push({ date: safeE, color: MILESTONE_COLORS.predani, name: "Předání" });
-    return { segments: [{ start: S, end: safeE, color: PHASE_COLORS.dokonceno }], diamonds: makeDiamonds(dItems), hasWarning, warnings };
+  const s = barStart ?? barEnd!;
+  const e = barEnd ?? addDays(s, 30);
+
+  if (milestoneDates.length === 0) {
+    return { segments: [{ start: s, end: e, color: PHASE_COLORS.konstrukce }], diamonds, connectorLine, hasWarning: false, warnings: [] };
   }
 
-  // CASE 7 — S + E + PRE only
-  if (!TPV && !EXP && PRE) {
-    dItems.push({ date: PRE, color: MILESTONE_COLORS.predani, name: "Předání" });
-    return { segments: [{ start: S, end: safeE, color: PHASE_COLORS.dokonceno }], diamonds: makeDiamonds(dItems), hasWarning, warnings };
+  const allPoints = [s, ...milestoneDates.map((m) => m.date), e].sort((a, b) => a.getTime() - b.getTime());
+  const colorSequence = [PHASE_COLORS.konstrukce, PHASE_COLORS.vyroba, PHASE_COLORS.montaz, PHASE_COLORS.dokonceno];
+  const segments: Segment[] = [];
+  let ci = 0;
+  for (let i = 0; i < allPoints.length - 1; i++) {
+    if (i > 0 && allPoints[i].getTime() === allPoints[i - 1].getTime()) continue;
+    segments.push({ start: allPoints[i], end: allPoints[i + 1], color: colorSequence[Math.min(ci, 3)] });
+    ci++;
   }
 
-  // CASE 6 — S + E + EXP only
-  if (!TPV && EXP && !PRE) {
-    dItems.push({ date: EXP, color: MILESTONE_COLORS.expedice, name: "Expedice" });
-    dItems.push({ date: safeE, color: MILESTONE_COLORS.predani, name: "Předání" });
-    return { segments: [{ start: S, end: EXP, color: PHASE_COLORS.vyroba }, { start: EXP, end: safeE, color: PHASE_COLORS.montaz }], diamonds: makeDiamonds(dItems), hasWarning, warnings };
-  }
-
-  // CASE 3 — S + E + TPV only
-  if (TPV && !EXP && !PRE) {
-    dItems.push({ date: TPV, color: MILESTONE_COLORS.tpv_date, name: "TPV" });
-    dItems.push({ date: safeE, color: MILESTONE_COLORS.predani, name: "Předání" });
-    return { segments: [{ start: S, end: TPV, color: PHASE_COLORS.konstrukce }, { start: TPV, end: safeE, color: PHASE_COLORS.dokonceno }], diamonds: makeDiamonds(dItems), hasWarning, warnings };
-  }
-
-  // CASE 4 — S + E + TPV + EXP (no PRE)
-  if (TPV && EXP && !PRE) {
-    dItems.push({ date: TPV, color: MILESTONE_COLORS.tpv_date, name: "TPV" });
-    dItems.push({ date: EXP, color: MILESTONE_COLORS.expedice, name: "Expedice" });
-    dItems.push({ date: safeE, color: MILESTONE_COLORS.predani, name: "Předání" });
-    return { segments: [{ start: S, end: TPV, color: PHASE_COLORS.konstrukce }, { start: TPV, end: EXP, color: PHASE_COLORS.vyroba }, { start: EXP, end: safeE, color: PHASE_COLORS.montaz }], diamonds: makeDiamonds(dItems), hasWarning, warnings };
-  }
-
-  // CASE 5 — S + E + TPV + EXP + PRE
-  if (TPV && EXP && PRE) {
-    dItems.push({ date: TPV, color: MILESTONE_COLORS.tpv_date, name: "TPV" });
-    dItems.push({ date: EXP, color: MILESTONE_COLORS.expedice, name: "Expedice" });
-    dItems.push({ date: PRE, color: MILESTONE_COLORS.predani, name: "Předání" });
-    return { segments: [{ start: S, end: TPV, color: PHASE_COLORS.konstrukce }, { start: TPV, end: EXP, color: PHASE_COLORS.vyroba }, { start: EXP, end: PRE, color: PHASE_COLORS.montaz }, { start: PRE, end: safeE, color: PHASE_COLORS.dokonceno }], diamonds: makeDiamonds(dItems), hasWarning, warnings };
-  }
-
-  // Fallback
-  const segs: Segment[] = [];
-  const pts: Date[] = [S];
-  if (TPV) { dItems.push({ date: TPV, color: MILESTONE_COLORS.tpv_date, name: "TPV" }); pts.push(TPV); }
-  if (EXP) { dItems.push({ date: EXP, color: MILESTONE_COLORS.expedice, name: "Expedice" }); pts.push(EXP); }
-  if (PRE) { dItems.push({ date: PRE, color: MILESTONE_COLORS.predani, name: "Předání" }); pts.push(PRE); }
-  pts.push(safeE);
-  pts.sort((a, b) => a.getTime() - b.getTime());
-  const colorSeq = [PHASE_COLORS.konstrukce, PHASE_COLORS.vyroba, PHASE_COLORS.montaz, PHASE_COLORS.dokonceno];
-  for (let i = 0; i < pts.length - 1; i++) {
-    if (pts[i].getTime() === pts[i + 1].getTime()) continue;
-    segs.push({ start: pts[i], end: pts[i + 1], color: colorSeq[Math.min(i, 3)] });
-  }
-  return { segments: segs, diamonds: makeDiamonds(dItems), hasWarning, warnings };
+  return { segments, diamonds, connectorLine, hasWarning: false, warnings: [] };
 }
 
 // ── Milestone Diamond ───────────────────────────────────────────────
@@ -493,50 +458,42 @@ function SubstageRow({
 }) {
   const barData = getStageBarData(stage, project, statusColorMap);
   const midY = SUBSTAGE_ROW_HEIGHT / 2;
-  const barTop = midY - SUBSTAGE_BAR_HEIGHT / 2;
 
   return (
-    <div style={{ height: SUBSTAGE_ROW_HEIGHT, position: "relative", overflow: "visible", width: timelineWidth }}>
+    <div style={{ height: SUBSTAGE_ROW_HEIGHT, position: "relative", width: timelineWidth }}>
       {/* Connector line */}
       {barData.connectorLine && (
         <ConnectorLine
           startDate={barData.connectorLine.startX}
           endDate={barData.connectorLine.endX}
-          origin={origin} dayPx={dayPx} midY={midY} hasWarning={barData.hasWarning}
+          origin={origin} dayPx={dayPx} midY={midY} hasWarning={false}
         />
       )}
       {barData.segments.map((seg, i) => {
         const x = dayOffset(seg.start, origin, dayPx);
         const w = dayOffset(seg.end, origin, dayPx) - x;
         if (w <= 0) return null;
-        const segW = Math.max(w, 4);
         const wkLabel = weeksLabel(seg.start, seg.end);
         return (
           <div
             key={i}
             style={{
               position: "absolute",
-              left: x, top: barTop,
-              width: segW, height: SUBSTAGE_BAR_HEIGHT,
-              background: seg.color,
-              zIndex: 2, borderRadius: 4, minWidth: 4,
+              left: x, top: 16 - SUBSTAGE_BAR_HEIGHT / 2,
+              width: Math.max(w, 4), height: SUBSTAGE_BAR_HEIGHT,
+              background: seg.color, opacity: 0.65,
+              zIndex: 2, borderRadius: 4,
             }}
           >
-            {segW > 32 && wkLabel && (
-              <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 600, color: "white", lineHeight: 1 }}>{wkLabel}</span>
+            {w > 32 && wkLabel && (
+              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-medium text-white/90 leading-none">{wkLabel}</span>
             )}
           </div>
         );
       })}
-      {barData.diamonds.map((m, i, arr) => {
-        let labelRow = 0;
-        if (i > 0 && Math.abs(differenceInDays(m.date, arr[i - 1].date)) <= 4) {
-          labelRow = i % 2;
-        }
-        return (
-          <MilestoneDiamond key={i} date={m.date} color={m.color} label={m.label} name={m.name} origin={origin} dayPx={dayPx} midY={midY} yOffset={m.yOffset} small labelRow={labelRow} />
-        );
-      })}
+      {barData.diamonds.map((m, i) => (
+        <MilestoneDiamond key={i} date={m.date} color={m.color} label={m.label} name={m.name} origin={origin} dayPx={dayPx} midY={midY} yOffset={m.yOffset} small />
+      ))}
     </div>
   );
 }
@@ -884,24 +841,13 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
 // ── Substage left panel rows ────────────────────────────────────────
 function SubstageLeftRows({ projectId }: { projectId: string }) {
   const { data: stages = [] } = useProjectStages(projectId);
-  // Compute warnings per stage using same logic as parent project
-  // Stages don't have datum_objednavky, use start_date as S
   return (
     <>
-      {stages.map((stage) => {
-        const S = parseDateField(stage.start_date);
-        const E = parseDateField(stage.datum_smluvni) ?? parseDateField(stage.end_date);
-        const TPV = parseDateField(stage.tpv_date);
-        const EXP = parseDateField(stage.expedice);
-        const PRE = parseDateField(stage.predani);
-        const warnings = getBarWarnings(S, E, TPV, EXP, PRE);
-        return (
-          <div key={stage.id} className="flex items-center gap-1 pl-8 pr-3 border-b bg-muted/10" style={{ height: SUBSTAGE_ROW_HEIGHT }}>
-            {warnings.length > 0 && <WarningIcon warnings={warnings} />}
-            <span className="text-[10px] text-muted-foreground truncate">{stage.stage_name}</span>
-          </div>
-        );
-      })}
+      {stages.map((stage) => (
+        <div key={stage.id} className="flex items-center gap-2 pl-8 pr-3 border-b bg-muted/10" style={{ height: SUBSTAGE_ROW_HEIGHT }}>
+          <span className="text-[10px] text-muted-foreground truncate">{stage.stage_name}</span>
+        </div>
+      ))}
     </>
   );
 }
