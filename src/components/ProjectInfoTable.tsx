@@ -28,6 +28,7 @@ import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { useAuth } from "@/hooks/useAuth";
 import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
 import { useAllColumnVisibility } from "./ColumnVisibilityContext";
+import { renderCrossTabHeaders, renderCrossTabCells } from "./CrossTabColumns";
 
 const emptyProject = {
   project_id: "",
@@ -68,8 +69,6 @@ const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
 
 export function ProjectInfoTable({ personFilter, statusFilter, search: externalSearch, riskHighlight }: ProjectInfoTableProps) {
   const { data: projects = [], isLoading } = useProjects();
-  const { data: statusOptions = [] } = useProjectStatusOptions();
-  const statusLabels = statusOptions.map((s) => s.label);
   const updateProject = useUpdateProject();
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [addOpen, setAddOpen] = useState(false);
@@ -78,10 +77,13 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const qc = useQueryClient();
   const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
   const { projectInfo: { isVisible, columns } } = useAllColumnVisibility();
+  const NATIVE_KEYS = ["project_id", "project_name", "klient", "location", "kalkulant", "architekt", "datum_smluvni", "datum_objednavky", "prodejni_cena", "marze", "link_cn"];
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck();
   const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("project-info");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns, canDeleteProject, isViewer } = useAuth();
+  const { data: statusOptions = [] } = useProjectStatusOptions();
+  const statusLabels = statusOptions.map((s) => s.label);
 
   useEffect(() => {
     const handleOpenAdd = () => setAddOpen(true);
@@ -177,6 +179,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
               {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="text-right" style={colStyle("prodejni_cena")} {...editProps("prodejni_cena", "Prodejní cena")} />}
               {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} className="text-right" style={colStyle("marze")} {...editProps("marze", "Marže")} />}
               {v("link_cn") && <SortableHeader label="CN" column="link_cn" {...sh} style={colStyle("link_cn")} {...editProps("link_cn", "CN")} />}
+              {renderCrossTabHeaders({ nativeKeys: NATIVE_KEYS, isVisible: v, sortCol, sortDir, onSort: toggleSort, getLabel, getWidth, editMode, updateLabel, updateWidth })}
               <ColumnVisibilityToggle tabKey="projectInfo" editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
             </TableRow>
           </TableHeader>
@@ -203,6 +206,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                 )}
                 {v("marze") && <TableCell className="text-right"><InlineEditableCell value={p.marze} onSave={(val) => save(p.id, "marze", val, p.marze || "")} readOnly={!canEdit} /></TableCell>}
                 {v("link_cn") && <TableCell><InlineEditableCell value={p.link_cn} onSave={(val) => save(p.id, "link_cn", val, p.link_cn || "")} readOnly={!canEdit} /></TableCell>}
+                {renderCrossTabCells({ nativeKeys: NATIVE_KEYS, isVisible: v, project: p, save, canEdit, statusLabels, saveCurrency })}
               </TableRow>
             ))}
           </TableBody>

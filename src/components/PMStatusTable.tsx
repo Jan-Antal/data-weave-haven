@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
 import { useAllColumnVisibility } from "./ColumnVisibilityContext";
+import { renderCrossTabHeaders, renderCrossTabCells } from "./CrossTabColumns";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -231,6 +232,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { pmStatus: { isVisible, columns } } = useAllColumnVisibility();
+  const PM_NATIVE_KEYS = ["project_id", "project_name", "pm", "status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "pm_poznamka"];
   const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("pm-status");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns } = useAuth();
@@ -288,6 +290,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
               {v("montaz") && <SortableHeader label="Montáž" column="montaz" {...sh} style={colStyle("montaz")} {...editProps("montaz", "Montáž")} />}
               {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} style={colStyle("predani")} {...editProps("predani", "Předání")} />}
               {v("pm_poznamka") && <SortableHeader label="Poznámka PM" column="pm_poznamka" {...sh} style={colStyle("pm_poznamka")} {...editProps("pm_poznamka", "Poznámka PM")} />}
+              {renderCrossTabHeaders({ nativeKeys: PM_NATIVE_KEYS, isVisible: v, sortCol, sortDir, onSort: toggleSort, getLabel, getWidth, editMode, updateLabel, updateWidth })}
               <ColumnVisibilityToggle tabKey="pmStatus" editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
             </TableRow>
           </TableHeader>
@@ -317,6 +320,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   {v("montaz") && <TableCell><InlineEditableCell value={(p as any).montaz} type="date" onSave={(val) => save(p.id, "montaz", val, (p as any).montaz || "")} readOnly={!canEdit} /></TableCell>}
                   {v("predani") && <TableCell><InlineEditableCell value={p.predani} type="date" onSave={(val) => save(p.id, "predani", val, p.predani || "")} readOnly={!canEdit} /></TableCell>}
                   {v("pm_poznamka") && <TableCell><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(val) => save(p.id, "pm_poznamka", val, p.pm_poznamka || "")} readOnly={!canEdit} /></TableCell>}
+                  {renderCrossTabCells({ nativeKeys: PM_NATIVE_KEYS, isVisible: v, project: p, save, canEdit, statusLabels })}
                 </TableRow>
                 {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} isVisible={v} statusLabels={statusLabels} canEdit={canEdit} />}
               </Fragment>
