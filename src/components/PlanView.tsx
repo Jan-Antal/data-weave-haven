@@ -133,6 +133,7 @@ interface Segment {
   start: Date;
   end: Date;
   color: string;
+  hatchColors?: [string, string]; // diagonal stripe pattern for out-of-order milestones
 }
 
 interface Diamond {
@@ -242,12 +243,20 @@ function getBarDataFromFields(
     dItems.push({ date: TPV, color: milestoneColors.tpv_date, name: "TPV" });
     dItems.push({ date: EXP, color: milestoneColors.expedice, name: "Expedice" });
     dItems.push({ date: safeE, color: milestoneColors.predani, name: "Předání" });
+    const tpvExpOverlap = TPV >= EXP;
+    const segs: Segment[] = tpvExpOverlap
+      ? [
+          { start: S, end: EXP, color: phaseColors.konstrukce },
+          { start: EXP, end: TPV, color: phaseColors.vyroba, hatchColors: [phaseColors.konstrukce, phaseColors.vyroba] },
+          { start: TPV, end: safeE, color: phaseColors.montaz },
+        ]
+      : [
+          { start: S, end: TPV, color: phaseColors.konstrukce },
+          { start: TPV, end: EXP, color: phaseColors.vyroba },
+          { start: EXP, end: safeE, color: phaseColors.montaz },
+        ];
     return {
-      segments: [
-        { start: S, end: TPV, color: phaseColors.konstrukce },
-        { start: TPV, end: EXP, color: phaseColors.vyroba },
-        { start: EXP, end: safeE, color: phaseColors.montaz },
-      ],
+      segments: segs.filter(s => differenceInDays(s.end, s.start) > 0),
       diamonds: makeDiamonds(dItems), hasWarning, warnings,
     };
   }
@@ -257,13 +266,53 @@ function getBarDataFromFields(
     dItems.push({ date: TPV, color: milestoneColors.tpv_date, name: "TPV" });
     dItems.push({ date: EXP, color: milestoneColors.expedice, name: "Expedice" });
     dItems.push({ date: PRE, color: milestoneColors.predani, name: "Předání" });
+    const tpvExpOverlap = TPV >= EXP;
+    const expPreOverlap = EXP >= PRE;
+    // Build segments handling overlaps
+    const segs: Segment[] = [];
+    const pts = [
+      { date: S, phase: "start" },
+      { date: TPV, phase: "tpv" },
+      { date: EXP, phase: "exp" },
+      { date: PRE, phase: "pre" },
+      { date: safeE, phase: "end" },
+    ].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    // Simple approach: iterate sorted points, assign colors based on expected phase
+    // For overlapping regions, use hatch
+    if (!tpvExpOverlap && !expPreOverlap) {
+      // Normal order
+      segs.push({ start: S, end: TPV, color: phaseColors.konstrukce });
+      segs.push({ start: TPV, end: EXP, color: phaseColors.vyroba });
+      segs.push({ start: EXP, end: PRE, color: phaseColors.montaz });
+      segs.push({ start: PRE, end: safeE, color: phaseColors.dokonceno });
+    } else {
+      // Sort milestone dates and build segments with hatch for reversed pairs
+      const milestones = [
+        { date: TPV, normalColor: phaseColors.konstrukce, nextColor: phaseColors.vyroba, name: "tpv" },
+        { date: EXP, normalColor: phaseColors.vyroba, nextColor: phaseColors.montaz, name: "exp" },
+        { date: PRE, normalColor: phaseColors.montaz, nextColor: phaseColors.dokonceno, name: "pre" },
+      ];
+      const allPts = [S, TPV, EXP, PRE, safeE].sort((a, b) => a.getTime() - b.getTime());
+      const colorSeq = [phaseColors.konstrukce, phaseColors.vyroba, phaseColors.montaz, phaseColors.dokonceno];
+      for (let i = 0; i < allPts.length - 1; i++) {
+        if (allPts[i].getTime() === allPts[i + 1].getTime()) continue;
+        const segStart = allPts[i];
+        const segEnd = allPts[i + 1];
+        const midpoint = new Date((segStart.getTime() + segEnd.getTime()) / 2);
+        // Determine if this segment is in an overlap zone
+        let hatch: [string, string] | undefined;
+        if (tpvExpOverlap && midpoint >= EXP && midpoint <= TPV) {
+          hatch = [phaseColors.konstrukce, phaseColors.vyroba];
+        }
+        if (expPreOverlap && midpoint >= PRE && midpoint <= EXP) {
+          hatch = [phaseColors.vyroba, phaseColors.montaz];
+        }
+        segs.push({ start: segStart, end: segEnd, color: colorSeq[Math.min(i, 3)], ...(hatch ? { hatchColors: hatch } : {}) });
+      }
+    }
     return {
-      segments: [
-        { start: S, end: TPV, color: phaseColors.konstrukce },
-        { start: TPV, end: EXP, color: phaseColors.vyroba },
-        { start: EXP, end: PRE, color: phaseColors.montaz },
-        { start: PRE, end: safeE, color: phaseColors.dokonceno },
-      ],
+      segments: segs.filter(s => differenceInDays(s.end, s.start) > 0),
       diamonds: makeDiamonds(dItems), hasWarning, warnings,
     };
   }
@@ -458,6 +507,7 @@ function SubstageRow({
         if (w <= 0) return null;
         const wkLabel = weeksLabel(seg.start, seg.end);
         const phaseLabel = PHASE_LABELS[seg.color];
+        const hatchId = seg.hatchColors ? `hatch-sub-${i}-${seg.hatchColors[0].replace('#','')}-${seg.hatchColors[1].replace('#','')}` : null;
         const segDiv = (
           <div
             key={i}
@@ -465,10 +515,11 @@ function SubstageRow({
               position: "absolute",
               left: x, top: midY - SUBSTAGE_BAR_HEIGHT / 2,
               width: Math.max(w, 4), height: SUBSTAGE_BAR_HEIGHT,
-              background: seg.color,
+              background: hatchId ? `url(#${hatchId})` : seg.color,
               zIndex: 2, borderRadius: 4,
             }}
           >
+            {hatchId && <HatchPattern id={hatchId} color1={seg.hatchColors![0]} color2={seg.hatchColors![1]} />}
             {w > 32 && wkLabel && (
               <span className="absolute inset-0 flex items-center justify-center text-[9px] font-medium text-white/90 leading-none">{wkLabel}</span>
             )}
@@ -786,6 +837,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                       const wkLabel = weeksLabel(seg.start, seg.end);
 
                       const phaseLabel = PHASE_LABELS[seg.color];
+                      const hatchId = seg.hatchColors ? `hatch-main-${i}-${seg.hatchColors[0].replace('#','')}-${seg.hatchColors[1].replace('#','')}` : null;
                       const segDiv = (
                         <div
                           key={`seg-${i}`}
@@ -795,12 +847,13 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                             top: 16,
                             width: segW,
                             height: BAR_HEIGHT,
-                            background: seg.color,
+                            background: hatchId ? `url(#${hatchId})` : seg.color,
                             zIndex: 2,
                             borderRadius: 4,
                             minWidth: 4,
                           }}
                         >
+                          {hatchId && <HatchPattern id={hatchId} color1={seg.hatchColors![0]} color2={seg.hatchColors![1]} />}
                           {segW > 32 && wkLabel && (
                             <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 600, color: "white", lineHeight: 1 }}>
                               {wkLabel}
