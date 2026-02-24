@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useProjects, Project } from "@/hooks/useProjects";
 import { useProjectStages, ProjectStage } from "@/hooks/useProjectStages";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
@@ -95,6 +95,9 @@ function getProjectBarData(p: Project, statusColorMap: Record<string, string>): 
   const expedice = parseDateField(p.expedice);
   const predani = parseDateField(p.predani);
 
+  // Debug logging
+  console.log(`[PlanView] ${p.project_id}: objednavky=${p.datum_objednavky}→${barStart}, smluvni=${p.datum_smluvni}→${barEnd}, tpv=${tpv}, exp=${expedice}, pred=${predani}`);
+
   const milestoneDates: { key: string; date: Date; color: string; name: string }[] = [];
   if (tpv) milestoneDates.push({ key: "tpv_date", date: tpv, color: MILESTONE_COLORS.tpv_date, name: "TPV" });
   if (expedice) milestoneDates.push({ key: "expedice", date: expedice, color: MILESTONE_COLORS.expedice, name: "Expedice" });
@@ -117,20 +120,36 @@ function getProjectBarData(p: Project, statusColorMap: Record<string, string>): 
     };
   });
 
-  // Determine effective start & end
-  const effectiveStart = barStart ?? (milestoneDates.length > 0 ? milestoneDates[0].date : null);
-  const effectiveEnd = barEnd ?? (milestoneDates.length > 0 ? milestoneDates[milestoneDates.length - 1].date : null);
+  // Determine effective start & end — use any available date
+  let effectiveStart = barStart;
+  let effectiveEnd = barEnd;
 
+  // If no start, use earliest milestone
+  if (!effectiveStart && milestoneDates.length > 0) {
+    effectiveStart = milestoneDates[0].date;
+  }
+  // If no end, use latest milestone
+  if (!effectiveEnd && milestoneDates.length > 0) {
+    effectiveEnd = milestoneDates[milestoneDates.length - 1].date;
+  }
+
+  // Nothing at all
   if (!effectiveStart && !effectiveEnd) {
     return { segments: [], diamonds };
   }
 
   const s = effectiveStart ?? effectiveEnd!;
-  const e = effectiveEnd ?? addDays(s, 30);
+  let e = effectiveEnd ?? addDays(s, 30);
+
+  // Ensure minimum 7-day bar so it's always visible
+  if (differenceInDays(e, s) < 7) {
+    e = addDays(s, 7);
+  }
 
   // If no milestones, single bar in status color
   if (milestoneDates.length === 0) {
     const color = statusColorMap[p.status || ""] || "#6b7280";
+    console.log(`[PlanView] ${p.project_id}: single bar ${s.toISOString()} → ${e.toISOString()}, color=${color}`);
     return { segments: [{ start: s, end: e, color }], diamonds };
   }
 
@@ -171,6 +190,7 @@ function getProjectBarData(p: Project, statusColorMap: Record<string, string>): 
     else if (predani && segEnd.getTime() === predani.getTime()) colorIdx = Math.max(colorIdx, 3);
   }
 
+  console.log(`[PlanView] ${p.project_id}: ${segments.length} segments, ${diamonds.length} diamonds`);
   return { segments, diamonds };
 }
 
@@ -470,7 +490,7 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
         >
           {/* Header */}
           <div style={{ height: HEADER_HEIGHT }} className="border-b bg-muted/20 flex items-end px-3 pb-1 gap-2">
-            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide" style={{ width: 90, flexShrink: 0 }}>ID</span>
+            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide" style={{ width: 110, flexShrink: 0 }}>ID</span>
             <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide flex-1">Název</span>
           </div>
 
@@ -490,7 +510,7 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
                     <ExpandButton projectId={p.project_id} expanded={isExp} onClick={() => {}} />
                   </div>
                   <StatusDot color={statusColor} />
-                  <span className="text-xs font-mono text-muted-foreground truncate" style={{ width: 70, flexShrink: 0 }}>{p.project_id}</span>
+                  <span className="text-xs font-mono text-muted-foreground whitespace-nowrap" style={{ width: 110, flexShrink: 0 }}>{p.project_id}</span>
                   <span className="text-xs font-medium truncate flex-1 min-w-0">{p.project_name}</span>
                 </div>
                 {isExp && <SubstageLeftRows projectId={p.project_id} />}
@@ -503,7 +523,7 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
         <div ref={rightRef} onScroll={handleRightScroll} className="overflow-auto flex-1 relative">
           <div style={{ width: timelineWidth, position: "relative" }}>
             {/* Timeline header */}
-            <div className="sticky top-0 z-20 bg-card border-b" style={{ height: HEADER_HEIGHT }}>
+            <div className="sticky top-0 z-20 bg-card border-b" style={{ height: HEADER_HEIGHT, position: "relative" }}>
               {/* Month row */}
               <div className="flex" style={{ height: showWeeks ? 28 : HEADER_HEIGHT }}>
                 {months.map((m, i) => (
@@ -526,12 +546,12 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
                   ))}
                 </div>
               )}
+              {/* Today label — inside the sticky header */}
+              <div className="absolute z-30 text-[9px] font-bold pointer-events-none" style={{ left: todayX, bottom: 2, color: "#e74c3c", transform: "translateX(-50%)" }}>
+                Dnes
+              </div>
             </div>
 
-            {/* Today label */}
-            <div className="absolute z-30 text-[9px] font-bold" style={{ left: todayX - 12, top: 2, color: "#e74c3c" }}>
-              Dnes
-            </div>
 
             {/* Rows */}
             {sorted.map((p) => {
@@ -555,36 +575,36 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
                       <div key={`mg-${i}`} className="absolute top-0 bottom-0 border-l border-border/20" style={{ left: m.startX }} />
                     ))}
 
-                    {/* Segments */}
+                    {/* Segments — rendered directly without wrapper div */}
                     {barData.segments.map((seg, i) => {
                       const x = dayOffset(seg.start, timelineStart, dayPx);
                       const w = dayOffset(seg.end, timelineStart, dayPx) - x;
-                      if (w <= 0) return null;
+                      const segW = Math.max(w, 4);
                       const wkLabel = weeksLabel(seg.start, seg.end);
                       const hatchId = seg.hatch ? `hatch-${hatchCounter++}` : undefined;
 
                       return (
-                        <div key={i}>
+                        <React.Fragment key={`seg-${i}`}>
                           {seg.hatch && hatchId && <HatchPattern id={hatchId} color1={seg.hatch.color1} color2={seg.hatch.color2} />}
                           <div
                             className="absolute rounded-sm"
                             style={{
                               left: x,
                               top: midY - BAR_HEIGHT / 2,
-                              width: Math.max(w, 2),
+                              width: segW,
                               height: BAR_HEIGHT,
                               backgroundColor: seg.hatch ? undefined : seg.color,
                               background: seg.hatch && hatchId ? `url(#${hatchId})` : undefined,
                               zIndex: 5,
                             }}
                           >
-                            {w > 32 && wkLabel && (
+                            {segW > 32 && wkLabel && (
                               <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-white leading-none drop-shadow-sm">
                                 {wkLabel}
                               </span>
                             )}
                           </div>
-                        </div>
+                        </React.Fragment>
                       );
                     })}
 
