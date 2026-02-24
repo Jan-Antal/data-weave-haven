@@ -15,6 +15,16 @@ interface SortableHeaderProps {
   customLabel?: string;
   onLabelChange?: (newLabel: string) => void;
   onWidthChange?: (newWidth: number) => void;
+  // Drag reorder props
+  dragProps?: {
+    draggable?: boolean;
+    onDragStart?: (e: React.DragEvent) => void;
+    onDragOver?: (e: React.DragEvent) => void;
+    onDrop?: (e: React.DragEvent) => void;
+    onDragEnd?: () => void;
+  };
+  dropIndicator?: "left" | "right" | null;
+  isDragging?: boolean;
 }
 
 export function SortableHeader({
@@ -29,6 +39,9 @@ export function SortableHeader({
   customLabel,
   onLabelChange,
   onWidthChange,
+  dragProps,
+  dropIndicator,
+  isDragging,
 }: SortableHeaderProps) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
@@ -59,13 +72,11 @@ export function SortableHeader({
     if (!th) return;
     const startWidth = th.getBoundingClientRect().width;
 
-    // Force table-layout: fixed on the parent table so widths are respected
     const table = th.closest("table");
     if (table) {
       table.style.tableLayout = "fixed";
     }
 
-    // Find the column index of this th
     const row = th.parentElement;
     const colIndex = row ? Array.from(row.children).indexOf(th) : -1;
 
@@ -75,7 +86,6 @@ export function SortableHeader({
       th.style.minWidth = `${newWidth}px`;
       th.style.maxWidth = `${newWidth}px`;
 
-      // Apply to all cells in the same column
       if (table && colIndex >= 0) {
         const rows = table.querySelectorAll("tr");
         rows.forEach((tr) => {
@@ -118,12 +128,26 @@ export function SortableHeader({
       ref={thRef}
       className={cn(
         "font-semibold select-none hover:bg-muted/50 relative",
-        editMode ? "cursor-default border-b-2 border-accent" : "cursor-pointer",
+        editMode && dragProps?.draggable ? "cursor-grab" : editMode ? "cursor-default" : "cursor-pointer",
+        editMode && "border-b-2 border-accent",
+        isDragging && "opacity-40",
         className
       )}
       style={{ ...style, overflow: "hidden" }}
       onClick={handleClick}
+      draggable={dragProps?.draggable}
+      onDragStart={dragProps?.onDragStart}
+      onDragOver={dragProps?.onDragOver}
+      onDrop={dragProps?.onDrop}
+      onDragEnd={dragProps?.onDragEnd}
     >
+      {/* Drop indicator lines */}
+      {dropIndicator === "left" && (
+        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-info z-20 rounded-full" />
+      )}
+      {dropIndicator === "right" && (
+        <div className="absolute right-0 top-0 bottom-0 w-[3px] bg-info z-20 rounded-full" />
+      )}
       <div className="flex items-center gap-1 pr-2">
         {editing ? (
           <input

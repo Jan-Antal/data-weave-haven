@@ -43,10 +43,13 @@ interface HeaderProps {
   editMode: boolean;
   updateLabel: (key: string, label: string) => void;
   updateWidth: (key: string, width: number) => void;
+  dragProps?: Record<string, any>;
+  dropIndicator?: "left" | "right" | null;
+  isDragging?: boolean;
 }
 
 export function renderColumnHeader(props: HeaderProps) {
-  const { colKey: key, sortCol, sortDir, onSort, getLabel, getWidth, editMode, updateLabel, updateWidth } = props;
+  const { colKey: key, sortCol, sortDir, onSort, getLabel, getWidth, editMode, updateLabel, updateWidth, dragProps, dropIndicator, isDragging } = props;
   const defaultLabel = getColumnLabel(key);
   const style = getColumnStyle(key, getWidth(key));
   const isRight = key === "prodejni_cena" || key === "marze";
@@ -64,6 +67,9 @@ export function renderColumnHeader(props: HeaderProps) {
       customLabel={getLabel(key, defaultLabel)}
       onLabelChange={(v: string) => updateLabel(key, v)}
       onWidthChange={(w: number) => updateWidth(key, w)}
+      dragProps={dragProps}
+      dropIndicator={dropIndicator}
+      isDragging={isDragging}
     />
   );
 }
@@ -81,54 +87,6 @@ interface CellProps {
 export function renderColumnCell(props: CellProps) {
   const { colKey: key, project: p, save, canEdit, statusLabels, saveCurrency } = props;
   return renderCell(key, p, save, canEdit, statusLabels, saveCurrency);
-}
-
-// ── Cross-tab header rendering (kept for backward compat) ───────────
-interface CrossTabHeadersProps {
-  nativeKeys: string[];
-  isVisible: (key: string) => boolean;
-  orderedKeys: string[];
-  sortCol: string | null;
-  sortDir: "asc" | "desc" | null;
-  onSort: (col: string) => void;
-  getLabel: (key: string, def: string) => string;
-  getWidth: (key: string) => number | null;
-  editMode: boolean;
-  updateLabel: (key: string, label: string) => void;
-  updateWidth: (key: string, width: number) => void;
-}
-
-export function renderCrossTabHeaders({
-  nativeKeys, isVisible, orderedKeys,
-  sortCol, sortDir, onSort,
-  getLabel, getWidth, editMode, updateLabel, updateWidth,
-}: CrossTabHeadersProps) {
-  return orderedKeys
-    .filter((k) => !nativeKeys.includes(k) && isVisible(k))
-    .map((key) => renderColumnHeader({
-      colKey: key, sortCol, sortDir, onSort,
-      getLabel, getWidth, editMode, updateLabel, updateWidth,
-    }));
-}
-
-// ── Cross-tab cell rendering ────────────────────────────────────────
-interface CrossTabCellsProps {
-  nativeKeys: string[];
-  isVisible: (key: string) => boolean;
-  orderedKeys: string[];
-  project: Project;
-  save: (id: string, field: string, value: string, oldValue: string) => void;
-  canEdit: boolean;
-  statusLabels: string[];
-  saveCurrency?: (id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => void;
-}
-
-export function renderCrossTabCells({
-  nativeKeys, isVisible, orderedKeys, project: p, save, canEdit, statusLabels, saveCurrency,
-}: CrossTabCellsProps) {
-  return orderedKeys
-    .filter((k) => !nativeKeys.includes(k) && isVisible(k))
-    .map((key) => renderCell(key, p, save, canEdit, statusLabels, saveCurrency));
 }
 
 function renderCell(

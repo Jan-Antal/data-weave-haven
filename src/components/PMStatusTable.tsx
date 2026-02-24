@@ -1,4 +1,4 @@
-import { useState, Fragment, useMemo } from "react";
+import { useState, Fragment, useMemo, useEffect, useCallback } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge, RiskBadge } from "./StatusBadge";
 import { InlineEditableCell } from "./InlineEditableCell";
@@ -29,13 +29,14 @@ import { getColumnStyle, renderColumnHeader, renderColumnCell } from "./CrossTab
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...PM_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
 
 const stageStatuses = ["Plánováno", "Probíhá", "Dokončeno", "Pozastaveno"];
 
-function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, orderedNativeKeys, orderedCrossKeys }: { stage: ProjectStage; project: Project; onDelete: (id: string) => void; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; orderedNativeKeys: string[]; orderedCrossKeys: string[] }) {
+function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys }: { stage: ProjectStage; project: Project; onDelete: (id: string) => void; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[] }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
   const updateStage = useUpdateStage();
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -44,7 +45,6 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
   };
   const v = isVisible;
 
-  // Stage-specific cell renderer
   const renderStageCell = (key: string) => {
     switch (key) {
       case "pm": return <TableCell key={key}><InlineEditableCell value={stage.pm} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} /></TableCell>;
@@ -75,8 +75,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
       {v("project_name") && (
         <TableCell className="truncate text-muted-foreground text-xs" title={project.project_name}>{project.project_name}</TableCell>
       )}
-      {orderedNativeKeys.filter((k) => v(k)).map((key) => renderStageCell(key))}
-      {orderedCrossKeys.filter((k) => v(k)).map((key) => <TableCell key={key} />)}
+      {renderKeys.map((key) => renderStageCell(key))}
       <TableCell>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(stage.id)}>
           <Trash2 className="h-3 w-3 text-destructive" />
@@ -86,7 +85,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
   );
 }
 
-function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, orderedNativeKeys, orderedCrossKeys }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; orderedNativeKeys: string[]; orderedCrossKeys: string[] }) {
+function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, renderKeys }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[] }) {
   const { data: stages = [] } = useProjectStages(projectId);
   const addStage = useAddStage();
   const deleteStage = useDeleteStage();
@@ -142,7 +141,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, o
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={stages.map(s => s.id)} strategy={verticalListSortingStrategy}>
           {stages.map(stage => (
-            <SortableStageRow key={stage.id} stage={stage} project={project} onDelete={(id) => setDeleteId(id)} isVisible={isVisible} statusLabels={statusLabels} canEdit={canEdit} orderedNativeKeys={orderedNativeKeys} orderedCrossKeys={orderedCrossKeys} />
+            <SortableStageRow key={stage.id} stage={stage} project={project} onDelete={(id) => setDeleteId(id)} isVisible={isVisible} statusLabels={statusLabels} canEdit={canEdit} renderKeys={renderKeys} />
           ))}
         </SortableContext>
       </DndContext>
@@ -201,13 +200,35 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { pmStatus: { isVisible } } = useAllColumnVisibility();
-  const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys } = useColumnLabels("pm-status");
+  const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, updateOrder } = useColumnLabels("pm-status");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns } = useAuth();
 
   const orderedNativeKeys = useMemo(() => getOrderedKeys(PM_NATIVE), [getOrderedKeys]);
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
-  const visibleCross = orderedAllKeys.filter((k) => !NATIVE_KEYS.includes(k) && isVisible(k));
+
+  const allVisibleKeys = useMemo(() => {
+    const native = orderedNativeKeys.filter((k) => isVisible(k));
+    const cross = orderedAllKeys.filter((k) => !NATIVE_KEYS.includes(k) && isVisible(k));
+    return [...native, ...cross];
+  }, [orderedNativeKeys, orderedAllKeys, isVisible]);
+
+  const [localOrder, setLocalOrder] = useState<string[]>(allVisibleKeys);
+
+  useEffect(() => {
+    if (!editMode) setLocalOrder(allVisibleKeys);
+  }, [allVisibleKeys, editMode]);
+
+  const handleToggleEditMode = useCallback(() => {
+    if (editMode) {
+      updateOrder(localOrder);
+    } else {
+      setLocalOrder(allVisibleKeys);
+    }
+    setEditMode(!editMode);
+  }, [editMode, localOrder, allVisibleKeys, updateOrder]);
+
+  const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 
   const toggleExpand = (pid: string) => {
     setExpanded(prev => {
@@ -235,9 +256,14 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
     editMode,
     updateLabel,
     updateWidth,
+    ...(editMode ? {
+      dragProps: getDragProps(key),
+      dropIndicator: dropTarget?.key === key ? dropTarget.side : null,
+      isDragging: dragKey === key,
+    } : {}),
   });
 
-  const visibleNative = orderedNativeKeys.filter((k) => v(k));
+  const renderKeys = editMode ? localOrder : allVisibleKeys;
 
   return (
     <div>
@@ -253,9 +279,8 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
               <TableHead style={{ minWidth: 32, width: 32 }} className="shrink-0"></TableHead>
               {v("project_id") && renderColumnHeader(headerProps("project_id"))}
               {v("project_name") && renderColumnHeader(headerProps("project_name"))}
-              {visibleNative.map((key) => renderColumnHeader(headerProps(key)))}
-              {visibleCross.map((key) => renderColumnHeader(headerProps(key)))}
-              <ColumnVisibilityToggle tabKey="pmStatus" editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
+              {renderKeys.map((key) => renderColumnHeader(headerProps(key)))}
+              <ColumnVisibilityToggle tabKey="pmStatus" editMode={editMode} onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined} />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -267,10 +292,9 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   </TableCell>
                   {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
                   {v("project_name") && <TableCell className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-                  {visibleNative.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels }))}
-                  {visibleCross.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels }))}
+                  {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels }))}
                 </TableRow>
-                {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} isVisible={v} statusLabels={statusLabels} canEdit={canEdit} orderedNativeKeys={visibleNative} orderedCrossKeys={visibleCross} />}
+                {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} isVisible={v} statusLabels={statusLabels} canEdit={canEdit} renderKeys={renderKeys} />}
               </Fragment>
             ))}
           </TableBody>
