@@ -676,7 +676,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
           style={{ width: LEFT_PANEL_WIDTH, scrollbarWidth: "none" }}
         >
           {/* Header */}
-          <div style={{ height: HEADER_HEIGHT }} className="border-b bg-muted/20 flex items-end px-3 pb-1 gap-2">
+          <div style={{ height: HEADER_HEIGHT, position: "sticky", top: 0, zIndex: 20 }} className="border-b bg-muted/20 flex items-end px-3 pb-1 gap-2 bg-card">
             <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide" style={{ width: 110, flexShrink: 0 }}>ID</span>
             <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide flex-1">Název</span>
           </div>
