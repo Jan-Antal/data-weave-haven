@@ -24,24 +24,23 @@ import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
-import { useAllColumnVisibility } from "./ColumnVisibilityContext";
-import { renderCrossTabHeaders, renderCrossTabCells } from "./CrossTabColumns";
+import { useAllColumnVisibility, PM_NATIVE } from "./ColumnVisibilityContext";
+import { getColumnStyle, renderCrossTabHeaders, renderCrossTabCells } from "./CrossTabColumns";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+
+const NATIVE_KEYS = ["project_id", "project_name", ...PM_NATIVE];
 
 const stageStatuses = ["Plánováno", "Probíhá", "Dokončeno", "Pozastaveno"];
 
 function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit }: { stage: ProjectStage; project: Project; onDelete: (id: string) => void; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
   const updateStage = useUpdateStage();
-
   const style = { transform: CSS.Transform.toString(transform), transition };
-
   const saveStage = (field: string, value: string) => {
     updateStage.mutate({ id: stage.id, field, value, projectId: project.project_id });
   };
-
   const v = isVisible;
 
   return (
@@ -192,13 +191,10 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit }:
 function ExpandArrow({ projectId, isExpanded }: { projectId: string; isExpanded: boolean }) {
   const { data: stages = [] } = useProjectStages(projectId);
   const hasStages = stages.length > 0;
-
   if (isExpanded) {
     return <ChevronDown className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent" : "text-muted-foreground"}`} />;
   }
-  return (
-    <ChevronRight className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent fill-accent/20" : "text-muted-foreground/50"}`} />
-  );
+  return <ChevronRight className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent fill-accent/20" : "text-muted-foreground/50"}`} />;
 }
 
 interface PMStatusTableProps {
@@ -208,21 +204,6 @@ interface PMStatusTableProps {
   riskHighlight?: import("@/hooks/useRiskHighlight").RiskHighlightType;
 }
 
-const DATE_COL: React.CSSProperties = { width: 100, minWidth: 100, maxWidth: 100 };
-const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
-  project_id: { width: 90, minWidth: 90 },
-  project_name: { minWidth: 180 },
-  pm: { minWidth: 110 },
-  status: { width: 110, minWidth: 100 },
-  risk: { width: 80, minWidth: 75 },
-  zamereni: DATE_COL,
-  tpv_date: DATE_COL,
-  expedice: DATE_COL,
-  montaz: DATE_COL,
-  predani: DATE_COL,
-  pm_poznamka: { minWidth: 140 },
-};
-
 export function PMStatusTable({ personFilter, statusFilter, search: externalSearch, riskHighlight }: PMStatusTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
@@ -231,8 +212,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const qc = useQueryClient();
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const { pmStatus: { isVisible, columns } } = useAllColumnVisibility();
-  const PM_NATIVE_KEYS = ["project_id", "project_name", "pm", "status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "pm_poznamka"];
+  const { pmStatus: { isVisible } } = useAllColumnVisibility();
   const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("pm-status");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns } = useAuth();
@@ -253,12 +233,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
 
   const sh = { sortCol, sortDir, onSort: toggleSort };
   const v = isVisible;
-
-  const colStyle = (key: string) => {
-    const w = getWidth(key);
-    const base = DEFAULT_STYLES[key] || {};
-    return w ? { ...base, width: w, minWidth: w } : base;
-  };
+  const cs = (key: string) => getColumnStyle(key, getWidth(key));
 
   const editProps = (key: string, defaultLabel: string) => ({
     editMode,
@@ -274,23 +249,23 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
           Režim úpravy sloupců
         </div>
       )}
-      <div className={cn("rounded-lg border bg-card overflow-x-scroll always-scrollbar", editMode && "rounded-t-none border-t-0")}>
+      <div className={cn("rounded-lg border bg-card overflow-x-auto always-scrollbar", editMode && "rounded-t-none border-t-0")}>
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
               <TableHead style={{ minWidth: 32, width: 32 }} className="shrink-0"></TableHead>
-              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} style={colStyle("project_id")} {...editProps("project_id", "Project ID")} />}
-              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={colStyle("project_name")} {...editProps("project_name", "Project Name")} />}
-              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} style={colStyle("pm")} {...editProps("pm", "PM")} />}
-              {v("status") && <SortableHeader label="Status" column="status" {...sh} style={colStyle("status")} {...editProps("status", "Status")} />}
-              {v("risk") && <SortableHeader label="Risk" column="risk" {...sh} style={colStyle("risk")} {...editProps("risk", "Risk")} />}
-              {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} style={colStyle("zamereni")} {...editProps("zamereni", "Zaměření")} />}
-              {v("tpv_date") && <SortableHeader label="TPV" column="tpv_date" {...sh} style={colStyle("tpv_date")} {...editProps("tpv_date", "TPV")} />}
-              {v("expedice") && <SortableHeader label="Expedice" column="expedice" {...sh} style={colStyle("expedice")} {...editProps("expedice", "Expedice")} />}
-              {v("montaz") && <SortableHeader label="Montáž" column="montaz" {...sh} style={colStyle("montaz")} {...editProps("montaz", "Montáž")} />}
-              {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} style={colStyle("predani")} {...editProps("predani", "Předání")} />}
-              {v("pm_poznamka") && <SortableHeader label="Poznámka PM" column="pm_poznamka" {...sh} style={colStyle("pm_poznamka")} {...editProps("pm_poznamka", "Poznámka PM")} />}
-              {renderCrossTabHeaders({ nativeKeys: PM_NATIVE_KEYS, isVisible: v, sortCol, sortDir, onSort: toggleSort, getLabel, getWidth, editMode, updateLabel, updateWidth })}
+              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} style={cs("project_id")} {...editProps("project_id", "Project ID")} />}
+              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={cs("project_name")} {...editProps("project_name", "Project Name")} />}
+              {v("pm") && <SortableHeader label="PM" column="pm" {...sh} style={cs("pm")} {...editProps("pm", "PM")} />}
+              {v("status") && <SortableHeader label="Status" column="status" {...sh} style={cs("status")} {...editProps("status", "Status")} />}
+              {v("risk") && <SortableHeader label="Risk" column="risk" {...sh} style={cs("risk")} {...editProps("risk", "Risk")} />}
+              {v("zamereni") && <SortableHeader label="Zaměření" column="zamereni" {...sh} style={cs("zamereni")} {...editProps("zamereni", "Zaměření")} />}
+              {v("tpv_date") && <SortableHeader label="TPV" column="tpv_date" {...sh} style={cs("tpv_date")} {...editProps("tpv_date", "TPV")} />}
+              {v("expedice") && <SortableHeader label="Expedice" column="expedice" {...sh} style={cs("expedice")} {...editProps("expedice", "Expedice")} />}
+              {v("montaz") && <SortableHeader label="Montáž" column="montaz" {...sh} style={cs("montaz")} {...editProps("montaz", "Montáž")} />}
+              {v("predani") && <SortableHeader label="Předání" column="predani" {...sh} style={cs("predani")} {...editProps("predani", "Předání")} />}
+              {v("pm_poznamka") && <SortableHeader label="Poznámka PM" column="pm_poznamka" {...sh} style={cs("pm_poznamka")} {...editProps("pm_poznamka", "Poznámka PM")} />}
+              {renderCrossTabHeaders({ nativeKeys: NATIVE_KEYS, isVisible: v, sortCol, sortDir, onSort: toggleSort, getLabel, getWidth, editMode, updateLabel, updateWidth })}
               <ColumnVisibilityToggle tabKey="pmStatus" editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
             </TableRow>
           </TableHeader>
@@ -320,7 +295,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   {v("montaz") && <TableCell><InlineEditableCell value={(p as any).montaz} type="date" onSave={(val) => save(p.id, "montaz", val, (p as any).montaz || "")} readOnly={!canEdit} /></TableCell>}
                   {v("predani") && <TableCell><InlineEditableCell value={p.predani} type="date" onSave={(val) => save(p.id, "predani", val, p.predani || "")} readOnly={!canEdit} /></TableCell>}
                   {v("pm_poznamka") && <TableCell><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(val) => save(p.id, "pm_poznamka", val, p.pm_poznamka || "")} readOnly={!canEdit} /></TableCell>}
-                  {renderCrossTabCells({ nativeKeys: PM_NATIVE_KEYS, isVisible: v, project: p, save, canEdit, statusLabels })}
+                  {renderCrossTabCells({ nativeKeys: NATIVE_KEYS, isVisible: v, project: p, save, canEdit, statusLabels })}
                 </TableRow>
                 {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} isVisible={v} statusLabels={statusLabels} canEdit={canEdit} />}
               </Fragment>

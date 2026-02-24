@@ -27,8 +27,10 @@ import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { useAuth } from "@/hooks/useAuth";
 import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
-import { useAllColumnVisibility } from "./ColumnVisibilityContext";
-import { renderCrossTabHeaders, renderCrossTabCells } from "./CrossTabColumns";
+import { useAllColumnVisibility, PROJECT_INFO_NATIVE } from "./ColumnVisibilityContext";
+import { getColumnStyle, renderCrossTabHeaders, renderCrossTabCells } from "./CrossTabColumns";
+
+const NATIVE_KEYS = ["project_id", "project_name", ...PROJECT_INFO_NATIVE];
 
 const emptyProject = {
   project_id: "",
@@ -52,23 +54,10 @@ interface ProjectInfoTableProps {
   riskHighlight?: import("@/hooks/useRiskHighlight").RiskHighlightType;
 }
 
-const DATE_COL: React.CSSProperties = { width: 100, minWidth: 100, maxWidth: 100 };
-const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
-  project_id: { width: 90, minWidth: 90 },
-  project_name: { minWidth: 180 },
-  klient: { minWidth: 100 },
-  location: { minWidth: 100 },
-  kalkulant: { minWidth: 110 },
-  architekt: { minWidth: 110 },
-  datum_smluvni: DATE_COL,
-  datum_objednavky: DATE_COL,
-  prodejni_cena: { width: 120, minWidth: 110 },
-  marze: { width: 70, minWidth: 60 },
-  link_cn: { minWidth: 120 },
-};
-
 export function ProjectInfoTable({ personFilter, statusFilter, search: externalSearch, riskHighlight }: ProjectInfoTableProps) {
   const { data: projects = [], isLoading } = useProjects();
+  const { data: statusOptions = [] } = useProjectStatusOptions();
+  const statusLabels = statusOptions.map((s) => s.label);
   const updateProject = useUpdateProject();
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [addOpen, setAddOpen] = useState(false);
@@ -76,14 +65,11 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const [datumWarning, setDatumWarning] = useState(false);
   const qc = useQueryClient();
   const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
-  const { projectInfo: { isVisible, columns } } = useAllColumnVisibility();
-  const NATIVE_KEYS = ["project_id", "project_name", "klient", "location", "kalkulant", "architekt", "datum_smluvni", "datum_objednavky", "prodejni_cena", "marze", "link_cn"];
+  const { projectInfo: { isVisible } } = useAllColumnVisibility();
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck();
   const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("project-info");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns, canDeleteProject, isViewer } = useAuth();
-  const { data: statusOptions = [] } = useProjectStatusOptions();
-  const statusLabels = statusOptions.map((s) => s.label);
 
   useEffect(() => {
     const handleOpenAdd = () => setAddOpen(true);
@@ -142,12 +128,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
 
   const sh = { sortCol, sortDir, onSort: toggleSort };
   const v = isVisible;
-
-  const colStyle = (key: string) => {
-    const w = getWidth(key);
-    const base = DEFAULT_STYLES[key] || {};
-    return w ? { ...base, width: w, minWidth: w } : base;
-  };
+  const cs = (key: string) => getColumnStyle(key, getWidth(key));
 
   const editProps = (key: string, defaultLabel: string) => ({
     editMode,
@@ -163,22 +144,22 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
           Režim úpravy sloupců
         </div>
       )}
-      <div className={cn("rounded-lg border bg-card overflow-x-scroll always-scrollbar", editMode && "rounded-t-none border-t-0")}>
+      <div className={cn("rounded-lg border bg-card overflow-x-auto always-scrollbar", editMode && "rounded-t-none border-t-0")}>
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
               <TableHead style={{ minWidth: 32, width: 32 }} className="shrink-0"></TableHead>
-              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} style={colStyle("project_id")} {...editProps("project_id", "Project ID")} />}
-              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={colStyle("project_name")} {...editProps("project_name", "Project Name")} />}
-              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} style={colStyle("klient")} {...editProps("klient", "Klient")} />}
-              {v("location") && <SortableHeader label="Lokace" column="location" {...sh} style={colStyle("location")} {...editProps("location", "Lokace")} />}
-              {v("kalkulant") && <SortableHeader label="Kalkulant" column="kalkulant" {...sh} style={colStyle("kalkulant")} {...editProps("kalkulant", "Kalkulant")} />}
-              {v("architekt") && <SortableHeader label="Architekt" column="architekt" {...sh} style={colStyle("architekt")} {...editProps("architekt", "Architekt")} />}
-              {v("datum_smluvni") && <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} style={colStyle("datum_smluvni")} {...editProps("datum_smluvni", "Datum Smluvní")} />}
-              {v("datum_objednavky") && <SortableHeader label="Datum Objednávky" column="datum_objednavky" {...sh} style={colStyle("datum_objednavky")} {...editProps("datum_objednavky", "Datum Objednávky")} />}
-              {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="text-right" style={colStyle("prodejni_cena")} {...editProps("prodejni_cena", "Prodejní cena")} />}
-              {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} className="text-right" style={colStyle("marze")} {...editProps("marze", "Marže")} />}
-              {v("link_cn") && <SortableHeader label="CN" column="link_cn" {...sh} style={colStyle("link_cn")} {...editProps("link_cn", "CN")} />}
+              {v("project_id") && <SortableHeader label="Project ID" column="project_id" {...sh} style={cs("project_id")} {...editProps("project_id", "Project ID")} />}
+              {v("project_name") && <SortableHeader label="Project Name" column="project_name" {...sh} style={cs("project_name")} {...editProps("project_name", "Project Name")} />}
+              {v("klient") && <SortableHeader label="Klient" column="klient" {...sh} style={cs("klient")} {...editProps("klient", "Klient")} />}
+              {v("location") && <SortableHeader label="Lokace" column="location" {...sh} style={cs("location")} {...editProps("location", "Lokace")} />}
+              {v("kalkulant") && <SortableHeader label="Kalkulant" column="kalkulant" {...sh} style={cs("kalkulant")} {...editProps("kalkulant", "Kalkulant")} />}
+              {v("architekt") && <SortableHeader label="Architekt" column="architekt" {...sh} style={cs("architekt")} {...editProps("architekt", "Architekt")} />}
+              {v("datum_smluvni") && <SortableHeader label="Datum Smluvní" column="datum_smluvni" {...sh} style={cs("datum_smluvni")} {...editProps("datum_smluvni", "Datum Smluvní")} />}
+              {v("datum_objednavky") && <SortableHeader label="Datum Objednávky" column="datum_objednavky" {...sh} style={cs("datum_objednavky")} {...editProps("datum_objednavky", "Datum Objednávky")} />}
+              {v("prodejni_cena") && <SortableHeader label="Prodejní cena" column="prodejni_cena" {...sh} className="text-right" style={cs("prodejni_cena")} {...editProps("prodejni_cena", "Prodejní cena")} />}
+              {v("marze") && <SortableHeader label="Marže" column="marze" {...sh} className="text-right" style={cs("marze")} {...editProps("marze", "Marže")} />}
+              {v("link_cn") && <SortableHeader label="CN" column="link_cn" {...sh} style={cs("link_cn")} {...editProps("link_cn", "CN")} />}
               {renderCrossTabHeaders({ nativeKeys: NATIVE_KEYS, isVisible: v, sortCol, sortDir, onSort: toggleSort, getLabel, getWidth, editMode, updateLabel, updateWidth })}
               <ColumnVisibilityToggle tabKey="projectInfo" editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
             </TableRow>
