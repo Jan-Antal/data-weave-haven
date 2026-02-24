@@ -37,9 +37,9 @@ export function ColumnVisibilityToggle({
             )}
           </button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-60 p-2 z-[9999] bg-popover border shadow-md max-h-[70vh] overflow-y-auto">
+        <PopoverContent align="end" className="w-60 p-0 z-[9999] bg-popover border shadow-md max-h-[70vh] flex flex-col">
           {onToggleEditMode && (
-            <>
+            <div className="p-2 pb-0 shrink-0">
               <Button
                 variant={editMode ? "default" : "outline"}
                 size="sm"
@@ -48,38 +48,40 @@ export function ColumnVisibilityToggle({
               >
                 {editMode ? "Dokončit úpravy" : "Upravit sloupce"}
               </Button>
-              <Separator className="mb-2" />
-            </>
+              <Separator />
+            </div>
           )}
-          <Accordion type="multiple" defaultValue={COLUMN_GROUPS.map(g => g.label)} className="w-full">
-            {COLUMN_GROUPS.map((group) => {
-              const groupColumns = allColumns.filter(
-                (col) => !col.locked && group.keys.includes(col.key)
-              );
-              if (groupColumns.length === 0) return null;
-              return (
-                <AccordionItem key={group.label} value={group.label} className="border-b-0">
-                  <AccordionTrigger className="py-1.5 px-2 text-xs font-semibold text-muted-foreground hover:no-underline">
-                    {group.label}
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-1 pt-0">
-                    {groupColumns.map((col) => (
-                      <label
-                        key={col.key}
-                        className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer text-sm"
-                      >
-                        <Checkbox
-                          checked={state.isVisible(col.key)}
-                          onCheckedChange={() => state.toggleColumn(col.key)}
-                        />
-                        <span>{col.label}</span>
-                      </label>
-                    ))}
-                  </AccordionContent>
-                </AccordionItem>
-              );
-            })}
-          </Accordion>
+          <div className="overflow-y-auto p-2 pt-1">
+            <Accordion type="multiple" defaultValue={COLUMN_GROUPS.map(g => g.label)} className="w-full">
+              {COLUMN_GROUPS.map((group) => {
+                const groupColumns = allColumns.filter(
+                  (col) => !col.locked && group.keys.includes(col.key)
+                );
+                if (groupColumns.length === 0) return null;
+                return (
+                  <AccordionItem key={group.label} value={group.label} className="border-b-0">
+                    <AccordionTrigger className="py-1.5 px-2 text-xs font-semibold text-muted-foreground hover:no-underline">
+                      {group.label}
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-1 pt-0">
+                      {groupColumns.map((col) => (
+                        <label
+                          key={col.key}
+                          className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer text-sm"
+                        >
+                          <Checkbox
+                            checked={state.isVisible(col.key)}
+                            onCheckedChange={() => state.toggleColumn(col.key)}
+                          />
+                          <span>{col.label}</span>
+                        </label>
+                      ))}
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+          </div>
         </PopoverContent>
       </Popover>
     </TableHead>
