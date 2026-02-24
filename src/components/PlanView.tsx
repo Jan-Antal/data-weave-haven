@@ -174,12 +174,18 @@ function getProjectBarData(p: Project, statusColorMap: Record<string, string>): 
     if (differenceInDays(e, s) < 7) e = addDays(s, 7);
 
     if (milestoneDates.length === 0) {
-      const color = statusColorMap[p.status || ""] || "#6b7280";
+      // No milestones → single bar in first phase color
       console.log(`[PlanView] ${p.project_id}: BOTH dates, no milestones, single bar`);
-      return { segments: [{ start: s, end: e, color }], diamonds, connectorLine, hasWarning };
+      return { segments: [{ start: s, end: e, color: PHASE_COLORS.konstrukce }], diamonds, connectorLine, hasWarning };
     }
 
-    const allPoints = [s, ...milestoneDates.map((m) => m.date), e];
+    // Clamp milestones to bar range for segmentation
+    const clampedMilestones = milestoneDates.map(m => ({
+      ...m,
+      date: m.date < s ? s : m.date > e ? e : m.date,
+    }));
+
+    const allPoints = [s, ...clampedMilestones.map((m) => m.date), e];
     allPoints.sort((a, b) => a.getTime() - b.getTime());
     const uniquePoints: Date[] = [allPoints[0]];
     for (let i = 1; i < allPoints.length; i++) {
@@ -212,17 +218,15 @@ function getProjectBarData(p: Project, statusColorMap: Record<string, string>): 
   // CASE 2: Only datum_objednavky → dashed bar extending 90 days forward
   if (barStart && !barEnd) {
     const e = addDays(barStart, 90);
-    const color = statusColorMap[p.status || ""] || "#6b7280";
     console.log(`[PlanView] ${p.project_id}: ONLY objednavky → dashed bar 90d forward`);
-    return { segments: [{ start: barStart, end: e, color, dashed: true }], diamonds, connectorLine, hasWarning };
+    return { segments: [{ start: barStart, end: e, color: PHASE_COLORS.konstrukce, dashed: true }], diamonds, connectorLine, hasWarning };
   }
 
   // CASE 3: Only datum_smluvni → dashed bar starting 90 days before
   if (!barStart && barEnd) {
     const s = addDays(barEnd, -90);
-    const color = statusColorMap[p.status || ""] || "#6b7280";
     console.log(`[PlanView] ${p.project_id}: ONLY smluvni → dashed bar 90d back`);
-    return { segments: [{ start: s, end: barEnd, color, dashed: true }], diamonds, connectorLine, hasWarning };
+    return { segments: [{ start: s, end: barEnd, color: PHASE_COLORS.konstrukce, dashed: true }], diamonds, connectorLine, hasWarning };
   }
 
   // CASE 4: Neither date exists → no bar, only milestones + connector
@@ -262,8 +266,7 @@ function getStageBarData(stage: ProjectStage, project: Project, statusColorMap: 
   const e = barEnd ?? addDays(s, 30);
 
   if (milestoneDates.length === 0) {
-    const color = statusColorMap[stage.status || ""] || "#6b7280";
-    return { segments: [{ start: s, end: e, color }], diamonds, connectorLine, hasWarning: false };
+    return { segments: [{ start: s, end: e, color: PHASE_COLORS.konstrukce }], diamonds, connectorLine, hasWarning: false };
   }
 
   const allPoints = [s, ...milestoneDates.map((m) => m.date), e].sort((a, b) => a.getTime() - b.getTime());
