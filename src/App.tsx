@@ -7,6 +7,7 @@ import { PeopleManagementProvider } from "@/components/PeopleManagementContext";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
+import AcceptInvite from "./pages/AcceptInvite";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,7 +24,14 @@ function AppRoutes() {
   }
 
   if (!user) {
-    return <Login />;
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route path="/accept-invite" element={<AcceptInvite />} />
+          <Route path="*" element={<Login />} />
+        </Routes>
+      </BrowserRouter>
+    );
   }
 
   return (
@@ -31,6 +39,7 @@ function AppRoutes() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/accept-invite" element={<AcceptInvite />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

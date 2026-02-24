@@ -41,7 +41,7 @@ export function UserManagement({ open, onOpenChange }: Props) {
   const [loading, setLoading] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [newUser, setNewUser] = useState({ full_name: "", email: "", password: "", role: "viewer" as AppRole });
+  const [newUser, setNewUser] = useState({ full_name: "", email: "", role: "viewer" as AppRole });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -82,7 +82,6 @@ export function UserManagement({ open, onOpenChange }: Props) {
     const errors: Record<string, string> = {};
     if (!newUser.full_name.trim()) errors.full_name = "Jméno je povinné";
     if (!newUser.email.trim()) errors.email = "Email je povinný";
-    if (!newUser.password.trim()) errors.password = "Heslo je povinné";
     if (!newUser.role) errors.role = "Role je povinná";
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
@@ -94,20 +93,19 @@ export function UserManagement({ open, onOpenChange }: Props) {
       const { data, error } = await supabase.functions.invoke("create-user", {
         body: {
           email: newUser.email.trim(),
-          password: newUser.password,
           full_name: newUser.full_name.trim(),
           role: newUser.role,
         },
       });
 
       if (error) {
-        setSubmitError(error.message || "Chyba při vytváření uživatele");
+        setSubmitError(error.message || "Chyba při odesílání pozvánky");
       } else if (data?.error) {
         setSubmitError(data.error);
       } else {
-        toast({ title: "Uživatel vytvořen" });
+        toast({ title: `Pozvánka odeslána na ${newUser.email.trim()}` });
         setAddOpen(false);
-        setNewUser({ full_name: "", email: "", password: "", role: "viewer" });
+        setNewUser({ full_name: "", email: "", role: "viewer" });
         setFieldErrors({});
         fetchUsers();
       }
@@ -326,11 +324,6 @@ export function UserManagement({ open, onOpenChange }: Props) {
               {fieldErrors.email && <p className="text-xs text-destructive mt-1">{fieldErrors.email}</p>}
             </div>
             <div>
-              <Label>Heslo</Label>
-              <Input type="password" value={newUser.password} onChange={(e) => { setNewUser((s) => ({ ...s, password: e.target.value })); setFieldErrors((f) => ({ ...f, password: "" })); }} className={fieldErrors.password ? "border-destructive" : ""} />
-              {fieldErrors.password && <p className="text-xs text-destructive mt-1">{fieldErrors.password}</p>}
-            </div>
-            <div>
               <Label>Role</Label>
               <Select value={newUser.role} onValueChange={(v) => { setNewUser((s) => ({ ...s, role: v as AppRole })); setFieldErrors((f) => ({ ...f, role: "" })); }}>
                 <SelectTrigger className={fieldErrors.role ? "border-destructive" : ""}>
@@ -348,7 +341,7 @@ export function UserManagement({ open, onOpenChange }: Props) {
           <div className="flex justify-end gap-2 mt-2">
             <Button variant="outline" onClick={() => { setAddOpen(false); setFieldErrors({}); setSubmitError(""); }}>Zrušit</Button>
             <Button onClick={handleAddUser} disabled={submitting}>
-              {submitting ? "Vytvářím..." : "Vytvořit"}
+              {submitting ? "Odesílám..." : "Odeslat pozvánku"}
             </Button>
           </div>
         </DialogContent>
