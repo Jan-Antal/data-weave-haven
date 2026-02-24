@@ -71,26 +71,45 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Generate invite link
-    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+    const redirectTo = "https://id-preview--ce3e87ee-9f18-44df-921b-691cc44882ec.lovable.app/accept-invite";
+
+    // Try invite first, fall back to recovery for already-registered users
+    let actionLink: string | undefined;
+
+    const { data: inviteLinkData, error: inviteLinkError } = await adminClient.auth.admin.generateLink({
       type: "invite",
       email: profile.email,
-      options: {
-        redirectTo: "https://id-preview--ce3e87ee-9f18-44df-921b-691cc44882ec.lovable.app/accept-invite",
-      },
+      options: { redirectTo },
     });
 
-    if (linkError) {
-      console.error("Generate link error:", linkError);
-      return new Response(JSON.stringify({ error: linkError.message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (inviteLinkError) {
+      // If user already exists, use recovery link instead (works the same for password setup)
+      if (inviteLinkError.message?.includes("already been registered") || (inviteLinkError as any).code === "email_exists") {
+        console.log("User already registered, generating recovery link instead");
+        const { data: recoveryData, error: recoveryError } = await adminClient.auth.admin.generateLink({
+          type: "recovery",
+          email: profile.email,
+          options: { redirectTo },
+        });
 
-    // The generated link contains token_hash and type params
-    // We need to construct the proper redirect URL with the confirmation token
-    const actionLink = linkData?.properties?.action_link;
+        if (recoveryError) {
+          console.error("Recovery link error:", recoveryError);
+          return new Response(JSON.stringify({ error: recoveryError.message }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        actionLink = recoveryData?.properties?.action_link;
+      } else {
+        console.error("Generate link error:", inviteLinkError);
+        return new Response(JSON.stringify({ error: inviteLinkError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else {
+      actionLink = inviteLinkData?.properties?.action_link;
+    }
 
     if (!actionLink) {
       return new Response(JSON.stringify({ error: "Failed to generate link" }), {

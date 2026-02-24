@@ -230,7 +230,7 @@ export function UserManagement({ open, onOpenChange }: Props) {
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={onOpenChange} modal={true}>
         <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
           <div className="px-5 pt-5 pb-3 border-b">
             <DialogHeader>
@@ -335,8 +335,8 @@ export function UserManagement({ open, onOpenChange }: Props) {
       </Dialog>
 
       {/* Add User Dialog */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="z-[99999]" style={{ zIndex: 99999 }}>
+      <Dialog open={addOpen} onOpenChange={(v) => { setAddOpen(v); if (!v) { setFieldErrors({}); setSubmitError(""); } }}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Nový uživatel</DialogTitle>
           </DialogHeader>
@@ -382,7 +382,7 @@ export function UserManagement({ open, onOpenChange }: Props) {
 
       {/* Reset Password Dialog */}
       <Dialog open={resetTarget !== null} onOpenChange={(v) => { if (!v) { setResetTarget(null); setResetPassword(""); setResetError(""); } }}>
-        <DialogContent className="z-[99999] max-w-sm" style={{ zIndex: 99999 }}>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Reset hesla</DialogTitle>
           </DialogHeader>
@@ -411,7 +411,7 @@ export function UserManagement({ open, onOpenChange }: Props) {
 
       {/* Transfer Ownership Dialog */}
       <Dialog open={transferOpen} onOpenChange={(v) => { if (!v) { setTransferOpen(false); setTransferTarget(""); } }}>
-        <DialogContent className="z-[99999] max-w-sm" style={{ zIndex: 99999 }}>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Předat vlastnictví</DialogTitle>
           </DialogHeader>
