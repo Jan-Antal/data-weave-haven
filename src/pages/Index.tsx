@@ -134,7 +134,7 @@ const Index = () => {
         <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRiskHighlightChange={setRiskHighlight} activeTab={activeTab} />
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between">
             <TabsList className="bg-card border">
               <TabsTrigger value="project-info" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Project Info
@@ -146,29 +146,55 @@ const Index = () => {
                 TPV Status
               </TabsTrigger>
             </TabsList>
-            <div className="w-px h-6 bg-border mx-1" />
-            <TabsList className="bg-card border">
-              <TabsTrigger value="plan" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+
+            {/* Plán + Zoom unified tile */}
+            <div
+              className="flex items-center"
+              style={{
+                border: "1px solid #e0ddd8",
+                borderRadius: 8,
+                background: "white",
+                overflow: "hidden",
+              }}
+            >
+              {activeTab === "plan" && (
+                <>
+                  {(["3M", "6M", "1R"] as ZoomLevel[]).map((z) => (
+                    <button
+                      key={z}
+                      onClick={() => setPlanZoom(z)}
+                      className="text-[11px] font-medium transition-colors"
+                      style={{
+                        height: 32,
+                        padding: "0 10px",
+                        background: planZoom === z ? "#1f2d26" : "transparent",
+                        color: planZoom === z ? "white" : "#555",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {z}
+                    </button>
+                  ))}
+                  <div style={{ width: 1, height: 16, background: "#ddd", margin: "0 4px", flexShrink: 0 }} />
+                </>
+              )}
+              <button
+                onClick={() => handleTabChange("plan")}
+                className="text-[11px] font-medium transition-colors"
+                style={{
+                  height: 32,
+                  padding: "0 12px",
+                  background: activeTab === "plan" ? "#1f2d26" : "transparent",
+                  color: activeTab === "plan" ? "white" : "#555",
+                  border: "none",
+                  cursor: "pointer",
+                  borderRadius: activeTab !== "plan" ? 7 : 0,
+                }}
+              >
                 📅 Plán
-              </TabsTrigger>
-            </TabsList>
-            {activeTab === "plan" && (
-              <div className="flex items-center gap-0.5 ml-1">
-                {(["3M", "6M", "1R"] as ZoomLevel[]).map((z) => (
-                  <button
-                    key={z}
-                    onClick={() => setPlanZoom(z)}
-                    className={`text-[11px] font-medium h-7 px-2 rounded-md transition-colors ${
-                      planZoom === z
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-card border text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                    }`}
-                  >
-                    {z}
-                  </button>
-                ))}
-              </div>
-            )}
+              </button>
+            </div>
           </div>
 
           <TabsContent value="project-info" forceMount className={activeTab !== "project-info" ? "hidden" : ""}>
