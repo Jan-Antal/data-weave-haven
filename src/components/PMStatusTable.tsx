@@ -207,18 +207,19 @@ interface PMStatusTableProps {
   riskHighlight?: import("@/hooks/useRiskHighlight").RiskHighlightType;
 }
 
+const DATE_COL: React.CSSProperties = { width: 100, minWidth: 100, maxWidth: 100 };
 const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
-  project_id: { minWidth: 90 },
-  project_name: { minWidth: 160, flex: 2 },
-  pm: { minWidth: 110, flex: 1 },
-  status: { minWidth: 100 },
-  risk: { minWidth: 75 },
-  zamereni: { minWidth: 90 },
-  tpv_date: { minWidth: 90 },
-  expedice: { minWidth: 90 },
-  montaz: { minWidth: 90 },
-  predani: { minWidth: 90 },
-  pm_poznamka: { minWidth: 140, flex: 1 },
+  project_id: { width: 90, minWidth: 90 },
+  project_name: { minWidth: 180 },
+  pm: { minWidth: 110 },
+  status: { width: 110, minWidth: 100 },
+  risk: { width: 80, minWidth: 75 },
+  zamereni: DATE_COL,
+  tpv_date: DATE_COL,
+  expedice: DATE_COL,
+  montaz: DATE_COL,
+  predani: DATE_COL,
+  pm_poznamka: { minWidth: 140 },
 };
 
 export function PMStatusTable({ personFilter, statusFilter, search: externalSearch, riskHighlight }: PMStatusTableProps) {
