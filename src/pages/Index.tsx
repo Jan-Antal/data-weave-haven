@@ -3,6 +3,7 @@ import { ProjectInfoTable } from "@/components/ProjectInfoTable";
 import { PMStatusTable } from "@/components/PMStatusTable";
 import { TPVStatusTable } from "@/components/TPVStatusTable";
 import { PlanView } from "@/components/PlanView";
+import type { ZoomLevel } from "@/components/PlanView";
 import { ColumnVisibilityProvider } from "@/components/ColumnVisibilityContext";
 import { DashboardStats } from "@/components/DashboardStats";
 import { TableFilters, useTableFilters } from "@/components/TableFilters";
@@ -28,6 +29,7 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("project-info");
   const [riskHighlight, setRiskHighlight] = useState<RiskHighlightType>(null);
   const [savedStatusFilter, setSavedStatusFilter] = useState<string[] | null>(null);
+  const [planZoom, setPlanZoom] = useState<ZoomLevel>("3M");
 
   const TPV_ACTIVE_STATUSES = ["Příprava", "Engineering", "TPV"];
 
@@ -150,6 +152,23 @@ const Index = () => {
                 📅 Plán
               </TabsTrigger>
             </TabsList>
+            {activeTab === "plan" && (
+              <div className="flex items-center gap-0.5 ml-1">
+                {(["3M", "6M", "1R"] as ZoomLevel[]).map((z) => (
+                  <button
+                    key={z}
+                    onClick={() => setPlanZoom(z)}
+                    className={`text-[11px] font-medium h-7 px-2 rounded-md transition-colors ${
+                      planZoom === z
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-card border text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    }`}
+                  >
+                    {z}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <TabsContent value="project-info" forceMount className={activeTab !== "project-info" ? "hidden" : ""}>
@@ -162,7 +181,7 @@ const Index = () => {
             <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
           </TabsContent>
           <TabsContent value="plan" forceMount className={activeTab !== "plan" ? "hidden" : ""}>
-            <PlanView personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} />
+            <PlanView personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} zoom={planZoom} />
           </TabsContent>
         </Tabs>
       </main>

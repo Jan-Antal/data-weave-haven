@@ -40,10 +40,13 @@ type ZoomLevel = "3M" | "6M" | "1R";
 const ZOOM_DAY_PX: Record<ZoomLevel, number> = { "3M": 8, "6M": 4, "1R": 2 };
 const ZOOM_MONTHS: Record<ZoomLevel, number> = { "3M": 3, "6M": 6, "1R": 12 };
 
+export type { ZoomLevel };
+
 interface PlanViewProps {
   personFilter: string | null;
   statusFilter: string[];
   search: string;
+  zoom?: ZoomLevel;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -474,11 +477,11 @@ function StatusDot({ color }: { color: string }) {
 }
 
 // ── Main PlanView ───────────────────────────────────────────────────
-export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) {
+export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }: PlanViewProps) {
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const { sorted } = useSortFilter(projects, { personFilter, statusFilter }, search);
-  const [zoom, setZoom] = useState<ZoomLevel>("3M");
+  const zoom = zoomProp ?? ("3M" as ZoomLevel);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const leftRef = useRef<HTMLDivElement>(null);
@@ -579,14 +582,6 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
-      {/* Zoom toolbar */}
-      <div className="flex items-center justify-end gap-1 px-3 py-2 border-b bg-muted/30">
-        {(["3M", "6M", "1R"] as ZoomLevel[]).map((z) => (
-          <Button key={z} variant={zoom === z ? "default" : "outline"} size="sm" className="text-xs h-7 px-3" onClick={() => setZoom(z)}>
-            {z}
-          </Button>
-        ))}
-      </div>
 
       <div className="flex" style={{ height: "calc(100vh - 340px)", minHeight: 400 }}>
         {/* LEFT PANEL */}
