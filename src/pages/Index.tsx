@@ -50,7 +50,7 @@ const Index = () => {
     <ColumnVisibilityProvider>
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b bg-primary px-6 py-4 sticky top-0 z-50">
-        <div className="max-w-[1600px] mx-auto flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-serif text-primary-foreground tracking-wide">
               A→M <span className="font-sans font-normal text-base opacity-80">Interior</span>
@@ -108,7 +108,7 @@ const Index = () => {
       </header>
 
       <div className="sticky top-[65px] z-40 bg-background border-b px-6 py-3">
-        <div className="max-w-[1600px] mx-auto">
+        <div>
           <TableFilters
             personFilter={filters.personFilter}
             onPersonFilterChange={filters.setPersonFilter}
@@ -127,7 +127,7 @@ const Index = () => {
         </div>
       </div>
 
-      <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6 flex-1">
+      <main className="px-6 py-6 space-y-6 flex-1 w-full">
         <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRiskHighlightChange={setRiskHighlight} activeTab={activeTab} />
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
