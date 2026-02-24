@@ -167,8 +167,8 @@ const Index = () => {
                       style={{
                         height: 32,
                         padding: "0 10px",
-                        background: planZoom === z ? "#1f2d26" : "transparent",
-                        color: planZoom === z ? "white" : "#555",
+                        background: planZoom === z ? "#e0ddd8" : "transparent",
+                        color: planZoom === z ? "#1f2d26" : "#555",
                         border: "none",
                         cursor: "pointer",
                       }}
@@ -181,7 +181,7 @@ const Index = () => {
               )}
               <button
                 onClick={() => handleTabChange("plan")}
-                className="text-[11px] font-medium transition-colors"
+                className="text-sm font-medium transition-colors"
                 style={{
                   height: 32,
                   padding: "0 12px",
