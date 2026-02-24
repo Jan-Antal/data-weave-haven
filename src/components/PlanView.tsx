@@ -402,18 +402,13 @@ function MilestoneDiamond({
   );
 }
 
-// ── Hatch pattern SVG ───────────────────────────────────────────────
-function HatchPattern({ id, color1, color2 }: { id: string; color1: string; color2: string }) {
-  return (
-    <svg width="0" height="0" className="absolute">
-      <defs>
-        <pattern id={id} patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
-          <rect width="4" height="8" fill={color1} />
-          <rect x="4" width="4" height="8" fill={color2} />
-        </pattern>
-      </defs>
-    </svg>
-  );
+// ── Hatch pattern helper ─────────────────────────────────────────────
+function hatchBackground(color1: string, color2: string): string {
+  return `repeating-linear-gradient(
+    45deg,
+    ${color1} 0px, ${color1} 4px,
+    ${color2} 4px, ${color2} 8px
+  )`;
 }
 
 // ── Warning icon ────────────────────────────────────────────────────
@@ -507,7 +502,7 @@ function SubstageRow({
         if (w <= 0) return null;
         const wkLabel = weeksLabel(seg.start, seg.end);
         const phaseLabel = PHASE_LABELS[seg.color];
-        const hatchId = seg.hatchColors ? `hatch-sub-${i}-${seg.hatchColors[0].replace('#','')}-${seg.hatchColors[1].replace('#','')}` : null;
+        const hasHatch = !!seg.hatchColors;
         const segDiv = (
           <div
             key={i}
@@ -515,11 +510,10 @@ function SubstageRow({
               position: "absolute",
               left: x, top: midY - SUBSTAGE_BAR_HEIGHT / 2,
               width: Math.max(w, 4), height: SUBSTAGE_BAR_HEIGHT,
-              background: hatchId ? `url(#${hatchId})` : seg.color,
+              background: hasHatch ? hatchBackground(seg.hatchColors![0], seg.hatchColors![1]) : seg.color,
               zIndex: 2, borderRadius: 4,
             }}
           >
-            {hatchId && <HatchPattern id={hatchId} color1={seg.hatchColors![0]} color2={seg.hatchColors![1]} />}
             {w > 32 && wkLabel && (
               <span className="absolute inset-0 flex items-center justify-center text-[9px] font-medium text-white/90 leading-none">{wkLabel}</span>
             )}
@@ -837,7 +831,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                       const wkLabel = weeksLabel(seg.start, seg.end);
 
                       const phaseLabel = PHASE_LABELS[seg.color];
-                      const hatchId = seg.hatchColors ? `hatch-main-${i}-${seg.hatchColors[0].replace('#','')}-${seg.hatchColors[1].replace('#','')}` : null;
+                      const hasHatch = !!seg.hatchColors;
                       const segDiv = (
                         <div
                           key={`seg-${i}`}
@@ -847,13 +841,12 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                             top: 16,
                             width: segW,
                             height: BAR_HEIGHT,
-                            background: hatchId ? `url(#${hatchId})` : seg.color,
+                            background: hasHatch ? hatchBackground(seg.hatchColors![0], seg.hatchColors![1]) : seg.color,
                             zIndex: 2,
                             borderRadius: 4,
                             minWidth: 4,
                           }}
                         >
-                          {hatchId && <HatchPattern id={hatchId} color1={seg.hatchColors![0]} color2={seg.hatchColors![1]} />}
                           {segW > 32 && wkLabel && (
                             <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 600, color: "white", lineHeight: 1 }}>
                               {wkLabel}
