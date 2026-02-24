@@ -4,7 +4,7 @@ import { useProjectStages, ProjectStage } from "@/hooks/useProjectStages";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { useSortFilter } from "@/hooks/useSortFilter";
 import { parseAppDate } from "@/lib/dateFormat";
-import { ChevronRight, ChevronDown } from "lucide-react";
+import { ChevronRight, ChevronDown, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { format, differenceInDays, addDays, startOfWeek, startOfMonth, addMonths, getISOWeek } from "date-fns";
@@ -67,12 +67,46 @@ function weeksLabel(startDate: Date, endDate: Date): string {
   return weeks > 0 ? `${weeks}t` : "";
 }
 
+// ── Milestone validation ────────────────────────────────────────────
+interface MilestoneWarning {
+  message: string;
+}
+
+function validateMilestones(p: { tpv_date?: string | null; expedice?: string | null; predani?: string | null }): MilestoneWarning[] {
+  const warnings: MilestoneWarning[] = [];
+  const tpv = parseDateField(p.tpv_date);
+  const exp = parseDateField(p.expedice);
+  const pred = parseDateField(p.predani);
+
+  // Check missing milestones if at least one exists
+  const hasAny = tpv || exp || pred;
+  if (hasAny) {
+    if (!tpv) warnings.push({ message: "Chybí datum TPV" });
+    if (!exp) warnings.push({ message: "Chybí datum Expedice" });
+    if (!pred) warnings.push({ message: "Chybí datum Předání" });
+  }
+
+  // Check order
+  if (tpv && exp && exp.getTime() < tpv.getTime()) {
+    warnings.push({ message: "Expedice je před TPV" });
+  }
+  if (exp && pred && pred.getTime() < exp.getTime()) {
+    warnings.push({ message: "Předání je před Expedicí" });
+  }
+  if (tpv && pred && pred.getTime() < tpv.getTime()) {
+    warnings.push({ message: "Předání je před TPV" });
+  }
+
+  return warnings;
+}
+
 // ── Bar data computation ────────────────────────────────────────────
 interface Segment {
   start: Date;
   end: Date;
   color: string;
   hatch?: { color1: string; color2: string };
+  dashed?: boolean;
 }
 
 interface Diamond {
@@ -86,6 +120,8 @@ interface Diamond {
 interface BarData {
   segments: Segment[];
   diamonds: Diamond[];
+  connectorLine?: { startX: Date; endX: Date };
+  hasWarning: boolean;
 }
 
 function getProjectBarData(p: Project, statusColorMap: Record<string, string>): BarData {
@@ -95,8 +131,10 @@ function getProjectBarData(p: Project, statusColorMap: Record<string, string>): 
   const expedice = parseDateField(p.expedice);
   const predani = parseDateField(p.predani);
 
-  // Debug logging
-  console.log(`[PlanView] ${p.project_id}: objednavky=${p.datum_objednavky}→${barStart}, smluvni=${p.datum_smluvni}→${barEnd}, tpv=${tpv}, exp=${expedice}, pred=${predani}`);
+  console.log(`[PlanView] ${p.project_id}: objednavky="${p.datum_objednavky}"→${barStart}, smluvni="${p.datum_smluvni}"→${barEnd}, tpv=${tpv}, exp=${expedice}, pred=${predani}`);
+
+  const warnings = validateMilestones(p);
+  const hasWarning = warnings.length > 0;
 
   const milestoneDates: { key: string; date: Date; color: string; name: string }[] = [];
   if (tpv) milestoneDates.push({ key: "tpv_date", date: tpv, color: MILESTONE_COLORS.tpv_date, name: "TPV" });
@@ -120,78 +158,76 @@ function getProjectBarData(p: Project, statusColorMap: Record<string, string>): 
     };
   });
 
-  // Determine effective start & end — use any available date
-  let effectiveStart = barStart;
-  let effectiveEnd = barEnd;
-
-  // If no start, use earliest milestone
-  if (!effectiveStart && milestoneDates.length > 0) {
-    effectiveStart = milestoneDates[0].date;
-  }
-  // If no end, use latest milestone
-  if (!effectiveEnd && milestoneDates.length > 0) {
-    effectiveEnd = milestoneDates[milestoneDates.length - 1].date;
+  // Connector line between milestones
+  let connectorLine: { startX: Date; endX: Date } | undefined;
+  if (milestoneDates.length >= 2) {
+    connectorLine = {
+      startX: milestoneDates[0].date,
+      endX: milestoneDates[milestoneDates.length - 1].date,
+    };
   }
 
-  // Nothing at all
-  if (!effectiveStart && !effectiveEnd) {
-    return { segments: [], diamonds };
+  // CASE 1: Both dates exist → full segmented bar
+  if (barStart && barEnd) {
+    let s = barStart;
+    let e = barEnd;
+    if (differenceInDays(e, s) < 7) e = addDays(s, 7);
+
+    if (milestoneDates.length === 0) {
+      const color = statusColorMap[p.status || ""] || "#6b7280";
+      console.log(`[PlanView] ${p.project_id}: BOTH dates, no milestones, single bar`);
+      return { segments: [{ start: s, end: e, color }], diamonds, connectorLine, hasWarning };
+    }
+
+    const allPoints = [s, ...milestoneDates.map((m) => m.date), e];
+    allPoints.sort((a, b) => a.getTime() - b.getTime());
+    const uniquePoints: Date[] = [allPoints[0]];
+    for (let i = 1; i < allPoints.length; i++) {
+      if (allPoints[i].getTime() !== allPoints[i - 1].getTime()) uniquePoints.push(allPoints[i]);
+    }
+
+    const colorSequence = [PHASE_COLORS.konstrukce, PHASE_COLORS.vyroba, PHASE_COLORS.montaz, PHASE_COLORS.dokonceno];
+    const segments: Segment[] = [];
+    let colorIdx = 0;
+
+    for (let i = 0; i < uniquePoints.length - 1; i++) {
+      const segStart = uniquePoints[i];
+      const segEnd = uniquePoints[i + 1];
+      const color = colorSequence[Math.min(colorIdx, colorSequence.length - 1)];
+      const daysBetween = differenceInDays(segEnd, segStart);
+      let hatch: { color1: string; color2: string } | undefined;
+      if (daysBetween <= OVERLAP_THRESHOLD_DAYS && daysBetween >= 0 && colorIdx > 0) {
+        hatch = { color1: colorSequence[Math.min(colorIdx - 1, colorSequence.length - 1)], color2: color };
+      }
+      segments.push({ start: segStart, end: segEnd, color, hatch });
+      if (tpv && segEnd.getTime() === tpv.getTime()) colorIdx = Math.max(colorIdx, 1);
+      else if (expedice && segEnd.getTime() === expedice.getTime()) colorIdx = Math.max(colorIdx, 2);
+      else if (predani && segEnd.getTime() === predani.getTime()) colorIdx = Math.max(colorIdx, 3);
+    }
+
+    console.log(`[PlanView] ${p.project_id}: BOTH dates → ${segments.length} segments`);
+    return { segments, diamonds, connectorLine, hasWarning };
   }
 
-  const s = effectiveStart ?? effectiveEnd!;
-  let e = effectiveEnd ?? addDays(s, 30);
-
-  // Ensure minimum 7-day bar so it's always visible
-  if (differenceInDays(e, s) < 7) {
-    e = addDays(s, 7);
-  }
-
-  // If no milestones, single bar in status color
-  if (milestoneDates.length === 0) {
+  // CASE 2: Only datum_objednavky → dashed bar extending 90 days forward
+  if (barStart && !barEnd) {
+    const e = addDays(barStart, 90);
     const color = statusColorMap[p.status || ""] || "#6b7280";
-    console.log(`[PlanView] ${p.project_id}: single bar ${s.toISOString()} → ${e.toISOString()}, color=${color}`);
-    return { segments: [{ start: s, end: e, color }], diamonds };
+    console.log(`[PlanView] ${p.project_id}: ONLY objednavky → dashed bar 90d forward`);
+    return { segments: [{ start: barStart, end: e, color, dashed: true }], diamonds, connectorLine, hasWarning };
   }
 
-  // Build allPoints: start + milestone dates + end, sorted & deduped
-  const allPoints = [s, ...milestoneDates.map((m) => m.date), e];
-  allPoints.sort((a, b) => a.getTime() - b.getTime());
-  // Dedup
-  const uniquePoints: Date[] = [allPoints[0]];
-  for (let i = 1; i < allPoints.length; i++) {
-    if (allPoints[i].getTime() !== allPoints[i - 1].getTime()) {
-      uniquePoints.push(allPoints[i]);
-    }
+  // CASE 3: Only datum_smluvni → dashed bar starting 90 days before
+  if (!barStart && barEnd) {
+    const s = addDays(barEnd, -90);
+    const color = statusColorMap[p.status || ""] || "#6b7280";
+    console.log(`[PlanView] ${p.project_id}: ONLY smluvni → dashed bar 90d back`);
+    return { segments: [{ start: s, end: barEnd, color, dashed: true }], diamonds, connectorLine, hasWarning };
   }
 
-  const colorSequence = [PHASE_COLORS.konstrukce, PHASE_COLORS.vyroba, PHASE_COLORS.montaz, PHASE_COLORS.dokonceno];
-  const segments: Segment[] = [];
-  let colorIdx = 0;
-
-  for (let i = 0; i < uniquePoints.length - 1; i++) {
-    const segStart = uniquePoints[i];
-    const segEnd = uniquePoints[i + 1];
-    const color = colorSequence[Math.min(colorIdx, colorSequence.length - 1)];
-
-    const daysBetween = differenceInDays(segEnd, segStart);
-    let hatch: { color1: string; color2: string } | undefined;
-    if (daysBetween <= OVERLAP_THRESHOLD_DAYS && daysBetween >= 0 && colorIdx > 0) {
-      hatch = {
-        color1: colorSequence[Math.min(colorIdx - 1, colorSequence.length - 1)],
-        color2: color,
-      };
-    }
-
-    segments.push({ start: segStart, end: segEnd, color, hatch });
-
-    // Advance color when we hit a milestone
-    if (tpv && segEnd.getTime() === tpv.getTime()) colorIdx = Math.max(colorIdx, 1);
-    else if (expedice && segEnd.getTime() === expedice.getTime()) colorIdx = Math.max(colorIdx, 2);
-    else if (predani && segEnd.getTime() === predani.getTime()) colorIdx = Math.max(colorIdx, 3);
-  }
-
-  console.log(`[PlanView] ${p.project_id}: ${segments.length} segments, ${diamonds.length} diamonds`);
-  return { segments, diamonds };
+  // CASE 4: Neither date exists → no bar, only milestones + connector
+  console.log(`[PlanView] ${p.project_id}: NO dates, milestones only`);
+  return { segments: [], diamonds, connectorLine, hasWarning };
 }
 
 function getStageBarData(stage: ProjectStage, project: Project, statusColorMap: Record<string, string>): BarData {
@@ -200,11 +236,6 @@ function getStageBarData(stage: ProjectStage, project: Project, statusColorMap: 
   const tpv = parseDateField(stage.tpv_date);
   const expedice = parseDateField(stage.expedice);
   const predani = parseDateField(stage.predani);
-
-  if (!barStart && !barEnd) return { segments: [], diamonds: [] };
-
-  const s = barStart ?? barEnd!;
-  const e = barEnd ?? addDays(s, 30);
 
   const milestoneDates: { date: Date; color: string; name: string }[] = [];
   if (tpv) milestoneDates.push({ date: tpv, color: MILESTONE_COLORS.tpv_date, name: "TPV" });
@@ -220,9 +251,19 @@ function getStageBarData(stage: ProjectStage, project: Project, statusColorMap: 
     return { date: m.date, color: m.color, label: formatMilestoneLabel(m.date), name: m.name, yOffset };
   });
 
+  let connectorLine: { startX: Date; endX: Date } | undefined;
+  if (milestoneDates.length >= 2) {
+    connectorLine = { startX: milestoneDates[0].date, endX: milestoneDates[milestoneDates.length - 1].date };
+  }
+
+  if (!barStart && !barEnd) return { segments: [], diamonds, connectorLine, hasWarning: false };
+
+  const s = barStart ?? barEnd!;
+  const e = barEnd ?? addDays(s, 30);
+
   if (milestoneDates.length === 0) {
     const color = statusColorMap[stage.status || ""] || "#6b7280";
-    return { segments: [{ start: s, end: e, color }], diamonds };
+    return { segments: [{ start: s, end: e, color }], diamonds, connectorLine, hasWarning: false };
   }
 
   const allPoints = [s, ...milestoneDates.map((m) => m.date), e].sort((a, b) => a.getTime() - b.getTime());
@@ -231,13 +272,11 @@ function getStageBarData(stage: ProjectStage, project: Project, statusColorMap: 
   let ci = 0;
   for (let i = 0; i < allPoints.length - 1; i++) {
     if (i > 0 && allPoints[i].getTime() === allPoints[i - 1].getTime()) continue;
-    const nextIdx = i + 1;
-    if (nextIdx >= allPoints.length) break;
-    segments.push({ start: allPoints[i], end: allPoints[nextIdx], color: colorSequence[Math.min(ci, 3)] });
+    segments.push({ start: allPoints[i], end: allPoints[i + 1], color: colorSequence[Math.min(ci, 3)] });
     ci++;
   }
 
-  return { segments, diamonds };
+  return { segments, diamonds, connectorLine, hasWarning: false };
 }
 
 // ── Milestone Diamond ───────────────────────────────────────────────
@@ -301,6 +340,54 @@ function HatchPattern({ id, color1, color2 }: { id: string; color1: string; colo
   );
 }
 
+// ── Warning icon ────────────────────────────────────────────────────
+function WarningIcon({ warnings }: { warnings: MilestoneWarning[] }) {
+  if (warnings.length === 0) return null;
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: "#f4a261" }} />
+        </TooltipTrigger>
+        <TooltipContent side="right" className="text-xs max-w-[200px]">
+          {warnings.map((w, i) => (
+            <div key={i}>{w.message}</div>
+          ))}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+// ── Connector line between milestones ───────────────────────────────
+function ConnectorLine({
+  startDate, endDate, origin, dayPx, midY, hasWarning,
+}: {
+  startDate: Date; endDate: Date; origin: Date; dayPx: number; midY: number; hasWarning: boolean;
+}) {
+  const x1 = dayOffset(startDate, origin, dayPx);
+  const x2 = dayOffset(endDate, origin, dayPx);
+  const w = x2 - x1;
+  if (w <= 0) return null;
+  return (
+    <div
+      className="absolute pointer-events-none"
+      style={{
+        left: x1,
+        top: midY - 1,
+        width: w,
+        height: 2,
+        backgroundColor: hasWarning ? "#f4a261" : "#94a3b8",
+        zIndex: 4,
+        ...(hasWarning ? {
+          backgroundImage: "repeating-linear-gradient(90deg, #f4a261 0px, #f4a261 4px, transparent 4px, transparent 8px)",
+          backgroundColor: "transparent",
+        } : {}),
+      }}
+    />
+  );
+}
+
 // ── Substage loader ─────────────────────────────────────────────────
 function SubstageRows({
   projectId, project, origin, dayPx, timelineWidth, statusColorMap,
@@ -330,6 +417,14 @@ function SubstageRow({
 
   return (
     <div style={{ height: SUBSTAGE_ROW_HEIGHT, position: "relative", width: timelineWidth }}>
+      {/* Connector line */}
+      {barData.connectorLine && (
+        <ConnectorLine
+          startDate={barData.connectorLine.startX}
+          endDate={barData.connectorLine.endX}
+          origin={origin} dayPx={dayPx} midY={midY} hasWarning={false}
+        />
+      )}
       {barData.segments.map((seg, i) => {
         const x = dayOffset(seg.start, origin, dayPx);
         const w = dayOffset(seg.end, origin, dayPx) - x;
@@ -341,8 +436,9 @@ function SubstageRow({
             className="absolute rounded-sm"
             style={{
               left: x, top: midY - SUBSTAGE_BAR_HEIGHT / 2,
-              width: Math.max(w, 2), height: SUBSTAGE_BAR_HEIGHT,
+              width: Math.max(w, 4), height: SUBSTAGE_BAR_HEIGHT,
               backgroundColor: seg.color, opacity: 0.65,
+              zIndex: 5,
             }}
           >
             {w > 32 && wkLabel && (
@@ -379,7 +475,7 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const { sorted } = useSortFilter(projects, { personFilter, statusFilter }, search);
-  const [zoom, setZoom] = useState<ZoomLevel>("6M");
+  const [zoom, setZoom] = useState<ZoomLevel>("3M");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const leftRef = useRef<HTMLDivElement>(null);
@@ -464,6 +560,15 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
 
   let hatchCounter = 0;
 
+  // Pre-compute warnings for left panel
+  const projectWarnings = useMemo(() => {
+    const map: Record<string, MilestoneWarning[]> = {};
+    for (const p of sorted) {
+      map[p.project_id] = validateMilestones(p);
+    }
+    return map;
+  }, [sorted]);
+
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Načítání...</div>;
 
   const HEADER_HEIGHT = showWeeks ? 52 : 32;
@@ -497,10 +602,11 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
           {sorted.map((p) => {
             const isExp = expanded.has(p.project_id);
             const statusColor = statusColorMap[p.status || ""] || "#6b7280";
+            const warnings = projectWarnings[p.project_id] || [];
             return (
               <div key={p.id}>
                 <div
-                  className="flex items-center gap-2 px-3 border-b hover:bg-muted/30 transition-colors"
+                  className="flex items-center gap-1.5 px-3 border-b hover:bg-muted/30 transition-colors"
                   style={{ height: ROW_HEIGHT }}
                 >
                   <div
@@ -510,6 +616,7 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
                     <ExpandButton projectId={p.project_id} expanded={isExp} onClick={() => {}} />
                   </div>
                   <StatusDot color={statusColor} />
+                  {warnings.length > 0 && <WarningIcon warnings={warnings} />}
                   <span className="text-xs font-mono text-muted-foreground whitespace-nowrap" style={{ width: 110, flexShrink: 0 }}>{p.project_id}</span>
                   <span className="text-xs font-medium truncate flex-1 min-w-0">{p.project_name}</span>
                 </div>
@@ -552,7 +659,6 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
               </div>
             </div>
 
-
             {/* Rows */}
             {sorted.map((p) => {
               const barData = getProjectBarData(p, statusColorMap);
@@ -565,23 +671,32 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
                     className="relative border-b hover:bg-muted/10 transition-colors"
                     style={{ height: ROW_HEIGHT, width: timelineWidth }}
                   >
-                    {/* Week grid lines */}
-                    {weeks.map((w, i) => (
+                    {/* Grid lines */}
+                    {showWeeks && weeks.map((w, i) => (
                       <div key={i} className="absolute top-0 bottom-0 border-l border-border/20" style={{ left: w.x }} />
                     ))}
-
-                    {/* Month grid lines for 1R view */}
                     {!showWeeks && months.map((m, i) => (
                       <div key={`mg-${i}`} className="absolute top-0 bottom-0 border-l border-border/20" style={{ left: m.startX }} />
                     ))}
 
-                    {/* Segments — rendered directly without wrapper div */}
+                    {/* Connector line between milestones */}
+                    {barData.connectorLine && (
+                      <ConnectorLine
+                        startDate={barData.connectorLine.startX}
+                        endDate={barData.connectorLine.endX}
+                        origin={timelineStart} dayPx={dayPx} midY={midY}
+                        hasWarning={barData.hasWarning}
+                      />
+                    )}
+
+                    {/* Segments */}
                     {barData.segments.map((seg, i) => {
                       const x = dayOffset(seg.start, timelineStart, dayPx);
                       const w = dayOffset(seg.end, timelineStart, dayPx) - x;
                       const segW = Math.max(w, 4);
                       const wkLabel = weeksLabel(seg.start, seg.end);
                       const hatchId = seg.hatch ? `hatch-${hatchCounter++}` : undefined;
+                      const isDashed = seg.dashed;
 
                       return (
                         <React.Fragment key={`seg-${i}`}>
@@ -595,7 +710,12 @@ export function PlanView({ personFilter, statusFilter, search }: PlanViewProps) 
                               height: BAR_HEIGHT,
                               backgroundColor: seg.hatch ? undefined : seg.color,
                               background: seg.hatch && hatchId ? `url(#${hatchId})` : undefined,
+                              opacity: isDashed ? 0.45 : 1,
                               zIndex: 5,
+                              ...(isDashed ? {
+                                border: `2px dashed ${seg.color}`,
+                                backgroundColor: `${seg.color}33`,
+                              } : {}),
                             }}
                           >
                             {segW > 32 && wkLabel && (
