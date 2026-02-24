@@ -4,6 +4,7 @@ import { RiskBadge, ProgressBar } from "./StatusBadge";
 import { InlineEditableCell } from "./InlineEditableCell";
 import { SortableHeader } from "./SortableHeader";
 import { useProjects } from "@/hooks/useProjects";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
 import { useSortFilter } from "@/hooks/useSortFilter";
 import { ChevronRight } from "lucide-react";
@@ -15,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
 import { useAllColumnVisibility } from "./ColumnVisibilityContext";
+import { renderCrossTabHeaders, renderCrossTabCells } from "./CrossTabColumns";
 
 function ExpandArrow({ projectId }: { projectId: string }) {
   const { data: items = [] } = useTPVItems(projectId);
@@ -43,9 +45,12 @@ const DEFAULT_STYLES: Record<string, React.CSSProperties> = {
 
 export function TPVStatusTable({ personFilter, statusFilter, search: externalSearch, riskHighlight }: TPVStatusTableProps) {
   const { data: projects = [], isLoading } = useProjects();
+  const { data: statusOptions = [] } = useProjectStatusOptions();
+  const statusLabels = statusOptions.map((s) => s.label);
   const updateProject = useUpdateProject();
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const { tpvStatus: { isVisible, columns } } = useAllColumnVisibility();
+  const TPV_NATIVE_KEYS = ["project_id", "project_name", "konstrukter", "narocnost", "hodiny_tpv", "percent_tpv", "tpv_poznamka"];
   const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("tpv-status");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns } = useAuth();
@@ -103,6 +108,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
               {v("hodiny_tpv") && <SortableHeader label="Hodiny TPV" column="hodiny_tpv" {...sh} style={colStyle("hodiny_tpv")} {...editProps("hodiny_tpv", "Hodiny TPV")} />}
               {v("percent_tpv") && <SortableHeader label="% Rozpracovanost" column="percent_tpv" {...sh} style={colStyle("percent_tpv")} {...editProps("percent_tpv", "% Rozpracovanost")} />}
               {v("tpv_poznamka") && <SortableHeader label="Poznámka TPV" column="tpv_poznamka" {...sh} style={colStyle("tpv_poznamka")} {...editProps("tpv_poznamka", "Poznámka TPV")} />}
+              {renderCrossTabHeaders({ nativeKeys: TPV_NATIVE_KEYS, isVisible: v, sortCol, sortDir, onSort: toggleSort, getLabel, getWidth, editMode, updateLabel, updateWidth })}
               <ColumnVisibilityToggle tabKey="tpvStatus" editMode={editMode} onToggleEditMode={canEditColumns ? () => setEditMode(!editMode) : undefined} />
             </TableRow>
           </TableHeader>
@@ -130,6 +136,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                   </TableCell>
                 )}
                 {v("tpv_poznamka") && <TableCell><InlineEditableCell value={p.tpv_poznamka} type="textarea" onSave={(val) => save(p.id, "tpv_poznamka", val, p.tpv_poznamka || "")} readOnly={!canEdit} /></TableCell>}
+                {renderCrossTabCells({ nativeKeys: TPV_NATIVE_KEYS, isVisible: v, project: p, save, canEdit, statusLabels })}
               </TableRow>
             ))}
           </TableBody>
