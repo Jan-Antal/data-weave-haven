@@ -5,46 +5,40 @@ import { InlineEditableCell } from "./InlineEditableCell";
 import { CurrencyEditCell } from "./CurrencyEditCell";
 import { StatusBadge, RiskBadge, ProgressBar } from "./StatusBadge";
 import type { Project } from "@/hooks/useProjects";
+import { ALL_COLUMNS } from "./ColumnVisibilityContext";
 
-// All column keys across all tabs (excluding project_id, project_name which are always handled natively)
-export const ALL_COLUMN_KEYS = [
-  "klient", "location", "kalkulant", "architekt", "datum_smluvni", "datum_objednavky",
-  "prodejni_cena", "marze", "link_cn",
-  "pm", "status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "pm_poznamka",
-  "konstrukter", "narocnost", "hodiny_tpv", "percent_tpv", "tpv_poznamka",
-];
+// ── Centralised column-width system ─────────────────────────────────
+// Requirement: date cols 100px, project_id 110px, project_name flex min 200px,
+// short cols 80px, others auto min 120px.
 
-interface ColumnMeta {
-  label: string;
-  style?: React.CSSProperties;
+const DATE_KEYS = new Set([
+  "datum_smluvni", "datum_objednavky", "zamereni",
+  "tpv_date", "expedice", "montaz", "predani",
+]);
+const SHORT_KEYS = new Set(["marze", "link_cn", "risk", "percent_tpv", "narocnost"]);
+
+export function getColumnStyle(key: string, customWidth?: number): React.CSSProperties {
+  if (customWidth) return { width: customWidth, minWidth: customWidth };
+  if (key === "project_id") return { width: 110, minWidth: 110, maxWidth: 110 };
+  if (key === "project_name") return { minWidth: 200 };
+  if (DATE_KEYS.has(key)) return { width: 100, minWidth: 100, maxWidth: 100 };
+  if (SHORT_KEYS.has(key)) return { width: 80, minWidth: 80, maxWidth: 80 };
+  return { minWidth: 120 };
 }
 
-const COLUMN_META: Record<string, ColumnMeta> = {
-  klient: { label: "Klient", style: { minWidth: 100 } },
-  location: { label: "Lokace", style: { minWidth: 100 } },
-  kalkulant: { label: "Kalkulant", style: { minWidth: 110 } },
-  architekt: { label: "Architekt", style: { minWidth: 110 } },
-  datum_smluvni: { label: "Datum Smluvní", style: { width: 100, minWidth: 100, maxWidth: 100 } },
-  datum_objednavky: { label: "Datum Objednávky", style: { width: 100, minWidth: 100, maxWidth: 100 } },
-  prodejni_cena: { label: "Prodejní cena", style: { width: 120, minWidth: 110 } },
-  marze: { label: "Marže", style: { width: 70, minWidth: 60 } },
-  link_cn: { label: "CN", style: { minWidth: 120 } },
-  pm: { label: "PM", style: { minWidth: 110 } },
-  status: { label: "Status", style: { width: 110, minWidth: 100 } },
-  risk: { label: "Risk", style: { width: 80, minWidth: 75 } },
-  zamereni: { label: "Zaměření", style: { width: 100, minWidth: 100, maxWidth: 100 } },
-  tpv_date: { label: "TPV", style: { width: 100, minWidth: 100, maxWidth: 100 } },
-  expedice: { label: "Expedice", style: { width: 100, minWidth: 100, maxWidth: 100 } },
-  montaz: { label: "Montáž", style: { width: 100, minWidth: 100, maxWidth: 100 } },
-  predani: { label: "Předání", style: { width: 100, minWidth: 100, maxWidth: 100 } },
-  pm_poznamka: { label: "Poznámka PM", style: { minWidth: 140 } },
-  konstrukter: { label: "Konstruktér", style: { minWidth: 110 } },
-  narocnost: { label: "Náročnost", style: { width: 90, minWidth: 85 } },
-  hodiny_tpv: { label: "Hodiny TPV", style: { width: 90, minWidth: 85 } },
-  percent_tpv: { label: "% Rozpracovanost", style: { width: 110, minWidth: 100 } },
-  tpv_poznamka: { label: "Poznámka TPV", style: { minWidth: 140 } },
-};
+// ── Column label lookup ─────────────────────────────────────────────
+const LABEL_MAP = Object.fromEntries(ALL_COLUMNS.map((c) => [c.key, c.label]));
+LABEL_MAP["project_id"] = "Project ID";
+LABEL_MAP["project_name"] = "Project Name";
 
+export function getColumnLabel(key: string): string {
+  return LABEL_MAP[key] ?? key;
+}
+
+// All toggleable column keys (used to find cross-tab columns)
+const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
+
+// ── Cross-tab header rendering ──────────────────────────────────────
 interface CrossTabHeadersProps {
   nativeKeys: string[];
   isVisible: (key: string) => boolean;
@@ -59,39 +53,36 @@ interface CrossTabHeadersProps {
 }
 
 export function renderCrossTabHeaders({
-  nativeKeys,
-  isVisible,
+  nativeKeys, isVisible,
   sortCol, sortDir, onSort,
   getLabel, getWidth, editMode, updateLabel, updateWidth,
 }: CrossTabHeadersProps) {
-  const crossKeys = ALL_COLUMN_KEYS.filter(k => !nativeKeys.includes(k) && isVisible(k));
-  
-  return crossKeys.map(key => {
-    const meta = COLUMN_META[key];
-    if (!meta) return null;
-    const w = getWidth(key);
-    const baseStyle = meta.style || {};
-    const style = w ? { ...baseStyle, width: w, minWidth: w } : baseStyle;
-    
-    return (
-      <SortableHeader
-        key={key}
-        label={meta.label}
-        column={key}
-        sortCol={sortCol}
-        sortDir={sortDir}
-        onSort={onSort}
-        style={style}
-        editMode={editMode}
-        customLabel={getLabel(key, meta.label)}
-        onLabelChange={(newLabel: string) => updateLabel(key, newLabel)}
-        onWidthChange={(newWidth: number) => updateWidth(key, newWidth)}
-        className={key === "prodejni_cena" || key === "marze" ? "text-right" : ""}
-      />
-    );
-  });
+  return ALL_KEYS
+    .filter((k) => !nativeKeys.includes(k) && isVisible(k))
+    .map((key) => {
+      const defaultLabel = getColumnLabel(key);
+      const style = getColumnStyle(key, getWidth(key));
+      const isRight = key === "prodejni_cena" || key === "marze";
+      return (
+        <SortableHeader
+          key={key}
+          label={defaultLabel}
+          column={key}
+          sortCol={sortCol}
+          sortDir={sortDir}
+          onSort={onSort}
+          style={style}
+          className={isRight ? "text-right" : ""}
+          editMode={editMode}
+          customLabel={getLabel(key, defaultLabel)}
+          onLabelChange={(v: string) => updateLabel(key, v)}
+          onWidthChange={(w: number) => updateWidth(key, w)}
+        />
+      );
+    });
 }
 
+// ── Cross-tab cell rendering ────────────────────────────────────────
 interface CrossTabCellsProps {
   nativeKeys: string[];
   isVisible: (key: string) => boolean;
@@ -103,69 +94,73 @@ interface CrossTabCellsProps {
 }
 
 export function renderCrossTabCells({
-  nativeKeys,
-  isVisible,
-  project: p,
-  save,
-  canEdit,
-  statusLabels,
-  saveCurrency,
+  nativeKeys, isVisible, project: p, save, canEdit, statusLabels, saveCurrency,
 }: CrossTabCellsProps) {
-  const crossKeys = ALL_COLUMN_KEYS.filter(k => !nativeKeys.includes(k) && isVisible(k));
-  
-  return crossKeys.map(key => {
-    switch (key) {
-      case "klient":
-        return <TableCell key={key}><InlineEditableCell value={p.klient} onSave={(val) => save(p.id, "klient", val, p.klient || "")} readOnly={!canEdit} /></TableCell>;
-      case "location":
-        return <TableCell key={key}><InlineEditableCell value={p.location} onSave={(val) => save(p.id, "location", val, p.location || "")} readOnly={!canEdit} /></TableCell>;
-      case "kalkulant":
-        return <TableCell key={key}><InlineEditableCell value={p.kalkulant} type="people" peopleRole="Kalkulant" onSave={(val) => save(p.id, "kalkulant", val, p.kalkulant || "")} readOnly={!canEdit} /></TableCell>;
-      case "architekt":
-        return <TableCell key={key}><InlineEditableCell value={p.architekt} onSave={(val) => save(p.id, "architekt", val, p.architekt || "")} readOnly={!canEdit} /></TableCell>;
-      case "datum_smluvni":
-        return <TableCell key={key}><InlineEditableCell value={p.datum_smluvni} type="date" onSave={(val) => save(p.id, "datum_smluvni", val, p.datum_smluvni || "")} readOnly={!canEdit} /></TableCell>;
-      case "datum_objednavky":
-        return <TableCell key={key}><InlineEditableCell value={p.datum_objednavky} type="date" onSave={(val) => save(p.id, "datum_objednavky", val, p.datum_objednavky || "")} readOnly={!canEdit} /></TableCell>;
-      case "prodejni_cena":
-        if (saveCurrency) {
-          return <TableCell key={key} className="text-right"><CurrencyEditCell value={p.prodejni_cena} currency={p.currency || "CZK"} onSave={(amount, currency) => saveCurrency(p.id, amount, currency, String(p.prodejni_cena ?? ""), p.currency || "CZK")} /></TableCell>;
-        }
-        return <TableCell key={key} className="text-right"><InlineEditableCell value={String(p.prodejni_cena ?? "")} onSave={(val) => save(p.id, "prodejni_cena", val, String(p.prodejni_cena ?? ""))} readOnly={!canEdit} /></TableCell>;
-      case "marze":
-        return <TableCell key={key} className="text-right"><InlineEditableCell value={p.marze} onSave={(val) => save(p.id, "marze", val, p.marze || "")} readOnly={!canEdit} /></TableCell>;
-      case "link_cn":
-        return <TableCell key={key}><InlineEditableCell value={p.link_cn} onSave={(val) => save(p.id, "link_cn", val, p.link_cn || "")} readOnly={!canEdit} /></TableCell>;
-      case "pm":
-        return <TableCell key={key}><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(val) => save(p.id, "pm", val, p.pm || "")} readOnly={!canEdit} /></TableCell>;
-      case "status":
-        return <TableCell key={key}><InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(val) => save(p.id, "status", val, p.status || "")} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} readOnly={!canEdit} /></TableCell>;
-      case "risk":
-        return <TableCell key={key}><InlineEditableCell value={p.risk} type="select" options={["Low", "Medium", "High"]} onSave={(val) => save(p.id, "risk", val, p.risk || "")} displayValue={<RiskBadge level={p.risk || ""} />} readOnly={!canEdit} /></TableCell>;
-      case "zamereni":
-        return <TableCell key={key}><InlineEditableCell value={p.zamereni} type="date" onSave={(val) => save(p.id, "zamereni", val, p.zamereni || "")} readOnly={!canEdit} /></TableCell>;
-      case "tpv_date":
-        return <TableCell key={key}><InlineEditableCell value={p.tpv_date} type="date" onSave={(val) => save(p.id, "tpv_date", val, p.tpv_date || "")} readOnly={!canEdit} /></TableCell>;
-      case "expedice":
-        return <TableCell key={key}><InlineEditableCell value={p.expedice} type="date" onSave={(val) => save(p.id, "expedice", val, p.expedice || "")} readOnly={!canEdit} /></TableCell>;
-      case "montaz":
-        return <TableCell key={key}><InlineEditableCell value={(p as any).montaz} type="date" onSave={(val) => save(p.id, "montaz", val, (p as any).montaz || "")} readOnly={!canEdit} /></TableCell>;
-      case "predani":
-        return <TableCell key={key}><InlineEditableCell value={p.predani} type="date" onSave={(val) => save(p.id, "predani", val, p.predani || "")} readOnly={!canEdit} /></TableCell>;
-      case "pm_poznamka":
-        return <TableCell key={key}><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(val) => save(p.id, "pm_poznamka", val, p.pm_poznamka || "")} readOnly={!canEdit} /></TableCell>;
-      case "konstrukter":
-        return <TableCell key={key}><InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(val) => save(p.id, "konstrukter", val, p.konstrukter || "")} readOnly={!canEdit} /></TableCell>;
-      case "narocnost":
-        return <TableCell key={key}><InlineEditableCell value={p.narocnost} type="select" options={["Low", "Medium", "High"]} onSave={(val) => save(p.id, "narocnost", val, p.narocnost || "")} displayValue={<RiskBadge level={p.narocnost || ""} />} readOnly={!canEdit} /></TableCell>;
-      case "hodiny_tpv":
-        return <TableCell key={key}><InlineEditableCell value={p.hodiny_tpv} onSave={(val) => save(p.id, "hodiny_tpv", val, p.hodiny_tpv || "")} readOnly={!canEdit} /></TableCell>;
-      case "percent_tpv":
-        return <TableCell key={key}><InlineEditableCell value={p.percent_tpv} type="number" onSave={(val) => save(p.id, "percent_tpv", val, String(p.percent_tpv ?? ""))} displayValue={<ProgressBar value={p.percent_tpv || 0} />} readOnly={!canEdit} /></TableCell>;
-      case "tpv_poznamka":
-        return <TableCell key={key}><InlineEditableCell value={p.tpv_poznamka} type="textarea" onSave={(val) => save(p.id, "tpv_poznamka", val, p.tpv_poznamka || "")} readOnly={!canEdit} /></TableCell>;
-      default:
-        return null;
-    }
-  });
+  return ALL_KEYS
+    .filter((k) => !nativeKeys.includes(k) && isVisible(k))
+    .map((key) => renderCell(key, p, save, canEdit, statusLabels, saveCurrency));
+}
+
+function renderCell(
+  key: string, p: Project,
+  save: (id: string, f: string, v: string, o: string) => void,
+  canEdit: boolean, statusLabels: string[],
+  saveCurrency?: (id: string, a: string, c: string, oa: string, oc: string) => void,
+) {
+  const s = (field: string, val: string, old: string) => save(p.id, field, val, old);
+  const v = (field: keyof Project) => (p as any)[field] ?? "";
+
+  switch (key) {
+    case "klient":
+      return <TableCell key={key}><InlineEditableCell value={p.klient} onSave={(x) => s("klient", x, v("klient"))} readOnly={!canEdit} /></TableCell>;
+    case "location":
+      return <TableCell key={key}><InlineEditableCell value={p.location} onSave={(x) => s("location", x, v("location"))} readOnly={!canEdit} /></TableCell>;
+    case "kalkulant":
+      return <TableCell key={key}><InlineEditableCell value={p.kalkulant} type="people" peopleRole="Kalkulant" onSave={(x) => s("kalkulant", x, v("kalkulant"))} readOnly={!canEdit} /></TableCell>;
+    case "architekt":
+      return <TableCell key={key}><InlineEditableCell value={p.architekt} onSave={(x) => s("architekt", x, v("architekt"))} readOnly={!canEdit} /></TableCell>;
+    case "datum_smluvni":
+      return <TableCell key={key}><InlineEditableCell value={p.datum_smluvni} type="date" onSave={(x) => s("datum_smluvni", x, v("datum_smluvni"))} readOnly={!canEdit} /></TableCell>;
+    case "datum_objednavky":
+      return <TableCell key={key}><InlineEditableCell value={p.datum_objednavky} type="date" onSave={(x) => s("datum_objednavky", x, v("datum_objednavky"))} readOnly={!canEdit} /></TableCell>;
+    case "prodejni_cena":
+      if (saveCurrency) {
+        return <TableCell key={key} className="text-right"><CurrencyEditCell value={p.prodejni_cena} currency={p.currency || "CZK"} onSave={(a, c) => saveCurrency(p.id, a, c, String(p.prodejni_cena ?? ""), p.currency || "CZK")} /></TableCell>;
+      }
+      return <TableCell key={key} className="text-right"><InlineEditableCell value={String(p.prodejni_cena ?? "")} onSave={(x) => s("prodejni_cena", x, String(p.prodejni_cena ?? ""))} readOnly={!canEdit} /></TableCell>;
+    case "marze":
+      return <TableCell key={key} className="text-right"><InlineEditableCell value={p.marze} onSave={(x) => s("marze", x, v("marze"))} readOnly={!canEdit} /></TableCell>;
+    case "link_cn":
+      return <TableCell key={key}><InlineEditableCell value={p.link_cn} onSave={(x) => s("link_cn", x, v("link_cn"))} readOnly={!canEdit} /></TableCell>;
+    case "pm":
+      return <TableCell key={key}><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(x) => s("pm", x, v("pm"))} readOnly={!canEdit} /></TableCell>;
+    case "status":
+      return <TableCell key={key}><InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(x) => s("status", x, v("status"))} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} readOnly={!canEdit} /></TableCell>;
+    case "risk":
+      return <TableCell key={key}><InlineEditableCell value={p.risk} type="select" options={["Low", "Medium", "High"]} onSave={(x) => s("risk", x, v("risk"))} displayValue={<RiskBadge level={p.risk || ""} />} readOnly={!canEdit} /></TableCell>;
+    case "zamereni":
+      return <TableCell key={key}><InlineEditableCell value={p.zamereni} type="date" onSave={(x) => s("zamereni", x, v("zamereni"))} readOnly={!canEdit} /></TableCell>;
+    case "tpv_date":
+      return <TableCell key={key}><InlineEditableCell value={p.tpv_date} type="date" onSave={(x) => s("tpv_date", x, v("tpv_date"))} readOnly={!canEdit} /></TableCell>;
+    case "expedice":
+      return <TableCell key={key}><InlineEditableCell value={p.expedice} type="date" onSave={(x) => s("expedice", x, v("expedice"))} readOnly={!canEdit} /></TableCell>;
+    case "montaz":
+      return <TableCell key={key}><InlineEditableCell value={(p as any).montaz} type="date" onSave={(x) => s("montaz", x, (p as any).montaz || "")} readOnly={!canEdit} /></TableCell>;
+    case "predani":
+      return <TableCell key={key}><InlineEditableCell value={p.predani} type="date" onSave={(x) => s("predani", x, v("predani"))} readOnly={!canEdit} /></TableCell>;
+    case "pm_poznamka":
+      return <TableCell key={key}><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(x) => s("pm_poznamka", x, v("pm_poznamka"))} readOnly={!canEdit} /></TableCell>;
+    case "konstrukter":
+      return <TableCell key={key}><InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(x) => s("konstrukter", x, v("konstrukter"))} readOnly={!canEdit} /></TableCell>;
+    case "narocnost":
+      return <TableCell key={key}><InlineEditableCell value={p.narocnost} type="select" options={["Low", "Medium", "High"]} onSave={(x) => s("narocnost", x, v("narocnost"))} displayValue={<RiskBadge level={p.narocnost || ""} />} readOnly={!canEdit} /></TableCell>;
+    case "hodiny_tpv":
+      return <TableCell key={key}><InlineEditableCell value={p.hodiny_tpv} onSave={(x) => s("hodiny_tpv", x, v("hodiny_tpv"))} readOnly={!canEdit} /></TableCell>;
+    case "percent_tpv":
+      return <TableCell key={key}><InlineEditableCell value={p.percent_tpv} type="number" onSave={(x) => s("percent_tpv", x, String(p.percent_tpv ?? ""))} displayValue={<ProgressBar value={p.percent_tpv || 0} />} readOnly={!canEdit} /></TableCell>;
+    case "tpv_poznamka":
+      return <TableCell key={key}><InlineEditableCell value={p.tpv_poznamka} type="textarea" onSave={(x) => s("tpv_poznamka", x, v("tpv_poznamka"))} readOnly={!canEdit} /></TableCell>;
+    default:
+      return null;
+  }
 }

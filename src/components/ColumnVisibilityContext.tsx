@@ -1,12 +1,9 @@
-import { createContext, useContext, ReactNode, useMemo } from "react";
+import { createContext, useContext, ReactNode } from "react";
 import { useColumnVisibility, ColumnDef } from "@/hooks/useColumnVisibility";
 
-// Native columns per tab (excluding locked project_id/project_name)
-const PROJECT_INFO_NATIVE = ["klient", "location", "kalkulant", "architekt", "datum_smluvni", "datum_objednavky", "prodejni_cena", "marze", "link_cn"];
-const PM_NATIVE = ["pm", "status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "pm_poznamka"];
-const TPV_NATIVE = ["konstrukter", "narocnost", "hodiny_tpv", "percent_tpv", "tpv_poznamka"];
-
-const ALL_EXTRA_COLUMNS: ColumnDef[] = [
+// ── Master column registry ─────────────────────────────────────────
+// Every toggleable column in the app. Locked columns are separate.
+export const ALL_COLUMNS: ColumnDef[] = [
   { key: "klient", label: "Klient" },
   { key: "location", label: "Lokace" },
   { key: "kalkulant", label: "Kalkulant" },
@@ -37,34 +34,35 @@ const LOCKED: ColumnDef[] = [
   { key: "project_name", label: "Project Name", locked: true },
 ];
 
-function buildColumns(nativeKeys: string[]): ColumnDef[] {
-  return [
-    ...LOCKED,
-    ...ALL_EXTRA_COLUMNS,
-  ];
+// ── Native column keys per tab ──────────────────────────────────────
+export const PROJECT_INFO_NATIVE = [
+  "klient", "location", "kalkulant", "architekt",
+  "datum_smluvni", "datum_objednavky", "prodejni_cena", "marze", "link_cn",
+];
+export const PM_NATIVE = [
+  "pm", "status", "risk", "zamereni", "tpv_date",
+  "expedice", "montaz", "predani", "pm_poznamka",
+];
+export const TPV_NATIVE = [
+  "konstrukter", "narocnost", "hodiny_tpv", "percent_tpv", "tpv_poznamka",
+];
+
+// Full column list for each tab = locked + all toggleable
+const FULL_COLUMNS: ColumnDef[] = [...LOCKED, ...ALL_COLUMNS];
+
+// Columns hidden by default = everything NOT native to that tab
+function defaultHidden(nativeKeys: string[]): string[] {
+  return ALL_COLUMNS.filter((c) => !nativeKeys.includes(c.key)).map((c) => c.key);
 }
 
-function buildDefaultHidden(nativeKeys: string[]): string[] {
-  return ALL_EXTRA_COLUMNS
-    .filter((c) => !nativeKeys.includes(c.key))
-    .map((c) => c.key);
-}
-
-export const PROJECT_INFO_COLUMNS = buildColumns(PROJECT_INFO_NATIVE);
-export const PM_COLUMNS = buildColumns(PM_NATIVE);
-export const TPV_COLUMNS = buildColumns(TPV_NATIVE);
-
-export const PROJECT_INFO_DEFAULT_HIDDEN = buildDefaultHidden(PROJECT_INFO_NATIVE);
-export const PM_DEFAULT_HIDDEN = buildDefaultHidden(PM_NATIVE);
-export const TPV_DEFAULT_HIDDEN = buildDefaultHidden(TPV_NATIVE);
-
-// For the toggle UI, group columns by their native tab
+// ── Groups for the toggle panel ─────────────────────────────────────
 export const COLUMN_GROUPS = [
   { label: "Project Info", keys: PROJECT_INFO_NATIVE },
   { label: "PM Status", keys: PM_NATIVE },
   { label: "TPV Status", keys: TPV_NATIVE },
 ];
 
+// ── Context types ───────────────────────────────────────────────────
 export interface ColumnVisibilityState {
   isVisible: (key: string) => boolean;
   toggleColumn: (key: string) => void;
@@ -78,22 +76,22 @@ interface ColumnVisibilityContextType {
   tpvStatus: ColumnVisibilityState;
 }
 
-const ColumnVisibilityCtx = createContext<ColumnVisibilityContextType | null>(null);
+const Ctx = createContext<ColumnVisibilityContextType | null>(null);
 
 export function ColumnVisibilityProvider({ children }: { children: ReactNode }) {
-  const projectInfo = useColumnVisibility("col-vis-project-info", PROJECT_INFO_COLUMNS, PROJECT_INFO_DEFAULT_HIDDEN);
-  const pmStatus = useColumnVisibility("col-vis-pm-status", PM_COLUMNS, PM_DEFAULT_HIDDEN);
-  const tpvStatus = useColumnVisibility("col-vis-tpv-status", TPV_COLUMNS, TPV_DEFAULT_HIDDEN);
+  const projectInfo = useColumnVisibility("col-vis-project-info", FULL_COLUMNS, defaultHidden(PROJECT_INFO_NATIVE));
+  const pmStatus = useColumnVisibility("col-vis-pm-status", FULL_COLUMNS, defaultHidden(PM_NATIVE));
+  const tpvStatus = useColumnVisibility("col-vis-tpv-status", FULL_COLUMNS, defaultHidden(TPV_NATIVE));
 
   return (
-    <ColumnVisibilityCtx.Provider value={{ projectInfo, pmStatus, tpvStatus }}>
+    <Ctx.Provider value={{ projectInfo, pmStatus, tpvStatus }}>
       {children}
-    </ColumnVisibilityCtx.Provider>
+    </Ctx.Provider>
   );
 }
 
 export function useAllColumnVisibility() {
-  const ctx = useContext(ColumnVisibilityCtx);
+  const ctx = useContext(Ctx);
   if (!ctx) throw new Error("ColumnVisibilityProvider missing");
   return ctx;
 }
