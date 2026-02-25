@@ -310,25 +310,38 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
 
             {/* Bottom bar */}
             <div className="flex items-center justify-between px-4 py-2.5 border-t border-border shrink-0">
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex items-center gap-2 min-w-0 overflow-hidden">
                 <span className="text-xs text-muted-foreground truncate">{previewFile.file.name}</span>
                 {previewFile.file.size > 0 && (
                   <span className="text-xs text-muted-foreground shrink-0">({formatFileSize(previewFile.file.size)})</span>
                 )}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 ml-4">
                 {previewFile.webUrl && (
-                  <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => window.open(previewFile.webUrl!, "_blank")}>
+                  <Button variant="outline" size="sm" className="h-8 text-xs whitespace-nowrap" onClick={() => window.open(previewFile.webUrl!, "_blank")}>
                     <ExternalLink className="h-3.5 w-3.5 mr-1" />
                     Otevřít v SharePointu
                   </Button>
                 )}
-                {previewFile.downloadUrl && (
-                  <Button size="sm" className="h-8 text-xs bg-[#2d5a3d] hover:bg-[#234a31] text-white" onClick={() => window.open(previewFile.downloadUrl!, "_blank")}>
-                    <Download className="h-3.5 w-3.5 mr-1" />
-                    Stáhnout
-                  </Button>
-                )}
+                <Button
+                  size="sm"
+                  className="h-8 text-xs whitespace-nowrap bg-[#2d5a3d] hover:bg-[#234a31] text-white"
+                  onClick={async () => {
+                    if (previewFile.downloadUrl) {
+                      window.open(previewFile.downloadUrl, "_blank");
+                    } else {
+                      try {
+                        const url = await sp.getDownloadUrl(previewFile.categoryKey, previewFile.file.name);
+                        if (url) window.open(url, "_blank");
+                      } catch (err: any) {
+                        toast({ title: "Chyba stahování", description: err.message, variant: "destructive" });
+                      }
+                    }
+                  }}
+                >
+                  <Download className="h-3.5 w-3.5 mr-1" />
+                  Stáhnout
+                </Button>
               </div>
             </div>
           </div>
