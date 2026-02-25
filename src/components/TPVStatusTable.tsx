@@ -36,9 +36,10 @@ interface TPVStatusTableProps {
   statusFilter: string[];
   search: string;
   riskHighlight?: import("@/hooks/useRiskHighlight").RiskHighlightType;
+  onRequestTab?: () => void;
 }
 
-export function TPVStatusTable({ personFilter, statusFilter, search: externalSearch, riskHighlight }: TPVStatusTableProps) {
+export function TPVStatusTable({ personFilter, statusFilter, search: externalSearch, riskHighlight, onRequestTab }: TPVStatusTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const statusLabels = statusOptions.map((s) => s.label);
@@ -92,7 +93,10 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
       <TPVItemsView
         projectId={activeProject.projectId}
         projectName={activeProject.projectName}
-        onBack={() => setActiveProject(null)}
+        onBack={() => {
+          setActiveProject(null);
+          onRequestTab?.();
+        }}
       />
     );
   }
