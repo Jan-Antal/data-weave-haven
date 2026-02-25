@@ -246,6 +246,40 @@ async function getPreviewUrl(
   };
 }
 
+const CATEGORIES = ["Cenova-nabidka", "Smlouva", "Vykresy", "Dokumentace", "Dodaci-list"];
+
+async function countFilesForProjects(
+  token: string,
+  driveId: string,
+  projectIds: string[]
+) {
+  const counts: Record<string, number> = {};
+  await Promise.all(
+    projectIds.map(async (pid) => {
+      let total = 0;
+      await Promise.all(
+        CATEGORIES.map(async (cat) => {
+          const path = folderPath(pid, cat);
+          const url = `${GRAPH}/drives/${driveId}/root:/${path}:/children?$select=id,file&$top=999`;
+          try {
+            const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+            if (res.ok) {
+              const json = await res.json();
+              total += (json.value ?? []).filter((f: any) => f.file).length;
+            } else {
+              await res.text();
+            }
+          } catch {
+            // ignore
+          }
+        })
+      );
+      counts[pid] = total;
+    })
+  );
+  return { counts };
+}
+
 // ---------- handler ----------
 
 Deno.serve(async (req) => {
@@ -277,7 +311,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { action, projectId, category, fileName, fileContent, itemId } = body;
+    const { action, projectId, projectIds, category, fileName, fileContent, itemId } = body;
 
     if (!action) {
       return new Response(
@@ -297,6 +331,22 @@ Deno.serve(async (req) => {
       const accessToken = await getAccessToken();
       const driveId = await getDriveId(accessToken);
       const result = await getPreviewUrl(accessToken, driveId, itemId);
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Count action — accepts projectIds array
+    if (action === "count") {
+      if (!projectIds || !Array.isArray(projectIds) || projectIds.length === 0) {
+        return new Response(
+          JSON.stringify({ error: "Missing projectIds array for count" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const accessToken = await getAccessToken();
+      const driveId = await getDriveId(accessToken);
+      const result = await countFilesForProjects(accessToken, driveId, projectIds);
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
