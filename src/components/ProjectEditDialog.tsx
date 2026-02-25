@@ -119,150 +119,153 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-5xl">
         <DialogHeader><DialogTitle>Projekt {project.project_id}</DialogTitle></DialogHeader>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-          <div>
-            <Label>Project ID</Label>
-            <Input
-              value={form.project_id}
-              onChange={(e) => setForm(s => ({ ...s, project_id: e.target.value }))}
-              onBlur={() => {
-                if (form.project_id !== project.project_id) {
-                  checkProjectId(form.project_id);
-                } else {
-                  resetIdCheck();
-                }
-              }}
-            />
-            {idExists && <p className="text-xs text-destructive mt-1">Toto ID již existuje</p>}
-          </div>
-          <div>
-            <Label>Datum Smluvní</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !form.datum_smluvni && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {form.datum_smluvni || "Vyberte datum"}
+        <div className="flex gap-0">
+          {/* Column 1 */}
+          <div className="flex-1 space-y-3 pr-4">
+            <div>
+              <Label>Project ID</Label>
+              <Input
+                value={form.project_id}
+                onChange={(e) => setForm(s => ({ ...s, project_id: e.target.value }))}
+                onBlur={() => {
+                  if (form.project_id !== project.project_id) {
+                    checkProjectId(form.project_id);
+                  } else {
+                    resetIdCheck();
+                  }
+                }}
+              />
+              {idExists && <p className="text-xs text-destructive mt-1">Toto ID již existuje</p>}
+            </div>
+            <div>
+              <Label>Klient</Label>
+              <Input value={form.klient} onChange={(e) => setForm(s => ({ ...s, klient: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={(v) => setForm(s => ({ ...s, status: v }))}>
+                <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
+                <SelectContent className="z-[99999]">
+                  {statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Prodejní cena</Label>
+              <div className="flex items-center gap-1">
+                <Input type="number" className="no-spinners" value={form.prodejni_cena} onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))} />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-10 px-3 font-mono shrink-0"
+                  onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
+                >
+                  {form.currency}
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 z-[99999]" align="start">
-                <Calendar
-                  mode="single"
-                  selected={form.datum_smluvni ? parseAppDate(form.datum_smluvni) : undefined}
-                  onSelect={(d) => {
-                    if (d) setForm(s => ({ ...s, datum_smluvni: formatAppDate(d) }));
-                  }}
-                  className="p-3 pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <div>
-            <Label>Project Name</Label>
-            <Input value={form.project_name} onChange={(e) => setForm(s => ({ ...s, project_name: e.target.value }))} />
-          </div>
-          <div>
-            <Label>PM</Label>
-            <PeopleSelectDropdown role="PM" value={form.pm} onValueChange={(v) => setForm(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
-          </div>
-
-          <div>
-            <Label>Klient</Label>
-            <Input value={form.klient} onChange={(e) => setForm(s => ({ ...s, klient: e.target.value }))} />
-          </div>
-          <div>
-            <Label>Konstruktér</Label>
-            <PeopleSelectDropdown role="Konstruktér" value={form.konstrukter} onValueChange={(v) => setForm(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
-          </div>
-
-          <div>
-            <Label>Status</Label>
-            <Select value={form.status} onValueChange={(v) => setForm(s => ({ ...s, status: v }))}>
-              <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
-              <SelectContent className="z-[99999]">
-                {statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Kalkulant</Label>
-            <PeopleSelectDropdown role="Kalkulant" value={form.kalkulant} onValueChange={(v) => setForm(s => ({ ...s, kalkulant: v }))} placeholder="Vyberte kalkulanta" />
-          </div>
-
-          <div className="col-span-2">
-            <Label>Prodejní cena</Label>
-            <div className="flex items-center gap-1">
-              <Input type="number" className="no-spinners" value={form.prodejni_cena} onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))} />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-10 px-3 font-mono shrink-0"
-                onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
-              >
-                {form.currency}
-              </Button>
+              </div>
+            </div>
+            <div>
+              <Label>Marže</Label>
+              <div className="flex items-center gap-1">
+                <Input type="number" className="no-spinners" value={form.marze} onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))} placeholder="0" />
+                <span className="text-sm text-muted-foreground shrink-0">%</span>
+              </div>
             </div>
           </div>
-          <div className="col-span-2">
-            <Label>Marže</Label>
-            <div className="flex items-center gap-1">
-              <Input type="number" className="no-spinners" value={form.marze} onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))} placeholder="0" />
-              <span className="text-sm text-muted-foreground shrink-0">%</span>
+
+          {/* Column 2 */}
+          <div className="flex-1 space-y-3 pr-4">
+            <div>
+              <Label>Project Name</Label>
+              <Input value={form.project_name} onChange={(e) => setForm(s => ({ ...s, project_name: e.target.value }))} />
+            </div>
+            <div>
+              <Label>PM</Label>
+              <PeopleSelectDropdown role="PM" value={form.pm} onValueChange={(v) => setForm(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
+            </div>
+            <div>
+              <Label>Konstruktér</Label>
+              <PeopleSelectDropdown role="Konstruktér" value={form.konstrukter} onValueChange={(v) => setForm(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
+            </div>
+            <div>
+              <Label>Kalkulant</Label>
+              <PeopleSelectDropdown role="Kalkulant" value={form.kalkulant} onValueChange={(v) => setForm(s => ({ ...s, kalkulant: v }))} placeholder="Vyberte kalkulanta" />
+            </div>
+            <div>
+              <Label>Datum Smluvní</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !form.datum_smluvni && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {form.datum_smluvni || "Vyberte datum"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 z-[99999]" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={form.datum_smluvni ? parseAppDate(form.datum_smluvni) : undefined}
+                    onSelect={(d) => {
+                      if (d) setForm(s => ({ ...s, datum_smluvni: formatAppDate(d) }));
+                    }}
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
-        </div>
 
-        {/* Documents Section */}
-        <div className="border-t pt-3 mt-1">
-          <Label className="text-sm font-semibold">Dokumenty</Label>
-          <div className="flex flex-wrap gap-2 mt-2">
-            {[
-              { key: "cenova_nabidka", icon: "📋", label: "Cenová nabídka" },
-              { key: "smlouva", icon: "📄", label: "Smlouva" },
-              { key: "vykresy", icon: "📐", label: "Výkresy" },
-              { key: "dokumentace", icon: "📁", label: "Dokumentace" },
-              { key: "dodaci_list", icon: "📦", label: "Dodací list" },
-            ].map((cat) => (
-              <button
-                key={cat.key}
-                type="button"
-                onClick={() => setActiveDocCategory(activeDocCategory === cat.key ? null : cat.key)}
-                className={cn(
-                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors",
-                  activeDocCategory === cat.key
-                    ? "bg-foreground text-background border-foreground"
-                    : "bg-background text-foreground border-input hover:bg-accent"
-                )}
-              >
-                <span>{cat.icon}</span>
-                {cat.label}
-              </button>
-            ))}
-          </div>
+          {/* Column 3 — Documents */}
+          <div className="w-[240px] shrink-0 border-l pl-4 flex flex-col">
+            <Label className="text-sm font-semibold mb-2">Dokumenty</Label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {[
+                { key: "cenova_nabidka", icon: "📋", label: "Cenová nabídka" },
+                { key: "smlouva", icon: "📄", label: "Smlouva" },
+                { key: "vykresy", icon: "📐", label: "Výkresy" },
+                { key: "dokumentace", icon: "📁", label: "Dokumentace" },
+                { key: "dodaci_list", icon: "📦", label: "Dodací list" },
+              ].map((cat) => (
+                <button
+                  key={cat.key}
+                  type="button"
+                  onClick={() => setActiveDocCategory(activeDocCategory === cat.key ? null : cat.key)}
+                  className={cn(
+                    "inline-flex items-center gap-1 px-2 py-1.5 rounded-md border text-[11px] font-medium transition-colors leading-tight",
+                    activeDocCategory === cat.key
+                      ? "bg-foreground text-background border-foreground"
+                      : "bg-background text-foreground border-input hover:bg-accent"
+                  )}
+                >
+                  <span>{cat.icon}</span>
+                  {cat.label}
+                </button>
+              ))}
+            </div>
 
-          {/* Upload zone */}
-          <div
-            className={cn(
-              "mt-3 rounded-lg border-2 border-dashed flex flex-col items-center justify-center py-6 px-4 transition-colors",
-              activeDocCategory
-                ? "border-muted-foreground/30 bg-muted/30 cursor-pointer hover:border-muted-foreground/50"
-                : "border-muted/50 bg-muted/20 cursor-not-allowed opacity-60"
-            )}
-          >
-            <Upload className="h-6 w-6 text-muted-foreground mb-2" />
-            <p className="text-xs text-muted-foreground text-center">
-              {activeDocCategory
-                ? "Přetáhněte soubory sem nebo klikněte pro výběr"
-                : "Nejprve vyberte kategorii"}
-            </p>
-          </div>
+            {/* Upload zone */}
+            <div
+              className={cn(
+                "mt-3 rounded-lg border-2 border-dashed flex flex-col items-center justify-center py-4 px-2 transition-colors",
+                activeDocCategory
+                  ? "border-muted-foreground/30 bg-muted/30 cursor-pointer hover:border-muted-foreground/50"
+                  : "border-muted/50 bg-muted/20 cursor-not-allowed opacity-60"
+              )}
+            >
+              <Upload className="h-5 w-5 text-muted-foreground mb-1" />
+              <p className="text-[10px] text-muted-foreground text-center">
+                {activeDocCategory
+                  ? "Přetáhněte soubory sem nebo klikněte pro výběr"
+                  : "Nejprve vyberte kategorii"}
+              </p>
+            </div>
 
-          {/* File list */}
-          <div className="mt-3 max-h-[200px] overflow-y-auto">
-            <p className="text-xs text-muted-foreground text-center py-3">Žádné dokumenty</p>
+            {/* File list */}
+            <div className="mt-2 flex-1 max-h-[200px] overflow-y-auto">
+              <p className="text-xs text-muted-foreground text-center py-3">Žádné dokumenty</p>
+            </div>
           </div>
         </div>
         {canDeleteProject && (
