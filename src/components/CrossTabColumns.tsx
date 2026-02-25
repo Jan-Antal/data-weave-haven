@@ -17,7 +17,9 @@ const SHORT_KEYS = new Set(["marze", "link_cn", "risk", "percent_tpv", "narocnos
 export function getColumnStyle(key: string, customWidth?: number | null): React.CSSProperties {
   if (customWidth) return { width: customWidth, minWidth: customWidth };
   if (key === "project_id") return { width: 110, minWidth: 110, maxWidth: 110 };
-  if (key === "project_name") return { minWidth: 200 };
+  if (key === "project_name") return { width: 180, minWidth: 180 };
+  if (key === "pm_poznamka") return { width: 120, minWidth: 120 };
+  if (key === "tpv_poznamka") return { width: 120, minWidth: 120 };
   if (DATE_KEYS.has(key)) return { width: 100, minWidth: 100, maxWidth: 100 };
   if (SHORT_KEYS.has(key)) return { width: 80, minWidth: 80, maxWidth: 80 };
   return { minWidth: 120 };
