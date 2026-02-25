@@ -742,12 +742,12 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
       {/* PART 1 — FIXED HEADER ROW (never scrolls vertically) */}
       <div className="flex shrink-0 border-b bg-primary/5">
         {/* Left panel header */}
-        <div className="border-r shrink-0 flex items-center px-3 gap-2" style={{ width: LEFT_PANEL_WIDTH, height: HEADER_HEIGHT }}>
-          <button onClick={() => togglePlanSort("project_id")} className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors" style={{ width: 110, flexShrink: 0 }}>
+        <div className="border-r shrink-0 flex items-center px-2 gap-2" style={{ width: LEFT_PANEL_WIDTH, height: HEADER_HEIGHT }}>
+          <button onClick={() => togglePlanSort("project_id")} className="flex items-center gap-1 h-9 px-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap hover:text-foreground transition-colors" style={{ width: 110, flexShrink: 0 }}>
             {planIdLabel}
             {planSortCol === "project_id" ? (planSortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}
           </button>
-          <button onClick={() => togglePlanSort("project_name")} className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors flex-1">
+          <button onClick={() => togglePlanSort("project_name")} className="flex items-center gap-1 h-9 px-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap hover:text-foreground transition-colors flex-1">
             {planNameLabel}
             {planSortCol === "project_name" ? (planSortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}
           </button>
