@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import { showUndoToast } from "./UndoToast";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
@@ -197,7 +198,23 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
 
   const handleSave = async () => {
     if (idExists) return;
-    const { error } = await supabase.from("projects").update({
+
+    // Store previous values for undo
+    const previousValues: Record<string, any> = {
+      project_id: project.project_id,
+      project_name: project.project_name,
+      klient: project.klient,
+      pm: project.pm,
+      konstrukter: project.konstrukter,
+      kalkulant: project.kalkulant,
+      status: project.status,
+      datum_smluvni: project.datum_smluvni,
+      prodejni_cena: project.prodejni_cena,
+      currency: project.currency,
+      marze: project.marze,
+    };
+
+    const newValues = {
       project_id: form.project_id,
       project_name: form.project_name,
       klient: form.klient || null,
@@ -209,13 +226,15 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
       prodejni_cena: form.prodejni_cena ? Number(form.prodejni_cena) : null,
       currency: form.currency || "CZK",
       marze: form.marze || null,
-    }).eq("id", project.id);
+    };
+
+    const { error } = await supabase.from("projects").update(newValues).eq("id", project.id);
     if (error) {
       toast({ title: "Chyba", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Uloženo" });
       qc.invalidateQueries({ queryKey: ["projects"] });
       onOpenChange(false);
+      showUndoToast(project.id, previousValues, qc);
     }
   };
 
