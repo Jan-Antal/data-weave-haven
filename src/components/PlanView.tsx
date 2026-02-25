@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { PlanDateEditDialog } from "@/components/PlanDateEditDialog";
 import { useProjects, Project } from "@/hooks/useProjects";
 import { useProjectStages, ProjectStage } from "@/hooks/useProjectStages";
@@ -560,6 +561,9 @@ function StatusDot({ color }: { color: string }) {
 export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }: PlanViewProps) {
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
+  const { getLabel } = useColumnLabels("project-info");
+  const planIdLabel = getLabel("project_id", "ID");
+  const planNameLabel = getLabel("project_name", "Název");
   const { sorted } = useSortFilter(projects, { personFilter, statusFilter }, search);
   const zoom = zoomProp ?? ("3M" as ZoomLevel);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -717,16 +721,16 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
     <div className="rounded-lg border bg-card overflow-hidden flex flex-col" style={{ height: "calc(100vh - 280px)", minHeight: 400 }}>
 
       {/* PART 1 — FIXED HEADER ROW (never scrolls vertically) */}
-      <div className="flex shrink-0 border-b">
+      <div className="flex shrink-0 border-b bg-primary/5">
         {/* Left panel header */}
-        <div className="border-r shrink-0 bg-card flex items-end px-3 pb-1 gap-2" style={{ width: LEFT_PANEL_WIDTH, height: HEADER_HEIGHT }}>
-          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide" style={{ width: 110, flexShrink: 0 }}>ID</span>
-          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide flex-1">Název</span>
+        <div className="border-r shrink-0 flex items-end px-3 pb-1 gap-2" style={{ width: LEFT_PANEL_WIDTH, height: HEADER_HEIGHT }}>
+          <span className="text-xs font-medium text-muted-foreground" style={{ width: 110, flexShrink: 0 }}>{planIdLabel}</span>
+          <span className="text-xs font-medium text-muted-foreground flex-1">{planNameLabel}</span>
         </div>
         {/* Timeline header — horizontal scroll synced with body */}
         <div
           ref={timelineHeaderRef}
-          className="flex-1 overflow-hidden bg-card"
+          className="flex-1 overflow-hidden"
           style={{ height: HEADER_HEIGHT }}
         >
           <div style={{ width: timelineWidth, minWidth: timelineWidth, position: "relative" }}>
