@@ -71,6 +71,88 @@ function folderPath(projectId: string, category: string) {
 
 // ---------- actions ----------
 
+async function deleteFile(
+  token: string,
+  driveId: string,
+  projectId: string,
+  category: string,
+  fileName: string
+) {
+  const path = folderPath(projectId, category);
+  const encodedFileName = encodeURIComponent(fileName);
+  const itemUrl = `${GRAPH}/drives/${driveId}/root:/${path}/${encodedFileName}`;
+  console.log("[delete] Resolving item:", itemUrl);
+  const itemRes = await fetch(itemUrl, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!itemRes.ok) {
+    const t = await itemRes.text();
+    throw new Error(`Delete resolve error ${itemRes.status}: ${t}`);
+  }
+  const item = await itemRes.json();
+  const itemId = item.id;
+  console.log("[delete] Deleting itemId:", itemId);
+  const delRes = await fetch(`${GRAPH}/drives/${driveId}/items/${itemId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!delRes.ok && delRes.status !== 204) {
+    const t = await delRes.text();
+    throw new Error(`Delete error ${delRes.status}: ${t}`);
+  }
+  await delRes.text().catch(() => {});
+  return { success: true };
+}
+
+async function archiveProjectFolder(
+  token: string,
+  driveId: string,
+  projectId: string
+) {
+  // Ensure _Archiv folder exists
+  await ensureFolder(token, driveId, `${LIB_ROOT}/_Archiv`);
+
+  // Try to get the project folder
+  const folderUrl = `${GRAPH}/drives/${driveId}/root:/${LIB_ROOT}/${projectId}`;
+  console.log("[archive] Resolving project folder:", folderUrl);
+  const folderRes = await fetch(folderUrl, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (folderRes.status === 404) {
+    await folderRes.text();
+    console.log("[archive] No project folder found, nothing to archive");
+    return { success: true, archived: false };
+  }
+  if (!folderRes.ok) {
+    const t = await folderRes.text();
+    throw new Error(`Archive resolve error ${folderRes.status}: ${t}`);
+  }
+  const folder = await folderRes.json();
+  const folderId = folder.id;
+
+  // Move folder to _Archiv
+  const moveRes = await fetch(`${GRAPH}/drives/${driveId}/items/${folderId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      parentReference: {
+        path: `/drives/${driveId}/root:/${LIB_ROOT}/_Archiv`,
+      },
+      name: projectId,
+    }),
+  });
+  if (!moveRes.ok) {
+    const t = await moveRes.text();
+    throw new Error(`Archive move error ${moveRes.status}: ${t}`);
+  }
+  await moveRes.json();
+  console.log("[archive] Successfully archived", projectId);
+  return { success: true, archived: true };
+}
+
 async function listFiles(
   token: string,
   driveId: string,
@@ -336,6 +418,38 @@ Deno.serve(async (req) => {
       const accessToken = await getAccessToken();
       const driveId = await getDriveId(accessToken);
       const result = await getPreviewUrl(accessToken, driveId, itemId);
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Delete file action
+    if (action === "delete") {
+      if (!projectId || !category || !fileName) {
+        return new Response(
+          JSON.stringify({ error: "Missing projectId, category, or fileName for delete" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const accessToken = await getAccessToken();
+      const driveId = await getDriveId(accessToken);
+      const result = await deleteFile(accessToken, driveId, projectId, category, fileName);
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Archive project folder action
+    if (action === "archive") {
+      if (!projectId) {
+        return new Response(
+          JSON.stringify({ error: "Missing projectId for archive" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const accessToken = await getAccessToken();
+      const driveId = await getDriveId(accessToken);
+      const result = await archiveProjectFolder(accessToken, driveId, projectId);
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
