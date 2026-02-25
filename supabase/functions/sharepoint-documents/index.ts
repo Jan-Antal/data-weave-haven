@@ -182,18 +182,23 @@ async function getDownloadUrl(
   fileName: string
 ) {
   const path = folderPath(projectId, category);
-  const url = `${GRAPH}/drives/${driveId}/root:/${path}/${fileName}?$select=id,name,webUrl,@microsoft.graph.downloadUrl`;
+  const encodedFileName = encodeURIComponent(fileName);
+  const url = `${GRAPH}/drives/${driveId}/root:/${path}/${encodedFileName}`;
+  console.log("[download] Fetching item metadata:", url);
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
+  const responseText = await res.text();
+  console.log("[download] Graph API status:", res.status, "body:", responseText);
   if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`Download URL error ${res.status}: ${t}`);
+    throw new Error(`Download URL error ${res.status}: ${responseText}`);
   }
-  const item = await res.json();
+  const item = JSON.parse(responseText);
+  const downloadUrl = item["@microsoft.graph.downloadUrl"] ?? null;
+  console.log("[download] downloadUrl found:", !!downloadUrl);
   return {
     name: item.name,
-    downloadUrl: item["@microsoft.graph.downloadUrl"] ?? null,
+    downloadUrl,
     webUrl: item.webUrl ?? null,
   };
 }
@@ -386,6 +391,7 @@ Deno.serve(async (req) => {
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
+        console.log("[download] Request:", { projectId, category, fileName });
         result = await getDownloadUrl(accessToken, driveId, projectId, category, fileName);
         break;
 
