@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.setup-admin]
 verify_jwt = false
+
+[functions.sharepoint-documents]
+verify_jwt = false
