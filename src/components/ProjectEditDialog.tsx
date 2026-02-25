@@ -319,7 +319,7 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
               <div className="flex items-center gap-2 shrink-0 ml-4">
                 <button
                   type="button"
-                  className="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-gray-300 bg-white px-4 py-2 text-xs text-gray-700 hover:bg-orange-50 hover:border-orange-400 hover:text-orange-700 transition-colors"
+                  className="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-gray-300 bg-white px-4 py-2 text-xs text-gray-700 hover:bg-[#e87c3e] hover:text-white hover:border-[#e87c3e] transition-colors"
                   onClick={async () => {
                     toast({ title: "Stahování...", description: "Připravujeme soubor ke stažení." });
                     try {
@@ -346,7 +346,7 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
                 {previewFile.webUrl && (
                   <button
                     type="button"
-                    className="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-gray-300 bg-white px-4 py-2 text-xs text-gray-700 hover:bg-orange-50 hover:border-orange-400 hover:text-orange-700 transition-colors"
+                    className="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-gray-300 bg-white px-4 py-2 text-xs text-gray-700 hover:bg-[#e87c3e] hover:text-white hover:border-[#e87c3e] transition-colors"
                     onClick={() => window.open(previewFile.webUrl!, "_blank")}
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
