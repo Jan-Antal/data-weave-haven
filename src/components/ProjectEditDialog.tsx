@@ -83,7 +83,7 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
     currency: "CZK",
     marze: "",
   });
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0); // 0=button, 1=confirm, 2=doc warning
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck(project?.id);
 
@@ -106,7 +106,7 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
         currency: project.currency || "CZK",
         marze: project.marze || "",
       });
-      setConfirmDelete(false);
+      setDeleteStep(0);
       setOpenCategory(null);
       sp.resetCache();
       resetIdCheck();
@@ -559,19 +559,36 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
               <div>
                 {canDeleteProject && (
                   <>
-                    {!confirmDelete ? (
+                    {deleteStep === 0 && (
                       <button
                         type="button"
-                        className="text-sm text-destructive hover:underline"
-                        onClick={() => setConfirmDelete(true)}
+                        className="rounded-md border border-gray-200 bg-gray-100 px-4 py-2 text-sm text-gray-500 hover:bg-gray-200 transition-colors"
+                        onClick={() => setDeleteStep(1)}
                       >
                         Smazat projekt
                       </button>
-                    ) : (
+                    )}
+                    {deleteStep === 1 && (
                       <div className="flex items-center gap-3">
-                        <span className="text-sm text-destructive">Opravdu smazat?</span>
-                        <button type="button" className="text-sm text-muted-foreground hover:underline" onClick={() => setConfirmDelete(false)}>Zrušit</button>
-                        <button type="button" className="text-sm text-destructive font-medium hover:underline" onClick={handleDelete}>Potvrdit</button>
+                        <span className="text-sm text-gray-600">Opravdu smazat?</span>
+                        <button type="button" className="text-sm text-red-500 font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
+                        <button type="button" className="text-sm text-gray-400 font-medium hover:underline" onClick={() => {
+                          const totalDocs = Object.values(sp.filesByCategory).reduce((sum, files) => sum + files.length, 0);
+                          if (totalDocs > 0) {
+                            setDeleteStep(2);
+                          } else {
+                            handleDelete();
+                          }
+                        }}>Potvrdit</button>
+                      </div>
+                    )}
+                    {deleteStep === 2 && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-600">
+                          Tento projekt obsahuje {Object.values(sp.filesByCategory).reduce((sum, files) => sum + files.length, 0)} dokumentů. Opravdu chcete smazat?
+                        </span>
+                        <button type="button" className="text-sm text-red-500 font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
+                        <button type="button" className="text-sm text-gray-400 font-medium hover:underline" onClick={handleDelete}>Potvrdit smazání</button>
                       </div>
                     )}
                   </>
