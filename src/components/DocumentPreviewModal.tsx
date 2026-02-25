@@ -57,12 +57,12 @@ export function DocumentPreviewModal({
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { e.stopPropagation(); onClose(); }
-      if (e.key === "ArrowLeft" && canGoPrev) onNavigate?.(-1);
-      if (e.key === "ArrowRight" && canGoNext) onNavigate?.(1);
+      if (e.key === "Escape") { e.stopPropagation(); e.stopImmediatePropagation(); e.preventDefault(); onClose(); }
+      if (e.key === "ArrowLeft" && canGoPrev) { e.stopImmediatePropagation(); onNavigate?.(-1); }
+      if (e.key === "ArrowRight" && canGoNext) { e.stopImmediatePropagation(); onNavigate?.(1); }
     };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
+    document.addEventListener("keydown", handler, true);
+    return () => document.removeEventListener("keydown", handler, true);
   }, [open, onClose, onNavigate, canGoPrev, canGoNext]);
 
   if (!open) return null;
