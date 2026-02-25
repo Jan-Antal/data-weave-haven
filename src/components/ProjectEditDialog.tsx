@@ -101,6 +101,13 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
     }
   }, [project, open, resetIdCheck]);
 
+  // Fetch all category counts on dialog open
+  useEffect(() => {
+    if (project && open) {
+      sp.fetchAllCategories();
+    }
+  }, [project?.project_id, open]);
+
   const handleToggleCategory = useCallback((key: string) => {
     const willOpen = openCategory !== key;
     setOpenCategory(willOpen ? key : null);

@@ -16,9 +16,12 @@ const CATEGORY_FOLDER_MAP: Record<string, string> = {
   dodaci_list: "Dodaci-list",
 };
 
+const ALL_CATEGORY_KEYS = Object.keys(CATEGORY_FOLDER_MAP);
+
 export function useSharePointDocs(projectId: string) {
   const [filesByCategory, setFilesByCategory] = useState<Record<string, SPFile[]>>({});
   const [loadingCategory, setLoadingCategory] = useState<string | null>(null);
+  const [initialLoading, setInitialLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fetchedRef = useRef<Set<string>>(new Set());
 
@@ -27,6 +30,33 @@ export function useSharePointDocs(projectId: string) {
     if (error) throw new Error(error.message ?? "Edge function error");
     return data;
   }, []);
+
+  const fetchAllCategories = useCallback(async () => {
+    if (!projectId) return;
+    setInitialLoading(true);
+    try {
+      const results = await Promise.all(
+        ALL_CATEGORY_KEYS.map(async (key) => {
+          const folder = CATEGORY_FOLDER_MAP[key];
+          try {
+            const files = await invoke({ action: "list", projectId, category: folder });
+            return { key, files: (files ?? []) as SPFile[] };
+          } catch (err) {
+            console.error(`SP list error for ${key}:`, err);
+            return { key, files: [] as SPFile[] };
+          }
+        })
+      );
+      const map: Record<string, SPFile[]> = {};
+      for (const r of results) {
+        map[r.key] = r.files;
+        fetchedRef.current.add(r.key);
+      }
+      setFilesByCategory(map);
+    } finally {
+      setInitialLoading(false);
+    }
+  }, [projectId, invoke]);
 
   const listFiles = useCallback(async (categoryKey: string, force = false) => {
     if (!force && fetchedRef.current.has(categoryKey)) return;
@@ -58,7 +88,6 @@ export function useSharePointDocs(projectId: string) {
         fileName: file.name,
         fileContent: base64,
       });
-      // Add to cache
       setFilesByCategory((prev) => ({
         ...prev,
         [categoryKey]: [...(prev[categoryKey] ?? []), result as SPFile],
@@ -81,7 +110,7 @@ export function useSharePointDocs(projectId: string) {
     setFilesByCategory({});
   }, []);
 
-  return { filesByCategory, loadingCategory, uploading, listFiles, uploadFile, getDownloadUrl, resetCache };
+  return { filesByCategory, loadingCategory, initialLoading, uploading, listFiles, fetchAllCategories, uploadFile, getDownloadUrl, resetCache };
 }
 
 function fileToBase64(file: File): Promise<string> {
