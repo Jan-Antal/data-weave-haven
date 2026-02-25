@@ -53,6 +53,48 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_column_definitions: {
+        Row: {
+          column_key: string
+          created_at: string
+          data_type: string
+          group_key: string
+          id: string
+          label: string
+          people_role: string | null
+          select_options: string[] | null
+          sort_order: number | null
+          table_name: string
+          updated_at: string
+        }
+        Insert: {
+          column_key: string
+          created_at?: string
+          data_type?: string
+          group_key: string
+          id?: string
+          label: string
+          people_role?: string | null
+          select_options?: string[] | null
+          sort_order?: number | null
+          table_name: string
+          updated_at?: string
+        }
+        Update: {
+          column_key?: string
+          created_at?: string
+          data_type?: string
+          group_key?: string
+          id?: string
+          label?: string
+          people_role?: string | null
+          select_options?: string[] | null
+          sort_order?: number | null
+          table_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       exchange_rates: {
         Row: {
           created_at: string
@@ -232,6 +274,7 @@ export type Database = {
           contract_link: string | null
           created_at: string
           currency: string | null
+          custom_fields: Json | null
           datum_objednavky: string | null
           datum_smluvni: string | null
           datum_tpv: string | null
@@ -277,6 +320,7 @@ export type Database = {
           contract_link?: string | null
           created_at?: string
           currency?: string | null
+          custom_fields?: Json | null
           datum_objednavky?: string | null
           datum_smluvni?: string | null
           datum_tpv?: string | null
@@ -322,6 +366,7 @@ export type Database = {
           contract_link?: string | null
           created_at?: string
           currency?: string | null
+          custom_fields?: Json | null
           datum_objednavky?: string | null
           datum_smluvni?: string | null
           datum_tpv?: string | null
@@ -368,6 +413,7 @@ export type Database = {
         Row: {
           accepted_date: string | null
           created_at: string
+          custom_fields: Json | null
           deleted_at: string | null
           id: string
           item_name: string
@@ -382,6 +428,7 @@ export type Database = {
         Insert: {
           accepted_date?: string | null
           created_at?: string
+          custom_fields?: Json | null
           deleted_at?: string | null
           id?: string
           item_name: string
@@ -396,6 +443,7 @@ export type Database = {
         Update: {
           accepted_date?: string | null
           created_at?: string
+          custom_fields?: Json | null
           deleted_at?: string | null
           id?: string
           item_name?: string
