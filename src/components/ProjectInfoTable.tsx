@@ -202,6 +202,9 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
           <TableHeader>
             <TableRow className="bg-primary/5">
               <TableHead style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="shrink-0"></TableHead>
+              <TableHead style={{ minWidth: 40, width: 40, maxWidth: 40 }} className="text-center">
+                <Paperclip className="h-3 w-3 text-muted-foreground mx-auto" />
+              </TableHead>
               {v("project_id") && renderColumnHeader(headerProps("project_id"))}
               {v("project_name") && renderColumnHeader(headerProps("project_name"))}
               {renderKeys.map((key) => renderColumnHeader(headerProps(key)))}
@@ -212,17 +215,17 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
             {sorted.map((p) => (
               <TableRow key={p.id} className="hover:bg-muted/50 transition-colors" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { backgroundColor: c } : {}; })()}>
                 <TableCell style={{ minWidth: 32, width: 32 }} />
+                <TableCell style={{ minWidth: 40, width: 40, maxWidth: 40 }} className="text-center">
+                  {(docCounts[p.project_id] ?? 0) > 0 && (
+                    <span className="inline-flex items-center gap-0.5 text-muted-foreground text-[10px]">
+                      <Paperclip className="h-3 w-3" />
+                      {docCounts[p.project_id]}
+                    </span>
+                  )}
+                </TableCell>
                 {v("project_id") && (
                   <TableCell className="font-mono text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => setEditProject(p)}>
-                    <span className="flex items-center gap-1.5">
-                      {p.project_id}
-                      {(docCounts[p.project_id] ?? 0) > 0 && (
-                        <span className="inline-flex items-center gap-0.5 text-muted-foreground text-[10px] font-normal">
-                          <Paperclip className="h-3 w-3" />
-                          {docCounts[p.project_id]}
-                        </span>
-                      )}
-                    </span>
+                    {p.project_id}
                   </TableCell>
                 )}
                 {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
