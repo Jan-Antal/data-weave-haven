@@ -7,8 +7,7 @@ import { useProjects } from "@/hooks/useProjects";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
 import { useSortFilter } from "@/hooks/useSortFilter";
-import { ChevronRight, Paperclip } from "lucide-react";
-import { useDocumentCounts } from "@/hooks/useDocumentCounts";
+import { ChevronRight } from "lucide-react";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { useTPVItems } from "@/hooks/useTPVItems";
 import { TPVItemsView } from "./TPVItemsView";
@@ -44,8 +43,6 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const statusLabels = statusOptions.map((s) => s.label);
   const updateProject = useUpdateProject();
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
-  const allProjectIds = useMemo(() => projects.map((p) => p.project_id), [projects]);
-  const { counts: docCounts } = useDocumentCounts(allProjectIds);
   const { tpvStatus: { isVisible } } = useAllColumnVisibility();
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("tpv-status");
   const [editMode, setEditMode] = useState(false);
@@ -131,9 +128,6 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
-              <TableHead style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="text-center">
-                <Paperclip className="h-3.5 w-3.5 text-gray-400 mx-auto" />
-              </TableHead>
               <TableHead style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="shrink-0"></TableHead>
               {v("project_id") && renderColumnHeader(headerProps("project_id"))}
               {v("project_name") && renderColumnHeader(headerProps("project_name"))}
@@ -144,14 +138,6 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
           <TableBody>
             {sorted.map((p) => (
               <TableRow key={p.id} className="hover:bg-muted/50 transition-colors h-9" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { backgroundColor: c } : {}; })()}>
-                <TableCell className="text-center" style={{ minWidth: 36, width: 36, maxWidth: 36 }}>
-                  {(docCounts[p.project_id] ?? 0) > 0 && (
-                    <span className="inline-flex items-center gap-0.5 text-gray-400 text-[10px]">
-                      <Paperclip className="h-3 w-3" />
-                      {docCounts[p.project_id]}
-                    </span>
-                  )}
-                </TableCell>
                 <TableCell
                   className="w-[32px] cursor-pointer"
                   onClick={() => setActiveProject({ projectId: p.project_id, projectName: p.project_name })}

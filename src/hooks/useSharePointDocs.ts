@@ -114,20 +114,6 @@ export function useSharePointDocs(projectId: string) {
     return (result as { downloadUrl: string | null }).downloadUrl;
   }, [projectId, invoke]);
 
-  const deleteFile = useCallback(async (categoryKey: string, fileName: string) => {
-    const folder = CATEGORY_FOLDER_MAP[categoryKey];
-    if (!folder) return;
-    await invoke({ action: "delete", projectId, category: folder, fileName });
-    setFilesByCategory((prev) => ({
-      ...prev,
-      [categoryKey]: (prev[categoryKey] ?? []).filter((f) => f.name !== fileName),
-    }));
-  }, [projectId, invoke]);
-
-  const archiveProject = useCallback(async () => {
-    await invoke({ action: "archive", projectId });
-  }, [projectId, invoke]);
-
   const getPreview = useCallback(async (itemId: string): Promise<SPPreview> => {
     const result = await invoke({ action: "preview", itemId });
     return result as SPPreview;
@@ -138,7 +124,7 @@ export function useSharePointDocs(projectId: string) {
     setFilesByCategory({});
   }, []);
 
-  return { filesByCategory, loadingCategory, initialLoading, uploading, listFiles, fetchAllCategories, uploadFile, deleteFile, archiveProject, getDownloadUrl, getPreview, resetCache };
+  return { filesByCategory, loadingCategory, initialLoading, uploading, listFiles, fetchAllCategories, uploadFile, getDownloadUrl, getPreview, resetCache };
 }
 
 function fileToBase64(file: File): Promise<string> {
