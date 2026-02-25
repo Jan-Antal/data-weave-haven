@@ -14,8 +14,22 @@ const DATE_KEYS = new Set([
 ]);
 const SHORT_KEYS = new Set(["marze", "link_cn", "risk", "percent_tpv", "narocnost"]);
 
+// Max width caps for specific columns
+const WIDTH_CAPS: Record<string, number> = {
+  project_name: 180,
+  pm_poznamka: 120,
+  tpv_poznamka: 120,
+};
+
 export function getColumnStyle(key: string, customWidth?: number | null): React.CSSProperties {
-  if (customWidth) return { width: customWidth, minWidth: customWidth };
+  const cap = WIDTH_CAPS[key];
+  let w = customWidth ?? null;
+  if (cap && w) w = Math.min(w, cap);
+
+  if (w) {
+    console.log(`[ColWidth] key=${key} width=${w} (from DB=${customWidth}, cap=${cap ?? "none"})`);
+    return { width: w, minWidth: w };
+  }
   if (key === "project_id") return { width: 110, minWidth: 110, maxWidth: 110 };
   if (key === "project_name") return { width: 180, minWidth: 180 };
   if (key === "pm_poznamka") return { width: 120, minWidth: 120 };
