@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -57,6 +57,7 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
     marze: "",
   });
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [activeDocCategory, setActiveDocCategory] = useState<string | null>(null);
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck(project?.id);
 
   useEffect(() => {
@@ -214,6 +215,56 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
           </div>
         </div>
 
+        {/* Documents Section */}
+        <div className="border-t pt-3 mt-1">
+          <Label className="text-sm font-semibold">Dokumenty</Label>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {[
+              { key: "cenova_nabidka", icon: "📋", label: "Cenová nabídka" },
+              { key: "smlouva", icon: "📄", label: "Smlouva" },
+              { key: "vykresy", icon: "📐", label: "Výkresy" },
+              { key: "dokumentace", icon: "📁", label: "Dokumentace" },
+              { key: "dodaci_list", icon: "📦", label: "Dodací list" },
+            ].map((cat) => (
+              <button
+                key={cat.key}
+                type="button"
+                onClick={() => setActiveDocCategory(activeDocCategory === cat.key ? null : cat.key)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors",
+                  activeDocCategory === cat.key
+                    ? "bg-foreground text-background border-foreground"
+                    : "bg-background text-foreground border-input hover:bg-accent"
+                )}
+              >
+                <span>{cat.icon}</span>
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Upload zone */}
+          <div
+            className={cn(
+              "mt-3 rounded-lg border-2 border-dashed flex flex-col items-center justify-center py-6 px-4 transition-colors",
+              activeDocCategory
+                ? "border-muted-foreground/30 bg-muted/30 cursor-pointer hover:border-muted-foreground/50"
+                : "border-muted/50 bg-muted/20 cursor-not-allowed opacity-60"
+            )}
+          >
+            <Upload className="h-6 w-6 text-muted-foreground mb-2" />
+            <p className="text-xs text-muted-foreground text-center">
+              {activeDocCategory
+                ? "Přetáhněte soubory sem nebo klikněte pro výběr"
+                : "Nejprve vyberte kategorii"}
+            </p>
+          </div>
+
+          {/* File list */}
+          <div className="mt-3 max-h-[200px] overflow-y-auto">
+            <p className="text-xs text-muted-foreground text-center py-3">Žádné dokumenty</p>
+          </div>
+        </div>
         {canDeleteProject && (
           <div className="border-t pt-3 mt-1">
             {!confirmDelete ? (
