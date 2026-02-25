@@ -251,6 +251,98 @@ async function getPreviewUrl(
   };
 }
 
+async function deleteFile(
+  token: string,
+  driveId: string,
+  projectId: string,
+  category: string,
+  fileName: string
+) {
+  const path = folderPath(projectId, category);
+  const encodedFileName = encodeURIComponent(fileName);
+  const itemUrl = `${GRAPH}/drives/${driveId}/root:/${path}/${encodedFileName}`;
+  console.log("[delete] Resolving item:", itemUrl);
+  const itemRes = await fetch(itemUrl, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!itemRes.ok) {
+    const t = await itemRes.text();
+    throw new Error(`Delete resolve error ${itemRes.status}: ${t}`);
+  }
+  const item = await itemRes.json();
+  const itemId = item.id;
+  console.log("[delete] Deleting item:", itemId);
+  const delRes = await fetch(`${GRAPH}/drives/${driveId}/items/${itemId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!delRes.ok && delRes.status !== 204) {
+    const t = await delRes.text();
+    throw new Error(`Delete error ${delRes.status}: ${t}`);
+  }
+  await delRes.text().catch(() => {});
+  return { success: true };
+}
+
+async function archiveProject(
+  token: string,
+  driveId: string,
+  projectId: string
+) {
+  // Check if project folder exists
+  const srcPath = `${LIB_ROOT}/${projectId}`;
+  const srcUrl = `${GRAPH}/drives/${driveId}/root:/${srcPath}`;
+  console.log("[archive] Checking source folder:", srcUrl);
+  const srcRes = await fetch(srcUrl, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (srcRes.status === 404) {
+    await srcRes.text();
+    console.log("[archive] No folder to archive for", projectId);
+    return { success: true, moved: false };
+  }
+  if (!srcRes.ok) {
+    const t = await srcRes.text();
+    throw new Error(`Archive source error ${srcRes.status}: ${t}`);
+  }
+  const srcFolder = await srcRes.json();
+  const folderId = srcFolder.id;
+
+  // Ensure _Archiv folder exists
+  await ensureFolder(token, driveId, `${LIB_ROOT}/_Archiv`);
+
+  // Get _Archiv folder id
+  const archivUrl = `${GRAPH}/drives/${driveId}/root:/${LIB_ROOT}/_Archiv`;
+  const archivRes = await fetch(archivUrl, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!archivRes.ok) {
+    const t = await archivRes.text();
+    throw new Error(`Archive folder error ${archivRes.status}: ${t}`);
+  }
+  const archivFolder = await archivRes.json();
+
+  // Move the project folder into _Archiv
+  console.log("[archive] Moving folder", folderId, "to _Archiv");
+  const moveRes = await fetch(`${GRAPH}/drives/${driveId}/items/${folderId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      parentReference: { id: archivFolder.id },
+      name: projectId,
+    }),
+  });
+  if (!moveRes.ok) {
+    const t = await moveRes.text();
+    throw new Error(`Archive move error ${moveRes.status}: ${t}`);
+  }
+  await moveRes.json();
+  return { success: true, moved: true };
+}
+
 const CATEGORIES = ["Cenova-nabidka", "Smlouva", "Vykresy", "Dokumentace", "Dodaci-list"];
 
 async function countFilesForProjects(
@@ -357,6 +449,22 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Archive action — move project folder to _Archiv
+    if (action === "archive") {
+      if (!projectId) {
+        return new Response(
+          JSON.stringify({ error: "Missing projectId for archive" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const accessToken = await getAccessToken();
+      const driveId = await getDriveId(accessToken);
+      const result = await archiveProject(accessToken, driveId, projectId);
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (!projectId || !category) {
       return new Response(
         JSON.stringify({ error: "Missing required fields: projectId, category" }),
@@ -393,6 +501,17 @@ Deno.serve(async (req) => {
         }
         console.log("[download] Request:", { projectId, category, fileName });
         result = await getDownloadUrl(accessToken, driveId, projectId, category, fileName);
+        break;
+
+      case "delete":
+        if (!fileName) {
+          return new Response(
+            JSON.stringify({ error: "Missing fileName for delete" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        console.log("[delete] Request:", { projectId, category, fileName });
+        result = await deleteFile(accessToken, driveId, projectId, category, fileName);
         break;
 
       default:

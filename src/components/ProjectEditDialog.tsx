@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, FileText, X } from "lucide-react";
+import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, FileText, X, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -83,7 +83,9 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
     currency: "CZK",
     marze: "",
   });
-  const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0); // 0=button, 1=confirm, 2=doc warning
+  const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
+  const [deletingFile, setDeletingFile] = useState<string | null>(null); // fileName being confirmed for delete
+  const [deletingFileLoading, setDeletingFileLoading] = useState(false);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck(project?.id);
 
@@ -219,6 +221,12 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
   };
 
   const handleDelete = async () => {
+    // Archive documents in SharePoint first
+    try {
+      await sp.archiveProject();
+    } catch (err: any) {
+      console.error("Archive failed, proceeding with soft-delete:", err);
+    }
     const { error } = await supabase.from("projects").update({ deleted_at: new Date().toISOString() } as any).eq("id", project.id);
     if (error) {
       toast({ title: "Chyba", description: error.message, variant: "destructive" });
@@ -505,13 +513,47 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
                               ) : (
                                 <div className="space-y-0.5 max-h-[140px] overflow-y-auto">
                                   {files.map((f) => (
-                                    <div key={f.name} className="flex items-center gap-1 py-1 px-1 rounded hover:bg-accent/50 text-xs cursor-pointer" onClick={() => handlePreview(f, cat.key)}>
-                                      <FileText className={cn("h-3.5 w-3.5 shrink-0", getFileIconColor(f.name))} />
-                                      <span className="truncate flex-1 text-left text-foreground" title={f.name}>
-                                        {f.name}
-                                      </span>
-                                      <span className="text-muted-foreground shrink-0 text-[10px]">{formatFileSize(f.size)}</span>
-                                    </div>
+                                    deletingFile === `${cat.key}::${f.name}` ? (
+                                      <div key={f.name} className="flex items-center gap-1.5 py-1 px-1 rounded bg-accent/50 text-xs">
+                                        <span className="text-gray-600 truncate">Smazat soubor?</span>
+                                        <button type="button" className="text-red-500 font-medium hover:underline shrink-0" onClick={() => setDeletingFile(null)}>Zrušit</button>
+                                        <button
+                                          type="button"
+                                          className="text-gray-400 font-medium hover:underline shrink-0"
+                                          disabled={deletingFileLoading}
+                                          onClick={async () => {
+                                            setDeletingFileLoading(true);
+                                            try {
+                                              await sp.deleteFile(cat.key, f.name);
+                                              dispatchDocCountUpdate(project!.project_id, -1);
+                                              toast({ title: "Soubor smazán" });
+                                            } catch (err: any) {
+                                              toast({ title: "Chyba", description: err.message, variant: "destructive" });
+                                            } finally {
+                                              setDeletingFile(null);
+                                              setDeletingFileLoading(false);
+                                            }
+                                          }}
+                                        >
+                                          {deletingFileLoading ? "…" : "Smazat"}
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div key={f.name} className="group flex items-center gap-1 py-1 px-1 rounded hover:bg-accent/50 text-xs cursor-pointer" onClick={() => handlePreview(f, cat.key)}>
+                                        <FileText className={cn("h-3.5 w-3.5 shrink-0", getFileIconColor(f.name))} />
+                                        <span className="truncate flex-1 text-left text-foreground" title={f.name}>
+                                          {f.name}
+                                        </span>
+                                        <span className="text-muted-foreground shrink-0 text-[10px] group-hover:hidden">{formatFileSize(f.size)}</span>
+                                        <button
+                                          type="button"
+                                          className="hidden group-hover:block shrink-0 text-gray-300 hover:text-red-400 transition-colors"
+                                          onClick={(e) => { e.stopPropagation(); setDeletingFile(`${cat.key}::${f.name}`); }}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                      </div>
+                                    )
                                   ))}
                                 </div>
                               )}
