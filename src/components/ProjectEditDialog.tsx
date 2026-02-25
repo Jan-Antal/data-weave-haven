@@ -317,15 +317,9 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
                 )}
               </div>
               <div className="flex items-center gap-2 shrink-0 ml-4">
-                {previewFile.webUrl && (
-                  <Button variant="outline" size="sm" className="h-8 text-xs whitespace-nowrap" onClick={() => window.open(previewFile.webUrl!, "_blank")}>
-                    <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                    Otevřít v SharePointu
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  className="h-8 text-xs whitespace-nowrap bg-[#2d5a3d] hover:bg-[#234a31] text-white"
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-gray-300 bg-white px-4 py-2 text-xs text-gray-700 hover:bg-orange-50 hover:border-orange-400 hover:text-orange-700 transition-colors"
                   onClick={async () => {
                     if (previewFile.downloadUrl) {
                       window.open(previewFile.downloadUrl, "_blank");
@@ -339,9 +333,19 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
                     }
                   }}
                 >
-                  <Download className="h-3.5 w-3.5 mr-1" />
+                  <Download className="h-3.5 w-3.5" />
                   Stáhnout
-                </Button>
+                </button>
+                {previewFile.webUrl && (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-gray-300 bg-white px-4 py-2 text-xs text-gray-700 hover:bg-orange-50 hover:border-orange-400 hover:text-orange-700 transition-colors"
+                    onClick={() => window.open(previewFile.webUrl!, "_blank")}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Otevřít v SharePointu
+                  </button>
+                )}
               </div>
             </div>
           </div>
