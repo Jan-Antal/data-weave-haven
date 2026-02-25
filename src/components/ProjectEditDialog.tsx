@@ -321,15 +321,22 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
                   type="button"
                   className="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-gray-300 bg-white px-4 py-2 text-xs text-gray-700 hover:bg-orange-50 hover:border-orange-400 hover:text-orange-700 transition-colors"
                   onClick={async () => {
-                    if (previewFile.downloadUrl) {
-                      window.open(previewFile.downloadUrl, "_blank");
-                    } else {
-                      try {
-                        const url = await sp.getDownloadUrl(previewFile.categoryKey, previewFile.file.name);
-                        if (url) window.open(url, "_blank");
-                      } catch (err: any) {
-                        toast({ title: "Chyba stahování", description: err.message, variant: "destructive" });
+                    toast({ title: "Stahování...", description: "Připravujeme soubor ke stažení." });
+                    try {
+                      let url = previewFile.downloadUrl;
+                      if (!url) {
+                        url = await sp.getDownloadUrl(previewFile.categoryKey, previewFile.file.name);
                       }
+                      if (!url) throw new Error("Nepodařilo se získat odkaz ke stažení.");
+                      const link = document.createElement("a");
+                      link.href = url;
+                      link.download = previewFile.file.name;
+                      link.target = "_blank";
+                      document.body.appendChild(link);
+                      try { link.click(); } catch { window.open(url, "_blank"); }
+                      document.body.removeChild(link);
+                    } catch (err: any) {
+                      toast({ title: "Chyba stahování", description: err.message, variant: "destructive" });
                     }
                   }}
                 >
