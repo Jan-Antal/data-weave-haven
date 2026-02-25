@@ -19,6 +19,9 @@ const WIDTH_CAPS: Record<string, number> = {
   project_name: 180,
   pm_poznamka: 120,
   tpv_poznamka: 120,
+  pm: 124,
+  kalkulant: 124,
+  architekt: 124,
 };
 
 const TRUNCATE_STYLE: React.CSSProperties = {
@@ -41,6 +44,9 @@ export function getColumnStyle(key: string, customWidth?: number | null): React.
   if (key === "project_name") return { width: 180, minWidth: 180, maxWidth: 180, ...TRUNCATE_STYLE };
   if (key === "pm_poznamka") return { width: 120, minWidth: 120, maxWidth: 120, ...TRUNCATE_STYLE };
   if (key === "tpv_poznamka") return { width: 120, minWidth: 120, maxWidth: 120, ...TRUNCATE_STYLE };
+  if (key === "pm") return { width: 124, minWidth: 124, maxWidth: 124, ...TRUNCATE_STYLE };
+  if (key === "kalkulant") return { width: 124, minWidth: 124, maxWidth: 124, ...TRUNCATE_STYLE };
+  if (key === "architekt") return { width: 124, minWidth: 124, maxWidth: 124, ...TRUNCATE_STYLE };
   if (DATE_KEYS.has(key)) return { width: 100, minWidth: 100, maxWidth: 100 };
   if (SHORT_KEYS.has(key)) return { width: 80, minWidth: 80, maxWidth: 80 };
   return { minWidth: 120 };

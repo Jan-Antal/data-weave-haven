@@ -128,7 +128,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
-              <TableHead style={{ minWidth: 32, width: 32 }} className="shrink-0"></TableHead>
+              <TableHead style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="shrink-0"></TableHead>
               {v("project_id") && renderColumnHeader(headerProps("project_id"))}
               {v("project_name") && renderColumnHeader(headerProps("project_name"))}
               {renderKeys.map((key) => renderColumnHeader(headerProps(key)))}
