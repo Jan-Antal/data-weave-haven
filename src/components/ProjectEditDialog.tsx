@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon, Upload, ChevronDown, Download, FileText, FileSpreadsheet, FileImage, File } from "lucide-react";
+import { CalendarIcon, Upload, ChevronDown, Download, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,6 +17,7 @@ import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
+import { useSharePointDocs } from "@/hooks/useSharePointDocs";
 
 interface Project {
   id: string;
@@ -47,6 +48,12 @@ const DOC_CATEGORIES = [
   { key: "dodaci_list", icon: "📦", label: "Dodací list" },
 ];
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDialogProps) {
   const qc = useQueryClient();
   const { data: statusOptions = [] } = useProjectStatusOptions();
@@ -69,6 +76,9 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck(project?.id);
 
+  const sp = useSharePointDocs(project?.project_id ?? "");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (project && open) {
       setForm({
@@ -86,9 +96,53 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
       });
       setConfirmDelete(false);
       setOpenCategory(null);
+      sp.resetCache();
       resetIdCheck();
     }
   }, [project, open, resetIdCheck]);
+
+  const handleToggleCategory = useCallback((key: string) => {
+    const willOpen = openCategory !== key;
+    setOpenCategory(willOpen ? key : null);
+    if (willOpen) {
+      sp.listFiles(key);
+    }
+  }, [openCategory, sp]);
+
+  const handleFileDrop = useCallback(async (e: React.DragEvent, categoryKey: string) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files);
+    for (const file of files) {
+      try {
+        await sp.uploadFile(categoryKey, file);
+        toast({ title: "Soubor nahrán", description: file.name });
+      } catch (err: any) {
+        toast({ title: "Chyba uploadu", description: err.message, variant: "destructive" });
+      }
+    }
+  }, [sp]);
+
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>, categoryKey: string) => {
+    const files = Array.from(e.target.files ?? []);
+    for (const file of files) {
+      try {
+        await sp.uploadFile(categoryKey, file);
+        toast({ title: "Soubor nahrán", description: file.name });
+      } catch (err: any) {
+        toast({ title: "Chyba uploadu", description: err.message, variant: "destructive" });
+      }
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [sp]);
+
+  const handleDownload = useCallback(async (categoryKey: string, fileName: string) => {
+    try {
+      const url = await sp.getDownloadUrl(categoryKey, fileName);
+      if (url) window.open(url, "_blank");
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [sp]);
 
   if (!project) return null;
 
@@ -138,7 +192,6 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
           {/* LEFT PANEL — Form fields */}
           <div className="flex-1 px-6 pb-4">
             <div className="grid grid-cols-2 gap-x-3 gap-y-3">
-              {/* Col 1 */}
               <div>
                 <Label className="text-xs">Project ID</Label>
                 <Input
@@ -243,11 +296,14 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
               <div className="space-y-1.5">
                 {DOC_CATEGORIES.map((cat) => {
                   const isOpen = openCategory === cat.key;
+                  const files = sp.filesByCategory[cat.key] ?? [];
+                  const isLoading = sp.loadingCategory === cat.key;
+
                   return (
                     <div key={cat.key}>
                       <button
                         type="button"
-                        onClick={() => setOpenCategory(isOpen ? null : cat.key)}
+                        onClick={() => handleToggleCategory(cat.key)}
                         className={cn(
                           "w-full flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-medium transition-all",
                           isOpen
@@ -257,22 +313,68 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
                       >
                         <span className="text-base leading-none">{cat.icon}</span>
                         <span className="flex-1 text-left text-xs">{cat.label}</span>
-                        <Badge variant="secondary" className="h-5 min-w-[20px] justify-center px-1.5 text-[10px]">0</Badge>
+                        <Badge variant="secondary" className="h-5 min-w-[20px] justify-center px-1.5 text-[10px]">
+                          {files.length}
+                        </Badge>
                         <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", isOpen && "rotate-180")} />
                       </button>
 
                       {isOpen && (
                         <div className="mt-1.5 ml-1 pl-3 border-l-2 border-primary/20 space-y-2">
-                          {/* Empty file list */}
-                          <p className="text-xs text-muted-foreground py-2">Žádné soubory</p>
+                          {/* File list */}
+                          {isLoading ? (
+                            <div className="flex items-center justify-center py-3">
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            </div>
+                          ) : files.length === 0 ? (
+                            <p className="text-xs text-muted-foreground py-2">Žádné soubory</p>
+                          ) : (
+                            <div className="space-y-1 max-h-[140px] overflow-y-auto">
+                              {files.map((f) => (
+                                <div key={f.name} className="flex items-center gap-1.5 py-1 px-1 rounded hover:bg-accent/50 group text-xs">
+                                  <span className="truncate flex-1 text-foreground" title={f.name}>{f.name}</span>
+                                  <span className="text-muted-foreground shrink-0 text-[10px]">{formatFileSize(f.size)}</span>
+                                  <button
+                                    type="button"
+                                    className="shrink-0 p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={() => handleDownload(cat.key, f.name)}
+                                    title="Stáhnout"
+                                  >
+                                    <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
 
                           {/* Upload zone */}
-                          <div className="rounded-md border border-dashed border-muted-foreground/30 bg-background flex flex-col items-center justify-center py-3 px-2 cursor-pointer hover:border-muted-foreground/50 transition-colors">
-                            <Upload className="h-4 w-4 text-muted-foreground mb-1" />
-                            <p className="text-[10px] text-muted-foreground text-center">
-                              Přetáhněte soubor nebo vyberte
-                            </p>
+                          <div
+                            className={cn(
+                              "relative rounded-md border border-dashed border-muted-foreground/30 bg-background flex flex-col items-center justify-center py-3 px-2 cursor-pointer hover:border-muted-foreground/50 transition-colors",
+                              sp.uploading && "pointer-events-none opacity-60"
+                            )}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => handleFileDrop(e, cat.key)}
+                            onClick={() => fileInputRef.current?.click()}
+                          >
+                            {sp.uploading ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            ) : (
+                              <>
+                                <Upload className="h-4 w-4 text-muted-foreground mb-1" />
+                                <p className="text-[10px] text-muted-foreground text-center">
+                                  Přetáhněte soubor nebo vyberte
+                                </p>
+                              </>
+                            )}
                           </div>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            className="hidden"
+                            multiple
+                            onChange={(e) => handleFileSelect(e, cat.key)}
+                          />
                         </div>
                       )}
                     </div>
