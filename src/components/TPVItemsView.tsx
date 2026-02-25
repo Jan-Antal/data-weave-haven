@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { InlineEditableCell } from "./InlineEditableCell";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -7,14 +7,31 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useTPVItems, useUpdateTPVItem, useAddTPVItem, useDeleteTPVItems, useBulkUpdateTPVStatus, useBulkInsertTPVItems } from "@/hooks/useTPVItems";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
-import { ArrowLeft, Plus, Upload, Trash2, LayoutGrid } from "lucide-react";
+import { ArrowLeft, Plus, Upload, Trash2, Columns3, GripVertical } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const TPV_LIST_STORAGE_KEY = "tpv-list-columns";
+const TPV_LIST_ORDER_KEY = "tpv-list-column-order";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean }[] = [
   { key: "item_name", label: "Název", locked: true },
@@ -25,6 +42,8 @@ const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean }[] = [
   { key: "accepted_date", label: "Přijato" },
   { key: "notes", label: "Poznámka" },
 ];
+
+const DEFAULT_KEYS = TPV_LIST_COLUMNS.map(c => c.key);
 
 function loadTPVListVisibility(): Record<string, boolean> {
   try {
@@ -38,6 +57,55 @@ function loadTPVListVisibility(): Record<string, boolean> {
 
 function saveTPVListVisibility(vis: Record<string, boolean>) {
   try { localStorage.setItem(TPV_LIST_STORAGE_KEY, JSON.stringify(vis)); } catch {}
+}
+
+function loadTPVListOrder(): string[] {
+  try {
+    const stored = localStorage.getItem(TPV_LIST_ORDER_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as string[];
+      // Ensure all keys are present
+      const missing = DEFAULT_KEYS.filter(k => !parsed.includes(k));
+      return [...parsed, ...missing];
+    }
+  } catch {}
+  return DEFAULT_KEYS;
+}
+
+function saveTPVListOrder(order: string[]) {
+  try { localStorage.setItem(TPV_LIST_ORDER_KEY, JSON.stringify(order)); } catch {}
+}
+
+function SortableTPVColumnRow({
+  colKey, label, checked, onToggle, locked,
+}: {
+  colKey: string; label: string; checked: boolean; onToggle: () => void; locked?: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: colKey,
+    disabled: !!locked,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-1 px-1 py-1 rounded hover:bg-muted/50 cursor-pointer text-sm">
+      {!locked ? (
+        <div {...attributes} {...listeners} className="cursor-grab shrink-0 p-0.5">
+          <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+        </div>
+      ) : (
+        <div className="shrink-0 p-0.5 w-[18px]" />
+      )}
+      <label className="flex items-center gap-2 flex-1 cursor-pointer px-1">
+        <Checkbox checked={checked} onCheckedChange={() => { if (!locked) onToggle(); }} disabled={locked} />
+        <span className={locked ? "text-muted-foreground" : ""}>{label}</span>
+      </label>
+    </div>
+  );
 }
 
 interface Props {
@@ -67,8 +135,7 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
   const [newItem, setNewItem] = useState({ item_name: "", item_type: "", status: "", sent_date: "", accepted_date: "", notes: "" });
   const fileRef = useRef<HTMLInputElement>(null);
   const [colVis, setColVis] = useState<Record<string, boolean>>(loadTPVListVisibility);
-  const [colDropdownOpen, setColDropdownOpen] = useState(false);
-  const colDropdownRef = useRef<HTMLDivElement>(null);
+  const [colOrder, setColOrder] = useState<string[]>(loadTPVListOrder);
 
   const isColVisible = (key: string) => colVis[key] !== false;
   const toggleColVis = (key: string) => {
@@ -77,17 +144,27 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
     saveTPVListVisibility(next);
   };
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    if (!colDropdownOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (colDropdownRef.current && !colDropdownRef.current.contains(e.target as Node)) setColDropdownOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [colDropdownOpen]);
+  const orderedVisibleKeys = useMemo(
+    () => colOrder.filter(k => isColVisible(k)),
+    [colOrder, colVis]
+  );
 
-  const visibleColCount = TPV_LIST_COLUMNS.filter(c => isColVisible(c.key)).length + 2; // +checkbox +actions
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const handleColDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = colOrder.indexOf(active.id as string);
+    const newIndex = colOrder.indexOf(over.id as string);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const newOrder = arrayMove(colOrder, oldIndex, newIndex);
+    setColOrder(newOrder);
+    saveTPVListOrder(newOrder);
+  }, [colOrder]);
+
+  const visibleColCount = orderedVisibleKeys.length + 2; // +checkbox +actions
 
   const toggleSelect = (id: string) => {
     setSelected(prev => {
@@ -194,33 +271,6 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
             </Button>
           </div>
         )}
-        {/* Column visibility toggle */}
-        <div className="relative ml-auto" ref={colDropdownRef}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setColDropdownOpen(!colDropdownOpen)}
-            title="Upravit sloupce"
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </Button>
-          {colDropdownOpen && (
-            <div className="absolute right-0 top-full mt-1 z-50 bg-card border rounded-lg shadow-lg p-3 min-w-[180px]">
-              <p className="text-xs font-semibold text-muted-foreground mb-2">Upravit sloupce</p>
-              {TPV_LIST_COLUMNS.map(col => (
-                <label key={col.key} className="flex items-center gap-2 py-1 cursor-pointer text-sm">
-                  <Checkbox
-                    checked={isColVisible(col.key)}
-                    onCheckedChange={() => { if (!col.locked) toggleColVis(col.key); }}
-                    disabled={col.locked}
-                  />
-                  <span className={col.locked ? "text-muted-foreground" : ""}>{col.label}</span>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
       <div className="rounded-lg border bg-card overflow-auto">
@@ -228,14 +278,64 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
           <TableHeader>
             <TableRow className="bg-primary/5">
               <TableHead className="w-10"><Checkbox checked={items.length > 0 && selected.size === items.length} onCheckedChange={toggleAll} /></TableHead>
-              {isColVisible("item_name") && <TableHead className="font-semibold min-w-[200px]">Název</TableHead>}
-              {isColVisible("item_type") && <TableHead className="font-semibold min-w-[120px]">Typ</TableHead>}
-              {isColVisible("konstrukter") && <TableHead className="font-semibold min-w-[120px]">Konstruktér</TableHead>}
-              {isColVisible("status") && <TableHead className="font-semibold min-w-[140px]">Status</TableHead>}
-              {isColVisible("sent_date") && <TableHead className="font-semibold" style={{ width: 100, minWidth: 100, maxWidth: 100 }}>Odesláno</TableHead>}
-              {isColVisible("accepted_date") && <TableHead className="font-semibold" style={{ width: 100, minWidth: 100, maxWidth: 100 }}>Přijato</TableHead>}
-              {isColVisible("notes") && <TableHead className="font-semibold min-w-[200px]">Poznámka</TableHead>}
-              <TableHead className="w-10"></TableHead>
+              {orderedVisibleKeys.map(key => {
+                const col = TPV_LIST_COLUMNS.find(c => c.key === key)!;
+                const style = key === "sent_date" || key === "accepted_date"
+                  ? { width: 100, minWidth: 100, maxWidth: 100 }
+                  : key === "item_name" ? { minWidth: 200 }
+                  : key === "notes" ? { minWidth: 200 }
+                  : key === "status" ? { minWidth: 140 }
+                  : { minWidth: 120 };
+                return <TableHead key={key} className="font-semibold" style={style}>{col.label}</TableHead>;
+              })}
+              {/* Column toggle in header — same as main tables */}
+              <TableHead
+                className="w-[32px] min-w-[32px] p-0 sticky right-0 z-20"
+                style={{ background: "linear-gradient(hsl(var(--primary) / 0.05), hsl(var(--primary) / 0.05)), hsl(var(--card))" }}
+              >
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="relative p-2 rounded hover:bg-muted/50 transition-colors" title="Zobrazení sloupců" type="button">
+                      <Columns3 className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="end"
+                    side="bottom"
+                    avoidCollisions
+                    collisionPadding={16}
+                    sideOffset={4}
+                    className="w-60 p-0 z-[9999] bg-popover border shadow-md flex flex-col"
+                    style={{ maxHeight: "calc(100vh - 120px)" }}
+                  >
+                    <div className="overflow-y-auto p-2 pt-1">
+                      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleColDragEnd}>
+                        <SortableContext items={colOrder} strategy={verticalListSortingStrategy}>
+                          <div className="mb-2">
+                            <div className="flex items-center gap-1 w-full text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-2 py-1">
+                              TPV List
+                            </div>
+                            {colOrder.map(key => {
+                              const col = TPV_LIST_COLUMNS.find(c => c.key === key);
+                              if (!col) return null;
+                              return (
+                                <SortableTPVColumnRow
+                                  key={key}
+                                  colKey={key}
+                                  label={col.label}
+                                  checked={isColVisible(key)}
+                                  onToggle={() => toggleColVis(key)}
+                                  locked={col.locked}
+                                />
+                              );
+                            })}
+                          </div>
+                        </SortableContext>
+                      </DndContext>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -247,23 +347,20 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
               <TableRow key={item.id} className={`hover:bg-muted/50 transition-colors h-9 ${selected.has(item.id) ? "bg-primary/5" : ""}`}>
                 {canManageTPV && <TableCell><Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} /></TableCell>}
                 {!canManageTPV && <TableCell />}
-                {isColVisible("item_name") && <TableCell><InlineEditableCell value={item.item_name} onSave={(v) => saveField(item.id, "item_name", v, item.item_name)} className="font-medium" readOnly={!canManageTPV} /></TableCell>}
-                {isColVisible("item_type") && <TableCell><InlineEditableCell value={item.item_type} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} readOnly={!canManageTPV} /></TableCell>}
-                {isColVisible("konstrukter") && (
-                  <TableCell>
-                    <InlineEditableCell
-                      value={item.konstrukter || ""}
-                      type="people"
-                      peopleRole="Konstruktér"
-                      onSave={(v) => saveField(item.id, "konstrukter", v, item.konstrukter || "")}
-                      readOnly={!canManageTPV}
-                    />
-                  </TableCell>
-                )}
-                {isColVisible("status") && <TableCell><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} onSave={(v) => saveField(item.id, "status", v, item.status || "")} readOnly={!canManageTPV} /></TableCell>}
-                {isColVisible("sent_date") && <TableCell><InlineEditableCell value={item.sent_date} onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>}
-                {isColVisible("accepted_date") && <TableCell><InlineEditableCell value={item.accepted_date} onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>}
-                {isColVisible("notes") && <TableCell><InlineEditableCell value={item.notes} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} readOnly={!canManageTPV} /></TableCell>}
+                {orderedVisibleKeys.map(key => {
+                  if (key === "item_name") return <TableCell key={key}><InlineEditableCell value={item.item_name} onSave={(v) => saveField(item.id, "item_name", v, item.item_name)} className="font-medium" readOnly={!canManageTPV} /></TableCell>;
+                  if (key === "item_type") return <TableCell key={key}><InlineEditableCell value={item.item_type} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} readOnly={!canManageTPV} /></TableCell>;
+                  if (key === "konstrukter") return (
+                    <TableCell key={key}>
+                      <InlineEditableCell value={item.konstrukter || ""} type="people" peopleRole="Konstruktér" onSave={(v) => saveField(item.id, "konstrukter", v, item.konstrukter || "")} readOnly={!canManageTPV} />
+                    </TableCell>
+                  );
+                  if (key === "status") return <TableCell key={key}><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} onSave={(v) => saveField(item.id, "status", v, item.status || "")} readOnly={!canManageTPV} /></TableCell>;
+                  if (key === "sent_date") return <TableCell key={key}><InlineEditableCell value={item.sent_date} onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>;
+                  if (key === "accepted_date") return <TableCell key={key}><InlineEditableCell value={item.accepted_date} onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>;
+                  if (key === "notes") return <TableCell key={key}><InlineEditableCell value={item.notes} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} readOnly={!canManageTPV} /></TableCell>;
+                  return null;
+                })}
                 <TableCell>
                   {canManageTPV && (
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDeleteIds([item.id])}>
