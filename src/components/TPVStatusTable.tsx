@@ -14,7 +14,7 @@ import { TPVItemsView } from "./TPVItemsView";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
+import { getProjectRiskColor, getTPVRiskRowStyle } from "@/hooks/useRiskHighlight";
 import { useAllColumnVisibility, TPV_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
 import { getColumnStyle, renderColumnHeader, renderColumnCell } from "./CrossTabColumns";
 import { useHeaderDrag } from "@/hooks/useHeaderDrag";
@@ -136,19 +136,30 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sorted.map((p) => (
-              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors h-9" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { backgroundColor: c } : {}; })()}>
+            {sorted.map((p) => {
+              const dashboardColor = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
+              const tpvRisk = getTPVRiskRowStyle(p as any);
+              const rowBg = dashboardColor || tpvRisk.bg;
+              return (
+              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors h-9" style={rowBg ? { backgroundColor: rowBg } : {}}>
                 <TableCell
-                  className="w-[32px] cursor-pointer"
+                  className="w-[32px] cursor-pointer relative"
                   onClick={() => setActiveProject({ projectId: p.project_id, projectName: p.project_name })}
                 >
+                  {tpvRisk.dotColor && !dashboardColor && (
+                    <span
+                      className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full"
+                      style={{ width: 6, height: 6, backgroundColor: tpvRisk.dotColor }}
+                    />
+                  )}
                   <ExpandArrow projectId={p.project_id} />
                 </TableCell>
                 {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
                 {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
                 {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels }))}
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </div>
