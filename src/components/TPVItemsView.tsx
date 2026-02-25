@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColumns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { InlineEditableCell } from "./InlineEditableCell";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -68,6 +69,8 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
   const deleteItems = useDeleteTPVItems();
   const bulkStatus = useBulkUpdateTPVStatus();
   const bulkInsert = useBulkInsertTPVItems();
+  const { columns: customColumns } = useAllCustomColumns("tpv_items");
+  const updateCustomField = useUpdateCustomField();
 
   // ── Column management via shared hooks ──────────────────────────
   const {
@@ -301,6 +304,7 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
                 columns={TPV_LIST_COLUMNS}
                 groupLabel="TPV List"
                 labelTab="tpv-list"
+                tableName="tpv_items"
                 isVisible={isColVisible}
                 toggleColumn={toggleColVis}
                 editMode={editMode}
@@ -331,6 +335,26 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
                   if (key === "sent_date") return <TableCell key={key}><InlineEditableCell value={item.sent_date} onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>;
                   if (key === "accepted_date") return <TableCell key={key}><InlineEditableCell value={item.accepted_date} onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>;
                   if (key === "notes") return <TableCell key={key}><InlineEditableCell value={item.notes} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} readOnly={!canManageTPV} /></TableCell>;
+                  // Custom columns
+                  if (key.startsWith("custom_")) {
+                    const def = customColumns.find(c => c.column_key === key);
+                    if (!def) return null;
+                    const customFields = (item as any).custom_fields || {};
+                    const val = customFields[key] || "";
+                    const cellType = def.data_type === "date" ? "date" : def.data_type === "number" ? "number" : def.data_type === "select" ? "select" : def.data_type === "people" ? "people" : undefined;
+                    return (
+                      <TableCell key={key}>
+                        <InlineEditableCell
+                          value={val}
+                          type={cellType as any}
+                          options={def.data_type === "select" ? def.select_options : undefined}
+                          peopleRole={def.data_type === "people" ? (def.people_role as any || undefined) : undefined}
+                          onSave={(v) => updateCustomField.mutate({ rowId: item.id, tableName: "tpv_items", columnKey: key, value: v, oldValue: val })}
+                          readOnly={!canManageTPV}
+                        />
+                      </TableCell>
+                    );
+                  }
                   return null;
                 })}
                 <TableCell>

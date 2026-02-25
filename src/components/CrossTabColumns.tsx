@@ -6,6 +6,7 @@ import { CurrencyEditCell } from "./CurrencyEditCell";
 import { StatusBadge, RiskBadge, ProgressBar } from "./StatusBadge";
 import type { Project } from "@/hooks/useProjects";
 import { ALL_COLUMNS } from "./ColumnVisibilityContext";
+import type { CustomColumnDef } from "@/hooks/useCustomColumns";
 
 // ── Centralised column-width system ─────────────────────────────────
 const DATE_KEYS = new Set([
@@ -111,11 +112,13 @@ interface CellProps {
   canEdit: boolean;
   statusLabels: string[];
   saveCurrency?: (id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => void;
+  customColumns?: CustomColumnDef[];
+  saveCustomField?: (rowId: string, columnKey: string, value: string, oldValue: string) => void;
 }
 
 export function renderColumnCell(props: CellProps) {
-  const { colKey: key, project: p, save, canEdit, statusLabels, saveCurrency } = props;
-  return renderCell(key, p, save, canEdit, statusLabels, saveCurrency);
+  const { colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField } = props;
+  return renderCell(key, p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField);
 }
 
 function renderCell(
@@ -123,6 +126,8 @@ function renderCell(
   save: (id: string, f: string, v: string, o: string) => void,
   canEdit: boolean, statusLabels: string[],
   saveCurrency?: (id: string, a: string, c: string, oa: string, oc: string) => void,
+  customColumns?: CustomColumnDef[],
+  saveCustomField?: (rowId: string, columnKey: string, value: string, oldValue: string) => void,
 ) {
   const s = (field: string, val: string, old: string) => save(p.id, field, val, old);
   const v = (field: keyof Project) => (p as any)[field] ?? "";
@@ -177,7 +182,32 @@ function renderCell(
       return <TableCell key={key}><InlineEditableCell value={p.percent_tpv} type="number" onSave={(x) => s("percent_tpv", x, String(p.percent_tpv ?? ""))} displayValue={<ProgressBar value={p.percent_tpv || 0} />} readOnly={!canEdit} /></TableCell>;
     case "tpv_poznamka":
       return <TableCell key={key} style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.tpv_poznamka || ""}><InlineEditableCell value={p.tpv_poznamka} type="textarea" onSave={(x) => s("tpv_poznamka", x, v("tpv_poznamka"))} readOnly={!canEdit} /></TableCell>;
-    default:
+    default: {
+      // Handle custom columns
+      if (key.startsWith("custom_") && customColumns && saveCustomField) {
+        const def = customColumns.find(c => c.column_key === key);
+        if (!def) return null;
+        const customFields = (p as any).custom_fields || {};
+        const val = customFields[key] || "";
+        const cellType = def.data_type === "date" ? "date"
+          : def.data_type === "number" ? "number"
+          : def.data_type === "select" ? "select"
+          : def.data_type === "people" ? "people"
+          : undefined;
+        return (
+          <TableCell key={key}>
+            <InlineEditableCell
+              value={val}
+              type={cellType as any}
+              options={def.data_type === "select" ? def.select_options : undefined}
+              peopleRole={def.data_type === "people" ? (def.people_role as any || undefined) : undefined}
+              onSave={(x) => saveCustomField(p.id, key, x, val)}
+              readOnly={!canEdit}
+            />
+          </TableCell>
+        );
+      }
       return null;
+    }
   }
 }
