@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, type MutableRefObject } from "react";
 import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColumns";
 import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from "@/components/ui/table";
 import { RiskBadge, ProgressBar } from "./StatusBadge";
@@ -37,9 +37,10 @@ interface TPVStatusTableProps {
   search: string;
   riskHighlight?: import("@/hooks/useRiskHighlight").RiskHighlightType;
   onRequestTab?: () => void;
+  closeDetailRef?: MutableRefObject<(() => void) | null>;
 }
 
-export function TPVStatusTable({ personFilter, statusFilter, search: externalSearch, riskHighlight, onRequestTab }: TPVStatusTableProps) {
+export function TPVStatusTable({ personFilter, statusFilter, search: externalSearch, riskHighlight, onRequestTab, closeDetailRef }: TPVStatusTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const statusLabels = statusOptions.map((s) => s.label);
@@ -52,6 +53,14 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns } = useAuth();
   const [activeProject, setActiveProject] = useState<{ projectId: string; projectName: string } | null>(null);
+
+  // Expose close-detail callback to parent so tab switches can reset the detail view
+  useEffect(() => {
+    if (closeDetailRef) {
+      closeDetailRef.current = () => setActiveProject(null);
+      return () => { closeDetailRef.current = null; };
+    }
+  }, [closeDetailRef]);
 
   const orderedNativeKeys = useMemo(() => getOrderedKeys(TPV_NATIVE), [getOrderedKeys]);
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);

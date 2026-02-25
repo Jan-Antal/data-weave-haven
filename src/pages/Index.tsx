@@ -11,7 +11,7 @@ import { TableFilters, useTableFilters } from "@/components/TableFilters";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Settings, Plus, LogOut, User } from "lucide-react";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
 import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
 import { StatusManagement } from "@/components/StatusManagement";
@@ -31,16 +31,18 @@ const Index = () => {
   const [riskHighlight, setRiskHighlight] = useState<RiskHighlightType>(null);
   const [savedStatusFilter, setSavedStatusFilter] = useState<string[] | null>(null);
   const [planZoom, setPlanZoom] = useState<ZoomLevel>("3M");
+  const tpvCloseDetailRef = useRef<(() => void) | null>(null);
 
   const TPV_ACTIVE_STATUSES = ["Příprava", "Engineering", "TPV"];
 
   const handleTabChange = (tab: string) => {
+    // Close any open TPV detail view on any tab switch
+    tpvCloseDetailRef.current?.();
+
     if (tab === "tpv-status" && activeTab !== "tpv-status") {
-      // Entering TPV tab: save current filter, apply TPV filter
       setSavedStatusFilter(filters.statusFilter);
       filters.setStatusFilter(TPV_ACTIVE_STATUSES);
     } else if (tab !== "tpv-status" && activeTab === "tpv-status") {
-      // Leaving TPV tab: restore saved filter
       if (savedStatusFilter !== null) {
         filters.setStatusFilter(savedStatusFilter);
         setSavedStatusFilter(null);
@@ -190,7 +192,7 @@ const Index = () => {
             <PMStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
           </TabsContent>
           <TabsContent value="tpv-status" forceMount className={activeTab !== "tpv-status" ? "hidden" : ""}>
-            <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRequestTab={() => handleTabChange("tpv-status")} />
+            <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRequestTab={() => handleTabChange("tpv-status")} closeDetailRef={tpvCloseDetailRef} />
           </TabsContent>
           <TabsContent value="plan" forceMount className={activeTab !== "plan" ? "hidden" : ""}>
             <PlanView personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} zoom={planZoom} />
