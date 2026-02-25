@@ -231,7 +231,8 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
 
   return (
     <Dialog open={open} onOpenChange={(v) => {
-      if (!v) { setPreviewFile(null); onOpenChange(false); }
+      if (!v && previewFile) { setPreviewFile(null); return; }
+      if (!v) { onOpenChange(false); }
     }}>
       <DialogContent
         className={cn(
