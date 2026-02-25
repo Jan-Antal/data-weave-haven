@@ -2,10 +2,19 @@ import { useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface SPFile {
+  itemId: string;
   name: string;
   size: number;
   lastModified: string;
   downloadUrl: string | null;
+  webUrl: string | null;
+}
+
+export interface SPPreview {
+  previewUrl: string | null;
+  webUrl: string | null;
+  downloadUrl: string | null;
+  name: string;
 }
 
 const CATEGORY_FOLDER_MAP: Record<string, string> = {
@@ -105,12 +114,17 @@ export function useSharePointDocs(projectId: string) {
     return (result as { downloadUrl: string | null }).downloadUrl;
   }, [projectId, invoke]);
 
+  const getPreview = useCallback(async (itemId: string): Promise<SPPreview> => {
+    const result = await invoke({ action: "preview", itemId });
+    return result as SPPreview;
+  }, [invoke]);
+
   const resetCache = useCallback(() => {
     fetchedRef.current.clear();
     setFilesByCategory({});
   }, []);
 
-  return { filesByCategory, loadingCategory, initialLoading, uploading, listFiles, fetchAllCategories, uploadFile, getDownloadUrl, resetCache };
+  return { filesByCategory, loadingCategory, initialLoading, uploading, listFiles, fetchAllCategories, uploadFile, getDownloadUrl, getPreview, resetCache };
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -118,7 +132,6 @@ function fileToBase64(file: File): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
-      // Strip "data:...;base64," prefix
       resolve(result.split(",")[1]);
     };
     reader.onerror = reject;
