@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Paperclip } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 import { ProjectEditDialog } from "./ProjectEditDialog";
@@ -30,6 +30,7 @@ import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
 import { useAllColumnVisibility, PROJECT_INFO_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
 import { getColumnStyle, renderColumnHeader, renderColumnCell } from "./CrossTabColumns";
 import { useHeaderDrag } from "@/hooks/useHeaderDrag";
+import { useDocumentCounts } from "@/hooks/useDocumentCounts";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...PROJECT_INFO_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
@@ -62,6 +63,8 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const statusLabels = statusOptions.map((s) => s.label);
   const updateProject = useUpdateProject();
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
+  const allProjectIds = useMemo(() => projects.map((p) => p.project_id), [projects]);
+  const { counts: docCounts } = useDocumentCounts(allProjectIds);
   const [addOpen, setAddOpen] = useState(false);
   const [newProj, setNewProj] = useState({ ...emptyProject });
   const [datumWarning, setDatumWarning] = useState(false);
@@ -211,7 +214,15 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                 <TableCell style={{ minWidth: 32, width: 32 }} />
                 {v("project_id") && (
                   <TableCell className="font-mono text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => setEditProject(p)}>
-                    {p.project_id}
+                    <span className="flex items-center gap-1.5">
+                      {p.project_id}
+                      {(docCounts[p.project_id] ?? 0) > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-muted-foreground text-[10px] font-normal">
+                          <Paperclip className="h-3 w-3" />
+                          {docCounts[p.project_id]}
+                        </span>
+                      )}
+                    </span>
                   </TableCell>
                 )}
                 {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}

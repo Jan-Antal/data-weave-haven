@@ -19,6 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { useSharePointDocs, type SPFile } from "@/hooks/useSharePointDocs";
 import { DocumentPreviewModal } from "./DocumentPreviewModal";
+import { dispatchDocCountUpdate } from "@/hooks/useDocumentCounts";
 
 interface Project {
   id: string;
@@ -134,6 +135,7 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
     for (const file of files) {
       try {
         await sp.uploadFile(categoryKey, file);
+        dispatchDocCountUpdate(project!.project_id, 1);
         toast({ title: "Soubor nahrán", description: file.name });
       } catch (err: any) {
         toast({ title: "Chyba uploadu", description: err.message, variant: "destructive" });
@@ -146,6 +148,7 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
     for (const file of files) {
       try {
         await sp.uploadFile(categoryKey, file);
+        dispatchDocCountUpdate(project!.project_id, 1);
         toast({ title: "Soubor nahrán", description: file.name });
       } catch (err: any) {
         toast({ title: "Chyba uploadu", description: err.message, variant: "destructive" });
