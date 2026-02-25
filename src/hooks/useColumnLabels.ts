@@ -21,7 +21,9 @@ export function useColumnLabels(tab: string) {
         .select("column_key, custom_label, width, sort_order, display_order, visible")
         .eq("tab", tab);
       if (error) throw error;
-      return (data || []) as ColumnLabelRow[];
+      const rows = (data || []) as ColumnLabelRow[];
+      console.log(`[column_labels] tab="${tab}"`, rows);
+      return rows;
     },
   });
 
