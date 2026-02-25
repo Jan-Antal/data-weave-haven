@@ -48,10 +48,10 @@ export function showUndoToast(
 
   const { dismiss } = toast({
     duration: UNDO_DURATION,
-    className: "bg-gray-800 text-white border-gray-700",
+    className: "bg-gray-100 text-gray-700 border-gray-200 shadow-md",
     title: (
       <div className="flex items-center justify-between w-full gap-4">
-        <span className="text-sm font-medium">Uloženo</span>
+        <span className="text-sm font-medium text-gray-700">Uloženo</span>
         <button
           type="button"
           onClick={(e) => {
@@ -59,7 +59,7 @@ export function showUndoToast(
             handleUndo();
             dismiss();
           }}
-          className="text-orange-400 font-medium hover:text-orange-300 transition-colors text-sm shrink-0"
+          className="text-gray-500 font-medium hover:text-gray-700 transition-colors text-sm shrink-0"
         >
           Zpět
         </button>
@@ -68,7 +68,7 @@ export function showUndoToast(
     description: (
       <div className="mt-2 w-full">
         <div
-          className="h-0.5 bg-orange-400/80 rounded-full origin-left"
+          className="h-0.5 bg-gray-300 rounded-full origin-left"
           style={{
             animation: `undo-shrink ${UNDO_DURATION}ms linear forwards`,
           }}
