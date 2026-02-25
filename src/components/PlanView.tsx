@@ -6,6 +6,7 @@ import { useProjectStages, ProjectStage } from "@/hooks/useProjectStages";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { useSortFilter } from "@/hooks/useSortFilter";
 import { parseAppDate } from "@/lib/dateFormat";
+import { ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { ChevronRight, ChevronDown, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
@@ -564,8 +565,26 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
   const { getLabel } = useColumnLabels("project-info");
   const planIdLabel = getLabel("project_id", "ID");
   const planNameLabel = getLabel("project_name", "Název");
-  const { sorted } = useSortFilter(projects, { personFilter, statusFilter }, search);
+  const { sorted: filteredProjects } = useSortFilter(projects, { personFilter, statusFilter }, search);
   const zoom = zoomProp ?? ("3M" as ZoomLevel);
+  const [planSortCol, setPlanSortCol] = useState<string | null>(null);
+  const [planSortDir, setPlanSortDir] = useState<"asc" | "desc" | null>(null);
+
+  const togglePlanSort = useCallback((col: string) => {
+    if (planSortCol !== col) { setPlanSortCol(col); setPlanSortDir("asc"); }
+    else if (planSortDir === "asc") setPlanSortDir("desc");
+    else { setPlanSortCol(null); setPlanSortDir(null); }
+  }, [planSortCol, planSortDir]);
+
+  const sorted = useMemo(() => {
+    if (!planSortCol || !planSortDir) return filteredProjects;
+    return [...filteredProjects].sort((a, b) => {
+      const va = ((a as any)[planSortCol] ?? "").toString().toLowerCase();
+      const vb = ((b as any)[planSortCol] ?? "").toString().toLowerCase();
+      const cmp = va.localeCompare(vb, undefined, { numeric: true });
+      return planSortDir === "desc" ? -cmp : cmp;
+    });
+  }, [filteredProjects, planSortCol, planSortDir]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [containerWidth, setContainerWidth] = useState(0);
   const [editProject, setEditProject] = useState<Project | null>(null);
@@ -723,9 +742,15 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
       {/* PART 1 — FIXED HEADER ROW (never scrolls vertically) */}
       <div className="flex shrink-0 border-b bg-primary/5">
         {/* Left panel header */}
-        <div className="border-r shrink-0 flex items-end px-3 pb-1 gap-2" style={{ width: LEFT_PANEL_WIDTH, height: HEADER_HEIGHT }}>
-          <span className="text-xs font-medium text-muted-foreground" style={{ width: 110, flexShrink: 0 }}>{planIdLabel}</span>
-          <span className="text-xs font-medium text-muted-foreground flex-1">{planNameLabel}</span>
+        <div className="border-r shrink-0 flex items-center px-3 gap-2" style={{ width: LEFT_PANEL_WIDTH, height: HEADER_HEIGHT }}>
+          <button onClick={() => togglePlanSort("project_id")} className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors" style={{ width: 110, flexShrink: 0 }}>
+            {planIdLabel}
+            {planSortCol === "project_id" ? (planSortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}
+          </button>
+          <button onClick={() => togglePlanSort("project_name")} className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors flex-1">
+            {planNameLabel}
+            {planSortCol === "project_name" ? (planSortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}
+          </button>
         </div>
         {/* Timeline header — horizontal scroll synced with body */}
         <div
