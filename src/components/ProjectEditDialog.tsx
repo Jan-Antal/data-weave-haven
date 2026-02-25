@@ -90,7 +90,7 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
 
   const sp = useSharePointDocs(project?.project_id ?? "");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [previewFile, setPreviewFile] = useState<{ file: SPFile; loading: boolean; previewUrl: string | null; webUrl: string | null; downloadUrl: string | null } | null>(null);
+  const [previewFile, setPreviewFile] = useState<{ file: SPFile; categoryKey: string; loading: boolean; previewUrl: string | null; webUrl: string | null; downloadUrl: string | null } | null>(null);
 
   useEffect(() => {
     if (project && open) {
@@ -166,8 +166,8 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
     }
   }, [sp]);
 
-  const handlePreview = useCallback(async (file: SPFile) => {
-    setPreviewFile({ file, loading: true, previewUrl: null, webUrl: file.webUrl, downloadUrl: file.downloadUrl });
+  const handlePreview = useCallback(async (file: SPFile, categoryKey: string) => {
+    setPreviewFile({ file, categoryKey, loading: true, previewUrl: null, webUrl: file.webUrl, downloadUrl: file.downloadUrl });
     try {
       const preview = await sp.getPreview(file.itemId);
       setPreviewFile((prev) => prev ? { ...prev, loading: false, previewUrl: preview.previewUrl, webUrl: preview.webUrl ?? file.webUrl, downloadUrl: preview.downloadUrl ?? file.downloadUrl } : null);
@@ -176,6 +176,16 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
       setPreviewFile((prev) => prev ? { ...prev, loading: false } : null);
     }
   }, [sp]);
+
+  const handlePreviewNavigate = useCallback((direction: -1 | 1) => {
+    if (!previewFile) return;
+    const files = sp.filesByCategory[previewFile.categoryKey] ?? [];
+    const currentIdx = files.findIndex((f) => f.itemId === previewFile.file.itemId);
+    const nextIdx = currentIdx + direction;
+    if (nextIdx >= 0 && nextIdx < files.length) {
+      handlePreview(files[nextIdx], previewFile.categoryKey);
+    }
+  }, [previewFile, sp.filesByCategory, handlePreview]);
 
   if (!project) return null;
 
@@ -370,13 +380,13 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
                                     type="button"
                                     className="truncate flex-1 text-left text-foreground hover:underline cursor-pointer"
                                     title={f.name}
-                                    onClick={() => handlePreview(f)}
+                                    onClick={() => handlePreview(f, cat.key)}
                                   >
                                     {f.name}
                                   </button>
                                   <span className="text-muted-foreground shrink-0 text-[10px]">{formatFileSize(f.size)}</span>
                                   <div className="flex items-center shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button type="button" className="p-0.5 rounded hover:bg-accent" onClick={() => handlePreview(f)} title="Náhled">
+                                    <button type="button" className="p-0.5 rounded hover:bg-accent" onClick={() => handlePreview(f, cat.key)} title="Náhled">
                                       <Eye className="h-3.5 w-3.5 text-muted-foreground" />
                                     </button>
                                     {f.webUrl && (
@@ -465,10 +475,14 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
         open={!!previewFile}
         onClose={() => setPreviewFile(null)}
         fileName={previewFile?.file.name ?? ""}
+        fileSize={previewFile?.file.size}
         previewUrl={previewFile?.previewUrl ?? null}
         webUrl={previewFile?.webUrl ?? null}
         downloadUrl={previewFile?.downloadUrl ?? null}
         loading={previewFile?.loading ?? false}
+        totalFiles={(previewFile ? (sp.filesByCategory[previewFile.categoryKey] ?? []).length : 1)}
+        currentIndex={previewFile ? (sp.filesByCategory[previewFile.categoryKey] ?? []).findIndex((f) => f.itemId === previewFile.file.itemId) : 0}
+        onNavigate={handlePreviewNavigate}
       />
     </Dialog>
   );
