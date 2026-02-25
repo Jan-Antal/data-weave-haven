@@ -14,7 +14,7 @@ import { TPVItemsView } from "./TPVItemsView";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { getProjectRiskColor, getTPVRiskRowStyle } from "@/hooks/useRiskHighlight";
+import { getTPVDashboardRiskColor } from "@/hooks/useRiskHighlight";
 import { useAllColumnVisibility, TPV_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
 import { getColumnStyle, renderColumnHeader, renderColumnCell } from "./CrossTabColumns";
 import { useHeaderDrag } from "@/hooks/useHeaderDrag";
@@ -137,19 +137,17 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
           </TableHeader>
           <TableBody>
             {sorted.map((p) => {
-              const dashboardColor = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
-              const tpvRisk = getTPVRiskRowStyle(p as any);
-              const rowBg = dashboardColor || tpvRisk.bg;
+              const tpvHighlight = getTPVDashboardRiskColor(p as any, riskHighlight ?? null);
               return (
-              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors h-9" style={rowBg ? { backgroundColor: rowBg } : {}}>
+              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors h-9" style={tpvHighlight.bg ? { backgroundColor: tpvHighlight.bg } : {}}>
                 <TableCell
                   className="w-[32px] cursor-pointer relative"
                   onClick={() => setActiveProject({ projectId: p.project_id, projectName: p.project_name })}
                 >
-                  {tpvRisk.dotColor && !dashboardColor && (
+                  {tpvHighlight.dotColor && (
                     <span
                       className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full"
-                      style={{ width: 6, height: 6, backgroundColor: tpvRisk.dotColor }}
+                      style={{ width: 6, height: 6, backgroundColor: tpvHighlight.dotColor }}
                     />
                   )}
                   <ExpandArrow projectId={p.project_id} />
