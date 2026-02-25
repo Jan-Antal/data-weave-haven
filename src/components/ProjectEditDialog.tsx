@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Eye, Loader2, FileText, X } from "lucide-react";
+import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, FileText, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -324,7 +324,7 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
                   </Button>
                 )}
                 {previewFile.downloadUrl && (
-                  <Button size="sm" className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => window.open(previewFile.downloadUrl!, "_blank")}>
+                  <Button size="sm" className="h-8 text-xs bg-[#2d5a3d] hover:bg-[#234a31] text-white" onClick={() => window.open(previewFile.downloadUrl!, "_blank")}>
                     <Download className="h-3.5 w-3.5 mr-1" />
                     Stáhnout
                   </Button>
@@ -481,30 +481,12 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
                               ) : (
                                 <div className="space-y-0.5 max-h-[140px] overflow-y-auto">
                                   {files.map((f) => (
-                                    <div key={f.name} className="flex items-center gap-1 py-1 px-1 rounded hover:bg-accent/50 group text-xs">
+                                    <div key={f.name} className="flex items-center gap-1 py-1 px-1 rounded hover:bg-accent/50 text-xs cursor-pointer" onClick={() => handlePreview(f, cat.key)}>
                                       <FileText className={cn("h-3.5 w-3.5 shrink-0", getFileIconColor(f.name))} />
-                                      <button
-                                        type="button"
-                                        className="truncate flex-1 text-left text-foreground hover:underline cursor-pointer"
-                                        title={f.name}
-                                        onClick={() => handlePreview(f, cat.key)}
-                                      >
+                                      <span className="truncate flex-1 text-left text-foreground" title={f.name}>
                                         {f.name}
-                                      </button>
+                                      </span>
                                       <span className="text-muted-foreground shrink-0 text-[10px]">{formatFileSize(f.size)}</span>
-                                      <div className="flex items-center shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button type="button" className="p-0.5 rounded hover:bg-accent" onClick={() => handlePreview(f, cat.key)} title="Náhled">
-                                          <Eye className="h-3.5 w-3.5 text-muted-foreground" />
-                                        </button>
-                                        {f.webUrl && (
-                                          <button type="button" className="p-0.5 rounded hover:bg-accent" onClick={() => window.open(f.webUrl!, "_blank")} title="Otevřít v SharePointu">
-                                            <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-                                          </button>
-                                        )}
-                                        <button type="button" className="p-0.5 rounded hover:bg-accent" onClick={() => handleDownload(cat.key, f.name)} title="Stáhnout">
-                                          <Download className="h-3.5 w-3.5 text-muted-foreground" />
-                                        </button>
-                                      </div>
                                     </div>
                                   ))}
                                 </div>
