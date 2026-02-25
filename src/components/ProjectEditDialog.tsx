@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon, Upload, ChevronDown, Download, ExternalLink, Eye, Loader2, FileText } from "lucide-react";
+import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Eye, Loader2, FileText, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -18,7 +18,6 @@ import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { useSharePointDocs, type SPFile } from "@/hooks/useSharePointDocs";
-import { DocumentPreviewModal } from "./DocumentPreviewModal";
 import { dispatchDocCountUpdate } from "@/hooks/useDocumentCounts";
 
 interface Project {
@@ -187,6 +186,12 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
     }
   }, [previewFile, sp.filesByCategory, handlePreview]);
 
+  const previewFiles = previewFile ? (sp.filesByCategory[previewFile.categoryKey] ?? []) : [];
+  const previewCurrentIndex = previewFile ? previewFiles.findIndex((f) => f.itemId === previewFile.file.itemId) : 0;
+  const previewTotal = previewFiles.length;
+  const canGoPrev = previewTotal > 1 && previewCurrentIndex > 0;
+  const canGoNext = previewTotal > 1 && previewCurrentIndex < previewTotal - 1;
+
   if (!project) return null;
 
   const handleSave = async () => {
@@ -225,267 +230,354 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
   };
 
   return (
-    <>
-    <Dialog open={open} onOpenChange={(v) => { if (!previewFile) onOpenChange(v); }}>
-      <DialogContent className="sm:max-w-[920px] p-0 gap-0 overflow-hidden">
-        <DialogHeader className="px-6 pt-6 pb-4">
-          <DialogTitle>Projekt {project.project_id}</DialogTitle>
-        </DialogHeader>
-
-        <div className="flex min-h-[380px]">
-          {/* LEFT PANEL — Form fields */}
-          <div className="flex-1 px-6 pb-4">
-            <div className="grid grid-cols-2 gap-x-3 gap-y-3">
-              <div>
-                <Label className="text-xs">Project ID</Label>
-                <Input
-                  value={form.project_id}
-                  onChange={(e) => setForm(s => ({ ...s, project_id: e.target.value }))}
-                  onBlur={() => {
-                    if (form.project_id !== project.project_id) {
-                      checkProjectId(form.project_id);
-                    } else {
-                      resetIdCheck();
-                    }
-                  }}
-                />
-                {idExists && <p className="text-xs text-destructive mt-1">Toto ID již existuje</p>}
+    <Dialog open={open} onOpenChange={(v) => {
+      if (!v) { setPreviewFile(null); onOpenChange(false); }
+    }}>
+      <DialogContent
+        className={cn(
+          "p-0 gap-0 overflow-hidden",
+          previewFile ? "sm:max-w-[92vw] h-[88vh]" : "sm:max-w-[920px]"
+        )}
+        onEscapeKeyDown={(e) => {
+          if (previewFile) {
+            e.preventDefault();
+            setPreviewFile(null);
+          }
+        }}
+      >
+        {previewFile ? (
+          /* ===== PREVIEW MODE ===== */
+          <div className="flex flex-col h-full">
+            {/* Top bar */}
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setPreviewFile(null)}>
+                  <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                  Zpět
+                </Button>
+                <FileText className={cn("h-4 w-4 shrink-0", getFileIconColor(previewFile.file.name))} />
+                <span className="text-sm font-medium truncate" title={previewFile.file.name}>
+                  {previewFile.file.name}
+                </span>
+                {previewFile.file.size > 0 && (
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {formatFileSize(previewFile.file.size)}
+                  </span>
+                )}
+                {previewTotal > 1 && (
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    ({previewCurrentIndex + 1}/{previewTotal})
+                  </span>
+                )}
               </div>
-              <div>
-                <Label className="text-xs">Project Name</Label>
-                <Input value={form.project_name} onChange={(e) => setForm(s => ({ ...s, project_name: e.target.value }))} />
-              </div>
-
-              <div>
-                <Label className="text-xs">Klient</Label>
-                <Input value={form.klient} onChange={(e) => setForm(s => ({ ...s, klient: e.target.value }))} />
-              </div>
-              <div>
-                <Label className="text-xs">PM</Label>
-                <PeopleSelectDropdown role="PM" value={form.pm} onValueChange={(v) => setForm(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
-              </div>
-
-              <div>
-                <Label className="text-xs">Status</Label>
-                <Select value={form.status} onValueChange={(v) => setForm(s => ({ ...s, status: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
-                  <SelectContent className="z-[99999]">
-                    {statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs">Konstruktér</Label>
-                <PeopleSelectDropdown role="Konstruktér" value={form.konstrukter} onValueChange={(v) => setForm(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
-              </div>
-
-              <div>
-                <Label className="text-xs">Prodejní cena</Label>
-                <div className="flex items-center gap-1">
-                  <Input type="number" className="no-spinners" value={form.prodejni_cena} onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))} />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-10 px-3 font-mono shrink-0"
-                    onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
-                  >
-                    {form.currency}
+              <div className="flex items-center gap-1">
+                {canGoPrev && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handlePreviewNavigate(-1)}>
+                    <ChevronLeft className="h-4 w-4" />
                   </Button>
-                </div>
+                )}
+                {canGoNext && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handlePreviewNavigate(1)}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
-              <div>
-                <Label className="text-xs">Kalkulant</Label>
-                <PeopleSelectDropdown role="Kalkulant" value={form.kalkulant} onValueChange={(v) => setForm(s => ({ ...s, kalkulant: v }))} placeholder="Vyberte kalkulanta" />
-              </div>
+            </div>
 
-              <div>
-                <Label className="text-xs">Marže</Label>
-                <div className="flex items-center gap-1">
-                  <Input type="number" className="no-spinners" value={form.marze} onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))} placeholder="0" />
-                  <span className="text-sm text-muted-foreground shrink-0">%</span>
+            {/* Preview body */}
+            <div className="flex-1 relative min-h-0">
+              {previewFile.loading && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-background/80">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground mt-2">Načítání náhledu…</p>
                 </div>
+              )}
+              {!previewFile.loading && previewFile.previewUrl ? (
+                <iframe
+                  src={previewFile.previewUrl}
+                  className="w-full h-full border-0"
+                  title={`Preview: ${previewFile.file.name}`}
+                  sandbox="allow-scripts allow-same-origin allow-forms"
+                />
+              ) : !previewFile.loading && !previewFile.previewUrl ? (
+                <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
+                  <FileText className="h-12 w-12 opacity-30" />
+                  <p className="text-sm">Náhled není dostupný pro tento typ souboru.</p>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Bottom bar */}
+            <div className="flex items-center justify-between px-4 py-2.5 border-t border-border shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs text-muted-foreground truncate">{previewFile.file.name}</span>
+                {previewFile.file.size > 0 && (
+                  <span className="text-xs text-muted-foreground shrink-0">({formatFileSize(previewFile.file.size)})</span>
+                )}
               </div>
-              <div>
-                <Label className="text-xs">Datum Smluvní</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !form.datum_smluvni && "text-muted-foreground")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {form.datum_smluvni || "Vyberte datum"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 z-[99999]" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={form.datum_smluvni ? parseAppDate(form.datum_smluvni) : undefined}
-                      onSelect={(d) => {
-                        if (d) setForm(s => ({ ...s, datum_smluvni: formatAppDate(d) }));
-                      }}
-                      className="p-3 pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
+              <div className="flex items-center gap-2 shrink-0">
+                {previewFile.webUrl && (
+                  <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => window.open(previewFile.webUrl!, "_blank")}>
+                    <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                    Otevřít v SharePointu
+                  </Button>
+                )}
+                {previewFile.downloadUrl && (
+                  <Button size="sm" className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => window.open(previewFile.downloadUrl!, "_blank")}>
+                    <Download className="h-3.5 w-3.5 mr-1" />
+                    Stáhnout
+                  </Button>
+                )}
               </div>
             </div>
           </div>
+        ) : (
+          /* ===== EDIT FORM MODE ===== */
+          <>
+            <DialogHeader className="px-6 pt-6 pb-4">
+              <DialogTitle>Projekt {project.project_id}</DialogTitle>
+            </DialogHeader>
 
-          {/* RIGHT PANEL — Documents */}
-          <div className="w-[340px] shrink-0 border-l border-border bg-muted/30 flex flex-col">
-            <div className="px-4 pt-4 pb-2">
-              <h3 className="text-sm font-semibold text-foreground">Dokumenty</h3>
-            </div>
+            <div className="flex min-h-[380px]">
+              {/* LEFT PANEL — Form fields */}
+              <div className="flex-1 px-6 pb-4">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-3">
+                  <div>
+                    <Label className="text-xs">Project ID</Label>
+                    <Input
+                      value={form.project_id}
+                      onChange={(e) => setForm(s => ({ ...s, project_id: e.target.value }))}
+                      onBlur={() => {
+                        if (form.project_id !== project.project_id) {
+                          checkProjectId(form.project_id);
+                        } else {
+                          resetIdCheck();
+                        }
+                      }}
+                    />
+                    {idExists && <p className="text-xs text-destructive mt-1">Toto ID již existuje</p>}
+                  </div>
+                  <div>
+                    <Label className="text-xs">Project Name</Label>
+                    <Input value={form.project_name} onChange={(e) => setForm(s => ({ ...s, project_name: e.target.value }))} />
+                  </div>
 
-            <div className="flex-1 overflow-y-auto px-4 pb-4">
-              <div className="space-y-1.5">
-                {DOC_CATEGORIES.map((cat) => {
-                  const isOpen = openCategory === cat.key;
-                  const files = sp.filesByCategory[cat.key] ?? [];
-                  const isLoading = sp.loadingCategory === cat.key;
+                  <div>
+                    <Label className="text-xs">Klient</Label>
+                    <Input value={form.klient} onChange={(e) => setForm(s => ({ ...s, klient: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">PM</Label>
+                    <PeopleSelectDropdown role="PM" value={form.pm} onValueChange={(v) => setForm(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
+                  </div>
 
-                  return (
-                    <div key={cat.key}>
-                      <button
+                  <div>
+                    <Label className="text-xs">Status</Label>
+                    <Select value={form.status} onValueChange={(v) => setForm(s => ({ ...s, status: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
+                      <SelectContent className="z-[99999]">
+                        {statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Konstruktér</Label>
+                    <PeopleSelectDropdown role="Konstruktér" value={form.konstrukter} onValueChange={(v) => setForm(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
+                  </div>
+
+                  <div>
+                    <Label className="text-xs">Prodejní cena</Label>
+                    <div className="flex items-center gap-1">
+                      <Input type="number" className="no-spinners" value={form.prodejni_cena} onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))} />
+                      <Button
                         type="button"
-                        onClick={() => handleToggleCategory(cat.key)}
-                        className={cn(
-                          "w-full flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-medium transition-all",
-                          isOpen
-                            ? "border-[hsl(var(--primary))] bg-primary/5 text-foreground"
-                            : "border-border bg-background text-foreground hover:bg-accent"
-                        )}
+                        variant="outline"
+                        size="sm"
+                        className="h-10 px-3 font-mono shrink-0"
+                        onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
                       >
-                        <span className="text-base leading-none">{cat.icon}</span>
-                        <span className="flex-1 text-left text-xs">{cat.label}</span>
-                        <Badge variant="secondary" className="h-5 min-w-[20px] justify-center px-1.5 text-[10px]">
-                          {files.length}
-                        </Badge>
-                        <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", isOpen && "rotate-180")} />
-                      </button>
+                        {form.currency}
+                      </Button>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Kalkulant</Label>
+                    <PeopleSelectDropdown role="Kalkulant" value={form.kalkulant} onValueChange={(v) => setForm(s => ({ ...s, kalkulant: v }))} placeholder="Vyberte kalkulanta" />
+                  </div>
 
-                      {isOpen && (
-                        <div className="mt-1.5 ml-1 pl-3 border-l-2 border-primary/20 space-y-2">
-                          {/* File list */}
-                          {isLoading ? (
-                            <div className="flex items-center justify-center py-3">
-                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                            </div>
-                          ) : files.length === 0 ? (
-                            <p className="text-xs text-muted-foreground py-2">Žádné soubory</p>
-                          ) : (
-                            <div className="space-y-0.5 max-h-[140px] overflow-y-auto">
-                              {files.map((f) => (
-                                <div key={f.name} className="flex items-center gap-1 py-1 px-1 rounded hover:bg-accent/50 group text-xs">
-                                  <FileText className={cn("h-3.5 w-3.5 shrink-0", getFileIconColor(f.name))} />
-                                  <button
-                                    type="button"
-                                    className="truncate flex-1 text-left text-foreground hover:underline cursor-pointer"
-                                    title={f.name}
-                                    onClick={() => handlePreview(f, cat.key)}
-                                  >
-                                    {f.name}
-                                  </button>
-                                  <span className="text-muted-foreground shrink-0 text-[10px]">{formatFileSize(f.size)}</span>
-                                  <div className="flex items-center shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button type="button" className="p-0.5 rounded hover:bg-accent" onClick={() => handlePreview(f, cat.key)} title="Náhled">
-                                      <Eye className="h-3.5 w-3.5 text-muted-foreground" />
-                                    </button>
-                                    {f.webUrl && (
-                                      <button type="button" className="p-0.5 rounded hover:bg-accent" onClick={() => window.open(f.webUrl!, "_blank")} title="Otevřít v SharePointu">
-                                        <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-                                      </button>
-                                    )}
-                                    <button type="button" className="p-0.5 rounded hover:bg-accent" onClick={() => handleDownload(cat.key, f.name)} title="Stáhnout">
-                                      <Download className="h-3.5 w-3.5 text-muted-foreground" />
-                                    </button>
-                                  </div>
+                  <div>
+                    <Label className="text-xs">Marže</Label>
+                    <div className="flex items-center gap-1">
+                      <Input type="number" className="no-spinners" value={form.marze} onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))} placeholder="0" />
+                      <span className="text-sm text-muted-foreground shrink-0">%</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Datum Smluvní</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !form.datum_smluvni && "text-muted-foreground")}>
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {form.datum_smluvni || "Vyberte datum"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 z-[99999]" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={form.datum_smluvni ? parseAppDate(form.datum_smluvni) : undefined}
+                          onSelect={(d) => {
+                            if (d) setForm(s => ({ ...s, datum_smluvni: formatAppDate(d) }));
+                          }}
+                          className="p-3 pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT PANEL — Documents */}
+              <div className="w-[340px] shrink-0 border-l border-border bg-muted/30 flex flex-col">
+                <div className="px-4 pt-4 pb-2">
+                  <h3 className="text-sm font-semibold text-foreground">Dokumenty</h3>
+                </div>
+
+                <div className="flex-1 overflow-y-auto px-4 pb-4">
+                  <div className="space-y-1.5">
+                    {DOC_CATEGORIES.map((cat) => {
+                      const isOpen = openCategory === cat.key;
+                      const files = sp.filesByCategory[cat.key] ?? [];
+                      const isLoading = sp.loadingCategory === cat.key;
+
+                      return (
+                        <div key={cat.key}>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCategory(cat.key)}
+                            className={cn(
+                              "w-full flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-medium transition-all",
+                              isOpen
+                                ? "border-[hsl(var(--primary))] bg-primary/5 text-foreground"
+                                : "border-border bg-background text-foreground hover:bg-accent"
+                            )}
+                          >
+                            <span className="text-base leading-none">{cat.icon}</span>
+                            <span className="flex-1 text-left text-xs">{cat.label}</span>
+                            <Badge variant="secondary" className="h-5 min-w-[20px] justify-center px-1.5 text-[10px]">
+                              {files.length}
+                            </Badge>
+                            <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", isOpen && "rotate-180")} />
+                          </button>
+
+                          {isOpen && (
+                            <div className="mt-1.5 ml-1 pl-3 border-l-2 border-primary/20 space-y-2">
+                              {isLoading ? (
+                                <div className="flex items-center justify-center py-3">
+                                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                                 </div>
-                              ))}
+                              ) : files.length === 0 ? (
+                                <p className="text-xs text-muted-foreground py-2">Žádné soubory</p>
+                              ) : (
+                                <div className="space-y-0.5 max-h-[140px] overflow-y-auto">
+                                  {files.map((f) => (
+                                    <div key={f.name} className="flex items-center gap-1 py-1 px-1 rounded hover:bg-accent/50 group text-xs">
+                                      <FileText className={cn("h-3.5 w-3.5 shrink-0", getFileIconColor(f.name))} />
+                                      <button
+                                        type="button"
+                                        className="truncate flex-1 text-left text-foreground hover:underline cursor-pointer"
+                                        title={f.name}
+                                        onClick={() => handlePreview(f, cat.key)}
+                                      >
+                                        {f.name}
+                                      </button>
+                                      <span className="text-muted-foreground shrink-0 text-[10px]">{formatFileSize(f.size)}</span>
+                                      <div className="flex items-center shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button type="button" className="p-0.5 rounded hover:bg-accent" onClick={() => handlePreview(f, cat.key)} title="Náhled">
+                                          <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                                        </button>
+                                        {f.webUrl && (
+                                          <button type="button" className="p-0.5 rounded hover:bg-accent" onClick={() => window.open(f.webUrl!, "_blank")} title="Otevřít v SharePointu">
+                                            <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                                          </button>
+                                        )}
+                                        <button type="button" className="p-0.5 rounded hover:bg-accent" onClick={() => handleDownload(cat.key, f.name)} title="Stáhnout">
+                                          <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Upload zone */}
+                              <div
+                                className={cn(
+                                  "relative rounded-md border border-dashed border-muted-foreground/30 bg-background flex flex-col items-center justify-center py-3 px-2 cursor-pointer hover:border-muted-foreground/50 transition-colors",
+                                  sp.uploading && "pointer-events-none opacity-60"
+                                )}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => handleFileDrop(e, cat.key)}
+                                onClick={() => fileInputRef.current?.click()}
+                              >
+                                {sp.uploading ? (
+                                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                ) : (
+                                  <>
+                                    <Upload className="h-4 w-4 text-muted-foreground mb-1" />
+                                    <p className="text-[10px] text-muted-foreground text-center">
+                                      Přetáhněte soubor nebo vyberte
+                                    </p>
+                                  </>
+                                )}
+                              </div>
+                              <input
+                                ref={fileInputRef}
+                                type="file"
+                                className="hidden"
+                                multiple
+                                onChange={(e) => handleFileSelect(e, cat.key)}
+                              />
                             </div>
                           )}
-
-                          {/* Upload zone */}
-                          <div
-                            className={cn(
-                              "relative rounded-md border border-dashed border-muted-foreground/30 bg-background flex flex-col items-center justify-center py-3 px-2 cursor-pointer hover:border-muted-foreground/50 transition-colors",
-                              sp.uploading && "pointer-events-none opacity-60"
-                            )}
-                            onDragOver={(e) => e.preventDefault()}
-                            onDrop={(e) => handleFileDrop(e, cat.key)}
-                            onClick={() => fileInputRef.current?.click()}
-                          >
-                            {sp.uploading ? (
-                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                            ) : (
-                              <>
-                                <Upload className="h-4 w-4 text-muted-foreground mb-1" />
-                                <p className="text-[10px] text-muted-foreground text-center">
-                                  Přetáhněte soubor nebo vyberte
-                                </p>
-                              </>
-                            )}
-                          </div>
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            className="hidden"
-                            multiple
-                            onChange={(e) => handleFileSelect(e, cat.key)}
-                          />
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-border">
-          <div>
-            {canDeleteProject && (
-              <>
-                {!confirmDelete ? (
-                  <button
-                    type="button"
-                    className="text-sm text-destructive hover:underline"
-                    onClick={() => setConfirmDelete(true)}
-                  >
-                    Smazat projekt
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-destructive">Opravdu smazat?</span>
-                    <button type="button" className="text-sm text-muted-foreground hover:underline" onClick={() => setConfirmDelete(false)}>Zrušit</button>
-                    <button type="button" className="text-sm text-destructive font-medium hover:underline" onClick={handleDelete}>Potvrdit</button>
-                  </div>
+            {/* Footer */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-border">
+              <div>
+                {canDeleteProject && (
+                  <>
+                    {!confirmDelete ? (
+                      <button
+                        type="button"
+                        className="text-sm text-destructive hover:underline"
+                        onClick={() => setConfirmDelete(true)}
+                      >
+                        Smazat projekt
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-destructive">Opravdu smazat?</span>
+                        <button type="button" className="text-sm text-muted-foreground hover:underline" onClick={() => setConfirmDelete(false)}>Zrušit</button>
+                        <button type="button" className="text-sm text-destructive font-medium hover:underline" onClick={handleDelete}>Potvrdit</button>
+                      </div>
+                    )}
+                  </>
                 )}
-              </>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Zavřít</Button>
-            {canEdit && <Button onClick={handleSave} disabled={idExists || !form.project_id}>Uložit</Button>}
-          </div>
-        </div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => onOpenChange(false)}>Zavřít</Button>
+                {canEdit && <Button onClick={handleSave} disabled={idExists || !form.project_id}>Uložit</Button>}
+              </div>
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
-
-    <DocumentPreviewModal
-      open={!!previewFile}
-      onClose={() => setPreviewFile(null)}
-      fileName={previewFile?.file.name ?? ""}
-      fileSize={previewFile?.file.size}
-      previewUrl={previewFile?.previewUrl ?? null}
-      webUrl={previewFile?.webUrl ?? null}
-      downloadUrl={previewFile?.downloadUrl ?? null}
-      loading={previewFile?.loading ?? false}
-      totalFiles={(previewFile ? (sp.filesByCategory[previewFile.categoryKey] ?? []).length : 1)}
-      currentIndex={previewFile ? (sp.filesByCategory[previewFile.categoryKey] ?? []).findIndex((f) => f.itemId === previewFile.file.itemId) : 0}
-      onNavigate={handlePreviewNavigate}
-    />
-  </>
   );
 }
