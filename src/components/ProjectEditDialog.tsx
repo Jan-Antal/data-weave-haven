@@ -225,7 +225,8 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open} onOpenChange={(v) => { if (!previewFile) onOpenChange(v); }}>
       <DialogContent className="sm:max-w-[920px] p-0 gap-0 overflow-hidden">
         <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle>Projekt {project.project_id}</DialogTitle>
@@ -470,20 +471,21 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
           </div>
         </div>
       </DialogContent>
-
-      <DocumentPreviewModal
-        open={!!previewFile}
-        onClose={() => setPreviewFile(null)}
-        fileName={previewFile?.file.name ?? ""}
-        fileSize={previewFile?.file.size}
-        previewUrl={previewFile?.previewUrl ?? null}
-        webUrl={previewFile?.webUrl ?? null}
-        downloadUrl={previewFile?.downloadUrl ?? null}
-        loading={previewFile?.loading ?? false}
-        totalFiles={(previewFile ? (sp.filesByCategory[previewFile.categoryKey] ?? []).length : 1)}
-        currentIndex={previewFile ? (sp.filesByCategory[previewFile.categoryKey] ?? []).findIndex((f) => f.itemId === previewFile.file.itemId) : 0}
-        onNavigate={handlePreviewNavigate}
-      />
     </Dialog>
+
+    <DocumentPreviewModal
+      open={!!previewFile}
+      onClose={() => setPreviewFile(null)}
+      fileName={previewFile?.file.name ?? ""}
+      fileSize={previewFile?.file.size}
+      previewUrl={previewFile?.previewUrl ?? null}
+      webUrl={previewFile?.webUrl ?? null}
+      downloadUrl={previewFile?.downloadUrl ?? null}
+      loading={previewFile?.loading ?? false}
+      totalFiles={(previewFile ? (sp.filesByCategory[previewFile.categoryKey] ?? []).length : 1)}
+      currentIndex={previewFile ? (sp.filesByCategory[previewFile.categoryKey] ?? []).findIndex((f) => f.itemId === previewFile.file.itemId) : 0}
+      onNavigate={handlePreviewNavigate}
+    />
+  </>
   );
 }
