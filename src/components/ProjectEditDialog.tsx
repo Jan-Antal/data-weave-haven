@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon, Upload, ChevronDown, Download, Loader2 } from "lucide-react";
+import { CalendarIcon, Upload, ChevronDown, Download, ExternalLink, Eye, Loader2, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,7 +17,8 @@ import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
-import { useSharePointDocs } from "@/hooks/useSharePointDocs";
+import { useSharePointDocs, type SPFile } from "@/hooks/useSharePointDocs";
+import { DocumentPreviewModal } from "./DocumentPreviewModal";
 
 interface Project {
   id: string;
@@ -47,6 +48,16 @@ const DOC_CATEGORIES = [
   { key: "dokumentace", icon: "📁", label: "Dokumentace" },
   { key: "dodaci_list", icon: "📦", label: "Dodací list" },
 ];
+
+function getFileIconColor(name: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "pdf") return "text-red-500";
+  if (["xlsx", "xls", "csv"].includes(ext)) return "text-green-600";
+  if (["docx", "doc"].includes(ext)) return "text-blue-500";
+  if (["dwg", "dxf"].includes(ext)) return "text-orange-500";
+  if (["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"].includes(ext)) return "text-purple-500";
+  return "text-muted-foreground";
+}
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -78,6 +89,7 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
 
   const sp = useSharePointDocs(project?.project_id ?? "");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewFile, setPreviewFile] = useState<{ file: SPFile; loading: boolean; previewUrl: string | null; webUrl: string | null; downloadUrl: string | null } | null>(null);
 
   useEffect(() => {
     if (project && open) {
@@ -148,6 +160,17 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
       if (url) window.open(url, "_blank");
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [sp]);
+
+  const handlePreview = useCallback(async (file: SPFile) => {
+    setPreviewFile({ file, loading: true, previewUrl: null, webUrl: file.webUrl, downloadUrl: file.downloadUrl });
+    try {
+      const preview = await sp.getPreview(file.itemId);
+      setPreviewFile((prev) => prev ? { ...prev, loading: false, previewUrl: preview.previewUrl, webUrl: preview.webUrl ?? file.webUrl, downloadUrl: preview.downloadUrl ?? file.downloadUrl } : null);
+    } catch (err: any) {
+      console.error("Preview error:", err);
+      setPreviewFile((prev) => prev ? { ...prev, loading: false } : null);
     }
   }, [sp]);
 
@@ -336,19 +359,32 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
                           ) : files.length === 0 ? (
                             <p className="text-xs text-muted-foreground py-2">Žádné soubory</p>
                           ) : (
-                            <div className="space-y-1 max-h-[140px] overflow-y-auto">
+                            <div className="space-y-0.5 max-h-[140px] overflow-y-auto">
                               {files.map((f) => (
-                                <div key={f.name} className="flex items-center gap-1.5 py-1 px-1 rounded hover:bg-accent/50 group text-xs">
-                                  <span className="truncate flex-1 text-foreground" title={f.name}>{f.name}</span>
-                                  <span className="text-muted-foreground shrink-0 text-[10px]">{formatFileSize(f.size)}</span>
+                                <div key={f.name} className="flex items-center gap-1 py-1 px-1 rounded hover:bg-accent/50 group text-xs">
+                                  <FileText className={cn("h-3.5 w-3.5 shrink-0", getFileIconColor(f.name))} />
                                   <button
                                     type="button"
-                                    className="shrink-0 p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={() => handleDownload(cat.key, f.name)}
-                                    title="Stáhnout"
+                                    className="truncate flex-1 text-left text-foreground hover:underline cursor-pointer"
+                                    title={f.name}
+                                    onClick={() => handlePreview(f)}
                                   >
-                                    <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                                    {f.name}
                                   </button>
+                                  <span className="text-muted-foreground shrink-0 text-[10px]">{formatFileSize(f.size)}</span>
+                                  <div className="flex items-center shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button type="button" className="p-0.5 rounded hover:bg-accent" onClick={() => handlePreview(f)} title="Náhled">
+                                      <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                                    </button>
+                                    {f.webUrl && (
+                                      <button type="button" className="p-0.5 rounded hover:bg-accent" onClick={() => window.open(f.webUrl!, "_blank")} title="Otevřít v SharePointu">
+                                        <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                                      </button>
+                                    )}
+                                    <button type="button" className="p-0.5 rounded hover:bg-accent" onClick={() => handleDownload(cat.key, f.name)} title="Stáhnout">
+                                      <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                                    </button>
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -421,6 +457,16 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
           </div>
         </div>
       </DialogContent>
+
+      <DocumentPreviewModal
+        open={!!previewFile}
+        onClose={() => setPreviewFile(null)}
+        fileName={previewFile?.file.name ?? ""}
+        previewUrl={previewFile?.previewUrl ?? null}
+        webUrl={previewFile?.webUrl ?? null}
+        downloadUrl={previewFile?.downloadUrl ?? null}
+        loading={previewFile?.loading ?? false}
+      />
     </Dialog>
   );
 }

@@ -38,7 +38,6 @@ async function getAccessToken(): Promise<string> {
 }
 
 async function getDriveId(token: string): Promise<string> {
-  // Resolve site
   const siteRes = await fetch(
     `${GRAPH}/sites/${SITE_HOST}:${SITE_PATH}`,
     { headers: { Authorization: `Bearer ${token}` } }
@@ -50,7 +49,6 @@ async function getDriveId(token: string): Promise<string> {
   const site = await siteRes.json();
   const siteId = site.id;
 
-  // Get default drive (Shared Documents)
   const drivesRes = await fetch(
     `${GRAPH}/sites/${siteId}/drives`,
     { headers: { Authorization: `Bearer ${token}` } }
@@ -60,7 +58,6 @@ async function getDriveId(token: string): Promise<string> {
     throw new Error(`Drives error ${drivesRes.status}: ${t}`);
   }
   const drives = await drivesRes.json();
-  // "Documents" is the default document library display name
   const drive =
     drives.value.find((d: any) => d.name === "Shared Documents" || d.name === "Documents") ??
     drives.value[0];
@@ -81,12 +78,11 @@ async function listFiles(
   category: string
 ) {
   const path = folderPath(projectId, category);
-  const url = `${GRAPH}/drives/${driveId}/root:/${path}:/children?$select=name,size,lastModifiedDateTime,@microsoft.graph.downloadUrl`;
+  const url = `${GRAPH}/drives/${driveId}/root:/${path}:/children?$select=id,name,size,lastModifiedDateTime,webUrl,file,@microsoft.graph.downloadUrl`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (res.status === 404) {
-    // Folder doesn't exist yet — return empty
     await res.text();
     return [];
   }
@@ -95,12 +91,16 @@ async function listFiles(
     throw new Error(`List error ${res.status}: ${t}`);
   }
   const json = await res.json();
-  return (json.value ?? []).map((f: any) => ({
-    name: f.name,
-    size: f.size,
-    lastModified: f.lastModifiedDateTime,
-    downloadUrl: f["@microsoft.graph.downloadUrl"] ?? null,
-  }));
+  return (json.value ?? [])
+    .filter((f: any) => f.file) // only files, not subfolders
+    .map((f: any) => ({
+      itemId: f.id,
+      name: f.name,
+      size: f.size,
+      lastModified: f.lastModifiedDateTime,
+      downloadUrl: f["@microsoft.graph.downloadUrl"] ?? null,
+      webUrl: f.webUrl ?? null,
+    }));
 }
 
 async function ensureFolder(
@@ -108,7 +108,6 @@ async function ensureFolder(
   driveId: string,
   folderPathStr: string
 ) {
-  // Try creating each segment; Graph supports nested creation via children
   const segments = folderPathStr.split("/");
   let currentPath = "";
   for (const seg of segments) {
@@ -129,10 +128,8 @@ async function ensureFolder(
         "@microsoft.graph.conflictBehavior": "fail",
       }),
     });
-    // 409 = already exists, which is fine
     if (!res.ok && res.status !== 409) {
       const t = await res.text();
-      // If it's a nameAlreadyExists error, skip
       if (!t.includes("nameAlreadyExists")) {
         throw new Error(`Folder create error ${res.status}: ${t}`);
       }
@@ -169,9 +166,11 @@ async function uploadFile(
   }
   const item = await res.json();
   return {
+    itemId: item.id,
     name: item.name,
     size: item.size,
     downloadUrl: item["@microsoft.graph.downloadUrl"] ?? null,
+    webUrl: item.webUrl ?? null,
   };
 }
 
@@ -183,7 +182,7 @@ async function getDownloadUrl(
   fileName: string
 ) {
   const path = folderPath(projectId, category);
-  const url = `${GRAPH}/drives/${driveId}/root:/${path}/${fileName}`;
+  const url = `${GRAPH}/drives/${driveId}/root:/${path}/${fileName}?$select=id,name,webUrl,@microsoft.graph.downloadUrl`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -195,6 +194,55 @@ async function getDownloadUrl(
   return {
     name: item.name,
     downloadUrl: item["@microsoft.graph.downloadUrl"] ?? null,
+    webUrl: item.webUrl ?? null,
+  };
+}
+
+async function getPreviewUrl(
+  token: string,
+  driveId: string,
+  itemId: string
+) {
+  // Get preview embed URL
+  const previewRes = await fetch(
+    `${GRAPH}/drives/${driveId}/items/${itemId}/preview`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    }
+  );
+  if (!previewRes.ok) {
+    const t = await previewRes.text();
+    throw new Error(`Preview error ${previewRes.status}: ${t}`);
+  }
+  const preview = await previewRes.json();
+
+  // Also get item info for webUrl
+  const itemRes = await fetch(
+    `${GRAPH}/drives/${driveId}/items/${itemId}?$select=name,webUrl,@microsoft.graph.downloadUrl`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  let webUrl = null;
+  let downloadUrl = null;
+  let name = "";
+  if (itemRes.ok) {
+    const item = await itemRes.json();
+    webUrl = item.webUrl ?? null;
+    downloadUrl = item["@microsoft.graph.downloadUrl"] ?? null;
+    name = item.name ?? "";
+  } else {
+    await itemRes.text();
+  }
+
+  return {
+    previewUrl: preview.getUrl ?? null,
+    webUrl,
+    downloadUrl,
+    name,
   };
 }
 
@@ -206,7 +254,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Validate auth
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(
@@ -230,11 +277,34 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { action, projectId, category, fileName, fileContent } = body;
+    const { action, projectId, category, fileName, fileContent, itemId } = body;
 
-    if (!action || !projectId || !category) {
+    if (!action) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: action, projectId, category" }),
+        JSON.stringify({ error: "Missing required field: action" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Preview only needs itemId
+    if (action === "preview") {
+      if (!itemId) {
+        return new Response(
+          JSON.stringify({ error: "Missing itemId for preview" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const accessToken = await getAccessToken();
+      const driveId = await getDriveId(accessToken);
+      const result = await getPreviewUrl(accessToken, driveId, itemId);
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!projectId || !category) {
+      return new Response(
+        JSON.stringify({ error: "Missing required fields: projectId, category" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
