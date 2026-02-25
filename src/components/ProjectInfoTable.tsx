@@ -201,9 +201,8 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
-              <TableHead style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="shrink-0"></TableHead>
-              <TableHead style={{ minWidth: 40, width: 40, maxWidth: 40 }} className="text-center">
-                <Paperclip className="h-3 w-3 text-muted-foreground mx-auto" />
+              <TableHead style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="text-center">
+                <Paperclip className="h-3.5 w-3.5 text-gray-400 mx-auto" />
               </TableHead>
               {v("project_id") && renderColumnHeader(headerProps("project_id"))}
               {v("project_name") && renderColumnHeader(headerProps("project_name"))}
@@ -214,10 +213,9 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
           <TableBody>
             {sorted.map((p) => (
               <TableRow key={p.id} className="hover:bg-muted/50 transition-colors" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { backgroundColor: c } : {}; })()}>
-                <TableCell style={{ minWidth: 32, width: 32 }} />
-                <TableCell style={{ minWidth: 40, width: 40, maxWidth: 40 }} className="text-center">
+                <TableCell style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="text-center">
                   {(docCounts[p.project_id] ?? 0) > 0 && (
-                    <span className="inline-flex items-center gap-0.5 text-muted-foreground text-[10px]">
+                    <span className="inline-flex items-center gap-0.5 text-gray-400 text-[10px]">
                       <Paperclip className="h-3 w-3" />
                       {docCounts[p.project_id]}
                     </span>
