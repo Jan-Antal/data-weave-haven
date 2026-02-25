@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { X, Download, ExternalLink, Loader2, ChevronLeft, ChevronRight, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { createPortal } from "react-dom";
 
 function getFileIconColor(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
@@ -26,11 +27,8 @@ interface DocumentPreviewModalProps {
   webUrl: string | null;
   downloadUrl: string | null;
   loading?: boolean;
-  /** Navigation: total files in current category */
   totalFiles?: number;
-  /** Navigation: current index (0-based) */
   currentIndex?: number;
-  /** Called with direction -1 (prev) or +1 (next) */
   onNavigate?: (direction: -1 | 1) => void;
 }
 
@@ -49,30 +47,36 @@ export function DocumentPreviewModal({
 }: DocumentPreviewModalProps) {
   const [iframeLoading, setIframeLoading] = useState(true);
 
-  // Reset iframe loading when previewUrl changes
   useEffect(() => {
     if (previewUrl) setIframeLoading(true);
   }, [previewUrl]);
 
-  // Escape key
+  const canGoPrev = totalFiles > 1 && currentIndex > 0;
+  const canGoNext = totalFiles > 1 && currentIndex < totalFiles - 1;
+
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") { e.stopPropagation(); onClose(); }
       if (e.key === "ArrowLeft" && canGoPrev) onNavigate?.(-1);
       if (e.key === "ArrowRight" && canGoNext) onNavigate?.(1);
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [open, onClose, onNavigate, totalFiles, currentIndex]);
+  }, [open, onClose, onNavigate, canGoPrev, canGoNext]);
 
   if (!open) return null;
 
-  const canGoPrev = totalFiles > 1 && currentIndex > 0;
-  const canGoNext = totalFiles > 1 && currentIndex < totalFiles - 1;
-
-  return (
-    <div className="fixed inset-0 z-[100000] flex items-center justify-center" onClick={onClose}>
+  const modal = (
+    <div
+      className="fixed inset-0 z-[100000] flex items-center justify-center"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/80" />
 
@@ -80,7 +84,7 @@ export function DocumentPreviewModal({
       {canGoPrev && (
         <button
           type="button"
-          className="absolute left-4 z-10 rounded-full bg-background/20 hover:bg-background/40 p-2 transition-colors"
+          className="absolute left-4 z-10 rounded-full bg-white/10 hover:bg-white/20 p-2 transition-colors"
           onClick={(e) => { e.stopPropagation(); onNavigate?.(-1); }}
         >
           <ChevronLeft className="h-6 w-6 text-white" />
@@ -91,21 +95,21 @@ export function DocumentPreviewModal({
       {canGoNext && (
         <button
           type="button"
-          className="absolute right-4 z-10 rounded-full bg-background/20 hover:bg-background/40 p-2 transition-colors"
+          className="absolute right-4 z-10 rounded-full bg-white/10 hover:bg-white/20 p-2 transition-colors"
           onClick={(e) => { e.stopPropagation(); onNavigate?.(1); }}
         >
           <ChevronRight className="h-6 w-6 text-white" />
         </button>
       )}
 
-      {/* Modal container */}
+      {/* Modal container — 90vw x 85vh, flex column */}
       <div
-        className="relative z-10 flex flex-col w-full max-w-[900px] mx-4 bg-background rounded-lg shadow-2xl overflow-hidden"
-        style={{ maxHeight: "85vh" }}
+        className="relative z-10 flex flex-col bg-background rounded-lg shadow-2xl overflow-hidden"
+        style={{ width: "90vw", height: "85vh" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top bar */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <FileText className={`h-4 w-4 shrink-0 ${getFileIconColor(fileName)}`} />
             <span className="text-sm font-medium truncate" title={fileName}>
@@ -118,22 +122,22 @@ export function DocumentPreviewModal({
             )}
             {totalFiles > 1 && (
               <span className="text-xs text-muted-foreground shrink-0">
-                {currentIndex + 1} / {totalFiles}
+                ({currentIndex + 1}/{totalFiles})
               </span>
             )}
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={(e) => { e.stopPropagation(); onClose(); }}
             className="rounded-sm p-1.5 hover:bg-accent transition-colors shrink-0"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Preview body */}
-        <div className="flex-1 relative min-h-[300px]" style={{ height: "calc(85vh - 110px)" }}>
-          {(loading || iframeLoading) && (
+        {/* Preview body — flex-1 fills all space between header and footer */}
+        <div className="flex-1 relative min-h-0">
+          {(loading || (previewUrl && iframeLoading)) && (
             <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-background/80">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               <p className="text-sm text-muted-foreground mt-2">Načítání náhledu…</p>
@@ -162,30 +166,40 @@ export function DocumentPreviewModal({
         </div>
 
         {/* Bottom bar */}
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border shrink-0">
-          {webUrl && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs"
-              onClick={() => window.open(webUrl, "_blank")}
-            >
-              <ExternalLink className="h-3.5 w-3.5 mr-1" />
-              Otevřít v SharePointu
-            </Button>
-          )}
-          {downloadUrl && (
-            <Button
-              size="sm"
-              className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white"
-              onClick={() => window.open(downloadUrl, "_blank")}
-            >
-              <Download className="h-3.5 w-3.5 mr-1" />
-              Stáhnout
-            </Button>
-          )}
+        <div className="flex items-center justify-between px-4 py-2.5 border-t border-border shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xs text-muted-foreground truncate" title={fileName}>{fileName}</span>
+            {fileSize != null && fileSize > 0 && (
+              <span className="text-xs text-muted-foreground shrink-0">({formatFileSize(fileSize)})</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {webUrl && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => window.open(webUrl, "_blank")}
+              >
+                <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                Otevřít v SharePointu
+              </Button>
+            )}
+            {downloadUrl && (
+              <Button
+                size="sm"
+                className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => window.open(downloadUrl, "_blank")}
+              >
+                <Download className="h-3.5 w-3.5 mr-1" />
+                Stáhnout
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 }
