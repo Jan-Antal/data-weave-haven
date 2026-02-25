@@ -7,31 +7,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useTPVItems, useUpdateTPVItem, useAddTPVItem, useDeleteTPVItems, useBulkUpdateTPVStatus, useBulkInsertTPVItems } from "@/hooks/useTPVItems";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
-import { ArrowLeft, Plus, Upload, Trash2, Columns3, GripVertical } from "lucide-react";
+import { ArrowLeft, Plus, Upload, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-  arrayMove,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-
-const TPV_LIST_STORAGE_KEY = "tpv-list-columns";
-const TPV_LIST_ORDER_KEY = "tpv-list-column-order";
+import { useColumnLabels } from "@/hooks/useColumnLabels";
+import { useHeaderDrag } from "@/hooks/useHeaderDrag";
+import { SortableHeader } from "./SortableHeader";
+import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
+import { cn } from "@/lib/utils";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean }[] = [
   { key: "item_name", label: "Název", locked: true },
@@ -43,69 +29,26 @@ const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean }[] = [
   { key: "notes", label: "Poznámka" },
 ];
 
-const DEFAULT_KEYS = TPV_LIST_COLUMNS.map(c => c.key);
+const TPV_LIST_LABEL_MAP = Object.fromEntries(TPV_LIST_COLUMNS.map(c => [c.key, c.label]));
+const TPV_LIST_NON_LOCKED = TPV_LIST_COLUMNS.filter(c => !c.locked).map(c => c.key);
 
-function loadTPVListVisibility(): Record<string, boolean> {
-  try {
-    const stored = localStorage.getItem(TPV_LIST_STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch {}
-  const defaults: Record<string, boolean> = {};
-  TPV_LIST_COLUMNS.forEach(c => { defaults[c.key] = true; });
-  return defaults;
-}
-
-function saveTPVListVisibility(vis: Record<string, boolean>) {
-  try { localStorage.setItem(TPV_LIST_STORAGE_KEY, JSON.stringify(vis)); } catch {}
-}
-
-function loadTPVListOrder(): string[] {
-  try {
-    const stored = localStorage.getItem(TPV_LIST_ORDER_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored) as string[];
-      // Ensure all keys are present
-      const missing = DEFAULT_KEYS.filter(k => !parsed.includes(k));
-      return [...parsed, ...missing];
-    }
-  } catch {}
-  return DEFAULT_KEYS;
-}
-
-function saveTPVListOrder(order: string[]) {
-  try { localStorage.setItem(TPV_LIST_ORDER_KEY, JSON.stringify(order)); } catch {}
-}
-
-function SortableTPVColumnRow({
-  colKey, label, checked, onToggle, locked,
-}: {
-  colKey: string; label: string; checked: boolean; onToggle: () => void; locked?: boolean;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: colKey,
-    disabled: !!locked,
-  });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-1 px-1 py-1 rounded hover:bg-muted/50 cursor-pointer text-sm">
-      {!locked ? (
-        <div {...attributes} {...listeners} className="cursor-grab shrink-0 p-0.5">
-          <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
-        </div>
-      ) : (
-        <div className="shrink-0 p-0.5 w-[18px]" />
-      )}
-      <label className="flex items-center gap-2 flex-1 cursor-pointer px-1">
-        <Checkbox checked={checked} onCheckedChange={() => { if (!locked) onToggle(); }} disabled={locked} />
-        <span className={locked ? "text-muted-foreground" : ""}>{label}</span>
-      </label>
-    </div>
-  );
+function getTPVListColumnStyle(key: string, customWidth?: number | null): React.CSSProperties {
+  if (customWidth) return { width: customWidth, minWidth: customWidth };
+  switch (key) {
+    case "sent_date":
+    case "accepted_date":
+      return { width: 100, minWidth: 100, maxWidth: 100 };
+    case "item_name":
+      return { minWidth: 200 };
+    case "notes":
+      return { minWidth: 200 };
+    case "status":
+      return { minWidth: 140 };
+    case "konstrukter":
+      return { minWidth: 124, maxWidth: 124, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } as React.CSSProperties;
+    default:
+      return { minWidth: 120 };
+  }
 }
 
 interface Props {
@@ -115,17 +58,83 @@ interface Props {
 }
 
 export function TPVItemsView({ projectId, projectName, onBack }: Props) {
-  const { canManageTPV, canEdit } = useAuth();
+  const { canManageTPV, canEdit, canEditColumns } = useAuth();
   const { data: items = [], isLoading } = useTPVItems(projectId);
   const { data: statusOptions = [] } = useTPVStatusOptions();
   const TPV_STATUSES = statusOptions.map(o => o.label);
-  
+
   const updateItem = useUpdateTPVItem();
   const addItem = useAddTPVItem();
   const deleteItems = useDeleteTPVItems();
   const bulkStatus = useBulkUpdateTPVStatus();
   const bulkInsert = useBulkInsertTPVItems();
 
+  // ── Column management via shared hooks ──────────────────────────
+  const {
+    getLabel, getWidth, updateLabel, updateWidth,
+    getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder,
+    getVisibilityMap, updateVisibility,
+  } = useColumnLabels("tpv-list");
+
+  const visMap = useMemo(() => getVisibilityMap(), [getVisibilityMap]);
+  const isColVisible = useCallback((key: string) => {
+    if (key === "item_name") return true;
+    return visMap[key] !== false;
+  }, [visMap]);
+  const toggleColVis = useCallback((key: string) => {
+    updateVisibility(key, !isColVisible(key));
+  }, [isColVisible, updateVisibility]);
+
+  const orderedNonLocked = useMemo(() => getOrderedKeys(TPV_LIST_NON_LOCKED), [getOrderedKeys]);
+  const allVisibleNonLocked = useMemo(() => {
+    const vis = orderedNonLocked.filter(k => isColVisible(k));
+    return getDisplayOrderedKeys(vis);
+  }, [orderedNonLocked, isColVisible, getDisplayOrderedKeys]);
+
+  const [editMode, setEditMode] = useState(false);
+  const [localOrder, setLocalOrder] = useState<string[]>(allVisibleNonLocked);
+
+  useEffect(() => {
+    if (!editMode) setLocalOrder(allVisibleNonLocked);
+  }, [allVisibleNonLocked, editMode]);
+
+  const handleToggleEditMode = useCallback(async () => {
+    if (editMode) {
+      await updateDisplayOrder(localOrder);
+    } else {
+      setLocalOrder(allVisibleNonLocked);
+    }
+    setEditMode(!editMode);
+  }, [editMode, localOrder, allVisibleNonLocked, updateDisplayOrder]);
+
+  const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
+
+  const renderKeys = editMode ? localOrder : allVisibleNonLocked;
+
+  // ── Sort state ──────────────────────────────────────────────────
+  const [sortCol, setSortCol] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc" | null>(null);
+  const toggleSort = (col: string) => {
+    if (sortCol === col) {
+      if (sortDir === "asc") setSortDir("desc");
+      else if (sortDir === "desc") { setSortCol(null); setSortDir(null); }
+    } else {
+      setSortCol(col);
+      setSortDir("asc");
+    }
+  };
+
+  const sortedItems = useMemo(() => {
+    if (!sortCol || !sortDir) return items;
+    return [...items].sort((a, b) => {
+      const va = (a as any)[sortCol] || "";
+      const vb = (b as any)[sortCol] || "";
+      const cmp = String(va).localeCompare(String(vb));
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [items, sortCol, sortDir]);
+
+  // ── Selection & CRUD state ──────────────────────────────────────
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -134,37 +143,8 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
   const [bulkStatusValue, setBulkStatusValue] = useState("");
   const [newItem, setNewItem] = useState({ item_name: "", item_type: "", status: "", sent_date: "", accepted_date: "", notes: "" });
   const fileRef = useRef<HTMLInputElement>(null);
-  const [colVis, setColVis] = useState<Record<string, boolean>>(loadTPVListVisibility);
-  const [colOrder, setColOrder] = useState<string[]>(loadTPVListOrder);
 
-  const isColVisible = (key: string) => colVis[key] !== false;
-  const toggleColVis = (key: string) => {
-    const next = { ...colVis, [key]: !isColVisible(key) };
-    setColVis(next);
-    saveTPVListVisibility(next);
-  };
-
-  const orderedVisibleKeys = useMemo(
-    () => colOrder.filter(k => isColVisible(k)),
-    [colOrder, colVis]
-  );
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
-  );
-
-  const handleColDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = colOrder.indexOf(active.id as string);
-    const newIndex = colOrder.indexOf(over.id as string);
-    if (oldIndex === -1 || newIndex === -1) return;
-    const newOrder = arrayMove(colOrder, oldIndex, newIndex);
-    setColOrder(newOrder);
-    saveTPVListOrder(newOrder);
-  }, [colOrder]);
-
-  const visibleColCount = orderedVisibleKeys.length + 2; // +checkbox +actions
+  const visibleColCount = renderKeys.length + 3; // +checkbox +item_name +actions
 
   const toggleSelect = (id: string) => {
     setSelected(prev => {
@@ -234,8 +214,28 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
     updateItem.mutate({ id: itemId, field, value, projectId, oldValue });
   };
 
+  // ── Header helpers ──────────────────────────────────────────────
+  const headerProps = (key: string) => ({
+    label: TPV_LIST_LABEL_MAP[key] || key,
+    column: key,
+    sortCol,
+    sortDir,
+    onSort: toggleSort,
+    style: getTPVListColumnStyle(key, getWidth(key)),
+    editMode,
+    customLabel: getLabel(key, TPV_LIST_LABEL_MAP[key] || key),
+    onLabelChange: (v: string) => updateLabel(key, v),
+    onWidthChange: (w: number) => updateWidth(key, w),
+    ...(editMode ? {
+      dragProps: getDragProps(key),
+      dropIndicator: dropTarget?.key === key ? dropTarget.side : null,
+      isDragging: dragKey === key,
+    } : {}),
+  });
+
   return (
     <div className="w-full min-w-0">
+      {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap mb-4">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Zpět
@@ -273,82 +273,54 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
         )}
       </div>
 
-      <div className="rounded-lg border bg-card overflow-auto">
+      {/* Edit mode banner */}
+      {editMode && (
+        <div className="bg-accent/10 border border-accent/30 text-accent text-xs font-medium px-3 py-1.5 rounded-t-lg">
+          Režim úpravy sloupců
+        </div>
+      )}
+
+      <div className={cn("rounded-lg border bg-card overflow-x-auto always-scrollbar", editMode && "rounded-t-none border-t-0")}>
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
-              <TableHead className="w-10"><Checkbox checked={items.length > 0 && selected.size === items.length} onCheckedChange={toggleAll} /></TableHead>
-              {orderedVisibleKeys.map(key => {
-                const col = TPV_LIST_COLUMNS.find(c => c.key === key)!;
-                const style = key === "sent_date" || key === "accepted_date"
-                  ? { width: 100, minWidth: 100, maxWidth: 100 }
-                  : key === "item_name" ? { minWidth: 200 }
-                  : key === "notes" ? { minWidth: 200 }
-                  : key === "status" ? { minWidth: 140 }
-                  : { minWidth: 120 };
-                return <TableHead key={key} className="font-semibold" style={style}>{col.label}</TableHead>;
-              })}
-              {/* Column toggle in header — same as main tables */}
-              <TableHead
-                className="w-[32px] min-w-[32px] p-0 sticky right-0 z-20"
-                style={{ background: "linear-gradient(hsl(var(--primary) / 0.05), hsl(var(--primary) / 0.05)), hsl(var(--card))" }}
-              >
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button className="relative p-2 rounded hover:bg-muted/50 transition-colors" title="Zobrazení sloupců" type="button">
-                      <Columns3 className="h-4 w-4 text-muted-foreground" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    align="end"
-                    side="bottom"
-                    avoidCollisions
-                    collisionPadding={16}
-                    sideOffset={4}
-                    className="w-60 p-0 z-[9999] bg-popover border shadow-md flex flex-col"
-                    style={{ maxHeight: "calc(100vh - 120px)" }}
-                  >
-                    <div className="overflow-y-auto p-2 pt-1">
-                      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleColDragEnd}>
-                        <SortableContext items={colOrder} strategy={verticalListSortingStrategy}>
-                          <div className="mb-2">
-                            <div className="flex items-center gap-1 w-full text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-2 py-1">
-                              TPV List
-                            </div>
-                            {colOrder.map(key => {
-                              const col = TPV_LIST_COLUMNS.find(c => c.key === key);
-                              if (!col) return null;
-                              return (
-                                <SortableTPVColumnRow
-                                  key={key}
-                                  colKey={key}
-                                  label={col.label}
-                                  checked={isColVisible(key)}
-                                  onToggle={() => toggleColVis(key)}
-                                  locked={col.locked}
-                                />
-                              );
-                            })}
-                          </div>
-                        </SortableContext>
-                      </DndContext>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+              <TableHead className="w-10">
+                <Checkbox checked={items.length > 0 && selected.size === items.length} onCheckedChange={toggleAll} />
               </TableHead>
+              {/* Locked: item_name */}
+              {isColVisible("item_name") && (
+                <SortableHeader {...headerProps("item_name")} />
+              )}
+              {/* Dynamic columns */}
+              {renderKeys.map(key => (
+                <SortableHeader key={key} {...headerProps(key)} />
+              ))}
+              {/* Column toggle */}
+              <ColumnVisibilityToggle
+                standalone
+                columns={TPV_LIST_COLUMNS}
+                groupLabel="TPV List"
+                labelTab="tpv-list"
+                isVisible={isColVisible}
+                toggleColumn={toggleColVis}
+                editMode={editMode}
+                onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined}
+              />
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow><TableCell colSpan={visibleColCount} className="text-center text-muted-foreground">Načítání...</TableCell></TableRow>
-            ) : items.length === 0 ? (
+            ) : sortedItems.length === 0 ? (
               <TableRow><TableCell colSpan={visibleColCount} className="text-center text-muted-foreground">Žádné položky</TableCell></TableRow>
-            ) : items.map(item => (
+            ) : sortedItems.map(item => (
               <TableRow key={item.id} className={`hover:bg-muted/50 transition-colors h-9 ${selected.has(item.id) ? "bg-primary/5" : ""}`}>
                 {canManageTPV && <TableCell><Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} /></TableCell>}
                 {!canManageTPV && <TableCell />}
-                {orderedVisibleKeys.map(key => {
-                  if (key === "item_name") return <TableCell key={key}><InlineEditableCell value={item.item_name} onSave={(v) => saveField(item.id, "item_name", v, item.item_name)} className="font-medium" readOnly={!canManageTPV} /></TableCell>;
+                {isColVisible("item_name") && (
+                  <TableCell><InlineEditableCell value={item.item_name} onSave={(v) => saveField(item.id, "item_name", v, item.item_name)} className="font-medium" readOnly={!canManageTPV} /></TableCell>
+                )}
+                {renderKeys.map(key => {
                   if (key === "item_type") return <TableCell key={key}><InlineEditableCell value={item.item_type} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} readOnly={!canManageTPV} /></TableCell>;
                   if (key === "konstrukter") return (
                     <TableCell key={key}>
