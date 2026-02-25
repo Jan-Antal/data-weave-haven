@@ -137,19 +137,22 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
     let overdue = 0;
     let upcoming = 0;
     let highRisk = 0;
+    const isTPVTab = activeTab === "tpv-status";
     activeProjects.forEach((p) => {
-      if (p.datum_smluvni) {
-        const d = parseAppDate(p.datum_smluvni);
+      const dateField = isTPVTab ? (p as any).datum_tpv : p.datum_smluvni;
+      if (dateField) {
+        const d = parseAppDate(dateField);
         if (d) {
           d.setHours(0, 0, 0, 0);
           if (d < now) overdue++;
           else if (d <= in14) upcoming++;
         }
       }
-      if (p.risk === "High") highRisk++;
+      const riskField = isTPVTab ? ((p as any).tpv_risk || p.risk) : p.risk;
+      if (riskField === "High") highRisk++;
     });
     return { overdue, upcoming, highRisk };
-  }, [activeProjects]);
+  }, [activeProjects, activeTab]);
 
   const isTPV = activeTab === "tpv-status";
   const KONSTRUKTER_ACTIVE_STATUSES = ["Příprava", "Engineering", "TPV"];
