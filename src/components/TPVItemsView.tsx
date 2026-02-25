@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { InlineEditableCell } from "./InlineEditableCell";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -10,9 +10,35 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useTPVItems, useUpdateTPVItem, useAddTPVItem, useDeleteTPVItems, useBulkUpdateTPVStatus, useBulkInsertTPVItems } from "@/hooks/useTPVItems";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
-import { ArrowLeft, Plus, Upload, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Upload, Trash2, LayoutGrid } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/useAuth";
+
+const TPV_LIST_STORAGE_KEY = "tpv-list-columns";
+
+const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean }[] = [
+  { key: "item_name", label: "Název", locked: true },
+  { key: "item_type", label: "Typ" },
+  { key: "konstrukter", label: "Konstruktér" },
+  { key: "status", label: "Status" },
+  { key: "sent_date", label: "Odesláno" },
+  { key: "accepted_date", label: "Přijato" },
+  { key: "notes", label: "Poznámka" },
+];
+
+function loadTPVListVisibility(): Record<string, boolean> {
+  try {
+    const stored = localStorage.getItem(TPV_LIST_STORAGE_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  const defaults: Record<string, boolean> = {};
+  TPV_LIST_COLUMNS.forEach(c => { defaults[c.key] = true; });
+  return defaults;
+}
+
+function saveTPVListVisibility(vis: Record<string, boolean>) {
+  try { localStorage.setItem(TPV_LIST_STORAGE_KEY, JSON.stringify(vis)); } catch {}
+}
 
 interface Props {
   projectId: string;
@@ -40,6 +66,28 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
   const [bulkStatusValue, setBulkStatusValue] = useState("");
   const [newItem, setNewItem] = useState({ item_name: "", item_type: "", status: "", sent_date: "", accepted_date: "", notes: "" });
   const fileRef = useRef<HTMLInputElement>(null);
+  const [colVis, setColVis] = useState<Record<string, boolean>>(loadTPVListVisibility);
+  const [colDropdownOpen, setColDropdownOpen] = useState(false);
+  const colDropdownRef = useRef<HTMLDivElement>(null);
+
+  const isColVisible = (key: string) => colVis[key] !== false;
+  const toggleColVis = (key: string) => {
+    const next = { ...colVis, [key]: !isColVisible(key) };
+    setColVis(next);
+    saveTPVListVisibility(next);
+  };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!colDropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (colDropdownRef.current && !colDropdownRef.current.contains(e.target as Node)) setColDropdownOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [colDropdownOpen]);
+
+  const visibleColCount = TPV_LIST_COLUMNS.filter(c => isColVisible(c.key)).length + 2; // +checkbox +actions
 
   const toggleSelect = (id: string) => {
     setSelected(prev => {
@@ -146,6 +194,33 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
             </Button>
           </div>
         )}
+        {/* Column visibility toggle */}
+        <div className="relative ml-auto" ref={colDropdownRef}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setColDropdownOpen(!colDropdownOpen)}
+            title="Upravit sloupce"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          {colDropdownOpen && (
+            <div className="absolute right-0 top-full mt-1 z-50 bg-card border rounded-lg shadow-lg p-3 min-w-[180px]">
+              <p className="text-xs font-semibold text-muted-foreground mb-2">Upravit sloupce</p>
+              {TPV_LIST_COLUMNS.map(col => (
+                <label key={col.key} className="flex items-center gap-2 py-1 cursor-pointer text-sm">
+                  <Checkbox
+                    checked={isColVisible(col.key)}
+                    onCheckedChange={() => { if (!col.locked) toggleColVis(col.key); }}
+                    disabled={col.locked}
+                  />
+                  <span className={col.locked ? "text-muted-foreground" : ""}>{col.label}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="rounded-lg border bg-card overflow-auto">
@@ -153,40 +228,42 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
           <TableHeader>
             <TableRow className="bg-primary/5">
               <TableHead className="w-10"><Checkbox checked={items.length > 0 && selected.size === items.length} onCheckedChange={toggleAll} /></TableHead>
-              <TableHead className="font-semibold min-w-[200px]">Název</TableHead>
-              <TableHead className="font-semibold min-w-[120px]">Typ</TableHead>
-              <TableHead className="font-semibold min-w-[120px]">Konstruktér</TableHead>
-              <TableHead className="font-semibold min-w-[140px]">Status</TableHead>
-              <TableHead className="font-semibold" style={{ width: 100, minWidth: 100, maxWidth: 100 }}>Odesláno</TableHead>
-              <TableHead className="font-semibold" style={{ width: 100, minWidth: 100, maxWidth: 100 }}>Přijato</TableHead>
-              <TableHead className="font-semibold min-w-[200px]">Poznámka</TableHead>
+              {isColVisible("item_name") && <TableHead className="font-semibold min-w-[200px]">Název</TableHead>}
+              {isColVisible("item_type") && <TableHead className="font-semibold min-w-[120px]">Typ</TableHead>}
+              {isColVisible("konstrukter") && <TableHead className="font-semibold min-w-[120px]">Konstruktér</TableHead>}
+              {isColVisible("status") && <TableHead className="font-semibold min-w-[140px]">Status</TableHead>}
+              {isColVisible("sent_date") && <TableHead className="font-semibold" style={{ width: 100, minWidth: 100, maxWidth: 100 }}>Odesláno</TableHead>}
+              {isColVisible("accepted_date") && <TableHead className="font-semibold" style={{ width: 100, minWidth: 100, maxWidth: 100 }}>Přijato</TableHead>}
+              {isColVisible("notes") && <TableHead className="font-semibold min-w-[200px]">Poznámka</TableHead>}
               <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Načítání...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={visibleColCount} className="text-center text-muted-foreground">Načítání...</TableCell></TableRow>
             ) : items.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Žádné položky</TableCell></TableRow>
+              <TableRow><TableCell colSpan={visibleColCount} className="text-center text-muted-foreground">Žádné položky</TableCell></TableRow>
             ) : items.map(item => (
               <TableRow key={item.id} className={`hover:bg-muted/50 transition-colors h-9 ${selected.has(item.id) ? "bg-primary/5" : ""}`}>
                 {canManageTPV && <TableCell><Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} /></TableCell>}
                 {!canManageTPV && <TableCell />}
-                <TableCell><InlineEditableCell value={item.item_name} onSave={(v) => saveField(item.id, "item_name", v, item.item_name)} className="font-medium" readOnly={!canManageTPV} /></TableCell>
-                <TableCell><InlineEditableCell value={item.item_type} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} readOnly={!canManageTPV} /></TableCell>
-                <TableCell>
-                  <InlineEditableCell
-                    value={item.konstrukter || ""}
-                    type="people"
-                    peopleRole="Konstruktér"
-                    onSave={(v) => saveField(item.id, "konstrukter", v, item.konstrukter || "")}
-                    readOnly={!canManageTPV}
-                  />
-                </TableCell>
-                <TableCell><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} onSave={(v) => saveField(item.id, "status", v, item.status || "")} readOnly={!canManageTPV} /></TableCell>
-                <TableCell><InlineEditableCell value={item.sent_date} onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>
-                <TableCell><InlineEditableCell value={item.accepted_date} onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>
-                <TableCell><InlineEditableCell value={item.notes} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} readOnly={!canManageTPV} /></TableCell>
+                {isColVisible("item_name") && <TableCell><InlineEditableCell value={item.item_name} onSave={(v) => saveField(item.id, "item_name", v, item.item_name)} className="font-medium" readOnly={!canManageTPV} /></TableCell>}
+                {isColVisible("item_type") && <TableCell><InlineEditableCell value={item.item_type} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} readOnly={!canManageTPV} /></TableCell>}
+                {isColVisible("konstrukter") && (
+                  <TableCell>
+                    <InlineEditableCell
+                      value={item.konstrukter || ""}
+                      type="people"
+                      peopleRole="Konstruktér"
+                      onSave={(v) => saveField(item.id, "konstrukter", v, item.konstrukter || "")}
+                      readOnly={!canManageTPV}
+                    />
+                  </TableCell>
+                )}
+                {isColVisible("status") && <TableCell><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} onSave={(v) => saveField(item.id, "status", v, item.status || "")} readOnly={!canManageTPV} /></TableCell>}
+                {isColVisible("sent_date") && <TableCell><InlineEditableCell value={item.sent_date} onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>}
+                {isColVisible("accepted_date") && <TableCell><InlineEditableCell value={item.accepted_date} onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>}
+                {isColVisible("notes") && <TableCell><InlineEditableCell value={item.notes} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} readOnly={!canManageTPV} /></TableCell>}
                 <TableCell>
                   {canManageTPV && (
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDeleteIds([item.id])}>
