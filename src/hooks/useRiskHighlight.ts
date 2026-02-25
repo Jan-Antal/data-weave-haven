@@ -19,11 +19,28 @@ export function getProjectRiskColor(
 
   const severity = getProjectRiskSeverity(project);
 
-  if (activeHighlight === "overdue" && severity === "overdue") return "#fde8e8";
-  if (activeHighlight === "upcoming" && severity === "upcoming") return "#fef0e0";
-  if (activeHighlight === "high-risk" && (project.risk === "High")) return "#fefae0";
+  if (activeHighlight === "overdue" && severity === "overdue") return RISK_COLORS["overdue"];
+  if (activeHighlight === "upcoming" && severity === "upcoming") return RISK_COLORS["upcoming"];
+  if (activeHighlight === "high-risk" && (project.risk === "High")) return RISK_COLORS["high-risk"];
 
   return null;
+}
+
+/** Dashboard-driven highlight for TPV Status tab (uses datum_tpv + tpv_risk) */
+export function getTPVDashboardRiskColor(
+  project: { datum_tpv?: string | null; tpv_risk?: string | null; risk?: string | null; status?: string | null },
+  activeHighlight: RiskHighlightType
+): { bg: string | null; dotColor: string | null } {
+  if (!activeHighlight) return { bg: null, dotColor: null };
+
+  const severity = getTPVRiskSeverity(project);
+  if (!severity) return { bg: null, dotColor: null };
+
+  if (activeHighlight === severity) {
+    return { bg: RISK_COLORS[severity], dotColor: RISK_DOT_COLORS[severity] };
+  }
+
+  return { bg: null, dotColor: null };
 }
 
 export function getProjectRiskSeverity(
