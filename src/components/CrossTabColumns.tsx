@@ -21,19 +21,26 @@ const WIDTH_CAPS: Record<string, number> = {
   tpv_poznamka: 120,
 };
 
+const TRUNCATE_STYLE: React.CSSProperties = {
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
 export function getColumnStyle(key: string, customWidth?: number | null): React.CSSProperties {
   const cap = WIDTH_CAPS[key];
   let w = customWidth ?? null;
   if (cap && w) w = Math.min(w, cap);
 
   if (w) {
-    console.log(`[ColWidth] key=${key} width=${w} (from DB=${customWidth}, cap=${cap ?? "none"})`);
-    return { width: w, minWidth: w };
+    const base: React.CSSProperties = { width: w, minWidth: w };
+    if (cap) return { ...base, maxWidth: cap, ...TRUNCATE_STYLE };
+    return base;
   }
   if (key === "project_id") return { width: 110, minWidth: 110, maxWidth: 110 };
-  if (key === "project_name") return { width: 180, minWidth: 180 };
-  if (key === "pm_poznamka") return { width: 120, minWidth: 120 };
-  if (key === "tpv_poznamka") return { width: 120, minWidth: 120 };
+  if (key === "project_name") return { width: 180, minWidth: 180, maxWidth: 180, ...TRUNCATE_STYLE };
+  if (key === "pm_poznamka") return { width: 120, minWidth: 120, maxWidth: 120, ...TRUNCATE_STYLE };
+  if (key === "tpv_poznamka") return { width: 120, minWidth: 120, maxWidth: 120, ...TRUNCATE_STYLE };
   if (DATE_KEYS.has(key)) return { width: 100, minWidth: 100, maxWidth: 100 };
   if (SHORT_KEYS.has(key)) return { width: 80, minWidth: 80, maxWidth: 80 };
   return { minWidth: 120 };
@@ -153,7 +160,7 @@ function renderCell(
     case "predani":
       return <TableCell key={key}><InlineEditableCell value={p.predani} type="date" onSave={(x) => s("predani", x, v("predani"))} readOnly={!canEdit} /></TableCell>;
     case "pm_poznamka":
-      return <TableCell key={key}><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(x) => s("pm_poznamka", x, v("pm_poznamka"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.pm_poznamka || ""}><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(x) => s("pm_poznamka", x, v("pm_poznamka"))} readOnly={!canEdit} /></TableCell>;
     case "konstrukter":
       return <TableCell key={key}><InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(x) => s("konstrukter", x, v("konstrukter"))} readOnly={!canEdit} /></TableCell>;
     case "narocnost":
@@ -163,7 +170,7 @@ function renderCell(
     case "percent_tpv":
       return <TableCell key={key}><InlineEditableCell value={p.percent_tpv} type="number" onSave={(x) => s("percent_tpv", x, String(p.percent_tpv ?? ""))} displayValue={<ProgressBar value={p.percent_tpv || 0} />} readOnly={!canEdit} /></TableCell>;
     case "tpv_poznamka":
-      return <TableCell key={key}><InlineEditableCell value={p.tpv_poznamka} type="textarea" onSave={(x) => s("tpv_poznamka", x, v("tpv_poznamka"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.tpv_poznamka || ""}><InlineEditableCell value={p.tpv_poznamka} type="textarea" onSave={(x) => s("tpv_poznamka", x, v("tpv_poznamka"))} readOnly={!canEdit} /></TableCell>;
     default:
       return null;
   }

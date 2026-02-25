@@ -145,7 +145,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                   <ExpandArrow projectId={p.project_id} />
                 </TableCell>
                 {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
-                {v("project_name") && <TableCell><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
+                {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
                 {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels }))}
               </TableRow>
             ))}

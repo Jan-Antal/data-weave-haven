@@ -214,7 +214,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                     {p.project_id}
                   </TableCell>
                 )}
-                {v("project_name") && <TableCell><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
+                {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
                 {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, saveCurrency }))}
               </TableRow>
             ))}

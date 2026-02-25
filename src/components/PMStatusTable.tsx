@@ -74,7 +74,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
         </TableCell>
       )}
       {v("project_name") && (
-        <TableCell className="truncate text-muted-foreground text-xs" title={project.project_name}>{project.project_name}</TableCell>
+        <TableCell className="truncate text-muted-foreground text-xs" style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={project.project_name}>{project.project_name}</TableCell>
       )}
       {renderKeys.map((key) => renderStageCell(key))}
       <TableCell>
@@ -297,7 +297,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                     <ExpandArrow projectId={p.project_id} isExpanded={expanded.has(p.project_id)} />
                   </TableCell>
                   {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
-                  {v("project_name") && <TableCell className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
+                  {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name} className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
                   {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels }))}
                 </TableRow>
                 {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} isVisible={v} statusLabels={statusLabels} canEdit={canEdit} renderKeys={renderKeys} />}
