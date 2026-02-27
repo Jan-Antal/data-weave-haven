@@ -181,7 +181,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
 const MemoSortableStageRow = memo(SortableStageRow);
 
 // ── Stages section (same pattern as PM Status) ──────────────────────
-function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, renderKeys, personFilter, statusFilterSet, searchLower }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[]; personFilter: string | null; statusFilterSet: Set<string> | null; searchLower: string | null }) {
+function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, renderKeys, personFilter, statusFilterSet, searchLower, showAddButton = true }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[]; personFilter: string | null; statusFilterSet: Set<string> | null; searchLower: string | null; showAddButton?: boolean }) {
   const { data: stages = [] } = useProjectStages(projectId);
   const deleteStage = useDeleteStage();
   const reorderStages = useReorderStages();
@@ -298,13 +298,15 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
           ))}
         </SortableContext>
       </DndContext>
-      <TableRow className="bg-muted/20 h-9">
-        <TableCell colSpan={20}>
-          <Button variant="ghost" size="sm" className="text-xs h-6" onClick={handleInlineAdd}>
-            <Plus className="h-3 w-3 mr-1" /> Přidat etapu
-          </Button>
-        </TableCell>
-      </TableRow>
+      {showAddButton && (
+        <TableRow className="bg-muted/20 h-9">
+          <TableCell colSpan={20}>
+            <Button variant="ghost" size="sm" className="text-xs h-6" onClick={handleInlineAdd}>
+              <Plus className="h-3 w-3 mr-1" /> Přidat etapu
+            </Button>
+          </TableCell>
+        </TableRow>
+      )}
       <ConfirmDialog open={!!deleteId} onConfirm={() => { if (deleteId) { deleteStage.mutate({ id: deleteId, projectId }); setDeleteId(null); } }} onCancel={() => setDeleteId(null)} />
     </>
   );
@@ -337,6 +339,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const qc = useQueryClient();
   const { sorted: baseSorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [showAddButton, setShowAddButton] = useState<Set<string>>(new Set());
   const { tpvStatus: { isVisible } } = useAllColumnVisibility();
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("tpv-status");
   const [editMode, setEditMode] = useState(false);
@@ -451,7 +454,16 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const toggleExpand = (pid: string) => {
     setExpanded(prev => {
       const next = new Set(prev);
-      next.has(pid) ? next.delete(pid) : next.add(pid);
+      if (!next.has(pid)) {
+        next.add(pid);
+        setShowAddButton(ab => { const n = new Set(ab); n.delete(pid); return n; });
+      } else if (!showAddButton.has(pid)) {
+        setShowAddButton(ab => { const n = new Set(ab); n.add(pid); return n; });
+        return prev;
+      } else {
+        next.delete(pid);
+        setShowAddButton(ab => { const n = new Set(ab); n.delete(pid); return n; });
+      }
       return next;
     });
   };
@@ -499,8 +511,8 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                     className="text-muted-foreground/60 hover:text-muted-foreground transition-colors"
                     title={expanded.size === sorted.length ? "Sbalit vše" : "Rozbalit vše"}
                     onClick={() => {
-                      if (expanded.size === sorted.length) setExpanded(new Set());
-                      else setExpanded(new Set(sorted.map((p) => p.project_id)));
+                      if (expanded.size === sorted.length) { setExpanded(new Set()); setShowAddButton(new Set()); }
+                      else { setExpanded(new Set(sorted.map((p) => p.project_id))); setShowAddButton(new Set()); }
                     }}
                   >
                     {expanded.size === sorted.length ? <ChevronsUp className="h-3.5 w-3.5" /> : <ChevronsDown className="h-3.5 w-3.5" />}
@@ -537,7 +549,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                       <TPVListIcon projectId={p.project_id} onClick={() => setActiveProject({ projectId: p.project_id, projectName: p.project_name })} />
                     </TableCell>
                   </TableRow>
-                  {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} isVisible={v} statusLabels={statusLabels} canEdit={canEdit} renderKeys={renderKeys} personFilter={personFilter} statusFilterSet={statusFilter && statusFilter.length > 0 ? new Set(statusFilter) : null} searchLower={externalSearch ? externalSearch.toLowerCase() : null} />}
+                  {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} isVisible={v} statusLabels={statusLabels} canEdit={canEdit} renderKeys={renderKeys} personFilter={personFilter} statusFilterSet={statusFilter && statusFilter.length > 0 ? new Set(statusFilter) : null} searchLower={externalSearch ? externalSearch.toLowerCase() : null} showAddButton={showAddButton.has(p.project_id)} />}
                 </Fragment>
               );
             })}
