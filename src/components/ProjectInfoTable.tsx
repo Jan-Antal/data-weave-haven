@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon, Paperclip } from "lucide-react";
+import { CalendarIcon, Paperclip, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 import { ProjectEditDialog } from "./ProjectEditDialog";
@@ -35,6 +35,7 @@ import { useDocumentCounts } from "@/hooks/useDocumentCounts";
 import { useExportContext } from "./ExportContext";
 import { getProjectCellValue } from "@/lib/exportExcel";
 import { getColumnLabel } from "./CrossTabColumns";
+import { useSubprojectCreation } from "@/hooks/useSubprojectCreation";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...PROJECT_INFO_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
@@ -68,9 +69,10 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const updateProject = useUpdateProject();
   const { columns: customColumns } = useAllCustomColumns("projects");
   const updateCustomField = useUpdateCustomField();
-  const { sorted, sortCol, sortDir, toggleSort, hierarchyInfo } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
+  const { sorted, sortCol, sortDir, toggleSort, hierarchyInfo, childrenMap } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const allProjectIds = useMemo(() => projects.map((p) => p.project_id), [projects]);
   const { counts: docCounts } = useDocumentCounts(allProjectIds);
+  const sub = useSubprojectCreation(projects);
   const [addOpen, setAddOpen] = useState(false);
   const [newProj, setNewProj] = useState({ ...emptyProject });
   const [datumWarning, setDatumWarning] = useState(false);
@@ -241,14 +243,42 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
               const hi = hierarchyInfo.get(p.project_id);
               const isChild = hi?.isChild ?? false;
               const childMatchCount = hi?.childMatchCount;
+              const isParent = childrenMap.has(p.project_id) || !isChild;
+              const isFreshRow = sub.isFresh(p.project_id);
+              const getInherited = (field: string) => isFreshRow && sub.isFieldInherited(p.project_id, field);
               return (
-              <TableRow key={p.id} className={cn("hover:bg-muted/50 transition-colors", isChild && "bg-muted/30")} style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { backgroundColor: c } : {}; })()}>
-                <TableCell style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="text-center">
+              <TableRow
+                key={p.id}
+                className={cn(
+                  "group/row hover:bg-muted/50 transition-colors relative",
+                  isChild && "bg-muted/30",
+                  isFreshRow && "border-l-2 border-blue-300",
+                )}
+                style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { backgroundColor: c } : {}; })()}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && isFreshRow) {
+                    e.stopPropagation();
+                    sub.requestCancel(p.project_id);
+                  }
+                }}
+              >
+                <TableCell style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="text-center relative">
                   {(docCounts[p.project_id] ?? 0) > 0 && (
                     <span className="inline-flex items-center gap-0.5 text-muted-foreground text-[10px]">
                       <Paperclip className="h-3 w-3" />
                       {docCounts[p.project_id]}
                     </span>
+                  )}
+                  {/* "+ Podprojekt" button on parent rows */}
+                  {canEdit && !isChild && (
+                    <button
+                      className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-10 opacity-0 group-hover/row:opacity-100 transition-opacity bg-card border border-border rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-primary hover:border-primary flex items-center gap-0.5 whitespace-nowrap shadow-sm"
+                      onClick={(e) => { e.stopPropagation(); sub.createSubproject(p); }}
+                      title="Vytvořit podprojekt"
+                    >
+                      <Plus className="h-2.5 w-2.5" />
+                      Podprojekt
+                    </button>
                   )}
                 </TableCell>
                 {v("project_id") && (
@@ -256,8 +286,8 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                     {isChild && <span className="text-muted-foreground mr-1">↳</span>}{p.project_id}
                   </TableCell>
                 )}
-                {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-                {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }), childMatchCount: key === "status" ? childMatchCount : undefined }))}
+                {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name} className={getInherited("project_name") ? "text-blue-400" : ""}><InlineEditableCell value={p.project_name} onSave={(val) => { sub.markFieldTouched(p.project_id, "project_name"); save(p.id, "project_name", val, p.project_name); }} className={cn("font-medium", getInherited("project_name") && "text-blue-400")} readOnly={!canEdit} /></TableCell>}
+                {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }), childMatchCount: key === "status" ? childMatchCount : undefined, isInherited: getInherited(key), onFieldTouched: isFreshRow ? (field) => sub.markFieldTouched(p.project_id, field) : undefined }))}
               </TableRow>
               );
             })}
@@ -358,6 +388,19 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
       </Dialog>
 
       {editProject && <ProjectEditDialog project={editProject} open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }} />}
+
+      {/* Cancel subproject confirmation */}
+      {sub.cancelConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
+          <div className="bg-card border rounded-lg shadow-lg p-4 max-w-xs">
+            <p className="text-sm mb-3">Zrušit nový podprojekt?</p>
+            <div className="flex gap-2 justify-end">
+              <button className="text-sm text-muted-foreground hover:text-foreground" onClick={() => sub.dismissCancel()}>Ne</button>
+              <button className="text-sm text-destructive hover:text-destructive/80" onClick={() => sub.confirmCancel(sub.cancelConfirm!)}>Ano</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

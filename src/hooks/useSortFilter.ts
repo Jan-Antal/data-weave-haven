@@ -219,5 +219,5 @@ export function useSortFilter<T extends Record<string, any>>(data: T[], external
     return ordered;
   }, [smartFiltered, sortCol, sortDir, parentMap, childrenMap]);
 
-  return { sorted, search, setSearch, sortCol, sortDir, toggleSort, hierarchyInfo: hierarchyInfoMap };
+  return { sorted, search, setSearch, sortCol, sortDir, toggleSort, hierarchyInfo: hierarchyInfoMap, parentMap, childrenMap };
 }

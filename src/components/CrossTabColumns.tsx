@@ -115,11 +115,15 @@ interface CellProps {
   customColumns?: CustomColumnDef[];
   saveCustomField?: (rowId: string, columnKey: string, value: string, oldValue: string) => void;
   childMatchCount?: number;
+  /** When true, render text in muted blue to indicate inherited value */
+  isInherited?: boolean;
+  /** Called when a field is edited on an inherited row */
+  onFieldTouched?: (field: string) => void;
 }
 
 export function renderColumnCell(props: CellProps) {
-  const { colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField, childMatchCount } = props;
-  return renderCell(key, p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField, childMatchCount);
+  const { colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField, childMatchCount, isInherited, onFieldTouched } = props;
+  return renderCell(key, p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField, childMatchCount, isInherited, onFieldTouched);
 }
 
 function renderCell(
@@ -130,60 +134,67 @@ function renderCell(
   customColumns?: CustomColumnDef[],
   saveCustomField?: (rowId: string, columnKey: string, value: string, oldValue: string) => void,
   childMatchCount?: number,
+  isInherited?: boolean,
+  onFieldTouched?: (field: string) => void,
 ) {
-  const s = (field: string, val: string, old: string) => save(p.id, field, val, old);
+  const inheritedClass = isInherited ? "text-blue-400" : "";
+  const wrappedSave = (field: string, val: string, old: string) => {
+    onFieldTouched?.(field);
+    save(p.id, field, val, old);
+  };
+  const s = wrappedSave;
   const v = (field: keyof Project) => (p as any)[field] ?? "";
 
   switch (key) {
     case "klient":
-      return <TableCell key={key}><InlineEditableCell value={p.klient} onSave={(x) => s("klient", x, v("klient"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={p.klient} onSave={(x) => s("klient", x, v("klient"))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "location":
-      return <TableCell key={key}><InlineEditableCell value={p.location} onSave={(x) => s("location", x, v("location"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={p.location} onSave={(x) => s("location", x, v("location"))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "kalkulant":
-      return <TableCell key={key}><InlineEditableCell value={p.kalkulant} type="people" peopleRole="Kalkulant" onSave={(x) => s("kalkulant", x, v("kalkulant"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={p.kalkulant} type="people" peopleRole="Kalkulant" onSave={(x) => s("kalkulant", x, v("kalkulant"))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "architekt":
-      return <TableCell key={key}><InlineEditableCell value={p.architekt} onSave={(x) => s("architekt", x, v("architekt"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={p.architekt} onSave={(x) => s("architekt", x, v("architekt"))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "datum_smluvni":
-      return <TableCell key={key}><InlineEditableCell value={p.datum_smluvni} type="date" onSave={(x) => s("datum_smluvni", x, v("datum_smluvni"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={p.datum_smluvni} type="date" onSave={(x) => s("datum_smluvni", x, v("datum_smluvni"))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "datum_objednavky":
-      return <TableCell key={key}><InlineEditableCell value={p.datum_objednavky} type="date" onSave={(x) => s("datum_objednavky", x, v("datum_objednavky"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={p.datum_objednavky} type="date" onSave={(x) => s("datum_objednavky", x, v("datum_objednavky"))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "prodejni_cena":
       if (saveCurrency) {
-        return <TableCell key={key} className="text-right"><CurrencyEditCell value={p.prodejni_cena} currency={p.currency || "CZK"} onSave={(a, c) => saveCurrency(p.id, a, c, String(p.prodejni_cena ?? ""), p.currency || "CZK")} /></TableCell>;
+        return <TableCell key={key} className={`text-right ${inheritedClass}`}><CurrencyEditCell value={p.prodejni_cena} currency={p.currency || "CZK"} onSave={(a, c) => saveCurrency(p.id, a, c, String(p.prodejni_cena ?? ""), p.currency || "CZK")} /></TableCell>;
       }
-      return <TableCell key={key} className="text-right"><InlineEditableCell value={String(p.prodejni_cena ?? "")} onSave={(x) => s("prodejni_cena", x, String(p.prodejni_cena ?? ""))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={`text-right ${inheritedClass}`}><InlineEditableCell value={String(p.prodejni_cena ?? "")} onSave={(x) => s("prodejni_cena", x, String(p.prodejni_cena ?? ""))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "marze":
-      return <TableCell key={key} className="text-right"><InlineEditableCell value={p.marze} onSave={(x) => s("marze", x, v("marze"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={`text-right ${inheritedClass}`}><InlineEditableCell value={p.marze} onSave={(x) => s("marze", x, v("marze"))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "link_cn":
-      return <TableCell key={key}><InlineEditableCell value={p.link_cn} onSave={(x) => s("link_cn", x, v("link_cn"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={p.link_cn} onSave={(x) => s("link_cn", x, v("link_cn"))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "pm":
-      return <TableCell key={key}><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(x) => s("pm", x, v("pm"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(x) => s("pm", x, v("pm"))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "status":
-      return <TableCell key={key}><span className="inline-flex items-center gap-1"><InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(x) => s("status", x, v("status"))} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} readOnly={!canEdit} />{childMatchCount != null && <span className="text-[10px] text-muted-foreground font-normal">({childMatchCount})</span>}</span></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><span className="inline-flex items-center gap-1"><InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(x) => s("status", x, v("status"))} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} readOnly={!canEdit} />{childMatchCount != null && <span className="text-[10px] text-muted-foreground font-normal">({childMatchCount})</span>}</span></TableCell>;
     case "risk":
-      return <TableCell key={key}><InlineEditableCell value={p.risk} type="select" options={["Low", "Medium", "High"]} onSave={(x) => s("risk", x, v("risk"))} displayValue={<RiskBadge level={p.risk || ""} />} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={p.risk} type="select" options={["Low", "Medium", "High"]} onSave={(x) => s("risk", x, v("risk"))} displayValue={<RiskBadge level={p.risk || ""} />} readOnly={!canEdit} /></TableCell>;
     case "zamereni":
-      return <TableCell key={key}><InlineEditableCell value={p.zamereni} type="date" onSave={(x) => s("zamereni", x, v("zamereni"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={p.zamereni} type="date" onSave={(x) => s("zamereni", x, v("zamereni"))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "tpv_date":
-      return <TableCell key={key}><InlineEditableCell value={p.tpv_date} type="date" onSave={(x) => s("tpv_date", x, v("tpv_date"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={p.tpv_date} type="date" onSave={(x) => s("tpv_date", x, v("tpv_date"))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "expedice":
-      return <TableCell key={key}><InlineEditableCell value={p.expedice} type="date" onSave={(x) => s("expedice", x, v("expedice"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={p.expedice} type="date" onSave={(x) => s("expedice", x, v("expedice"))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "montaz":
-      return <TableCell key={key}><InlineEditableCell value={(p as any).montaz} type="date" onSave={(x) => s("montaz", x, (p as any).montaz || "")} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={(p as any).montaz} type="date" onSave={(x) => s("montaz", x, (p as any).montaz || "")} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "predani":
-      return <TableCell key={key}><InlineEditableCell value={p.predani} type="date" onSave={(x) => s("predani", x, v("predani"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={p.predani} type="date" onSave={(x) => s("predani", x, v("predani"))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "pm_poznamka":
-      return <TableCell key={key} style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.pm_poznamka || ""}><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(x) => s("pm_poznamka", x, v("pm_poznamka"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass} style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.pm_poznamka || ""}><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(x) => s("pm_poznamka", x, v("pm_poznamka"))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "konstrukter":
-      return <TableCell key={key}><InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(x) => s("konstrukter", x, v("konstrukter"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(x) => s("konstrukter", x, v("konstrukter"))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "narocnost":
-      return <TableCell key={key}><InlineEditableCell value={p.narocnost} type="select" options={["Low", "Medium", "High"]} onSave={(x) => s("narocnost", x, v("narocnost"))} displayValue={<RiskBadge level={p.narocnost || ""} />} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={p.narocnost} type="select" options={["Low", "Medium", "High"]} onSave={(x) => s("narocnost", x, v("narocnost"))} displayValue={<RiskBadge level={p.narocnost || ""} />} readOnly={!canEdit} /></TableCell>;
     case "hodiny_tpv":
-      return <TableCell key={key}><InlineEditableCell value={p.hodiny_tpv} onSave={(x) => s("hodiny_tpv", x, v("hodiny_tpv"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={p.hodiny_tpv} onSave={(x) => s("hodiny_tpv", x, v("hodiny_tpv"))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     case "percent_tpv":
-      return <TableCell key={key}><InlineEditableCell value={p.percent_tpv} type="number" onSave={(x) => s("percent_tpv", x, String(p.percent_tpv ?? ""))} displayValue={<ProgressBar value={p.percent_tpv || 0} />} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass}><InlineEditableCell value={p.percent_tpv} type="number" onSave={(x) => s("percent_tpv", x, String(p.percent_tpv ?? ""))} displayValue={<ProgressBar value={p.percent_tpv || 0} />} readOnly={!canEdit} /></TableCell>;
     case "tpv_poznamka":
-      return <TableCell key={key} style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.tpv_poznamka || ""}><InlineEditableCell value={p.tpv_poznamka} type="textarea" onSave={(x) => s("tpv_poznamka", x, v("tpv_poznamka"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className={inheritedClass} style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.tpv_poznamka || ""}><InlineEditableCell value={p.tpv_poznamka} type="textarea" onSave={(x) => s("tpv_poznamka", x, v("tpv_poznamka"))} readOnly={!canEdit} className={inheritedClass} /></TableCell>;
     default: {
       // Handle custom columns
       if (key.startsWith("custom_") && customColumns && saveCustomField) {
