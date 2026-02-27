@@ -34,6 +34,7 @@ import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 import { useExportContext } from "./ExportContext";
 import { getProjectCellValue } from "@/lib/exportExcel";
 import { getColumnLabel } from "./CrossTabColumns";
+import { useProjectHierarchy } from "@/hooks/useProjectHierarchy";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...PM_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
@@ -205,12 +206,19 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const updateCustomField = useUpdateCustomField();
   const qc = useQueryClient();
   const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [stageExpanded, setStageExpanded] = useState<Set<string>>(new Set());
   const { pmStatus: { isVisible } } = useAllColumnVisibility();
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("pm-status");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns } = useAuth();
   const { registerExport } = useExportContext();
+
+  // Hierarchy
+  const { hierarchicalRows, toggleExpand: toggleHierarchyExpand, isExpanded: isHierarchyExpanded } = useProjectHierarchy(
+    projects,
+    sorted,
+    { personFilter: personFilter ?? undefined, statusFilter, search: externalSearch }
+  );
 
   const orderedNativeKeys = useMemo(() => getOrderedKeys(PM_NATIVE), [getOrderedKeys]);
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
@@ -243,7 +251,6 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
 
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 
-  // Register export data getter with column metadata
   useEffect(() => {
     const allExportKeys = ["project_id", "project_name", ...allVisibleKeys];
     registerExport("pm-status", {
@@ -262,8 +269,8 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
     });
   }, [registerExport, sorted, allVisibleKeys, getLabel]);
 
-  const toggleExpand = (pid: string) => {
-    setExpanded(prev => {
+  const toggleStageExpand = (pid: string) => {
+    setStageExpanded(prev => {
       const next = new Set(prev);
       next.has(pid) ? next.delete(pid) : next.add(pid);
       return next;
@@ -316,19 +323,62 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sorted.map((p) => (
-              <Fragment key={p.id}>
-                <TableRow className="hover:bg-muted/50 transition-colors h-9" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { backgroundColor: c } : {}; })()}>
-                  <TableCell className="w-[32px] cursor-pointer" onClick={() => toggleExpand(p.project_id)}>
-                    <ExpandArrow projectId={p.project_id} isExpanded={expanded.has(p.project_id)} />
-                  </TableCell>
-                  {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
-                  {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name} className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-                  {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }) }))}
-                </TableRow>
-                {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} isVisible={v} statusLabels={statusLabels} canEdit={canEdit} renderKeys={renderKeys} />}
-              </Fragment>
-            ))}
+            {hierarchicalRows.map((hr) => {
+              const p = hr.row;
+              const riskColor = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
+              const rowStyle: React.CSSProperties = {
+                ...(riskColor ? { backgroundColor: riskColor } : {}),
+                ...(hr.visibleViaChild ? { opacity: 0.6 } : {}),
+              };
+              return (
+                <Fragment key={`${p.id}${hr.isChild ? '-child' : ''}`}>
+                  <TableRow
+                    className={cn(
+                      "hover:bg-muted/50 transition-colors h-9",
+                      hr.isChild && "bg-muted/30 border-l-2 border-l-primary/20"
+                    )}
+                    style={rowStyle}
+                  >
+                    <TableCell className="w-[32px]">
+                      <div className="flex items-center gap-0.5">
+                        {hr.isParent && (
+                          <button
+                            onClick={() => toggleHierarchyExpand(p.project_id)}
+                            className="p-0.5 hover:bg-muted rounded"
+                          >
+                            {isHierarchyExpanded(p.project_id)
+                              ? <ChevronDown className="h-3.5 w-3.5 text-accent stroke-[2.5]" />
+                              : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground stroke-[2.5]" />}
+                          </button>
+                        )}
+                        {!hr.isChild && (
+                          <button
+                            onClick={() => toggleStageExpand(p.project_id)}
+                            className="p-0.5 hover:bg-muted rounded"
+                          >
+                            <ExpandArrow projectId={p.project_id} isExpanded={stageExpanded.has(p.project_id)} />
+                          </button>
+                        )}
+                      </div>
+                    </TableCell>
+                    {v("project_id") && (
+                      <TableCell className="font-mono text-xs truncate" title={p.project_id}>
+                        <span className={hr.isChild ? "pl-4" : ""}>
+                          {hr.isChild && <span className="text-muted-foreground mr-1">↳</span>}
+                          {p.project_id}
+                        </span>
+                        {hr.isParent && !isHierarchyExpanded(p.project_id) && hr.childCount > 0 && (
+                          <span className="ml-1.5 text-[10px] text-muted-foreground">({hr.childCount})</span>
+                        )}
+                      </TableCell>
+                    )}
+                    {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name} className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
+                    {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }) }))}
+                  </TableRow>
+                  {!hr.isChild && stageExpanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} isVisible={v} statusLabels={statusLabels} canEdit={canEdit} renderKeys={renderKeys} />}
+                </Fragment>
+              );
+            })}
           </TableBody>
         </Table>
       </div>

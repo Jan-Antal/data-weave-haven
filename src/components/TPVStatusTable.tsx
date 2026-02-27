@@ -8,7 +8,7 @@ import { useProjects } from "@/hooks/useProjects";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
 import { useSortFilter } from "@/hooks/useSortFilter";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, ChevronDown } from "lucide-react";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { useTPVItems } from "@/hooks/useTPVItems";
 import { TPVItemsView } from "./TPVItemsView";
@@ -21,6 +21,7 @@ import { getColumnStyle, renderColumnHeader, renderColumnCell, getColumnLabel } 
 import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 import { useExportContext } from "./ExportContext";
 import { getProjectCellValue } from "@/lib/exportExcel";
+import { useProjectHierarchy } from "@/hooks/useProjectHierarchy";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...TPV_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
@@ -57,7 +58,13 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const { registerExport } = useExportContext();
   const [activeProject, setActiveProject] = useState<{ projectId: string; projectName: string } | null>(null);
 
-  // Expose close-detail callback to parent so tab switches can reset the detail view
+  // Hierarchy
+  const { hierarchicalRows, toggleExpand, isExpanded } = useProjectHierarchy(
+    projects,
+    sorted,
+    { personFilter: personFilter ?? undefined, statusFilter, search: externalSearch }
+  );
+
   useEffect(() => {
     if (closeDetailRef) {
       closeDetailRef.current = () => setActiveProject(null);
@@ -96,7 +103,6 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
 
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 
-  // Register export data getter with column metadata
   useEffect(() => {
     const allExportKeys = ["project_id", "project_name", ...allVisibleKeys];
     registerExport("tpv-status", {
@@ -174,26 +180,64 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sorted.map((p) => {
+            {hierarchicalRows.map((hr) => {
+              const p = hr.row;
               const tpvHighlight = getTPVDashboardRiskColor(p as any, riskHighlight ?? null);
+              const rowStyle: React.CSSProperties = {
+                ...(tpvHighlight.bg ? { backgroundColor: tpvHighlight.bg } : {}),
+                ...(hr.visibleViaChild ? { opacity: 0.6 } : {}),
+              };
               return (
-              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors h-9" style={tpvHighlight.bg ? { backgroundColor: tpvHighlight.bg } : {}}>
-                <TableCell
-                  className="w-[32px] cursor-pointer relative"
-                  onClick={() => setActiveProject({ projectId: p.project_id, projectName: p.project_name })}
-                >
-                  {tpvHighlight.dotColor && (
-                    <span
-                      className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full"
-                      style={{ width: 6, height: 6, backgroundColor: tpvHighlight.dotColor }}
-                    />
+                <TableRow
+                  key={`${p.id}${hr.isChild ? '-child' : ''}`}
+                  className={cn(
+                    "hover:bg-muted/50 transition-colors h-9",
+                    hr.isChild && "bg-muted/30 border-l-2 border-l-primary/20"
                   )}
-                  <ExpandArrow projectId={p.project_id} />
-                </TableCell>
-                {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
-                {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-                {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }) }))}
-              </TableRow>
+                  style={rowStyle}
+                >
+                  <TableCell className="w-[32px]">
+                    <div className="flex items-center gap-0.5">
+                      {hr.isParent && (
+                        <button
+                          onClick={() => toggleExpand(p.project_id)}
+                          className="p-0.5 hover:bg-muted rounded"
+                        >
+                          {isExpanded(p.project_id)
+                            ? <ChevronDown className="h-3.5 w-3.5 text-accent stroke-[2.5]" />
+                            : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground stroke-[2.5]" />}
+                        </button>
+                      )}
+                      {!hr.isChild && (
+                        <button
+                          className="relative cursor-pointer"
+                          onClick={() => setActiveProject({ projectId: p.project_id, projectName: p.project_name })}
+                        >
+                          {tpvHighlight.dotColor && (
+                            <span
+                              className="absolute left-0 top-1/2 -translate-y-1/2 rounded-full"
+                              style={{ width: 6, height: 6, backgroundColor: tpvHighlight.dotColor }}
+                            />
+                          )}
+                          <ExpandArrow projectId={p.project_id} />
+                        </button>
+                      )}
+                    </div>
+                  </TableCell>
+                  {v("project_id") && (
+                    <TableCell className="font-mono text-xs truncate" title={p.project_id}>
+                      <span className={hr.isChild ? "pl-4" : ""}>
+                        {hr.isChild && <span className="text-muted-foreground mr-1">↳</span>}
+                        {p.project_id}
+                      </span>
+                      {hr.isParent && !isExpanded(p.project_id) && hr.childCount > 0 && (
+                        <span className="ml-1.5 text-[10px] text-muted-foreground">({hr.childCount})</span>
+                      )}
+                    </TableCell>
+                  )}
+                  {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
+                  {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }) }))}
+                </TableRow>
               );
             })}
           </TableBody>
