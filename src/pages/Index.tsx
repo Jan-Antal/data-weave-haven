@@ -12,11 +12,11 @@ import { DashboardStats } from "@/components/DashboardStats";
 import { TableFilters, useTableFilters } from "@/components/TableFilters";
 import { ExportButton } from "@/components/ExportButton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Settings, Plus, LogOut, User } from "lucide-react";
+import { Settings, Plus, LogOut, User, Check } from "lucide-react";
 import { FeedbackWidget } from "@/components/FeedbackWidget";
 import { AdminInboxButton } from "@/components/AdminInbox";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
 import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
 import { StatusManagement } from "@/components/StatusManagement";
@@ -24,6 +24,13 @@ import { RecycleBin } from "@/components/RecycleBin";
 import { UserManagement } from "@/components/UserManagement";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Admin",
+  pm: "PM",
+  konstrukter: "Konstruktér",
+  viewer: "Viewer",
+};
 
 const Index = () => {
   const filters = useTableFilters();
@@ -55,12 +62,26 @@ const Index = () => {
     }
     setActiveTab(tab);
   };
-  const { profile, signOut, canAccessSettings, canCreateProject, isAdmin } = useAuth();
+  const { profile, signOut, canAccessSettings, canCreateProject, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, isKonstrukter } = useAuth();
+
+  // Auto-switch to allowed tab when role changes
+  useEffect(() => {
+    if (isKonstrukter && activeTab !== "tpv-status" && activeTab !== "plan") {
+      setActiveTab("tpv-status");
+    }
+  }, [isKonstrukter, activeTab]);
 
   return (
     <ColumnVisibilityProvider>
     <ExportProvider>
     <div className="min-h-screen bg-background flex flex-col">
+      {/* Role simulation banner */}
+      {simulatedRole && (
+        <div className="bg-amber-50 border-b border-amber-200 px-6 flex items-center justify-between" style={{ height: 32 }}>
+          <span className="text-amber-700 text-sm">Zobrazení jako: <strong>{ROLE_LABELS[simulatedRole] || simulatedRole}</strong></span>
+          <button onClick={() => setSimulatedRole(null)} className="text-amber-700 font-medium hover:text-amber-900 underline text-sm">Zpět na Admin</button>
+        </div>
+      )}
       <header className="border-b bg-primary px-6 py-4 sticky top-0 z-50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -71,7 +92,7 @@ const Index = () => {
             <span className="text-primary-foreground/70 text-sm font-sans">Project Info 2026</span>
           </div>
           <div className="flex items-center gap-1">
-            <AdminInboxButton />
+            {canAccessSettings && <AdminInboxButton />}
             {/* User dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -87,6 +108,33 @@ const Index = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Role switcher - owner only */}
+            {realRole === "owner" && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="px-2 py-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors text-sm font-sans">
+                    {ROLE_LABELS[role || "admin"] || "Admin"}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Zobrazit jako</div>
+                  <DropdownMenuSeparator />
+                  {(["admin", "pm", "konstrukter", "viewer"] as const).map((r) => (
+                    <DropdownMenuItem
+                      key={r}
+                      onClick={() => setSimulatedRole(r === "admin" ? null : r)}
+                      className="flex items-center justify-between"
+                    >
+                      <span>{ROLE_LABELS[r]}</span>
+                      {((r === "admin" && !simulatedRole) || simulatedRole === r) && (
+                        <Check className="h-4 w-4 text-green-600" />
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
             {/* Settings gear - admin only */}
             {canAccessSettings && (
@@ -149,12 +197,16 @@ const Index = () => {
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <div className="flex items-center justify-between">
             <TabsList className="bg-card border">
-              <TabsTrigger value="project-info" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                Project Info
-              </TabsTrigger>
-              <TabsTrigger value="pm-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                PM Status
-              </TabsTrigger>
+              {!isKonstrukter && (
+                <TabsTrigger value="project-info" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  Project Info
+                </TabsTrigger>
+              )}
+              {!isKonstrukter && (
+                <TabsTrigger value="pm-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  PM Status
+                </TabsTrigger>
+              )}
               <TabsTrigger value="tpv-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" onClick={() => tpvCloseDetailRef.current?.()}>
                 TPV Status
               </TabsTrigger>
@@ -214,7 +266,7 @@ const Index = () => {
       <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
       <UserManagement open={userMgmtOpen} onOpenChange={setUserMgmtOpen} />
-      <FeedbackWidget />
+      {canAccessSettings && <FeedbackWidget />}
     </div>
     </ExportProvider>
     </ColumnVisibilityProvider>

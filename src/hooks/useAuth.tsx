@@ -9,6 +9,8 @@ interface AuthContextType {
   session: Session | null;
   profile: { full_name: string; email: string; is_active: boolean } | null;
   role: AppRole | null;
+  /** The actual DB role (never changes with simulation) */
+  realRole: AppRole | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -23,6 +25,9 @@ interface AuthContextType {
   canManageTPV: boolean;
   canAccessSettings: boolean;
   canEditColumns: boolean;
+  /** Simulated role (null = no simulation, using real role) */
+  simulatedRole: AppRole | null;
+  setSimulatedRole: (role: AppRole | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -35,8 +40,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<AuthContextType["profile"]>(null);
-  const [role, setRole] = useState<AppRole | null>(null);
+  const [realRole, setRealRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [simulatedRole, setSimulatedRole] = useState<AppRole | null>(null);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -45,7 +51,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          // Fetch profile and role using setTimeout to avoid Supabase deadlock
           setTimeout(async () => {
             const { data: profileData } = await supabase
               .from("profiles")
@@ -59,12 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .select("role")
               .eq("user_id", session.user.id)
               .single();
-            setRole((roleData?.role as AppRole) ?? null);
+            setRealRole((roleData?.role as AppRole) ?? null);
             setLoading(false);
           }, 0);
         } else {
           setProfile(null);
-          setRole(null);
+          setRealRole(null);
+          setSimulatedRole(null);
           setLoading(false);
         }
       }
@@ -88,17 +94,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
-  const isOwner = role === "owner";
-  const isAdmin = role === "admin" || isOwner;
-  const isPM = role === "pm";
-  const isKonstrukter = role === "konstrukter";
-  const isViewer = role === "viewer";
+  // Effective role: use simulated if set (only owner can simulate)
+  const effectiveRole = (simulatedRole && (realRole === "owner")) ? simulatedRole : realRole;
+
+  const isOwner = effectiveRole === "owner";
+  const isAdmin = effectiveRole === "admin" || isOwner;
+  const isPM = effectiveRole === "pm";
+  const isKonstrukter = effectiveRole === "konstrukter";
+  const isViewer = effectiveRole === "viewer";
 
   const value: AuthContextType = {
     user,
     session,
     profile,
-    role,
+    role: effectiveRole,
+    realRole,
     loading,
     signIn,
     signOut,
@@ -113,6 +123,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     canManageTPV: isAdmin || isPM || isKonstrukter,
     canAccessSettings: isAdmin,
     canEditColumns: isAdmin,
+    simulatedRole,
+    setSimulatedRole: (role) => {
+      // Only owner can simulate
+      if (realRole === "owner") setSimulatedRole(role);
+    },
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
