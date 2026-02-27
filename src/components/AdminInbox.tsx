@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
-import { Mail, X, MailOpen } from "lucide-react";
+import { Mail, X, MailOpen, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
-import { SwipeableMessage } from "./SwipeableMessage";
 
 interface FeedbackItem {
   id: string;
@@ -27,9 +26,93 @@ function timeAgo(dateStr: string): string {
   return `před ${days} dny`;
 }
 
-const UNDO_DURATION = 5000;
-let deleteUndoTimeout: ReturnType<typeof setTimeout> | null = null;
-let deleteUndoDismiss: (() => void) | null = null;
+function MessageCard({
+  item,
+  isExpanded,
+  onClickMessage,
+  onToggleRead,
+  onDelete,
+}: {
+  item: FeedbackItem;
+  isExpanded: boolean;
+  onClickMessage: () => void;
+  onToggleRead: () => void;
+  onDelete: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  const handleDelete = async () => {
+    setRemoving(true);
+    setTimeout(async () => {
+      await onDelete();
+    }, 250);
+  };
+
+  return (
+    <div
+      className={`group relative transition-all duration-250 ${removing ? "opacity-0 max-h-0 overflow-hidden" : "opacity-100"}`}
+    >
+      <button
+        onClick={onClickMessage}
+        className={`w-full text-left px-5 py-3 pr-20 border-b border-gray-50 transition-colors hover:bg-gray-50 ${
+          !item.is_read ? "border-l-2 border-l-[#2d5a3d] bg-green-50/30" : ""
+        }`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <span className={`text-sm ${!item.is_read ? "font-semibold" : "font-medium"} text-gray-800 truncate`}>
+            {item.user_name || item.user_email}
+          </span>
+          <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">{timeAgo(item.created_at)}</span>
+        </div>
+        {item.user_name && (
+          <div className="text-xs text-gray-400 truncate">{item.user_email}</div>
+        )}
+        <p className={`text-sm text-gray-600 mt-1 ${isExpanded ? "" : "line-clamp-3"}`}>
+          {item.message}
+        </p>
+      </button>
+
+      {/* Action buttons */}
+      <div className="absolute top-2.5 right-3 flex items-center gap-0.5">
+        {confirming ? (
+          <div className="flex items-center gap-1.5 text-xs bg-white rounded px-1.5 py-0.5 shadow-sm border border-gray-100">
+            <span className="text-gray-500">Smazat?</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+              className="text-red-500 hover:text-red-700 font-medium transition-colors"
+            >
+              Ano
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setConfirming(false); }}
+              className="text-gray-400 hover:text-gray-600 font-medium transition-colors"
+            >
+              Ne
+            </button>
+          </div>
+        ) : (
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleRead(); }}
+              className="p-1 rounded text-gray-300 hover:text-blue-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all"
+              title={item.is_read ? "Označit jako nepřečtené" : "Označit jako přečtené"}
+            >
+              {item.is_read ? <Mail className="h-3.5 w-3.5" /> : <MailOpen className="h-3.5 w-3.5" />}
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setConfirming(true); }}
+              className="p-1 rounded text-gray-300 hover:text-red-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all"
+              title="Smazat"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function AdminInboxButton() {
   const { isAdmin } = useAuth();
@@ -79,67 +162,9 @@ export function AdminInboxButton() {
   };
 
   const deleteMessage = async (item: FeedbackItem) => {
-    // Remove from UI immediately
     setItems(prev => prev.filter(i => i.id !== item.id));
-
-    // Clear previous undo
-    if (deleteUndoTimeout) { clearTimeout(deleteUndoTimeout); deleteUndoTimeout = null; }
-    if (deleteUndoDismiss) { deleteUndoDismiss(); deleteUndoDismiss = null; }
-
-    // Hard delete
     await supabase.from("feedback").delete().eq("id", item.id);
-
-    const handleUndo = async () => {
-      if (deleteUndoTimeout) { clearTimeout(deleteUndoTimeout); deleteUndoTimeout = null; }
-      // Re-insert the message
-      const { error } = await supabase.from("feedback").insert({
-        id: item.id,
-        user_id: item.id, // will be overridden by original data
-        user_name: item.user_name,
-        user_email: item.user_email,
-        message: item.message,
-        is_read: item.is_read,
-        created_at: item.created_at,
-      } as any);
-      if (!error) {
-        setItems(prev => [item, ...prev].sort((a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        ));
-        toast({ title: "Zpráva obnovena" });
-      }
-    };
-
-    const { dismiss } = toast({
-      duration: UNDO_DURATION,
-      className: "bg-gray-100 text-gray-700 border-gray-200 shadow-md",
-      title: (
-        <div className="flex items-center justify-between w-full gap-4">
-          <span className="text-sm font-medium text-gray-700">Zpráva smazána</span>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); handleUndo(); dismiss(); }}
-            className="text-gray-500 font-medium hover:text-gray-700 transition-colors text-sm shrink-0"
-          >
-            Zpět
-          </button>
-        </div>
-      ) as any,
-      description: (
-        <div className="mt-2 w-full">
-          <div
-            className="h-0.5 bg-gray-300 rounded-full origin-left"
-            style={{ animation: `undo-shrink ${UNDO_DURATION}ms linear forwards` }}
-          />
-          <style>{`@keyframes undo-shrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }`}</style>
-        </div>
-      ) as any,
-    });
-
-    deleteUndoDismiss = dismiss;
-    deleteUndoTimeout = setTimeout(() => {
-      deleteUndoTimeout = null;
-      deleteUndoDismiss = null;
-    }, UNDO_DURATION);
+    toast({ title: "Zpráva smazána" });
   };
 
   return (
@@ -181,37 +206,16 @@ export function AdminInboxButton() {
                   <span className="text-sm">Žádné zprávy</span>
                 </div>
               ) : (
-                items.map(item => {
-                  const isExpanded = expanded === item.id;
-                  return (
-                    <SwipeableMessage
-                      key={item.id}
-                      isRead={item.is_read}
-                      onDelete={() => deleteMessage(item)}
-                      onToggleRead={() => toggleRead(item)}
-                    >
-                      <button
-                        onClick={() => handleClickMessage(item)}
-                        className={`w-full text-left px-5 py-3 border-b border-gray-50 transition-colors hover:bg-gray-50 ${
-                          !item.is_read ? "border-l-2 border-l-[#2d5a3d] bg-green-50/30" : ""
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <span className={`text-sm ${!item.is_read ? "font-semibold" : "font-medium"} text-gray-800 truncate`}>
-                            {item.user_name || item.user_email}
-                          </span>
-                          <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">{timeAgo(item.created_at)}</span>
-                        </div>
-                        {item.user_name && (
-                          <div className="text-xs text-gray-400 truncate">{item.user_email}</div>
-                        )}
-                        <p className={`text-sm text-gray-600 mt-1 ${isExpanded ? "" : "line-clamp-3"}`}>
-                          {item.message}
-                        </p>
-                      </button>
-                    </SwipeableMessage>
-                  );
-                })
+                items.map(item => (
+                  <MessageCard
+                    key={item.id}
+                    item={item}
+                    isExpanded={expanded === item.id}
+                    onClickMessage={() => handleClickMessage(item)}
+                    onToggleRead={() => toggleRead(item)}
+                    onDelete={() => deleteMessage(item)}
+                  />
+                ))
               )}
             </div>
           </div>
