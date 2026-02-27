@@ -34,11 +34,39 @@ import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 import { useExportContext } from "./ExportContext";
 import { getProjectCellValue } from "@/lib/exportExcel";
 import { getColumnLabel } from "./CrossTabColumns";
+import { useStagesByProject } from "@/hooks/useAllProjectStages";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...PM_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
 
 const stageStatuses = ["Plánováno", "Probíhá", "Dokončeno", "Pozastaveno"];
+
+/** Check if any stage matches the active filters */
+function stageMatchesFilters(
+  stages: ProjectStage[],
+  personFilter: string | null,
+  statusFilter: string[],
+  search: string | undefined
+): boolean {
+  if (stages.length === 0) return false;
+
+  return stages.some((stage) => {
+    // Person filter
+    if (personFilter && stage.pm && String(stage.pm).includes(personFilter)) return true;
+
+    // Status filter
+    if (statusFilter && statusFilter.length > 0 && stage.status && statusFilter.includes(stage.status)) return true;
+
+    // Text search
+    if (search) {
+      const q = search.toLowerCase();
+      const searchable = [stage.stage_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
+      if (searchable.some((v) => v && String(v).toLowerCase().includes(q))) return true;
+    }
+
+    return false;
+  });
+}
 
 function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys }: { stage: ProjectStage; project: Project; onDelete: (id: string) => void; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[] }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
@@ -204,13 +232,64 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const { columns: customColumns } = useAllCustomColumns("projects");
   const updateCustomField = useUpdateCustomField();
   const qc = useQueryClient();
-  const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
+  const { sorted: baseSorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { pmStatus: { isVisible } } = useAllColumnVisibility();
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("pm-status");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns } = useAuth();
   const { registerExport } = useExportContext();
+  const { stagesByProject } = useStagesByProject();
+
+  // Stage-aware filtering: find parents to include because their stages match filters
+  const hasActiveFilters = !!(personFilter || (statusFilter && statusFilter.length > 0) || externalSearch);
+
+  const { sorted, stageExpandedIds } = useMemo(() => {
+    if (!hasActiveFilters || stagesByProject.size === 0) {
+      return { sorted: baseSorted, stageExpandedIds: new Set<string>() };
+    }
+
+    const baseSortedIds = new Set(baseSorted.map((p) => p.project_id));
+    const extraParents: Project[] = [];
+    const autoExpand = new Set<string>();
+
+    for (const p of projects) {
+      // Skip projects already in results
+      if (baseSortedIds.has(p.project_id)) {
+        // But still check if stages match to auto-expand
+        const stages = stagesByProject.get(p.project_id) || [];
+        if (stageMatchesFilters(stages, personFilter, statusFilter, externalSearch)) {
+          autoExpand.add(p.project_id);
+        }
+        continue;
+      }
+
+      // Check if any stage of this project matches the filters
+      const stages = stagesByProject.get(p.project_id) || [];
+      if (stageMatchesFilters(stages, personFilter, statusFilter, externalSearch)) {
+        extraParents.push(p);
+        autoExpand.add(p.project_id);
+      }
+    }
+
+    // Merge extra parents into sorted list, maintaining project_id order
+    const merged = [...baseSorted, ...extraParents].sort((a, b) =>
+      a.project_id.localeCompare(b.project_id, "cs")
+    );
+
+    return { sorted: merged, stageExpandedIds: autoExpand };
+  }, [baseSorted, projects, stagesByProject, hasActiveFilters, personFilter, statusFilter, externalSearch]);
+
+  // Auto-expand parents whose stages matched
+  useEffect(() => {
+    if (stageExpandedIds.size > 0) {
+      setExpanded((prev) => {
+        const next = new Set(prev);
+        for (const id of stageExpandedIds) next.add(id);
+        return next;
+      });
+    }
+  }, [stageExpandedIds]);
 
   const orderedNativeKeys = useMemo(() => getOrderedKeys(PM_NATIVE), [getOrderedKeys]);
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
