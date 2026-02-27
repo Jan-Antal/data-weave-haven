@@ -1,28 +1,39 @@
-import { createContext, useContext, useRef, useCallback, type MutableRefObject, type ReactNode } from "react";
+import { createContext, useContext, useRef, useCallback, type ReactNode } from "react";
 
-export type ExportDataGetter = () => { headers: string[]; rows: (string | number)[][] } | null;
+export type ExportDataGetter = (selectedKeys?: string[]) => { headers: string[]; rows: (string | number)[][] } | null;
+
+export interface ExportColumnGroup {
+  label: string;
+  keys: string[];
+  getLabel: (key: string) => string;
+}
+
+export interface ExportMeta {
+  getter: ExportDataGetter;
+  groups: ExportColumnGroup[];
+  defaultVisibleKeys: string[];
+}
 
 interface ExportContextType {
-  registerGetter: (tab: string, getter: ExportDataGetter) => void;
-  getExportData: (tab: string) => { headers: string[]; rows: (string | number)[][] } | null;
+  registerExport: (tab: string, meta: ExportMeta) => void;
+  getExportMeta: (tab: string) => ExportMeta | null;
 }
 
 const ExportCtx = createContext<ExportContextType | null>(null);
 
 export function ExportProvider({ children }: { children: ReactNode }) {
-  const gettersRef = useRef<Record<string, ExportDataGetter>>({});
+  const metaRef = useRef<Record<string, ExportMeta>>({});
 
-  const registerGetter = useCallback((tab: string, getter: ExportDataGetter) => {
-    gettersRef.current[tab] = getter;
+  const registerExport = useCallback((tab: string, meta: ExportMeta) => {
+    metaRef.current[tab] = meta;
   }, []);
 
-  const getExportData = useCallback((tab: string) => {
-    const getter = gettersRef.current[tab];
-    return getter ? getter() : null;
+  const getExportMeta = useCallback((tab: string) => {
+    return metaRef.current[tab] ?? null;
   }, []);
 
   return (
-    <ExportCtx.Provider value={{ registerGetter, getExportData }}>
+    <ExportCtx.Provider value={{ registerExport, getExportMeta }}>
       {children}
     </ExportCtx.Provider>
   );
