@@ -114,11 +114,12 @@ interface CellProps {
   saveCurrency?: (id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => void;
   customColumns?: CustomColumnDef[];
   saveCustomField?: (rowId: string, columnKey: string, value: string, oldValue: string) => void;
+  childMatchCount?: number;
 }
 
 export function renderColumnCell(props: CellProps) {
-  const { colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField } = props;
-  return renderCell(key, p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField);
+  const { colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField, childMatchCount } = props;
+  return renderCell(key, p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField, childMatchCount);
 }
 
 function renderCell(
@@ -128,6 +129,7 @@ function renderCell(
   saveCurrency?: (id: string, a: string, c: string, oa: string, oc: string) => void,
   customColumns?: CustomColumnDef[],
   saveCustomField?: (rowId: string, columnKey: string, value: string, oldValue: string) => void,
+  childMatchCount?: number,
 ) {
   const s = (field: string, val: string, old: string) => save(p.id, field, val, old);
   const v = (field: keyof Project) => (p as any)[field] ?? "";
@@ -157,7 +159,7 @@ function renderCell(
     case "pm":
       return <TableCell key={key}><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(x) => s("pm", x, v("pm"))} readOnly={!canEdit} /></TableCell>;
     case "status":
-      return <TableCell key={key}><InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(x) => s("status", x, v("status"))} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><span className="inline-flex items-center gap-1"><InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(x) => s("status", x, v("status"))} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} readOnly={!canEdit} />{childMatchCount != null && <span className="text-[10px] text-muted-foreground font-normal">({childMatchCount})</span>}</span></TableCell>;
     case "risk":
       return <TableCell key={key}><InlineEditableCell value={p.risk} type="select" options={["Low", "Medium", "High"]} onSave={(x) => s("risk", x, v("risk"))} displayValue={<RiskBadge level={p.risk || ""} />} readOnly={!canEdit} /></TableCell>;
     case "zamereni":

@@ -49,7 +49,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const updateProject = useUpdateProject();
   const { columns: customColumns } = useAllCustomColumns("projects");
   const updateCustomField = useUpdateCustomField();
-  const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
+  const { sorted, sortCol, sortDir, toggleSort, hierarchyInfo } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const { tpvStatus: { isVisible } } = useAllColumnVisibility();
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("tpv-status");
   const [editMode, setEditMode] = useState(false);
@@ -176,8 +176,11 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
           <TableBody>
             {sorted.map((p) => {
               const tpvHighlight = getTPVDashboardRiskColor(p as any, riskHighlight ?? null);
+              const hi = hierarchyInfo.get(p.project_id);
+              const isChild = hi?.isChild ?? false;
+              const childMatchCount = hi?.childMatchCount;
               return (
-              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors h-9" style={tpvHighlight.bg ? { backgroundColor: tpvHighlight.bg } : {}}>
+              <TableRow key={p.id} className={cn("hover:bg-muted/50 transition-colors h-9", isChild && "bg-muted/30")} style={tpvHighlight.bg ? { backgroundColor: tpvHighlight.bg } : {}}>
                 <TableCell
                   className="w-[32px] cursor-pointer relative"
                   onClick={() => setActiveProject({ projectId: p.project_id, projectName: p.project_name })}
@@ -190,9 +193,9 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                   )}
                   <ExpandArrow projectId={p.project_id} />
                 </TableCell>
-                {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
+                {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{isChild && <span className="text-muted-foreground mr-1">↳</span>}{p.project_id}</TableCell>}
                 {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-                {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }) }))}
+                {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }), childMatchCount: key === "status" ? childMatchCount : undefined }))}
               </TableRow>
               );
             })}

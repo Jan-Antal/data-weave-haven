@@ -68,7 +68,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const updateProject = useUpdateProject();
   const { columns: customColumns } = useAllCustomColumns("projects");
   const updateCustomField = useUpdateCustomField();
-  const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
+  const { sorted, sortCol, sortDir, toggleSort, hierarchyInfo } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const allProjectIds = useMemo(() => projects.map((p) => p.project_id), [projects]);
   const { counts: docCounts } = useDocumentCounts(allProjectIds);
   const [addOpen, setAddOpen] = useState(false);
@@ -237,11 +237,15 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sorted.map((p) => (
-              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { backgroundColor: c } : {}; })()}>
+            {sorted.map((p) => {
+              const hi = hierarchyInfo.get(p.project_id);
+              const isChild = hi?.isChild ?? false;
+              const childMatchCount = hi?.childMatchCount;
+              return (
+              <TableRow key={p.id} className={cn("hover:bg-muted/50 transition-colors", isChild && "bg-muted/30")} style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { backgroundColor: c } : {}; })()}>
                 <TableCell style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="text-center">
                   {(docCounts[p.project_id] ?? 0) > 0 && (
-                    <span className="inline-flex items-center gap-0.5 text-gray-400 text-[10px]">
+                    <span className="inline-flex items-center gap-0.5 text-muted-foreground text-[10px]">
                       <Paperclip className="h-3 w-3" />
                       {docCounts[p.project_id]}
                     </span>
@@ -249,13 +253,14 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                 </TableCell>
                 {v("project_id") && (
                   <TableCell className="font-mono text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => setEditProject(p)}>
-                    {p.project_id}
+                    {isChild && <span className="text-muted-foreground mr-1">↳</span>}{p.project_id}
                   </TableCell>
                 )}
                 {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-                {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }) }))}
+                {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }), childMatchCount: key === "status" ? childMatchCount : undefined }))}
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </div>
