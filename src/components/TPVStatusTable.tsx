@@ -196,33 +196,26 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                   )}
                   style={rowStyle}
                 >
-                  <TableCell className="w-[32px]">
-                    <div className="flex items-center gap-0.5">
-                      {hr.isParent && (
-                        <button
-                          onClick={() => toggleExpand(p.project_id)}
-                          className="p-0.5 hover:bg-muted rounded"
-                        >
-                          {isExpanded(p.project_id)
-                            ? <ChevronDown className="h-3.5 w-3.5 text-accent stroke-[2.5]" />
-                            : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground stroke-[2.5]" />}
-                        </button>
-                      )}
-                      {!hr.isChild && (
-                        <button
-                          className="relative cursor-pointer"
-                          onClick={() => setActiveProject({ projectId: p.project_id, projectName: p.project_name })}
-                        >
-                          {tpvHighlight.dotColor && (
-                            <span
-                              className="absolute left-0 top-1/2 -translate-y-1/2 rounded-full"
-                              style={{ width: 6, height: 6, backgroundColor: tpvHighlight.dotColor }}
-                            />
-                          )}
-                          <ExpandArrow projectId={p.project_id} />
-                        </button>
-                      )}
-                    </div>
+                  <TableCell
+                    className="w-[32px] cursor-pointer relative"
+                    onClick={() => {
+                      if (hr.isParent) toggleExpand(p.project_id);
+                      else if (!hr.isChild) setActiveProject({ projectId: p.project_id, projectName: p.project_name });
+                    }}
+                  >
+                    {tpvHighlight.dotColor && !hr.isChild && (
+                      <span
+                        className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full"
+                        style={{ width: 6, height: 6, backgroundColor: tpvHighlight.dotColor }}
+                      />
+                    )}
+                    {hr.isParent ? (
+                      isExpanded(p.project_id)
+                        ? <ChevronDown className="h-5 w-5 stroke-[3] text-accent" />
+                        : <ChevronRight className="h-5 w-5 stroke-[3] text-accent fill-accent/20" />
+                    ) : !hr.isChild ? (
+                      <ExpandArrow projectId={p.project_id} />
+                    ) : null}
                   </TableCell>
                   {v("project_id") && (
                     <TableCell className="font-mono text-xs truncate" title={p.project_id}>

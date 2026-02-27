@@ -271,7 +271,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                           ? <ChevronDown className="h-4 w-4 text-accent stroke-[2.5]" />
                           : <ChevronRight className="h-4 w-4 text-muted-foreground stroke-[2.5]" />}
                       </button>
-                    ) : hr.isChild ? null : (
+                    ) : (
                       (docCounts[p.project_id] ?? 0) > 0 && (
                         <span className="inline-flex items-center gap-0.5 text-muted-foreground text-[10px]">
                           <Paperclip className="h-3 w-3" />
