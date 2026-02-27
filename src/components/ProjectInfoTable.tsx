@@ -262,22 +262,15 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                   style={rowStyle}
                 >
                   <TableCell style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="text-center">
-                    {hr.isParent ? (
+                    {!hr.isChild && (
                       <button
-                        onClick={() => toggleExpand(p.project_id)}
-                        className="p-0.5 hover:bg-muted rounded"
+                        onClick={() => hr.isParent ? toggleExpand(p.project_id) : undefined}
+                        className={cn("p-0.5 rounded", hr.isParent && "hover:bg-muted cursor-pointer")}
                       >
-                        {isExpanded(p.project_id)
-                          ? <ChevronDown className="h-4 w-4 text-accent stroke-[2.5]" />
-                          : <ChevronRight className="h-4 w-4 text-muted-foreground stroke-[2.5]" />}
+                        {hr.isParent && isExpanded(p.project_id)
+                          ? <ChevronDown className="h-4 w-4 text-muted-foreground stroke-[2.5]" />
+                          : <ChevronRight className="h-4 w-4 text-muted-foreground/50 stroke-[2.5]" />}
                       </button>
-                    ) : (
-                      (docCounts[p.project_id] ?? 0) > 0 && (
-                        <span className="inline-flex items-center gap-0.5 text-muted-foreground text-[10px]">
-                          <Paperclip className="h-3 w-3" />
-                          {docCounts[p.project_id]}
-                        </span>
-                      )
                     )}
                   </TableCell>
                   {v("project_id") && (
@@ -286,9 +279,6 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                         {hr.isChild && <span className="text-muted-foreground mr-1">↳</span>}
                         {p.project_id}
                       </span>
-                      {hr.isParent && !isExpanded(p.project_id) && hr.childCount > 0 && (
-                        <span className="ml-1.5 text-[10px] text-muted-foreground">({hr.childCount})</span>
-                      )}
                     </TableCell>
                   )}
                   {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
