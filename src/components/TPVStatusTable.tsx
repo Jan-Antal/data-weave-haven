@@ -37,7 +37,7 @@ import { useTPVItems } from "@/hooks/useTPVItems";
 const NATIVE_KEYS = ["project_id", "project_name", ...TPV_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
 
-const INHERITABLE_FIELDS = ["pm", "status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "datum_smluvni", "pm_poznamka", "konstrukter", "narocnost", "architekt"];
+const INHERITABLE_FIELDS = ["pm", "status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "datum_smluvni", "konstrukter", "narocnost", "architekt"];
 
 /** Check if any stage matches the active filters */
 function stageMatchesFilters(
