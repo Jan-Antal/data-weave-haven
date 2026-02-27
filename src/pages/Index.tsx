@@ -109,35 +109,8 @@ const Index = () => {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Role switcher - owner only */}
-            {realRole === "owner" && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="px-2 py-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors text-sm font-sans">
-                    {ROLE_LABELS[role || "admin"] || "Admin"}
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Zobrazit jako</div>
-                  <DropdownMenuSeparator />
-                  {(["admin", "pm", "konstrukter", "viewer"] as const).map((r) => (
-                    <DropdownMenuItem
-                      key={r}
-                      onClick={() => setSimulatedRole(r === "admin" ? null : r)}
-                      className="flex items-center justify-between"
-                    >
-                      <span>{ROLE_LABELS[r]}</span>
-                      {((r === "admin" && !simulatedRole) || simulatedRole === r) && (
-                        <Check className="h-4 w-4 text-green-600" />
-                      )}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-
             {/* Settings gear - admin only */}
-            {canAccessSettings && (
+            {(canAccessSettings || realRole === "owner") && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
@@ -145,22 +118,43 @@ const Index = () => {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setUserMgmtOpen(true)}>
-                    Správa uživatelů
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={openPeopleManagement}>
-                    Správa osob
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setExchangeRateOpen(true)}>
-                    Kurzovní lístek
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setStatusMgmtOpen(true)}>
-                    Správa statusů
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setRecycleBinOpen(true)}>
-                    Koš
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
+                  {canAccessSettings && (
+                    <>
+                      <DropdownMenuItem onClick={() => setUserMgmtOpen(true)}>
+                        Správa uživatelů
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={openPeopleManagement}>
+                        Správa osob
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setExchangeRateOpen(true)}>
+                        Kurzovní lístek
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setStatusMgmtOpen(true)}>
+                        Správa statusů
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setRecycleBinOpen(true)}>
+                        Koš
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {realRole === "owner" && (
+                    <>
+                      {canAccessSettings && <DropdownMenuSeparator />}
+                      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Zobrazit jako</div>
+                      {(["admin", "pm", "konstrukter", "viewer"] as const).map((r) => (
+                        <DropdownMenuItem
+                          key={r}
+                          onClick={() => setSimulatedRole(r === "admin" ? null : r)}
+                          className="flex items-center justify-between"
+                        >
+                          <span>{ROLE_LABELS[r]}</span>
+                          {((r === "admin" && !simulatedRole) || simulatedRole === r) && (
+                            <Check className="h-4 w-4 text-green-600" />
+                          )}
+                        </DropdownMenuItem>
+                      ))}
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
