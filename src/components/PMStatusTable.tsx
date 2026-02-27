@@ -25,7 +25,7 @@ import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
-import { useAllColumnVisibility, PM_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
+import { useAllColumnVisibility, PROJECT_INFO_NATIVE, PM_NATIVE, TPV_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
 import { getColumnStyle, renderColumnHeader, renderColumnCell } from "./CrossTabColumns";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -210,7 +210,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("pm-status");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns } = useAuth();
-  const { registerGetter } = useExportContext();
+  const { registerExport } = useExportContext();
 
   const orderedNativeKeys = useMemo(() => getOrderedKeys(PM_NATIVE), [getOrderedKeys]);
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
@@ -243,15 +243,24 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
 
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 
-  // Register export data getter
+  // Register export data getter with column metadata
   useEffect(() => {
-    registerGetter("pm-status", () => {
-      const visKeys = ["project_id", "project_name", ...allVisibleKeys];
-      const headers = visKeys.map(k => getLabel(k, getColumnLabel(k)));
-      const rows = sorted.map(p => visKeys.map(k => getProjectCellValue(p as any, k)));
-      return { headers, rows };
+    const allExportKeys = ["project_id", "project_name", ...allVisibleKeys];
+    registerExport("pm-status", {
+      getter: (selectedKeys) => {
+        const keys = selectedKeys ?? allExportKeys;
+        const headers = keys.map(k => getLabel(k, getColumnLabel(k)));
+        const rows = sorted.map(p => keys.map(k => getProjectCellValue(p as any, k)));
+        return { headers, rows };
+      },
+      groups: [
+        { label: "Project Info", keys: ["project_id", "project_name", ...PROJECT_INFO_NATIVE], getLabel: (k) => getLabel(k, getColumnLabel(k)) },
+        { label: "PM Status", keys: PM_NATIVE, getLabel: (k) => getLabel(k, getColumnLabel(k)) },
+        { label: "TPV Status", keys: TPV_NATIVE, getLabel: (k) => getLabel(k, getColumnLabel(k)) },
+      ],
+      defaultVisibleKeys: allExportKeys,
     });
-  }, [registerGetter, sorted, allVisibleKeys, getLabel]);
+  }, [registerExport, sorted, allVisibleKeys, getLabel]);
 
   const toggleExpand = (pid: string) => {
     setExpanded(prev => {

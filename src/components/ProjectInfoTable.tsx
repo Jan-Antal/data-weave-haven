@@ -28,7 +28,7 @@ import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { useAuth } from "@/hooks/useAuth";
 import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
-import { useAllColumnVisibility, PROJECT_INFO_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
+import { useAllColumnVisibility, PROJECT_INFO_NATIVE, PM_NATIVE, TPV_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
 import { getColumnStyle, renderColumnHeader, renderColumnCell } from "./CrossTabColumns";
 import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 import { useDocumentCounts } from "@/hooks/useDocumentCounts";
@@ -81,7 +81,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("project-info");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns, canDeleteProject, isViewer } = useAuth();
-  const { registerGetter } = useExportContext();
+  const { registerExport } = useExportContext();
 
   // Persisted group order from DB (for side panel)
   const orderedNativeKeys = useMemo(() => getOrderedKeys(PROJECT_INFO_NATIVE), [getOrderedKeys]);
@@ -126,15 +126,24 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     return () => document.removeEventListener("open-add-project", handleOpenAdd);
   }, []);
 
-  // Register export data getter
+  // Register export data getter with column metadata
   useEffect(() => {
-    registerGetter("project-info", () => {
-      const visKeys = ["project_id", "project_name", ...allVisibleKeys];
-      const headers = visKeys.map(k => getLabel(k, getColumnLabel(k)));
-      const rows = sorted.map(p => visKeys.map(k => getProjectCellValue(p as any, k)));
-      return { headers, rows };
+    const allExportKeys = ["project_id", "project_name", ...allVisibleKeys];
+    registerExport("project-info", {
+      getter: (selectedKeys) => {
+        const keys = selectedKeys ?? allExportKeys;
+        const headers = keys.map(k => getLabel(k, getColumnLabel(k)));
+        const rows = sorted.map(p => keys.map(k => getProjectCellValue(p as any, k)));
+        return { headers, rows };
+      },
+      groups: [
+        { label: "Project Info", keys: ["project_id", "project_name", ...PROJECT_INFO_NATIVE], getLabel: (k) => getLabel(k, getColumnLabel(k)) },
+        { label: "PM Status", keys: PM_NATIVE, getLabel: (k) => getLabel(k, getColumnLabel(k)) },
+        { label: "TPV Status", keys: TPV_NATIVE, getLabel: (k) => getLabel(k, getColumnLabel(k)) },
+      ],
+      defaultVisibleKeys: allExportKeys,
     });
-  }, [registerGetter, sorted, allVisibleKeys, getLabel]);
+  }, [registerExport, sorted, allVisibleKeys, getLabel]);
 
   const save = (id: string, field: string, value: string, oldValue: string) => {
     updateProject.mutate({ id, field, value, oldValue });

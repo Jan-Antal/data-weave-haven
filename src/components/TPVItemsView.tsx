@@ -20,6 +20,7 @@ import { SortableHeader } from "./SortableHeader";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { cn } from "@/lib/utils";
 import { exportToExcel, buildFileName } from "@/lib/exportExcel";
+import { ExportPopup } from "./ExportPopup";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean }[] = [
   { key: "item_name", label: "Název", locked: true },
@@ -237,24 +238,39 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
     } : {}),
   });
 
-  const handleExportTPV = () => {
-    const visKeys = ["item_name", ...renderKeys];
-    const headers = visKeys.map(k => getLabel(k, TPV_LIST_LABEL_MAP[k] || k));
-    const rows = sortedItems.map(item => visKeys.map(k => {
-      if (k.startsWith("custom_")) {
-        const cf = (item as any).custom_fields || {};
-        return cf[k] ?? "";
+  const tpvExportMeta = useMemo(() => ({
+    getter: (selectedKeys?: string[]) => {
+      const visKeys = selectedKeys ?? ["item_name", ...renderKeys];
+      const headers = visKeys.map(k => getLabel(k, TPV_LIST_LABEL_MAP[k] || k));
+      const rows = sortedItems.map(item => visKeys.map(k => {
+        if (k.startsWith("custom_")) {
+          const cf = (item as any).custom_fields || {};
+          return cf[k] ?? "";
+        }
+        const val = (item as any)[k];
+        return val == null ? "" : String(val);
+      }));
+      return { headers, rows };
+    },
+    groups: [
+      { label: "TPV List", keys: TPV_LIST_COLUMNS.map(c => c.key), getLabel: (k: string) => getLabel(k, TPV_LIST_LABEL_MAP[k] || k) },
+    ],
+    defaultVisibleKeys: ["item_name", ...renderKeys],
+  }), [renderKeys, sortedItems, getLabel]);
+
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportWrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!exportOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (exportWrapperRef.current && !exportWrapperRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
       }
-      const val = (item as any)[k];
-      return val == null ? "" : String(val);
-    }));
-    exportToExcel({
-      sheetName: "TPV Items",
-      fileName: buildFileName("TPV", projectId),
-      headers,
-      rows,
-    });
-  };
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [exportOpen]);
 
   return (
     <div className="w-full min-w-0">
@@ -265,13 +281,25 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
         </Button>
         <span className="text-sm font-serif font-bold">{projectId} — {projectName}</span>
         <span className="text-muted-foreground/40 text-sm">|</span>
-        <button
-          onClick={handleExportTPV}
-          className="border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-sm px-3 py-1.5 rounded-md gap-1.5 flex items-center"
-        >
-          <Download className="h-3.5 w-3.5" />
-          Export
-        </button>
+        <div ref={exportWrapperRef} className="relative">
+          <button
+            onClick={() => setExportOpen(!exportOpen)}
+            className="border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-sm px-3 py-1.5 rounded-md gap-1.5 flex items-center"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export
+          </button>
+          {exportOpen && (
+            <ExportPopup
+              tabKey={`tpv-list-${projectId}`}
+              tabLabel="TPV"
+              sheetName="TPV Items"
+              meta={tpvExportMeta}
+              onClose={() => setExportOpen(false)}
+              projectId={projectId}
+            />
+          )}
+        </div>
         {canManageTPV && (
           <>
             <Button size="sm" variant="outline" onClick={() => { setNewItem({ item_name: "", item_type: "", status: "", sent_date: "", accepted_date: "", notes: "" }); setAddOpen(true); }}>
