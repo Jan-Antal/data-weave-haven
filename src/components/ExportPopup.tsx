@@ -163,16 +163,16 @@ export function ExportPopup({ tabKey, tabLabel, sheetName, meta, onClose, projec
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/50 rounded-b-xl">
-        <Button variant="outline" size="sm" onClick={onClose} className="text-gray-500 border-gray-200 h-8">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-gray-100 bg-gray-50/50 rounded-b-xl">
+        <Button variant="outline" size="sm" onClick={onClose} className="text-gray-500 border-gray-200 h-8 shrink-0">
           Zrušit
         </Button>
-        <span className="text-xs text-gray-400">{selectedCount} sloupců vybráno</span>
+        <span className="text-sm text-gray-400 truncate">{selectedCount} sloupců vybráno</span>
         <Button
           size="sm"
           onClick={handleExport}
           disabled={selectedCount === 0}
-          className="h-8 bg-[#2d5a3d] hover:bg-[#244d33] text-white"
+          className="h-8 bg-[#2d5a3d] hover:bg-[#244d33] text-white shrink-0"
         >
           <Download className="h-3.5 w-3.5 mr-1" />
           Exportovat
