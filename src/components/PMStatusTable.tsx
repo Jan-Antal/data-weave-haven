@@ -1,4 +1,4 @@
-import React, { useState, Fragment, useMemo, useEffect, useCallback, memo } from "react";
+import React, { useState, Fragment, useMemo, useEffect, useCallback, memo, useRef } from "react";
 import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColumns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge, RiskBadge } from "./StatusBadge";
@@ -323,62 +323,83 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const { registerExport } = useExportContext();
   const { stagesByProject } = useStagesByProject();
 
-  // Stage-aware filtering: find parents to include because their stages match filters
+  // Frozen filter results: only recompute visible IDs when filter values or dataset size changes,
+  // NOT when individual project data is edited.
+  const filterFingerprint = JSON.stringify([personFilter, statusFilter, externalSearch]);
+  const computeKey = `${filterFingerprint}|${projects.length}|${stagesByProject.size}`;
   const hasActiveFilters = !!(personFilter || (statusFilter && statusFilter.length > 0) || externalSearch);
 
-  const { sorted, stageExpandedIds } = useMemo(() => {
-    if (!hasActiveFilters || stagesByProject.size === 0) {
-      return { sorted: baseSorted, stageExpandedIds: new Set<string>() };
-    }
+  const frozenRef = useRef<{ key: string; ids: Set<string>; autoExpand: Set<string> }>({
+    key: '', ids: new Set(), autoExpand: new Set(),
+  });
 
-    // Pre-build Sets for O(1) lookups
-    const statusFilterSet = statusFilter && statusFilter.length > 0 ? new Set(statusFilter) : null;
-    const searchLower = externalSearch ? externalSearch.toLowerCase() : null;
-
-    const baseSortedIds = new Set(baseSorted.map((p) => p.project_id));
-    const extraParents: Project[] = [];
+  // Recompute frozen set only when computeKey changes (filter or dataset size change)
+  if (frozenRef.current.key !== computeKey) {
+    const baseIds = new Set(baseSorted.map((p) => p.project_id));
     const autoExpand = new Set<string>();
 
-    for (const p of projects) {
-      const stages = stagesByProject.get(p.project_id);
-      if (!stages || stages.length === 0) {
-        continue;
-      }
+    if (hasActiveFilters && stagesByProject.size > 0) {
+      const statusFilterSet = statusFilter && statusFilter.length > 0 ? new Set(statusFilter) : null;
+      const searchLower = externalSearch ? externalSearch.toLowerCase() : null;
 
-      if (baseSortedIds.has(p.project_id)) {
-        if (stageMatchesFilters(stages, personFilter, statusFilterSet, searchLower)) {
+      for (const p of projects) {
+        const stages = stagesByProject.get(p.project_id);
+        if (!stages || stages.length === 0) continue;
+
+        if (baseIds.has(p.project_id)) {
+          if (stageMatchesFilters(stages, personFilter, statusFilterSet, searchLower)) {
+            autoExpand.add(p.project_id);
+          }
+        } else if (stageMatchesFilters(stages, personFilter, statusFilterSet, searchLower)) {
+          baseIds.add(p.project_id);
           autoExpand.add(p.project_id);
         }
-        continue;
-      }
-
-      if (stageMatchesFilters(stages, personFilter, statusFilterSet, searchLower)) {
-        extraParents.push(p);
-        autoExpand.add(p.project_id);
       }
     }
 
-    if (extraParents.length === 0) {
-      return { sorted: baseSorted, stageExpandedIds: autoExpand };
-    }
+    frozenRef.current = { key: computeKey, ids: baseIds, autoExpand };
+  }
 
-    const merged = [...baseSorted, ...extraParents].sort((a, b) =>
-      a.project_id.localeCompare(b.project_id, "cs")
-    );
+  // Build sorted list from frozen IDs + current project data (so edits are reflected)
+  const sorted = useMemo(() => {
+    const frozenIds = frozenRef.current.ids;
+    let result = projects.filter((p) => frozenIds.has(p.project_id));
 
-    return { sorted: merged, stageExpandedIds: autoExpand };
-  }, [baseSorted, projects, stagesByProject, hasActiveFilters, personFilter, statusFilter, externalSearch]);
-
-  // Auto-expand parents whose stages matched
-  useEffect(() => {
-    if (stageExpandedIds.size > 0) {
-      setExpanded((prev) => {
-        const next = new Set(prev);
-        for (const id of stageExpandedIds) next.add(id);
-        return next;
+    if (sortCol && sortDir) {
+      result = [...result].sort((a, b) => {
+        const av = (a as any)[sortCol] ?? "";
+        const bv = (b as any)[sortCol] ?? "";
+        const numA = Number(av);
+        const numB = Number(bv);
+        if (!isNaN(numA) && !isNaN(numB) && av !== "" && bv !== "") {
+          return sortDir === "asc" ? numA - numB : numB - numA;
+        }
+        const cmp = String(av).localeCompare(String(bv), "cs");
+        return sortDir === "asc" ? cmp : -cmp;
       });
+    } else {
+      result.sort((a, b) => a.project_id.localeCompare(b.project_id, "cs"));
     }
-  }, [stageExpandedIds]);
+
+    return result;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects, sortCol, sortDir, computeKey]);
+
+  // Auto-expand parents whose stages matched — ONLY when filters change
+  const prevComputeKeyRef = useRef('');
+  useEffect(() => {
+    if (computeKey !== prevComputeKeyRef.current) {
+      prevComputeKeyRef.current = computeKey;
+      const autoExpand = frozenRef.current.autoExpand;
+      if (autoExpand.size > 0) {
+        setExpanded((prev) => {
+          const next = new Set(prev);
+          for (const id of autoExpand) next.add(id);
+          return next;
+        });
+      }
+    }
+  }, [computeKey]);
 
   const orderedNativeKeys = useMemo(() => getOrderedKeys(PM_NATIVE), [getOrderedKeys]);
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
