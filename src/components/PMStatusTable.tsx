@@ -7,13 +7,10 @@ import { SortableHeader } from "./SortableHeader";
 import { useProjects } from "@/hooks/useProjects";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
 import { useSortFilter } from "@/hooks/useSortFilter";
-import { useProjectStages, useUpdateStage, useAddStage, useDeleteStage, useReorderStages } from "@/hooks/useProjectStages";
+import { useProjectStages, useUpdateStage, useDeleteStage, useReorderStages } from "@/hooks/useProjectStages";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ChevronRight, ChevronDown, Plus, Trash2, GripVertical } from "lucide-react";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
@@ -68,27 +65,46 @@ function stageMatchesFilters(
   });
 }
 
-function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys }: { stage: ProjectStage; project: Project; onDelete: (id: string) => void; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[] }) {
+const INHERITABLE_FIELDS = ["pm", "status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "pm_poznamka", "datum_smluvni"];
+
+interface StageRowProps {
+  stage: ProjectStage;
+  project: Project;
+  onDelete: (id: string) => void;
+  isVisible: (key: string) => boolean;
+  statusLabels: string[];
+  canEdit: boolean;
+  renderKeys: string[];
+  isFieldInherited?: (field: string) => boolean;
+  onFieldTouched?: (field: string) => void;
+  cancelConfirm?: boolean;
+  onCancelConfirm?: () => void;
+  onCancelDismiss?: () => void;
+}
+
+function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys, isFieldInherited, onFieldTouched, cancelConfirm, onCancelConfirm, onCancelDismiss }: StageRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
   const updateStage = useUpdateStage();
   const style = { transform: CSS.Transform.toString(transform), transition };
   const saveStage = (field: string, value: string) => {
+    onFieldTouched?.(field);
     updateStage.mutate({ id: stage.id, field, value, projectId: project.project_id });
   };
   const v = isVisible;
+  const inheritedClass = (field: string) => isFieldInherited?.(field) ? "text-blue-300" : "";
 
   const renderStageCell = (key: string) => {
     switch (key) {
-      case "datum_smluvni": return <TableCell key={key}><span className="text-xs text-muted-foreground px-1">{project.datum_smluvni || "—"}</span></TableCell>;
-      case "pm": return <TableCell key={key}><InlineEditableCell value={stage.pm} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} /></TableCell>;
-      case "status": return <TableCell key={key}><InlineEditableCell value={stage.status} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={stage.status ? <StatusBadge status={stage.status} /> : "—"} readOnly={!canEdit} /></TableCell>;
-      case "risk": return <TableCell key={key}><InlineEditableCell value={stage.risk} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("risk", val)} displayValue={<RiskBadge level={stage.risk || ""} />} readOnly={!canEdit} /></TableCell>;
-      case "zamereni": return <TableCell key={key}><InlineEditableCell value={stage.zamereni} type="date" onSave={(val) => saveStage("zamereni", val)} readOnly={!canEdit} /></TableCell>;
-      case "tpv_date": return <TableCell key={key}><InlineEditableCell value={stage.tpv_date} type="date" onSave={(val) => saveStage("tpv_date", val)} readOnly={!canEdit} /></TableCell>;
-      case "expedice": return <TableCell key={key}><InlineEditableCell value={stage.expedice} type="date" onSave={(val) => saveStage("expedice", val)} readOnly={!canEdit} /></TableCell>;
-      case "montaz": return <TableCell key={key}><InlineEditableCell value={(stage as any).montaz} type="date" onSave={(val) => saveStage("montaz", val)} readOnly={!canEdit} /></TableCell>;
-      case "predani": return <TableCell key={key}><InlineEditableCell value={stage.predani} type="date" onSave={(val) => saveStage("predani", val)} readOnly={!canEdit} /></TableCell>;
-      case "pm_poznamka": return <TableCell key={key}><InlineEditableCell value={stage.pm_poznamka} type="textarea" onSave={(val) => saveStage("pm_poznamka", val)} readOnly={!canEdit} /></TableCell>;
+      case "datum_smluvni": return <TableCell key={key}><span className={cn("text-xs px-1", isFieldInherited?.(key) ? "text-blue-300" : "text-muted-foreground")}>{project.datum_smluvni || "—"}</span></TableCell>;
+      case "pm": return <TableCell key={key}><InlineEditableCell value={stage.pm} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} className={inheritedClass("pm")} /></TableCell>;
+      case "status": return <TableCell key={key}><InlineEditableCell value={stage.status} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={stage.status ? <StatusBadge status={stage.status} /> : "—"} readOnly={!canEdit} className={inheritedClass("status")} /></TableCell>;
+      case "risk": return <TableCell key={key}><InlineEditableCell value={stage.risk} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("risk", val)} displayValue={<RiskBadge level={stage.risk || ""} />} readOnly={!canEdit} className={inheritedClass("risk")} /></TableCell>;
+      case "zamereni": return <TableCell key={key}><InlineEditableCell value={stage.zamereni} type="date" onSave={(val) => saveStage("zamereni", val)} readOnly={!canEdit} className={inheritedClass("zamereni")} /></TableCell>;
+      case "tpv_date": return <TableCell key={key}><InlineEditableCell value={stage.tpv_date} type="date" onSave={(val) => saveStage("tpv_date", val)} readOnly={!canEdit} className={inheritedClass("tpv_date")} /></TableCell>;
+      case "expedice": return <TableCell key={key}><InlineEditableCell value={stage.expedice} type="date" onSave={(val) => saveStage("expedice", val)} readOnly={!canEdit} className={inheritedClass("expedice")} /></TableCell>;
+      case "montaz": return <TableCell key={key}><InlineEditableCell value={(stage as any).montaz} type="date" onSave={(val) => saveStage("montaz", val)} readOnly={!canEdit} className={inheritedClass("montaz")} /></TableCell>;
+      case "predani": return <TableCell key={key}><InlineEditableCell value={stage.predani} type="date" onSave={(val) => saveStage("predani", val)} readOnly={!canEdit} className={inheritedClass("predani")} /></TableCell>;
+      case "pm_poznamka": return <TableCell key={key}><InlineEditableCell value={stage.pm_poznamka} type="textarea" onSave={(val) => saveStage("pm_poznamka", val)} readOnly={!canEdit} className={inheritedClass("pm_poznamka")} /></TableCell>;
       default: return <TableCell key={key} />;
     }
   };
@@ -110,9 +126,17 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
       )}
       {renderKeys.map((key) => renderStageCell(key))}
       <TableCell>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(stage.id)}>
-          <Trash2 className="h-3 w-3 text-destructive" />
-        </Button>
+        {cancelConfirm ? (
+          <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
+            <span className="text-muted-foreground">Zrušit novou etapu?</span>
+            <button onClick={onCancelConfirm} className="text-destructive hover:underline font-medium">Zrušit</button>
+            <button onClick={onCancelDismiss} className="text-muted-foreground hover:underline">Ponechat</button>
+          </div>
+        ) : (
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(stage.id)}>
+            <Trash2 className="h-3 w-3 text-destructive" />
+          </Button>
+        )}
       </TableCell>
     </TableRow>
   );
@@ -120,12 +144,14 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
 
 function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, renderKeys }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[] }) {
   const { data: stages = [] } = useProjectStages(projectId);
-  const addStage = useAddStage();
   const deleteStage = useDeleteStage();
   const reorderStages = useReorderStages();
-  const [addOpen, setAddOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [newStage, setNewStage] = useState({ stage_name: "", status: "", start_date: "", end_date: "", notes: "" });
+  const qc = useQueryClient();
+
+  // Track fresh (newly created inline) stages: stageId → Set of inherited field keys
+  const [freshStages, setFreshStages] = useState<Map<string, Set<string>>>(new Map());
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
@@ -138,24 +164,77 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     return lastChar ? String.fromCharCode(lastChar.charCodeAt(0) + 1) : "A";
   };
 
-  const handleAddOpen = () => {
-    setNewStage({ stage_name: `${projectId}-${nextSuffix()}`, status: "", start_date: "", end_date: "", notes: "" });
-    setAddOpen(true);
+  const handleInlineAdd = async () => {
+    const stageName = `${projectId}-${nextSuffix()}`;
+    const id = crypto.randomUUID();
+
+    // Build inherited data from parent
+    const inheritedData: Record<string, any> = {};
+    const inheritedKeys = new Set<string>();
+    for (const field of INHERITABLE_FIELDS) {
+      const val = (project as any)[field];
+      if (val != null && val !== "") {
+        inheritedData[field] = val;
+        inheritedKeys.add(field);
+      }
+    }
+
+    const { error } = await supabase.from("project_stages").insert({
+      id,
+      project_id: projectId,
+      stage_name: stageName,
+      stage_order: stages.length,
+      ...inheritedData,
+    });
+
+    if (error) {
+      toast({ title: "Chyba", description: "Nepodařilo se vytvořit etapu", variant: "destructive" });
+      return;
+    }
+
+    setFreshStages(prev => new Map(prev).set(id, inheritedKeys));
+    qc.invalidateQueries({ queryKey: ["project_stages", projectId] });
+    qc.invalidateQueries({ queryKey: ["all_project_stages"] });
   };
 
-  const handleAdd = () => {
-    if (!newStage.stage_name) return;
-    addStage.mutate({
-      project_id: projectId,
-      stage_name: newStage.stage_name,
-      stage_order: stages.length,
-      status: newStage.status || undefined,
-      start_date: newStage.start_date || undefined,
-      end_date: newStage.end_date || undefined,
-      notes: newStage.notes || undefined,
+  const markFieldTouched = useCallback((stageId: string, field: string) => {
+    setFreshStages(prev => {
+      const fields = prev.get(stageId);
+      if (!fields) return prev;
+      const next = new Map(prev);
+      const updated = new Set(fields);
+      updated.delete(field);
+      if (updated.size === 0) {
+        next.delete(stageId);
+      } else {
+        next.set(stageId, updated);
+      }
+      return next;
     });
-    setAddOpen(false);
+  }, []);
+
+  const handleCancelStage = async (stageId: string) => {
+    await supabase.from("project_stages").delete().eq("id", stageId);
+    setFreshStages(prev => { const next = new Map(prev); next.delete(stageId); return next; });
+    setCancelConfirmId(null);
+    qc.invalidateQueries({ queryKey: ["project_stages", projectId] });
+    qc.invalidateQueries({ queryKey: ["all_project_stages"] });
   };
+
+  // Handle Escape key for fresh stages
+  useEffect(() => {
+    if (freshStages.size === 0) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        const freshIds = [...freshStages.keys()];
+        if (freshIds.length > 0) {
+          setCancelConfirmId(freshIds[freshIds.length - 1]);
+        }
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [freshStages]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -174,36 +253,33 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={stages.map(s => s.id)} strategy={verticalListSortingStrategy}>
           {stages.map(stage => (
-            <SortableStageRow key={stage.id} stage={stage} project={project} onDelete={(id) => setDeleteId(id)} isVisible={isVisible} statusLabels={statusLabels} canEdit={canEdit} renderKeys={renderKeys} />
+            <SortableStageRow
+              key={stage.id}
+              stage={stage}
+              project={project}
+              onDelete={(id) => setDeleteId(id)}
+              isVisible={isVisible}
+              statusLabels={statusLabels}
+              canEdit={canEdit}
+              renderKeys={renderKeys}
+              isFieldInherited={freshStages.has(stage.id) ? (field) => freshStages.get(stage.id)?.has(field) ?? false : undefined}
+              onFieldTouched={freshStages.has(stage.id) ? (field) => markFieldTouched(stage.id, field) : undefined}
+              cancelConfirm={cancelConfirmId === stage.id}
+              onCancelConfirm={() => handleCancelStage(stage.id)}
+              onCancelDismiss={() => setCancelConfirmId(null)}
+            />
           ))}
         </SortableContext>
       </DndContext>
       <TableRow className="bg-muted/20 h-9">
         <TableCell colSpan={16}>
-          <Button variant="ghost" size="sm" className="text-xs h-6" onClick={handleAddOpen}>
+          <Button variant="ghost" size="sm" className="text-xs h-6" onClick={handleInlineAdd}>
             <Plus className="h-3 w-3 mr-1" /> Přidat etapu
           </Button>
         </TableCell>
       </TableRow>
 
       <ConfirmDialog open={!!deleteId} onConfirm={() => { if (deleteId) { deleteStage.mutate({ id: deleteId, projectId }); setDeleteId(null); } }} onCancel={() => setDeleteId(null)} />
-
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Nová etapa</DialogTitle></DialogHeader>
-          <div className="grid gap-3">
-            <div><Label>Název etapy</Label><Input value={newStage.stage_name} onChange={(e) => setNewStage(s => ({ ...s, stage_name: e.target.value }))} /></div>
-            <div><Label>Status</Label><Input value={newStage.status} onChange={(e) => setNewStage(s => ({ ...s, status: e.target.value }))} /></div>
-            <div><Label>Začátek</Label><Input value={newStage.start_date} onChange={(e) => setNewStage(s => ({ ...s, start_date: e.target.value }))} /></div>
-            <div><Label>Konec</Label><Input value={newStage.end_date} onChange={(e) => setNewStage(s => ({ ...s, end_date: e.target.value }))} /></div>
-            <div><Label>Poznámka</Label><Input value={newStage.notes} onChange={(e) => setNewStage(s => ({ ...s, notes: e.target.value }))} /></div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Zrušit</Button>
-            <Button onClick={handleAdd}>Přidat</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
