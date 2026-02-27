@@ -329,35 +329,29 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const computeKey = `${filterFingerprint}|${projects.length}|${stagesByProject.size}`;
   const hasActiveFilters = !!(personFilter || (statusFilter && statusFilter.length > 0) || externalSearch);
 
-  const frozenRef = useRef<{ key: string; ids: Set<string>; autoExpand: Set<string> }>({
-    key: '', ids: new Set(), autoExpand: new Set(),
+  const frozenRef = useRef<{ key: string; ids: Set<string> }>({
+    key: '', ids: new Set(),
   });
 
-  // Recompute frozen set only when computeKey changes (filter or dataset size change)
+  // Recompute visible IDs only when filters or dataset size change
   if (frozenRef.current.key !== computeKey) {
     const baseIds = new Set(baseSorted.map((p) => p.project_id));
-    const autoExpand = new Set<string>();
 
     if (hasActiveFilters && stagesByProject.size > 0) {
       const statusFilterSet = statusFilter && statusFilter.length > 0 ? new Set(statusFilter) : null;
       const searchLower = externalSearch ? externalSearch.toLowerCase() : null;
 
       for (const p of projects) {
+        if (baseIds.has(p.project_id)) continue;
         const stages = stagesByProject.get(p.project_id);
         if (!stages || stages.length === 0) continue;
-
-        if (baseIds.has(p.project_id)) {
-          if (stageMatchesFilters(stages, personFilter, statusFilterSet, searchLower)) {
-            autoExpand.add(p.project_id);
-          }
-        } else if (stageMatchesFilters(stages, personFilter, statusFilterSet, searchLower)) {
+        if (stageMatchesFilters(stages, personFilter, statusFilterSet, searchLower)) {
           baseIds.add(p.project_id);
-          autoExpand.add(p.project_id);
         }
       }
     }
 
-    frozenRef.current = { key: computeKey, ids: baseIds, autoExpand };
+    frozenRef.current = { key: computeKey, ids: baseIds };
   }
 
   // Build sorted list from frozen IDs + current project data (so edits are reflected)
@@ -384,22 +378,6 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projects, sortCol, sortDir, computeKey]);
-
-  // Auto-expand parents whose stages matched — ONLY when filters change
-  const prevComputeKeyRef = useRef('');
-  useEffect(() => {
-    if (computeKey !== prevComputeKeyRef.current) {
-      prevComputeKeyRef.current = computeKey;
-      const autoExpand = frozenRef.current.autoExpand;
-      if (autoExpand.size > 0) {
-        setExpanded((prev) => {
-          const next = new Set(prev);
-          for (const id of autoExpand) next.add(id);
-          return next;
-        });
-      }
-    }
-  }, [computeKey]);
 
   const orderedNativeKeys = useMemo(() => getOrderedKeys(PM_NATIVE), [getOrderedKeys]);
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
