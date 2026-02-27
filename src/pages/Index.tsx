@@ -13,6 +13,8 @@ import { TableFilters, useTableFilters } from "@/components/TableFilters";
 import { ExportButton } from "@/components/ExportButton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Settings, Plus, LogOut, User } from "lucide-react";
+import { FeedbackWidget } from "@/components/FeedbackWidget";
+import { AdminInboxButton } from "@/components/AdminInbox";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useState, useRef, useCallback } from "react";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
@@ -68,7 +70,8 @@ const Index = () => {
             <span className="text-primary-foreground/40 text-sm">|</span>
             <span className="text-primary-foreground/70 text-sm font-sans">Project Info 2026</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <AdminInboxButton />
             {/* User dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -211,6 +214,7 @@ const Index = () => {
       <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
       <UserManagement open={userMgmtOpen} onOpenChange={setUserMgmtOpen} />
+      <FeedbackWidget />
     </div>
     </ExportProvider>
     </ColumnVisibilityProvider>
