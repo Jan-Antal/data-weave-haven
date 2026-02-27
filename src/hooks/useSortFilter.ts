@@ -106,20 +106,26 @@ export function useSortFilter<T extends Record<string, any>>(data: T[], external
     const infoMap = new Map<string, HierarchyInfo>();
     const extraParentIds = new Set<string>();
 
-    // Mark children
+    // Step 1: Find matching subprojects and pull in their parents
     for (const row of filtered) {
       const pid = row.project_id as string;
       const parentId = parentMap.get(pid);
       if (parentId) {
         infoMap.set(pid, { isChild: true, parentId });
-        // If parent is not already in filtered, add it
         if (!filteredIds.has(parentId)) {
           extraParentIds.add(parentId);
         }
       }
     }
 
-    // Count child matches for parents
+    if (extraParentIds.size > 0) {
+      console.log("[SmartFilter] Subprojects matched filter, pulling in parents:", {
+        matchingSubprojects: [...filteredIds].filter(id => parentMap.has(id)),
+        parentsAddedBySubprojects: [...extraParentIds],
+      });
+    }
+
+    // Step 2: Count child matches for parents
     for (const [parentId, children] of childrenMap) {
       const matchingChildren = children.filter((cid) => filteredIds.has(cid));
       if (matchingChildren.length > 0) {
@@ -131,7 +137,7 @@ export function useSortFilter<T extends Record<string, any>>(data: T[], external
       }
     }
 
-    // Also mark children that ARE in filtered but whose parent is also in filtered
+    // Mark children whose parent is also in filtered
     for (const row of filtered) {
       const pid = row.project_id as string;
       if (parentMap.has(pid) && !infoMap.has(pid)) {
@@ -139,7 +145,7 @@ export function useSortFilter<T extends Record<string, any>>(data: T[], external
       }
     }
 
-    // Build final list: filtered + extra parents
+    // Step 3: Build final list: filtered + extra parents
     let finalResult: T[];
     if (extraParentIds.size > 0) {
       const extraParents = data.filter((r) => extraParentIds.has(r.project_id as string));
@@ -148,9 +154,8 @@ export function useSortFilter<T extends Record<string, any>>(data: T[], external
       finalResult = filtered;
     }
 
-    // Mark non-matching children for hiding: if a child's parent is in the set
-    // but the child itself didn't match, don't include it
-    // (already handled since we only have filtered + extra parents)
+    console.log("[SmartFilter] Hierarchy map:", [...parentMap.entries()].slice(0, 10), "Children map:", [...childrenMap.entries()].slice(0, 10));
+    console.log("[SmartFilter] Result:", finalResult.length, "rows (filtered:", filtered.length, "+ extra parents:", extraParentIds.size, ")");
 
     return { smartFiltered: finalResult, hierarchyInfoMap: infoMap };
   }, [filtered, data, parentMap, childrenMap]);
