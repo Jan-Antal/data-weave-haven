@@ -196,28 +196,33 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                   )}
                   style={rowStyle}
                 >
-                  <TableCell
-                    className="w-[32px] cursor-pointer relative"
-                    onClick={() => {
-                      if (hr.isParent) toggleExpand(p.project_id);
-                      else if (!hr.isChild) setActiveProject({ projectId: p.project_id, projectName: p.project_name });
-                    }}
-                  >
-                    {tpvHighlight.dotColor && !hr.isChild && (
-                      <span
-                        className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full"
-                        style={{ width: 6, height: 6, backgroundColor: tpvHighlight.dotColor }}
-                      />
-                    )}
-                    {!hr.isChild && (
-                      hr.isParent ? (
-                        isExpanded(p.project_id)
-                          ? <ChevronDown className="h-5 w-5 stroke-[3] text-muted-foreground" />
-                          : <ChevronRight className="h-5 w-5 stroke-[3] text-muted-foreground/50" />
-                      ) : (
-                        <ExpandArrow projectId={p.project_id} />
-                      )
-                    )}
+                  <TableCell className="w-[32px]">
+                    <div className="flex items-center gap-0.5">
+                      {hr.isParent && (
+                        <button
+                          onClick={() => toggleExpand(p.project_id)}
+                          className="p-0.5 hover:bg-muted rounded"
+                        >
+                          {isExpanded(p.project_id)
+                            ? <ChevronDown className="h-3.5 w-3.5 text-accent stroke-[2.5]" />
+                            : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground stroke-[2.5]" />}
+                        </button>
+                      )}
+                      {!hr.isChild && (
+                        <button
+                          className="relative cursor-pointer"
+                          onClick={() => setActiveProject({ projectId: p.project_id, projectName: p.project_name })}
+                        >
+                          {tpvHighlight.dotColor && (
+                            <span
+                              className="absolute left-0 top-1/2 -translate-y-1/2 rounded-full"
+                              style={{ width: 6, height: 6, backgroundColor: tpvHighlight.dotColor }}
+                            />
+                          )}
+                          <ExpandArrow projectId={p.project_id} />
+                        </button>
+                      )}
+                    </div>
                   </TableCell>
                   {v("project_id") && (
                     <TableCell className="font-mono text-xs truncate" title={p.project_id}>
@@ -225,6 +230,9 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                         {hr.isChild && <span className="text-muted-foreground mr-1">↳</span>}
                         {p.project_id}
                       </span>
+                      {hr.isParent && !isExpanded(p.project_id) && hr.childCount > 0 && (
+                        <span className="ml-1.5 text-[10px] text-muted-foreground">({hr.childCount})</span>
+                      )}
                     </TableCell>
                   )}
                   {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}

@@ -339,26 +339,37 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                     )}
                     style={rowStyle}
                   >
-                    <TableCell className="w-[32px] cursor-pointer" onClick={() => {
-                      if (hr.isParent) toggleHierarchyExpand(p.project_id);
-                      else if (!hr.isChild) toggleStageExpand(p.project_id);
-                    }}>
-                      {!hr.isChild && (
-                        hr.isParent ? (
-                          isHierarchyExpanded(p.project_id)
-                            ? <ChevronDown className="h-5 w-5 stroke-[3] text-muted-foreground" />
-                            : <ChevronRight className="h-5 w-5 stroke-[3] text-muted-foreground/50" />
-                        ) : (
-                          <ExpandArrow projectId={p.project_id} isExpanded={stageExpanded.has(p.project_id)} />
-                        )
-                      )}
+                    <TableCell className="w-[32px]">
+                      <div className="flex items-center gap-0.5">
+                        {hr.isParent && (
+                          <button
+                            onClick={() => toggleHierarchyExpand(p.project_id)}
+                            className="p-0.5 hover:bg-muted rounded"
+                          >
+                            {isHierarchyExpanded(p.project_id)
+                              ? <ChevronDown className="h-3.5 w-3.5 text-accent stroke-[2.5]" />
+                              : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground stroke-[2.5]" />}
+                          </button>
+                        )}
+                        {!hr.isChild && (
+                          <button
+                            onClick={() => toggleStageExpand(p.project_id)}
+                            className="p-0.5 hover:bg-muted rounded"
+                          >
+                            <ExpandArrow projectId={p.project_id} isExpanded={stageExpanded.has(p.project_id)} />
+                          </button>
+                        )}
+                      </div>
                     </TableCell>
                     {v("project_id") && (
                       <TableCell className="font-mono text-xs truncate" title={p.project_id}>
                         <span className={hr.isChild ? "pl-4" : ""}>
                           {hr.isChild && <span className="text-muted-foreground mr-1">↳</span>}
-                        {p.project_id}
-                      </span>
+                          {p.project_id}
+                        </span>
+                        {hr.isParent && !isHierarchyExpanded(p.project_id) && hr.childCount > 0 && (
+                          <span className="ml-1.5 text-[10px] text-muted-foreground">({hr.childCount})</span>
+                        )}
                       </TableCell>
                     )}
                     {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name} className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
