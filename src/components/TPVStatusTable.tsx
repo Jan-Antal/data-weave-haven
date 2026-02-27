@@ -37,7 +37,7 @@ import { useTPVItems } from "@/hooks/useTPVItems";
 const NATIVE_KEYS = ["project_id", "project_name", ...TPV_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
 
-const INHERITABLE_FIELDS = ["konstrukter", "narocnost", "architekt", "tpv_poznamka"];
+const INHERITABLE_FIELDS = ["pm", "status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "datum_smluvni", "pm_poznamka", "konstrukter", "narocnost", "architekt"];
 
 /** Check if any stage matches the active filters */
 function stageMatchesFilters(
@@ -221,7 +221,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     const queryKey = ["project_stages", projectId];
     qc.setQueryData<ProjectStage[]>(queryKey, (old) => [
       ...(old || []),
-      { ...newStage, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, start_date: null, end_date: null, notes: null, datum_smluvni: null, pm: null, status: null, risk: null, zamereni: null, tpv_date: null, expedice: null, montaz: null, predani: null, pm_poznamka: null, konstrukter: null, narocnost: null, hodiny_tpv: null, percent_tpv: null, architekt: null } as ProjectStage,
+      { ...newStage, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, start_date: null, end_date: null, notes: null, datum_smluvni: inheritedData.datum_smluvni ?? null, pm: inheritedData.pm ?? null, status: inheritedData.status ?? null, risk: inheritedData.risk ?? null, zamereni: inheritedData.zamereni ?? null, tpv_date: inheritedData.tpv_date ?? null, expedice: inheritedData.expedice ?? null, montaz: inheritedData.montaz ?? null, predani: inheritedData.predani ?? null, pm_poznamka: inheritedData.pm_poznamka ?? null, konstrukter: inheritedData.konstrukter ?? null, narocnost: inheritedData.narocnost ?? null, hodiny_tpv: null, percent_tpv: null, architekt: inheritedData.architekt ?? null } as ProjectStage,
     ]);
     setFreshStages(prev => new Map(prev).set(id, inheritedKeys));
 
