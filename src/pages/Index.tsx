@@ -6,8 +6,11 @@ import { TPVStatusTable } from "@/components/TPVStatusTable";
 import { PlanView } from "@/components/PlanView";
 import type { ZoomLevel } from "@/components/PlanView";
 import { ColumnVisibilityProvider } from "@/components/ColumnVisibilityContext";
+import { ExportProvider, useExportContext } from "@/components/ExportContext";
+import { exportToExcel, buildFileName } from "@/lib/exportExcel";
 import { DashboardStats } from "@/components/DashboardStats";
 import { TableFilters, useTableFilters } from "@/components/TableFilters";
+import { ExportButton } from "@/components/ExportButton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Settings, Plus, LogOut, User } from "lucide-react";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
@@ -54,6 +57,7 @@ const Index = () => {
 
   return (
     <ColumnVisibilityProvider>
+    <ExportProvider>
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b bg-primary px-6 py-4 sticky top-0 z-50">
         <div className="flex items-center justify-between">
@@ -123,11 +127,14 @@ const Index = () => {
             search={filters.search}
             onSearchChange={filters.setSearch}
             rightSlot={
-              canCreateProject ? (
-                <Button size="sm" onClick={() => document.dispatchEvent(new CustomEvent("open-add-project"))}>
-                  <Plus className="h-4 w-4 mr-1" /> Nový projekt
-                </Button>
-              ) : undefined
+              <div className="flex items-center gap-2">
+                <ExportButton activeTab={activeTab} />
+                {canCreateProject && (
+                  <Button size="sm" onClick={() => document.dispatchEvent(new CustomEvent("open-add-project"))}>
+                    <Plus className="h-4 w-4 mr-1" /> Nový projekt
+                  </Button>
+                )}
+              </div>
             }
           />
         </div>
@@ -205,6 +212,7 @@ const Index = () => {
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
       <UserManagement open={userMgmtOpen} onOpenChange={setUserMgmtOpen} />
     </div>
+    </ExportProvider>
     </ColumnVisibilityProvider>
   );
 };

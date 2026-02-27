@@ -17,8 +17,10 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { getTPVDashboardRiskColor } from "@/hooks/useRiskHighlight";
 import { useAllColumnVisibility, TPV_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
-import { getColumnStyle, renderColumnHeader, renderColumnCell } from "./CrossTabColumns";
+import { getColumnStyle, renderColumnHeader, renderColumnCell, getColumnLabel } from "./CrossTabColumns";
 import { useHeaderDrag } from "@/hooks/useHeaderDrag";
+import { useExportContext } from "./ExportContext";
+import { getProjectCellValue } from "@/lib/exportExcel";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...TPV_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
@@ -52,6 +54,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("tpv-status");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns } = useAuth();
+  const { registerGetter } = useExportContext();
   const [activeProject, setActiveProject] = useState<{ projectId: string; projectName: string } | null>(null);
 
   // Expose close-detail callback to parent so tab switches can reset the detail view
@@ -92,6 +95,16 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   }, [editMode, localOrder, allVisibleKeys, updateDisplayOrder]);
 
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
+
+  // Register export data getter
+  useEffect(() => {
+    registerGetter("tpv-status", () => {
+      const visKeys = ["project_id", "project_name", ...allVisibleKeys];
+      const headers = visKeys.map(k => getLabel(k, getColumnLabel(k)));
+      const rows = sorted.map(p => visKeys.map(k => getProjectCellValue(p as any, k)));
+      return { headers, rows };
+    });
+  }, [registerGetter, sorted, allVisibleKeys, getLabel]);
 
   const save = (id: string, field: string, value: string, oldValue: string) => {
     updateProject.mutate({ id, field, value, oldValue });

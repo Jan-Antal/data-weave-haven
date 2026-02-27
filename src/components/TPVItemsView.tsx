@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useTPVItems, useUpdateTPVItem, useAddTPVItem, useDeleteTPVItems, useBulkUpdateTPVStatus, useBulkInsertTPVItems } from "@/hooks/useTPVItems";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
-import { ArrowLeft, Plus, Upload, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Upload, Trash2, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/useAuth";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
@@ -19,6 +19,7 @@ import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 import { SortableHeader } from "./SortableHeader";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { cn } from "@/lib/utils";
+import { exportToExcel, buildFileName } from "@/lib/exportExcel";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean }[] = [
   { key: "item_name", label: "Název", locked: true },
@@ -236,6 +237,25 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
     } : {}),
   });
 
+  const handleExportTPV = () => {
+    const visKeys = ["item_name", ...renderKeys];
+    const headers = visKeys.map(k => getLabel(k, TPV_LIST_LABEL_MAP[k] || k));
+    const rows = sortedItems.map(item => visKeys.map(k => {
+      if (k.startsWith("custom_")) {
+        const cf = (item as any).custom_fields || {};
+        return cf[k] ?? "";
+      }
+      const val = (item as any)[k];
+      return val == null ? "" : String(val);
+    }));
+    exportToExcel({
+      sheetName: "TPV Items",
+      fileName: buildFileName("TPV", projectId),
+      headers,
+      rows,
+    });
+  };
+
   return (
     <div className="w-full min-w-0">
       {/* Toolbar */}
@@ -245,6 +265,13 @@ export function TPVItemsView({ projectId, projectName, onBack }: Props) {
         </Button>
         <span className="text-sm font-serif font-bold">{projectId} — {projectName}</span>
         <span className="text-muted-foreground/40 text-sm">|</span>
+        <button
+          onClick={handleExportTPV}
+          className="border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-sm px-3 py-1.5 rounded-md gap-1.5 flex items-center"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Export
+        </button>
         {canManageTPV && (
           <>
             <Button size="sm" variant="outline" onClick={() => { setNewItem({ item_name: "", item_type: "", status: "", sent_date: "", accepted_date: "", notes: "" }); setAddOpen(true); }}>
