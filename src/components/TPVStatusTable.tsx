@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, useCallback, type MutableRefObject } from "react";
-import { Plus } from "lucide-react";
 import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColumns";
 import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from "@/components/ui/table";
 import { RiskBadge, ProgressBar } from "./StatusBadge";
@@ -22,7 +21,6 @@ import { getColumnStyle, renderColumnHeader, renderColumnCell, getColumnLabel } 
 import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 import { useExportContext } from "./ExportContext";
 import { getProjectCellValue } from "@/lib/exportExcel";
-import { useSubprojectCreation } from "@/hooks/useSubprojectCreation";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...TPV_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
@@ -51,8 +49,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const updateProject = useUpdateProject();
   const { columns: customColumns } = useAllCustomColumns("projects");
   const updateCustomField = useUpdateCustomField();
-  const { sorted, sortCol, sortDir, toggleSort, hierarchyInfo, childrenMap } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
-  const sub = useSubprojectCreation(projects);
+  const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const { tpvStatus: { isVisible } } = useAllColumnVisibility();
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("tpv-status");
   const [editMode, setEditMode] = useState(false);
@@ -179,16 +176,11 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
           <TableBody>
             {sorted.map((p) => {
               const tpvHighlight = getTPVDashboardRiskColor(p as any, riskHighlight ?? null);
-              const hi = hierarchyInfo.get(p.project_id);
-              const isChild = hi?.isChild ?? false;
-              const childMatchCount = hi?.childMatchCount;
-              const isFreshRow = sub.isFresh(p.project_id);
-              const getInherited = (field: string) => isFreshRow && sub.isFieldInherited(p.project_id, field);
               return (
-              <TableRow key={p.id} className={cn("group/row hover:bg-muted/50 transition-colors h-9 relative", isChild && "bg-muted/30", isFreshRow && "border-l-2 border-blue-300")} style={tpvHighlight.bg ? { backgroundColor: tpvHighlight.bg } : {}}>
+              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors h-9" style={tpvHighlight.bg ? { backgroundColor: tpvHighlight.bg } : {}}>
                 <TableCell
                   className="w-[32px] cursor-pointer relative"
-                  onClick={() => { sub.finalize(p.project_id); setActiveProject({ projectId: p.project_id, projectName: p.project_name }); }}
+                  onClick={() => setActiveProject({ projectId: p.project_id, projectName: p.project_name })}
                 >
                   {tpvHighlight.dotColor && (
                     <span
@@ -197,37 +189,16 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                     />
                   )}
                   <ExpandArrow projectId={p.project_id} />
-                  {canEdit && !isChild && (
-                    <button
-                      className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-10 opacity-0 group-hover/row:opacity-100 transition-opacity bg-card border border-border rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-primary hover:border-primary flex items-center gap-0.5 whitespace-nowrap shadow-sm"
-                      onClick={(e) => { e.stopPropagation(); sub.createSubproject(p); }}
-                      title="Vytvořit podprojekt"
-                    >
-                      <Plus className="h-2.5 w-2.5" />
-                      Podprojekt
-                    </button>
-                  )}
                 </TableCell>
-                {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{isChild && <span className="text-muted-foreground mr-1">↳</span>}{p.project_id}</TableCell>}
-                {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name} className={getInherited("project_name") ? "text-blue-400" : ""}><InlineEditableCell value={p.project_name} onSave={(val) => { sub.markFieldTouched(p.project_id, "project_name"); save(p.id, "project_name", val, p.project_name); }} className={cn("font-medium", getInherited("project_name") && "text-blue-400")} readOnly={!canEdit} /></TableCell>}
-                {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }), childMatchCount: key === "status" ? childMatchCount : undefined, isInherited: getInherited(key), onFieldTouched: isFreshRow ? (field) => sub.markFieldTouched(p.project_id, field) : undefined }))}
+                {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
+                {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
+                {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }) }))}
               </TableRow>
               );
             })}
           </TableBody>
         </Table>
       </div>
-      {sub.cancelConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-          <div className="bg-card border rounded-lg shadow-lg p-4 max-w-xs">
-            <p className="text-sm mb-3">Zrušit nový podprojekt?</p>
-            <div className="flex gap-2 justify-end">
-              <button className="text-sm text-muted-foreground hover:text-foreground" onClick={() => sub.dismissCancel()}>Ne</button>
-              <button className="text-sm text-destructive hover:text-destructive/80" onClick={() => sub.confirmCancel(sub.cancelConfirm!)}>Ano</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
