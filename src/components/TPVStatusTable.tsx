@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect, useCallback, type MutableRefObject } from "react";
+import React, { useState, Fragment, useMemo, useEffect, useCallback, memo, useRef, type MutableRefObject } from "react";
 import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColumns";
-import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RiskBadge, ProgressBar } from "./StatusBadge";
 import { InlineEditableCell } from "./InlineEditableCell";
 import { SortableHeader } from "./SortableHeader";
@@ -8,9 +8,16 @@ import { useProjects } from "@/hooks/useProjects";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
 import { useSortFilter } from "@/hooks/useSortFilter";
-import { ChevronRight } from "lucide-react";
+import { useProjectStages, useUpdateStage, useDeleteStage, useReorderStages } from "@/hooks/useProjectStages";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { ChevronRight, ChevronDown, Plus, Trash2, GripVertical, ChevronsDown, ChevronsUp, List } from "lucide-react";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import type { ProjectStage } from "@/hooks/useProjectStages";
+import type { Project } from "@/hooks/useProjects";
+import { Button } from "@/components/ui/button";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
-import { useTPVItems } from "@/hooks/useTPVItems";
 import { TPVItemsView } from "./TPVItemsView";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { cn } from "@/lib/utils";
@@ -18,21 +25,278 @@ import { useAuth } from "@/hooks/useAuth";
 import { getTPVDashboardRiskColor } from "@/hooks/useRiskHighlight";
 import { useAllColumnVisibility, PROJECT_INFO_NATIVE, PM_NATIVE, TPV_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
 import { getColumnStyle, renderColumnHeader, renderColumnCell, getColumnLabel } from "./CrossTabColumns";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 import { useExportContext } from "./ExportContext";
 import { getProjectCellValue } from "@/lib/exportExcel";
+import { useStagesByProject } from "@/hooks/useAllProjectStages";
+import { useTPVItems } from "@/hooks/useTPVItems";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...TPV_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
 
-function ExpandArrow({ projectId }: { projectId: string }) {
+const INHERITABLE_FIELDS = ["konstrukter", "narocnost", "hodiny_tpv", "percent_tpv", "tpv_poznamka"];
+
+/** Check if any stage matches the active filters */
+function stageMatchesFilters(
+  stages: ProjectStage[],
+  personFilter: string | null,
+  statusFilterSet: Set<string> | null,
+  searchLower: string | null
+): boolean {
+  if (stages.length === 0) return false;
+  for (const stage of stages) {
+    if (personFilter && stage.pm && String(stage.pm).includes(personFilter)) return true;
+    if (statusFilterSet && stage.status && statusFilterSet.has(stage.status)) return true;
+    if (searchLower) {
+      const searchable = [stage.stage_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
+      for (const v of searchable) {
+        if (v && String(v).toLowerCase().includes(searchLower)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+// ── TPV Items count badge for List icon ─────────────────────────────
+function TPVListIcon({ projectId, onClick }: { projectId: string; onClick: () => void }) {
   const { data: items = [] } = useTPVItems(projectId);
-  const hasItems = items.length > 0;
   return (
-    <ChevronRight className={`h-5 w-5 stroke-[3] ${hasItems ? "text-accent fill-accent/20" : "text-muted-foreground/50"}`} />
+    <button
+      className="text-muted-foreground/40 hover:text-[hsl(var(--accent))] transition-colors cursor-pointer"
+      title={`TPV seznam (${items.length})`}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+    >
+      <List className="h-4 w-4" />
+    </button>
   );
 }
 
+// ── Stage row for TPV tab ───────────────────────────────────────────
+interface StageRowProps {
+  stage: ProjectStage;
+  project: Project;
+  onDelete: (id: string) => void;
+  isVisible: (key: string) => boolean;
+  statusLabels: string[];
+  canEdit: boolean;
+  renderKeys: string[];
+  isFieldInherited?: (field: string) => boolean;
+  onFieldTouched?: (field: string) => void;
+  cancelConfirm?: boolean;
+  onCancelConfirm?: () => void;
+  onCancelDismiss?: () => void;
+}
+
+function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys, isFieldInherited, onFieldTouched, cancelConfirm, onCancelConfirm, onCancelDismiss }: StageRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
+  const updateStage = useUpdateStage();
+  const style = { transform: CSS.Transform.toString(transform), transition };
+  const saveStage = (field: string, value: string) => {
+    onFieldTouched?.(field);
+    updateStage.mutate({ id: stage.id, field, value, projectId: project.project_id });
+  };
+  const v = isVisible;
+  const inheritedClass = (field: string) => isFieldInherited?.(field) ? "text-blue-300" : "";
+
+  const renderStageCell = (key: string) => {
+    // Stages don't have TPV-specific fields — show empty cells
+    switch (key) {
+      case "konstrukter": return <TableCell key={key} />;
+      case "narocnost": return <TableCell key={key} />;
+      case "hodiny_tpv": return <TableCell key={key} />;
+      case "percent_tpv": return <TableCell key={key} />;
+      case "tpv_poznamka": return <TableCell key={key} />;
+      // Cross-tab columns that stages DO have
+      case "pm": return <TableCell key={key}><InlineEditableCell value={stage.pm} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} className={inheritedClass("pm")} /></TableCell>;
+      case "status": return <TableCell key={key}><InlineEditableCell value={stage.status} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} readOnly={!canEdit} className={inheritedClass("status")} /></TableCell>;
+      case "risk": return <TableCell key={key}><InlineEditableCell value={stage.risk} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("risk", val)} displayValue={<RiskBadge level={stage.risk || ""} />} readOnly={!canEdit} className={inheritedClass("risk")} /></TableCell>;
+      case "zamereni": return <TableCell key={key}><InlineEditableCell value={stage.zamereni} type="date" onSave={(val) => saveStage("zamereni", val)} readOnly={!canEdit} className={inheritedClass("zamereni")} /></TableCell>;
+      case "tpv_date": return <TableCell key={key}><InlineEditableCell value={stage.tpv_date} type="date" onSave={(val) => saveStage("tpv_date", val)} readOnly={!canEdit} className={inheritedClass("tpv_date")} /></TableCell>;
+      case "expedice": return <TableCell key={key}><InlineEditableCell value={stage.expedice} type="date" onSave={(val) => saveStage("expedice", val)} readOnly={!canEdit} className={inheritedClass("expedice")} /></TableCell>;
+      case "montaz": return <TableCell key={key}><InlineEditableCell value={(stage as any).montaz} type="date" onSave={(val) => saveStage("montaz", val)} readOnly={!canEdit} className={inheritedClass("montaz")} /></TableCell>;
+      case "predani": return <TableCell key={key}><InlineEditableCell value={stage.predani} type="date" onSave={(val) => saveStage("predani", val)} readOnly={!canEdit} className={inheritedClass("predani")} /></TableCell>;
+      case "pm_poznamka": return <TableCell key={key}><InlineEditableCell value={stage.pm_poznamka} type="textarea" onSave={(val) => saveStage("pm_poznamka", val)} readOnly={!canEdit} className={inheritedClass("pm_poznamka")} /></TableCell>;
+      default: return <TableCell key={key} />;
+    }
+  };
+
+  return (
+    <TableRow ref={setNodeRef} style={style} className="bg-muted/20 h-9">
+      <TableCell className="w-[32px]">
+        <div {...attributes} {...listeners} className="cursor-grab pl-2">
+          <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+        </div>
+      </TableCell>
+      {v("project_id") && (
+        <TableCell className="font-mono text-xs truncate pl-4 text-muted-foreground">
+          <InlineEditableCell value={stage.stage_name} onSave={(val) => saveStage("stage_name", val)} readOnly={!canEdit} />
+        </TableCell>
+      )}
+      {v("project_name") && (
+        <TableCell className="truncate text-muted-foreground text-xs" style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={project.project_name}>{project.project_name}</TableCell>
+      )}
+      {renderKeys.map((key) => renderStageCell(key))}
+      {/* List icon column — empty for stages */}
+      <TableCell style={{ width: 40, minWidth: 40, maxWidth: 40 }} />
+      <TableCell>
+        {cancelConfirm ? (
+          <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
+            <span className="text-muted-foreground">Zrušit novou etapu?</span>
+            <button onClick={onCancelConfirm} className="text-destructive hover:underline font-medium">Zrušit</button>
+            <button onClick={onCancelDismiss} className="text-muted-foreground hover:underline">Ponechat</button>
+          </div>
+        ) : (
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(stage.id)}>
+            <Trash2 className="h-3 w-3 text-destructive" />
+          </Button>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+const MemoSortableStageRow = memo(SortableStageRow);
+
+// ── Stages section (same pattern as PM Status) ──────────────────────
+function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, renderKeys }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[] }) {
+  const { data: stages = [] } = useProjectStages(projectId);
+  const deleteStage = useDeleteStage();
+  const reorderStages = useReorderStages();
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const qc = useQueryClient();
+  const [freshStages, setFreshStages] = useState<Map<string, Set<string>>>(new Map());
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
+
+  const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
+
+  const nextSuffix = () => {
+    const letters = stages.map(s => {
+      const match = s.stage_name.match(/-([A-Z])$/);
+      return match ? match[1] : null;
+    }).filter(Boolean) as string[];
+    const lastChar = letters.sort().pop();
+    return lastChar ? String.fromCharCode(lastChar.charCodeAt(0) + 1) : "A";
+  };
+
+  const handleInlineAdd = async () => {
+    const stageName = `${projectId}-${nextSuffix()}`;
+    const id = crypto.randomUUID();
+    const inheritedData: Record<string, any> = {};
+    const inheritedKeys = new Set<string>();
+    for (const field of INHERITABLE_FIELDS) {
+      const val = (project as any)[field];
+      if (val != null && val !== "") {
+        inheritedData[field] = val;
+        inheritedKeys.add(field);
+      }
+    }
+
+    const newStage = { id, project_id: projectId, stage_name: stageName, stage_order: stages.length, ...inheritedData };
+    const queryKey = ["project_stages", projectId];
+    qc.setQueryData<ProjectStage[]>(queryKey, (old) => [
+      ...(old || []),
+      { ...newStage, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, start_date: null, end_date: null, notes: null, datum_smluvni: null, pm: null, status: null, risk: null, zamereni: null, tpv_date: null, expedice: null, montaz: null, predani: null, pm_poznamka: null } as ProjectStage,
+    ]);
+    setFreshStages(prev => new Map(prev).set(id, inheritedKeys));
+
+    const { error } = await supabase.from("project_stages").insert(newStage);
+    if (error) {
+      toast({ title: "Chyba", description: "Nepodařilo se vytvořit etapu", variant: "destructive" });
+      qc.invalidateQueries({ queryKey });
+      setFreshStages(prev => { const next = new Map(prev); next.delete(id); return next; });
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["all_project_stages"] });
+  };
+
+  const markFieldTouched = useCallback((stageId: string, field: string) => {
+    setFreshStages(prev => {
+      const fields = prev.get(stageId);
+      if (!fields) return prev;
+      const next = new Map(prev);
+      const updated = new Set(fields);
+      updated.delete(field);
+      if (updated.size === 0) next.delete(stageId);
+      else next.set(stageId, updated);
+      return next;
+    });
+  }, []);
+
+  const handleCancelStage = async (stageId: string) => {
+    await supabase.from("project_stages").delete().eq("id", stageId);
+    setFreshStages(prev => { const next = new Map(prev); next.delete(stageId); return next; });
+    setCancelConfirmId(null);
+    qc.invalidateQueries({ queryKey: ["project_stages", projectId] });
+    qc.invalidateQueries({ queryKey: ["all_project_stages"] });
+  };
+
+  useEffect(() => {
+    if (freshStages.size === 0) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        const freshIds = [...freshStages.keys()];
+        if (freshIds.length > 0) setCancelConfirmId(freshIds[freshIds.length - 1]);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [freshStages]);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = stages.findIndex(s => s.id === active.id);
+    const newIndex = stages.findIndex(s => s.id === over.id);
+    const reordered = arrayMove(stages, oldIndex, newIndex);
+    reorderStages.mutate({ stages: reordered.map((s, i) => ({ id: s.id, stage_order: i })), projectId });
+  };
+
+  return (
+    <>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={stages.map(s => s.id)} strategy={verticalListSortingStrategy}>
+          {stages.map(stage => (
+            <MemoSortableStageRow
+              key={stage.id}
+              stage={stage}
+              project={project}
+              onDelete={(id) => setDeleteId(id)}
+              isVisible={isVisible}
+              statusLabels={statusLabels}
+              canEdit={canEdit}
+              renderKeys={renderKeys}
+              isFieldInherited={freshStages.has(stage.id) ? (field) => freshStages.get(stage.id)?.has(field) ?? false : undefined}
+              onFieldTouched={freshStages.has(stage.id) ? (field) => markFieldTouched(stage.id, field) : undefined}
+              cancelConfirm={cancelConfirmId === stage.id}
+              onCancelConfirm={() => handleCancelStage(stage.id)}
+              onCancelDismiss={() => setCancelConfirmId(null)}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
+      <TableRow className="bg-muted/20 h-9">
+        <TableCell colSpan={20}>
+          <Button variant="ghost" size="sm" className="text-xs h-6" onClick={handleInlineAdd}>
+            <Plus className="h-3 w-3 mr-1" /> Přidat etapu
+          </Button>
+        </TableCell>
+      </TableRow>
+      <ConfirmDialog open={!!deleteId} onConfirm={() => { if (deleteId) { deleteStage.mutate({ id: deleteId, projectId }); setDeleteId(null); } }} onCancel={() => setDeleteId(null)} />
+    </>
+  );
+}
+
+// ── Expand arrow ────────────────────────────────────────────────────
+function ExpandArrow({ isExpanded, stageCount }: { isExpanded: boolean; stageCount: number }) {
+  const hasStages = stageCount > 0;
+  if (isExpanded) return <ChevronDown className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent" : "text-muted-foreground"}`} />;
+  return <ChevronRight className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent fill-accent/20" : "text-muted-foreground/50"}`} />;
+}
+
+// ── Main component ──────────────────────────────────────────────────
 interface TPVStatusTableProps {
   personFilter: string | null;
   statusFilter: string[];
@@ -49,21 +313,93 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const updateProject = useUpdateProject();
   const { columns: customColumns } = useAllCustomColumns("projects");
   const updateCustomField = useUpdateCustomField();
-  const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
+  const qc = useQueryClient();
+  const { sorted: baseSorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { tpvStatus: { isVisible } } = useAllColumnVisibility();
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("tpv-status");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns } = useAuth();
   const { registerExport } = useExportContext();
+  const { stagesByProject } = useStagesByProject();
   const [activeProject, setActiveProject] = useState<{ projectId: string; projectName: string } | null>(null);
 
-  // Expose close-detail callback to parent so tab switches can reset the detail view
+  // Expose close-detail callback to parent
   useEffect(() => {
     if (closeDetailRef) {
       closeDetailRef.current = () => setActiveProject(null);
       return () => { closeDetailRef.current = null; };
     }
   }, [closeDetailRef]);
+
+  // ── Frozen filter results ───────────────────────────────────────
+  const filterFingerprint = JSON.stringify([personFilter, statusFilter, externalSearch]);
+  const computeKey = `${filterFingerprint}|${projects.length}|${stagesByProject.size}`;
+  const hasActiveFilters = !!(personFilter || (statusFilter && statusFilter.length > 0) || externalSearch);
+
+  const frozenRef = useRef<{ key: string; ids: Set<string>; autoExpand: Set<string> }>({
+    key: '', ids: new Set(), autoExpand: new Set(),
+  });
+
+  if (frozenRef.current.key !== computeKey) {
+    const baseIds = new Set(baseSorted.map((p) => p.project_id));
+    const autoExpand = new Set<string>();
+
+    if (hasActiveFilters && stagesByProject.size > 0) {
+      const statusFilterSet = statusFilter && statusFilter.length > 0 ? new Set(statusFilter) : null;
+      const searchLower = externalSearch ? externalSearch.toLowerCase() : null;
+
+      for (const p of projects) {
+        const stages = stagesByProject.get(p.project_id);
+        if (!stages || stages.length === 0) continue;
+        if (baseIds.has(p.project_id)) {
+          if (stageMatchesFilters(stages, personFilter, statusFilterSet, searchLower)) {
+            autoExpand.add(p.project_id);
+          }
+        } else if (stageMatchesFilters(stages, personFilter, statusFilterSet, searchLower)) {
+          baseIds.add(p.project_id);
+          autoExpand.add(p.project_id);
+        }
+      }
+    }
+
+    frozenRef.current = { key: computeKey, ids: baseIds, autoExpand };
+  }
+
+  const sorted = useMemo(() => {
+    const frozenIds = frozenRef.current.ids;
+    let result = projects.filter((p) => frozenIds.has(p.project_id));
+    if (sortCol && sortDir) {
+      result = [...result].sort((a, b) => {
+        const av = (a as any)[sortCol] ?? "";
+        const bv = (b as any)[sortCol] ?? "";
+        const numA = Number(av); const numB = Number(bv);
+        if (!isNaN(numA) && !isNaN(numB) && av !== "" && bv !== "") return sortDir === "asc" ? numA - numB : numB - numA;
+        const cmp = String(av).localeCompare(String(bv), "cs");
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+    } else {
+      result.sort((a, b) => a.project_id.localeCompare(b.project_id, "cs"));
+    }
+    return result;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects, sortCol, sortDir, computeKey]);
+
+  // Auto-expand parents whose stages matched — ONLY when filters change
+  const prevComputeKeyRef = useRef('');
+  useEffect(() => {
+    if (computeKey !== prevComputeKeyRef.current) {
+      prevComputeKeyRef.current = computeKey;
+      const autoExpand = frozenRef.current.autoExpand;
+      if (autoExpand.size > 0) {
+        setExpanded((prev) => {
+          const next = new Set(prev);
+          for (const id of autoExpand) next.add(id);
+          return next;
+        });
+      }
+    }
+  }, [computeKey]);
 
   const orderedNativeKeys = useMemo(() => getOrderedKeys(TPV_NATIVE), [getOrderedKeys]);
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
@@ -86,17 +422,14 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   }, [allVisibleKeys, editMode]);
 
   const handleToggleEditMode = useCallback(async () => {
-    if (editMode) {
-      await updateDisplayOrder(localOrder);
-    } else {
-      setLocalOrder(allVisibleKeys);
-    }
+    if (editMode) await updateDisplayOrder(localOrder);
+    else setLocalOrder(allVisibleKeys);
     setEditMode(!editMode);
   }, [editMode, localOrder, allVisibleKeys, updateDisplayOrder]);
 
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 
-  // Register export data getter with column metadata
+  // Register export
   useEffect(() => {
     const allExportKeys = ["project_id", "project_name", ...allVisibleKeys];
     registerExport("tpv-status", {
@@ -115,19 +448,25 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
     });
   }, [registerExport, sorted, allVisibleKeys, getLabel]);
 
+  const toggleExpand = (pid: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      next.has(pid) ? next.delete(pid) : next.add(pid);
+      return next;
+    });
+  };
+
   const save = (id: string, field: string, value: string, oldValue: string) => {
     updateProject.mutate({ id, field, value, oldValue });
   };
 
+  // If TPV List detail is open, show it
   if (activeProject) {
     return (
       <TPVItemsView
         projectId={activeProject.projectId}
         projectName={activeProject.projectName}
-        onBack={() => {
-          setActiveProject(null);
-          onRequestTab?.();
-        }}
+        onBack={() => { setActiveProject(null); onRequestTab?.(); }}
       />
     );
   }
@@ -137,20 +476,8 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const v = isVisible;
 
   const headerProps = (key: string) => ({
-    colKey: key,
-    sortCol,
-    sortDir,
-    onSort: toggleSort,
-    getLabel,
-    getWidth,
-    editMode,
-    updateLabel,
-    updateWidth,
-    ...(editMode ? {
-      dragProps: getDragProps(key),
-      dropIndicator: dropTarget?.key === key ? dropTarget.side : null,
-      isDragging: dragKey === key,
-    } : {}),
+    colKey: key, sortCol, sortDir, onSort: toggleSort, getLabel, getWidth, editMode, updateLabel, updateWidth,
+    ...(editMode ? { dragProps: getDragProps(key), dropIndicator: dropTarget?.key === key ? dropTarget.side : null, isDragging: dragKey === key } : {}),
   });
 
   const renderKeys = editMode ? localOrder : allVisibleKeys;
@@ -166,10 +493,27 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
-              <TableHead style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="shrink-0"></TableHead>
+              <TableHead style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="shrink-0">
+                {sorted.length > 0 && (
+                  <button
+                    className="text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                    title={expanded.size === sorted.length ? "Sbalit vše" : "Rozbalit vše"}
+                    onClick={() => {
+                      if (expanded.size === sorted.length) setExpanded(new Set());
+                      else setExpanded(new Set(sorted.map((p) => p.project_id)));
+                    }}
+                  >
+                    {expanded.size === sorted.length ? <ChevronsUp className="h-3.5 w-3.5" /> : <ChevronsDown className="h-3.5 w-3.5" />}
+                  </button>
+                )}
+              </TableHead>
               {v("project_id") && renderColumnHeader(headerProps("project_id"))}
               {v("project_name") && renderColumnHeader(headerProps("project_name"))}
               {renderKeys.map((key) => renderColumnHeader(headerProps(key)))}
+              {/* List icon header */}
+              <TableHead style={{ width: 40, minWidth: 40, maxWidth: 40 }} className="text-center">
+                <List className="h-3.5 w-3.5 text-muted-foreground/50 mx-auto" />
+              </TableHead>
               <ColumnVisibilityToggle tabKey="tpvStatus" editMode={editMode} onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined} />
             </TableRow>
           </TableHeader>
@@ -177,23 +521,24 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
             {sorted.map((p) => {
               const tpvHighlight = getTPVDashboardRiskColor(p as any, riskHighlight ?? null);
               return (
-              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors h-9" style={tpvHighlight.bg ? { backgroundColor: tpvHighlight.bg } : {}}>
-                <TableCell
-                  className="w-[32px] cursor-pointer relative"
-                  onClick={() => setActiveProject({ projectId: p.project_id, projectName: p.project_name })}
-                >
-                  {tpvHighlight.dotColor && (
-                    <span
-                      className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full"
-                      style={{ width: 6, height: 6, backgroundColor: tpvHighlight.dotColor }}
-                    />
-                  )}
-                  <ExpandArrow projectId={p.project_id} />
-                </TableCell>
-                {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
-                {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-                {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }) }))}
-              </TableRow>
+                <Fragment key={p.id}>
+                  <TableRow className="hover:bg-muted/50 transition-colors h-9" style={tpvHighlight.bg ? { backgroundColor: tpvHighlight.bg } : {}}>
+                    <TableCell className="w-[32px] cursor-pointer relative" onClick={() => toggleExpand(p.project_id)}>
+                      {tpvHighlight.dotColor && (
+                        <span className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full" style={{ width: 6, height: 6, backgroundColor: tpvHighlight.dotColor }} />
+                      )}
+                      <ExpandArrow isExpanded={expanded.has(p.project_id)} stageCount={stagesByProject.get(p.project_id)?.length ?? 0} />
+                    </TableCell>
+                    {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
+                    {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
+                    {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }) }))}
+                    {/* List icon to open TPV items detail */}
+                    <TableCell style={{ width: 40, minWidth: 40, maxWidth: 40 }} className="text-center">
+                      <TPVListIcon projectId={p.project_id} onClick={() => setActiveProject({ projectId: p.project_id, projectName: p.project_name })} />
+                    </TableCell>
+                  </TableRow>
+                  {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} isVisible={v} statusLabels={statusLabels} canEdit={canEdit} renderKeys={renderKeys} />}
+                </Fragment>
               );
             })}
           </TableBody>
