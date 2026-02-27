@@ -209,13 +209,15 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                         style={{ width: 6, height: 6, backgroundColor: tpvHighlight.dotColor }}
                       />
                     )}
-                    {hr.isParent ? (
-                      isExpanded(p.project_id)
-                        ? <ChevronDown className="h-5 w-5 stroke-[3] text-accent" />
-                        : <ChevronRight className="h-5 w-5 stroke-[3] text-accent fill-accent/20" />
-                    ) : !hr.isChild ? (
-                      <ExpandArrow projectId={p.project_id} />
-                    ) : null}
+                    {!hr.isChild && (
+                      hr.isParent ? (
+                        isExpanded(p.project_id)
+                          ? <ChevronDown className="h-5 w-5 stroke-[3] text-muted-foreground" />
+                          : <ChevronRight className="h-5 w-5 stroke-[3] text-muted-foreground/50" />
+                      ) : (
+                        <ExpandArrow projectId={p.project_id} />
+                      )
+                    )}
                   </TableCell>
                   {v("project_id") && (
                     <TableCell className="font-mono text-xs truncate" title={p.project_id}>
@@ -223,9 +225,6 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                         {hr.isChild && <span className="text-muted-foreground mr-1">↳</span>}
                         {p.project_id}
                       </span>
-                      {hr.isParent && !isExpanded(p.project_id) && hr.childCount > 0 && (
-                        <span className="ml-1.5 text-[10px] text-muted-foreground">({hr.childCount})</span>
-                      )}
                     </TableCell>
                   )}
                   {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
