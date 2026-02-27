@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon, Paperclip } from "lucide-react";
+import { CalendarIcon, Paperclip, ChevronRight, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 import { ProjectEditDialog } from "./ProjectEditDialog";
@@ -35,6 +35,7 @@ import { useDocumentCounts } from "@/hooks/useDocumentCounts";
 import { useExportContext } from "./ExportContext";
 import { getProjectCellValue } from "@/lib/exportExcel";
 import { getColumnLabel } from "./CrossTabColumns";
+import { useProjectHierarchy } from "@/hooks/useProjectHierarchy";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...PROJECT_INFO_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
@@ -82,6 +83,13 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns, canDeleteProject, isViewer } = useAuth();
   const { registerExport } = useExportContext();
+
+  // Hierarchy
+  const { hierarchicalRows, toggleExpand, isExpanded, childrenOf } = useProjectHierarchy(
+    projects,
+    sorted,
+    { personFilter: personFilter ?? undefined, statusFilter, search: externalSearch }
+  );
 
   // Persisted group order from DB (for side panel)
   const orderedNativeKeys = useMemo(() => getOrderedKeys(PROJECT_INFO_NATIVE), [getOrderedKeys]);
@@ -228,7 +236,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
           <TableHeader>
             <TableRow className="bg-primary/5">
               <TableHead style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="text-center">
-                <Paperclip className="h-3.5 w-3.5 text-gray-400 mx-auto" />
+                <Paperclip className="h-3.5 w-3.5 text-muted-foreground mx-auto" />
               </TableHead>
               {v("project_id") && renderColumnHeader(headerProps("project_id"))}
               {v("project_name") && renderColumnHeader(headerProps("project_name"))}
@@ -237,25 +245,57 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sorted.map((p) => (
-              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { backgroundColor: c } : {}; })()}>
-                <TableCell style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="text-center">
-                  {(docCounts[p.project_id] ?? 0) > 0 && (
-                    <span className="inline-flex items-center gap-0.5 text-gray-400 text-[10px]">
-                      <Paperclip className="h-3 w-3" />
-                      {docCounts[p.project_id]}
-                    </span>
+            {hierarchicalRows.map((hr) => {
+              const p = hr.row;
+              const riskColor = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
+              const rowStyle: React.CSSProperties = {
+                ...(riskColor ? { backgroundColor: riskColor } : {}),
+                ...(hr.visibleViaChild ? { opacity: 0.6 } : {}),
+              };
+              return (
+                <TableRow
+                  key={`${p.id}${hr.isChild ? '-child' : ''}`}
+                  className={cn(
+                    "hover:bg-muted/50 transition-colors",
+                    hr.isChild && "bg-muted/30 border-l-2 border-l-primary/20"
                   )}
-                </TableCell>
-                {v("project_id") && (
-                  <TableCell className="font-mono text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => setEditProject(p)}>
-                    {p.project_id}
+                  style={rowStyle}
+                >
+                  <TableCell style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="text-center">
+                    {hr.isParent ? (
+                      <button
+                        onClick={() => toggleExpand(p.project_id)}
+                        className="p-0.5 hover:bg-muted rounded"
+                      >
+                        {isExpanded(p.project_id)
+                          ? <ChevronDown className="h-4 w-4 text-accent stroke-[2.5]" />
+                          : <ChevronRight className="h-4 w-4 text-muted-foreground stroke-[2.5]" />}
+                      </button>
+                    ) : hr.isChild ? null : (
+                      (docCounts[p.project_id] ?? 0) > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-muted-foreground text-[10px]">
+                          <Paperclip className="h-3 w-3" />
+                          {docCounts[p.project_id]}
+                        </span>
+                      )
+                    )}
                   </TableCell>
-                )}
-                {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-                {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }) }))}
-              </TableRow>
-            ))}
+                  {v("project_id") && (
+                    <TableCell className="font-mono text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => setEditProject(p)}>
+                      <span className={hr.isChild ? "pl-4" : ""}>
+                        {hr.isChild && <span className="text-muted-foreground mr-1">↳</span>}
+                        {p.project_id}
+                      </span>
+                      {hr.isParent && !isExpanded(p.project_id) && hr.childCount > 0 && (
+                        <span className="ml-1.5 text-[10px] text-muted-foreground">({hr.childCount})</span>
+                      )}
+                    </TableCell>
+                  )}
+                  {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
+                  {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }) }))}
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
