@@ -199,14 +199,19 @@ export type Database = {
       }
       project_stages: {
         Row: {
+          architekt: string | null
           created_at: string
           datum_smluvni: string | null
           deleted_at: string | null
           end_date: string | null
           expedice: string | null
+          hodiny_tpv: string | null
           id: string
+          konstrukter: string | null
           montaz: string | null
+          narocnost: string | null
           notes: string | null
+          percent_tpv: number | null
           pm: string | null
           pm_poznamka: string | null
           predani: string | null
@@ -221,14 +226,19 @@ export type Database = {
           zamereni: string | null
         }
         Insert: {
+          architekt?: string | null
           created_at?: string
           datum_smluvni?: string | null
           deleted_at?: string | null
           end_date?: string | null
           expedice?: string | null
+          hodiny_tpv?: string | null
           id?: string
+          konstrukter?: string | null
           montaz?: string | null
+          narocnost?: string | null
           notes?: string | null
+          percent_tpv?: number | null
           pm?: string | null
           pm_poznamka?: string | null
           predani?: string | null
@@ -243,14 +253,19 @@ export type Database = {
           zamereni?: string | null
         }
         Update: {
+          architekt?: string | null
           created_at?: string
           datum_smluvni?: string | null
           deleted_at?: string | null
           end_date?: string | null
           expedice?: string | null
+          hodiny_tpv?: string | null
           id?: string
+          konstrukter?: string | null
           montaz?: string | null
+          narocnost?: string | null
           notes?: string | null
+          percent_tpv?: number | null
           pm?: string | null
           pm_poznamka?: string | null
           predani?: string | null
