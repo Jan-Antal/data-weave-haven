@@ -11,7 +11,7 @@ import { useProjectStages, useUpdateStage, useDeleteStage, useReorderStages } fr
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, ChevronDown, Plus, Trash2, GripVertical } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Trash2, GripVertical, ChevronsDown, ChevronsUp } from "lucide-react";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -463,7 +463,27 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
-              <TableHead style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="shrink-0"></TableHead>
+              <TableHead style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="shrink-0">
+                {sorted.length > 0 && (
+                  <button
+                    className="text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                    title={expanded.size === sorted.length ? "Sbalit vše" : "Rozbalit vše"}
+                    onClick={() => {
+                      if (expanded.size === sorted.length) {
+                        setExpanded(new Set());
+                      } else {
+                        setExpanded(new Set(sorted.map((p) => p.project_id)));
+                      }
+                    }}
+                  >
+                    {expanded.size === sorted.length ? (
+                      <ChevronsUp className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronsDown className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                )}
+              </TableHead>
               {v("project_id") && renderColumnHeader(headerProps("project_id"))}
               {v("project_name") && renderColumnHeader(headerProps("project_name"))}
               {renderKeys.map((key) => renderColumnHeader(headerProps(key)))}
