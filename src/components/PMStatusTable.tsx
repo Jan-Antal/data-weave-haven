@@ -1,4 +1,4 @@
-import { useState, Fragment, useMemo, useEffect, useCallback } from "react";
+import React, { useState, Fragment, useMemo, useEffect, useCallback, memo } from "react";
 import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColumns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge, RiskBadge } from "./StatusBadge";
@@ -38,31 +38,26 @@ const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
 
 const stageStatuses = ["Plánováno", "Probíhá", "Dokončeno", "Pozastaveno"];
 
-/** Check if any stage matches the active filters */
+/** Check if any stage matches the active filters — optimized with Set lookups */
 function stageMatchesFilters(
   stages: ProjectStage[],
   personFilter: string | null,
-  statusFilter: string[],
-  search: string | undefined
+  statusFilterSet: Set<string> | null,
+  searchLower: string | null
 ): boolean {
   if (stages.length === 0) return false;
 
-  return stages.some((stage) => {
-    // Person filter
+  for (const stage of stages) {
     if (personFilter && stage.pm && String(stage.pm).includes(personFilter)) return true;
-
-    // Status filter
-    if (statusFilter && statusFilter.length > 0 && stage.status && statusFilter.includes(stage.status)) return true;
-
-    // Text search
-    if (search) {
-      const q = search.toLowerCase();
+    if (statusFilterSet && stage.status && statusFilterSet.has(stage.status)) return true;
+    if (searchLower) {
       const searchable = [stage.stage_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
-      if (searchable.some((v) => v && String(v).toLowerCase().includes(q))) return true;
+      for (const v of searchable) {
+        if (v && String(v).toLowerCase().includes(searchLower)) return true;
+      }
     }
-
-    return false;
-  });
+  }
+  return false;
 }
 
 const INHERITABLE_FIELDS = ["pm", "status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "datum_smluvni"];
@@ -142,6 +137,8 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
   );
 }
 
+const MemoSortableStageRow = memo(SortableStageRow);
+
 function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, renderKeys }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[] }) {
   const { data: stages = [] } = useProjectStages(projectId);
   const deleteStage = useDeleteStage();
@@ -179,21 +176,31 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
       }
     }
 
-    const { error } = await supabase.from("project_stages").insert({
+    const newStage = {
       id,
       project_id: projectId,
       stage_name: stageName,
       stage_order: stages.length,
       ...inheritedData,
-    });
+    };
 
+    // Optimistic: add to cache immediately
+    const queryKey = ["project_stages", projectId];
+    qc.setQueryData<ProjectStage[]>(queryKey, (old) => [
+      ...(old || []),
+      { ...newStage, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, start_date: null, end_date: null, notes: null, datum_smluvni: inheritedData.datum_smluvni ?? null, pm: inheritedData.pm ?? null, status: inheritedData.status ?? null, risk: inheritedData.risk ?? null, zamereni: inheritedData.zamereni ?? null, tpv_date: inheritedData.tpv_date ?? null, expedice: inheritedData.expedice ?? null, montaz: inheritedData.montaz ?? null, predani: inheritedData.predani ?? null, pm_poznamka: null } as ProjectStage,
+    ]);
+    setFreshStages(prev => new Map(prev).set(id, inheritedKeys));
+
+    // Save in background
+    const { error } = await supabase.from("project_stages").insert(newStage);
     if (error) {
       toast({ title: "Chyba", description: "Nepodařilo se vytvořit etapu", variant: "destructive" });
+      qc.invalidateQueries({ queryKey });
+      setFreshStages(prev => { const next = new Map(prev); next.delete(id); return next; });
       return;
     }
 
-    setFreshStages(prev => new Map(prev).set(id, inheritedKeys));
-    qc.invalidateQueries({ queryKey: ["project_stages", projectId] });
     qc.invalidateQueries({ queryKey: ["all_project_stages"] });
   };
 
@@ -253,7 +260,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={stages.map(s => s.id)} strategy={verticalListSortingStrategy}>
           {stages.map(stage => (
-            <SortableStageRow
+            <MemoSortableStageRow
               key={stage.id}
               stage={stage}
               project={project}
@@ -284,9 +291,8 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
   );
 }
 
-function ExpandArrow({ projectId, isExpanded }: { projectId: string; isExpanded: boolean }) {
-  const { data: stages = [] } = useProjectStages(projectId);
-  const hasStages = stages.length > 0;
+function ExpandArrow({ projectId, isExpanded, stageCount }: { projectId: string; isExpanded: boolean; stageCount: number }) {
+  const hasStages = stageCount > 0;
   if (isExpanded) {
     return <ChevronDown className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent" : "text-muted-foreground"}`} />;
   }
@@ -325,30 +331,37 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
       return { sorted: baseSorted, stageExpandedIds: new Set<string>() };
     }
 
+    // Pre-build Sets for O(1) lookups
+    const statusFilterSet = statusFilter && statusFilter.length > 0 ? new Set(statusFilter) : null;
+    const searchLower = externalSearch ? externalSearch.toLowerCase() : null;
+
     const baseSortedIds = new Set(baseSorted.map((p) => p.project_id));
     const extraParents: Project[] = [];
     const autoExpand = new Set<string>();
 
     for (const p of projects) {
-      // Skip projects already in results
+      const stages = stagesByProject.get(p.project_id);
+      if (!stages || stages.length === 0) {
+        continue;
+      }
+
       if (baseSortedIds.has(p.project_id)) {
-        // But still check if stages match to auto-expand
-        const stages = stagesByProject.get(p.project_id) || [];
-        if (stageMatchesFilters(stages, personFilter, statusFilter, externalSearch)) {
+        if (stageMatchesFilters(stages, personFilter, statusFilterSet, searchLower)) {
           autoExpand.add(p.project_id);
         }
         continue;
       }
 
-      // Check if any stage of this project matches the filters
-      const stages = stagesByProject.get(p.project_id) || [];
-      if (stageMatchesFilters(stages, personFilter, statusFilter, externalSearch)) {
+      if (stageMatchesFilters(stages, personFilter, statusFilterSet, searchLower)) {
         extraParents.push(p);
         autoExpand.add(p.project_id);
       }
     }
 
-    // Merge extra parents into sorted list, maintaining project_id order
+    if (extraParents.length === 0) {
+      return { sorted: baseSorted, stageExpandedIds: autoExpand };
+    }
+
     const merged = [...baseSorted, ...extraParents].sort((a, b) =>
       a.project_id.localeCompare(b.project_id, "cs")
     );
@@ -495,7 +508,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
               <Fragment key={p.id}>
                 <TableRow className="hover:bg-muted/50 transition-colors h-9" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { backgroundColor: c } : {}; })()}>
                   <TableCell className="w-[32px] cursor-pointer" onClick={() => toggleExpand(p.project_id)}>
-                    <ExpandArrow projectId={p.project_id} isExpanded={expanded.has(p.project_id)} />
+                    <ExpandArrow projectId={p.project_id} isExpanded={expanded.has(p.project_id)} stageCount={stagesByProject.get(p.project_id)?.length ?? 0} />
                   </TableCell>
                   {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
                   {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name} className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}

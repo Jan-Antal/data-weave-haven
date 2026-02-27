@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { ProjectStage } from "./useProjectStages";
@@ -17,16 +18,24 @@ export function useAllProjectStages() {
   });
 }
 
-/** Group stages by project_id for quick lookup */
+/** Group stages by project_id for quick lookup — memoized */
 export function useStagesByProject() {
   const query = useAllProjectStages();
-  const map = new Map<string, ProjectStage[]>();
-  if (query.data) {
-    for (const s of query.data) {
-      const arr = map.get(s.project_id) || [];
-      arr.push(s);
-      map.set(s.project_id, arr);
+
+  const stagesByProject = useMemo(() => {
+    const map = new Map<string, ProjectStage[]>();
+    if (query.data) {
+      for (const s of query.data) {
+        const arr = map.get(s.project_id);
+        if (arr) {
+          arr.push(s);
+        } else {
+          map.set(s.project_id, [s]);
+        }
+      }
     }
-  }
-  return { ...query, stagesByProject: map };
+    return map;
+  }, [query.data]);
+
+  return { ...query, stagesByProject };
 }
