@@ -37,7 +37,7 @@ import { useTPVItems } from "@/hooks/useTPVItems";
 const NATIVE_KEYS = ["project_id", "project_name", ...TPV_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
 
-const INHERITABLE_FIELDS = ["konstrukter", "narocnost", "hodiny_tpv", "percent_tpv", "tpv_poznamka"];
+const INHERITABLE_FIELDS = ["konstrukter", "narocnost", "architekt", "tpv_poznamka"];
 
 /** Check if any stage matches the active filters */
 function stageMatchesFilters(
@@ -126,14 +126,13 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
   const inheritedClass = (field: string) => isFieldInherited?.(field) ? "text-blue-300" : "";
 
   const renderStageCell = (key: string) => {
-    // Stages don't have TPV-specific fields — show empty cells
     switch (key) {
-      case "konstrukter": return <TableCell key={key} />;
-      case "narocnost": return <TableCell key={key} />;
-      case "hodiny_tpv": return <TableCell key={key} />;
-      case "percent_tpv": return <TableCell key={key} />;
-      case "tpv_poznamka": return <TableCell key={key} />;
-      // Cross-tab columns that stages DO have
+      case "konstrukter": return <TableCell key={key}><InlineEditableCell value={(stage as any).konstrukter} type="people" peopleRole="Konstruktér" onSave={(val) => saveStage("konstrukter", val)} readOnly={!canEdit} className={inheritedClass("konstrukter")} /></TableCell>;
+      case "narocnost": return <TableCell key={key}><InlineEditableCell value={(stage as any).narocnost} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("narocnost", val)} displayValue={<RiskBadge level={(stage as any).narocnost || ""} />} readOnly={!canEdit} className={inheritedClass("narocnost")} /></TableCell>;
+      case "hodiny_tpv": return <TableCell key={key}><InlineEditableCell value={(stage as any).hodiny_tpv} onSave={(val) => saveStage("hodiny_tpv", val)} readOnly={!canEdit} /></TableCell>;
+      case "percent_tpv": return <TableCell key={key}><InlineEditableCell value={(stage as any).percent_tpv} type="number" onSave={(val) => saveStage("percent_tpv", val)} displayValue={<ProgressBar value={(stage as any).percent_tpv || 0} />} readOnly={!canEdit} /></TableCell>;
+      case "architekt": return <TableCell key={key}><InlineEditableCell value={(stage as any).architekt} onSave={(val) => saveStage("architekt", val)} readOnly={!canEdit} className={inheritedClass("architekt")} /></TableCell>;
+      case "tpv_poznamka": return <TableCell key={key}><InlineEditableCell value={(stage as any).tpv_poznamka} type="textarea" onSave={(val) => saveStage("tpv_poznamka", val)} readOnly={!canEdit} className={inheritedClass("tpv_poznamka")} /></TableCell>;
       case "pm": return <TableCell key={key}><InlineEditableCell value={stage.pm} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} className={inheritedClass("pm")} /></TableCell>;
       case "status": return <TableCell key={key}><InlineEditableCell value={stage.status} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={stage.status ? <StatusBadge status={stage.status} /> : "—"} readOnly={!canEdit} className={inheritedClass("status")} /></TableCell>;
       case "risk": return <TableCell key={key}><InlineEditableCell value={stage.risk} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("risk", val)} displayValue={<RiskBadge level={stage.risk || ""} />} readOnly={!canEdit} className={inheritedClass("risk")} /></TableCell>;
@@ -222,7 +221,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     const queryKey = ["project_stages", projectId];
     qc.setQueryData<ProjectStage[]>(queryKey, (old) => [
       ...(old || []),
-      { ...newStage, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, start_date: null, end_date: null, notes: null, datum_smluvni: null, pm: null, status: null, risk: null, zamereni: null, tpv_date: null, expedice: null, montaz: null, predani: null, pm_poznamka: null } as ProjectStage,
+      { ...newStage, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, start_date: null, end_date: null, notes: null, datum_smluvni: null, pm: null, status: null, risk: null, zamereni: null, tpv_date: null, expedice: null, montaz: null, predani: null, pm_poznamka: null, konstrukter: null, narocnost: null, hodiny_tpv: null, percent_tpv: null, architekt: null } as ProjectStage,
     ]);
     setFreshStages(prev => new Map(prev).set(id, inheritedKeys));
 
