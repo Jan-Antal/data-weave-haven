@@ -60,6 +60,25 @@ function stageMatchesFilters(
   return false;
 }
 
+/** Check if a single stage matches the active filters */
+function singleStageMatches(
+  stage: ProjectStage,
+  personFilter: string | null,
+  statusFilterSet: Set<string> | null,
+  searchLower: string | null
+): boolean {
+  if (!personFilter && !statusFilterSet && !searchLower) return true;
+  if (personFilter && stage.pm && String(stage.pm).includes(personFilter)) return true;
+  if (statusFilterSet && stage.status && statusFilterSet.has(stage.status)) return true;
+  if (searchLower) {
+    const searchable = [stage.stage_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
+    for (const v of searchable) {
+      if (v && String(v).toLowerCase().includes(searchLower)) return true;
+    }
+  }
+  return false;
+}
+
 const INHERITABLE_FIELDS = ["pm", "status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "datum_smluvni"];
 
 interface StageRowProps {
@@ -75,9 +94,10 @@ interface StageRowProps {
   cancelConfirm?: boolean;
   onCancelConfirm?: () => void;
   onCancelDismiss?: () => void;
+  dimmed?: boolean;
 }
 
-function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys, isFieldInherited, onFieldTouched, cancelConfirm, onCancelConfirm, onCancelDismiss }: StageRowProps) {
+function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys, isFieldInherited, onFieldTouched, cancelConfirm, onCancelConfirm, onCancelDismiss, dimmed }: StageRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
   const updateStage = useUpdateStage();
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -105,7 +125,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
   };
 
   return (
-    <TableRow ref={setNodeRef} style={style} className="bg-muted/20 h-9">
+    <TableRow ref={setNodeRef} style={style} className={cn("bg-muted/20 h-9", dimmed && "opacity-40")}>
       <TableCell className="w-[32px]">
         <div {...attributes} {...listeners} className="cursor-grab pl-2">
           <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
@@ -139,7 +159,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
 
 const MemoSortableStageRow = memo(SortableStageRow);
 
-function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, renderKeys }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[] }) {
+function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, renderKeys, personFilter, statusFilterSet, searchLower }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[]; personFilter: string | null; statusFilterSet: Set<string> | null; searchLower: string | null }) {
   const { data: stages = [] } = useProjectStages(projectId);
   const deleteStage = useDeleteStage();
   const reorderStages = useReorderStages();
@@ -274,6 +294,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
               cancelConfirm={cancelConfirmId === stage.id}
               onCancelConfirm={() => handleCancelStage(stage.id)}
               onCancelDismiss={() => setCancelConfirmId(null)}
+              dimmed={!singleStageMatches(stage, personFilter, statusFilterSet, searchLower)}
             />
           ))}
         </SortableContext>
@@ -513,7 +534,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name} className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
                   {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }) }))}
                 </TableRow>
-                {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} isVisible={v} statusLabels={statusLabels} canEdit={canEdit} renderKeys={renderKeys} />}
+                {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} isVisible={v} statusLabels={statusLabels} canEdit={canEdit} renderKeys={renderKeys} personFilter={personFilter} statusFilterSet={statusFilter && statusFilter.length > 0 ? new Set(statusFilter) : null} searchLower={externalSearch ? externalSearch.toLowerCase() : null} />}
               </Fragment>
             ))}
           </TableBody>
