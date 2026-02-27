@@ -79,7 +79,7 @@ function singleStageMatches(
   return false;
 }
 
-const INHERITABLE_FIELDS = ["pm", "status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "datum_smluvni", "pm_poznamka", "konstrukter", "narocnost", "architekt"];
+const INHERITABLE_FIELDS = ["pm", "status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "datum_smluvni", "konstrukter", "narocnost", "architekt"];
 
 interface StageRowProps {
   stage: ProjectStage;
