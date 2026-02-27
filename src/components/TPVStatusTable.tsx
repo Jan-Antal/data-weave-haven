@@ -149,6 +149,8 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
 
   return (
     <TableRow ref={setNodeRef} style={style} className={cn("bg-muted/20 h-9", dimmed && "opacity-40")}>
+      {/* Empty cell for TPV List icon column alignment */}
+      <TableCell style={{ width: 40, minWidth: 40, maxWidth: 40 }} />
       <TableCell className="w-[32px]">
         <div {...attributes} {...listeners} className="cursor-grab pl-2">
           <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
@@ -163,8 +165,6 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
         <TableCell className="truncate text-muted-foreground text-xs" style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={project.project_name}>{project.project_name}</TableCell>
       )}
       {renderKeys.map((key) => renderStageCell(key))}
-      {/* List icon column — empty for stages */}
-      <TableCell style={{ width: 40, minWidth: 40, maxWidth: 40 }} />
       <TableCell>
         {cancelConfirm ? (
           <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
