@@ -82,9 +82,13 @@ function singleStageMatches(
 // ── TPV Items count badge for List icon ─────────────────────────────
 function TPVListIcon({ projectId, onClick }: { projectId: string; onClick: () => void }) {
   const { data: items = [] } = useTPVItems(projectId);
+  const hasItems = items.length > 0;
   return (
     <button
-      className="text-muted-foreground/40 hover:text-[hsl(var(--accent))] transition-colors cursor-pointer"
+      className={cn(
+        "transition-colors cursor-pointer hover:text-[#e87c3e]",
+        hasItems ? "text-gray-700" : "text-gray-300"
+      )}
       title={`TPV seznam (${items.length})`}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
     >
@@ -505,6 +509,10 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
+              {/* List icon header - first column */}
+              <TableHead style={{ width: 40, minWidth: 40, maxWidth: 40 }} className="text-center">
+                <List className="h-3.5 w-3.5 text-muted-foreground/50 mx-auto" />
+              </TableHead>
               <TableHead style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="shrink-0">
                 {sorted.length > 0 && (
                   <button
@@ -522,10 +530,6 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
               {v("project_id") && renderColumnHeader(headerProps("project_id"))}
               {v("project_name") && renderColumnHeader(headerProps("project_name"))}
               {renderKeys.map((key) => renderColumnHeader(headerProps(key)))}
-              {/* List icon header */}
-              <TableHead style={{ width: 40, minWidth: 40, maxWidth: 40 }} className="text-center">
-                <List className="h-3.5 w-3.5 text-muted-foreground/50 mx-auto" />
-              </TableHead>
               <ColumnVisibilityToggle tabKey="tpvStatus" editMode={editMode} onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined} />
             </TableRow>
           </TableHeader>
@@ -535,6 +539,10 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
               return (
                 <Fragment key={p.id}>
                   <TableRow className="hover:bg-muted/50 transition-colors h-9" style={tpvHighlight.bg ? { backgroundColor: tpvHighlight.bg } : {}}>
+                    {/* List icon - first column */}
+                    <TableCell style={{ width: 40, minWidth: 40, maxWidth: 40 }} className="text-center">
+                      <TPVListIcon projectId={p.project_id} onClick={() => setActiveProject({ projectId: p.project_id, projectName: p.project_name })} />
+                    </TableCell>
                     <TableCell className="w-[32px] cursor-pointer relative" onClick={() => toggleExpand(p.project_id)}>
                       {tpvHighlight.dotColor && (
                         <span className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full" style={{ width: 6, height: 6, backgroundColor: tpvHighlight.dotColor }} />
@@ -544,10 +552,6 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                     {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
                     {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
                     {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }) }))}
-                    {/* List icon to open TPV items detail */}
-                    <TableCell style={{ width: 40, minWidth: 40, maxWidth: 40 }} className="text-center">
-                      <TPVListIcon projectId={p.project_id} onClick={() => setActiveProject({ projectId: p.project_id, projectName: p.project_name })} />
-                    </TableCell>
                   </TableRow>
                   {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} isVisible={v} statusLabels={statusLabels} canEdit={canEdit} renderKeys={renderKeys} personFilter={personFilter} statusFilterSet={statusFilter && statusFilter.length > 0 ? new Set(statusFilter) : null} searchLower={externalSearch ? externalSearch.toLowerCase() : null} showAddButton={showAddButton.has(p.project_id)} />}
                 </Fragment>
