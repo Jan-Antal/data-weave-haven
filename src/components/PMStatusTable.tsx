@@ -31,6 +31,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useHeaderDrag } from "@/hooks/useHeaderDrag";
+import { useExportContext } from "./ExportContext";
+import { getProjectCellValue } from "@/lib/exportExcel";
+import { getColumnLabel } from "./CrossTabColumns";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...PM_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
@@ -207,6 +210,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("pm-status");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns } = useAuth();
+  const { registerGetter } = useExportContext();
 
   const orderedNativeKeys = useMemo(() => getOrderedKeys(PM_NATIVE), [getOrderedKeys]);
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
@@ -238,6 +242,16 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   }, [editMode, localOrder, allVisibleKeys, updateDisplayOrder]);
 
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
+
+  // Register export data getter
+  useEffect(() => {
+    registerGetter("pm-status", () => {
+      const visKeys = ["project_id", "project_name", ...allVisibleKeys];
+      const headers = visKeys.map(k => getLabel(k, getColumnLabel(k)));
+      const rows = sorted.map(p => visKeys.map(k => getProjectCellValue(p as any, k)));
+      return { headers, rows };
+    });
+  }, [registerGetter, sorted, allVisibleKeys, getLabel]);
 
   const toggleExpand = (pid: string) => {
     setExpanded(prev => {

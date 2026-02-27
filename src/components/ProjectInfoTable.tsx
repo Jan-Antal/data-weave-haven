@@ -32,6 +32,9 @@ import { useAllColumnVisibility, PROJECT_INFO_NATIVE, ALL_COLUMNS } from "./Colu
 import { getColumnStyle, renderColumnHeader, renderColumnCell } from "./CrossTabColumns";
 import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 import { useDocumentCounts } from "@/hooks/useDocumentCounts";
+import { useExportContext } from "./ExportContext";
+import { getProjectCellValue } from "@/lib/exportExcel";
+import { getColumnLabel } from "./CrossTabColumns";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...PROJECT_INFO_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
@@ -78,6 +81,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("project-info");
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns, canDeleteProject, isViewer } = useAuth();
+  const { registerGetter } = useExportContext();
 
   // Persisted group order from DB (for side panel)
   const orderedNativeKeys = useMemo(() => getOrderedKeys(PROJECT_INFO_NATIVE), [getOrderedKeys]);
@@ -121,6 +125,16 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     document.addEventListener("open-add-project", handleOpenAdd);
     return () => document.removeEventListener("open-add-project", handleOpenAdd);
   }, []);
+
+  // Register export data getter
+  useEffect(() => {
+    registerGetter("project-info", () => {
+      const visKeys = ["project_id", "project_name", ...allVisibleKeys];
+      const headers = visKeys.map(k => getLabel(k, getColumnLabel(k)));
+      const rows = sorted.map(p => visKeys.map(k => getProjectCellValue(p as any, k)));
+      return { headers, rows };
+    });
+  }, [registerGetter, sorted, allVisibleKeys, getLabel]);
 
   const save = (id: string, field: string, value: string, oldValue: string) => {
     updateProject.mutate({ id, field, value, oldValue });
