@@ -65,7 +65,7 @@ function stageMatchesFilters(
   });
 }
 
-const INHERITABLE_FIELDS = ["pm", "status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "pm_poznamka", "datum_smluvni"];
+const INHERITABLE_FIELDS = ["pm", "status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "datum_smluvni"];
 
 interface StageRowProps {
   stage: ProjectStage;
