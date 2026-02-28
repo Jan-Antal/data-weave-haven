@@ -19,6 +19,7 @@ import type { Project } from "@/hooks/useProjects";
 import { Button } from "@/components/ui/button";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { TPVItemsView } from "./TPVItemsView";
+import { ProjectEditDialog } from "./ProjectEditDialog";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -338,6 +339,7 @@ interface TPVProjectRowProps {
   saveCustomField: (rowId: string, colKey: string, val: string, old: string) => void;
   riskHighlight: any;
   isFieldReadOnly: (field: string) => boolean;
+  onEditProject: (p: Project) => void;
 }
 
 const TPVProjectRow = memo(function TPVProjectRow({
@@ -356,6 +358,7 @@ const TPVProjectRow = memo(function TPVProjectRow({
   saveCustomField,
   riskHighlight,
   isFieldReadOnly,
+  onEditProject,
 }: TPVProjectRowProps) {
   const tpvHighlight = useMemo(
     () => getTPVDashboardRiskColor(p as any, riskHighlight ?? null),
@@ -379,7 +382,7 @@ const TPVProjectRow = memo(function TPVProjectRow({
         )}
         <ExpandArrow isExpanded={isExpanded} stageCount={stageCount} />
       </TableCell>
-      {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
+      {v("project_id") && <TableCell className="font-mono text-xs truncate cursor-pointer text-foreground hover:text-blue-600 hover:underline" title={p.project_id} onClick={() => onEditProject(p)}>{p.project_id}</TableCell>}
       {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit || isFieldReadOnly("project_name")} /></TableCell>}
       {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly }))}
     </TableRow>
@@ -415,6 +418,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const { stagesByProject } = useStagesByProject();
   const { itemsByProject: tpvItemsByProject } = useAllTPVItems();
   const [activeProject, setActiveProject] = useState<{ projectId: string; projectName: string } | null>(null);
+  const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
 
   // Memoize filter Sets
   const statusFilterSet = useMemo(
@@ -632,6 +636,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                   saveCustomField={handleSaveCustomField}
                   riskHighlight={riskHighlight}
                   isFieldReadOnly={isFieldReadOnly}
+                  onEditProject={(p) => setEditProject(p)}
                 />
                 {expanded.has(p.project_id) && (
                   <StagesSection
@@ -652,6 +657,8 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
           </TableBody>
         </Table>
       </div>
+
+      {editProject && <ProjectEditDialog project={editProject} open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }} />}
     </div>
   );
 }
