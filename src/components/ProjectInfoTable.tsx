@@ -413,7 +413,12 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const updateCustomField = useUpdateCustomField();
   const { sorted: baseSorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const allProjectIds = useMemo(() => projects.map((p) => p.project_id), [projects]);
-  const { counts: docCounts } = useDocumentCounts(allProjectIds);
+  const projectStatuses = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    for (const p of projects) map[p.project_id] = p.status;
+    return map;
+  }, [projects]);
+  const { counts: docCounts } = useDocumentCounts(allProjectIds, projectStatuses);
   const [addOpen, setAddOpen] = useState(false);
   const [newProj, setNewProj] = useState({ ...emptyProject });
   const [datumWarning, setDatumWarning] = useState(false);
