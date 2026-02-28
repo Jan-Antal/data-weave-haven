@@ -30,7 +30,13 @@ export function PdfPreviewModal({ html, tabLabel, onClose }: PdfPreviewModalProp
 
   const handlePrint = () => {
     const win = iframeRef.current?.contentWindow;
-    if (win) win.print();
+    const doc = iframeRef.current?.contentDocument;
+    if (win && doc) {
+      const today = new Date().toISOString().split("T")[0];
+      const tabKey = tabLabel.replace(/\s+/g, "");
+      doc.title = `AMI-${tabKey}-${today}`;
+      win.print();
+    }
   };
 
   return createPortal(
