@@ -2,7 +2,6 @@ import { useMemo, useState, useEffect } from "react";
 import { useProjects } from "@/hooks/useProjects";
 import { useExchangeRates, getExchangeRate } from "@/hooks/useExchangeRates";
 import { parseAppDate } from "@/lib/dateFormat";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
 import {
   BarChart,
@@ -56,16 +55,17 @@ function formatNumber(v: number): string {
   }).format(v);
 }
 
-interface DashboardStatsProps {
+export interface DashboardStatsProps {
   personFilter?: string | null;
   statusFilter?: string[];
   search?: string;
   riskHighlight: RiskHighlightType;
   onRiskHighlightChange: (v: RiskHighlightType) => void;
   activeTab?: string;
+  onCollapsedChange?: (collapsed: boolean) => void;
 }
 
-export function DashboardStats({ personFilter, statusFilter, search, riskHighlight, onRiskHighlightChange, activeTab }: DashboardStatsProps) {
+export function DashboardStats({ personFilter, statusFilter, search, riskHighlight, onRiskHighlightChange, activeTab, onCollapsedChange }: DashboardStatsProps) {
   const { data: projects = [] } = useProjects();
   const { data: rates = [] } = useExchangeRates();
 
@@ -81,7 +81,15 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
     try {
       localStorage.setItem(STORAGE_KEY, String(collapsed));
     } catch {}
-  }, [collapsed]);
+    onCollapsedChange?.(collapsed);
+  }, [collapsed, onCollapsedChange]);
+
+  // Listen for external toggle events
+  useEffect(() => {
+    const handler = () => setCollapsed(prev => !prev);
+    document.addEventListener("toggle-dashboard", handler);
+    return () => document.removeEventListener("toggle-dashboard", handler);
+  }, []);
 
   const filtered = useMemo(() => {
     let list = projects;
@@ -200,14 +208,7 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
   ];
 
   return (
-    <div className="space-y-2">
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-        {collapsed ? "Zobrazit dashboard" : "Skrýt dashboard"}
-      </button>
+    <div>
 
       {!collapsed && (
         <div className="flex gap-3 animate-in fade-in slide-in-from-top-2 duration-200" style={{ height: 190 }}>
