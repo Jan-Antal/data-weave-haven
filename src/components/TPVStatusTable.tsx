@@ -32,7 +32,7 @@ import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 import { useExportContext } from "./ExportContext";
 import { getProjectCellValue } from "@/lib/exportExcel";
 import { useStagesByProject } from "@/hooks/useAllProjectStages";
-import { useTPVItems } from "@/hooks/useTPVItems";
+import { useAllTPVItems } from "@/hooks/useAllTPVItems";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...TPV_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
@@ -80,16 +80,15 @@ function singleStageMatches(
 }
 
 // ── TPV Items count badge for List icon ─────────────────────────────
-const TPVListIcon = memo(function TPVListIcon({ projectId, onClick }: { projectId: string; onClick: () => void }) {
-  const { data: items = [] } = useTPVItems(projectId);
-  const hasItems = items.length > 0;
+const TPVListIcon = memo(function TPVListIcon({ projectId, itemCount, onClick }: { projectId: string; itemCount: number; onClick: () => void }) {
+  const hasItems = itemCount > 0;
   return (
     <button
       className={cn(
         "transition-colors cursor-pointer hover:text-[#e87c3e]",
         hasItems ? "text-gray-700" : "text-gray-300"
       )}
-      title={`TPV seznam (${items.length})`}
+      title={`TPV seznam (${itemCount})`}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
     >
       <List className="h-4 w-4" />
@@ -327,6 +326,7 @@ interface TPVProjectRowProps {
   project: Project;
   isExpanded: boolean;
   stageCount: number;
+  tpvItemCount: number;
   onToggleExpand: (pid: string) => void;
   onOpenTPVList: (projectId: string, projectName: string) => void;
   isVisible: (key: string) => boolean;
@@ -343,6 +343,7 @@ const TPVProjectRow = memo(function TPVProjectRow({
   project: p,
   isExpanded,
   stageCount,
+  tpvItemCount,
   onToggleExpand,
   onOpenTPVList,
   isVisible: v,
@@ -367,7 +368,7 @@ const TPVProjectRow = memo(function TPVProjectRow({
     <TableRow className="hover:bg-muted/50 transition-colors h-9" style={tpvHighlight.bg ? { backgroundColor: tpvHighlight.bg } : {}}>
       {/* Col 1 — Icon slot (32px) */}
       <TableCell style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="text-center px-0">
-        <TPVListIcon projectId={p.project_id} onClick={handleOpenList} />
+        <TPVListIcon projectId={p.project_id} itemCount={tpvItemCount} onClick={handleOpenList} />
       </TableCell>
       {/* Col 2 — Chevron slot (28px) */}
       <TableCell style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="px-0 cursor-pointer relative" onClick={() => onToggleExpand(p.project_id)}>
@@ -410,6 +411,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const { canEdit, canEditColumns } = useAuth();
   const { registerExport } = useExportContext();
   const { stagesByProject } = useStagesByProject();
+  const { itemsByProject: tpvItemsByProject } = useAllTPVItems();
   const [activeProject, setActiveProject] = useState<{ projectId: string; projectName: string } | null>(null);
 
   // Memoize filter Sets
@@ -616,6 +618,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                   project={p}
                   isExpanded={expanded.has(p.project_id)}
                   stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
+                  tpvItemCount={tpvItemsByProject.get(p.project_id)?.length ?? 0}
                   onToggleExpand={toggleExpand}
                   onOpenTPVList={handleOpenTPVList}
                   isVisible={v}
