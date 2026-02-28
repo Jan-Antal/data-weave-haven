@@ -148,10 +148,11 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
 
   return (
     <TableRow ref={setNodeRef} style={style} className={cn("bg-muted/20 h-9", dimmed && "opacity-40")}>
-      {/* Empty cell for TPV List icon column alignment */}
-      <TableCell style={{ width: 40, minWidth: 40, maxWidth: 40 }} />
-      <TableCell className="w-[32px]">
-        <div {...attributes} {...listeners} className="cursor-grab pl-2">
+      {/* Col 1 — Icon slot (32px) — empty for stages */}
+      <TableCell style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="px-0" />
+      {/* Col 2 — Chevron slot (28px) — drag handle for stages */}
+      <TableCell style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="px-0">
+        <div {...attributes} {...listeners} className="cursor-grab pl-1">
           <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
         </div>
       </TableCell>
@@ -364,11 +365,12 @@ const TPVProjectRow = memo(function TPVProjectRow({
 
   return (
     <TableRow className="hover:bg-muted/50 transition-colors h-9" style={tpvHighlight.bg ? { backgroundColor: tpvHighlight.bg } : {}}>
-      {/* List icon - first column */}
-      <TableCell style={{ width: 40, minWidth: 40, maxWidth: 40 }} className="text-center">
+      {/* Col 1 — Icon slot (32px) */}
+      <TableCell style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="text-center px-0">
         <TPVListIcon projectId={p.project_id} onClick={handleOpenList} />
       </TableCell>
-      <TableCell className="w-[32px] cursor-pointer relative" onClick={() => onToggleExpand(p.project_id)}>
+      {/* Col 2 — Chevron slot (28px) */}
+      <TableCell style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="px-0 cursor-pointer relative" onClick={() => onToggleExpand(p.project_id)}>
         {tpvHighlight.dotColor && (
           <span className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full" style={{ width: 6, height: 6, backgroundColor: tpvHighlight.dotColor }} />
         )}
@@ -582,11 +584,12 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
-              {/* List icon header - first column */}
-              <TableHead style={{ width: 40, minWidth: 40, maxWidth: 40 }} className="text-center">
+              {/* Col 1 — Icon slot (32px) */}
+              <TableHead style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="text-center px-0">
                 <List className="h-3.5 w-3.5 text-muted-foreground/50 mx-auto" />
               </TableHead>
-              <TableHead style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="shrink-0">
+              {/* Col 2 — Chevron slot (28px) */}
+              <TableHead style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="shrink-0 px-0">
                 {sorted.length > 0 && (
                   <button
                     className="text-muted-foreground/60 hover:text-muted-foreground transition-colors"
