@@ -1,4 +1,5 @@
 import React, { useState, Fragment, useMemo, useEffect, useCallback, memo, useRef } from "react";
+import { logActivity } from "@/lib/activityLog";
 import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColumns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge, RiskBadge } from "./StatusBadge";
@@ -104,12 +105,13 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
   const style = { transform: CSS.Transform.toString(transform), transition };
   const saveStage = useCallback((field: string, value: string) => {
     onFieldTouched?.(field);
+    const tracked = ["konstrukter", "status", "datum_smluvni"];
     updateStage.mutate({
       id: stage.id, field, value, projectId: project.project_id,
-      oldValue: field === "konstrukter" ? ((stage as any).konstrukter ?? "") : undefined,
-      stageName: field === "konstrukter" ? stage.stage_name : undefined,
+      oldValue: tracked.includes(field) ? ((stage as any)[field] ?? "") : undefined,
+      stageName: tracked.includes(field) ? stage.stage_name : undefined,
     });
-  }, [stage.id, stage.stage_name, (stage as any).konstrukter, project.project_id, onFieldTouched, updateStage]);
+  }, [stage.id, stage.stage_name, (stage as any).konstrukter, (stage as any).status, (stage as any).datum_smluvni, project.project_id, onFieldTouched, updateStage]);
   const v = isVisible;
   const inheritedClass = (field: string) => isFieldInherited?.(field) ? "text-blue-300" : "";
 
@@ -234,7 +236,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
       setFreshStages(prev => { const next = new Map(prev); next.delete(id); return next; });
       return;
     }
-
+    logActivity({ projectId, actionType: "etapa_created", detail: stageName });
     qc.invalidateQueries({ queryKey: ["all_project_stages"] });
   }, [projectId, project, stages, qc]);
 
