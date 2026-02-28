@@ -28,8 +28,11 @@ export function parseAppDate(dateStr: string): Date | undefined {
   if (!dateStr) return undefined;
 
   // Handle ISO timestamp with timezone (Supabase format): 2026-02-15T23:00:00.000Z
+  // Extract the date part and parse as local to avoid UTC timezone shifts
   if (dateStr.includes('T')) {
-    const d = new Date(dateStr);
+    const datePart = dateStr.split('T')[0]; // "2026-02-15"
+    const [year, month, day] = datePart.split('-').map(Number);
+    const d = new Date(year, month - 1, day);
     return isValid(d) && d.getFullYear() > 1900 ? d : undefined;
   }
 

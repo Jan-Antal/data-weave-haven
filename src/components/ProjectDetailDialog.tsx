@@ -608,6 +608,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                           <PopoverContent className="w-auto p-0 z-[99999]" align="start">
                             <Calendar
                               mode="single"
+                              defaultMonth={form.datum_objednavky ? parseAppDate(form.datum_objednavky) : undefined}
                               selected={form.datum_objednavky ? parseAppDate(form.datum_objednavky) : undefined}
                               onSelect={(d) => {
                                 if (d) setForm(s => ({ ...s, datum_objednavky: formatAppDate(d) }));
@@ -635,6 +636,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                           <PopoverContent className="w-auto p-0 z-[99999]" align="start">
                             <Calendar
                               mode="single"
+                              defaultMonth={form.datum_smluvni ? parseAppDate(form.datum_smluvni) : undefined}
                               selected={form.datum_smluvni ? parseAppDate(form.datum_smluvni) : undefined}
                               onSelect={(d) => {
                                 if (d) setForm(s => ({ ...s, datum_smluvni: formatAppDate(d) }));
