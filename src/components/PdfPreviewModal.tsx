@@ -57,7 +57,8 @@ export function PdfPreviewModal({ html, tabLabel, exportOptions, onClose }: PdfP
       const { headers, rows, filterSummary, statusColors } = exportOptions;
 
       // Measure how many rows fit on a page by rendering a test page
-      const RENDER_WIDTH_PX = 1120; // matches our CSS body width roughly
+      // A4 landscape: 297mm - 2×10mm margin = 277mm printable ≈ 1047px at 96dpi
+      const RENDER_WIDTH_PX = 1047;
       const SCALE = 2;
 
       // Render a single-row test page to get header+row height
