@@ -45,15 +45,13 @@ export function ExportButton({ activeTab, personFilter, statusFilter }: ExportBu
     setExcelPopupOpen(true);
   };
 
-  const handlePdfClick = () => {
+  const handlePdfClick = async () => {
     setDropdownOpen(false);
     if (!meta) return;
 
-    // Use default visible keys (what you see is what you get)
     const data = meta.getter(meta.defaultVisibleKeys);
     if (!data) return;
 
-    // Build filter summary
     const parts: string[] = [];
     if (personFilter) parts.push(personFilter);
     if (statusFilter && statusFilter.length > 0) {
@@ -61,7 +59,7 @@ export function ExportButton({ activeTab, personFilter, statusFilter }: ExportBu
     }
     const filterSummary = parts.length > 0 ? parts.join(", ") : undefined;
 
-    exportToPdf({
+    await exportToPdf({
       tabLabel: tabInfo.label,
       headers: data.headers,
       rows: data.rows,
