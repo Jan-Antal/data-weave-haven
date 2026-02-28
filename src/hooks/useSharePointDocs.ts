@@ -29,10 +29,10 @@ const ALL_CATEGORY_KEYS = Object.keys(CATEGORY_FOLDER_MAP);
 
 // Global file cache: projectId → categoryKey → SPFile[]
 const globalFileCache: Record<string, Record<string, SPFile[]>> = {};
-// Track when each project was last refreshed from SharePoint
 const lastRefreshTime: Record<string, number> = {};
 
 const CACHE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
+const EDGE_FN_TIMEOUT_MS = 10000; // 10 seconds
 
 export function useSharePointDocs(projectId: string) {
   const [filesByCategory, setFilesByCategory] = useState<Record<string, SPFile[]>>(() => {
@@ -42,12 +42,22 @@ export function useSharePointDocs(projectId: string) {
   const [initialLoading, setInitialLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [cacheTimestamp, setCacheTimestamp] = useState<string | null>(null);
   const fetchedRef = useRef<Set<string>>(new Set());
 
   const invoke = useCallback(async (body: Record<string, unknown>) => {
-    const { data, error } = await supabase.functions.invoke("sharepoint-documents", { body });
-    if (error) throw new Error(error.message ?? "Edge function error");
-    return data;
+    // Add timeout via AbortController
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), EDGE_FN_TIMEOUT_MS);
+    try {
+      const { data, error } = await supabase.functions.invoke("sharepoint-documents", { body });
+      clearTimeout(timeoutId);
+      if (error) throw new Error(error.message ?? "Edge function error");
+      return data;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      throw err;
+    }
   }, []);
 
   // Save file list to Supabase cache table
@@ -84,6 +94,7 @@ export function useSharePointDocs(projectId: string) {
         const filesMap = data.file_list as unknown as Record<string, SPFile[]>;
         globalFileCache[projectId] = filesMap;
         setFilesByCategory(filesMap);
+        setCacheTimestamp(data.updated_at);
         for (const key of Object.keys(filesMap)) {
           fetchedRef.current.add(key);
         }
@@ -114,9 +125,12 @@ export function useSharePointDocs(projectId: string) {
       globalFileCache[projectId] = map;
       lastRefreshTime[projectId] = Date.now();
       setFilesByCategory(map);
+      setCacheTimestamp(new Date().toISOString());
       // Persist to DB cache
       persistToCache(projectId, map);
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.warn("SharePoint fetch failed, using cached data:", err);
+    }
   }, [projectId, invoke, persistToCache]);
 
   const fetchAllCategories = useCallback(async () => {
@@ -137,10 +151,10 @@ export function useSharePointDocs(projectId: string) {
       return;
     }
 
-    // Try DB cache first
+    // Try DB cache first (shows data instantly without spinner)
     const isFresh = await loadFromDBCache();
     if (globalFileCache[projectId] && Object.keys(globalFileCache[projectId]).length > 0) {
-      // Got data from DB cache, optionally background refresh if stale
+      // Got data from DB cache — no spinner needed
       if (!isFresh) {
         setRefreshing(true);
         fetchAllFromSharePoint().finally(() => setRefreshing(false));
@@ -148,20 +162,49 @@ export function useSharePointDocs(projectId: string) {
       return;
     }
 
-    // No cache at all — fetch from SharePoint
+    // No cache at all — try edge function but don't show spinner for long
     setInitialLoading(true);
     try {
       await fetchAllFromSharePoint();
+    } catch {
+      // Edge function failed, show empty state
     } finally {
       setInitialLoading(false);
     }
   }, [projectId, loadFromDBCache, fetchAllFromSharePoint]);
 
+  // Manual refresh triggered by user
+  const manualRefresh = useCallback(async () => {
+    if (!projectId) return;
+    setRefreshing(true);
+    try {
+      await fetchAllFromSharePoint();
+    } catch {
+      // Silently fail, keep showing cached data
+    } finally {
+      setRefreshing(false);
+    }
+  }, [projectId, fetchAllFromSharePoint]);
+
   const listFiles = useCallback(async (categoryKey: string, force = false) => {
+    // Always show cached data immediately
+    if (globalFileCache[projectId]?.[categoryKey]) {
+      setFilesByCategory(prev => ({
+        ...prev,
+        [categoryKey]: globalFileCache[projectId][categoryKey],
+      }));
+    }
+
     if (!force && fetchedRef.current.has(categoryKey)) return;
     const folder = CATEGORY_FOLDER_MAP[categoryKey];
     if (!folder) return;
-    setLoadingCategory(categoryKey);
+    
+    // Only show loading if we have NO cached data for this category
+    const hasCachedData = (globalFileCache[projectId]?.[categoryKey]?.length ?? 0) > 0;
+    if (!hasCachedData) {
+      setLoadingCategory(categoryKey);
+    }
+    
     try {
       const files = await invoke({ action: "list", projectId, category: folder });
       const fileList = files ?? [];
@@ -173,8 +216,11 @@ export function useSharePointDocs(projectId: string) {
       });
       fetchedRef.current.add(categoryKey);
     } catch (err: any) {
-      console.error("SP list error:", err);
-      setFilesByCategory((prev) => ({ ...prev, [categoryKey]: [] }));
+      console.warn("SP list error (using cached data):", err);
+      // Don't clear existing cached data on error
+      if (!hasCachedData) {
+        setFilesByCategory((prev) => ({ ...prev, [categoryKey]: [] }));
+      }
     } finally {
       setLoadingCategory(null);
     }
@@ -241,7 +287,7 @@ export function useSharePointDocs(projectId: string) {
     fetchedRef.current.clear();
   }, []);
 
-  return { filesByCategory, loadingCategory, initialLoading, uploading, refreshing, listFiles, fetchAllCategories, uploadFile, getDownloadUrl, deleteFile, archiveProject, getPreview, resetCache };
+  return { filesByCategory, loadingCategory, initialLoading, uploading, refreshing, cacheTimestamp, listFiles, fetchAllCategories, manualRefresh, uploadFile, getDownloadUrl, deleteFile, archiveProject, getPreview, resetCache };
 }
 
 function fileToBase64(file: File): Promise<string> {

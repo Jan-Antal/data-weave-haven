@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, FileText, X, Trash2 } from "lucide-react";
+import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, FileText, X, Trash2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -500,8 +500,21 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
 
               {/* RIGHT PANEL — Documents */}
               <div className="w-[340px] shrink-0 border-l border-border bg-muted/30 flex flex-col">
-                <div className="px-4 pt-4 pb-2">
+                <div className="px-4 pt-4 pb-2 flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-foreground">Dokumenty</h3>
+                  <div className="flex items-center gap-1.5">
+                    {sp.refreshing && (
+                      <span className="text-[10px] text-muted-foreground">Aktualizace...</span>
+                    )}
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                      title="Obnovit dokumenty"
+                      onClick={() => sp.manualRefresh()}
+                    >
+                      <RefreshCw className={cn("h-3.5 w-3.5", sp.refreshing && "animate-spin")} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-4 pb-4">
@@ -533,12 +546,19 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
 
                           {isOpen && (
                             <div className="mt-1.5 ml-1 pl-3 border-l-2 border-primary/20 space-y-2">
-                              {isLoading ? (
+                              {sp.loadingCategory === cat.key && !files.length ? (
                                 <div className="flex items-center justify-center py-3">
                                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                                 </div>
                               ) : files.length === 0 ? (
-                                <p className="text-xs text-muted-foreground py-2">Žádné soubory</p>
+                                <div>
+                                  <p className="text-xs text-muted-foreground py-2">Žádné soubory</p>
+                                  {sp.cacheTimestamp && (
+                                    <p className="text-[10px] text-muted-foreground/60">
+                                      Poslední aktualizace: {new Date(sp.cacheTimestamp).toLocaleString("cs-CZ")}
+                                    </p>
+                                  )}
+                                </div>
                               ) : (
                                 <div className="space-y-0.5 max-h-[140px] overflow-y-auto">
                                   {files.map((f) => {

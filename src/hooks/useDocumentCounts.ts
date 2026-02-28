@@ -9,9 +9,16 @@ const memoryCache: Record<string, number> = {};
 let memoryCacheLoaded = false;
 let backgroundRefreshScheduled = false;
 
+// Etapa pattern: ends with -A, -B, etc. (single uppercase letter after last dash)
+const ETAPA_PATTERN = /-[A-Z]$/;
+
+export function isEtapa(projectId: string): boolean {
+  return ETAPA_PATTERN.test(projectId);
+}
+
 export function dispatchDocCountUpdate(projectId: string, delta: number) {
   memoryCache[projectId] = (memoryCache[projectId] ?? 0) + delta;
-  // Also update Supabase cache in background
+  // Also update DB cache in background
   updateSupabaseCacheForProject(projectId, delta);
   window.dispatchEvent(new CustomEvent(DOC_COUNT_EVENT, { detail: { projectId, delta } }));
 }
@@ -26,13 +33,12 @@ async function updateSupabaseCacheForProject(projectId: string, delta: number) {
     const newTotal = Math.max(0, (data?.total_count ?? 0) + delta);
     await supabase
       .from("sharepoint_document_cache")
-      .upsert({ project_id: projectId, total_count: newTotal, updated_at: new Date().toISOString() }, { onConflict: "project_id" });
+      .upsert({ project_id: projectId, total_count: newTotal, updated_at: new Date().toISOString() } as any, { onConflict: "project_id" });
   } catch { /* ignore cache update errors */ }
 }
 
-export function useDocumentCounts(projectIds: string[]) {
+export function useDocumentCounts(projectIds: string[], projectStatuses?: Record<string, string | null>) {
   const [counts, setCounts] = useState<Record<string, number>>(() => {
-    // Initialize from memory cache
     const cached: Record<string, number> = {};
     for (const id of projectIds) {
       if (id in memoryCache) cached[id] = memoryCache[id];
@@ -41,6 +47,9 @@ export function useDocumentCounts(projectIds: string[]) {
   });
   const [loading, setLoading] = useState(false);
   const mountedRef = useRef(true);
+
+  // Filter out etapy — only main projects get doc counts
+  const mainProjectIds = projectIds.filter(id => !isEtapa(id));
 
   // Step 1: Load from Supabase cache table (instant, persistent)
   const loadFromSupabaseCache = useCallback(async (ids: string[]) => {
@@ -68,11 +77,28 @@ export function useDocumentCounts(projectIds: string[]) {
   // Step 2: Background refresh from SharePoint edge function
   const backgroundRefreshFromSharePoint = useCallback(async (ids: string[]) => {
     if (ids.length === 0) return;
+    
+    // Skip Dokončeno projects for background refresh
+    let idsToRefresh = ids;
+    if (projectStatuses) {
+      idsToRefresh = ids.filter(id => projectStatuses[id] !== "Dokončeno");
+    }
+    if (idsToRefresh.length === 0) return;
+
     try {
+      // Add 10s timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
       const { data, error } = await supabase.functions.invoke("sharepoint-documents", {
-        body: { action: "count", projectIds: ids },
+        body: { action: "count", projectIds: idsToRefresh },
       });
-      if (error || !data?.counts) return;
+      clearTimeout(timeoutId);
+      
+      if (error || !data?.counts) {
+        console.warn("Background SharePoint refresh failed (using cached data):", error);
+        return;
+      }
 
       const newCounts = data.counts as Record<string, number>;
       const updates: Record<string, number> = {};
@@ -92,16 +118,16 @@ export function useDocumentCounts(projectIds: string[]) {
         setCounts(prev => ({ ...prev, ...updates }));
       }
 
-      // Persist to Supabase cache in batches
+      // Persist to DB cache in batches
       if (upsertRows.length > 0) {
         await supabase
           .from("sharepoint_document_cache")
-          .upsert(upsertRows, { onConflict: "project_id" });
+          .upsert(upsertRows as any, { onConflict: "project_id" });
       }
     } catch (err) {
-      console.error("Background SharePoint refresh error:", err);
+      console.warn("Background SharePoint refresh error (cached data still valid):", err);
     }
-  }, []);
+  }, [projectStatuses]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -110,40 +136,37 @@ export function useDocumentCounts(projectIds: string[]) {
 
   // Main effect: load cache then schedule background refresh
   useEffect(() => {
-    if (projectIds.length === 0) return;
+    if (mainProjectIds.length === 0) return;
 
     // Always sync from memory cache first
     const fromMemory: Record<string, number> = {};
-    let hasAll = true;
-    for (const id of projectIds) {
+    for (const id of mainProjectIds) {
       if (id in memoryCache) {
         fromMemory[id] = memoryCache[id];
-      } else {
-        hasAll = false;
       }
     }
     if (Object.keys(fromMemory).length > 0) {
       setCounts(prev => ({ ...prev, ...fromMemory }));
     }
 
-    // Load from Supabase cache if not all in memory yet
+    // Load from Supabase cache if not loaded yet
     if (!memoryCacheLoaded) {
       memoryCacheLoaded = true;
       setLoading(true);
-      loadFromSupabaseCache(projectIds).finally(() => {
+      loadFromSupabaseCache(mainProjectIds).finally(() => {
         if (mountedRef.current) setLoading(false);
       });
     }
 
-    // Schedule ONE background refresh from SharePoint (2s delay)
+    // Schedule ONE background refresh from SharePoint (3s delay)
     if (!backgroundRefreshScheduled) {
       backgroundRefreshScheduled = true;
       const timer = setTimeout(() => {
-        backgroundRefreshFromSharePoint(projectIds);
-      }, 2000);
+        backgroundRefreshFromSharePoint(mainProjectIds);
+      }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [projectIds, loadFromSupabaseCache, backgroundRefreshFromSharePoint]);
+  }, [mainProjectIds.join(","), loadFromSupabaseCache, backgroundRefreshFromSharePoint]);
 
   // Listen for upload/delete events from the edit dialog
   useEffect(() => {

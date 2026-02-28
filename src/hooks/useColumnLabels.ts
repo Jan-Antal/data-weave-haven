@@ -21,10 +21,10 @@ export function useColumnLabels(tab: string) {
         .select("column_key, custom_label, width, sort_order, display_order, visible")
         .eq("tab", tab);
       if (error) throw error;
-      const rows = (data || []) as ColumnLabelRow[];
-      console.log(`[column_labels] tab="${tab}"`, rows);
-      return rows;
+      return (data || []) as ColumnLabelRow[];
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes — don't refetch on every mount/tab switch
+    gcTime: 10 * 60 * 1000,
   });
 
   const getLabel = useCallback(
