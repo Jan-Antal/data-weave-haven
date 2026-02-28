@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import type { PdfExportOptions } from "@/lib/exportPdf";
 import { Download, ChevronDown, FileSpreadsheet, FileText } from "lucide-react";
 import { useExportContext } from "./ExportContext";
 import { ExportPopup } from "./ExportPopup";
@@ -24,6 +25,7 @@ export function ExportButton({ activeTab, personFilter, statusFilter }: ExportBu
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [excelPopupOpen, setExcelPopupOpen] = useState(false);
   const [pdfHtml, setPdfHtml] = useState<string | null>(null);
+  const [pdfExportOptions, setPdfExportOptions] = useState<PdfExportOptions | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   // Close on outside click
@@ -69,14 +71,16 @@ export function ExportButton({ activeTab, personFilter, statusFilter }: ExportBu
       statusColors[opt.label] = opt.color;
     }
 
-    const html = buildPrintableHtml({
+    const opts: PdfExportOptions = {
       tabLabel: tabInfo.label,
       headers: data.headers,
       rows: data.rows,
       filterSummary,
       statusColors,
-    });
+    };
 
+    const html = buildPrintableHtml(opts);
+    setPdfExportOptions(opts);
     setPdfHtml(html);
   };
 
@@ -125,11 +129,12 @@ export function ExportButton({ activeTab, personFilter, statusFilter }: ExportBu
         )}
       </div>
 
-      {pdfHtml && (
+      {pdfHtml && pdfExportOptions && (
         <PdfPreviewModal
           html={pdfHtml}
           tabLabel={tabInfo.label}
-          onClose={() => setPdfHtml(null)}
+          exportOptions={pdfExportOptions}
+          onClose={() => { setPdfHtml(null); setPdfExportOptions(null); }}
         />
       )}
     </>
