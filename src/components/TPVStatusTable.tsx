@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { getTPVDashboardRiskColor } from "@/hooks/useRiskHighlight";
 import { useAllColumnVisibility, PROJECT_INFO_NATIVE, PM_NATIVE, TPV_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
-import { getColumnStyle, renderColumnHeader, renderColumnCell, getColumnLabel } from "./CrossTabColumns";
+import { getColumnStyle, renderColumnHeader, renderColumnCell, getColumnLabel, COL_ICON_STYLE, COL_CHEVRON_STYLE } from "./CrossTabColumns";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -147,10 +147,10 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
 
   return (
     <TableRow ref={setNodeRef} style={style} className={cn("bg-muted/20 h-9", dimmed && "opacity-40")}>
-      {/* Col 1 — Icon slot (32px) — empty for stages */}
-      <TableCell style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="px-0" />
-      {/* Col 2 — Chevron slot (28px) — drag handle for stages */}
-      <TableCell style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="px-0">
+      {/* Col 1 — Icon slot — empty for stages */}
+      <TableCell style={COL_ICON_STYLE} className="px-0" />
+      {/* Col 2 — Chevron slot — drag handle for stages */}
+      <TableCell style={COL_CHEVRON_STYLE} className="px-0">
         <div {...attributes} {...listeners} className="cursor-grab pl-1">
           <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
         </div>
@@ -368,12 +368,12 @@ const TPVProjectRow = memo(function TPVProjectRow({
 
   return (
     <TableRow className="hover:bg-muted/50 transition-colors h-9" style={tpvHighlight.bg ? { backgroundColor: tpvHighlight.bg } : {}}>
-      {/* Col 1 — Icon slot (32px) */}
-      <TableCell style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="text-center px-0">
+      {/* Col 1 — Icon slot */}
+      <TableCell style={COL_ICON_STYLE} className="text-center px-0">
         <TPVListIcon projectId={p.project_id} itemCount={tpvItemCount} onClick={handleOpenList} />
       </TableCell>
-      {/* Col 2 — Chevron slot (28px) */}
-      <TableCell style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="px-0 cursor-pointer relative" onClick={() => onToggleExpand(p.project_id)}>
+      {/* Col 2 — Chevron slot */}
+      <TableCell style={COL_CHEVRON_STYLE} className="px-0 cursor-pointer relative" onClick={() => onToggleExpand(p.project_id)}>
         {tpvHighlight.dotColor && (
           <span className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full" style={{ width: 6, height: 6, backgroundColor: tpvHighlight.dotColor }} />
         )}
@@ -588,12 +588,12 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
-              {/* Col 1 — Icon slot (32px) */}
-              <TableHead style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="text-center px-0">
+              {/* Col 1 — Icon slot */}
+              <TableHead style={COL_ICON_STYLE} className="text-center px-0">
                 <List className="h-3.5 w-3.5 text-muted-foreground/50 mx-auto" />
               </TableHead>
-              {/* Col 2 — Chevron slot (28px) */}
-              <TableHead style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="shrink-0 px-0">
+              {/* Col 2 — Chevron slot */}
+              <TableHead style={COL_CHEVRON_STYLE} className="shrink-0 px-0">
                 {sorted.length > 0 && (
                   <button
                     className="text-muted-foreground/60 hover:text-muted-foreground transition-colors"

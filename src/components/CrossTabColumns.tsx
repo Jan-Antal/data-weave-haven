@@ -8,6 +8,10 @@ import type { Project } from "@/hooks/useProjects";
 import { ALL_COLUMNS } from "./ColumnVisibilityContext";
 import type { CustomColumnDef } from "@/hooks/useCustomColumns";
 
+// ── Shared layout constants for first 2 columns ────────────────────
+export const COL_ICON_STYLE: React.CSSProperties = { width: 40, minWidth: 40, maxWidth: 40 };
+export const COL_CHEVRON_STYLE: React.CSSProperties = { width: 32, minWidth: 32, maxWidth: 32 };
+
 // ── Centralised column-width system ─────────────────────────────────
 const DATE_KEYS = new Set([
   "datum_smluvni", "datum_objednavky", "zamereni",
