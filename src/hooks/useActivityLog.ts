@@ -23,10 +23,10 @@ interface Filters {
 
 function getActionTypes(category: Filters["category"]): string[] | null {
   switch (category) {
-    case "status": return ["status_change", "konstrukter_change"];
-    case "terminy": return ["datum_smluvni_change"];
-    case "documents": return ["document_uploaded", "document_deleted"];
-    case "projects": return ["project_created", "project_deleted", "project_restored"];
+    case "status": return ["status_change", "konstrukter_change", "etapa_status_change", "etapa_konstrukter_change"];
+    case "terminy": return ["datum_smluvni_change", "etapa_datum_smluvni_change"];
+    case "documents": return ["document_uploaded", "document_deleted", "etapa_document_uploaded", "etapa_document_deleted"];
+    case "projects": return ["project_created", "project_deleted", "project_restored", "etapa_created", "etapa_deleted"];
     default: return null;
   }
 }

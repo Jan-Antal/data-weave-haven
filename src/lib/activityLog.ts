@@ -8,7 +8,14 @@ export type ActivityActionType =
   | "project_deleted"
   | "project_restored"
   | "document_uploaded"
-  | "document_deleted";
+  | "document_deleted"
+  | "etapa_created"
+  | "etapa_deleted"
+  | "etapa_status_change"
+  | "etapa_konstrukter_change"
+  | "etapa_datum_smluvni_change"
+  | "etapa_document_uploaded"
+  | "etapa_document_deleted";
 
 interface LogParams {
   projectId: string;

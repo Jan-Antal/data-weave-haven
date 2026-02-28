@@ -329,7 +329,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
           </TableCell>
         </TableRow>
       )}
-      <ConfirmDialog open={!!deleteId} onConfirm={() => { if (deleteId) { deleteStage.mutate({ id: deleteId, projectId }); setDeleteId(null); } }} onCancel={() => setDeleteId(null)} />
+      <ConfirmDialog open={!!deleteId} onConfirm={() => { if (deleteId) { const s = stages.find(st => st.id === deleteId); deleteStage.mutate({ id: deleteId, projectId, stageName: s?.stage_name }); setDeleteId(null); } }} onCancel={() => setDeleteId(null)} />
     </>
   );
 }
