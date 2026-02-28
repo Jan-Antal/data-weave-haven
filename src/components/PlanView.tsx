@@ -5,6 +5,7 @@ import { useProjects, Project } from "@/hooks/useProjects";
 import { useProjectStages, ProjectStage } from "@/hooks/useProjectStages";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
+import { useAuth } from "@/hooks/useAuth";
 import { useSortFilter } from "@/hooks/useSortFilter";
 import { parseAppDate, formatAppDate } from "@/lib/dateFormat";
 import { ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
@@ -648,6 +649,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
   const [containerWidth, setContainerWidth] = useState(0);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const updateProject = useUpdateProject();
+  const { isFieldReadOnly } = useAuth();
 
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
@@ -957,14 +959,14 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                     {/* Milestone diamonds */}
                     {barData.diamonds.map((m, i, arr) => {
                       const showLabel = !arr.some((other, j) => j > i && Math.abs(differenceInDays(other.date, m.date)) <= 5);
-                      const isDraggable = DRAGGABLE_MILESTONES.has(m.name);
+                      const canDrag = DRAGGABLE_MILESTONES.has(m.name) && m.fieldKey && !isFieldReadOnly(m.fieldKey);
                       return (
                         <MilestoneDiamond
                           key={i} date={m.date} color={m.color} label={m.label} name={m.name}
                           origin={timelineStart} dayPx={dayPx} midY={midY} showLabel={showLabel}
                           zIndex={10 + m.priority}
-                          draggable={isDraggable}
-                          onDragEnd={isDraggable && m.fieldKey ? (newDate) => {
+                          draggable={canDrag}
+                          onDragEnd={canDrag && m.fieldKey ? (newDate) => {
                             const oldVal = (p as any)[m.fieldKey!] ?? "";
                             updateProject.mutate({
                               id: p.id,
