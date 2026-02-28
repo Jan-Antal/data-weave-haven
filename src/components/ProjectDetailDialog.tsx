@@ -556,11 +556,11 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                   <div
                     className={cn(
                       "col-span-2 overflow-hidden transition-all duration-300 ease-in-out",
-                      showLocation ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
+                      showLocation ? "max-h-[280px] opacity-100" : "max-h-0 opacity-0"
                     )}
                   >
-                    <div className="flex items-stretch gap-3 pb-1">
-                      <div className="flex-[3] relative">
+                    <div className="grid grid-cols-2 gap-3 pb-1">
+                      <div className="relative">
                         <Label className="text-xs">Lokace</Label>
                         <Input
                           ref={locInputRef}
@@ -587,13 +587,14 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                           </div>
                         )}
                       </div>
-                      <div className="flex-[2] flex flex-col">
-                        <div className="mt-5 flex-1 min-h-[48px] rounded-md border border-input bg-muted/50 overflow-hidden" style={{ maxHeight: '80px' }}>
+                      <div className="flex flex-col">
+                        <Label className="text-xs opacity-0">Mapa</Label>
+                        <div className="mt-1 rounded-lg border border-input bg-muted/50 overflow-hidden relative pointer-events-none" style={{ height: '200px' }}>
                           {form.location ? (
                             <iframe
                               title="Map preview"
-                              className="w-full border-0"
-                              style={{ height: '100px', marginTop: '-10px' }}
+                              className="w-full border-0 absolute inset-0"
+                              style={{ height: 'calc(100% + 50px)', marginTop: '-20px' }}
                               src={`https://maps.google.com/maps?q=${encodeURIComponent(form.location)}&z=15&t=m&hl=cs&output=embed`}
                               loading="lazy"
                               referrerPolicy="no-referrer-when-downgrade"
