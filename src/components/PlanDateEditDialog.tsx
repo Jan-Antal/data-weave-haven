@@ -133,26 +133,27 @@ export function PlanDateEditDialog({ project, open, onOpenChange }: PlanDateEdit
             const hasWarning = fieldsWithWarning.has(f.key);
 
             return (
-              <div key={f.key} className="flex items-center gap-2">
+              <div key={f.key} className="flex items-center gap-0">
                 <span className={cn(
                   "text-xs font-medium w-[120px] shrink-0",
-                  readOnly && "text-muted-foreground",
-                  hasWarning && !readOnly && "text-orange-500"
+                  readOnly && "text-muted-foreground"
                 )}>{f.label}</span>
-                {hasWarning && (
-                  <TooltipProvider delayDuration={200}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-orange-500" />
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="text-xs max-w-[220px]">
-                        {orderWarnings.filter(w => w.fields.has(f.key)).map((w, i) => (
-                          <div key={i}>{w.message}</div>
-                        ))}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
+                <div className="w-6 shrink-0 flex items-center justify-center">
+                  {hasWarning ? (
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs max-w-[220px]">
+                          {orderWarnings.filter(w => w.fields.has(f.key)).map((w, i) => (
+                            <div key={i}>{w.message}</div>
+                          ))}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : null}
+                </div>
                 <Popover
                   open={openPickers[f.key] || false}
                   onOpenChange={(o) => {
