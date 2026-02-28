@@ -109,54 +109,6 @@ function weeksLabel(startDate: Date, endDate: Date): string {
 // ── Milestone validation ────────────────────────────────────────────
 interface MilestoneWarning {
   message: string;
-  fields?: string[]; // which field keys are involved
-}
-
-// Expected order: datum_objednavky < tpv_date < expedice < predani < datum_smluvni
-const ORDER_PAIRS: { before: string; after: string; beforeLabel: string; afterLabel: string }[] = [
-  { before: "datum_objednavky", after: "tpv_date", beforeLabel: "Datum Objednání", afterLabel: "TPV" },
-  { before: "datum_objednavky", after: "expedice", beforeLabel: "Datum Objednání", afterLabel: "Expedice" },
-  { before: "datum_objednavky", after: "predani", beforeLabel: "Datum Objednání", afterLabel: "Předání" },
-  { before: "datum_objednavky", after: "datum_smluvni", beforeLabel: "Datum Objednání", afterLabel: "Datum Smluvní" },
-  { before: "tpv_date", after: "expedice", beforeLabel: "TPV", afterLabel: "Expedice" },
-  { before: "tpv_date", after: "predani", beforeLabel: "TPV", afterLabel: "Předání" },
-  { before: "tpv_date", after: "datum_smluvni", beforeLabel: "TPV", afterLabel: "Datum Smluvní" },
-  { before: "expedice", after: "predani", beforeLabel: "Expedice", afterLabel: "Předání" },
-  { before: "expedice", after: "datum_smluvni", beforeLabel: "Expedice", afterLabel: "Datum Smluvní" },
-  { before: "predani", after: "datum_smluvni", beforeLabel: "Předání", afterLabel: "Datum Smluvní" },
-];
-
-function getOrderWarnings(dateMap: Record<string, Date | null>): MilestoneWarning[] {
-  const warnings: MilestoneWarning[] = [];
-  for (const pair of ORDER_PAIRS) {
-    const d1 = dateMap[pair.before];
-    const d2 = dateMap[pair.after];
-    if (d1 && d2 && d2 < d1) {
-      warnings.push({
-        message: `${pair.afterLabel} je před ${pair.beforeLabel}`,
-        fields: [pair.before, pair.after],
-      });
-    }
-  }
-  return warnings;
-}
-
-// Exported for use in the popup dialog
-export function getFieldOrderWarnings(values: Record<string, string | null>): Record<string, string[]> {
-  const dateMap: Record<string, Date | null> = {};
-  for (const key of Object.keys(values)) {
-    const v = values[key];
-    dateMap[key] = v ? (parseAppDate(v.trim()) ?? null) : null;
-  }
-  const warnings = getOrderWarnings(dateMap);
-  const fieldWarnings: Record<string, string[]> = {};
-  for (const w of warnings) {
-    for (const f of w.fields ?? []) {
-      if (!fieldWarnings[f]) fieldWarnings[f] = [];
-      fieldWarnings[f].push(w.message);
-    }
-  }
-  return fieldWarnings;
 }
 
 function getBarWarnings(
@@ -170,6 +122,7 @@ function getBarWarnings(
   }
   if (!S || !E) return warnings;
 
+  // S + E exist
   const hasTPV = !!TPV;
   const hasEXP = !!EXP;
 
@@ -180,14 +133,6 @@ function getBarWarnings(
   } else if (!hasEXP) {
     warnings.push({ message: "Chybí milník Expedice" });
   }
-
-  // Order warnings
-  const dateMap: Record<string, Date | null> = {
-    datum_objednavky: S, tpv_date: TPV, expedice: EXP, predani: PRE, datum_smluvni: E,
-  };
-  const orderWarnings = getOrderWarnings(dateMap);
-  warnings.push(...orderWarnings);
-
   return warnings;
 }
 
