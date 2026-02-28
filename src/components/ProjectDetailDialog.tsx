@@ -89,7 +89,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
     currency: "CZK",
     marze: "",
   });
-  const [showLocation, setShowLocation] = useState(false);
+  
   const [priceEditing, setPriceEditing] = useState(false);
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
@@ -119,7 +119,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
       });
       setDeleteStep(0);
       setOpenCategory(null);
-      setShowLocation(!!(project as any).location);
+      
       setPriceEditing(false);
       sp.resetCache();
       resetIdCheck();
@@ -478,29 +478,38 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     {isViewer ? (
                       <p className="text-sm py-2">{form.klient || "—"}{form.location ? ` (${form.location})` : ""}</p>
                     ) : (
-                      <>
-                        <div className="flex items-center gap-1">
-                          <Input value={form.klient} onChange={(e) => setForm(s => ({ ...s, klient: e.target.value }))} />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-10 w-10 shrink-0 px-0"
-                            onClick={() => setShowLocation(v => !v)}
-                            title="Lokace"
-                          >
-                            <MapPin className={cn("h-4 w-4", form.location ? "text-primary" : "text-muted-foreground/50")} />
-                          </Button>
-                        </div>
-                        {showLocation && (
-                          <Input
-                            value={form.location}
-                            onChange={(e) => setForm(s => ({ ...s, location: e.target.value }))}
-                            placeholder="Lokace (např. Praha, Zlín…)"
-                            className="mt-1.5 text-xs"
-                          />
-                        )}
-                      </>
+                      <div className="flex items-center gap-1">
+                        <Input value={form.klient} onChange={(e) => setForm(s => ({ ...s, klient: e.target.value }))} />
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-10 w-10 shrink-0 px-0"
+                              title={form.location ? `Lokace: ${form.location}` : "Přidat lokaci"}
+                            >
+                              <MapPin className={cn("h-4 w-4", form.location ? "text-foreground" : "text-muted-foreground/30")} />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-52 p-2 z-[99999]" align="end" side="bottom">
+                            <Input
+                              autoFocus
+                              value={form.location}
+                              onChange={(e) => setForm(s => ({ ...s, location: e.target.value }))}
+                              placeholder="Praha, Zlín…"
+                              className="text-xs h-8"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  (e.target as HTMLInputElement).blur();
+                                  // Close popover by clicking outside
+                                  document.body.click();
+                                }
+                              }}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
                     )}
                   </div>
                   <div>
