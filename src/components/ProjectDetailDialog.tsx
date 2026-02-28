@@ -89,7 +89,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
     currency: "CZK",
     marze: "",
   });
-  
+  const [showLocation, setShowLocation] = useState(false);
+  const [mapCoords, setMapCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [priceEditing, setPriceEditing] = useState(false);
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
@@ -119,7 +121,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
       });
       setDeleteStep(0);
       setOpenCategory(null);
-      
+      setShowLocation(!!(project as any).location);
+      setMapCoords(null);
       setPriceEditing(false);
       sp.resetCache();
       resetIdCheck();
@@ -208,6 +211,30 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
   const previewTotal = previewFiles.length;
   const canGoPrev = previewTotal > 1 && previewCurrentIndex > 0;
   const canGoNext = previewTotal > 1 && previewCurrentIndex < previewTotal - 1;
+
+  const geocodeLocation = useCallback((query: string) => {
+    if (geocodeTimer.current) clearTimeout(geocodeTimer.current);
+    if (!query.trim()) { setMapCoords(null); return; }
+    geocodeTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`, {
+          headers: { "Accept": "application/json" },
+        });
+        const data = await res.json();
+        if (data.length > 0) {
+          setMapCoords({ lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) });
+        } else {
+          setMapCoords(null);
+        }
+      } catch { setMapCoords(null); }
+    }, 1000);
+  }, []);
+
+  // Auto-geocode when location row is shown and has a value
+  useEffect(() => {
+    if (showLocation && form.location) geocodeLocation(form.location);
+    return () => { if (geocodeTimer.current) clearTimeout(geocodeTimer.current); };
+  }, [showLocation]);
 
   if (!project) return null;
 
@@ -478,41 +505,62 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     {isViewer ? (
                       <p className="text-sm py-2">{form.klient || "—"}{form.location ? ` (${form.location})` : ""}</p>
                     ) : (
-                      <div className="relative flex items-center gap-1">
+                      <div className="flex items-center gap-1">
                         <Input value={form.klient} onChange={(e) => setForm(s => ({ ...s, klient: e.target.value }))} />
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <button
-                              type="button"
-                              className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent transition-colors"
-                              title={form.location ? `Lokace: ${form.location}` : "Přidat lokaci"}
-                            >
-                              <MapPin className={cn("h-4 w-4", form.location ? "text-primary" : "text-muted-foreground/40")} />
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent
-                            className="w-48 p-2 z-[99999] shadow-lg"
-                            align="end"
-                            side="bottom"
-                            sideOffset={4}
-                          >
-                            <Input
-                              autoFocus
-                              value={form.location}
-                              onChange={(e) => setForm(s => ({ ...s, location: e.target.value }))}
-                              placeholder="Praha, Zlín…"
-                              className="text-xs h-8"
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  (e.target as HTMLInputElement).blur();
-                                  document.body.click();
-                                }
-                              }}
-                            />
-                          </PopoverContent>
-                        </Popover>
+                        <button
+                          type="button"
+                          className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent transition-colors"
+                          title={form.location ? `Lokace: ${form.location}` : "Přidat lokaci"}
+                          onClick={() => setShowLocation(v => !v)}
+                        >
+                          <MapPin className={cn("h-4 w-4", form.location ? "text-primary" : "text-muted-foreground/30")} />
+                        </button>
                       </div>
                     )}
+                  </div>
+
+                  {/* Expandable location row */}
+                  <div
+                    className={cn(
+                      "col-span-2 overflow-hidden transition-all duration-200 ease-in-out",
+                      showLocation ? "max-h-[220px] opacity-100" : "max-h-0 opacity-0"
+                    )}
+                  >
+                    <div className="flex gap-3 pb-2">
+                      <div className="flex-[3] min-w-0">
+                        <Label className="text-xs text-muted-foreground mb-1 block">Adresa / Lokace</Label>
+                        <Input
+                          value={form.location}
+                          onChange={(e) => setForm(s => ({ ...s, location: e.target.value }))}
+                          placeholder="Zadejte adresu..."
+                          className="text-sm"
+                          onBlur={() => geocodeLocation(form.location)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              geocodeLocation(form.location);
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="flex-[2] min-w-0">
+                        <Label className="text-xs text-muted-foreground mb-1 block">Mapa</Label>
+                        <div className="h-[160px] rounded-lg overflow-hidden bg-muted">
+                          {mapCoords ? (
+                            <iframe
+                              title="Map preview"
+                              className="w-full h-full border-0"
+                              src={`https://www.openstreetmap.org/export/embed.html?bbox=${mapCoords.lon - 0.01},${mapCoords.lat - 0.01},${mapCoords.lon + 0.01},${mapCoords.lat + 0.01}&layer=mapnik&marker=${mapCoords.lat},${mapCoords.lon}`}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground/40 text-xs">
+                              <MapPin className="h-5 w-5 mr-1.5 opacity-40" />
+                              Zadejte adresu pro zobrazení mapy
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   <div>
                     <Label className="text-xs">PM</Label>
