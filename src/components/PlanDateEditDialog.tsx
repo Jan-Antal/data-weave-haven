@@ -7,6 +7,7 @@ import { CalendarIcon, Trash2 } from "lucide-react";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
 import { cn } from "@/lib/utils";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
+import { useAuth } from "@/hooks/useAuth";
 import type { Project } from "@/hooks/useProjects";
 
 const DATE_FIELDS = [
@@ -27,6 +28,7 @@ interface PlanDateEditDialogProps {
 
 export function PlanDateEditDialog({ project, open, onOpenChange }: PlanDateEditDialogProps) {
   const updateProject = useUpdateProject();
+  const { isViewer, isFieldReadOnly } = useAuth();
   const [values, setValues] = useState<Record<FieldKey, string | null>>({
     datum_objednavky: null,
     datum_smluvni: null,
@@ -72,6 +74,12 @@ export function PlanDateEditDialog({ project, open, onOpenChange }: PlanDateEdit
     return day === 0 || day === 6;
   };
 
+  const hasChanges = DATE_FIELDS.some(f => {
+    const oldVal = (project as any)[f.key] ?? "";
+    const newVal = values[f.key] ?? "";
+    return oldVal !== newVal;
+  });
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[400px]">
@@ -85,21 +93,27 @@ export function PlanDateEditDialog({ project, open, onOpenChange }: PlanDateEdit
           {DATE_FIELDS.map((f) => {
             const raw = values[f.key];
             const parsed = raw ? parseAppDate(raw) : undefined;
+            const readOnly = isFieldReadOnly(f.key);
 
             return (
               <div key={f.key} className="flex items-center gap-2">
-                <span className="text-xs font-medium w-[120px] shrink-0">{f.label}</span>
+                <span className={cn("text-xs font-medium w-[120px] shrink-0", readOnly && "text-muted-foreground")}>{f.label}</span>
                 <Popover
                   open={openPickers[f.key] || false}
-                  onOpenChange={(o) => setOpenPickers((prev) => ({ ...prev, [f.key]: o }))}
+                  onOpenChange={(o) => {
+                    if (readOnly) return;
+                    setOpenPickers((prev) => ({ ...prev, [f.key]: o }));
+                  }}
                 >
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       size="sm"
+                      disabled={readOnly}
                       className={cn(
                         "h-8 w-[140px] justify-start text-left font-normal text-xs",
-                        !parsed && "text-muted-foreground"
+                        !parsed && "text-muted-foreground",
+                        readOnly && "opacity-50 cursor-not-allowed"
                       )}
                     >
                       <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
@@ -145,11 +159,13 @@ export function PlanDateEditDialog({ project, open, onOpenChange }: PlanDateEdit
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-            Zrušit
+            {isViewer ? "Zavřít" : "Zrušit"}
           </Button>
-          <Button size="sm" onClick={handleSave}>
-            Uložit
-          </Button>
+          {!isViewer && (
+            <Button size="sm" onClick={handleSave} disabled={!hasChanges}>
+              Uložit
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
