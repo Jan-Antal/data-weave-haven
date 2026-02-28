@@ -454,6 +454,30 @@ export type Database = {
         }
         Relationships: []
       }
+      sharepoint_document_cache: {
+        Row: {
+          category_counts: Json
+          file_list: Json
+          project_id: string
+          total_count: number
+          updated_at: string
+        }
+        Insert: {
+          category_counts?: Json
+          file_list?: Json
+          project_id: string
+          total_count?: number
+          updated_at?: string
+        }
+        Update: {
+          category_counts?: Json
+          file_list?: Json
+          project_id?: string
+          total_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tpv_items: {
         Row: {
           accepted_date: string | null
