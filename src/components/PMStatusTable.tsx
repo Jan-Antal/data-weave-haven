@@ -101,10 +101,10 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
   const updateStage = useUpdateStage();
   const style = { transform: CSS.Transform.toString(transform), transition };
-  const saveStage = (field: string, value: string) => {
+  const saveStage = useCallback((field: string, value: string) => {
     onFieldTouched?.(field);
     updateStage.mutate({ id: stage.id, field, value, projectId: project.project_id });
-  };
+  }, [stage.id, project.project_id, onFieldTouched, updateStage]);
   const v = isVisible;
   const inheritedClass = (field: string) => isFieldInherited?.(field) ? "text-blue-300" : "";
 
@@ -181,8 +181,14 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     return lastChar ? String.fromCharCode(lastChar.charCodeAt(0) + 1) : "A";
   };
 
-  const handleInlineAdd = async () => {
-    const stageName = `${projectId}-${nextSuffix()}`;
+  const handleInlineAdd = useCallback(async () => {
+    const letters = stages.map(s => {
+      const match = s.stage_name.match(/-([A-Z])$/);
+      return match ? match[1] : null;
+    }).filter(Boolean) as string[];
+    const lastChar = letters.sort().pop();
+    const suffix = lastChar ? String.fromCharCode(lastChar.charCodeAt(0) + 1) : "A";
+    const stageName = `${projectId}-${suffix}`;
     const id = crypto.randomUUID();
 
     // Build inherited data from parent
@@ -222,7 +228,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     }
 
     qc.invalidateQueries({ queryKey: ["all_project_stages"] });
-  };
+  }, [projectId, project, stages, qc]);
 
   const markFieldTouched = useCallback((stageId: string, field: string) => {
     setFreshStages(prev => {
@@ -240,13 +246,13 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     });
   }, []);
 
-  const handleCancelStage = async (stageId: string) => {
+  const handleCancelStage = useCallback(async (stageId: string) => {
     await supabase.from("project_stages").delete().eq("id", stageId);
     setFreshStages(prev => { const next = new Map(prev); next.delete(stageId); return next; });
     setCancelConfirmId(null);
     qc.invalidateQueries({ queryKey: ["project_stages", projectId] });
     qc.invalidateQueries({ queryKey: ["all_project_stages"] });
-  };
+  }, [projectId, qc]);
 
   // Handle Escape key for fresh stages
   useEffect(() => {
@@ -263,7 +269,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     return () => document.removeEventListener("keydown", handler);
   }, [freshStages]);
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     const oldIndex = stages.findIndex(s => s.id === active.id);
@@ -273,7 +279,9 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
       stages: reordered.map((s, i) => ({ id: s.id, stage_order: i })),
       projectId,
     });
-  };
+  }, [stages, projectId, reorderStages]);
+
+  const handleDelete = useCallback((id: string) => setDeleteId(id), []);
 
   return (
     <>
@@ -284,7 +292,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
               key={stage.id}
               stage={stage}
               project={project}
-              onDelete={(id) => setDeleteId(id)}
+              onDelete={handleDelete}
               isVisible={isVisible}
               statusLabels={statusLabels}
               canEdit={canEdit}
@@ -322,6 +330,53 @@ function ExpandArrow({ projectId, isExpanded, stageCount }: { projectId: string;
   return <ChevronRight className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent fill-accent/20" : "text-muted-foreground/50"}`} />;
 }
 
+// ── Memoized parent project row ──────────────────────────────────────
+interface PMProjectRowProps {
+  project: Project;
+  isExpanded: boolean;
+  stageCount: number;
+  onToggleExpand: (pid: string) => void;
+  isVisible: (key: string) => boolean;
+  renderKeys: string[];
+  save: (id: string, field: string, value: string, oldValue: string) => void;
+  canEdit: boolean;
+  statusLabels: string[];
+  customColumns: any[];
+  saveCustomField: (rowId: string, colKey: string, val: string, old: string) => void;
+  riskHighlight: any;
+}
+
+const PMProjectRow = memo(function PMProjectRow({
+  project: p,
+  isExpanded,
+  stageCount,
+  onToggleExpand,
+  isVisible: v,
+  renderKeys,
+  save,
+  canEdit,
+  statusLabels,
+  customColumns,
+  saveCustomField,
+  riskHighlight,
+}: PMProjectRowProps) {
+  const bgStyle = useMemo(() => {
+    const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
+    return c ? { backgroundColor: c } : {};
+  }, [p.risk, p.datum_smluvni, riskHighlight]);
+
+  return (
+    <TableRow className="hover:bg-muted/50 transition-colors h-9" style={bgStyle}>
+      <TableCell className="w-[32px] cursor-pointer" onClick={() => onToggleExpand(p.project_id)}>
+        <ExpandArrow projectId={p.project_id} isExpanded={isExpanded} stageCount={stageCount} />
+      </TableCell>
+      {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
+      {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name} className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
+      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old) }))}
+    </TableRow>
+  );
+});
+
 interface PMStatusTableProps {
   personFilter: string | null;
   statusFilter: string[];
@@ -332,7 +387,7 @@ interface PMStatusTableProps {
 export function PMStatusTable({ personFilter, statusFilter, search: externalSearch, riskHighlight }: PMStatusTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
-  const statusLabels = statusOptions.map((s) => s.label);
+  const statusLabels = useMemo(() => statusOptions.map((s) => s.label), [statusOptions]);
   const updateProject = useUpdateProject();
   const { columns: customColumns } = useAllCustomColumns("projects");
   const updateCustomField = useUpdateCustomField();
@@ -346,6 +401,16 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const { canEdit, canEditColumns } = useAuth();
   const { registerExport } = useExportContext();
   const { stagesByProject } = useStagesByProject();
+
+  // Memoize filter Sets to avoid re-creation on every render
+  const statusFilterSet = useMemo(
+    () => statusFilter && statusFilter.length > 0 ? new Set(statusFilter) : null,
+    [statusFilter]
+  );
+  const searchLower = useMemo(
+    () => externalSearch ? externalSearch.toLowerCase() : null,
+    [externalSearch]
+  );
 
   // Frozen filter results: only recompute visible IDs when filter values or dataset size changes,
   // NOT when individual project data is edited.
@@ -362,9 +427,6 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
     const baseIds = new Set(baseSorted.map((p) => p.project_id));
 
     if (hasActiveFilters && stagesByProject.size > 0) {
-      const statusFilterSet = statusFilter && statusFilter.length > 0 ? new Set(statusFilter) : null;
-      const searchLower = externalSearch ? externalSearch.toLowerCase() : null;
-
       for (const p of projects) {
         if (baseIds.has(p.project_id)) continue;
         const stages = stagesByProject.get(p.project_id);
@@ -453,7 +515,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
     });
   }, [registerExport, sorted, allVisibleKeys, getLabel]);
 
-  const toggleExpand = (pid: string) => {
+  const toggleExpand = useCallback((pid: string) => {
     setExpanded(prev => {
       const next = new Set(prev);
       if (!next.has(pid)) {
@@ -471,11 +533,15 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
       }
       return next;
     });
-  };
+  }, [showAddButton]);
 
-  const save = (id: string, field: string, value: string, oldValue: string) => {
+  const save = useCallback((id: string, field: string, value: string, oldValue: string) => {
     updateProject.mutate({ id, field, value, oldValue });
-  };
+  }, [updateProject]);
+
+  const handleSaveCustomField = useCallback((rowId: string, colKey: string, val: string, old: string) => {
+    updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old });
+  }, [updateCustomField]);
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Načítání...</div>;
 
@@ -543,15 +609,34 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
           <TableBody>
             {sorted.map((p) => (
               <Fragment key={p.id}>
-                <TableRow className="hover:bg-muted/50 transition-colors h-9" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { backgroundColor: c } : {}; })()}>
-                  <TableCell className="w-[32px] cursor-pointer" onClick={() => toggleExpand(p.project_id)}>
-                    <ExpandArrow projectId={p.project_id} isExpanded={expanded.has(p.project_id)} stageCount={stagesByProject.get(p.project_id)?.length ?? 0} />
-                  </TableCell>
-                  {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
-                  {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name} className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-                  {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }) }))}
-                </TableRow>
-                {expanded.has(p.project_id) && <StagesSection projectId={p.project_id} project={p} isVisible={v} statusLabels={statusLabels} canEdit={canEdit} renderKeys={renderKeys} personFilter={personFilter} statusFilterSet={statusFilter && statusFilter.length > 0 ? new Set(statusFilter) : null} searchLower={externalSearch ? externalSearch.toLowerCase() : null} showAddButton={showAddButton.has(p.project_id)} />}
+                <PMProjectRow
+                  project={p}
+                  isExpanded={expanded.has(p.project_id)}
+                  stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
+                  onToggleExpand={toggleExpand}
+                  isVisible={v}
+                  renderKeys={renderKeys}
+                  save={save}
+                  canEdit={canEdit}
+                  statusLabels={statusLabels}
+                  customColumns={customColumns}
+                  saveCustomField={handleSaveCustomField}
+                  riskHighlight={riskHighlight}
+                />
+                {expanded.has(p.project_id) && (
+                  <StagesSection
+                    projectId={p.project_id}
+                    project={p}
+                    isVisible={v}
+                    statusLabels={statusLabels}
+                    canEdit={canEdit}
+                    renderKeys={renderKeys}
+                    personFilter={personFilter}
+                    statusFilterSet={statusFilterSet}
+                    searchLower={searchLower}
+                    showAddButton={showAddButton.has(p.project_id)}
+                  />
+                )}
               </Fragment>
             ))}
           </TableBody>
