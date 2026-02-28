@@ -92,7 +92,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
   
   const [priceEditing, setPriceEditing] = useState(false);
   const [showLocation, setShowLocation] = useState(false);
-  const [mapCoords, setMapCoords] = useState<{ lat: string; lon: string } | null>(null);
+  
   const [locSuggestions, setLocSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
   const [showLocDropdown, setShowLocDropdown] = useState(false);
   const locDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -127,7 +127,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
       setOpenCategory(null);
       setShowLocation(false);
       setPriceEditing(false);
-      setMapCoords(null);
+      
       setLocSuggestions([]);
       setShowLocDropdown(false);
       sp.resetCache();
@@ -135,19 +135,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
     }
   }, [project, open, resetIdCheck]);
 
-  // Geocode location on dialog open if location exists
-  useEffect(() => {
-    if (project && open && form.location) {
-      fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(form.location)}&format=json&limit=1&countrycodes=cz,sk,at,de`, {
-        headers: { "Accept-Language": "cs" },
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data?.[0]) setMapCoords({ lat: data[0].lat, lon: data[0].lon });
-        })
-        .catch(() => {});
-    }
-  }, [project?.project_id, open]);
+  // Google Maps iframe handles its own geocoding via q= parameter — no Nominatim needed for map display
 
   // Debounced Nominatim autocomplete
   const handleLocationInput = useCallback((value: string) => {
@@ -176,7 +164,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
 
   const handleSelectSuggestion = useCallback((s: { display_name: string; lat: string; lon: string }) => {
     setForm(prev => ({ ...prev, location: s.display_name }));
-    setMapCoords({ lat: s.lat, lon: s.lon });
     setShowLocDropdown(false);
     setLocSuggestions([]);
   }, []);
@@ -185,17 +172,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
     if (e.key === "Enter") {
       e.preventDefault();
       setShowLocDropdown(false);
-      // Geocode current text
-      if (form.location.length >= 3) {
-        fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(form.location)}&format=json&limit=1&countrycodes=cz,sk,at,de`, {
-          headers: { "Accept-Language": "cs" },
-        })
-          .then(r => r.json())
-          .then(data => {
-            if (data?.[0]) setMapCoords({ lat: data[0].lat, lon: data[0].lon });
-          })
-          .catch(() => {});
-      }
+      // Map updates automatically via iframe q= parameter
     }
   }, [form.location]);
 
@@ -612,19 +589,15 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                       </div>
                       <div className="flex-[2] flex flex-col">
                         <div className="mt-5 flex-1 min-h-[48px] rounded-md border border-input bg-muted/50 overflow-hidden" style={{ maxHeight: '80px' }}>
-                          {mapCoords ? (
+                          {form.location ? (
                             <iframe
                               title="Map preview"
                               className="w-full border-0"
                               style={{ height: '100px', marginTop: '-10px' }}
-                              src={`https://maps.google.com/maps?ll=${mapCoords.lat},${mapCoords.lon}&z=15&t=m&hl=cs&mapclient=embed&q=${mapCoords.lat},${mapCoords.lon}&output=embed`}
+                              src={`https://maps.google.com/maps?q=${encodeURIComponent(form.location)}&z=15&t=m&hl=cs&output=embed`}
                               loading="lazy"
                               referrerPolicy="no-referrer-when-downgrade"
                             />
-                          ) : form.location ? (
-                            <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
-                              <Loader2 className="h-3 w-3 animate-spin mr-1" /> Hledám…
-                            </div>
                           ) : (
                             <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
                               Zadejte adresu
