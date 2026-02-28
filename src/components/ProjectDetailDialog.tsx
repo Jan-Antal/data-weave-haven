@@ -589,11 +589,11 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                       </div>
                       <div className="flex flex-col">
                         <Label className="text-xs opacity-0">Mapa</Label>
-                        <div className="mt-1 rounded-lg border border-input bg-muted/50 overflow-hidden relative pointer-events-none" style={{ height: '200px' }}>
+                        <div className="mt-1 rounded-lg border border-input bg-muted/50 overflow-hidden relative" style={{ height: '200px' }}>
                           {form.location ? (
                             <iframe
                               title="Map preview"
-                              className="w-full border-0 absolute inset-0"
+                              className="w-full border-0 absolute inset-0 pointer-events-none"
                               style={{ height: 'calc(100% + 50px)', marginTop: '-20px' }}
                               src={`https://maps.google.com/maps?q=${encodeURIComponent(form.location)}&z=15&t=m&hl=cs&output=embed`}
                               loading="lazy"
