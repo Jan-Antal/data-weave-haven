@@ -13,7 +13,7 @@ export const ALL_COLUMNS: ColumnDef[] = [
   { key: "datum_objednavky", label: "Datum Objednávky" },
   { key: "prodejni_cena", label: "Prodejní cena" },
   { key: "marze", label: "Marže" },
-  { key: "link_cn", label: "CN" },
+  
   { key: "pm", label: "PM" },
   { key: "status", label: "Status" },
   { key: "risk", label: "Risk" },
@@ -38,7 +38,7 @@ const LOCKED: ColumnDef[] = [
 // ── Native column keys per tab ──────────────────────────────────────
 export const PROJECT_INFO_NATIVE = [
   "klient", "location", "kalkulant", "architekt",
-  "datum_smluvni", "datum_objednavky", "prodejni_cena", "marze", "link_cn",
+  "datum_smluvni", "datum_objednavky", "prodejni_cena", "marze",
 ];
 export const PM_NATIVE = [
   "pm", "status", "risk", "zamereni", "tpv_date",
