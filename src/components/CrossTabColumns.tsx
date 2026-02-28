@@ -114,11 +114,12 @@ interface CellProps {
   saveCurrency?: (id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => void;
   customColumns?: CustomColumnDef[];
   saveCustomField?: (rowId: string, columnKey: string, value: string, oldValue: string) => void;
+  isFieldReadOnly?: (field: string) => boolean;
 }
 
 export function renderColumnCell(props: CellProps) {
-  const { colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField } = props;
-  return renderCell(key, p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField);
+  const { colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField, isFieldReadOnly } = props;
+  return renderCell(key, p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField, isFieldReadOnly);
 }
 
 function renderCell(
@@ -128,62 +129,63 @@ function renderCell(
   saveCurrency?: (id: string, a: string, c: string, oa: string, oc: string) => void,
   customColumns?: CustomColumnDef[],
   saveCustomField?: (rowId: string, columnKey: string, value: string, oldValue: string) => void,
+  isFieldReadOnly?: (field: string) => boolean,
 ) {
   const s = (field: string, val: string, old: string) => save(p.id, field, val, old);
   const v = (field: keyof Project) => (p as any)[field] ?? "";
+  const ro = (field: string) => !canEdit || (isFieldReadOnly?.(field) ?? false);
 
   switch (key) {
     case "klient":
-      return <TableCell key={key}><InlineEditableCell value={p.klient} onSave={(x) => s("klient", x, v("klient"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.klient} onSave={(x) => s("klient", x, v("klient"))} readOnly={ro("klient")} /></TableCell>;
     case "location":
-      return <TableCell key={key}><InlineEditableCell value={p.location} onSave={(x) => s("location", x, v("location"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.location} onSave={(x) => s("location", x, v("location"))} readOnly={ro("location")} /></TableCell>;
     case "kalkulant":
-      return <TableCell key={key}><InlineEditableCell value={p.kalkulant} type="people" peopleRole="Kalkulant" onSave={(x) => s("kalkulant", x, v("kalkulant"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.kalkulant} type="people" peopleRole="Kalkulant" onSave={(x) => s("kalkulant", x, v("kalkulant"))} readOnly={ro("kalkulant")} /></TableCell>;
     case "architekt":
-      return <TableCell key={key}><InlineEditableCell value={p.architekt} onSave={(x) => s("architekt", x, v("architekt"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.architekt} onSave={(x) => s("architekt", x, v("architekt"))} readOnly={ro("architekt")} /></TableCell>;
     case "datum_smluvni":
-      return <TableCell key={key}><InlineEditableCell value={p.datum_smluvni} type="date" onSave={(x) => s("datum_smluvni", x, v("datum_smluvni"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.datum_smluvni} type="date" onSave={(x) => s("datum_smluvni", x, v("datum_smluvni"))} readOnly={ro("datum_smluvni")} /></TableCell>;
     case "datum_objednavky":
-      return <TableCell key={key}><InlineEditableCell value={p.datum_objednavky} type="date" onSave={(x) => s("datum_objednavky", x, v("datum_objednavky"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.datum_objednavky} type="date" onSave={(x) => s("datum_objednavky", x, v("datum_objednavky"))} readOnly={ro("datum_objednavky")} /></TableCell>;
     case "prodejni_cena":
-      if (saveCurrency) {
+      if (saveCurrency && !ro("prodejni_cena")) {
         return <TableCell key={key} className="text-right"><CurrencyEditCell value={p.prodejni_cena} currency={p.currency || "CZK"} onSave={(a, c) => saveCurrency(p.id, a, c, String(p.prodejni_cena ?? ""), p.currency || "CZK")} /></TableCell>;
       }
-      return <TableCell key={key} className="text-right"><InlineEditableCell value={String(p.prodejni_cena ?? "")} onSave={(x) => s("prodejni_cena", x, String(p.prodejni_cena ?? ""))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className="text-right"><InlineEditableCell value={String(p.prodejni_cena ?? "")} onSave={(x) => s("prodejni_cena", x, String(p.prodejni_cena ?? ""))} readOnly={ro("prodejni_cena")} /></TableCell>;
     case "marze":
-      return <TableCell key={key} className="text-right"><InlineEditableCell value={p.marze} onSave={(x) => s("marze", x, v("marze"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} className="text-right"><InlineEditableCell value={p.marze} onSave={(x) => s("marze", x, v("marze"))} readOnly={ro("marze")} /></TableCell>;
     case "link_cn":
-      return <TableCell key={key}><InlineEditableCell value={p.link_cn} onSave={(x) => s("link_cn", x, v("link_cn"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.link_cn} onSave={(x) => s("link_cn", x, v("link_cn"))} readOnly={ro("link_cn")} /></TableCell>;
     case "pm":
-      return <TableCell key={key}><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(x) => s("pm", x, v("pm"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(x) => s("pm", x, v("pm"))} readOnly={ro("pm")} /></TableCell>;
     case "status":
-      return <TableCell key={key}><InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(x) => s("status", x, v("status"))} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(x) => s("status", x, v("status"))} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} readOnly={ro("status")} /></TableCell>;
     case "risk":
-      return <TableCell key={key}><InlineEditableCell value={p.risk} type="select" options={["Low", "Medium", "High"]} onSave={(x) => s("risk", x, v("risk"))} displayValue={<RiskBadge level={p.risk || ""} />} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.risk} type="select" options={["Low", "Medium", "High"]} onSave={(x) => s("risk", x, v("risk"))} displayValue={<RiskBadge level={p.risk || ""} />} readOnly={ro("risk")} /></TableCell>;
     case "zamereni":
-      return <TableCell key={key}><InlineEditableCell value={p.zamereni} type="date" onSave={(x) => s("zamereni", x, v("zamereni"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.zamereni} type="date" onSave={(x) => s("zamereni", x, v("zamereni"))} readOnly={ro("zamereni")} /></TableCell>;
     case "tpv_date":
-      return <TableCell key={key}><InlineEditableCell value={p.tpv_date} type="date" onSave={(x) => s("tpv_date", x, v("tpv_date"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.tpv_date} type="date" onSave={(x) => s("tpv_date", x, v("tpv_date"))} readOnly={ro("tpv_date")} /></TableCell>;
     case "expedice":
-      return <TableCell key={key}><InlineEditableCell value={p.expedice} type="date" onSave={(x) => s("expedice", x, v("expedice"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.expedice} type="date" onSave={(x) => s("expedice", x, v("expedice"))} readOnly={ro("expedice")} /></TableCell>;
     case "montaz":
-      return <TableCell key={key}><InlineEditableCell value={(p as any).montaz} type="date" onSave={(x) => s("montaz", x, (p as any).montaz || "")} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={(p as any).montaz} type="date" onSave={(x) => s("montaz", x, (p as any).montaz || "")} readOnly={ro("montaz")} /></TableCell>;
     case "predani":
-      return <TableCell key={key}><InlineEditableCell value={p.predani} type="date" onSave={(x) => s("predani", x, v("predani"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.predani} type="date" onSave={(x) => s("predani", x, v("predani"))} readOnly={ro("predani")} /></TableCell>;
     case "pm_poznamka":
-      return <TableCell key={key} style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.pm_poznamka || ""}><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(x) => s("pm_poznamka", x, v("pm_poznamka"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.pm_poznamka || ""}><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(x) => s("pm_poznamka", x, v("pm_poznamka"))} readOnly={ro("pm_poznamka")} /></TableCell>;
     case "konstrukter":
-      return <TableCell key={key}><InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(x) => s("konstrukter", x, v("konstrukter"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.konstrukter} type="people" peopleRole="Konstruktér" onSave={(x) => s("konstrukter", x, v("konstrukter"))} readOnly={ro("konstrukter")} /></TableCell>;
     case "narocnost":
-      return <TableCell key={key}><InlineEditableCell value={p.narocnost} type="select" options={["Low", "Medium", "High"]} onSave={(x) => s("narocnost", x, v("narocnost"))} displayValue={<RiskBadge level={p.narocnost || ""} />} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.narocnost} type="select" options={["Low", "Medium", "High"]} onSave={(x) => s("narocnost", x, v("narocnost"))} displayValue={<RiskBadge level={p.narocnost || ""} />} readOnly={ro("narocnost")} /></TableCell>;
     case "hodiny_tpv":
-      return <TableCell key={key}><InlineEditableCell value={p.hodiny_tpv} onSave={(x) => s("hodiny_tpv", x, v("hodiny_tpv"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.hodiny_tpv} onSave={(x) => s("hodiny_tpv", x, v("hodiny_tpv"))} readOnly={ro("hodiny_tpv")} /></TableCell>;
     case "percent_tpv":
-      return <TableCell key={key}><InlineEditableCell value={p.percent_tpv} type="number" onSave={(x) => s("percent_tpv", x, String(p.percent_tpv ?? ""))} displayValue={<ProgressBar value={p.percent_tpv || 0} />} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key}><InlineEditableCell value={p.percent_tpv} type="number" onSave={(x) => s("percent_tpv", x, String(p.percent_tpv ?? ""))} displayValue={<ProgressBar value={p.percent_tpv || 0} />} readOnly={ro("percent_tpv")} /></TableCell>;
     case "tpv_poznamka":
-      return <TableCell key={key} style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.tpv_poznamka || ""}><InlineEditableCell value={p.tpv_poznamka} type="textarea" onSave={(x) => s("tpv_poznamka", x, v("tpv_poznamka"))} readOnly={!canEdit} /></TableCell>;
+      return <TableCell key={key} style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.tpv_poznamka || ""}><InlineEditableCell value={p.tpv_poznamka} type="textarea" onSave={(x) => s("tpv_poznamka", x, v("tpv_poznamka"))} readOnly={ro("tpv_poznamka")} /></TableCell>;
     default: {
-      // Handle custom columns
       if (key.startsWith("custom_") && customColumns && saveCustomField) {
         const def = customColumns.find(c => c.column_key === key);
         if (!def) return null;
@@ -202,7 +204,7 @@ function renderCell(
               options={def.data_type === "select" ? def.select_options : undefined}
               peopleRole={def.data_type === "people" ? (def.people_role as any || undefined) : undefined}
               onSave={(x) => saveCustomField(p.id, key, x, val)}
-              readOnly={!canEdit}
+              readOnly={ro(key)}
             />
           </TableCell>
         );

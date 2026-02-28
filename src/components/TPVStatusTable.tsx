@@ -337,6 +337,7 @@ interface TPVProjectRowProps {
   customColumns: any[];
   saveCustomField: (rowId: string, colKey: string, val: string, old: string) => void;
   riskHighlight: any;
+  isFieldReadOnly: (field: string) => boolean;
 }
 
 const TPVProjectRow = memo(function TPVProjectRow({
@@ -354,6 +355,7 @@ const TPVProjectRow = memo(function TPVProjectRow({
   customColumns,
   saveCustomField,
   riskHighlight,
+  isFieldReadOnly,
 }: TPVProjectRowProps) {
   const tpvHighlight = useMemo(
     () => getTPVDashboardRiskColor(p as any, riskHighlight ?? null),
@@ -378,8 +380,8 @@ const TPVProjectRow = memo(function TPVProjectRow({
         <ExpandArrow isExpanded={isExpanded} stageCount={stageCount} />
       </TableCell>
       {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
-      {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old) }))}
+      {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit || isFieldReadOnly("project_name")} /></TableCell>}
+      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly }))}
     </TableRow>
   );
 });
@@ -408,7 +410,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const { tpvStatus: { isVisible } } = useAllColumnVisibility();
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("tpv-status");
   const [editMode, setEditMode] = useState(false);
-  const { canEdit, canEditColumns } = useAuth();
+  const { canEdit, canEditColumns, isFieldReadOnly } = useAuth();
   const { registerExport } = useExportContext();
   const { stagesByProject } = useStagesByProject();
   const { itemsByProject: tpvItemsByProject } = useAllTPVItems();
@@ -629,6 +631,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                   customColumns={customColumns}
                   saveCustomField={handleSaveCustomField}
                   riskHighlight={riskHighlight}
+                  isFieldReadOnly={isFieldReadOnly}
                 />
                 {expanded.has(p.project_id) && (
                   <StagesSection

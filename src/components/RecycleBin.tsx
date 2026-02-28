@@ -7,6 +7,7 @@ import { toast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { RotateCcw, Trash2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 interface RecycleBinProps {
   open: boolean;
@@ -28,7 +29,7 @@ function useDeletedRecords(table: string) {
   });
 }
 
-function RecordRow({ record, table, nameField, idField }: { record: any; table: string; nameField: string; idField?: string }) {
+function RecordRow({ record, table, nameField, idField, canPermanentDelete }: { record: any; table: string; nameField: string; idField?: string; canPermanentDelete: boolean }) {
   const qc = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -68,9 +69,11 @@ function RecordRow({ record, table, nameField, idField }: { record: any; table: 
             <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleRestore}>
               <RotateCcw className="h-3 w-3 mr-1" /> Obnovit
             </Button>
-            <Button size="sm" className="h-7 text-xs bg-[#EA592A] hover:bg-[#EA592A]/90 text-white" onClick={() => setConfirmDelete(true)}>
-              <Trash2 className="h-3 w-3 mr-1" /> Trvale smazat
-            </Button>
+            {canPermanentDelete && (
+              <Button size="sm" className="h-7 text-xs bg-[#EA592A] hover:bg-[#EA592A]/90 text-white" onClick={() => setConfirmDelete(true)}>
+                <Trash2 className="h-3 w-3 mr-1" /> Trvale smazat
+              </Button>
+            )}
           </>
         ) : (
           <div className="flex items-center gap-2">
@@ -84,7 +87,7 @@ function RecordRow({ record, table, nameField, idField }: { record: any; table: 
   );
 }
 
-function RecordList({ table, nameField, idField, emptyText }: { table: string; nameField: string; idField?: string; emptyText: string }) {
+function RecordList({ table, nameField, idField, emptyText, canPermanentDelete }: { table: string; nameField: string; idField?: string; emptyText: string; canPermanentDelete: boolean }) {
   const { data: records = [], isLoading } = useDeletedRecords(table);
 
   if (isLoading) return <p className="text-sm text-muted-foreground p-4">Načítání...</p>;
@@ -93,13 +96,14 @@ function RecordList({ table, nameField, idField, emptyText }: { table: string; n
   return (
     <div className="border rounded-lg max-h-[400px] overflow-y-auto">
       {records.map((r) => (
-        <RecordRow key={r.id} record={r} table={table} nameField={nameField} idField={idField} />
+        <RecordRow key={r.id} record={r} table={table} nameField={nameField} idField={idField} canPermanentDelete={canPermanentDelete} />
       ))}
     </div>
   );
 }
 
 export function RecycleBin({ open, onOpenChange }: RecycleBinProps) {
+  const { canPermanentDelete } = useAuth();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[650px]">
@@ -113,13 +117,13 @@ export function RecycleBin({ open, onOpenChange }: RecycleBinProps) {
             <TabsTrigger value="tpv" className="flex-1">TPV položky</TabsTrigger>
           </TabsList>
           <TabsContent value="projects">
-            <RecordList table="projects" nameField="project_name" idField="project_id" emptyText="Žádné smazané projekty" />
+            <RecordList table="projects" nameField="project_name" idField="project_id" emptyText="Žádné smazané projekty" canPermanentDelete={canPermanentDelete} />
           </TabsContent>
           <TabsContent value="stages">
-            <RecordList table="project_stages" nameField="stage_name" emptyText="Žádné smazané etapy" />
+            <RecordList table="project_stages" nameField="stage_name" emptyText="Žádné smazané etapy" canPermanentDelete={canPermanentDelete} />
           </TabsContent>
           <TabsContent value="tpv">
-            <RecordList table="tpv_items" nameField="item_name" emptyText="Žádné smazané TPV položky" />
+            <RecordList table="tpv_items" nameField="item_name" emptyText="Žádné smazané TPV položky" canPermanentDelete={canPermanentDelete} />
           </TabsContent>
         </Tabs>
       </DialogContent>

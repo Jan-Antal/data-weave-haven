@@ -9,7 +9,6 @@ interface AuthContextType {
   session: Session | null;
   profile: { full_name: string; email: string; is_active: boolean } | null;
   role: AppRole | null;
-  /** The actual DB role (never changes with simulation) */
   realRole: AppRole | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -25,7 +24,15 @@ interface AuthContextType {
   canManageTPV: boolean;
   canAccessSettings: boolean;
   canEditColumns: boolean;
-  /** Simulated role (null = no simulation, using real role) */
+  canUploadDocuments: boolean;
+  canPermanentDelete: boolean;
+  canManageUsers: boolean;
+  canManagePeople: boolean;
+  canManageExchangeRates: boolean;
+  canManageStatuses: boolean;
+  canAccessRecycleBin: boolean;
+  isFieldReadOnly: (field: string) => boolean;
+  defaultTab: string;
   simulatedRole: AppRole | null;
   setSimulatedRole: (role: AppRole | null) => void;
 }
@@ -103,6 +110,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isKonstrukter = effectiveRole === "konstrukter";
   const isViewer = effectiveRole === "viewer";
 
+  // Granular permissions
+  const canEdit = !isViewer;
+  const canCreateProject = isAdmin || isPM;
+  const canDeleteProject = isAdmin || isPM;
+  const canManageTPV = isAdmin || isPM || isKonstrukter;
+  const canAccessSettings = isAdmin || isPM || isKonstrukter; // at least Koš
+  const canEditColumns = isAdmin || isPM;
+  const canUploadDocuments = !isViewer;
+  const canPermanentDelete = isAdmin || isPM;
+
+  // Settings menu item visibility
+  const canManageUsers = isAdmin;
+  const canManagePeople = isAdmin || isPM;
+  const canManageExchangeRates = isAdmin;
+  const canManageStatuses = isAdmin || isPM;
+  const canAccessRecycleBin = isAdmin || isPM || isKonstrukter;
+
+  // Fields that are read-only for Konstruktér
+  const konstrukterReadOnlyFields = new Set([
+    "project_id", "project_name", "pm", "datum_smluvni",
+    "datum_objednavky", "prodejni_cena", "marze", "risk"
+  ]);
+  // Fields that are read-only for PM
+  const pmReadOnlyFields = new Set(["project_id"]);
+
+  const isFieldReadOnly = (field: string): boolean => {
+    if (isViewer) return true;
+    if (isKonstrukter && konstrukterReadOnlyFields.has(field)) return true;
+    if (isPM && pmReadOnlyFields.has(field)) return true;
+    return false;
+  };
+
+  // Default tab for role
+  const defaultTab = isPM ? "pm-status" : isKonstrukter ? "tpv-status" : "project-info";
+
   const value: AuthContextType = {
     user,
     session,
@@ -117,15 +159,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isPM,
     isKonstrukter,
     isViewer,
-    canEdit: !isViewer,
-    canCreateProject: isAdmin || isPM,
-    canDeleteProject: isAdmin || isPM,
-    canManageTPV: isAdmin || isPM || isKonstrukter,
-    canAccessSettings: isAdmin,
-    canEditColumns: isAdmin,
+    canEdit,
+    canCreateProject,
+    canDeleteProject,
+    canManageTPV,
+    canAccessSettings,
+    canEditColumns,
+    canUploadDocuments,
+    canPermanentDelete,
+    canManageUsers,
+    canManagePeople,
+    canManageExchangeRates,
+    canManageStatuses,
+    canAccessRecycleBin,
+    isFieldReadOnly,
+    defaultTab,
     simulatedRole,
     setSimulatedRole: (role) => {
-      // Only owner can simulate
       if (realRole === "owner") setSimulatedRole(role);
     },
   };

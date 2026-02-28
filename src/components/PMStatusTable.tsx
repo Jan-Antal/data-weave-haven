@@ -347,6 +347,7 @@ interface PMProjectRowProps {
   customColumns: any[];
   saveCustomField: (rowId: string, colKey: string, val: string, old: string) => void;
   riskHighlight: any;
+  isFieldReadOnly: (field: string) => boolean;
 }
 
 const PMProjectRow = memo(function PMProjectRow({
@@ -362,6 +363,7 @@ const PMProjectRow = memo(function PMProjectRow({
   customColumns,
   saveCustomField,
   riskHighlight,
+  isFieldReadOnly,
 }: PMProjectRowProps) {
   const bgStyle = useMemo(() => {
     const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
@@ -377,8 +379,8 @@ const PMProjectRow = memo(function PMProjectRow({
         <ExpandArrow projectId={p.project_id} isExpanded={isExpanded} stageCount={stageCount} />
       </TableCell>
       {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
-      {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name} className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old) }))}
+      {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name} className="truncate"><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit || isFieldReadOnly("project_name")} /></TableCell>}
+      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly }))}
     </TableRow>
   );
 });
@@ -404,7 +406,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const { pmStatus: { isVisible } } = useAllColumnVisibility();
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("pm-status");
   const [editMode, setEditMode] = useState(false);
-  const { canEdit, canEditColumns } = useAuth();
+  const { canEdit, canEditColumns, isFieldReadOnly } = useAuth();
   const { registerExport } = useExportContext();
   const { stagesByProject } = useStagesByProject();
 
@@ -631,6 +633,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   customColumns={customColumns}
                   saveCustomField={handleSaveCustomField}
                   riskHighlight={riskHighlight}
+                  isFieldReadOnly={isFieldReadOnly}
                 />
                 {expanded.has(p.project_id) && (
                   <StagesSection
