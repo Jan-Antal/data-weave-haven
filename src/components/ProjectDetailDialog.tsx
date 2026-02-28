@@ -91,6 +91,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
   });
   
   const [priceEditing, setPriceEditing] = useState(false);
+  const [showLocation, setShowLocation] = useState(false);
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [deletingFile, setDeletingFile] = useState<string | null>(null); // "catKey:fileName"
@@ -119,7 +120,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
       });
       setDeleteStep(0);
       setOpenCategory(null);
-      
+      setShowLocation(false);
       setPriceEditing(false);
       sp.resetCache();
       resetIdCheck();
@@ -480,37 +481,14 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     ) : (
                       <div className="relative flex items-center gap-1">
                         <Input value={form.klient} onChange={(e) => setForm(s => ({ ...s, klient: e.target.value }))} />
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <button
-                              type="button"
-                              className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent transition-colors"
-                              title={form.location ? `Lokace: ${form.location}` : "Přidat lokaci"}
-                            >
-                              <MapPin className={cn("h-4 w-4", form.location ? "text-primary" : "text-muted-foreground/40")} />
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent
-                            className="w-48 p-2 z-[99999] shadow-lg"
-                            align="end"
-                            side="bottom"
-                            sideOffset={4}
-                          >
-                            <Input
-                              autoFocus
-                              value={form.location}
-                              onChange={(e) => setForm(s => ({ ...s, location: e.target.value }))}
-                              placeholder="Praha, Zlín…"
-                              className="text-xs h-8"
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  (e.target as HTMLInputElement).blur();
-                                  document.body.click();
-                                }
-                              }}
-                            />
-                          </PopoverContent>
-                        </Popover>
+                        <button
+                          type="button"
+                          onClick={() => setShowLocation(prev => !prev)}
+                          className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent transition-colors"
+                          title={form.location ? `Lokace: ${form.location}` : "Přidat lokaci"}
+                        >
+                          <MapPin className={cn("h-4 w-4", form.location ? "text-primary" : "text-muted-foreground/30")} />
+                        </button>
                       </div>
                     )}
                   </div>
@@ -523,6 +501,44 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     ) : (
                       <PeopleSelectDropdown role="PM" value={form.pm} onValueChange={(v) => setForm(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
                     )}
+                  </div>
+
+                  {/* Collapsible location row */}
+                  <div
+                    className={cn(
+                      "col-span-2 overflow-hidden transition-all duration-300 ease-in-out",
+                      showLocation ? "max-h-32 opacity-100" : "max-h-0 opacity-0"
+                    )}
+                  >
+                    <div className="flex items-stretch gap-3 pb-1">
+                      <div className="flex-[3]">
+                        <Label className="text-xs">Lokace</Label>
+                        <Input
+                          value={form.location}
+                          onChange={(e) => setForm(s => ({ ...s, location: e.target.value }))}
+                          placeholder="Zadejte adresu..."
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="flex-[2] flex flex-col">
+                        <Label className="text-xs">Mapa</Label>
+                        <div className="mt-1 flex-1 min-h-[48px] rounded-md border border-input bg-muted/50 overflow-hidden">
+                          {form.location ? (
+                            <iframe
+                              title="Map preview"
+                              className="w-full h-full min-h-[48px] border-0"
+                              src={`https://www.google.com/maps?q=${encodeURIComponent(form.location)}&output=embed&z=13`}
+                              loading="lazy"
+                              referrerPolicy="no-referrer-when-downgrade"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
+                              Zadejte adresu pro zobrazení mapy
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div>
