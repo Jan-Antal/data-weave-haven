@@ -43,9 +43,9 @@ export function PdfPreviewModal({ html, tabLabel, onClose }: PdfPreviewModalProp
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-background">
+    <div className="fixed inset-0 z-[99998] flex flex-col bg-background">
       {/* Sticky action bar */}
-      <div className="sticky top-0 z-[110] flex items-center justify-between px-4 py-2.5 bg-background border-b border-border shadow-sm">
+      <div className="sticky top-0 z-[99999] flex items-center justify-between px-4 py-2.5 bg-background border-b border-border shadow-sm print:hidden">
         {/* Left: Back button */}
         <Button
           onClick={onClose}
