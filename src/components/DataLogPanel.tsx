@@ -34,6 +34,13 @@ const DOT_COLORS: Record<string, string> = {
   project_deleted: "bg-gray-800",
   document_uploaded: "bg-blue-500",
   document_deleted: "bg-orange-500",
+  etapa_created: "bg-green-500",
+  etapa_deleted: "bg-gray-800",
+  etapa_status_change: "bg-amber-400",
+  etapa_konstrukter_change: "bg-purple-500",
+  etapa_datum_smluvni_change: "bg-red-500",
+  etapa_document_uploaded: "bg-blue-500",
+  etapa_document_deleted: "bg-orange-500",
 };
 
 function formatDayHeader(dateStr: string): string {
@@ -117,6 +124,58 @@ function ActivityItem({ entry, onOpenProject }: { entry: ActivityLogEntry; onOpe
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded truncate max-w-[220px]">🗑 {entry.old_value}</span>
           {entry.detail && <span className="text-[10px] text-muted-foreground">{entry.detail}</span>}
+        </div>
+      );
+      break;
+    case "etapa_created":
+      mainText = <>{userName} vytvořil/a etapu {entry.detail} v {projectLink}</>;
+      break;
+    case "etapa_deleted":
+      mainText = <>{userName} smazal/a etapu {entry.detail} z {projectLink}</>;
+      break;
+    case "etapa_status_change":
+      mainText = <>{userName} změnil/a status {entry.detail} v {projectLink}</>;
+      subContent = (
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <span className="text-[11px] line-through text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{entry.old_value || "—"}</span>
+          <span className="text-[10px] text-muted-foreground">→</span>
+          <span className="text-[11px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">{entry.new_value || "—"}</span>
+        </div>
+      );
+      break;
+    case "etapa_konstrukter_change":
+      mainText = <>{userName} změnil/a konstruktéra {entry.detail} v {projectLink}</>;
+      subContent = (
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <span className="text-[11px] line-through text-muted-foreground">{entry.old_value || "—"}</span>
+          <span className="text-[10px] text-muted-foreground">→</span>
+          <span className="text-[11px] font-medium">{entry.new_value || "—"}</span>
+        </div>
+      );
+      break;
+    case "etapa_datum_smluvni_change":
+      mainText = <>{userName} změnil/a datum smluvní {entry.detail} v {projectLink}</>;
+      subContent = (
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <span className="text-[11px] line-through text-muted-foreground">{entry.old_value || "—"}</span>
+          <span className="text-[10px] text-muted-foreground">→</span>
+          <span className="text-[11px] font-medium text-red-600">{entry.new_value || "—"}</span>
+        </div>
+      );
+      break;
+    case "etapa_document_uploaded":
+      mainText = <>{userName} nahrál/a dokument do {entry.detail} v {projectLink}</>;
+      subContent = (
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <span className="text-[11px] bg-muted px-1.5 py-0.5 rounded truncate max-w-[220px]">📄 {entry.new_value}</span>
+        </div>
+      );
+      break;
+    case "etapa_document_deleted":
+      mainText = <>{userName} smazal/a dokument z {entry.detail} v {projectLink}</>;
+      subContent = (
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <span className="text-[11px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded truncate max-w-[220px]">🗑 {entry.old_value}</span>
         </div>
       );
       break;
