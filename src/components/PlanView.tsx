@@ -293,9 +293,11 @@ function getBarDataFromFields(
     segs.push({ start: S, end: safeE, color: phaseColors.dokonceno });
   }
 
-  // Add overdue segment (red/orange) if milestones exceed safeE
+  // Add overdue segment with diagonal hatch pattern if milestones exceed safeE
   if (hasOverdue) {
-    segs.push({ start: safeE, end: latestDate, color: phaseColors.overdue });
+    // Use the last segment's color as base, with overdue red stripes
+    const lastColor = segs.length > 0 ? segs[segs.length - 1].color : phaseColors.dokonceno;
+    segs.push({ start: safeE, end: latestDate, color: phaseColors.overdue, hatchColors: [phaseColors.overdue, lastColor] });
   }
 
   return { segments: segs, diamonds: makeDiamonds(dItems), hasWarning, warnings };
