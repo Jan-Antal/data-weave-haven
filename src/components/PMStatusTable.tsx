@@ -5,32 +5,33 @@ import { StatusBadge, RiskBadge } from "./StatusBadge";
 import { InlineEditableCell } from "./InlineEditableCell";
 import { SortableHeader } from "./SortableHeader";
 import { useProjects } from "@/hooks/useProjects";
+import { useDocumentCounts } from "@/hooks/useDocumentCounts";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
 import { useSortFilter } from "@/hooks/useSortFilter";
 import { useProjectStages, useUpdateStage, useDeleteStage, useReorderStages } from "@/hooks/useProjectStages";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, ChevronDown, Plus, Trash2, GripVertical, ChevronsDown, ChevronsUp } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Trash2, GripVertical, ChevronsDown, ChevronsUp, Paperclip } from "lucide-react";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { ProjectStage } from "@/hooks/useProjectStages";
 import type { Project } from "@/hooks/useProjects";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
+import { ProjectEditDialog } from "./ProjectEditDialog";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
 import { useAllColumnVisibility, PROJECT_INFO_NATIVE, PM_NATIVE, TPV_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
-import { getColumnStyle, renderColumnHeader, renderColumnCell } from "./CrossTabColumns";
+import { getColumnStyle, renderColumnHeader, renderColumnCell, getColumnLabel, COL_ICON_STYLE, COL_CHEVRON_STYLE } from "./CrossTabColumns";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 import { useExportContext } from "./ExportContext";
 import { getProjectCellValue } from "@/lib/exportExcel";
-import { getColumnLabel } from "./CrossTabColumns";
 import { useStagesByProject } from "@/hooks/useAllProjectStages";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...PM_NATIVE];
@@ -126,10 +127,10 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
 
   return (
     <TableRow ref={setNodeRef} style={style} className={cn("bg-muted/20 h-9", dimmed && "opacity-40")}>
-      {/* Col 1 — Icon slot (32px) — empty for stages */}
-      <TableCell style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="px-0" />
-      {/* Col 2 — Chevron slot (28px) — drag handle for stages */}
-      <TableCell style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="px-0">
+      {/* Col 1 — Icon slot — empty for stages */}
+      <TableCell style={COL_ICON_STYLE} className="px-0" />
+      {/* Col 2 — Chevron slot — drag handle for stages */}
+      <TableCell style={COL_CHEVRON_STYLE} className="px-0">
         <div {...attributes} {...listeners} className="cursor-grab pl-1">
           <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
         </div>
@@ -336,6 +337,7 @@ function ExpandArrow({ projectId, isExpanded, stageCount }: { projectId: string;
 // ── Memoized parent project row ──────────────────────────────────────
 interface PMProjectRowProps {
   project: Project;
+  docCount: number;
   isExpanded: boolean;
   stageCount: number;
   onToggleExpand: (pid: string) => void;
@@ -348,10 +350,12 @@ interface PMProjectRowProps {
   saveCustomField: (rowId: string, colKey: string, val: string, old: string) => void;
   riskHighlight: any;
   isFieldReadOnly: (field: string) => boolean;
+  onEditProject: (p: Project) => void;
 }
 
 const PMProjectRow = memo(function PMProjectRow({
   project: p,
+  docCount,
   isExpanded,
   stageCount,
   onToggleExpand,
@@ -364,6 +368,7 @@ const PMProjectRow = memo(function PMProjectRow({
   saveCustomField,
   riskHighlight,
   isFieldReadOnly,
+  onEditProject,
 }: PMProjectRowProps) {
   const bgStyle = useMemo(() => {
     const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
@@ -372,10 +377,17 @@ const PMProjectRow = memo(function PMProjectRow({
 
   return (
     <TableRow className="hover:bg-muted/50 transition-colors h-9" style={bgStyle}>
-      {/* Col 1 — Icon slot (32px) — empty spacer on PM */}
-      <TableCell style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="px-0" />
-      {/* Col 2 — Chevron slot (28px) */}
-      <TableCell style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="px-0 cursor-pointer" onClick={() => onToggleExpand(p.project_id)}>
+      {/* Col 1 — Icon slot (📎 clip) */}
+      <TableCell style={COL_ICON_STYLE} className="text-center px-0">
+        {(docCount ?? 0) > 0 && (
+          <span className="inline-flex items-center gap-0.5 text-muted-foreground text-[10px] cursor-pointer" onClick={() => onEditProject(p)}>
+            <Paperclip className="h-3 w-3" />
+            {docCount}
+          </span>
+        )}
+      </TableCell>
+      {/* Col 2 — Chevron slot */}
+      <TableCell style={COL_CHEVRON_STYLE} className="px-0 cursor-pointer" onClick={() => onToggleExpand(p.project_id)}>
         <ExpandArrow projectId={p.project_id} isExpanded={isExpanded} stageCount={stageCount} />
       </TableCell>
       {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
@@ -409,6 +421,14 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const { canEdit, canEditColumns, isFieldReadOnly } = useAuth();
   const { registerExport } = useExportContext();
   const { stagesByProject } = useStagesByProject();
+  const allProjectIds = useMemo(() => projects.map((p) => p.project_id), [projects]);
+  const projectStatuses = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    for (const p of projects) map[p.project_id] = p.status;
+    return map;
+  }, [projects]);
+  const { counts: docCounts } = useDocumentCounts(allProjectIds, projectStatuses);
+  const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
 
   // Memoize filter Sets to avoid re-creation on every render
   const statusFilterSet = useMemo(
@@ -585,10 +605,12 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
-              {/* Col 1 — Icon slot (32px) — empty spacer on PM */}
-              <TableHead style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="px-0" />
-              {/* Col 2 — Chevron slot (28px) */}
-              <TableHead style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="shrink-0 px-0">
+              {/* Col 1 — Icon slot (📎 clip) */}
+              <TableHead style={COL_ICON_STYLE} className="text-center px-0">
+                <Paperclip className="h-3.5 w-3.5 text-muted-foreground/50 mx-auto" />
+              </TableHead>
+              {/* Col 2 — Chevron slot */}
+              <TableHead style={COL_CHEVRON_STYLE} className="shrink-0 px-0">
                 {sorted.length > 0 && (
                   <button
                     className="text-muted-foreground/60 hover:text-muted-foreground transition-colors"
@@ -622,6 +644,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
               <Fragment key={p.id}>
                 <PMProjectRow
                   project={p}
+                  docCount={docCounts[p.project_id] ?? 0}
                   isExpanded={expanded.has(p.project_id)}
                   stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
                   onToggleExpand={toggleExpand}
@@ -634,6 +657,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   saveCustomField={handleSaveCustomField}
                   riskHighlight={riskHighlight}
                   isFieldReadOnly={isFieldReadOnly}
+                  onEditProject={(p) => setEditProject(p)}
                 />
                 {expanded.has(p.project_id) && (
                   <StagesSection
@@ -654,6 +678,8 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
           </TableBody>
         </Table>
       </div>
+
+      {editProject && <ProjectEditDialog project={editProject} open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }} />}
     </div>
   );
 }

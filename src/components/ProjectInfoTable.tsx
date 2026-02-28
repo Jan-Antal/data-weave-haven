@@ -32,7 +32,7 @@ import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { useAuth } from "@/hooks/useAuth";
 import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
 import { useAllColumnVisibility, PROJECT_INFO_NATIVE, PM_NATIVE, TPV_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
-import { getColumnStyle, renderColumnHeader, renderColumnCell } from "./CrossTabColumns";
+import { getColumnStyle, renderColumnHeader, renderColumnCell, COL_ICON_STYLE, COL_CHEVRON_STYLE } from "./CrossTabColumns";
 import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 import { useDocumentCounts } from "@/hooks/useDocumentCounts";
 import { useExportContext } from "./ExportContext";
@@ -161,10 +161,10 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
 
   return (
     <TableRow ref={setNodeRef} style={style} className={cn("bg-muted/20 h-9", dimmed && "opacity-40")}>
-      {/* Col 1 — Icon slot (32px) — empty for stages */}
-      <TableCell style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="px-0" />
-      {/* Col 2 — Chevron slot (28px) — drag handle for stages */}
-      <TableCell style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="px-0">
+      {/* Col 1 — Icon slot — empty for stages */}
+      <TableCell style={COL_ICON_STYLE} className="px-0" />
+      {/* Col 2 — Chevron slot — drag handle for stages */}
+      <TableCell style={COL_CHEVRON_STYLE} className="px-0">
         <div {...attributes} {...listeners} className="cursor-grab pl-1">
           <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
         </div>
@@ -374,8 +374,8 @@ const ProjectRow = memo(function ProjectRow({
 
   return (
     <TableRow className="hover:bg-muted/50 transition-colors h-9" style={bgStyle}>
-      {/* Col 1 — Icon slot (32px) */}
-      <TableCell style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="text-center px-0">
+      {/* Col 1 — Icon slot */}
+      <TableCell style={COL_ICON_STYLE} className="text-center px-0">
         {(docCount ?? 0) > 0 && (
           <span className="inline-flex items-center gap-0.5 text-gray-400 text-[10px]">
             <Paperclip className="h-3 w-3" />
@@ -383,8 +383,8 @@ const ProjectRow = memo(function ProjectRow({
           </span>
         )}
       </TableCell>
-      {/* Col 2 — Chevron slot (28px) */}
-      <TableCell style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="px-0 cursor-pointer" onClick={() => onToggleExpand(p.project_id)}>
+      {/* Col 2 — Chevron slot */}
+      <TableCell style={COL_CHEVRON_STYLE} className="px-0 cursor-pointer" onClick={() => onToggleExpand(p.project_id)}>
         <ExpandArrow isExpanded={isExpanded} stageCount={stageCount} />
       </TableCell>
       {v("project_id") && (
@@ -655,12 +655,12 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
-              {/* Col 1 — Icon slot (32px) */}
-              <TableHead style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="text-center px-0">
+              {/* Col 1 — Icon slot */}
+              <TableHead style={COL_ICON_STYLE} className="text-center px-0">
                 <Paperclip className="h-3.5 w-3.5 text-gray-400 mx-auto" />
               </TableHead>
-              {/* Col 2 — Chevron slot (28px) */}
-              <TableHead style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="shrink-0 px-0">
+              {/* Col 2 — Chevron slot */}
+              <TableHead style={COL_CHEVRON_STYLE} className="shrink-0 px-0">
                 {sorted.length > 0 && (
                   <button
                     className="text-muted-foreground/60 hover:text-muted-foreground transition-colors"
