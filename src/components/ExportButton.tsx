@@ -2,7 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { Download, ChevronDown, FileSpreadsheet, FileText } from "lucide-react";
 import { useExportContext } from "./ExportContext";
 import { ExportPopup } from "./ExportPopup";
-import { exportToPdf } from "@/lib/exportPdf";
+import { buildPrintableHtml } from "@/lib/exportPdf";
+import { PdfPreviewModal } from "./PdfPreviewModal";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 
 const TAB_MAP: Record<string, { key: string; sheet: string; label: string }> = {
   "project-info": { key: "project-info", sheet: "Project Info", label: "Project Info" },
@@ -18,8 +20,10 @@ interface ExportButtonProps {
 
 export function ExportButton({ activeTab, personFilter, statusFilter }: ExportButtonProps) {
   const { getExportMeta } = useExportContext();
+  const { data: statusOptions = [] } = useProjectStatusOptions();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [excelPopupOpen, setExcelPopupOpen] = useState(false);
+  const [pdfHtml, setPdfHtml] = useState<string | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   // Close on outside click
@@ -45,7 +49,7 @@ export function ExportButton({ activeTab, personFilter, statusFilter }: ExportBu
     setExcelPopupOpen(true);
   };
 
-  const handlePdfClick = async () => {
+  const handlePdfClick = () => {
     setDropdownOpen(false);
     if (!meta) return;
 
@@ -59,58 +63,75 @@ export function ExportButton({ activeTab, personFilter, statusFilter }: ExportBu
     }
     const filterSummary = parts.length > 0 ? parts.join(", ") : undefined;
 
-    await exportToPdf({
+    // Build status color map
+    const statusColors: Record<string, string> = {};
+    for (const opt of statusOptions) {
+      statusColors[opt.label] = opt.color;
+    }
+
+    const html = buildPrintableHtml({
       tabLabel: tabInfo.label,
       headers: data.headers,
       rows: data.rows,
       filterSummary,
+      statusColors,
     });
+
+    setPdfHtml(html);
   };
 
   return (
-    <div ref={wrapperRef} className="relative">
-      <button
-        onClick={() => {
-          if (excelPopupOpen) return;
-          setDropdownOpen(!dropdownOpen);
-        }}
-        className="border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-sm px-3 py-1.5 rounded-md gap-1.5 flex items-center"
-      >
-        <Download className="h-3.5 w-3.5" />
-        Export
-        <ChevronDown className="h-3 w-3 ml-0.5 opacity-50" />
-      </button>
+    <>
+      <div ref={wrapperRef} className="relative">
+        <button
+          onClick={() => {
+            if (excelPopupOpen) return;
+            setDropdownOpen(!dropdownOpen);
+          }}
+          className="border border-border bg-background text-foreground hover:bg-muted text-sm px-3 py-1.5 rounded-md gap-1.5 flex items-center"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Export
+          <ChevronDown className="h-3 w-3 ml-0.5 opacity-50" />
+        </button>
 
-      {/* Format dropdown */}
-      {dropdownOpen && (
-        <div className="absolute top-full right-0 mt-1 z-50 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-1">
-          <button
-            onClick={handleExcelClick}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
-          >
-            <FileSpreadsheet className="h-4 w-4 text-green-600" />
-            Export do Excel
-          </button>
-          <button
-            onClick={handlePdfClick}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
-          >
-            <FileText className="h-4 w-4 text-red-500" />
-            Export do PDF
-          </button>
-        </div>
-      )}
+        {dropdownOpen && (
+          <div className="absolute top-full right-0 mt-1 z-50 w-48 bg-popover rounded-lg shadow-lg border border-border py-1">
+            <button
+              onClick={handleExcelClick}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors text-left"
+            >
+              <FileSpreadsheet className="h-4 w-4 text-green-600" />
+              Export do Excel
+            </button>
+            <button
+              onClick={handlePdfClick}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-popover-foreground hover:bg-muted transition-colors text-left"
+            >
+              <FileText className="h-4 w-4 text-red-500" />
+              Export do PDF
+            </button>
+          </div>
+        )}
 
-      {/* Excel column picker popup */}
-      {excelPopupOpen && meta && (
-        <ExportPopup
-          tabKey={tabInfo.key}
+        {excelPopupOpen && meta && (
+          <ExportPopup
+            tabKey={tabInfo.key}
+            tabLabel={tabInfo.label}
+            sheetName={tabInfo.sheet}
+            meta={meta}
+            onClose={() => setExcelPopupOpen(false)}
+          />
+        )}
+      </div>
+
+      {pdfHtml && (
+        <PdfPreviewModal
+          html={pdfHtml}
           tabLabel={tabInfo.label}
-          sheetName={tabInfo.sheet}
-          meta={meta}
-          onClose={() => setExcelPopupOpen(false)}
+          onClose={() => setPdfHtml(null)}
         />
       )}
-    </div>
+    </>
   );
 }

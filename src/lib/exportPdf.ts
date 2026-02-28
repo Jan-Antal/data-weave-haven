@@ -1,222 +1,159 @@
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import { cs } from "date-fns/locale";
-import { toast } from "@/hooks/use-toast";
 
-interface PdfExportOptions {
+export interface PdfExportOptions {
   tabLabel: string;
   headers: string[];
   rows: (string | number)[][];
   filterSummary?: string;
+  statusColors?: Record<string, string>;
 }
 
-const TAB_LABEL_MAP: Record<string, string> = {
-  "Project Info": "ProjectInfo",
-  "PM Status": "PMStatus",
-  "TPV Status": "TPVStatus",
-};
+export function buildPrintableHtml({
+  tabLabel,
+  headers,
+  rows,
+  filterSummary,
+  statusColors = {},
+}: PdfExportOptions): string {
+  const dateStr = format(new Date(), "d. MMMM yyyy", { locale: cs });
 
-// We'll load and cache the font lazily
-let robotoBase64: string | null = null;
+  // Detect column types for alignment
+  const isNumberCol = headers.map((_, i) =>
+    rows.some((r) => typeof r[i] === "number" && r[i] !== 0)
+  );
 
-async function loadRobotoFont(): Promise<string> {
-  if (robotoBase64) return robotoBase64;
-  const response = await fetch(new URL("@/assets/Roboto-Regular.ttf", import.meta.url).href);
-  const buffer = await response.arrayBuffer();
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  robotoBase64 = btoa(binary);
-  return robotoBase64;
-}
+  const isStatusCol = headers.map((_, i) =>
+    rows.some((r) => typeof r[i] === "string" && statusColors[String(r[i])])
+  );
 
-export async function exportToPdf({ tabLabel, headers, rows, filterSummary }: PdfExportOptions) {
-  const toastRef = toast({
-    title: "Generování PDF…",
-    className: "bg-gray-100 text-gray-700 border border-gray-200 shadow-md",
-  });
-
-  try {
-    // Load font first
-    const fontData = await loadRobotoFont();
-
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 15;
-    const usableWidth = pageWidth - margin * 2;
-
-    // Register Roboto font for Czech diacritics
-    doc.addFileToVFS("Roboto-Regular.ttf", fontData);
-    doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
-    doc.setFont("Roboto", "normal");
-
-    const dateStr = format(new Date(), "d. MMMM yyyy", { locale: cs });
-
-    // Header — first page only (drawn before table, autoTable's didDrawPage handles subsequent pages)
-    doc.setFontSize(11);
-    doc.setFont("Roboto", "normal");
-    doc.setTextColor(45, 58, 46);
-    doc.text(`A→M Interior | Project Info 2026`, margin, margin + 4);
-
-    doc.setFontSize(9);
-    doc.setTextColor(107, 114, 128);
-    doc.text(`${tabLabel} — ${dateStr}`, margin, margin + 9);
-
-    let startY = margin + 13;
-
-    if (filterSummary) {
-      doc.setFontSize(7);
-      doc.setTextColor(107, 114, 128);
-      doc.text(`Filtry: ${filterSummary}`, margin, startY);
-      startY += 4;
+  // Format cell value
+  function fmtCell(val: string | number, colIdx: number): string {
+    if (val == null || val === "") return "";
+    if (typeof val === "number") return val.toLocaleString("cs-CZ");
+    const s = String(val);
+    // Status badge
+    if (isStatusCol[colIdx] && statusColors[s]) {
+      const c = statusColors[s];
+      return `<span class="badge" style="background:${c}20;color:${c};border:1px solid ${c}50;">${esc(s)}</span>`;
     }
-
-    // Font sizing based on column count
-    let fontSize = 7.5;
-    if (headers.length > 12) fontSize = 7;
-    if (headers.length > 16) fontSize = 6;
-
-    // Smart column widths based on header content
-    const colWidths = headers.map((h) => {
-      const lower = h.toLowerCase();
-      // Known column width hints
-      if (lower.includes("project id") || lower === "id") return 22;
-      if (lower.includes("project name") || lower.includes("název")) return 0; // flexible/wrap
-      if (lower.includes("klient")) return 20;
-      if (lower.includes("kalkulant") || lower.includes("pm") || lower.includes("architekt") || lower.includes("konstrukt")) return 22;
-      if (lower.includes("status")) return 18;
-      if (lower.includes("datum") || lower.includes("date") || lower.includes("expedice") || lower.includes("montáž") || lower.includes("předání") || lower.includes("zaměření") || lower.includes("smluvní")) return 18;
-      if (lower.includes("cena") || lower.includes("materiál") || lower.includes("výroba") || lower.includes("subdodávky")) return 22;
-      if (lower.includes("marže") || lower.includes("%")) return 12;
-      if (lower.includes("poznámka") || lower.includes("notes")) return 0; // flexible
-      // Default based on length
-      const len = h.length;
-      if (len <= 4) return 12;
-      if (len <= 8) return 18;
-      if (len <= 14) return 22;
-      return 0; // flexible
-    });
-
-    // Calculate: fixed columns get their width, flexible (0) share remaining space
-    const fixedTotal = colWidths.reduce((sum, w) => sum + w, 0);
-    const flexCount = colWidths.filter((w) => w === 0).length;
-    const remainingWidth = Math.max(usableWidth - fixedTotal, flexCount * 15);
-    const flexWidth = flexCount > 0 ? remainingWidth / flexCount : 0;
-
-    const finalWidths = colWidths.map((w) => (w === 0 ? Math.max(flexWidth, 15) : w));
-
-    // Scale if total exceeds usable width
-    const totalWidth = finalWidths.reduce((a, b) => a + b, 0);
-    const scale = totalWidth > usableWidth ? usableWidth / totalWidth : 1;
-    const scaledWidths = finalWidths.map((w) => w * scale);
-
-    // Format cell values
-    const formattedRows = rows.map((row) =>
-      row.map((cell) => {
-        if (cell == null) return "";
-        if (typeof cell === "number") {
-          return cell.toLocaleString("cs-CZ");
-        }
-        return String(cell);
-      })
-    );
-
-    autoTable(doc, {
-      startY,
-      head: [headers],
-      body: formattedRows,
-      margin: { left: margin, right: margin },
-      styles: {
-        font: "Roboto",
-        fontSize,
-        cellPadding: 2,
-        lineColor: [229, 231, 235],
-        lineWidth: 0.2,
-        textColor: [31, 41, 55],
-        overflow: "linebreak",
-        cellWidth: "wrap",
-      },
-      headStyles: {
-        fillColor: [45, 58, 46],
-        textColor: [255, 255, 255],
-        fontSize: fontSize + 0.5,
-        fontStyle: "bold",
-        halign: "left",
-        cellPadding: 2.5,
-        font: "Roboto",
-      },
-      alternateRowStyles: {
-        fillColor: [249, 250, 251],
-      },
-      columnStyles: Object.fromEntries(
-        headers.map((_, i) => {
-          const isNumber = rows.some((r) => typeof r[i] === "number" && r[i] !== 0);
-          return [
-            i,
-            {
-              cellWidth: scaledWidths[i],
-              halign: isNumber ? ("right" as const) : ("left" as const),
-            },
-          ];
-        })
-      ),
-      didDrawPage: () => {
-        // Footer with page numbers on every page
-        const pageCount = (doc as any).internal.getNumberOfPages();
-        const currentPage = (doc as any).internal.getCurrentPageInfo().pageNumber;
-        doc.setFont("Roboto", "normal");
-        doc.setFontSize(7);
-        doc.setTextColor(156, 163, 175);
-        doc.text(
-          `Strana ${currentPage} z ${pageCount}`,
-          pageWidth / 2,
-          pageHeight - 8,
-          { align: "center" }
-        );
-      },
-    });
-
-    // Fix total page count: re-draw footer on all pages with correct total
-    const totalPages = (doc as any).internal.getNumberOfPages();
-    if (totalPages > 1) {
-      for (let p = 1; p <= totalPages; p++) {
-        doc.setPage(p);
-        // White-out the old footer area
-        doc.setFillColor(255, 255, 255);
-        doc.rect(0, pageHeight - 12, pageWidth, 12, "F");
-        // Re-draw correct footer
-        doc.setFont("Roboto", "normal");
-        doc.setFontSize(7);
-        doc.setTextColor(156, 163, 175);
-        doc.text(
-          `Strana ${p} z ${totalPages}`,
-          pageWidth / 2,
-          pageHeight - 8,
-          { align: "center" }
-        );
-      }
-    }
-
-    // Build filename
-    const sanitized = TAB_LABEL_MAP[tabLabel] || tabLabel.replace(/\s+/g, "-");
-    const dateFile = format(new Date(), "yyyy-MM-dd");
-    const fileName = `AMI-${sanitized}-${dateFile}.pdf`;
-
-    doc.save(fileName);
-
-    toast({
-      title: "Exportováno",
-      className: "bg-gray-100 text-gray-700 border border-gray-200 shadow-md",
-    });
-  } catch (err) {
-    console.error("PDF export error:", err);
-    toast({
-      title: "Chyba při generování PDF",
-      variant: "destructive",
-    });
+    return esc(s);
   }
+
+  function esc(s: string): string {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  const theadCells = headers
+    .map((h, i) => `<th${isNumberCol[i] ? ' class="num"' : ""}>${esc(h)}</th>`)
+    .join("");
+
+  const tbodyRows = rows
+    .map((row) => {
+      const cells = row
+        .map((cell, i) => `<td${isNumberCol[i] ? ' class="num"' : ""}>${fmtCell(cell, i)}</td>`)
+        .join("");
+      return `<tr>${cells}</tr>`;
+    })
+    .join("\n");
+
+  return `<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>${esc(tabLabel)} — Export</title>
+<style>
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 8pt;
+    color: #1f2937;
+    padding: 10mm;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  @media print {
+    body { padding: 0; }
+  }
+  .header { margin-bottom: 6px; }
+  .header h1 {
+    font-size: 12pt;
+    font-weight: 700;
+    color: #2d3a2e;
+    margin: 0;
+  }
+  .header .subtitle {
+    font-size: 9pt;
+    color: #6b7280;
+    margin-top: 2px;
+  }
+  .header .filters {
+    font-size: 7pt;
+    color: #9ca3af;
+    margin-top: 2px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 4px;
+    font-size: 8pt;
+  }
+  thead { display: table-header-group; }
+  thead th {
+    background: #2d3a2e;
+    color: #fff;
+    font-weight: 600;
+    font-size: 8.5pt;
+    padding: 4px 5px;
+    text-align: left;
+    border: 1px solid #2d3a2e;
+    white-space: nowrap;
+  }
+  thead th.num { text-align: right; }
+  tbody tr { break-inside: avoid; }
+  tbody tr:nth-child(even) { background: #f9fafb; }
+  tbody td {
+    padding: 3px 5px;
+    border: 1px solid #e5e7eb;
+    vertical-align: top;
+    max-width: 200px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 7.5pt;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  @media print {
+    .no-print { display: none !important; }
+  }
+  /* Page counter footer */
+  @media print {
+    @page { @bottom-center { content: counter(page) " z " counter(pages); } }
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>A→M Interior | Project Info 2026</h1>
+  <div class="subtitle">${esc(tabLabel)} — ${esc(dateStr)}</div>
+  ${filterSummary ? `<div class="filters">Filtry: ${esc(filterSummary)}</div>` : ""}
+</div>
+<table>
+  <thead><tr>${theadCells}</tr></thead>
+  <tbody>
+    ${tbodyRows}
+  </tbody>
+</table>
+</body>
+</html>`;
 }
