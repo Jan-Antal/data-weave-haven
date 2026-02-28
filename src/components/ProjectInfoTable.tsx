@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, memo, Fragment, useRef } from "react";
 import { logActivity } from "@/lib/activityLog";
+import { useDataLogRowHighlight } from "@/hooks/useDataLogRowHighlight";
 import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColumns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { InlineEditableCell } from "./InlineEditableCell";
@@ -380,7 +381,7 @@ const ProjectRow = memo(function ProjectRow({
   }, [p.risk, p.datum_smluvni, riskHighlight]);
 
   return (
-    <TableRow className="hover:bg-muted/50 transition-colors h-9" style={bgStyle}>
+    <TableRow className="hover:bg-muted/50 transition-colors h-9" style={bgStyle} data-project-id={p.project_id}>
       {/* Col 1 — Icon slot */}
       <TableCell style={COL_ICON_STYLE} className="text-center px-0">
         {(docCount ?? 0) > 0 && (
@@ -414,6 +415,7 @@ interface ProjectInfoTableProps {
 }
 
 export function ProjectInfoTable({ personFilter, statusFilter, search: externalSearch, riskHighlight }: ProjectInfoTableProps) {
+  useDataLogRowHighlight();
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const statusLabels = useMemo(() => statusOptions.map((s) => s.label), [statusOptions]);

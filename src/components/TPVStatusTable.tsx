@@ -1,5 +1,6 @@
 import React, { useState, Fragment, useMemo, useEffect, useCallback, memo, useRef, type MutableRefObject } from "react";
 import { logActivity } from "@/lib/activityLog";
+import { useDataLogRowHighlight } from "@/hooks/useDataLogRowHighlight";
 import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColumns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge, RiskBadge, ProgressBar } from "./StatusBadge";
@@ -377,7 +378,7 @@ const TPVProjectRow = memo(function TPVProjectRow({
   }, [p.project_id, p.project_name, onOpenTPVList]);
 
   return (
-    <TableRow className="hover:bg-muted/50 transition-colors h-9" style={tpvHighlight.bg ? { backgroundColor: tpvHighlight.bg } : {}}>
+    <TableRow className="hover:bg-muted/50 transition-colors h-9" style={tpvHighlight.bg ? { backgroundColor: tpvHighlight.bg } : {}} data-project-id={p.project_id}>
       {/* Col 1 — Icon slot */}
       <TableCell style={COL_ICON_STYLE} className="text-center px-0">
         <TPVListIcon projectId={p.project_id} itemCount={tpvItemCount} onClick={handleOpenList} />
@@ -407,6 +408,7 @@ interface TPVStatusTableProps {
 }
 
 export function TPVStatusTable({ personFilter, statusFilter, search: externalSearch, riskHighlight, onRequestTab, closeDetailRef }: TPVStatusTableProps) {
+  useDataLogRowHighlight();
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const statusLabels = useMemo(() => statusOptions.map((s) => s.label), [statusOptions]);
