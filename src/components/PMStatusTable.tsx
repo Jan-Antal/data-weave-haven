@@ -104,8 +104,12 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
   const style = { transform: CSS.Transform.toString(transform), transition };
   const saveStage = useCallback((field: string, value: string) => {
     onFieldTouched?.(field);
-    updateStage.mutate({ id: stage.id, field, value, projectId: project.project_id });
-  }, [stage.id, project.project_id, onFieldTouched, updateStage]);
+    updateStage.mutate({
+      id: stage.id, field, value, projectId: project.project_id,
+      oldValue: field === "konstrukter" ? ((stage as any).konstrukter ?? "") : undefined,
+      stageName: field === "konstrukter" ? stage.stage_name : undefined,
+    });
+  }, [stage.id, stage.stage_name, (stage as any).konstrukter, project.project_id, onFieldTouched, updateStage]);
   const v = isVisible;
   const inheritedClass = (field: string) => isFieldInherited?.(field) ? "text-blue-300" : "";
 
@@ -566,8 +570,8 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
     });
   }, [showAddButton]);
 
-  const save = useCallback((id: string, field: string, value: string, oldValue: string) => {
-    updateProject.mutate({ id, field, value, oldValue });
+  const save = useCallback((id: string, field: string, value: string, oldValue: string, projectId?: string) => {
+    updateProject.mutate({ id, field, value, oldValue, projectId });
   }, [updateProject]);
 
   const handleSaveCustomField = useCallback((rowId: string, colKey: string, val: string, old: string) => {

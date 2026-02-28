@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { logActivity } from "@/lib/activityLog";
 
 export function useUpdateProject() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, field, value, oldValue }: { id: string; field: string; value: string; oldValue: string }) => {
+    mutationFn: async ({ id, field, value, oldValue, projectId }: { id: string; field: string; value: string; oldValue: string; projectId?: string }) => {
       let parsed: string | number | null = value;
       // Handle numeric fields
       const numericFields = ["prodejni_cena", "material", "subdodavky", "vyroba", "tpv_cost", "percent_tpv"];
@@ -14,6 +15,15 @@ export function useUpdateProject() {
       }
       const { error } = await supabase.from("projects").update({ [field]: parsed } as any).eq("id", id);
       if (error) throw error;
+
+      // Log status and konstrukter changes
+      if (field === "status" && value !== oldValue && projectId) {
+        logActivity({ projectId, actionType: "status_change", oldValue: oldValue || "—", newValue: value || "—" });
+      }
+      if (field === "konstrukter" && value !== oldValue && projectId) {
+        logActivity({ projectId, actionType: "konstrukter_change", oldValue: oldValue || "—", newValue: value || "—" });
+      }
+
       return { id, field, oldValue };
     },
     onSuccess: ({ id, field, oldValue }) => {

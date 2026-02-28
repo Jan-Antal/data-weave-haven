@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo, Fragment, useRef } from "react";
+import { logActivity } from "@/lib/activityLog";
 import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColumns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { InlineEditableCell } from "./InlineEditableCell";
@@ -136,8 +137,12 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
   const style = { transform: CSS.Transform.toString(transform), transition };
   const saveStage = useCallback((field: string, value: string) => {
     onFieldTouched?.(field);
-    updateStage.mutate({ id: stage.id, field, value, projectId: project.project_id });
-  }, [stage.id, project.project_id, onFieldTouched, updateStage]);
+    updateStage.mutate({
+      id: stage.id, field, value, projectId: project.project_id,
+      oldValue: field === "konstrukter" ? ((stage as any).konstrukter ?? "") : undefined,
+      stageName: field === "konstrukter" ? stage.stage_name : undefined,
+    });
+  }, [stage.id, stage.stage_name, (stage as any).konstrukter, project.project_id, onFieldTouched, updateStage]);
   const v = isVisible;
   const inheritedClass = (field: string) => isFieldInherited?.(field) ? "text-blue-300" : "";
 
@@ -569,8 +574,8 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     });
   }, [showAddButton]);
 
-  const save = useCallback((id: string, field: string, value: string, oldValue: string) => {
-    updateProject.mutate({ id, field, value, oldValue });
+  const save = useCallback((id: string, field: string, value: string, oldValue: string, projectId?: string) => {
+    updateProject.mutate({ id, field, value, oldValue, projectId });
   }, [updateProject]);
 
   const saveCurrency = useCallback((id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => {
@@ -617,6 +622,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
       toast({ title: "Chyba", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Projekt vytvořen" });
+      logActivity({ projectId: newProj.project_id, actionType: "project_created", detail: newProj.project_name });
       qc.invalidateQueries({ queryKey: ["projects"] });
       setAddOpen(false);
       setNewProj({ ...emptyProject });

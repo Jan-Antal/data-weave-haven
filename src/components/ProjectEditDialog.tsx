@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { logActivity } from "@/lib/activityLog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -138,6 +139,8 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
         await sp.uploadFile(categoryKey, file);
         dispatchDocCountUpdate(project!.project_id, 1);
         toast({ title: "Soubor nahrán", description: file.name });
+        const catLabel = DOC_CATEGORIES.find(c => c.key === categoryKey)?.label ?? categoryKey;
+        logActivity({ projectId: project!.project_id, actionType: "document_uploaded", newValue: file.name, detail: catLabel });
       } catch (err: any) {
         toast({ title: "Chyba uploadu", description: err.message, variant: "destructive" });
       }
@@ -151,6 +154,8 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
         await sp.uploadFile(categoryKey, file);
         dispatchDocCountUpdate(project!.project_id, 1);
         toast({ title: "Soubor nahrán", description: file.name });
+        const catLabel = DOC_CATEGORIES.find(c => c.key === categoryKey)?.label ?? categoryKey;
+        logActivity({ projectId: project!.project_id, actionType: "document_uploaded", newValue: file.name, detail: catLabel });
       } catch (err: any) {
         toast({ title: "Chyba uploadu", description: err.message, variant: "destructive" });
       }
@@ -232,6 +237,13 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
     if (error) {
       toast({ title: "Chyba", description: error.message, variant: "destructive" });
     } else {
+      // Log status and konstrukter changes
+      if (newValues.status !== previousValues.status) {
+        logActivity({ projectId: project.project_id, actionType: "status_change", oldValue: previousValues.status || "—", newValue: newValues.status || "—" });
+      }
+      if (newValues.konstrukter !== previousValues.konstrukter) {
+        logActivity({ projectId: project.project_id, actionType: "konstrukter_change", oldValue: previousValues.konstrukter || "—", newValue: newValues.konstrukter || "—" });
+      }
       qc.invalidateQueries({ queryKey: ["projects"] });
       onOpenChange(false);
       showUndoToast(project.id, previousValues, qc);
@@ -250,6 +262,7 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
       toast({ title: "Chyba", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Projekt přesunut do koše" });
+      logActivity({ projectId: project.project_id, actionType: "project_deleted", detail: project.project_name });
       qc.invalidateQueries({ queryKey: ["projects"] });
       onOpenChange(false);
     }
@@ -260,6 +273,8 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
       await sp.deleteFile(categoryKey, fileName);
       dispatchDocCountUpdate(project!.project_id, -1);
       toast({ title: "Soubor smazán" });
+      const catLabel = DOC_CATEGORIES.find(c => c.key === categoryKey)?.label ?? categoryKey;
+      logActivity({ projectId: project!.project_id, actionType: "document_deleted", oldValue: fileName, detail: catLabel });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
