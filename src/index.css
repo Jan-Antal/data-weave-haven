@@ -147,4 +147,27 @@
   h1, h2, h3, h4, h5, h6 {
     @apply font-serif;
   }
+
+  /* Data Log row highlight animation */
+  @keyframes datalog-row-highlight {
+    0% { background-color: hsl(48 96% 89%); }
+    100% { background-color: transparent; }
+  }
+  .datalog-row-highlight {
+    animation: datalog-row-highlight 2.5s ease-out forwards;
+  }
+
+  /* Data Log panel feed scrollbar */
+  .datalog-feed::-webkit-scrollbar {
+    width: 4px;
+  }
+  .datalog-feed::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .datalog-feed::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/20 rounded-full;
+  }
+  .datalog-feed::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
+  }
 }

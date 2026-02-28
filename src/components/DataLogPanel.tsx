@@ -1,5 +1,4 @@
 import { useState, useMemo } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useActivityLog, type ActivityLogEntry } from "@/hooks/useActivityLog";
 import { useProjects } from "@/hooks/useProjects";
 import { Button } from "@/components/ui/button";
@@ -8,11 +7,11 @@ import { X, Clock } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
 import { cs } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { useDataLogHighlight } from "@/components/DataLogHighlightContext";
 
 interface DataLogPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onOpenProject?: (projectId: string) => void;
 }
 
 type Category = "all" | "status" | "terminy" | "documents" | "projects";
@@ -50,26 +49,27 @@ function formatDayHeader(dateStr: string): string {
   return format(d, "d. MMMM yyyy", { locale: cs });
 }
 
-function ActivityItem({ entry, onOpenProject }: { entry: ActivityLogEntry; onOpenProject?: (id: string) => void }) {
+function ActivityItem({
+  entry,
+  isSelected,
+  onSelect,
+}: {
+  entry: ActivityLogEntry;
+  isSelected: boolean;
+  onSelect: (entry: ActivityLogEntry) => void;
+}) {
   const userName = entry.user_email?.split("@")[0] || "Uživatel";
   const time = format(new Date(entry.created_at), "HH:mm");
   const pid = entry.project_id;
 
-  const projectLink = (
-    <button
-      className="font-semibold hover:underline cursor-pointer"
-      onClick={() => onOpenProject?.(pid)}
-    >
-      {pid}
-    </button>
-  );
+  const projectLabel = <span className="font-semibold">{pid}</span>;
 
   let mainText: React.ReactNode = null;
   let subContent: React.ReactNode = null;
 
   switch (entry.action_type) {
     case "status_change":
-      mainText = <>{userName} změnil/a status {projectLink}</>;
+      mainText = <>{userName} změnil/a status {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] line-through text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{entry.old_value || "—"}</span>
@@ -80,8 +80,8 @@ function ActivityItem({ entry, onOpenProject }: { entry: ActivityLogEntry; onOpe
       break;
     case "konstrukter_change":
       mainText = entry.detail
-        ? <>{userName} změnil/a konstruktéra {entry.detail} v {projectLink}</>
-        : <>{userName} změnil/a konstruktéra {projectLink}</>;
+        ? <>{userName} změnil/a konstruktéra {entry.detail} v {projectLabel}</>
+        : <>{userName} změnil/a konstruktéra {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] line-through text-muted-foreground">{entry.old_value || "—"}</span>
@@ -91,7 +91,7 @@ function ActivityItem({ entry, onOpenProject }: { entry: ActivityLogEntry; onOpe
       );
       break;
     case "datum_smluvni_change":
-      mainText = <>{userName} změnil/a datum smluvní {projectLink}</>;
+      mainText = <>{userName} změnil/a datum smluvní {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] line-through text-muted-foreground">{entry.old_value || "—"}</span>
@@ -101,16 +101,16 @@ function ActivityItem({ entry, onOpenProject }: { entry: ActivityLogEntry; onOpe
       );
       break;
     case "project_created":
-      mainText = <>{userName} vytvořil/a {projectLink}{entry.detail ? ` — ${entry.detail}` : ""}</>;
+      mainText = <>{userName} vytvořil/a {projectLabel}{entry.detail ? ` — ${entry.detail}` : ""}</>;
       break;
     case "project_deleted":
-      mainText = <>{userName} smazal/a {projectLink}{entry.detail ? ` — ${entry.detail}` : ""}</>;
+      mainText = <>{userName} smazal/a {projectLabel}{entry.detail ? ` — ${entry.detail}` : ""}</>;
       break;
     case "project_restored":
-      mainText = <>{userName} obnovil/a {projectLink}{entry.detail ? ` — ${entry.detail}` : ""}</>;
+      mainText = <>{userName} obnovil/a {projectLabel}{entry.detail ? ` — ${entry.detail}` : ""}</>;
       break;
     case "document_uploaded":
-      mainText = <>{userName} nahrál/a dokument do {projectLink}</>;
+      mainText = <>{userName} nahrál/a dokument do {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] bg-muted px-1.5 py-0.5 rounded truncate max-w-[220px]">📄 {entry.new_value}</span>
@@ -119,7 +119,7 @@ function ActivityItem({ entry, onOpenProject }: { entry: ActivityLogEntry; onOpe
       );
       break;
     case "document_deleted":
-      mainText = <>{userName} smazal/a dokument z {projectLink}</>;
+      mainText = <>{userName} smazal/a dokument z {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded truncate max-w-[220px]">🗑 {entry.old_value}</span>
@@ -128,13 +128,13 @@ function ActivityItem({ entry, onOpenProject }: { entry: ActivityLogEntry; onOpe
       );
       break;
     case "etapa_created":
-      mainText = <>{userName} vytvořil/a etapu {entry.detail} v {projectLink}</>;
+      mainText = <>{userName} vytvořil/a etapu {entry.detail} v {projectLabel}</>;
       break;
     case "etapa_deleted":
-      mainText = <>{userName} smazal/a etapu {entry.detail} z {projectLink}</>;
+      mainText = <>{userName} smazal/a etapu {entry.detail} z {projectLabel}</>;
       break;
     case "etapa_status_change":
-      mainText = <>{userName} změnil/a status {entry.detail} v {projectLink}</>;
+      mainText = <>{userName} změnil/a status {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] line-through text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{entry.old_value || "—"}</span>
@@ -144,7 +144,7 @@ function ActivityItem({ entry, onOpenProject }: { entry: ActivityLogEntry; onOpe
       );
       break;
     case "etapa_konstrukter_change":
-      mainText = <>{userName} změnil/a konstruktéra {entry.detail} v {projectLink}</>;
+      mainText = <>{userName} změnil/a konstruktéra {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] line-through text-muted-foreground">{entry.old_value || "—"}</span>
@@ -154,7 +154,7 @@ function ActivityItem({ entry, onOpenProject }: { entry: ActivityLogEntry; onOpe
       );
       break;
     case "etapa_datum_smluvni_change":
-      mainText = <>{userName} změnil/a datum smluvní {entry.detail} v {projectLink}</>;
+      mainText = <>{userName} změnil/a datum smluvní {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] line-through text-muted-foreground">{entry.old_value || "—"}</span>
@@ -164,7 +164,7 @@ function ActivityItem({ entry, onOpenProject }: { entry: ActivityLogEntry; onOpe
       );
       break;
     case "etapa_document_uploaded":
-      mainText = <>{userName} nahrál/a dokument do {entry.detail} v {projectLink}</>;
+      mainText = <>{userName} nahrál/a dokument do {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] bg-muted px-1.5 py-0.5 rounded truncate max-w-[220px]">📄 {entry.new_value}</span>
@@ -172,7 +172,7 @@ function ActivityItem({ entry, onOpenProject }: { entry: ActivityLogEntry; onOpe
       );
       break;
     case "etapa_document_deleted":
-      mainText = <>{userName} smazal/a dokument z {entry.detail} v {projectLink}</>;
+      mainText = <>{userName} smazal/a dokument z {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded truncate max-w-[220px]">🗑 {entry.old_value}</span>
@@ -182,7 +182,13 @@ function ActivityItem({ entry, onOpenProject }: { entry: ActivityLogEntry; onOpe
   }
 
   return (
-    <div className="flex gap-2.5 py-2 px-3">
+    <button
+      onClick={() => onSelect(entry)}
+      className={cn(
+        "flex gap-2.5 py-1.5 px-3 w-full text-left transition-colors hover:bg-muted/50 cursor-pointer",
+        isSelected && "bg-amber-100"
+      )}
+    >
       <div className="pt-1.5 shrink-0">
         <div className={cn("w-2 h-2 rounded-full", DOT_COLORS[entry.action_type] || "bg-gray-400")} />
       </div>
@@ -191,14 +197,16 @@ function ActivityItem({ entry, onOpenProject }: { entry: ActivityLogEntry; onOpe
         {subContent}
         <p className="text-[10px] text-muted-foreground mt-0.5">{time}</p>
       </div>
-    </div>
+    </button>
   );
 }
 
-export function DataLogPanel({ open, onOpenChange, onOpenProject }: DataLogPanelProps) {
+export function DataLogPanel({ open, onOpenChange }: DataLogPanelProps) {
   const [category, setCategory] = useState<Category>("all");
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   const [userFilter, setUserFilter] = useState<string | null>(null);
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const { highlightProject } = useDataLogHighlight();
 
   const { data: projects = [] } = useProjects();
   const activeProjects = useMemo(() => projects.filter(p => !p.deleted_at), [projects]);
@@ -213,7 +221,6 @@ export function DataLogPanel({ open, onOpenChange, onOpenProject }: DataLogPanel
 
   const entries = useMemo(() => data?.pages.flat() ?? [], [data]);
 
-  // Group by day
   const grouped = useMemo(() => {
     const groups: { date: string; items: ActivityLogEntry[] }[] = [];
     for (const entry of entries) {
@@ -228,123 +235,122 @@ export function DataLogPanel({ open, onOpenChange, onOpenProject }: DataLogPanel
     return groups;
   }, [entries]);
 
-  // Unique users for filter
   const uniqueUsers = useMemo(() => {
     const set = new Set<string>();
     entries.forEach(e => { if (e.user_email) set.add(e.user_email); });
     return Array.from(set).sort();
   }, [entries]);
 
-  const handleProjectClick = (projectId: string) => {
-    onOpenChange(false);
-    onOpenProject?.(projectId);
+  const handleEntrySelect = (entry: ActivityLogEntry) => {
+    setSelectedEntryId(entry.id);
+    highlightProject(entry.project_id);
   };
 
+  if (!open) return null;
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="w-[380px] max-w-[90vw] p-0 flex flex-col [&>button]:hidden"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-background sticky top-0 z-10">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <SheetTitle className="text-sm font-semibold">Data Log</SheetTitle>
-          </div>
-          <button onClick={() => onOpenChange(false)} className="rounded-sm p-1 hover:bg-muted transition-colors">
-            <X className="h-4 w-4" />
-          </button>
+    <div className="w-[340px] shrink-0 border-l border-border bg-card flex flex-col datalog-panel overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 py-2.5 border-b bg-card sticky top-0 z-10">
+        <div className="flex items-center gap-2">
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          <span className="text-[13px] font-semibold font-sans">Data Log</span>
+        </div>
+        <button onClick={() => onOpenChange(false)} className="rounded-sm p-1 hover:bg-muted transition-colors">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div className="px-3 py-2.5 border-b space-y-2 bg-card sticky top-[41px] z-10">
+        <div className="flex flex-wrap gap-1">
+          {CATEGORY_PILLS.map(p => (
+            <button
+              key={p.value}
+              onClick={() => setCategory(p.value)}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors",
+                category === p.value
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-border hover:bg-muted"
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
 
-        {/* Filters */}
-        <div className="px-4 py-3 border-b space-y-2 bg-background sticky top-[49px] z-10">
-          {/* Category pills */}
-          <div className="flex flex-wrap gap-1">
-            {CATEGORY_PILLS.map(p => (
-              <button
-                key={p.value}
-                onClick={() => setCategory(p.value)}
-                className={cn(
-                  "px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors",
-                  category === p.value
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background text-muted-foreground border-border hover:bg-muted"
-                )}
-              >
-                {p.label}
-              </button>
+        <Select value={projectFilter ?? "__all__"} onValueChange={v => setProjectFilter(v === "__all__" ? null : v)}>
+          <SelectTrigger className="h-7 text-xs">
+            <SelectValue placeholder="Všechny projekty" />
+          </SelectTrigger>
+          <SelectContent className="z-[99999]">
+            <SelectItem value="__all__">Všechny projekty</SelectItem>
+            {activeProjects.map(p => (
+              <SelectItem key={p.project_id} value={p.project_id}>{p.project_id}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={userFilter ?? "__all__"} onValueChange={v => setUserFilter(v === "__all__" ? null : v)}>
+          <SelectTrigger className="h-7 text-xs">
+            <SelectValue placeholder="Všichni uživatelé" />
+          </SelectTrigger>
+          <SelectContent className="z-[99999]">
+            <SelectItem value="__all__">Všichni uživatelé</SelectItem>
+            {uniqueUsers.map(u => (
+              <SelectItem key={u} value={u}>{u.split("@")[0]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Feed */}
+      <div className="flex-1 overflow-y-auto datalog-feed">
+        {isLoading && (
+          <p className="text-xs text-muted-foreground p-4 text-center">Načítání…</p>
+        )}
+
+        {!isLoading && entries.length === 0 && (
+          <p className="text-xs text-muted-foreground p-4 text-center">Žádné záznamy</p>
+        )}
+
+        {grouped.map(group => (
+          <div key={group.date}>
+            <div className="px-3 pt-3 pb-1">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                {formatDayHeader(group.items[0].created_at)}
+              </p>
+            </div>
+            {group.items.map(entry => (
+              <ActivityItem
+                key={entry.id}
+                entry={entry}
+                isSelected={selectedEntryId === entry.id}
+                onSelect={handleEntrySelect}
+              />
             ))}
           </div>
+        ))}
 
-          {/* Dropdowns */}
-          <Select value={projectFilter ?? "__all__"} onValueChange={v => setProjectFilter(v === "__all__" ? null : v)}>
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue placeholder="Všechny projekty" />
-            </SelectTrigger>
-            <SelectContent className="z-[99999]">
-              <SelectItem value="__all__">Všechny projekty</SelectItem>
-              {activeProjects.map(p => (
-                <SelectItem key={p.project_id} value={p.project_id}>{p.project_id}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {hasNextPage && (
+          <div className="p-3 text-center">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+            >
+              {isFetchingNextPage ? "Načítání…" : "Načíst další →"}
+            </Button>
+          </div>
+        )}
 
-          <Select value={userFilter ?? "__all__"} onValueChange={v => setUserFilter(v === "__all__" ? null : v)}>
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue placeholder="Všichni uživatelé" />
-            </SelectTrigger>
-            <SelectContent className="z-[99999]">
-              <SelectItem value="__all__">Všichni uživatelé</SelectItem>
-              {uniqueUsers.map(u => (
-                <SelectItem key={u} value={u}>{u.split("@")[0]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Feed */}
-        <div className="flex-1 overflow-y-auto">
-          {isLoading && (
-            <p className="text-xs text-muted-foreground p-4 text-center">Načítání…</p>
-          )}
-
-          {!isLoading && entries.length === 0 && (
-            <p className="text-xs text-muted-foreground p-4 text-center">Žádné záznamy</p>
-          )}
-
-          {grouped.map(group => (
-            <div key={group.date}>
-              <div className="px-4 pt-3 pb-1">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-                  {formatDayHeader(group.items[0].created_at)}
-                </p>
-              </div>
-              {group.items.map(entry => (
-                <ActivityItem key={entry.id} entry={entry} onOpenProject={handleProjectClick} />
-              ))}
-            </div>
-          ))}
-
-          {hasNextPage && (
-            <div className="p-4 text-center">
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs"
-                onClick={() => fetchNextPage()}
-                disabled={isFetchingNextPage}
-              >
-                {isFetchingNextPage ? "Načítání…" : "Načíst další →"}
-              </Button>
-            </div>
-          )}
-
-          <p className="text-[10px] text-muted-foreground text-center px-4 py-3">
-            Záznamy starší než 30 dní jsou automaticky mazány
-          </p>
-        </div>
-      </SheetContent>
-    </Sheet>
+        <p className="text-[10px] text-muted-foreground text-center px-3 py-2.5">
+          Záznamy starší než 30 dní jsou automaticky mazány
+        </p>
+      </div>
+    </div>
   );
 }
