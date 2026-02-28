@@ -62,7 +62,11 @@ const LABEL_MAP = Object.fromEntries(ALL_COLUMNS.map((c) => [c.key, c.label]));
 LABEL_MAP["project_id"] = "Project ID";
 LABEL_MAP["project_name"] = "Project Name";
 
-export function getColumnLabel(key: string): string {
+export function getColumnLabel(key: string, customColumns?: CustomColumnDef[]): string {
+  if (key.startsWith("custom_") && customColumns) {
+    const def = customColumns.find(c => c.column_key === key);
+    if (def) return def.label;
+  }
   return LABEL_MAP[key] ?? key;
 }
 
@@ -80,11 +84,12 @@ interface HeaderProps {
   dragProps?: Record<string, any>;
   dropIndicator?: "left" | "right" | null;
   isDragging?: boolean;
+  customColumns?: CustomColumnDef[];
 }
 
 export function renderColumnHeader(props: HeaderProps) {
-  const { colKey: key, sortCol, sortDir, onSort, getLabel, getWidth, editMode, updateLabel, updateWidth, dragProps, dropIndicator, isDragging } = props;
-  const defaultLabel = getColumnLabel(key);
+  const { colKey: key, sortCol, sortDir, onSort, getLabel, getWidth, editMode, updateLabel, updateWidth, dragProps, dropIndicator, isDragging, customColumns } = props;
+  const defaultLabel = getColumnLabel(key, customColumns);
   const style = getColumnStyle(key, getWidth(key));
   const isRight = key === "prodejni_cena" || key === "marze";
   return (
