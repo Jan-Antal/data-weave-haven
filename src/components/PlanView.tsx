@@ -109,6 +109,43 @@ function weeksLabel(startDate: Date, endDate: Date): string {
 // ── Milestone validation ────────────────────────────────────────────
 interface MilestoneWarning {
   message: string;
+  fields?: string[]; // field keys that are out of order
+}
+
+const ORDER_SEQUENCE: { key: string; label: string }[] = [
+  { key: "datum_objednavky", label: "Objednání" },
+  { key: "tpv_date", label: "TPV" },
+  { key: "expedice", label: "Expedice" },
+  { key: "predani", label: "Předání" },
+  { key: "datum_smluvni", label: "Smluvní" },
+];
+
+function getChronologicalWarnings(
+  S: Date | null, TPV: Date | null, EXP: Date | null, PRE: Date | null, E: Date | null,
+): MilestoneWarning[] {
+  const warnings: MilestoneWarning[] = [];
+  const vals: { key: string; label: string; date: Date | null }[] = [
+    { key: "datum_objednavky", label: "Objednání", date: S },
+    { key: "tpv_date", label: "TPV", date: TPV },
+    { key: "expedice", label: "Expedice", date: EXP },
+    { key: "predani", label: "Předání", date: PRE },
+    { key: "datum_smluvni", label: "Smluvní", date: E },
+  ];
+
+  // Compare each pair in sequence (only when both have values)
+  for (let i = 0; i < vals.length; i++) {
+    for (let j = i + 1; j < vals.length; j++) {
+      const a = vals[i];
+      const b = vals[j];
+      if (a.date && b.date && a.date > b.date) {
+        warnings.push({
+          message: `${a.label} (${format(a.date, "dd-MMM")}) je po ${b.label} (${format(b.date, "dd-MMM")})`,
+          fields: [a.key, b.key],
+        });
+      }
+    }
+  }
+  return warnings;
 }
 
 function getBarWarnings(
@@ -122,7 +159,6 @@ function getBarWarnings(
   }
   if (!S || !E) return warnings;
 
-  // S + E exist
   const hasTPV = !!TPV;
   const hasEXP = !!EXP;
 
@@ -133,6 +169,10 @@ function getBarWarnings(
   } else if (!hasEXP) {
     warnings.push({ message: "Chybí milník Expedice" });
   }
+
+  // Chronological order checks
+  warnings.push(...getChronologicalWarnings(S, TPV, EXP, PRE, E));
+
   return warnings;
 }
 
