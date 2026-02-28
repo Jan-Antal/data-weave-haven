@@ -63,20 +63,20 @@ const BASE_STYLES = `
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .header { margin-bottom: 6px; }
-  .header h1 { font-size: 12pt; font-weight: 700; color: #2d3a2e; margin: 0; }
-  .header .subtitle { font-size: 9pt; color: #6b7280; margin-top: 2px; }
-  .header .filters { font-size: 7pt; color: #9ca3af; margin-top: 2px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 8pt; }
+  .header { margin-bottom: 16px; }
+  .header h1 { font-size: 18px; font-weight: 700; color: #2d3a2e; margin: 0 0 4px 0; }
+  .header .subtitle { font-size: 12px; color: #6b7280; margin-bottom: 2px; }
+  .header .filters { font-size: 10px; color: #9ca3af; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 9pt; }
   thead th {
-    background: #2d3a2e; color: #fff; font-weight: 600; font-size: 8.5pt;
-    padding: 4px 5px; text-align: left; border: 1px solid #2d3a2e; white-space: nowrap;
+    background: #2d3a2e; color: #fff; font-weight: 600; font-size: 10pt;
+    padding: 6px 8px; text-align: left; border: 1px solid #2d3a2e; white-space: nowrap;
   }
   thead th.num { text-align: right; }
   tbody tr:nth-child(even) { background: #f9fafb; }
   tbody td {
-    padding: 3px 5px; border: 1px solid #e5e7eb; vertical-align: top;
-    max-width: 200px; word-wrap: break-word; overflow-wrap: break-word;
+    padding: 5px 8px; border: 1px solid #e5e7eb; vertical-align: top;
+    max-width: 220px; word-wrap: break-word; overflow-wrap: break-word;
   }
   tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 7.5pt; font-weight: 500; white-space: nowrap; }
