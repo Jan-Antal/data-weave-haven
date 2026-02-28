@@ -214,8 +214,9 @@ export function ColumnVisibilityToggle(props: Props) {
 
   const resolveLabel = useCallback(
     (key: string) => {
+      // For custom columns, always use label from custom_column_definitions (single source of truth)
       const customLabel = customLabelMap[key];
-      if (customLabel) return dbGetLabel(key, customLabel);
+      if (customLabel) return customLabel;
       return dbGetLabel(key, labelMap[key] || key);
     },
     [dbGetLabel, labelMap, customLabelMap]

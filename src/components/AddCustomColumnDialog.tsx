@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCustomColumns, useAllCustomColumns } from "@/hooks/useCustomColumns";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Props {
   open: boolean;
@@ -24,6 +26,8 @@ const DATA_TYPES = [
 
 const PEOPLE_ROLES = ["PM", "Konstruktér", "Kalkulant"];
 
+const ALL_TAB_KEYS = ["project-info", "pm-status", "tpv-status"];
+
 export function AddCustomColumnDialog({ open, onOpenChange, tableName, groupKey, groupLabel }: Props) {
   const [name, setName] = useState("");
   const [dataType, setDataType] = useState("text");
@@ -31,8 +35,9 @@ export function AddCustomColumnDialog({ open, onOpenChange, tableName, groupKey,
   const [peopleRole, setPeopleRole] = useState("");
   const { addColumn } = useCustomColumns();
   const { columns: existingCustomColumns } = useAllCustomColumns(tableName);
+  const qc = useQueryClient();
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name.trim()) return;
     const columnKey = `custom_${Date.now()}_${name.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "")}`;
     // Place new column after all existing ones
@@ -48,6 +53,21 @@ export function AddCustomColumnDialog({ open, onOpenChange, tableName, groupKey,
       people_role: dataType === "people" ? peopleRole : undefined,
       sort_order: nextOrder,
     });
+
+    // Insert column_labels visibility entries for ALL tabs:
+    // visible=true for the creating tab, visible=false for all other tabs
+    const visibilityPromises = ALL_TAB_KEYS.map((tab) => {
+      return (supabase.from("column_labels") as any).insert({
+        tab,
+        column_key: columnKey,
+        custom_label: "",
+        visible: tab === groupKey,
+      });
+    });
+    await Promise.all(visibilityPromises);
+    // Invalidate column-labels queries so all tabs pick up the new entries
+    qc.invalidateQueries({ queryKey: ["column-labels"] });
+
     setName("");
     setDataType("text");
     setSelectOptions("");

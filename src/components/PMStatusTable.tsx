@@ -533,14 +533,14 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
     registerExport("pm-status", {
       getter: (selectedKeys) => {
         const keys = selectedKeys ?? allExportKeys;
-        const headers = keys.map(k => getLabel(k, getColumnLabel(k)));
+        const headers = keys.map(k => getLabel(k, getColumnLabel(k, customColumns)));
         const rows = sorted.map(p => keys.map(k => getProjectCellValue(p as any, k)));
         return { headers, rows };
       },
       groups: [
-        { label: "Project Info", keys: ["project_id", "project_name", ...PROJECT_INFO_NATIVE], getLabel: (k) => getLabel(k, getColumnLabel(k)) },
-        { label: "PM Status", keys: PM_NATIVE, getLabel: (k) => getLabel(k, getColumnLabel(k)) },
-        { label: "TPV Status", keys: TPV_NATIVE, getLabel: (k) => getLabel(k, getColumnLabel(k)) },
+        { label: "Project Info", keys: ["project_id", "project_name", ...PROJECT_INFO_NATIVE], getLabel: (k) => getLabel(k, getColumnLabel(k, customColumns)) },
+        { label: "PM Status", keys: PM_NATIVE, getLabel: (k) => getLabel(k, getColumnLabel(k, customColumns)) },
+        { label: "TPV Status", keys: TPV_NATIVE, getLabel: (k) => getLabel(k, getColumnLabel(k, customColumns)) },
       ],
       defaultVisibleKeys: allExportKeys,
     });
@@ -588,6 +588,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
     editMode,
     updateLabel,
     updateWidth,
+    customColumns,
     ...(editMode ? {
       dragProps: getDragProps(key),
       dropIndicator: dropTarget?.key === key ? dropTarget.side : null,

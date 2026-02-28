@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 
 export interface ColumnDef {
   key: string;
@@ -27,6 +27,12 @@ export function useColumnVisibility(
         } else {
           // No DB entry — use hardcoded default
           if (defaultHidden.includes(col.key)) hidden.add(col.key);
+        }
+      }
+      // Also process DB entries for keys NOT in allColumns (e.g., custom columns)
+      for (const key of Object.keys(dbMap)) {
+        if (!allColumns.find(c => c.key === key)) {
+          if (!dbMap[key]) hidden.add(key);
         }
       }
       return hidden;
@@ -64,13 +70,23 @@ export function useColumnVisibility(
     [onDbToggle]
   );
 
+  // Track which keys have explicit DB visibility entries
+  const dbKeySet = useMemo(() => {
+    return new Set(Object.keys(dbVisibilityMap ?? {}));
+  }, [dbVisibilityMap]);
+
   const isVisible = useCallback(
     (key: string) => {
       const col = allColumns.find((c) => c.key === key);
       if (col?.locked) return true;
+      // For custom/unknown columns not in allColumns: default to hidden
+      // unless explicitly set visible in DB
+      if (!col && key.startsWith("custom_")) {
+        if (!dbKeySet.has(key)) return false; // No DB entry → hidden by default
+      }
       return !hiddenColumns.has(key);
     },
-    [hiddenColumns, allColumns]
+    [hiddenColumns, allColumns, dbKeySet]
   );
 
   return { hiddenColumns, toggleColumn, isVisible, columns: allColumns };
