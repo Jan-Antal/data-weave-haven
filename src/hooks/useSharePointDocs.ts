@@ -29,15 +29,19 @@ const ALL_CATEGORY_KEYS = Object.keys(CATEGORY_FOLDER_MAP);
 
 // Global file cache: projectId → categoryKey → SPFile[]
 const globalFileCache: Record<string, Record<string, SPFile[]>> = {};
+// Track when each project was last refreshed from SharePoint
+const lastRefreshTime: Record<string, number> = {};
+
+const CACHE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
 
 export function useSharePointDocs(projectId: string) {
   const [filesByCategory, setFilesByCategory] = useState<Record<string, SPFile[]>>(() => {
-    // Initialize from global cache
     return globalFileCache[projectId] ?? {};
   });
   const [loadingCategory, setLoadingCategory] = useState<string | null>(null);
   const [initialLoading, setInitialLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const fetchedRef = useRef<Set<string>>(new Set());
 
   const invoke = useCallback(async (body: Record<string, unknown>) => {
@@ -46,39 +50,53 @@ export function useSharePointDocs(projectId: string) {
     return data;
   }, []);
 
-  const fetchAllCategories = useCallback(async () => {
-    if (!projectId) return;
-
-    // If we have cached data for this project, show it immediately
-    if (globalFileCache[projectId] && Object.keys(globalFileCache[projectId]).length > 0) {
-      setFilesByCategory(globalFileCache[projectId]);
-      for (const key of Object.keys(globalFileCache[projectId])) {
-        fetchedRef.current.add(key);
+  // Save file list to Supabase cache table
+  const persistToCache = useCallback(async (pid: string, filesMap: Record<string, SPFile[]>) => {
+    try {
+      const categoryCounts: Record<string, number> = {};
+      let total = 0;
+      for (const [key, files] of Object.entries(filesMap)) {
+        categoryCounts[key] = files.length;
+        total += files.length;
       }
-      // Background refresh
-      (async () => {
-        try {
-          const results = await Promise.all(
-            ALL_CATEGORY_KEYS.map(async (key) => {
-              const folder = CATEGORY_FOLDER_MAP[key];
-              try {
-                const files = await invoke({ action: "list", projectId, category: folder });
-                return { key, files: (files ?? []) as SPFile[] };
-              } catch {
-                return { key, files: [] as SPFile[] };
-              }
-            })
-          );
-          const map: Record<string, SPFile[]> = {};
-          for (const r of results) map[r.key] = r.files;
-          globalFileCache[projectId] = map;
-          setFilesByCategory(map);
-        } catch { /* ignore background refresh errors */ }
-      })();
-      return;
-    }
+      await supabase
+        .from("sharepoint_document_cache")
+        .upsert({
+          project_id: pid,
+          category_counts: categoryCounts,
+          file_list: filesMap,
+          total_count: total,
+          updated_at: new Date().toISOString(),
+        } as any, { onConflict: "project_id" });
+    } catch { /* ignore cache persist errors */ }
+  }, []);
 
-    setInitialLoading(true);
+  // Load from Supabase cache table
+  const loadFromDBCache = useCallback(async () => {
+    if (!projectId) return false;
+    try {
+      const { data } = await supabase
+        .from("sharepoint_document_cache")
+        .select("file_list, updated_at")
+        .eq("project_id", projectId)
+        .maybeSingle();
+      if (data?.file_list && typeof data.file_list === "object") {
+        const filesMap = data.file_list as unknown as Record<string, SPFile[]>;
+        globalFileCache[projectId] = filesMap;
+        setFilesByCategory(filesMap);
+        for (const key of Object.keys(filesMap)) {
+          fetchedRef.current.add(key);
+        }
+        // Check if stale
+        const updatedAt = new Date(data.updated_at).getTime();
+        return Date.now() - updatedAt < CACHE_MAX_AGE_MS;
+      }
+    } catch { /* ignore */ }
+    return false;
+  }, [projectId]);
+
+  const fetchAllFromSharePoint = useCallback(async () => {
+    if (!projectId) return;
     try {
       const results = await Promise.all(
         ALL_CATEGORY_KEYS.map(async (key) => {
@@ -86,23 +104,58 @@ export function useSharePointDocs(projectId: string) {
           try {
             const files = await invoke({ action: "list", projectId, category: folder });
             return { key, files: (files ?? []) as SPFile[] };
-          } catch (err) {
-            console.error(`SP list error for ${key}:`, err);
+          } catch {
             return { key, files: [] as SPFile[] };
           }
         })
       );
       const map: Record<string, SPFile[]> = {};
-      for (const r of results) {
-        map[r.key] = r.files;
-        fetchedRef.current.add(r.key);
-      }
+      for (const r of results) map[r.key] = r.files;
       globalFileCache[projectId] = map;
+      lastRefreshTime[projectId] = Date.now();
       setFilesByCategory(map);
+      // Persist to DB cache
+      persistToCache(projectId, map);
+    } catch { /* ignore */ }
+  }, [projectId, invoke, persistToCache]);
+
+  const fetchAllCategories = useCallback(async () => {
+    if (!projectId) return;
+
+    // If we have in-memory cached data, show immediately
+    if (globalFileCache[projectId] && Object.keys(globalFileCache[projectId]).length > 0) {
+      setFilesByCategory(globalFileCache[projectId]);
+      for (const key of Object.keys(globalFileCache[projectId])) {
+        fetchedRef.current.add(key);
+      }
+      // Check if stale and background refresh
+      const lastRefresh = lastRefreshTime[projectId] ?? 0;
+      if (Date.now() - lastRefresh > CACHE_MAX_AGE_MS) {
+        setRefreshing(true);
+        fetchAllFromSharePoint().finally(() => setRefreshing(false));
+      }
+      return;
+    }
+
+    // Try DB cache first
+    const isFresh = await loadFromDBCache();
+    if (globalFileCache[projectId] && Object.keys(globalFileCache[projectId]).length > 0) {
+      // Got data from DB cache, optionally background refresh if stale
+      if (!isFresh) {
+        setRefreshing(true);
+        fetchAllFromSharePoint().finally(() => setRefreshing(false));
+      }
+      return;
+    }
+
+    // No cache at all — fetch from SharePoint
+    setInitialLoading(true);
+    try {
+      await fetchAllFromSharePoint();
     } finally {
       setInitialLoading(false);
     }
-  }, [projectId, invoke]);
+  }, [projectId, loadFromDBCache, fetchAllFromSharePoint]);
 
   const listFiles = useCallback(async (categoryKey: string, force = false) => {
     if (!force && fetchedRef.current.has(categoryKey)) return;
@@ -144,13 +197,15 @@ export function useSharePointDocs(projectId: string) {
         const updated = { ...prev, [categoryKey]: [...(prev[categoryKey] ?? []), result as SPFile] };
         if (!globalFileCache[projectId]) globalFileCache[projectId] = {};
         globalFileCache[projectId][categoryKey] = updated[categoryKey];
+        // Persist updated cache
+        persistToCache(projectId, { ...globalFileCache[projectId] });
         return updated;
       });
       return result as SPFile;
     } finally {
       setUploading(false);
     }
-  }, [projectId, invoke]);
+  }, [projectId, invoke, persistToCache]);
 
   const getDownloadUrl = useCallback(async (categoryKey: string, fileName: string) => {
     const folder = CATEGORY_FOLDER_MAP[categoryKey];
@@ -167,9 +222,11 @@ export function useSharePointDocs(projectId: string) {
       const updated = { ...prev, [categoryKey]: (prev[categoryKey] ?? []).filter((f) => f.name !== fileName) };
       if (!globalFileCache[projectId]) globalFileCache[projectId] = {};
       globalFileCache[projectId][categoryKey] = updated[categoryKey];
+      // Persist updated cache
+      persistToCache(projectId, { ...globalFileCache[projectId] });
       return updated;
     });
-  }, [projectId, invoke]);
+  }, [projectId, invoke, persistToCache]);
 
   const archiveProject = useCallback(async () => {
     await invoke({ action: "archive", projectId });
@@ -181,12 +238,10 @@ export function useSharePointDocs(projectId: string) {
   }, [invoke]);
 
   const resetCache = useCallback(() => {
-    // Only clear the ref so next fetchAllCategories will refresh
-    // but keep globalFileCache for instant display
     fetchedRef.current.clear();
   }, []);
 
-  return { filesByCategory, loadingCategory, initialLoading, uploading, listFiles, fetchAllCategories, uploadFile, getDownloadUrl, deleteFile, archiveProject, getPreview, resetCache };
+  return { filesByCategory, loadingCategory, initialLoading, uploading, refreshing, listFiles, fetchAllCategories, uploadFile, getDownloadUrl, deleteFile, archiveProject, getPreview, resetCache };
 }
 
 function fileToBase64(file: File): Promise<string> {
