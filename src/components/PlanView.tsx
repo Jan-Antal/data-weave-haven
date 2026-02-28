@@ -20,6 +20,7 @@ const PHASE_COLORS = {
   vyroba: "#f4a261",
   montaz: "#e76f51",
   dokonceno: "#adb5bd",
+  overdue: "#dc2626",
 };
 
 const MILESTONE_COLORS = {
@@ -33,6 +34,7 @@ const PHASE_COLORS_LIGHT = {
   vyroba: "#f9c89a",
   montaz: "#f2a993",
   dokonceno: "#d6dadd",
+  overdue: "#ef4444",
 };
 
 const MILESTONE_COLORS_SOLID = {
@@ -45,9 +47,11 @@ const PHASE_LABELS: Record<string, string> = {
   [PHASE_COLORS.konstrukce]: "Konstrukce",
   [PHASE_COLORS.vyroba]: "Výroba",
   [PHASE_COLORS.montaz]: "Montáž",
+  [PHASE_COLORS.overdue]: "Po termínu",
   [PHASE_COLORS_LIGHT.konstrukce]: "Konstrukce",
   [PHASE_COLORS_LIGHT.vyroba]: "Výroba",
   [PHASE_COLORS_LIGHT.montaz]: "Montáž",
+  [PHASE_COLORS_LIGHT.overdue]: "Po termínu",
 };
 
 const CZECH_MONTHS = [
@@ -201,7 +205,7 @@ function getBarDataFromFields(
 
   const dItems: { date: Date; color: string; name: string }[] = [];
 
-  // CASE 1
+  // CASE 1 — no start date
   if (!S) {
     dItems.push({ date: E, color: milestoneColors.predani, name: "Předání" });
     return { ...empty, diamonds: makeDiamonds(dItems) };
@@ -209,144 +213,52 @@ function getBarDataFromFields(
 
   const safeE = differenceInDays(E, S) < 7 ? addDays(S, 7) : E;
 
-  // CASE 2
-  if (!TPV && !EXP && !PRE) {
-    dItems.push({ date: safeE, color: milestoneColors.predani, name: "Předání" });
-    return { segments: [{ start: S, end: safeE, color: phaseColors.dokonceno }], diamonds: makeDiamonds(dItems), hasWarning, warnings };
-  }
+  // Compute the latest date across all milestones + safeE
+  const allDates = [safeE];
+  if (TPV) allDates.push(TPV);
+  if (EXP) allDates.push(EXP);
+  if (PRE) allDates.push(PRE);
+  const latestDate = allDates.reduce((a, b) => (a > b ? a : b));
+  const hasOverdue = latestDate > safeE;
 
-  // CASE 7
-  if (!TPV && !EXP && PRE) {
-    dItems.push({ date: PRE, color: milestoneColors.predani, name: "Předání" });
-    return { segments: [{ start: S, end: safeE, color: phaseColors.dokonceno }], diamonds: makeDiamonds(dItems), hasWarning, warnings };
-  }
+  // Build milestone diamonds
+  if (TPV) dItems.push({ date: TPV, color: milestoneColors.tpv_date, name: "TPV" });
+  if (EXP) dItems.push({ date: EXP, color: milestoneColors.expedice, name: "Expedice" });
+  if (PRE) dItems.push({ date: PRE, color: milestoneColors.predani, name: "Předání" });
 
-  // CASE 6
-  if (!TPV && EXP && !PRE) {
-    dItems.push({ date: EXP, color: milestoneColors.expedice, name: "Expedice" });
-    dItems.push({ date: safeE, color: milestoneColors.predani, name: "Předání" });
-    return {
-      segments: [
-        { start: S, end: EXP, color: phaseColors.vyroba },
-        { start: EXP, end: safeE, color: phaseColors.montaz },
-      ],
-      diamonds: makeDiamonds(dItems), hasWarning, warnings,
-    };
-  }
-
-  // CASE 3
-  if (TPV && !EXP && !PRE) {
-    dItems.push({ date: TPV, color: milestoneColors.tpv_date, name: "TPV" });
-    dItems.push({ date: safeE, color: milestoneColors.predani, name: "Předání" });
-    return {
-      segments: [
-        { start: S, end: TPV, color: phaseColors.konstrukce },
-        { start: TPV, end: safeE, color: phaseColors.dokonceno },
-      ],
-      diamonds: makeDiamonds(dItems), hasWarning, warnings,
-    };
-  }
-
-  // CASE 4
-  if (TPV && EXP && !PRE) {
-    dItems.push({ date: TPV, color: milestoneColors.tpv_date, name: "TPV" });
-    dItems.push({ date: EXP, color: milestoneColors.expedice, name: "Expedice" });
-    dItems.push({ date: safeE, color: milestoneColors.predani, name: "Předání" });
-    const tpvExpOverlap = TPV >= EXP;
-    const segs: Segment[] = tpvExpOverlap
-      ? [
-          { start: S, end: EXP, color: phaseColors.konstrukce },
-          { start: EXP, end: TPV, color: phaseColors.vyroba, hatchColors: [phaseColors.konstrukce, phaseColors.vyroba] },
-          { start: TPV, end: safeE, color: phaseColors.montaz },
-        ]
-      : [
-          { start: S, end: TPV, color: phaseColors.konstrukce },
-          { start: TPV, end: EXP, color: phaseColors.vyroba },
-          { start: EXP, end: safeE, color: phaseColors.montaz },
-        ];
-    return {
-      segments: segs.filter(s => differenceInDays(s.end, s.start) > 0),
-      diamonds: makeDiamonds(dItems), hasWarning, warnings,
-    };
-  }
-
-  // CASE 5
-  if (TPV && EXP && PRE) {
-    dItems.push({ date: TPV, color: milestoneColors.tpv_date, name: "TPV" });
-    dItems.push({ date: EXP, color: milestoneColors.expedice, name: "Expedice" });
-    dItems.push({ date: PRE, color: milestoneColors.predani, name: "Předání" });
-    const tpvExpOverlap = TPV >= EXP;
-    const expPreOverlap = EXP >= PRE;
-    // Build segments handling overlaps
-    const segs: Segment[] = [];
-    const pts = [
-      { date: S, phase: "start" },
-      { date: TPV, phase: "tpv" },
-      { date: EXP, phase: "exp" },
-      { date: PRE, phase: "pre" },
-      { date: safeE, phase: "end" },
-    ].sort((a, b) => a.date.getTime() - b.date.getTime());
-
-    // Simple approach: iterate sorted points, assign colors based on expected phase
-    // For overlapping regions, use hatch
-    if (!tpvExpOverlap && !expPreOverlap) {
-      // Normal order
-      segs.push({ start: S, end: TPV, color: phaseColors.konstrukce });
-      segs.push({ start: TPV, end: EXP, color: phaseColors.vyroba });
-      segs.push({ start: EXP, end: PRE, color: phaseColors.montaz });
-      segs.push({ start: PRE, end: safeE, color: phaseColors.dokonceno });
-    } else {
-      // Sort milestone dates and build segments with hatch for reversed pairs
-      const milestones = [
-        { date: TPV, normalColor: phaseColors.konstrukce, nextColor: phaseColors.vyroba, name: "tpv" },
-        { date: EXP, normalColor: phaseColors.vyroba, nextColor: phaseColors.montaz, name: "exp" },
-        { date: PRE, normalColor: phaseColors.montaz, nextColor: phaseColors.dokonceno, name: "pre" },
-      ];
-      const allPts = [S, TPV, EXP, PRE, safeE].sort((a, b) => a.getTime() - b.getTime());
-      const colorSeq = [phaseColors.konstrukce, phaseColors.vyroba, phaseColors.montaz, phaseColors.dokonceno];
-      for (let i = 0; i < allPts.length - 1; i++) {
-        if (allPts[i].getTime() === allPts[i + 1].getTime()) continue;
-        const segStart = allPts[i];
-        const segEnd = allPts[i + 1];
-        const midpoint = new Date((segStart.getTime() + segEnd.getTime()) / 2);
-        // Determine if this segment is in an overlap zone
-        let hatch: [string, string] | undefined;
-        if (tpvExpOverlap && midpoint >= EXP && midpoint <= TPV) {
-          hatch = [phaseColors.konstrukce, phaseColors.vyroba];
-        }
-        if (expPreOverlap && midpoint >= PRE && midpoint <= EXP) {
-          hatch = [phaseColors.vyroba, phaseColors.montaz];
-        }
-        segs.push({ start: segStart, end: segEnd, color: colorSeq[Math.min(i, 3)], ...(hatch ? { hatchColors: hatch } : {}) });
-      }
-    }
-    return {
-      segments: segs.filter(s => differenceInDays(s.end, s.start) > 0),
-      diamonds: makeDiamonds(dItems), hasWarning, warnings,
-    };
-  }
-
-  // Remaining edge cases
-  const segs: Segment[] = [];
-  const pts: Date[] = [S];
-  if (TPV) { dItems.push({ date: TPV, color: milestoneColors.tpv_date, name: "TPV" }); pts.push(TPV); }
-  if (EXP) { dItems.push({ date: EXP, color: milestoneColors.expedice, name: "Expedice" }); pts.push(EXP); }
-  if (PRE) { dItems.push({ date: PRE, color: milestoneColors.predani, name: "Předání" }); pts.push(PRE); }
-  pts.push(safeE);
-  pts.sort((a, b) => a.getTime() - b.getTime());
+  // Build segments up to safeE using available milestones (capped at safeE)
+  const milestonesCapped: Date[] = [];
+  if (TPV && TPV <= safeE) milestonesCapped.push(TPV);
+  if (EXP && EXP <= safeE) milestonesCapped.push(EXP);
+  if (PRE && PRE <= safeE) milestonesCapped.push(PRE);
+  milestonesCapped.sort((a, b) => a.getTime() - b.getTime());
 
   const colorSeq = [phaseColors.konstrukce, phaseColors.vyroba, phaseColors.montaz, phaseColors.dokonceno];
-  for (let i = 0; i < pts.length - 1; i++) {
-    if (pts[i].getTime() === pts[i + 1].getTime()) continue;
-    segs.push({ start: pts[i], end: pts[i + 1], color: colorSeq[Math.min(i, 3)] });
+  const pts = [S, ...milestonesCapped, safeE];
+  // Deduplicate consecutive equal dates
+  const uniquePts: Date[] = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    if (pts[i].getTime() !== pts[i - 1].getTime()) uniquePts.push(pts[i]);
   }
 
-  const allDiamonds = makeDiamonds(dItems);
-  const connectorLine = allDiamonds.length >= 2
-    ? { startX: allDiamonds[0].date, endX: allDiamonds[allDiamonds.length - 1].date }
-    : undefined;
+  const segs: Segment[] = [];
+  for (let i = 0; i < uniquePts.length - 1; i++) {
+    const w = differenceInDays(uniquePts[i + 1], uniquePts[i]);
+    if (w <= 0) continue;
+    segs.push({ start: uniquePts[i], end: uniquePts[i + 1], color: colorSeq[Math.min(i, colorSeq.length - 1)] });
+  }
 
-  return { segments: segs, diamonds: allDiamonds, connectorLine, hasWarning, warnings };
+  // If no milestones before safeE and we have none, show a single dokonceno bar
+  if (segs.length === 0 && differenceInDays(safeE, S) > 0) {
+    segs.push({ start: S, end: safeE, color: phaseColors.dokonceno });
+  }
+
+  // Add overdue segment (red/orange) if milestones exceed safeE
+  if (hasOverdue) {
+    segs.push({ start: safeE, end: latestDate, color: phaseColors.overdue });
+  }
+
+  return { segments: segs, diamonds: makeDiamonds(dItems), hasWarning, warnings };
 }
 
 function getProjectBarData(p: Project, statusColorMap: Record<string, string>): BarData {
