@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { logActivity } from "@/lib/activityLog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -92,6 +92,11 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
   
   const [priceEditing, setPriceEditing] = useState(false);
   const [showLocation, setShowLocation] = useState(false);
+  const [mapCoords, setMapCoords] = useState<{ lat: string; lon: string } | null>(null);
+  const [locSuggestions, setLocSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
+  const [showLocDropdown, setShowLocDropdown] = useState(false);
+  const locDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const locInputRef = useRef<HTMLInputElement>(null);
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [deletingFile, setDeletingFile] = useState<string | null>(null); // "catKey:fileName"
@@ -122,17 +127,77 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
       setOpenCategory(null);
       setShowLocation(false);
       setPriceEditing(false);
+      setMapCoords(null);
+      setLocSuggestions([]);
+      setShowLocDropdown(false);
       sp.resetCache();
       resetIdCheck();
     }
   }, [project, open, resetIdCheck]);
 
-  // Fetch all category counts on dialog open
+  // Geocode location on dialog open if location exists
   useEffect(() => {
-    if (project && open) {
-      sp.fetchAllCategories();
+    if (project && open && form.location) {
+      fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(form.location)}&format=json&limit=1&countrycodes=cz,sk,at,de`, {
+        headers: { "Accept-Language": "cs" },
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data?.[0]) setMapCoords({ lat: data[0].lat, lon: data[0].lon });
+        })
+        .catch(() => {});
     }
   }, [project?.project_id, open]);
+
+  // Debounced Nominatim autocomplete
+  const handleLocationInput = useCallback((value: string) => {
+    setForm(s => ({ ...s, location: value }));
+    if (locDebounceRef.current) clearTimeout(locDebounceRef.current);
+    if (value.length < 3) {
+      setLocSuggestions([]);
+      setShowLocDropdown(false);
+      return;
+    }
+    locDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(value)}&format=json&limit=5&countrycodes=cz,sk,at,de&addressdetails=1`,
+          { headers: { "Accept-Language": "cs" } }
+        );
+        const data = await res.json();
+        setLocSuggestions(data.map((d: any) => ({ display_name: d.display_name, lat: d.lat, lon: d.lon })));
+        setShowLocDropdown(data.length > 0);
+      } catch {
+        setLocSuggestions([]);
+        setShowLocDropdown(false);
+      }
+    }, 500);
+  }, []);
+
+  const handleSelectSuggestion = useCallback((s: { display_name: string; lat: string; lon: string }) => {
+    setForm(prev => ({ ...prev, location: s.display_name }));
+    setMapCoords({ lat: s.lat, lon: s.lon });
+    setShowLocDropdown(false);
+    setLocSuggestions([]);
+  }, []);
+
+  const handleLocationKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      setShowLocDropdown(false);
+      // Geocode current text
+      if (form.location.length >= 3) {
+        fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(form.location)}&format=json&limit=1&countrycodes=cz,sk,at,de`, {
+          headers: { "Accept-Language": "cs" },
+        })
+          .then(r => r.json())
+          .then(data => {
+            if (data?.[0]) setMapCoords({ lat: data[0].lat, lon: data[0].lon });
+          })
+          .catch(() => {});
+      }
+    }
+  }, [form.location]);
 
   const handleToggleCategory = useCallback((key: string) => {
     const willOpen = openCategory !== key;
@@ -141,6 +206,13 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
       sp.listFiles(key);
     }
   }, [openCategory, sp]);
+
+  // Fetch all category counts on dialog open
+  useEffect(() => {
+    if (project && open) {
+      sp.fetchAllCategories();
+    }
+  }, [project?.project_id, open]);
 
   const handleFileDrop = useCallback(async (e: React.DragEvent, categoryKey: string) => {
     e.preventDefault();
@@ -507,33 +579,55 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                   <div
                     className={cn(
                       "col-span-2 overflow-hidden transition-all duration-300 ease-in-out",
-                      showLocation ? "max-h-32 opacity-100" : "max-h-0 opacity-0"
+                      showLocation ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
                     )}
                   >
                     <div className="flex items-stretch gap-3 pb-1">
-                      <div className="flex-[3]">
+                      <div className="flex-[3] relative">
                         <Label className="text-xs">Lokace</Label>
                         <Input
+                          ref={locInputRef}
                           value={form.location}
-                          onChange={(e) => setForm(s => ({ ...s, location: e.target.value }))}
+                          onChange={(e) => handleLocationInput(e.target.value)}
+                          onKeyDown={handleLocationKeyDown}
+                          onBlur={() => setTimeout(() => setShowLocDropdown(false), 200)}
+                          onFocus={() => { if (locSuggestions.length > 0) setShowLocDropdown(true); }}
                           placeholder="Zadejte adresu..."
                           className="mt-1"
                         />
+                        {showLocDropdown && locSuggestions.length > 0 && (
+                          <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-md border border-border bg-popover shadow-lg max-h-48 overflow-y-auto">
+                            {locSuggestions.map((s, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors truncate"
+                                onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(s); }}
+                              >
+                                {s.display_name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div className="flex-[2] flex flex-col">
-                        <Label className="text-xs">Mapa</Label>
-                        <div className="mt-1 flex-1 min-h-[48px] rounded-md border border-input bg-muted/50 overflow-hidden">
-                          {form.location ? (
+                        <div className="mt-5 flex-1 min-h-[48px] rounded-md border border-input bg-muted/50 overflow-hidden" style={{ maxHeight: '80px' }}>
+                          {mapCoords ? (
                             <iframe
                               title="Map preview"
-                              className="w-full h-full min-h-[48px] border-0"
-                              src={`https://www.google.com/maps?q=${encodeURIComponent(form.location)}&output=embed&z=13`}
+                              className="w-full border-0"
+                              style={{ height: '100px', marginTop: '-10px' }}
+                              src={`https://maps.google.com/maps?ll=${mapCoords.lat},${mapCoords.lon}&z=15&t=m&hl=cs&mapclient=embed&q=${mapCoords.lat},${mapCoords.lon}&output=embed`}
                               loading="lazy"
                               referrerPolicy="no-referrer-when-downgrade"
                             />
+                          ) : form.location ? (
+                            <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
+                              <Loader2 className="h-3 w-3 animate-spin mr-1" /> Hledám…
+                            </div>
                           ) : (
                             <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
-                              Zadejte adresu pro zobrazení mapy
+                              Zadejte adresu
                             </div>
                           )}
                         </div>
