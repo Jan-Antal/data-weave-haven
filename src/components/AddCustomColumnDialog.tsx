@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCustomColumns } from "@/hooks/useCustomColumns";
+import { useCustomColumns, useAllCustomColumns } from "@/hooks/useCustomColumns";
 
 interface Props {
   open: boolean;
@@ -30,10 +30,14 @@ export function AddCustomColumnDialog({ open, onOpenChange, tableName, groupKey,
   const [selectOptions, setSelectOptions] = useState("");
   const [peopleRole, setPeopleRole] = useState("");
   const { addColumn } = useCustomColumns();
+  const { columns: existingCustomColumns } = useAllCustomColumns(tableName);
 
   const handleSubmit = () => {
     if (!name.trim()) return;
     const columnKey = `custom_${Date.now()}_${name.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "")}`;
+    // Place new column after all existing ones
+    const maxOrder = existingCustomColumns.reduce((max, c) => Math.max(max, c.sort_order ?? 0), 0);
+    const nextOrder = maxOrder + 1;
     addColumn.mutate({
       table_name: tableName,
       group_key: groupKey,
@@ -42,6 +46,7 @@ export function AddCustomColumnDialog({ open, onOpenChange, tableName, groupKey,
       data_type: dataType,
       select_options: dataType === "select" ? selectOptions.split(",").map(s => s.trim()).filter(Boolean) : [],
       people_role: dataType === "people" ? peopleRole : undefined,
+      sort_order: nextOrder,
     });
     setName("");
     setDataType("text");

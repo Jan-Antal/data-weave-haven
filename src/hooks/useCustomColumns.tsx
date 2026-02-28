@@ -40,10 +40,13 @@ export function useCustomColumns(tableName?: string, groupKey?: string) {
       data_type: string;
       select_options?: string[];
       people_role?: string;
+      sort_order?: number;
     }) => {
+      const { sort_order, ...rest } = def;
       const { error } = await (supabase.from("custom_column_definitions") as any).insert({
-        ...def,
-        select_options: def.select_options || [],
+        ...rest,
+        select_options: rest.select_options || [],
+        sort_order: sort_order ?? 0,
       });
       if (error) throw error;
     },

@@ -496,11 +496,14 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const orderedNativeKeys = useMemo(() => getOrderedKeys(PM_NATIVE), [getOrderedKeys]);
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
 
+  const customColumnKeys = useMemo(() => customColumns.map(c => c.column_key), [customColumns]);
+
   const allVisibleGroupOrder = useMemo(() => {
     const native = orderedNativeKeys.filter((k) => isVisible(k));
     const cross = orderedAllKeys.filter((k) => !NATIVE_KEYS.includes(k) && isVisible(k));
-    return [...native, ...cross];
-  }, [orderedNativeKeys, orderedAllKeys, isVisible]);
+    const custom = customColumnKeys.filter((k) => isVisible(k) && !native.includes(k) && !cross.includes(k));
+    return [...native, ...cross, ...custom];
+  }, [orderedNativeKeys, orderedAllKeys, isVisible, customColumnKeys]);
 
   const allVisibleKeys = useMemo(
     () => getDisplayOrderedKeys(allVisibleGroupOrder),
