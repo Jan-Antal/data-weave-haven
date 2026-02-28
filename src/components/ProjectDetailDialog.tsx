@@ -478,21 +478,24 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     {isViewer ? (
                       <p className="text-sm py-2">{form.klient || "—"}{form.location ? ` (${form.location})` : ""}</p>
                     ) : (
-                      <div className="flex items-center gap-1">
+                      <div className="relative flex items-center gap-1">
                         <Input value={form.klient} onChange={(e) => setForm(s => ({ ...s, klient: e.target.value }))} />
                         <Popover>
                           <PopoverTrigger asChild>
-                            <Button
+                            <button
                               type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-10 w-10 shrink-0 px-0"
+                              className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent transition-colors"
                               title={form.location ? `Lokace: ${form.location}` : "Přidat lokaci"}
                             >
-                              <MapPin className={cn("h-4 w-4", form.location ? "text-foreground" : "text-muted-foreground/30")} />
-                            </Button>
+                              <MapPin className={cn("h-4 w-4", form.location ? "text-primary" : "text-muted-foreground/40")} />
+                            </button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-52 p-2 z-[99999]" align="end" side="bottom">
+                          <PopoverContent
+                            className="w-48 p-2 z-[99999] shadow-lg"
+                            align="end"
+                            side="bottom"
+                            sideOffset={4}
+                          >
                             <Input
                               autoFocus
                               value={form.location}
@@ -502,7 +505,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
                                   (e.target as HTMLInputElement).blur();
-                                  // Close popover by clicking outside
                                   document.body.click();
                                 }
                               }}
