@@ -334,7 +334,6 @@ export type Database = {
           kalkulant: string | null
           klient: string | null
           konstrukter: string | null
-          link_cn: string | null
           location: string | null
           marze: string | null
           material: number | null
@@ -380,7 +379,6 @@ export type Database = {
           kalkulant?: string | null
           klient?: string | null
           konstrukter?: string | null
-          link_cn?: string | null
           location?: string | null
           marze?: string | null
           material?: number | null
@@ -426,7 +424,6 @@ export type Database = {
           kalkulant?: string | null
           klient?: string | null
           konstrukter?: string | null
-          link_cn?: string | null
           location?: string | null
           marze?: string | null
           material?: number | null
