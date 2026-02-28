@@ -15,11 +15,12 @@ interface DataLogPanelProps {
   onOpenProject?: (projectId: string) => void;
 }
 
-type Category = "all" | "status" | "documents" | "projects";
+type Category = "all" | "status" | "terminy" | "documents" | "projects";
 
 const CATEGORY_PILLS: { value: Category; label: string }[] = [
   { value: "all", label: "Vše" },
   { value: "status", label: "Status" },
+  { value: "terminy", label: "Termíny" },
   { value: "documents", label: "Dokumenty" },
   { value: "projects", label: "Projekty" },
 ];
@@ -27,9 +28,10 @@ const CATEGORY_PILLS: { value: Category; label: string }[] = [
 const DOT_COLORS: Record<string, string> = {
   status_change: "bg-amber-400",
   konstrukter_change: "bg-purple-500",
+  datum_smluvni_change: "bg-red-500",
   project_created: "bg-green-500",
   project_restored: "bg-green-500",
-  project_deleted: "bg-red-500",
+  project_deleted: "bg-gray-800",
   document_uploaded: "bg-blue-500",
   document_deleted: "bg-orange-500",
 };
@@ -78,6 +80,16 @@ function ActivityItem({ entry, onOpenProject }: { entry: ActivityLogEntry; onOpe
           <span className="text-[11px] line-through text-muted-foreground">{entry.old_value || "—"}</span>
           <span className="text-[10px] text-muted-foreground">→</span>
           <span className="text-[11px] font-medium">{entry.new_value || "—"}</span>
+        </div>
+      );
+      break;
+    case "datum_smluvni_change":
+      mainText = <>{userName} změnil/a datum smluvní {projectLink}</>;
+      subContent = (
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <span className="text-[11px] line-through text-muted-foreground">{entry.old_value || "—"}</span>
+          <span className="text-[10px] text-muted-foreground">→</span>
+          <span className="text-[11px] font-medium text-red-600">{entry.new_value || "—"}</span>
         </div>
       );
       break;

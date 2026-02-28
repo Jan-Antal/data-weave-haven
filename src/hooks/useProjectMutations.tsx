@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { logActivity } from "@/lib/activityLog";
+import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
 
 export function useUpdateProject() {
   const qc = useQueryClient();
@@ -22,6 +23,11 @@ export function useUpdateProject() {
       }
       if (field === "konstrukter" && value !== oldValue && projectId) {
         logActivity({ projectId, actionType: "konstrukter_change", oldValue: oldValue || "—", newValue: value || "—" });
+      }
+      if (field === "datum_smluvni" && value !== oldValue && projectId) {
+        const fmtOld = oldValue ? (parseAppDate(oldValue) ? formatAppDate(parseAppDate(oldValue)!) : oldValue) : "—";
+        const fmtNew = value ? (parseAppDate(value) ? formatAppDate(parseAppDate(value)!) : value) : "—";
+        logActivity({ projectId, actionType: "datum_smluvni_change", oldValue: fmtOld, newValue: fmtNew });
       }
 
       return { id, field, oldValue };
