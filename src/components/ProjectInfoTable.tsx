@@ -92,7 +92,8 @@ const ProjectRow = memo(function ProjectRow({
 
   return (
     <TableRow className="hover:bg-muted/50 transition-colors" style={bgStyle}>
-      <TableCell style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="text-center">
+      {/* Col 1 — Icon slot (32px) */}
+      <TableCell style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="text-center px-0">
         {(docCount ?? 0) > 0 && (
           <span className="inline-flex items-center gap-0.5 text-gray-400 text-[10px]">
             <Paperclip className="h-3 w-3" />
@@ -100,6 +101,8 @@ const ProjectRow = memo(function ProjectRow({
           </span>
         )}
       </TableCell>
+      {/* Col 2 — Chevron slot (28px) — empty spacer on Project Info */}
+      <TableCell style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="px-0" />
       {v("project_id") && (
         <TableCell className="font-mono text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => onEditProject(p)}>
           {p.project_id}
@@ -292,9 +295,12 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
-              <TableHead style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="text-center">
+              {/* Col 1 — Icon slot (32px) */}
+              <TableHead style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="text-center px-0">
                 <Paperclip className="h-3.5 w-3.5 text-gray-400 mx-auto" />
               </TableHead>
+              {/* Col 2 — Chevron slot (28px) — empty spacer */}
+              <TableHead style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="px-0" />
               {v("project_id") && renderColumnHeader(headerProps("project_id"))}
               {v("project_name") && renderColumnHeader(headerProps("project_name"))}
               {renderKeys.map((key) => renderColumnHeader(headerProps(key)))}

@@ -126,8 +126,11 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
 
   return (
     <TableRow ref={setNodeRef} style={style} className={cn("bg-muted/20 h-9", dimmed && "opacity-40")}>
-      <TableCell className="w-[32px]">
-        <div {...attributes} {...listeners} className="cursor-grab pl-2">
+      {/* Col 1 — Icon slot (32px) — empty for stages */}
+      <TableCell style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="px-0" />
+      {/* Col 2 — Chevron slot (28px) — drag handle for stages */}
+      <TableCell style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="px-0">
+        <div {...attributes} {...listeners} className="cursor-grab pl-1">
           <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
         </div>
       </TableCell>
@@ -367,7 +370,10 @@ const PMProjectRow = memo(function PMProjectRow({
 
   return (
     <TableRow className="hover:bg-muted/50 transition-colors h-9" style={bgStyle}>
-      <TableCell className="w-[32px] cursor-pointer" onClick={() => onToggleExpand(p.project_id)}>
+      {/* Col 1 — Icon slot (32px) — empty spacer on PM */}
+      <TableCell style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="px-0" />
+      {/* Col 2 — Chevron slot (28px) */}
+      <TableCell style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="px-0 cursor-pointer" onClick={() => onToggleExpand(p.project_id)}>
         <ExpandArrow projectId={p.project_id} isExpanded={isExpanded} stageCount={stageCount} />
       </TableCell>
       {v("project_id") && <TableCell className="font-mono text-xs truncate" title={p.project_id}>{p.project_id}</TableCell>}
@@ -577,7 +583,10 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
-              <TableHead style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="shrink-0">
+              {/* Col 1 — Icon slot (32px) — empty spacer on PM */}
+              <TableHead style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="px-0" />
+              {/* Col 2 — Chevron slot (28px) */}
+              <TableHead style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="shrink-0 px-0">
                 {sorted.length > 0 && (
                   <button
                     className="text-muted-foreground/60 hover:text-muted-foreground transition-colors"
