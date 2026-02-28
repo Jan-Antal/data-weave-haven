@@ -382,7 +382,7 @@ const TPVProjectRow = memo(function TPVProjectRow({
         )}
         <ExpandArrow isExpanded={isExpanded} stageCount={stageCount} />
       </TableCell>
-      {v("project_id") && <TableCell className="font-mono text-xs truncate cursor-pointer text-foreground hover:text-blue-600 hover:underline" title={p.project_id} onClick={() => onEditProject(p)}>{p.project_id}</TableCell>}
+      {v("project_id") && <TableCell className="font-mono text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => onEditProject(p)}>{p.project_id}</TableCell>}
       {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit || isFieldReadOnly("project_name")} /></TableCell>}
       {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly }))}
     </TableRow>
