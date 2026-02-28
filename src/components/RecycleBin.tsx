@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { logActivity } from "@/lib/activityLog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +43,9 @@ function RecordRow({ record, table, nameField, idField, canPermanentDelete }: { 
       toast({ title: "Chyba", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Obnoveno" });
+      if (table === "projects" && record.project_id) {
+        logActivity({ projectId: record.project_id, actionType: "project_restored", detail: record.project_name || record.project_id });
+      }
       qc.invalidateQueries({ queryKey: ["deleted", table] });
       qc.invalidateQueries({ queryKey: [table === "projects" ? "projects" : table === "project_stages" ? "project_stages" : "tpv_items"] });
     }

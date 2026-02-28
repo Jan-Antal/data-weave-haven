@@ -22,6 +22,7 @@ import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
 import { StatusManagement } from "@/components/StatusManagement";
 import { RecycleBin } from "@/components/RecycleBin";
 import { UserManagement } from "@/components/UserManagement";
+import { DataLogPanel } from "@/components/DataLogPanel";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -39,6 +40,7 @@ const Index = () => {
   const [statusMgmtOpen, setStatusMgmtOpen] = useState(false);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [userMgmtOpen, setUserMgmtOpen] = useState(false);
+  const [dataLogOpen, setDataLogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("project-info");
   const [riskHighlight, setRiskHighlight] = useState<RiskHighlightType>(null);
   const [savedStatusFilter, setSavedStatusFilter] = useState<string[] | null>(null);
@@ -152,6 +154,11 @@ const Index = () => {
                   {canAccessRecycleBin && (
                     <DropdownMenuItem onClick={() => setRecycleBinOpen(true)}>
                       Koš
+                    </DropdownMenuItem>
+                  )}
+                  {(isAdmin || role === "pm" || isOwner) && (
+                    <DropdownMenuItem onClick={() => setDataLogOpen(true)}>
+                      Data Log
                     </DropdownMenuItem>
                   )}
                   {realRole === "owner" && (
@@ -286,6 +293,7 @@ const Index = () => {
       <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
       <UserManagement open={userMgmtOpen} onOpenChange={setUserMgmtOpen} />
+      <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} />
       {canAccessSettings && <FeedbackWidget />}
     </div>
     </ExportProvider>

@@ -122,7 +122,7 @@ export function renderColumnHeader(props: HeaderProps) {
 interface CellProps {
   colKey: string;
   project: Project;
-  save: (id: string, field: string, value: string, oldValue: string) => void;
+  save: (id: string, field: string, value: string, oldValue: string, projectId?: string) => void;
   canEdit: boolean;
   statusLabels: string[];
   saveCurrency?: (id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => void;
@@ -138,14 +138,14 @@ export function renderColumnCell(props: CellProps) {
 
 function renderCell(
   key: string, p: Project,
-  save: (id: string, f: string, v: string, o: string) => void,
+  save: (id: string, f: string, v: string, o: string, projectId?: string) => void,
   canEdit: boolean, statusLabels: string[],
   saveCurrency?: (id: string, a: string, c: string, oa: string, oc: string) => void,
   customColumns?: CustomColumnDef[],
   saveCustomField?: (rowId: string, columnKey: string, value: string, oldValue: string) => void,
   isFieldReadOnly?: (field: string) => boolean,
 ) {
-  const s = (field: string, val: string, old: string) => save(p.id, field, val, old);
+  const s = (field: string, val: string, old: string) => save(p.id, field, val, old, p.project_id);
   const v = (field: keyof Project) => (p as any)[field] ?? "";
   const ro = (field: string) => !canEdit || (isFieldReadOnly?.(field) ?? false);
 

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
+import { logActivity } from "@/lib/activityLog";
 
 export type ProjectStage = Tables<"project_stages">;
 
@@ -25,9 +26,12 @@ export function useProjectStages(projectId: string) {
 export function useUpdateStage() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, field, value }: { id: string; field: string; value: any; projectId: string }) => {
+    mutationFn: async ({ id, field, value, projectId, oldValue, stageName }: { id: string; field: string; value: any; projectId: string; oldValue?: string; stageName?: string }) => {
       const { error } = await supabase.from("project_stages").update({ [field]: value } as any).eq("id", id);
       if (error) throw error;
+      if (field === "konstrukter" && String(value) !== String(oldValue ?? "")) {
+        logActivity({ projectId, actionType: "konstrukter_change", oldValue: oldValue || "—", newValue: String(value) || "—", detail: stageName || null });
+      }
     },
     onSuccess: (_, { projectId }) => {
       qc.invalidateQueries({ queryKey: ["project_stages", projectId] });

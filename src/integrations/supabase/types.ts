@@ -197,6 +197,42 @@ export type Database = {
         }
         Relationships: []
       }
+      project_activity_log: {
+        Row: {
+          action_type: string
+          created_at: string
+          detail: string | null
+          id: string
+          new_value: string | null
+          old_value: string | null
+          project_id: string
+          user_email: string
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          detail?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          project_id: string
+          user_email?: string
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          detail?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          project_id?: string
+          user_email?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       project_stages: {
         Row: {
           architekt: string | null
@@ -578,6 +614,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_old_activity_logs: { Args: never; Returns: undefined }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
