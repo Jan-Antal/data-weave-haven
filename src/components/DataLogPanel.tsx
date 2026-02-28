@@ -72,9 +72,9 @@ function ActivityItem({
       mainText = <>{userName} změnil/a status {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span className="text-[11px] line-through text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{entry.old_value || "—"}</span>
-          <span className="text-[10px] text-muted-foreground">→</span>
-          <span className="text-[11px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">{entry.new_value || "—"}</span>
+          <span className="text-[11px] line-through px-1.5 py-0.5 rounded" style={{ background: '#fee2e2', color: '#991b1b' }}>{entry.old_value || "—"}</span>
+          <span className="text-[10px]" style={{ color: '#9ca3af' }}>→</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: '#d1fae5', color: '#065f46' }}>{entry.new_value || "—"}</span>
         </div>
       );
       break;
@@ -84,9 +84,9 @@ function ActivityItem({
         : <>{userName} změnil/a konstruktéra {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span className="text-[11px] line-through text-muted-foreground">{entry.old_value || "—"}</span>
-          <span className="text-[10px] text-muted-foreground">→</span>
-          <span className="text-[11px] font-medium">{entry.new_value || "—"}</span>
+          <span className="text-[11px] line-through px-1.5 py-0.5 rounded" style={{ background: '#fee2e2', color: '#991b1b' }}>{entry.old_value || "—"}</span>
+          <span className="text-[10px]" style={{ color: '#9ca3af' }}>→</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: '#d1fae5', color: '#065f46' }}>{entry.new_value || "—"}</span>
         </div>
       );
       break;
@@ -94,9 +94,9 @@ function ActivityItem({
       mainText = <>{userName} změnil/a datum smluvní {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span className="text-[11px] line-through text-muted-foreground">{entry.old_value || "—"}</span>
-          <span className="text-[10px] text-muted-foreground">→</span>
-          <span className="text-[11px] font-medium text-red-600">{entry.new_value || "—"}</span>
+          <span className="text-[11px] line-through px-1.5 py-0.5 rounded" style={{ background: '#fee2e2', color: '#991b1b' }}>{entry.old_value || "—"}</span>
+          <span className="text-[10px]" style={{ color: '#9ca3af' }}>→</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: '#d1fae5', color: '#065f46' }}>{entry.new_value || "—"}</span>
         </div>
       );
       break;
@@ -137,9 +137,9 @@ function ActivityItem({
       mainText = <>{userName} změnil/a status {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span className="text-[11px] line-through text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{entry.old_value || "—"}</span>
-          <span className="text-[10px] text-muted-foreground">→</span>
-          <span className="text-[11px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">{entry.new_value || "—"}</span>
+          <span className="text-[11px] line-through px-1.5 py-0.5 rounded" style={{ background: '#fee2e2', color: '#991b1b' }}>{entry.old_value || "—"}</span>
+          <span className="text-[10px]" style={{ color: '#9ca3af' }}>→</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: '#d1fae5', color: '#065f46' }}>{entry.new_value || "—"}</span>
         </div>
       );
       break;
@@ -147,9 +147,9 @@ function ActivityItem({
       mainText = <>{userName} změnil/a konstruktéra {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span className="text-[11px] line-through text-muted-foreground">{entry.old_value || "—"}</span>
-          <span className="text-[10px] text-muted-foreground">→</span>
-          <span className="text-[11px] font-medium">{entry.new_value || "—"}</span>
+          <span className="text-[11px] line-through px-1.5 py-0.5 rounded" style={{ background: '#fee2e2', color: '#991b1b' }}>{entry.old_value || "—"}</span>
+          <span className="text-[10px]" style={{ color: '#9ca3af' }}>→</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: '#d1fae5', color: '#065f46' }}>{entry.new_value || "—"}</span>
         </div>
       );
       break;
@@ -157,9 +157,9 @@ function ActivityItem({
       mainText = <>{userName} změnil/a datum smluvní {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span className="text-[11px] line-through text-muted-foreground">{entry.old_value || "—"}</span>
-          <span className="text-[10px] text-muted-foreground">→</span>
-          <span className="text-[11px] font-medium text-red-600">{entry.new_value || "—"}</span>
+          <span className="text-[11px] line-through px-1.5 py-0.5 rounded" style={{ background: '#fee2e2', color: '#991b1b' }}>{entry.old_value || "—"}</span>
+          <span className="text-[10px]" style={{ color: '#9ca3af' }}>→</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: '#d1fae5', color: '#065f46' }}>{entry.new_value || "—"}</span>
         </div>
       );
       break;
