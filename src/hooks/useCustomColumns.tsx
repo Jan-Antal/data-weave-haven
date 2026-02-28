@@ -58,13 +58,30 @@ export function useCustomColumns(tableName?: string, groupKey?: string) {
 
   const deleteColumn = useMutation({
     mutationFn: async (id: string) => {
+      // Get column_key before deleting
+      const { data: colDef } = await (supabase.from("custom_column_definitions") as any)
+        .select("column_key")
+        .eq("id", id)
+        .single();
+      const columnKey = colDef?.column_key;
+
       const { error } = await (supabase.from("custom_column_definitions") as any)
         .delete()
         .eq("id", id);
       if (error) throw error;
+
+      // Clean up column_labels entries for this column
+      if (columnKey) {
+        await (supabase.from("column_labels") as any)
+          .delete()
+          .eq("column_key", columnKey);
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["custom-columns"] });
+      qc.invalidateQueries({ queryKey: ["column-labels"] });
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      qc.invalidateQueries({ queryKey: ["tpv-items"] });
       toast({ title: "Sloupec smazán" });
     },
     onError: (e: any) => {
