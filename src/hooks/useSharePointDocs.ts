@@ -27,8 +27,14 @@ const CATEGORY_FOLDER_MAP: Record<string, string> = {
 
 const ALL_CATEGORY_KEYS = Object.keys(CATEGORY_FOLDER_MAP);
 
+// Global file cache: projectId → categoryKey → SPFile[]
+const globalFileCache: Record<string, Record<string, SPFile[]>> = {};
+
 export function useSharePointDocs(projectId: string) {
-  const [filesByCategory, setFilesByCategory] = useState<Record<string, SPFile[]>>({});
+  const [filesByCategory, setFilesByCategory] = useState<Record<string, SPFile[]>>(() => {
+    // Initialize from global cache
+    return globalFileCache[projectId] ?? {};
+  });
   const [loadingCategory, setLoadingCategory] = useState<string | null>(null);
   const [initialLoading, setInitialLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -42,6 +48,36 @@ export function useSharePointDocs(projectId: string) {
 
   const fetchAllCategories = useCallback(async () => {
     if (!projectId) return;
+
+    // If we have cached data for this project, show it immediately
+    if (globalFileCache[projectId] && Object.keys(globalFileCache[projectId]).length > 0) {
+      setFilesByCategory(globalFileCache[projectId]);
+      for (const key of Object.keys(globalFileCache[projectId])) {
+        fetchedRef.current.add(key);
+      }
+      // Background refresh
+      (async () => {
+        try {
+          const results = await Promise.all(
+            ALL_CATEGORY_KEYS.map(async (key) => {
+              const folder = CATEGORY_FOLDER_MAP[key];
+              try {
+                const files = await invoke({ action: "list", projectId, category: folder });
+                return { key, files: (files ?? []) as SPFile[] };
+              } catch {
+                return { key, files: [] as SPFile[] };
+              }
+            })
+          );
+          const map: Record<string, SPFile[]> = {};
+          for (const r of results) map[r.key] = r.files;
+          globalFileCache[projectId] = map;
+          setFilesByCategory(map);
+        } catch { /* ignore background refresh errors */ }
+      })();
+      return;
+    }
+
     setInitialLoading(true);
     try {
       const results = await Promise.all(
@@ -61,6 +97,7 @@ export function useSharePointDocs(projectId: string) {
         map[r.key] = r.files;
         fetchedRef.current.add(r.key);
       }
+      globalFileCache[projectId] = map;
       setFilesByCategory(map);
     } finally {
       setInitialLoading(false);
@@ -74,7 +111,13 @@ export function useSharePointDocs(projectId: string) {
     setLoadingCategory(categoryKey);
     try {
       const files = await invoke({ action: "list", projectId, category: folder });
-      setFilesByCategory((prev) => ({ ...prev, [categoryKey]: files ?? [] }));
+      const fileList = files ?? [];
+      setFilesByCategory((prev) => {
+        const updated = { ...prev, [categoryKey]: fileList };
+        if (!globalFileCache[projectId]) globalFileCache[projectId] = {};
+        globalFileCache[projectId][categoryKey] = fileList;
+        return updated;
+      });
       fetchedRef.current.add(categoryKey);
     } catch (err: any) {
       console.error("SP list error:", err);
@@ -97,10 +140,12 @@ export function useSharePointDocs(projectId: string) {
         fileName: file.name,
         fileContent: base64,
       });
-      setFilesByCategory((prev) => ({
-        ...prev,
-        [categoryKey]: [...(prev[categoryKey] ?? []), result as SPFile],
-      }));
+      setFilesByCategory((prev) => {
+        const updated = { ...prev, [categoryKey]: [...(prev[categoryKey] ?? []), result as SPFile] };
+        if (!globalFileCache[projectId]) globalFileCache[projectId] = {};
+        globalFileCache[projectId][categoryKey] = updated[categoryKey];
+        return updated;
+      });
       return result as SPFile;
     } finally {
       setUploading(false);
@@ -118,10 +163,12 @@ export function useSharePointDocs(projectId: string) {
     const folder = CATEGORY_FOLDER_MAP[categoryKey];
     if (!folder) return;
     await invoke({ action: "delete", projectId, category: folder, fileName });
-    setFilesByCategory((prev) => ({
-      ...prev,
-      [categoryKey]: (prev[categoryKey] ?? []).filter((f) => f.name !== fileName),
-    }));
+    setFilesByCategory((prev) => {
+      const updated = { ...prev, [categoryKey]: (prev[categoryKey] ?? []).filter((f) => f.name !== fileName) };
+      if (!globalFileCache[projectId]) globalFileCache[projectId] = {};
+      globalFileCache[projectId][categoryKey] = updated[categoryKey];
+      return updated;
+    });
   }, [projectId, invoke]);
 
   const archiveProject = useCallback(async () => {
@@ -134,8 +181,9 @@ export function useSharePointDocs(projectId: string) {
   }, [invoke]);
 
   const resetCache = useCallback(() => {
+    // Only clear the ref so next fetchAllCategories will refresh
+    // but keep globalFileCache for instant display
     fetchedRef.current.clear();
-    setFilesByCategory({});
   }, []);
 
   return { filesByCategory, loadingCategory, initialLoading, uploading, listFiles, fetchAllCategories, uploadFile, getDownloadUrl, deleteFile, archiveProject, getPreview, resetCache };
