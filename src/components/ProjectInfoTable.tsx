@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColumns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { InlineEditableCell } from "./InlineEditableCell";
@@ -35,6 +35,7 @@ import { useDocumentCounts } from "@/hooks/useDocumentCounts";
 import { useExportContext } from "./ExportContext";
 import { getProjectCellValue } from "@/lib/exportExcel";
 import { getColumnLabel } from "./CrossTabColumns";
+import type { Project } from "@/hooks/useProjects";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...PROJECT_INFO_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
@@ -54,6 +55,62 @@ const emptyProject = {
   fakturace: "",
 };
 
+// ── Memoized project row ────────────────────────────────────────────
+interface ProjectRowProps {
+  project: Project;
+  docCount: number;
+  isVisible: (key: string) => boolean;
+  renderKeys: string[];
+  save: (id: string, field: string, value: string, oldValue: string) => void;
+  saveCurrency: (id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => void;
+  canEdit: boolean;
+  statusLabels: string[];
+  customColumns: any[];
+  saveCustomField: (rowId: string, colKey: string, val: string, old: string) => void;
+  riskHighlight: any;
+  onEditProject: (p: Project) => void;
+}
+
+const ProjectRow = memo(function ProjectRow({
+  project: p,
+  docCount,
+  isVisible: v,
+  renderKeys,
+  save,
+  saveCurrency,
+  canEdit,
+  statusLabels,
+  customColumns,
+  saveCustomField,
+  riskHighlight,
+  onEditProject,
+}: ProjectRowProps) {
+  const bgStyle = useMemo(() => {
+    const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
+    return c ? { backgroundColor: c } : {};
+  }, [p.risk, p.datum_smluvni, riskHighlight]);
+
+  return (
+    <TableRow className="hover:bg-muted/50 transition-colors" style={bgStyle}>
+      <TableCell style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="text-center">
+        {(docCount ?? 0) > 0 && (
+          <span className="inline-flex items-center gap-0.5 text-gray-400 text-[10px]">
+            <Paperclip className="h-3 w-3" />
+            {docCount}
+          </span>
+        )}
+      </TableCell>
+      {v("project_id") && (
+        <TableCell className="font-mono text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => onEditProject(p)}>
+          {p.project_id}
+        </TableCell>
+      )}
+      {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
+      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old) }))}
+    </TableRow>
+  );
+});
+
 interface ProjectInfoTableProps {
   personFilter: string | null;
   statusFilter: string[];
@@ -64,7 +121,7 @@ interface ProjectInfoTableProps {
 export function ProjectInfoTable({ personFilter, statusFilter, search: externalSearch, riskHighlight }: ProjectInfoTableProps) {
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
-  const statusLabels = statusOptions.map((s) => s.label);
+  const statusLabels = useMemo(() => statusOptions.map((s) => s.label), [statusOptions]);
   const updateProject = useUpdateProject();
   const { columns: customColumns } = useAllCustomColumns("projects");
   const updateCustomField = useUpdateCustomField();
@@ -145,11 +202,11 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     });
   }, [registerExport, sorted, allVisibleKeys, getLabel]);
 
-  const save = (id: string, field: string, value: string, oldValue: string) => {
+  const save = useCallback((id: string, field: string, value: string, oldValue: string) => {
     updateProject.mutate({ id, field, value, oldValue });
-  };
+  }, [updateProject]);
 
-  const saveCurrency = (id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => {
+  const saveCurrency = useCallback((id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => {
     const parsedAmount = amount === "" ? null : Number(amount);
     supabase.from("projects").update({ prodejni_cena: parsedAmount, currency } as any).eq("id", id).then(({ error }) => {
       if (error) {
@@ -159,7 +216,15 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
         toast({ title: "Uloženo" });
       }
     });
-  };
+  }, [qc]);
+
+  const handleSaveCustomField = useCallback((rowId: string, colKey: string, val: string, old: string) => {
+    updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old });
+  }, [updateCustomField]);
+
+  const handleEditProject = useCallback((p: Project) => {
+    setEditProject(p);
+  }, []);
 
   const handleAddProject = async () => {
     if (!newProj.project_id || !newProj.project_name) return;
@@ -238,23 +303,21 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
           </TableHeader>
           <TableBody>
             {sorted.map((p) => (
-              <TableRow key={p.id} className="hover:bg-muted/50 transition-colors" style={(() => { const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null; return c ? { backgroundColor: c } : {}; })()}>
-                <TableCell style={{ minWidth: 36, width: 36, maxWidth: 36 }} className="text-center">
-                  {(docCounts[p.project_id] ?? 0) > 0 && (
-                    <span className="inline-flex items-center gap-0.5 text-gray-400 text-[10px]">
-                      <Paperclip className="h-3 w-3" />
-                      {docCounts[p.project_id]}
-                    </span>
-                  )}
-                </TableCell>
-                {v("project_id") && (
-                  <TableCell className="font-mono text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => setEditProject(p)}>
-                    {p.project_id}
-                  </TableCell>
-                )}
-                {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-                {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old }) }))}
-              </TableRow>
+              <ProjectRow
+                key={p.id}
+                project={p}
+                docCount={docCounts[p.project_id] ?? 0}
+                isVisible={v}
+                renderKeys={renderKeys}
+                save={save}
+                saveCurrency={saveCurrency}
+                canEdit={canEdit}
+                statusLabels={statusLabels}
+                customColumns={customColumns}
+                saveCustomField={handleSaveCustomField}
+                riskHighlight={riskHighlight}
+                onEditProject={handleEditProject}
+              />
             ))}
           </TableBody>
         </Table>

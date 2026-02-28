@@ -44,10 +44,14 @@ const Index = () => {
   const [savedStatusFilter, setSavedStatusFilter] = useState<string[] | null>(null);
   const [planZoom, setPlanZoom] = useState<ZoomLevel>("3M");
   const tpvCloseDetailRef = useRef<(() => void) | null>(null);
+  const scrollPositions = useRef<Record<string, number>>({});
 
   const TPV_ACTIVE_STATUSES = ["Příprava", "Engineering", "TPV"];
 
-  const handleTabChange = (tab: string) => {
+  const handleTabChange = useCallback((tab: string) => {
+    // Save scroll position of current tab
+    scrollPositions.current[activeTab] = window.scrollY;
+
     // Close any open TPV detail view on any tab switch
     tpvCloseDetailRef.current?.();
 
@@ -61,7 +65,13 @@ const Index = () => {
       }
     }
     setActiveTab(tab);
-  };
+
+    // Restore scroll position of target tab
+    requestAnimationFrame(() => {
+      const savedPos = scrollPositions.current[tab] ?? 0;
+      window.scrollTo(0, savedPos);
+    });
+  }, [activeTab, filters, savedStatusFilter]);
   const { profile, signOut, canAccessSettings, canCreateProject, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, isKonstrukter } = useAuth();
 
   // Auto-switch to allowed tab when role changes
