@@ -9,12 +9,6 @@ export interface PdfExportOptions {
   statusColors?: Record<string, string>;
 }
 
-interface PageBuildOptions extends PdfExportOptions {
-  pageNum: number;
-  totalPages: number;
-  showTitle: boolean;
-}
-
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
@@ -80,35 +74,8 @@ const BASE_STYLES = `
   }
   tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 7.5pt; font-weight: 500; white-space: nowrap; }
-  .page-footer { margin-top: 6px; text-align: right; font-size: 7pt; color: #9ca3af; }
 `;
 
-/** Build HTML for a single PDF page (used by paginated renderer) */
-export function buildPageHtml({
-  tabLabel,
-  headers,
-  rows,
-  filterSummary,
-  statusColors = {},
-  pageNum,
-  totalPages,
-  showTitle,
-}: PageBuildOptions): string {
-  const dateStr = format(new Date(), "d. MMMM yyyy", { locale: cs });
-  const { isNumberCol, isStatusCol } = getColumnMeta(headers, rows, statusColors);
-  const theadCells = buildTheadCells(headers, isNumberCol);
-  const tbodyRows = buildTbodyRows(rows, isNumberCol, isStatusCol, statusColors);
-
-  return `<!DOCTYPE html><html lang="cs"><head><meta charset="utf-8"><style>${BASE_STYLES}</style></head><body>
-${showTitle ? `<div class="header">
-  <h1>A→M Interior | Project Info 2026</h1>
-  <div class="subtitle">${esc(tabLabel)} — ${esc(dateStr)}</div>
-  ${filterSummary ? `<div class="filters">Filtry: ${esc(filterSummary)}</div>` : ""}
-</div>` : ""}
-<table><thead><tr>${theadCells}</tr></thead><tbody>${tbodyRows}</tbody></table>
-<div class="page-footer">Strana ${pageNum} z ${totalPages}</div>
-</body></html>`;
-}
 
 /** Build full preview HTML (single document for iframe preview) */
 export function buildPrintableHtml({
