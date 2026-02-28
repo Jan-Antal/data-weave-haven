@@ -181,7 +181,7 @@ interface Segment {
   start: Date;
   end: Date;
   color: string;
-  hatchColors?: [string, string]; // diagonal stripe pattern for out-of-order milestones
+  hatched?: boolean; // diagonal stripe overlay for overdue portions
 }
 
 interface Diamond {
@@ -259,48 +259,61 @@ function getBarDataFromFields(
   if (EXP) allDates.push(EXP);
   if (PRE) allDates.push(PRE);
   const latestDate = allDates.reduce((a, b) => (a > b ? a : b));
-  const hasOverdue = latestDate > safeE;
 
   // Build milestone diamonds
   if (TPV) dItems.push({ date: TPV, color: milestoneColors.tpv_date, name: "TPV" });
   if (EXP) dItems.push({ date: EXP, color: milestoneColors.expedice, name: "Expedice" });
   if (PRE) dItems.push({ date: PRE, color: milestoneColors.predani, name: "Předání" });
 
-  // Build segments up to safeE using available milestones (capped at safeE)
-  const milestonesCapped: Date[] = [];
-  if (TPV && TPV <= safeE) milestonesCapped.push(TPV);
-  if (EXP && EXP <= safeE) milestonesCapped.push(EXP);
-  if (PRE && PRE <= safeE) milestonesCapped.push(PRE);
-  milestonesCapped.sort((a, b) => a.getTime() - b.getTime());
+  // Build segments from S to latestDate using ALL milestones as split points
+  const allMilestones: Date[] = [];
+  if (TPV) allMilestones.push(TPV);
+  if (EXP) allMilestones.push(EXP);
+  if (PRE) allMilestones.push(PRE);
+  allMilestones.sort((a, b) => a.getTime() - b.getTime());
+
+  // Build point sequence: S → milestones → safeE → latestDate
+  const rawPts = [S, ...allMilestones, safeE];
+  if (latestDate > safeE) rawPts.push(latestDate);
+  rawPts.sort((a, b) => a.getTime() - b.getTime());
+
+  // Deduplicate
+  const uniquePts: Date[] = [rawPts[0]];
+  for (let i = 1; i < rawPts.length; i++) {
+    if (rawPts[i].getTime() !== rawPts[i - 1].getTime()) uniquePts.push(rawPts[i]);
+  }
 
   const colorSeq = [phaseColors.konstrukce, phaseColors.vyroba, phaseColors.montaz, phaseColors.dokonceno];
-  const pts = [S, ...milestonesCapped, safeE];
-  // Deduplicate consecutive equal dates
-  const uniquePts: Date[] = [pts[0]];
-  for (let i = 1; i < pts.length; i++) {
-    if (pts[i].getTime() !== pts[i - 1].getTime()) uniquePts.push(pts[i]);
-  }
-
   const segs: Segment[] = [];
   for (let i = 0; i < uniquePts.length - 1; i++) {
-    const w = differenceInDays(uniquePts[i + 1], uniquePts[i]);
+    const segStart = uniquePts[i];
+    const segEnd = uniquePts[i + 1];
+    const w = differenceInDays(segEnd, segStart);
     if (w <= 0) continue;
-    segs.push({ start: uniquePts[i], end: uniquePts[i + 1], color: colorSeq[Math.min(i, colorSeq.length - 1)] });
+    const color = colorSeq[Math.min(i, colorSeq.length - 1)];
+    // Hatch if any part of this segment is after Datum Smluvní
+    const isAfterDeadline = segStart >= safeE;
+    segs.push({ start: segStart, end: segEnd, color, hatched: isAfterDeadline });
   }
 
-  // If no milestones before safeE and we have none, show a single dokonceno bar
-  if (segs.length === 0 && differenceInDays(safeE, S) > 0) {
-    segs.push({ start: S, end: safeE, color: phaseColors.dokonceno });
+  // If segment spans across safeE, split it
+  const finalSegs: Segment[] = [];
+  for (const seg of segs) {
+    if (!seg.hatched && seg.end > safeE && seg.start < safeE) {
+      // Split: solid part before safeE, hatched part after
+      finalSegs.push({ start: seg.start, end: safeE, color: seg.color });
+      finalSegs.push({ start: safeE, end: seg.end, color: seg.color, hatched: true });
+    } else {
+      finalSegs.push(seg);
+    }
   }
 
-  // Add overdue segment with diagonal hatch pattern if milestones exceed safeE
-  if (hasOverdue) {
-    // Use the last segment's color as base, with overdue red stripes
-    const lastColor = segs.length > 0 ? segs[segs.length - 1].color : phaseColors.dokonceno;
-    segs.push({ start: safeE, end: latestDate, color: phaseColors.overdue, hatchColors: [phaseColors.overdue, lastColor] });
+  // If no segments at all, show a single bar
+  if (finalSegs.length === 0 && differenceInDays(latestDate, S) > 0) {
+    finalSegs.push({ start: S, end: latestDate, color: phaseColors.dokonceno });
   }
 
-  return { segments: segs, diamonds: makeDiamonds(dItems), hasWarning, warnings };
+  return { segments: finalSegs, diamonds: makeDiamonds(dItems), hasWarning, warnings };
 }
 
 function getProjectBarData(p: Project, statusColorMap: Record<string, string>): BarData {
@@ -419,12 +432,12 @@ function MilestoneDiamond({
 }
 
 // ── Hatch pattern helper ─────────────────────────────────────────────
-function hatchBackground(color1: string, color2: string): string {
+function hatchOverlay(baseColor: string): string {
   return `repeating-linear-gradient(
     45deg,
-    ${color1} 0px, ${color1} 4px,
-    ${color2} 4px, ${color2} 8px
-  )`;
+    transparent 0px, transparent 3px,
+    rgba(255,255,255,0.35) 3px, rgba(255,255,255,0.35) 6px
+  ), ${baseColor}`;
 }
 
 // ── Warning icon ────────────────────────────────────────────────────
@@ -518,7 +531,7 @@ function SubstageRow({
         if (w <= 0) return null;
         const wkLabel = weeksLabel(seg.start, seg.end);
         const phaseLabel = PHASE_LABELS[seg.color];
-        const hasHatch = !!seg.hatchColors;
+        const hasHatch = !!seg.hatched;
         const segDiv = (
           <div
             key={i}
@@ -526,7 +539,7 @@ function SubstageRow({
               position: "absolute",
               left: x, top: midY - SUBSTAGE_BAR_HEIGHT / 2,
               width: Math.max(w, 4), height: SUBSTAGE_BAR_HEIGHT,
-              background: hasHatch ? hatchBackground(seg.hatchColors![0], seg.hatchColors![1]) : seg.color,
+              background: hasHatch ? hatchOverlay(seg.color) : seg.color,
               zIndex: 2, borderRadius: 4,
             }}
           >
@@ -876,7 +889,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                       const wkLabel = weeksLabel(seg.start, seg.end);
 
                       const phaseLabel = PHASE_LABELS[seg.color];
-                      const hasHatch = !!seg.hatchColors;
+                      const hasHatch = !!seg.hatched;
                       const segDiv = (
                         <div
                           key={`seg-${i}`}
@@ -886,7 +899,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                             top: 16,
                             width: segW,
                             height: BAR_HEIGHT,
-                            background: hasHatch ? hatchBackground(seg.hatchColors![0], seg.hatchColors![1]) : seg.color,
+                            background: hasHatch ? hatchOverlay(seg.color) : seg.color,
                             zIndex: 2,
                             borderRadius: 4,
                             minWidth: 4,
