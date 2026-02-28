@@ -321,7 +321,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
       {showAddButton && (
         <TableRow className="bg-muted/20 h-9">
           <TableCell colSpan={16}>
-            <Button variant="ghost" size="sm" className="text-xs h-6" onClick={handleInlineAdd}>
+            <Button variant="ghost" size="sm" className="text-xs h-5 text-muted-foreground/60 hover:text-muted-foreground font-normal" onClick={handleInlineAdd}>
               <Plus className="h-3 w-3 mr-1" /> Přidat etapu
             </Button>
           </TableCell>
