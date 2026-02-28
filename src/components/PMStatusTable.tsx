@@ -558,21 +558,15 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
     setExpanded(prev => {
       const next = new Set(prev);
       if (!next.has(pid)) {
-        // collapsed → expanded (no add button)
         next.add(pid);
-        setShowAddButton(ab => { const n = new Set(ab); n.delete(pid); return n; });
-      } else if (!showAddButton.has(pid)) {
-        // expanded → expanded + add button
         setShowAddButton(ab => { const n = new Set(ab); n.add(pid); return n; });
-        return prev; // keep expanded
       } else {
-        // expanded + add button → collapsed
         next.delete(pid);
         setShowAddButton(ab => { const n = new Set(ab); n.delete(pid); return n; });
       }
       return next;
     });
-  }, [showAddButton]);
+  }, []);
 
   const save = useCallback((id: string, field: string, value: string, oldValue: string, projectId?: string) => {
     updateProject.mutate({ id, field, value, oldValue, projectId });

@@ -547,17 +547,14 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
       const next = new Set(prev);
       if (!next.has(pid)) {
         next.add(pid);
-        setShowAddButton(ab => { const n = new Set(ab); n.delete(pid); return n; });
-      } else if (!showAddButton.has(pid)) {
         setShowAddButton(ab => { const n = new Set(ab); n.add(pid); return n; });
-        return prev;
       } else {
         next.delete(pid);
         setShowAddButton(ab => { const n = new Set(ab); n.delete(pid); return n; });
       }
       return next;
     });
-  }, [showAddButton]);
+  }, []);
 
   const save = useCallback((id: string, field: string, value: string, oldValue: string, projectId?: string) => {
     updateProject.mutate({ id, field, value, oldValue, projectId });
