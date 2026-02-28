@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { ArrowLeft, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
@@ -42,7 +43,7 @@ export function PdfPreviewModal({ html, tabLabel, onClose }: PdfPreviewModalProp
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[99998] flex flex-col bg-background">
       {/* Sticky action bar */}
       <div className="sticky top-0 z-[99999] flex items-center justify-between px-4 py-2.5 bg-background border-b border-border shadow-sm print:hidden">
@@ -83,6 +84,7 @@ export function PdfPreviewModal({ html, tabLabel, onClose }: PdfPreviewModalProp
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
