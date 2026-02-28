@@ -130,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fields that are read-only for Konstruktér
   const konstrukterReadOnlyFields = new Set([
     "project_id", "project_name", "pm", "datum_smluvni",
-    "datum_objednavky", "prodejni_cena", "marze", "risk"
+    "datum_objednavky", "prodejni_cena", "marze", "risk", "klient"
   ]);
   // Fields that are read-only for PM
   const pmReadOnlyFields = new Set(["project_id"]);
