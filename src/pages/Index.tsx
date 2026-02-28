@@ -12,7 +12,7 @@ import { DashboardStats } from "@/components/DashboardStats";
 import { TableFilters, useTableFilters } from "@/components/TableFilters";
 import { ExportButton } from "@/components/ExportButton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Settings, Plus, LogOut, User, Check, BarChart3 } from "lucide-react";
+import { Settings, Plus, LogOut, User, Check, ChevronUp, ChevronDown } from "lucide-react";
 import { FeedbackWidget } from "@/components/FeedbackWidget";
 import { AdminInboxButton } from "@/components/AdminInbox";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
@@ -198,11 +198,13 @@ const Index = () => {
         </div>
       </div>
 
-      <main className="px-6 py-6 space-y-6 flex-1 w-full">
-        <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRiskHighlightChange={setRiskHighlight} activeTab={activeTab} onCollapsedChange={setDashboardCollapsed} />
+      <main className="px-6 flex-1 w-full">
+        <div className={dashboardCollapsed ? "py-2" : "py-4"}>
+          <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRiskHighlightChange={setRiskHighlight} activeTab={activeTab} onCollapsedChange={setDashboardCollapsed} />
+        </div>
 
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-          <div className="flex items-center justify-between">
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center">
               <TabsList className="bg-card border">
                 {!isKonstrukter && (
@@ -223,10 +225,10 @@ const Index = () => {
                 onClick={() => {
                   document.dispatchEvent(new CustomEvent("toggle-dashboard"));
                 }}
-                className="ml-2 w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 transition-colors"
-                title={dashboardCollapsed ? "Zobrazit dashboard" : "Skrýt dashboard"}
+                className="ml-4 flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors cursor-pointer"
               >
-                <BarChart3 className={cn("h-4 w-4 transition-opacity", dashboardCollapsed && "opacity-40")} />
+                {dashboardCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+                <span>{dashboardCollapsed ? "Zobrazit dashboard" : "Skrýt dashboard"}</span>
               </button>
             </div>
 

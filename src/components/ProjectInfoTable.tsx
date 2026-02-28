@@ -291,7 +291,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
           Režim úpravy sloupců
         </div>
       )}
-      <div className={cn("rounded-lg border bg-card overflow-x-auto always-scrollbar", editMode && "rounded-t-none border-t-0")}>
+      <div className={cn("rounded-lg border bg-card overflow-auto always-scrollbar", editMode && "rounded-t-none border-t-0")} style={{ maxHeight: "calc(100vh - 260px)" }}>
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
