@@ -11,10 +11,10 @@ import type { Project } from "@/hooks/useProjects";
 
 const DATE_FIELDS = [
   { key: "datum_objednavky", label: "Datum Objednání" },
-  { key: "datum_smluvni", label: "Datum Smluvní" },
   { key: "tpv_date", label: "TPV" },
   { key: "expedice", label: "Expedice" },
   { key: "predani", label: "Předání" },
+  { key: "datum_smluvni", label: "Datum Smluvní" },
 ] as const;
 
 type FieldKey = (typeof DATE_FIELDS)[number]["key"];
