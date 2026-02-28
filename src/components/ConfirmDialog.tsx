@@ -27,7 +27,7 @@ export function ConfirmDialog({ open, onConfirm, onCancel, title = "Opravdu smaz
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onCancel}>Zrušit</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>Smazat</AlertDialogAction>
+          <AlertDialogAction onClick={onConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Smazat</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
