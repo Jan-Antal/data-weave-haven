@@ -60,7 +60,7 @@ interface Props {
   onBack: () => void;
 }
 
-export function TPVItemsView({ projectId, projectName, onBack }: Props) {
+export function TPVList({ projectId, projectName, onBack }: Props) {
   const { canManageTPV, canEdit, canEditColumns } = useAuth();
   const { data: items = [], isLoading } = useTPVItems(projectId);
   const { data: statusOptions = [] } = useTPVStatusOptions();

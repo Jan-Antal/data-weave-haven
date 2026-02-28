@@ -23,10 +23,10 @@ interface Filters {
 
 function getActionTypes(category: Filters["category"]): string[] | null {
   switch (category) {
-    case "status": return ["status_change", "konstrukter_change", "etapa_status_change", "etapa_konstrukter_change"];
-    case "terminy": return ["datum_smluvni_change", "etapa_datum_smluvni_change"];
-    case "documents": return ["document_uploaded", "document_deleted", "etapa_document_uploaded", "etapa_document_deleted"];
-    case "projects": return ["project_created", "project_deleted", "project_restored", "etapa_created", "etapa_deleted"];
+    case "status": return ["status_change", "konstrukter_change", "stage_status_change", "stage_konstrukter_change"];
+    case "terminy": return ["datum_smluvni_change", "stage_datum_smluvni_change"];
+    case "documents": return ["document_uploaded", "document_deleted", "stage_document_uploaded", "stage_document_deleted"];
+    case "projects": return ["project_created", "project_deleted", "project_restored", "stage_created", "stage_deleted"];
     default: return null;
   }
 }
@@ -35,7 +35,7 @@ export function useActivityLog(filters: Filters) {
   return useInfiniteQuery({
     queryKey: ["activity-log", filters],
     queryFn: async ({ pageParam = 0 }) => {
-      let q = (supabase.from("project_activity_log") as any)
+      let q = (supabase.from("data_log") as any)
         .select("*")
         .order("created_at", { ascending: false })
         .range(pageParam, pageParam + PAGE_SIZE - 1);

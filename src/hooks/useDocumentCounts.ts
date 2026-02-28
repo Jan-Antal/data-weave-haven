@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-// Global event bus so ProjectEditDialog can notify the table
+// Global event bus so ProjectDetailDialog can notify the table
 const DOC_COUNT_EVENT = "doc-count-updated";
 
 // In-memory cache (Layer 2) — persists across component remounts within session
@@ -9,11 +9,11 @@ const memoryCache: Record<string, number> = {};
 let memoryCacheLoaded = false;
 let backgroundRefreshScheduled = false;
 
-// Etapa pattern: ends with -A, -B, etc. (single uppercase letter after last dash)
-const ETAPA_PATTERN = /-[A-Z]$/;
+// Stage pattern: ends with -A, -B, etc. (single uppercase letter after last dash)
+const STAGE_SUFFIX_PATTERN = /-[A-Z]$/;
 
-export function isEtapa(projectId: string): boolean {
-  return ETAPA_PATTERN.test(projectId);
+export function isStage(projectId: string): boolean {
+  return STAGE_SUFFIX_PATTERN.test(projectId);
 }
 
 export function dispatchDocCountUpdate(projectId: string, delta: number) {
@@ -48,8 +48,8 @@ export function useDocumentCounts(projectIds: string[], projectStatuses?: Record
   const [loading, setLoading] = useState(false);
   const mountedRef = useRef(true);
 
-  // Filter out etapy — only main projects get doc counts
-  const mainProjectIds = projectIds.filter(id => !isEtapa(id));
+  // Filter out stages — only main projects get doc counts
+  const mainProjectIds = projectIds.filter(id => !isStage(id));
 
   // Step 1: Load from Supabase cache table (instant, persistent)
   const loadFromSupabaseCache = useCallback(async (ids: string[]) => {

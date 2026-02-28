@@ -21,7 +21,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { ProjectStage } from "@/hooks/useProjectStages";
 import type { Project } from "@/hooks/useProjects";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
-import { ProjectEditDialog } from "./ProjectEditDialog";
+import { ProjectDetailDialog } from "./ProjectDetailDialog";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -237,7 +237,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
       setFreshStages(prev => { const next = new Map(prev); next.delete(id); return next; });
       return;
     }
-    logActivity({ projectId, actionType: "etapa_created", detail: stageName });
+    logActivity({ projectId, actionType: "stage_created", detail: stageName });
     qc.invalidateQueries({ queryKey: ["all_project_stages"] });
   }, [projectId, project, stages, qc]);
 
@@ -691,7 +691,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
         </Table>
       </div>
 
-      {editProject && <ProjectEditDialog project={editProject} open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }} />}
+      {editProject && <ProjectDetailDialog project={editProject} open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }} />}
     </div>
   );
 }

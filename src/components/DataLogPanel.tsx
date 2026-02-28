@@ -33,13 +33,13 @@ const DOT_COLORS: Record<string, string> = {
   project_deleted: "bg-gray-800",
   document_uploaded: "bg-blue-500",
   document_deleted: "bg-orange-500",
-  etapa_created: "bg-green-500",
-  etapa_deleted: "bg-gray-800",
-  etapa_status_change: "bg-amber-400",
-  etapa_konstrukter_change: "bg-purple-500",
-  etapa_datum_smluvni_change: "bg-red-500",
-  etapa_document_uploaded: "bg-blue-500",
-  etapa_document_deleted: "bg-orange-500",
+  stage_created: "bg-green-500",
+  stage_deleted: "bg-gray-800",
+  stage_status_change: "bg-amber-400",
+  stage_konstrukter_change: "bg-purple-500",
+  stage_datum_smluvni_change: "bg-red-500",
+  stage_document_uploaded: "bg-blue-500",
+  stage_document_deleted: "bg-orange-500",
 };
 
 function formatDayHeader(dateStr: string): string {
@@ -127,13 +127,13 @@ function ActivityItem({
         </div>
       );
       break;
-    case "etapa_created":
+    case "stage_created":
       mainText = <>{userName} vytvořil/a etapu {entry.detail} v {projectLabel}</>;
       break;
-    case "etapa_deleted":
+    case "stage_deleted":
       mainText = <>{userName} smazal/a etapu {entry.detail} z {projectLabel}</>;
       break;
-    case "etapa_status_change":
+    case "stage_status_change":
       mainText = <>{userName} změnil/a status {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -143,7 +143,7 @@ function ActivityItem({
         </div>
       );
       break;
-    case "etapa_konstrukter_change":
+    case "stage_konstrukter_change":
       mainText = <>{userName} změnil/a konstruktéra {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -153,7 +153,7 @@ function ActivityItem({
         </div>
       );
       break;
-    case "etapa_datum_smluvni_change":
+    case "stage_datum_smluvni_change":
       mainText = <>{userName} změnil/a datum smluvní {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -163,7 +163,7 @@ function ActivityItem({
         </div>
       );
       break;
-    case "etapa_document_uploaded":
+    case "stage_document_uploaded":
       mainText = <>{userName} nahrál/a dokument do {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -171,7 +171,7 @@ function ActivityItem({
         </div>
       );
       break;
-    case "etapa_document_deleted":
+    case "stage_document_deleted":
       mainText = <>{userName} smazal/a dokument z {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
