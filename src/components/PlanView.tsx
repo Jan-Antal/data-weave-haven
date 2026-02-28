@@ -4,10 +4,11 @@ import { PlanDateEditDialog } from "@/components/PlanDateEditDialog";
 import { useProjects, Project } from "@/hooks/useProjects";
 import { useProjectStages, ProjectStage } from "@/hooks/useProjectStages";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
+import { useUpdateProject } from "@/hooks/useProjectMutations";
 import { useSortFilter } from "@/hooks/useSortFilter";
-import { parseAppDate } from "@/lib/dateFormat";
+import { parseAppDate, formatAppDate } from "@/lib/dateFormat";
 import { ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
-import { ChevronRight, ChevronDown, AlertTriangle } from "lucide-react";
+import { ChevronRight, ChevronDown, AlertTriangle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { format, differenceInDays, addDays, startOfWeek, startOfMonth, addMonths, getISOWeek } from "date-fns";
@@ -144,7 +145,11 @@ interface Diamond {
   label: string;
   name: string;
   priority: number; // higher = renders on top (Předání=3 > Expedice=2 > TPV=1)
+  fieldKey?: string; // database field key for saving drag changes
 }
+
+const DRAGGABLE_MILESTONES = new Set(["TPV", "Expedice", "Předání"]);
+const MILESTONE_FIELD_MAP: Record<string, string> = { "TPV": "tpv_date", "Expedice": "expedice", "Předání": "predani" };
 
 interface BarData {
   segments: Segment[];
@@ -164,6 +169,7 @@ function makeDiamonds(items: { date: Date; color: string; name: string }[]): Dia
     label: formatMilestoneLabel(m.date),
     name: m.name,
     priority: MILESTONE_PRIORITY[m.name] ?? 0,
+    fieldKey: MILESTONE_FIELD_MAP[m.name],
   }));
 }
 
@@ -355,22 +361,67 @@ function getStageBarData(stage: ProjectStage, project: Project, statusColorMap: 
 // ── Milestone Diamond ───────────────────────────────────────────────
 function MilestoneDiamond({
   date, color, label, name, origin, dayPx, midY, small, showLabel, zIndex,
+  draggable, onDragEnd,
 }: {
   date: Date; color: string; label: string; name: string;
   origin: Date; dayPx: number; midY: number; small?: boolean;
   showLabel?: boolean; zIndex?: number;
+  draggable?: boolean;
+  onDragEnd?: (newDate: Date) => void;
 }) {
-  const x = dayOffset(date, origin, dayPx);
+  const [dragOffset, setDragOffset] = useState<number | null>(null);
+  const dragStartX = useRef<number>(0);
+  const originalX = useRef<number>(0);
+
+  const baseX = dayOffset(date, origin, dayPx);
+  const currentX = dragOffset !== null ? baseX + dragOffset : baseX;
   const size = small ? 8 : 12;
+  const isDraggable = draggable && !!onDragEnd;
+
+  const dragDate = useMemo(() => {
+    if (dragOffset === null) return null;
+    const daysDelta = Math.round(dragOffset / dayPx);
+    return addDays(date, daysDelta);
+  }, [dragOffset, dayPx, date]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!isDraggable) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragStartX.current = e.clientX;
+    originalX.current = baseX;
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      const delta = ev.clientX - dragStartX.current;
+      setDragOffset(delta);
+    };
+
+    const handleMouseUp = (ev: MouseEvent) => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      const delta = ev.clientX - dragStartX.current;
+      const daysDelta = Math.round(delta / dayPx);
+      if (daysDelta !== 0) {
+        const newDate = addDays(date, daysDelta);
+        onDragEnd?.(newDate);
+      }
+      setDragOffset(null);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  }, [isDraggable, baseX, dayPx, date, onDragEnd]);
 
   const diamondStyle: React.CSSProperties = {
-    left: x - size / 2,
+    left: currentX - size / 2,
     top: midY - size / 2,
     width: size,
     height: size,
     backgroundColor: color,
     transform: "rotate(45deg)",
-    zIndex: zIndex ?? 10,
+    zIndex: dragOffset !== null ? 50 : (zIndex ?? 10),
+    cursor: isDraggable ? (dragOffset !== null ? "grabbing" : "grab") : "default",
+    transition: dragOffset !== null ? "none" : undefined,
   };
 
   return (
@@ -380,24 +431,32 @@ function MilestoneDiamond({
           <div
             className="absolute"
             style={diamondStyle}
+            onMouseDown={handleMouseDown}
           />
         </TooltipTrigger>
         <TooltipContent side="top" className="text-xs">
-          <span className="font-medium">{name}</span>: {format(date, "dd-MMM-yy")}
+          {dragOffset !== null && dragDate ? (
+            <span className="font-medium">{name}: {format(dragDate, "dd-MMM-yy")}</span>
+          ) : (
+            <>
+              <span className="font-medium">{name}</span>: {format(date, "dd-MMM-yy")}
+              {!isDraggable && <Lock className="inline-block h-3 w-3 ml-1 opacity-50" />}
+            </>
+          )}
         </TooltipContent>
       </Tooltip>
       {(showLabel !== false) && (
         <span
           className="absolute text-[9px] font-medium whitespace-nowrap pointer-events-none"
           style={{
-            left: x,
+            left: currentX,
             top: 0,
             transform: "translateX(-50%)",
             color,
             zIndex: (zIndex ?? 10) + 1,
           }}
         >
-          {label}
+          {dragOffset !== null && dragDate ? format(dragDate, "dd-MMM").replace(/\./g, "") : label}
         </span>
       )}
     </TooltipProvider>
@@ -588,6 +647,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [containerWidth, setContainerWidth] = useState(0);
   const [editProject, setEditProject] = useState<Project | null>(null);
+  const updateProject = useUpdateProject();
 
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
@@ -897,8 +957,24 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                     {/* Milestone diamonds */}
                     {barData.diamonds.map((m, i, arr) => {
                       const showLabel = !arr.some((other, j) => j > i && Math.abs(differenceInDays(other.date, m.date)) <= 5);
+                      const isDraggable = DRAGGABLE_MILESTONES.has(m.name);
                       return (
-                        <MilestoneDiamond key={i} date={m.date} color={m.color} label={m.label} name={m.name} origin={timelineStart} dayPx={dayPx} midY={midY} showLabel={showLabel} zIndex={10 + m.priority} />
+                        <MilestoneDiamond
+                          key={i} date={m.date} color={m.color} label={m.label} name={m.name}
+                          origin={timelineStart} dayPx={dayPx} midY={midY} showLabel={showLabel}
+                          zIndex={10 + m.priority}
+                          draggable={isDraggable}
+                          onDragEnd={isDraggable && m.fieldKey ? (newDate) => {
+                            const oldVal = (p as any)[m.fieldKey!] ?? "";
+                            updateProject.mutate({
+                              id: p.id,
+                              field: m.fieldKey!,
+                              value: formatAppDate(newDate),
+                              oldValue: oldVal,
+                              projectId: p.project_id,
+                            });
+                          } : undefined}
+                        />
                       );
                     })}
                   </div>
