@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Trash2 } from "lucide-react";
+import { CalendarIcon, Trash2, AlertTriangle } from "lucide-react";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
 import { cn } from "@/lib/utils";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
 import { useAuth } from "@/hooks/useAuth";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import type { Project } from "@/hooks/useProjects";
 
 const DATE_FIELDS = [
@@ -49,6 +50,41 @@ export function PlanDateEditDialog({ project, open, onOpenChange }: PlanDateEdit
       });
     }
   }, [project, open]);
+
+  // Chronological order warnings
+  const orderWarnings = useMemo(() => {
+    const ORDER: { key: FieldKey; label: string }[] = [
+      { key: "datum_objednavky", label: "Objednání" },
+      { key: "tpv_date", label: "TPV" },
+      { key: "expedice", label: "Expedice" },
+      { key: "predani", label: "Předání" },
+      { key: "datum_smluvni", label: "Smluvní" },
+    ];
+    const warnings: { message: string; fields: Set<string> }[] = [];
+    for (let i = 0; i < ORDER.length; i++) {
+      const aRaw = values[ORDER[i].key];
+      const aDate = aRaw ? parseAppDate(aRaw) : null;
+      if (!aDate) continue;
+      for (let j = i + 1; j < ORDER.length; j++) {
+        const bRaw = values[ORDER[j].key];
+        const bDate = bRaw ? parseAppDate(bRaw) : null;
+        if (!bDate) continue;
+        if (aDate > bDate) {
+          warnings.push({
+            message: `${ORDER[i].label} je po ${ORDER[j].label}`,
+            fields: new Set([ORDER[i].key, ORDER[j].key]),
+          });
+        }
+      }
+    }
+    return warnings;
+  }, [values]);
+
+  const fieldsWithWarning = useMemo(() => {
+    const s = new Set<string>();
+    orderWarnings.forEach(w => w.fields.forEach(f => s.add(f)));
+    return s;
+  }, [orderWarnings]);
 
   if (!project) return null;
 
@@ -94,10 +130,29 @@ export function PlanDateEditDialog({ project, open, onOpenChange }: PlanDateEdit
             const raw = values[f.key];
             const parsed = raw ? parseAppDate(raw) : undefined;
             const readOnly = isFieldReadOnly(f.key);
+            const hasWarning = fieldsWithWarning.has(f.key);
 
             return (
               <div key={f.key} className="flex items-center gap-2">
-                <span className={cn("text-xs font-medium w-[120px] shrink-0", readOnly && "text-muted-foreground")}>{f.label}</span>
+                <span className={cn(
+                  "text-xs font-medium w-[120px] shrink-0",
+                  readOnly && "text-muted-foreground",
+                  hasWarning && !readOnly && "text-orange-500"
+                )}>{f.label}</span>
+                {hasWarning && (
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-orange-500" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs max-w-[220px]">
+                        {orderWarnings.filter(w => w.fields.has(f.key)).map((w, i) => (
+                          <div key={i}>{w.message}</div>
+                        ))}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
                 <Popover
                   open={openPickers[f.key] || false}
                   onOpenChange={(o) => {
