@@ -31,15 +31,15 @@ export function useUpdateStage() {
       const { error } = await supabase.from("project_stages").update({ [field]: value } as any).eq("id", id);
       if (error) throw error;
       if (field === "konstrukter" && String(value) !== String(oldValue ?? "")) {
-        logActivity({ projectId, actionType: "etapa_konstrukter_change", oldValue: oldValue || "—", newValue: String(value) || "—", detail: stageName || null });
+        logActivity({ projectId, actionType: "stage_konstrukter_change", oldValue: oldValue || "—", newValue: String(value) || "—", detail: stageName || null });
       }
       if (field === "status" && String(value) !== String(oldValue ?? "")) {
-        logActivity({ projectId, actionType: "etapa_status_change", oldValue: oldValue || "—", newValue: String(value) || "—", detail: stageName || null });
+        logActivity({ projectId, actionType: "stage_status_change", oldValue: oldValue || "—", newValue: String(value) || "—", detail: stageName || null });
       }
       if (field === "datum_smluvni" && String(value) !== String(oldValue ?? "")) {
         const fmtOld = oldValue ? (parseAppDate(oldValue) ? formatAppDate(parseAppDate(oldValue)!) : oldValue) : "—";
         const fmtNew = value ? (parseAppDate(String(value)) ? formatAppDate(parseAppDate(String(value))!) : String(value)) : "—";
-        logActivity({ projectId, actionType: "etapa_datum_smluvni_change", oldValue: fmtOld, newValue: fmtNew, detail: stageName || null });
+        logActivity({ projectId, actionType: "stage_datum_smluvni_change", oldValue: fmtOld, newValue: fmtNew, detail: stageName || null });
       }
     },
     onSuccess: (_, { projectId }) => {
@@ -58,7 +58,7 @@ export function useAddStage() {
     mutationFn: async (stage: { project_id: string; stage_name: string; stage_order: number; status?: string; start_date?: string; end_date?: string; notes?: string }) => {
       const { error } = await supabase.from("project_stages").insert(stage);
       if (error) throw error;
-      logActivity({ projectId: stage.project_id, actionType: "etapa_created", detail: stage.stage_name });
+      logActivity({ projectId: stage.project_id, actionType: "stage_created", detail: stage.stage_name });
     },
     onSuccess: (_, { project_id }) => {
       qc.invalidateQueries({ queryKey: ["project_stages", project_id] });
@@ -76,7 +76,7 @@ export function useDeleteStage() {
     mutationFn: async ({ id, projectId, stageName }: { id: string; projectId: string; stageName?: string }) => {
       const { error } = await supabase.from("project_stages").update({ deleted_at: new Date().toISOString() } as any).eq("id", id);
       if (error) throw error;
-      logActivity({ projectId, actionType: "etapa_deleted", detail: stageName || null });
+      logActivity({ projectId, actionType: "stage_deleted", detail: stageName || null });
     },
     onSuccess: (_, { projectId }) => {
       qc.invalidateQueries({ queryKey: ["project_stages", projectId] });

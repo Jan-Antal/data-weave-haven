@@ -37,7 +37,7 @@ interface Project {
   marze: string | null;
 }
 
-interface ProjectEditDialogProps {
+interface ProjectDetailDialogProps {
   project: Project | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -67,7 +67,7 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDialogProps) {
+export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDetailDialogProps) {
   const qc = useQueryClient();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const { canEdit, canDeleteProject, isViewer, isFieldReadOnly, canUploadDocuments } = useAuth();

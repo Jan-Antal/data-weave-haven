@@ -95,6 +95,42 @@ export type Database = {
         }
         Relationships: []
       }
+      data_log: {
+        Row: {
+          action_type: string
+          created_at: string
+          detail: string | null
+          id: string
+          new_value: string | null
+          old_value: string | null
+          project_id: string
+          user_email: string
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          detail?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          project_id: string
+          user_email?: string
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          detail?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          project_id?: string
+          user_email?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       exchange_rates: {
         Row: {
           created_at: string
@@ -194,42 +230,6 @@ export type Database = {
           full_name?: string
           id?: string
           is_active?: boolean
-        }
-        Relationships: []
-      }
-      project_activity_log: {
-        Row: {
-          action_type: string
-          created_at: string
-          detail: string | null
-          id: string
-          new_value: string | null
-          old_value: string | null
-          project_id: string
-          user_email: string
-          user_id: string
-        }
-        Insert: {
-          action_type: string
-          created_at?: string
-          detail?: string | null
-          id?: string
-          new_value?: string | null
-          old_value?: string | null
-          project_id: string
-          user_email?: string
-          user_id: string
-        }
-        Update: {
-          action_type?: string
-          created_at?: string
-          detail?: string | null
-          id?: string
-          new_value?: string | null
-          old_value?: string | null
-          project_id?: string
-          user_email?: string
-          user_id?: string
         }
         Relationships: []
       }

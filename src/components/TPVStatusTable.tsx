@@ -20,8 +20,8 @@ import type { ProjectStage } from "@/hooks/useProjectStages";
 import type { Project } from "@/hooks/useProjects";
 import { Button } from "@/components/ui/button";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
-import { TPVItemsView } from "./TPVItemsView";
-import { ProjectEditDialog } from "./ProjectEditDialog";
+import { TPVList } from "./TPVList";
+import { ProjectDetailDialog } from "./ProjectDetailDialog";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -237,7 +237,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
       setFreshStages(prev => { const next = new Map(prev); next.delete(id); return next; });
       return;
     }
-    logActivity({ projectId, actionType: "etapa_created", detail: stageName });
+    logActivity({ projectId, actionType: "stage_created", detail: stageName });
     qc.invalidateQueries({ queryKey: ["all_project_stages"] });
   }, [projectId, project, stages, qc]);
 
@@ -574,7 +574,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   // If TPV List detail is open, show it
   if (activeProject) {
     return (
-      <TPVItemsView
+      <TPVList
         projectId={activeProject.projectId}
         projectName={activeProject.projectName}
         onBack={() => { setActiveProject(null); onRequestTab?.(); }}
@@ -670,7 +670,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
         </Table>
       </div>
 
-      {editProject && <ProjectEditDialog project={editProject} open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }} />}
+      {editProject && <ProjectDetailDialog project={editProject} open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }} />}
     </div>
   );
 }

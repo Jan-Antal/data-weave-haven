@@ -27,7 +27,7 @@ import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
 import { CalendarIcon, Paperclip, ChevronRight, ChevronDown, Plus, Trash2, GripVertical, ChevronsDown, ChevronsUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
-import { ProjectEditDialog } from "./ProjectEditDialog";
+import { ProjectDetailDialog } from "./ProjectDetailDialog";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
@@ -250,7 +250,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
       setFreshStages(prev => { const next = new Map(prev); next.delete(id); return next; });
       return;
     }
-    logActivity({ projectId, actionType: "etapa_created", detail: stageName });
+    logActivity({ projectId, actionType: "stage_created", detail: stageName });
     qc.invalidateQueries({ queryKey: ["all_project_stages"] });
   }, [projectId, project, stages, qc]);
 
@@ -838,7 +838,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
         </DialogContent>
       </Dialog>
 
-      {editProject && <ProjectEditDialog project={editProject} open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }} />}
+      {editProject && <ProjectDetailDialog project={editProject} open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }} />}
     </div>
   );
 }

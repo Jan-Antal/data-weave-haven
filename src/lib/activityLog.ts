@@ -9,13 +9,13 @@ export type ActivityActionType =
   | "project_restored"
   | "document_uploaded"
   | "document_deleted"
-  | "etapa_created"
-  | "etapa_deleted"
-  | "etapa_status_change"
-  | "etapa_konstrukter_change"
-  | "etapa_datum_smluvni_change"
-  | "etapa_document_uploaded"
-  | "etapa_document_deleted";
+  | "stage_created"
+  | "stage_deleted"
+  | "stage_status_change"
+  | "stage_konstrukter_change"
+  | "stage_datum_smluvni_change"
+  | "stage_document_uploaded"
+  | "stage_document_deleted";
 
 interface LogParams {
   projectId: string;
@@ -30,7 +30,7 @@ export async function logActivity(params: LogParams) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    await (supabase.from("project_activity_log") as any).insert({
+    await (supabase.from("data_log") as any).insert({
       project_id: params.projectId,
       user_id: user.id,
       user_email: user.email ?? "",
