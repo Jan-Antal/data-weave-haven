@@ -244,6 +244,11 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
       if (newValues.konstrukter !== previousValues.konstrukter) {
         logActivity({ projectId: project.project_id, actionType: "konstrukter_change", oldValue: previousValues.konstrukter || "—", newValue: newValues.konstrukter || "—" });
       }
+      if (newValues.datum_smluvni !== previousValues.datum_smluvni) {
+        const fmtOld = previousValues.datum_smluvni ? (parseAppDate(previousValues.datum_smluvni) ? formatAppDate(parseAppDate(previousValues.datum_smluvni)!) : previousValues.datum_smluvni) : "—";
+        const fmtNew = newValues.datum_smluvni ? (parseAppDate(newValues.datum_smluvni) ? formatAppDate(parseAppDate(newValues.datum_smluvni)!) : newValues.datum_smluvni) : "—";
+        logActivity({ projectId: project.project_id, actionType: "datum_smluvni_change", oldValue: fmtOld, newValue: fmtNew });
+      }
       qc.invalidateQueries({ queryKey: ["projects"] });
       onOpenChange(false);
       showUndoToast(project.id, previousValues, qc);

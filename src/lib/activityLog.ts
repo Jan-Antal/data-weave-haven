@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 export type ActivityActionType =
   | "status_change"
   | "konstrukter_change"
+  | "datum_smluvni_change"
   | "project_created"
   | "project_deleted"
   | "project_restored"

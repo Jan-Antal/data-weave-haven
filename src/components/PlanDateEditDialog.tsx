@@ -60,6 +60,7 @@ export function PlanDateEditDialog({ project, open, onOpenChange }: PlanDateEdit
           field: f.key,
           value: newVal,
           oldValue: oldVal,
+          projectId: project.project_id,
         });
       }
     }

@@ -16,7 +16,7 @@ export interface ActivityLogEntry {
 const PAGE_SIZE = 40;
 
 interface Filters {
-  category: "all" | "status" | "documents" | "projects";
+  category: "all" | "status" | "terminy" | "documents" | "projects";
   projectId: string | null;
   userEmail: string | null;
 }
@@ -24,6 +24,7 @@ interface Filters {
 function getActionTypes(category: Filters["category"]): string[] | null {
   switch (category) {
     case "status": return ["status_change", "konstrukter_change"];
+    case "terminy": return ["datum_smluvni_change"];
     case "documents": return ["document_uploaded", "document_deleted"];
     case "projects": return ["project_created", "project_deleted", "project_restored"];
     default: return null;
