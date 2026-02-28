@@ -67,6 +67,11 @@ export function getColumnLabel(key: string, customColumns?: CustomColumnDef[]): 
     const def = customColumns.find(c => c.column_key === key);
     if (def) return def.label;
   }
+  // Fallback: strip "custom_TIMESTAMP_" prefix for a readable label
+  if (key.startsWith("custom_")) {
+    const parts = key.replace(/^custom_\d+_/, "");
+    if (parts) return parts.charAt(0).toUpperCase() + parts.slice(1).replace(/_/g, " ");
+  }
   return LABEL_MAP[key] ?? key;
 }
 

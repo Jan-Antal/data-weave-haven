@@ -43,30 +43,41 @@ export function AddCustomColumnDialog({ open, onOpenChange, tableName, groupKey,
     // Place new column after all existing ones
     const maxOrder = existingCustomColumns.reduce((max, c) => Math.max(max, c.sort_order ?? 0), 0);
     const nextOrder = maxOrder + 1;
-    addColumn.mutate({
-      table_name: tableName,
-      group_key: groupKey,
-      column_key: columnKey,
-      label: name.trim(),
-      data_type: dataType,
-      select_options: dataType === "select" ? selectOptions.split(",").map(s => s.trim()).filter(Boolean) : [],
-      people_role: dataType === "people" ? peopleRole : undefined,
-      sort_order: nextOrder,
-    });
 
-    // Insert column_labels visibility entries for ALL tabs:
-    // visible=true for the creating tab, visible=false for all other tabs
-    const visibilityPromises = ALL_TAB_KEYS.map((tab) => {
-      return (supabase.from("column_labels") as any).insert({
-        tab,
-        column_key: columnKey,
-        custom_label: "",
-        visible: tab === groupKey,
+    try {
+      // 1. First, insert visibility entries for ALL tabs BEFORE creating the column definition
+      // This ensures visibility is set up before the column appears in queries
+      const visibilityPromises = ALL_TAB_KEYS.map((tab) => {
+        return (supabase.from("column_labels") as any).insert({
+          tab,
+          column_key: columnKey,
+          custom_label: "",
+          visible: tab === groupKey,
+        });
       });
-    });
-    await Promise.all(visibilityPromises);
-    // Invalidate column-labels queries so all tabs pick up the new entries
-    qc.invalidateQueries({ queryKey: ["column-labels"] });
+      const visResults = await Promise.all(visibilityPromises);
+      // Check for errors
+      for (const r of visResults) {
+        if (r.error) console.error("column_labels insert error:", r.error);
+      }
+
+      // 2. Invalidate column-labels so all tabs pick up the new visibility entries
+      await qc.invalidateQueries({ queryKey: ["column-labels"] });
+
+      // 3. Now create the custom column definition (this triggers custom-columns refetch)
+      await addColumn.mutateAsync({
+        table_name: tableName,
+        group_key: groupKey,
+        column_key: columnKey,
+        label: name.trim(),
+        data_type: dataType,
+        select_options: dataType === "select" ? selectOptions.split(",").map(s => s.trim()).filter(Boolean) : [],
+        people_role: dataType === "people" ? peopleRole : undefined,
+        sort_order: nextOrder,
+      });
+    } catch (e) {
+      console.error("Error creating custom column:", e);
+    }
 
     setName("");
     setDataType("text");
