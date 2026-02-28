@@ -17,7 +17,7 @@ const DATE_KEYS = new Set([
   "datum_smluvni", "datum_objednavky", "zamereni",
   "tpv_date", "expedice", "montaz", "predani",
 ]);
-const SHORT_KEYS = new Set(["marze", "link_cn", "risk", "percent_tpv", "narocnost"]);
+const SHORT_KEYS = new Set(["marze", "risk", "percent_tpv", "narocnost"]);
 
 // Max width caps for specific columns
 const WIDTH_CAPS: Record<string, number> = {
@@ -164,8 +164,6 @@ function renderCell(
       return <TableCell key={key} className="text-right"><InlineEditableCell value={String(p.prodejni_cena ?? "")} onSave={(x) => s("prodejni_cena", x, String(p.prodejni_cena ?? ""))} readOnly={ro("prodejni_cena")} /></TableCell>;
     case "marze":
       return <TableCell key={key} className="text-right"><InlineEditableCell value={p.marze} onSave={(x) => s("marze", x, v("marze"))} readOnly={ro("marze")} /></TableCell>;
-    case "link_cn":
-      return <TableCell key={key}><InlineEditableCell value={p.link_cn} onSave={(x) => s("link_cn", x, v("link_cn"))} readOnly={ro("link_cn")} /></TableCell>;
     case "pm":
       return <TableCell key={key}><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(x) => s("pm", x, v("pm"))} readOnly={ro("pm")} /></TableCell>;
     case "status":
