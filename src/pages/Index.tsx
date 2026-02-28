@@ -44,7 +44,7 @@ const Index = () => {
   const [savedStatusFilter, setSavedStatusFilter] = useState<string[] | null>(null);
   const [planZoom, setPlanZoom] = useState<ZoomLevel>("3M");
   const [dashboardCollapsed, setDashboardCollapsed] = useState(() => {
-    try { return localStorage.getItem("dashboard-collapsed") === "true"; } catch { return false; }
+    try { return sessionStorage.getItem("dashboard-collapsed") === "true"; } catch { return false; }
   });
   const tpvCloseDetailRef = useRef<(() => void) | null>(null);
   const scrollPositions = useRef<Record<string, number>>({});
