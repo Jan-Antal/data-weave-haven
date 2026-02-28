@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from "react";
-import { X, Download } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 
@@ -42,25 +42,31 @@ export function PdfPreviewModal({ html, tabLabel, onClose }: PdfPreviewModalProp
     }
   };
 
-  const sanitized = TAB_LABEL_MAP[tabLabel] || tabLabel.replace(/\s+/g, "-");
-  const dateFile = format(new Date(), "yyyy-MM-dd");
-  const _fileName = `AMI-${sanitized}-${dateFile}.pdf`;
-
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-background/95 backdrop-blur-sm">
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background shadow-sm">
-        <h2 className="text-sm font-semibold text-foreground">Náhled exportu</h2>
-        <div className="flex items-center gap-2">
-          <Button onClick={handleDownload} size="sm" className="gap-1.5">
-            <Download className="h-3.5 w-3.5" />
-            Stáhnout PDF
-          </Button>
-          <Button onClick={onClose} variant="outline" size="sm">
-            <X className="h-3.5 w-3.5" />
-            Zavřít
-          </Button>
-        </div>
+    <div className="fixed inset-0 z-[100] flex flex-col bg-background">
+      {/* Sticky action bar */}
+      <div className="sticky top-0 z-[110] flex items-center justify-between px-4 py-2.5 bg-background border-b border-border shadow-sm">
+        {/* Left: Back button */}
+        <Button
+          onClick={onClose}
+          variant="ghost"
+          size="sm"
+          className="gap-1.5 text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Zpět
+        </Button>
+
+        {/* Center: Label */}
+        <span className="text-sm text-muted-foreground font-medium select-none">
+          Náhled exportu
+        </span>
+
+        {/* Right: Download button */}
+        <Button onClick={handleDownload} size="sm" className="gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground">
+          <Download className="h-3.5 w-3.5" />
+          Stáhnout PDF
+        </Button>
       </div>
 
       {/* Preview iframe */}
