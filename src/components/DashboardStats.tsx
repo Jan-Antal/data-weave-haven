@@ -71,7 +71,7 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
-      return localStorage.getItem(STORAGE_KEY) === "true";
+      return sessionStorage.getItem(STORAGE_KEY) === "true";
     } catch {
       return false;
     }
@@ -79,7 +79,7 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, String(collapsed));
+      sessionStorage.setItem(STORAGE_KEY, String(collapsed));
     } catch {}
     onCollapsedChange?.(collapsed);
   }, [collapsed, onCollapsedChange]);
