@@ -89,7 +89,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
     currency: "CZK",
     marze: "",
   });
-  const [showLocation, setShowLocation] = useState(false);
+  
   const [priceEditing, setPriceEditing] = useState(false);
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
@@ -119,8 +119,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
       });
       setDeleteStep(0);
       setOpenCategory(null);
-      setShowLocation(false);
-      setPriceEditing(false);
+      
       setPriceEditing(false);
       sp.resetCache();
       resetIdCheck();
@@ -209,8 +208,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
   const previewTotal = previewFiles.length;
   const canGoPrev = previewTotal > 1 && previewCurrentIndex > 0;
   const canGoNext = previewTotal > 1 && previewCurrentIndex < previewTotal - 1;
-
-
 
   if (!project) return null;
 
@@ -481,35 +478,41 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     {isViewer ? (
                       <p className="text-sm py-2">{form.klient || "—"}{form.location ? ` (${form.location})` : ""}</p>
                     ) : (
-                      <div className="flex items-center gap-1">
+                      <div className="relative flex items-center gap-1">
                         <Input value={form.klient} onChange={(e) => setForm(s => ({ ...s, klient: e.target.value }))} />
-                        <button
-                          type="button"
-                          className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent transition-colors"
-                          title={form.location ? `Lokace: ${form.location}` : "Přidat lokaci"}
-                          onClick={() => setShowLocation(v => !v)}
-                        >
-                          <MapPin className={cn("h-4 w-4", form.location ? "text-primary" : "text-muted-foreground/30")} />
-                        </button>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent transition-colors"
+                              title={form.location ? `Lokace: ${form.location}` : "Přidat lokaci"}
+                            >
+                              <MapPin className={cn("h-4 w-4", form.location ? "text-primary" : "text-muted-foreground/40")} />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            className="w-48 p-2 z-[99999] shadow-lg"
+                            align="end"
+                            side="bottom"
+                            sideOffset={4}
+                          >
+                            <Input
+                              autoFocus
+                              value={form.location}
+                              onChange={(e) => setForm(s => ({ ...s, location: e.target.value }))}
+                              placeholder="Praha, Zlín…"
+                              className="text-xs h-8"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  (e.target as HTMLInputElement).blur();
+                                  document.body.click();
+                                }
+                              }}
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     )}
-                  </div>
-
-                  {/* Expandable location row */}
-                  <div
-                    className={cn(
-                      "col-span-2 overflow-hidden transition-all duration-200 ease-in-out",
-                      showLocation ? "max-h-[60px] opacity-100" : "max-h-0 opacity-0"
-                    )}
-                  >
-                    <div className="pb-2">
-                      <Input
-                        value={form.location}
-                        onChange={(e) => setForm(s => ({ ...s, location: e.target.value }))}
-                        placeholder="Zadejte adresu..."
-                        className="text-sm"
-                      />
-                    </div>
                   </div>
                   <div>
                     <Label className="text-xs">PM</Label>
