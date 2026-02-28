@@ -594,7 +594,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                             <iframe
                               title="Map preview"
                               className="w-full border-0 absolute inset-0 pointer-events-none"
-                              style={{ height: 'calc(100% + 60px)', marginTop: '-30px' }}
+                              style={{ height: 'calc(100% + 200px)', marginTop: '-160px' }}
                               src={`https://maps.google.com/maps?q=${encodeURIComponent(form.location)}&z=15&t=m&hl=cs&output=embed`}
                               loading="lazy"
                               referrerPolicy="no-referrer-when-downgrade"
