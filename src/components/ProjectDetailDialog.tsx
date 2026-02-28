@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, FileText, X, Trash2, RefreshCw } from "lucide-react";
+import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, FileText, X, Trash2, RefreshCw, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,11 +27,13 @@ interface Project {
   project_id: string;
   project_name: string;
   klient: string | null;
+  location: string | null;
   pm: string | null;
   konstrukter: string | null;
   kalkulant: string | null;
   status: string | null;
   datum_smluvni: string | null;
+  datum_objednavky: string | null;
   prodejni_cena: number | null;
   currency: string | null;
   marze: string | null;
@@ -76,15 +78,19 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
     project_id: "",
     project_name: "",
     klient: "",
+    location: "",
     pm: "",
     konstrukter: "",
     kalkulant: "",
     status: "",
     datum_smluvni: "",
+    datum_objednavky: "",
     prodejni_cena: "",
     currency: "CZK",
     marze: "",
   });
+  const [showLocation, setShowLocation] = useState(false);
+  const [priceEditing, setPriceEditing] = useState(false);
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [deletingFile, setDeletingFile] = useState<string | null>(null); // "catKey:fileName"
@@ -100,17 +106,21 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
         project_id: project.project_id || "",
         project_name: project.project_name || "",
         klient: project.klient || "",
+        location: (project as any).location || "",
         pm: project.pm || "",
         konstrukter: project.konstrukter || "",
         kalkulant: project.kalkulant || "",
         status: project.status || "",
         datum_smluvni: project.datum_smluvni || "",
+        datum_objednavky: (project as any).datum_objednavky || "",
         prodejni_cena: project.prodejni_cena != null ? String(project.prodejni_cena) : "",
         currency: project.currency || "CZK",
         marze: project.marze || "",
       });
       setDeleteStep(0);
       setOpenCategory(null);
+      setShowLocation(!!(project as any).location);
+      setPriceEditing(false);
       sp.resetCache();
       resetIdCheck();
     }
@@ -209,11 +219,13 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
       project_id: project.project_id,
       project_name: project.project_name,
       klient: project.klient,
+      location: (project as any).location,
       pm: project.pm,
       konstrukter: project.konstrukter,
       kalkulant: project.kalkulant,
       status: project.status,
       datum_smluvni: project.datum_smluvni,
+      datum_objednavky: (project as any).datum_objednavky,
       prodejni_cena: project.prodejni_cena,
       currency: project.currency,
       marze: project.marze,
@@ -223,11 +235,13 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
       project_id: form.project_id,
       project_name: form.project_name,
       klient: form.klient || null,
+      location: form.location || null,
       pm: form.pm || null,
       konstrukter: form.konstrukter || null,
       kalkulant: form.kalkulant || null,
       status: form.status || null,
       datum_smluvni: form.datum_smluvni || null,
+      datum_objednavky: form.datum_objednavky || null,
       prodejni_cena: form.prodejni_cena ? Number(form.prodejni_cena) : null,
       currency: form.currency || "CZK",
       marze: form.marze || null,
@@ -462,9 +476,31 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                   <div>
                     <Label className="text-xs">Klient</Label>
                     {isViewer ? (
-                      <p className="text-sm py-2">{form.klient || "—"}</p>
+                      <p className="text-sm py-2">{form.klient || "—"}{form.location ? ` (${form.location})` : ""}</p>
                     ) : (
-                      <Input value={form.klient} onChange={(e) => setForm(s => ({ ...s, klient: e.target.value }))} />
+                      <>
+                        <div className="flex items-center gap-1">
+                          <Input value={form.klient} onChange={(e) => setForm(s => ({ ...s, klient: e.target.value }))} />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-10 w-10 shrink-0 px-0"
+                            onClick={() => setShowLocation(v => !v)}
+                            title="Lokace"
+                          >
+                            <MapPin className={cn("h-4 w-4", form.location ? "text-primary" : "text-muted-foreground/50")} />
+                          </Button>
+                        </div>
+                        {showLocation && (
+                          <Input
+                            value={form.location}
+                            onChange={(e) => setForm(s => ({ ...s, location: e.target.value }))}
+                            placeholder="Lokace (např. Praha, Zlín…)"
+                            className="mt-1.5 text-xs"
+                          />
+                        )}
+                      </>
                     )}
                   </div>
                   <div>
@@ -503,14 +539,16 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                   <div>
                     <Label className="text-xs">Prodejní cena</Label>
                     {isViewer ? (
-                      <p className="text-sm py-2">{form.prodejni_cena ? `${form.prodejni_cena} ${form.currency}` : "—"}</p>
+                      <p className="text-sm py-2">{form.prodejni_cena ? `${Number(form.prodejni_cena).toLocaleString("cs-CZ")} ${form.currency}` : "—"}</p>
                     ) : (
                       <div className="flex items-center gap-1">
                         <Input
-                          type="number"
+                          type={priceEditing ? "number" : "text"}
                           className={cn("no-spinners", isFieldReadOnly("prodejni_cena") && "bg-muted text-muted-foreground cursor-not-allowed")}
-                          value={form.prodejni_cena}
+                          value={priceEditing ? form.prodejni_cena : (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : "")}
                           onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))}
+                          onFocus={() => setPriceEditing(true)}
+                          onBlur={() => setPriceEditing(false)}
                           disabled={isFieldReadOnly("prodejni_cena")}
                         />
                         <Button
@@ -535,50 +573,78 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     )}
                   </div>
 
-                  <div>
-                    <Label className="text-xs">Marže</Label>
-                    {isViewer ? (
-                      <p className="text-sm py-2">{form.marze ? `${form.marze} %` : "—"}</p>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          type="number"
-                          className={cn("no-spinners", isFieldReadOnly("marze") && "bg-muted text-muted-foreground cursor-not-allowed")}
-                          value={form.marze}
-                          onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
-                          placeholder="0"
-                          disabled={isFieldReadOnly("marze")}
-                        />
-                        <span className="text-sm text-muted-foreground shrink-0">%</span>
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <Label className="text-xs">Datum Smluvní</Label>
-                    {isViewer ? (
-                      <p className="text-sm py-2">{form.datum_smluvni || "—"}</p>
-                    ) : isFieldReadOnly("datum_smluvni") ? (
-                      <Input value={form.datum_smluvni} disabled className="bg-muted text-muted-foreground cursor-not-allowed" />
-                    ) : (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !form.datum_smluvni && "text-muted-foreground")}>
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {form.datum_smluvni || "Vyberte datum"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 z-[99999]" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={form.datum_smluvni ? parseAppDate(form.datum_smluvni) : undefined}
-                            onSelect={(d) => {
-                              if (d) setForm(s => ({ ...s, datum_smluvni: formatAppDate(d) }));
-                            }}
-                            className="p-3 pointer-events-auto"
+                  {/* Bottom row: 3 columns */}
+                  <div className="col-span-2 grid grid-cols-3 gap-x-3">
+                    <div>
+                      <Label className="text-xs">Marže</Label>
+                      {isViewer ? (
+                        <p className="text-sm py-2">{form.marze ? `${form.marze} %` : "—"}</p>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            className={cn("no-spinners", isFieldReadOnly("marze") && "bg-muted text-muted-foreground cursor-not-allowed")}
+                            value={form.marze}
+                            onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
+                            placeholder="0"
+                            disabled={isFieldReadOnly("marze")}
                           />
-                        </PopoverContent>
-                      </Popover>
-                    )}
+                          <span className="text-sm text-muted-foreground shrink-0">%</span>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-xs">Datum Objednávky</Label>
+                      {isViewer ? (
+                        <p className="text-sm py-2">{form.datum_objednavky || "—"}</p>
+                      ) : (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !form.datum_objednavky && "text-muted-foreground")}>
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {form.datum_objednavky || "Vyberte datum"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0 z-[99999]" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={form.datum_objednavky ? parseAppDate(form.datum_objednavky) : undefined}
+                              onSelect={(d) => {
+                                if (d) setForm(s => ({ ...s, datum_objednavky: formatAppDate(d) }));
+                              }}
+                              className="p-3 pointer-events-auto"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-xs">Datum Smluvní</Label>
+                      {isViewer ? (
+                        <p className="text-sm py-2">{form.datum_smluvni || "—"}</p>
+                      ) : isFieldReadOnly("datum_smluvni") ? (
+                        <Input value={form.datum_smluvni} disabled className="bg-muted text-muted-foreground cursor-not-allowed" />
+                      ) : (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !form.datum_smluvni && "text-muted-foreground")}>
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {form.datum_smluvni || "Vyberte datum"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0 z-[99999]" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={form.datum_smluvni ? parseAppDate(form.datum_smluvni) : undefined}
+                              onSelect={(d) => {
+                                if (d) setForm(s => ({ ...s, datum_smluvni: formatAppDate(d) }));
+                              }}
+                              className="p-3 pointer-events-auto"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
