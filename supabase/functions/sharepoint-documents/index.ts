@@ -522,7 +522,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("SharePoint error:", err);
     return new Response(
-      JSON.stringify({ error: err.message ?? "Internal error" }),
+      JSON.stringify({ error: "Document operation failed. Please try again." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
