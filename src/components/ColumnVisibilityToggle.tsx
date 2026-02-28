@@ -100,9 +100,9 @@ function useCollapsedGroups(storageKey: string, defaultExpandedGroup?: string) {
 }
 
 function SortableColumnRow({
-  colKey, label, checked, onToggle, canDrag, onDelete,
+  colKey, label, checked, onToggle, canDrag, onDelete, isCustom,
 }: {
-  colKey: string; label: string; checked: boolean; onToggle: () => void; canDrag: boolean; onDelete?: () => void;
+  colKey: string; label: string; checked: boolean; onToggle: () => void; canDrag: boolean; onDelete?: () => void; isCustom?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: colKey, disabled: !canDrag,
@@ -119,6 +119,7 @@ function SortableColumnRow({
       <label className="flex items-center gap-2 flex-1 cursor-pointer px-1">
         <Checkbox checked={checked} onCheckedChange={onToggle} />
         <span>{label}</span>
+        {isCustom && <span className="text-xs italic text-muted-foreground ml-1">custom</span>}
       </label>
       {onDelete && (
         <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(); }} className="shrink-0 p-0.5 hover:text-destructive">
@@ -191,7 +192,8 @@ export function ColumnVisibilityToggle(props: Props) {
     return [...staticKeys, ...customKeys.filter(k => !staticKeys.includes(k))];
   }, [isStandalone, customColumns]);
 
-  const orderedKeys = useMemo(() => getOrderedKeys(allKeys), [getOrderedKeys, ...allKeys]);
+  const allKeysKey = allKeys.join(",");
+  const orderedKeys = useMemo(() => getOrderedKeys(allKeys), [getOrderedKeys, allKeysKey]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -256,22 +258,24 @@ export function ColumnVisibilityToggle(props: Props) {
             {sortedGroupKeys.map((key) => {
               const isCustom = customKeys.includes(key);
               if (isAdmin) {
-                return (
-                  <SortableColumnRow
-                    key={key}
-                    colKey={key}
-                    label={resolveLabel(key)}
-                    checked={visState.isVisible(key)}
-                    onToggle={() => visState.toggleColumn(key)}
-                    canDrag={true}
-                    onDelete={isCustom ? () => setDeleteConfirm(customCols.find(c => c.column_key === key)?.id || null) : undefined}
-                  />
-                );
+                  return (
+                    <SortableColumnRow
+                      key={key}
+                      colKey={key}
+                      label={resolveLabel(key)}
+                      checked={visState.isVisible(key)}
+                      onToggle={() => visState.toggleColumn(key)}
+                      canDrag={true}
+                      isCustom={isCustom}
+                      onDelete={isCustom ? () => setDeleteConfirm(customCols.find(c => c.column_key === key)?.id || null) : undefined}
+                    />
+                  );
               }
               return (
                 <label key={key} className="flex items-center gap-2 px-2 py-1 rounded text-sm text-muted-foreground">
                   <Checkbox checked={visState.isVisible(key)} disabled />
                   <span>{resolveLabel(key)}</span>
+                  {isCustom && <span className="text-xs italic text-muted-foreground ml-1">custom</span>}
                 </label>
               );
             })}
