@@ -203,7 +203,7 @@ const Index = () => {
             onSearchChange={filters.setSearch}
             rightSlot={
               <div className="flex items-center gap-2">
-                <ExportButton activeTab={activeTab} />
+                <ExportButton activeTab={activeTab} personFilter={filters.personFilter} statusFilter={filters.statusFilter} />
                 {canCreateProject && (
                   <Button size="sm" onClick={() => document.dispatchEvent(new CustomEvent("open-add-project"))}>
                     <Plus className="h-4 w-4 mr-1" /> Nový projekt
