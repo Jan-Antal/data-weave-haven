@@ -12,7 +12,7 @@ import { DashboardStats } from "@/components/DashboardStats";
 import { TableFilters, useTableFilters } from "@/components/TableFilters";
 import { ExportButton } from "@/components/ExportButton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Settings, Plus, LogOut, User, Check } from "lucide-react";
+import { Settings, Plus, LogOut, User, Check, BarChart3 } from "lucide-react";
 import { FeedbackWidget } from "@/components/FeedbackWidget";
 import { AdminInboxButton } from "@/components/AdminInbox";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
@@ -43,6 +43,9 @@ const Index = () => {
   const [riskHighlight, setRiskHighlight] = useState<RiskHighlightType>(null);
   const [savedStatusFilter, setSavedStatusFilter] = useState<string[] | null>(null);
   const [planZoom, setPlanZoom] = useState<ZoomLevel>("3M");
+  const [dashboardCollapsed, setDashboardCollapsed] = useState(() => {
+    try { return localStorage.getItem("dashboard-collapsed") === "true"; } catch { return false; }
+  });
   const tpvCloseDetailRef = useRef<(() => void) | null>(null);
   const scrollPositions = useRef<Record<string, number>>({});
 
@@ -196,25 +199,36 @@ const Index = () => {
       </div>
 
       <main className="px-6 py-6 space-y-6 flex-1 w-full">
-        <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRiskHighlightChange={setRiskHighlight} activeTab={activeTab} />
+        <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRiskHighlightChange={setRiskHighlight} activeTab={activeTab} onCollapsedChange={setDashboardCollapsed} />
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <div className="flex items-center justify-between">
-            <TabsList className="bg-card border">
-              {!isKonstrukter && (
-                <TabsTrigger value="project-info" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  Project Info
+            <div className="flex items-center">
+              <TabsList className="bg-card border">
+                {!isKonstrukter && (
+                  <TabsTrigger value="project-info" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    Project Info
+                  </TabsTrigger>
+                )}
+                {!isKonstrukter && (
+                  <TabsTrigger value="pm-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    PM Status
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="tpv-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" onClick={() => tpvCloseDetailRef.current?.()}>
+                  TPV Status
                 </TabsTrigger>
-              )}
-              {!isKonstrukter && (
-                <TabsTrigger value="pm-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  PM Status
-                </TabsTrigger>
-              )}
-              <TabsTrigger value="tpv-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" onClick={() => tpvCloseDetailRef.current?.()}>
-                TPV Status
-              </TabsTrigger>
-            </TabsList>
+              </TabsList>
+              <button
+                onClick={() => {
+                  document.dispatchEvent(new CustomEvent("toggle-dashboard"));
+                }}
+                className="ml-2 w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 transition-colors"
+                title={dashboardCollapsed ? "Zobrazit dashboard" : "Skrýt dashboard"}
+              >
+                <BarChart3 className={cn("h-4 w-4 transition-opacity", dashboardCollapsed && "opacity-40")} />
+              </button>
+            </div>
 
             {/* Plán + Zoom unified tile */}
             <div className="inline-flex h-10 items-center rounded-md bg-card border p-1">
