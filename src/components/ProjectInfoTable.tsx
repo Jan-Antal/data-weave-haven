@@ -1,12 +1,15 @@
-import { useState, useEffect, useCallback, useMemo, memo } from "react";
+import { useState, useEffect, useCallback, useMemo, memo, Fragment, useRef } from "react";
 import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColumns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { InlineEditableCell } from "./InlineEditableCell";
 import { CurrencyEditCell } from "./CurrencyEditCell";
+import { StatusBadge, RiskBadge } from "./StatusBadge";
 import { SortableHeader } from "./SortableHeader";
 import { useProjects } from "@/hooks/useProjects";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
 import { useSortFilter } from "@/hooks/useSortFilter";
+import { useProjectStages, useUpdateStage, useDeleteStage, useReorderStages } from "@/hooks/useProjectStages";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -19,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon, Paperclip } from "lucide-react";
+import { CalendarIcon, Paperclip, ChevronRight, ChevronDown, Plus, Trash2, GripVertical, ChevronsDown, ChevronsUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 import { ProjectEditDialog } from "./ProjectEditDialog";
@@ -35,6 +38,11 @@ import { useDocumentCounts } from "@/hooks/useDocumentCounts";
 import { useExportContext } from "./ExportContext";
 import { getProjectCellValue } from "@/lib/exportExcel";
 import { getColumnLabel } from "./CrossTabColumns";
+import { useStagesByProject } from "@/hooks/useAllProjectStages";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import type { ProjectStage } from "@/hooks/useProjectStages";
 import type { Project } from "@/hooks/useProjects";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...PROJECT_INFO_NATIVE];
@@ -55,10 +63,279 @@ const emptyProject = {
   fakturace: "",
 };
 
+const INHERITABLE_FIELDS = ["pm", "status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "datum_smluvni", "konstrukter", "narocnost", "architekt"];
+
+// ── Smart filtering helpers ─────────────────────────────────────────
+function stageMatchesFilters(
+  stages: ProjectStage[],
+  personFilter: string | null,
+  statusFilterSet: Set<string> | null,
+  searchLower: string | null
+): boolean {
+  for (const stage of stages) {
+    if (personFilter && stage.pm && String(stage.pm).includes(personFilter)) return true;
+    if (statusFilterSet && stage.status && statusFilterSet.has(stage.status)) return true;
+    if (searchLower) {
+      const searchable = [stage.stage_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
+      for (const v of searchable) {
+        if (v && String(v).toLowerCase().includes(searchLower)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function singleStageMatches(
+  stage: ProjectStage,
+  personFilter: string | null,
+  statusFilterSet: Set<string> | null,
+  searchLower: string | null
+): boolean {
+  if (!personFilter && !statusFilterSet && !searchLower) return true;
+  if (personFilter && stage.pm && String(stage.pm).includes(personFilter)) return true;
+  if (statusFilterSet && stage.status && statusFilterSet.has(stage.status)) return true;
+  if (searchLower) {
+    const searchable = [stage.stage_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
+    for (const v of searchable) {
+      if (v && String(v).toLowerCase().includes(searchLower)) return true;
+    }
+  }
+  return false;
+}
+
+// ── Expand arrow ────────────────────────────────────────────────────
+function ExpandArrow({ isExpanded, stageCount }: { isExpanded: boolean; stageCount: number }) {
+  const hasStages = stageCount > 0;
+  if (isExpanded) {
+    return <ChevronDown className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent" : "text-muted-foreground"}`} />;
+  }
+  return <ChevronRight className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent fill-accent/20" : "text-muted-foreground/50"}`} />;
+}
+
+// ── Stage row ───────────────────────────────────────────────────────
+interface StageRowProps {
+  stage: ProjectStage;
+  project: Project;
+  onDelete: (id: string) => void;
+  isVisible: (key: string) => boolean;
+  statusLabels: string[];
+  canEdit: boolean;
+  renderKeys: string[];
+  isFieldInherited?: (field: string) => boolean;
+  onFieldTouched?: (field: string) => void;
+  cancelConfirm?: boolean;
+  onCancelConfirm?: () => void;
+  onCancelDismiss?: () => void;
+  dimmed?: boolean;
+  saveCurrency?: (id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => void;
+}
+
+function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys, isFieldInherited, onFieldTouched, cancelConfirm, onCancelConfirm, onCancelDismiss, dimmed, saveCurrency }: StageRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
+  const updateStage = useUpdateStage();
+  const style = { transform: CSS.Transform.toString(transform), transition };
+  const saveStage = useCallback((field: string, value: string) => {
+    onFieldTouched?.(field);
+    updateStage.mutate({ id: stage.id, field, value, projectId: project.project_id });
+  }, [stage.id, project.project_id, onFieldTouched, updateStage]);
+  const v = isVisible;
+  const inheritedClass = (field: string) => isFieldInherited?.(field) ? "text-blue-300" : "";
+
+  const renderStageCell = (key: string) => {
+    switch (key) {
+      case "klient": return <TableCell key={key}><span className="text-xs text-muted-foreground">{project.klient || "—"}</span></TableCell>;
+      case "kalkulant": return <TableCell key={key}><span className="text-xs text-muted-foreground">{project.kalkulant || "—"}</span></TableCell>;
+      case "pm": return <TableCell key={key}><InlineEditableCell value={stage.pm} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} className={inheritedClass("pm")} /></TableCell>;
+      case "status": return <TableCell key={key}><InlineEditableCell value={stage.status} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={stage.status ? <StatusBadge status={stage.status} /> : "—"} readOnly={!canEdit} className={inheritedClass("status")} /></TableCell>;
+      case "datum_smluvni": return <TableCell key={key}><span className={cn("text-xs px-1", isFieldInherited?.(key) ? "text-blue-300" : "text-muted-foreground")}>{project.datum_smluvni || "—"}</span></TableCell>;
+      case "datum_objednavky": return <TableCell key={key}><span className="text-xs text-muted-foreground">{project.datum_objednavky || "—"}</span></TableCell>;
+      case "prodejni_cena": return <TableCell key={key}><span className="text-xs text-muted-foreground">{project.prodejni_cena ?? "—"}</span></TableCell>;
+      case "marze": return <TableCell key={key}><span className="text-xs text-muted-foreground">{project.marze || "—"}</span></TableCell>;
+      case "location": return <TableCell key={key}><span className="text-xs text-muted-foreground">{project.location || "—"}</span></TableCell>;
+      case "architekt": return <TableCell key={key}><InlineEditableCell value={(stage as any).architekt} onSave={(val) => saveStage("architekt", val)} readOnly={!canEdit} className={inheritedClass("architekt")} /></TableCell>;
+      case "konstrukter": return <TableCell key={key}><InlineEditableCell value={(stage as any).konstrukter} type="people" peopleRole="Konstruktér" onSave={(val) => saveStage("konstrukter", val)} readOnly={!canEdit} className={inheritedClass("konstrukter")} /></TableCell>;
+      case "risk": return <TableCell key={key}><InlineEditableCell value={stage.risk} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("risk", val)} displayValue={<RiskBadge level={stage.risk || ""} />} readOnly={!canEdit} className={inheritedClass("risk")} /></TableCell>;
+      default: return <TableCell key={key} />;
+    }
+  };
+
+  return (
+    <TableRow ref={setNodeRef} style={style} className={cn("bg-muted/20 h-9", dimmed && "opacity-40")}>
+      {/* Col 1 — Icon slot (32px) — empty for stages */}
+      <TableCell style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="px-0" />
+      {/* Col 2 — Chevron slot (28px) — drag handle for stages */}
+      <TableCell style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="px-0">
+        <div {...attributes} {...listeners} className="cursor-grab pl-1">
+          <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+        </div>
+      </TableCell>
+      {v("project_id") && (
+        <TableCell className="font-mono text-xs truncate pl-4 text-muted-foreground">
+          <InlineEditableCell value={stage.stage_name} onSave={(val) => saveStage("stage_name", val)} readOnly={!canEdit} />
+        </TableCell>
+      )}
+      {v("project_name") && (
+        <TableCell className="truncate text-muted-foreground text-xs" style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={project.project_name}>{project.project_name}</TableCell>
+      )}
+      {renderKeys.map((key) => renderStageCell(key))}
+      <TableCell>
+        {cancelConfirm ? (
+          <div className="flex items-center gap-1.5 text-xs whitespace-nowrap">
+            <span className="text-muted-foreground">Zrušit novou etapu?</span>
+            <button onClick={onCancelConfirm} className="text-destructive hover:underline font-medium">Zrušit</button>
+            <button onClick={onCancelDismiss} className="text-muted-foreground hover:underline">Ponechat</button>
+          </div>
+        ) : (
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(stage.id)}>
+            <Trash2 className="h-3 w-3 text-destructive" />
+          </Button>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+const MemoSortableStageRow = memo(SortableStageRow);
+
+// ── Stages section ──────────────────────────────────────────────────
+function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, renderKeys, personFilter, statusFilterSet, searchLower, showAddButton = true, saveCurrency }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[]; personFilter: string | null; statusFilterSet: Set<string> | null; searchLower: string | null; showAddButton?: boolean; saveCurrency?: (id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => void }) {
+  const { data: stages = [] } = useProjectStages(projectId);
+  const deleteStage = useDeleteStage();
+  const reorderStages = useReorderStages();
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const qc = useQueryClient();
+  const [freshStages, setFreshStages] = useState<Map<string, Set<string>>>(new Map());
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
+  const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
+
+  const handleInlineAdd = useCallback(async () => {
+    const letters = stages.map(s => {
+      const match = s.stage_name.match(/-([A-Z])$/);
+      return match ? match[1] : null;
+    }).filter(Boolean) as string[];
+    const lastChar = letters.sort().pop();
+    const suffix = lastChar ? String.fromCharCode(lastChar.charCodeAt(0) + 1) : "A";
+    const stageName = `${projectId}-${suffix}`;
+    const id = crypto.randomUUID();
+
+    const inheritedData: Record<string, any> = {};
+    const inheritedKeys = new Set<string>();
+    for (const field of INHERITABLE_FIELDS) {
+      const val = (project as any)[field];
+      if (val != null && val !== "") {
+        inheritedData[field] = val;
+        inheritedKeys.add(field);
+      }
+    }
+
+    const newStage = { id, project_id: projectId, stage_name: stageName, stage_order: stages.length, ...inheritedData };
+    const queryKey = ["project_stages", projectId];
+    qc.setQueryData<ProjectStage[]>(queryKey, (old) => [
+      ...(old || []),
+      { ...newStage, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, start_date: null, end_date: null, notes: null, datum_smluvni: inheritedData.datum_smluvni ?? null, pm: inheritedData.pm ?? null, status: inheritedData.status ?? null, risk: inheritedData.risk ?? null, zamereni: inheritedData.zamereni ?? null, tpv_date: inheritedData.tpv_date ?? null, expedice: inheritedData.expedice ?? null, montaz: inheritedData.montaz ?? null, predani: inheritedData.predani ?? null, pm_poznamka: null, konstrukter: inheritedData.konstrukter ?? null, narocnost: inheritedData.narocnost ?? null, hodiny_tpv: null, percent_tpv: null, architekt: inheritedData.architekt ?? null } as ProjectStage,
+    ]);
+    setFreshStages(prev => new Map(prev).set(id, inheritedKeys));
+
+    const { error } = await supabase.from("project_stages").insert(newStage);
+    if (error) {
+      toast({ title: "Chyba", description: "Nepodařilo se vytvořit etapu", variant: "destructive" });
+      qc.invalidateQueries({ queryKey });
+      setFreshStages(prev => { const next = new Map(prev); next.delete(id); return next; });
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["all_project_stages"] });
+  }, [projectId, project, stages, qc]);
+
+  const markFieldTouched = useCallback((stageId: string, field: string) => {
+    setFreshStages(prev => {
+      const fields = prev.get(stageId);
+      if (!fields) return prev;
+      const next = new Map(prev);
+      const updated = new Set(fields);
+      updated.delete(field);
+      if (updated.size === 0) next.delete(stageId);
+      else next.set(stageId, updated);
+      return next;
+    });
+  }, []);
+
+  const handleCancelStage = useCallback(async (stageId: string) => {
+    await supabase.from("project_stages").delete().eq("id", stageId);
+    setFreshStages(prev => { const next = new Map(prev); next.delete(stageId); return next; });
+    setCancelConfirmId(null);
+    qc.invalidateQueries({ queryKey: ["project_stages", projectId] });
+    qc.invalidateQueries({ queryKey: ["all_project_stages"] });
+  }, [projectId, qc]);
+
+  useEffect(() => {
+    if (freshStages.size === 0) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        const freshIds = [...freshStages.keys()];
+        if (freshIds.length > 0) setCancelConfirmId(freshIds[freshIds.length - 1]);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [freshStages]);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = stages.findIndex(s => s.id === active.id);
+    const newIndex = stages.findIndex(s => s.id === over.id);
+    const reordered = arrayMove(stages, oldIndex, newIndex);
+    reorderStages.mutate({ stages: reordered.map((s, i) => ({ id: s.id, stage_order: i })), projectId });
+  }, [stages, projectId, reorderStages]);
+
+  const handleDelete = useCallback((id: string) => setDeleteId(id), []);
+
+  return (
+    <>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={stages.map(s => s.id)} strategy={verticalListSortingStrategy}>
+          {stages.map(stage => (
+            <MemoSortableStageRow
+              key={stage.id}
+              stage={stage}
+              project={project}
+              onDelete={handleDelete}
+              isVisible={isVisible}
+              statusLabels={statusLabels}
+              canEdit={canEdit}
+              renderKeys={renderKeys}
+              isFieldInherited={freshStages.has(stage.id) ? (field) => freshStages.get(stage.id)?.has(field) ?? false : undefined}
+              onFieldTouched={freshStages.has(stage.id) ? (field) => markFieldTouched(stage.id, field) : undefined}
+              cancelConfirm={cancelConfirmId === stage.id}
+              onCancelConfirm={() => handleCancelStage(stage.id)}
+              onCancelDismiss={() => setCancelConfirmId(null)}
+              dimmed={!singleStageMatches(stage, personFilter, statusFilterSet, searchLower)}
+              saveCurrency={saveCurrency}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
+      {showAddButton && (
+        <TableRow className="bg-muted/20 h-9">
+          <TableCell colSpan={20}>
+            <Button variant="ghost" size="sm" className="text-xs h-6" onClick={handleInlineAdd}>
+              <Plus className="h-3 w-3 mr-1" /> Přidat etapu
+            </Button>
+          </TableCell>
+        </TableRow>
+      )}
+      <ConfirmDialog open={!!deleteId} onConfirm={() => { if (deleteId) { deleteStage.mutate({ id: deleteId, projectId }); setDeleteId(null); } }} onCancel={() => setDeleteId(null)} />
+    </>
+  );
+}
+
 // ── Memoized project row ────────────────────────────────────────────
 interface ProjectRowProps {
   project: Project;
   docCount: number;
+  isExpanded: boolean;
+  stageCount: number;
+  onToggleExpand: (pid: string) => void;
   isVisible: (key: string) => boolean;
   renderKeys: string[];
   save: (id: string, field: string, value: string, oldValue: string) => void;
@@ -74,6 +351,9 @@ interface ProjectRowProps {
 const ProjectRow = memo(function ProjectRow({
   project: p,
   docCount,
+  isExpanded,
+  stageCount,
+  onToggleExpand,
   isVisible: v,
   renderKeys,
   save,
@@ -91,7 +371,7 @@ const ProjectRow = memo(function ProjectRow({
   }, [p.risk, p.datum_smluvni, riskHighlight]);
 
   return (
-    <TableRow className="hover:bg-muted/50 transition-colors" style={bgStyle}>
+    <TableRow className="hover:bg-muted/50 transition-colors h-9" style={bgStyle}>
       {/* Col 1 — Icon slot (32px) */}
       <TableCell style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="text-center px-0">
         {(docCount ?? 0) > 0 && (
@@ -101,8 +381,10 @@ const ProjectRow = memo(function ProjectRow({
           </span>
         )}
       </TableCell>
-      {/* Col 2 — Chevron slot (28px) — empty spacer on Project Info */}
-      <TableCell style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="px-0" />
+      {/* Col 2 — Chevron slot (28px) */}
+      <TableCell style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="px-0 cursor-pointer" onClick={() => onToggleExpand(p.project_id)}>
+        <ExpandArrow isExpanded={isExpanded} stageCount={stageCount} />
+      </TableCell>
       {v("project_id") && (
         <TableCell className="font-mono text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => onEditProject(p)}>
           {p.project_id}
@@ -114,6 +396,7 @@ const ProjectRow = memo(function ProjectRow({
   );
 });
 
+// ── Main component ──────────────────────────────────────────────────
 interface ProjectInfoTableProps {
   personFilter: string | null;
   statusFilter: string[];
@@ -128,7 +411,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const updateProject = useUpdateProject();
   const { columns: customColumns } = useAllCustomColumns("projects");
   const updateCustomField = useUpdateCustomField();
-  const { sorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
+  const { sorted: baseSorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
   const allProjectIds = useMemo(() => projects.map((p) => p.project_id), [projects]);
   const { counts: docCounts } = useDocumentCounts(allProjectIds);
   const [addOpen, setAddOpen] = useState(false);
@@ -142,19 +425,76 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const [editMode, setEditMode] = useState(false);
   const { canEdit, canEditColumns, canDeleteProject, isViewer } = useAuth();
   const { registerExport } = useExportContext();
+  const { stagesByProject } = useStagesByProject();
+
+  // Expand/collapse state
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [showAddButton, setShowAddButton] = useState<Set<string>>(new Set());
+
+  // Memoize filter Sets
+  const statusFilterSet = useMemo(
+    () => statusFilter && statusFilter.length > 0 ? new Set(statusFilter) : null,
+    [statusFilter]
+  );
+  const searchLower = useMemo(
+    () => externalSearch ? externalSearch.toLowerCase() : null,
+    [externalSearch]
+  );
+
+  // Frozen filter results
+  const filterFingerprint = JSON.stringify([personFilter, statusFilter, externalSearch]);
+  const computeKey = `${filterFingerprint}|${projects.length}|${stagesByProject.size}`;
+  const hasActiveFilters = !!(personFilter || (statusFilter && statusFilter.length > 0) || externalSearch);
+
+  const frozenRef = useRef<{ key: string; ids: Set<string> }>({ key: '', ids: new Set() });
+
+  if (frozenRef.current.key !== computeKey) {
+    const baseIds = new Set(baseSorted.map((p) => p.project_id));
+    if (hasActiveFilters && stagesByProject.size > 0) {
+      for (const p of projects) {
+        if (baseIds.has(p.project_id)) continue;
+        const stages = stagesByProject.get(p.project_id);
+        if (!stages || stages.length === 0) continue;
+        if (stageMatchesFilters(stages, personFilter, statusFilterSet, searchLower)) {
+          baseIds.add(p.project_id);
+        }
+      }
+    }
+    frozenRef.current = { key: computeKey, ids: baseIds };
+  }
+
+  const sorted = useMemo(() => {
+    const frozenIds = frozenRef.current.ids;
+    let result = projects.filter((p) => frozenIds.has(p.project_id));
+    if (sortCol && sortDir) {
+      result = [...result].sort((a, b) => {
+        const av = (a as any)[sortCol] ?? "";
+        const bv = (b as any)[sortCol] ?? "";
+        const numA = Number(av);
+        const numB = Number(bv);
+        if (!isNaN(numA) && !isNaN(numB) && av !== "" && bv !== "") {
+          return sortDir === "asc" ? numA - numB : numB - numA;
+        }
+        const cmp = String(av).localeCompare(String(bv), "cs");
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+    } else {
+      result.sort((a, b) => a.project_id.localeCompare(b.project_id, "cs"));
+    }
+    return result;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects, sortCol, sortDir, computeKey]);
 
   // Persisted group order from DB (for side panel)
   const orderedNativeKeys = useMemo(() => getOrderedKeys(PROJECT_INFO_NATIVE), [getOrderedKeys]);
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
 
-  // All visible keys in their group order
   const allVisibleGroupOrder = useMemo(() => {
     const native = orderedNativeKeys.filter((k) => isVisible(k));
     const cross = orderedAllKeys.filter((k) => !NATIVE_KEYS.includes(k) && isVisible(k));
     return [...native, ...cross];
   }, [orderedNativeKeys, orderedAllKeys, isVisible]);
 
-  // Display order (independent horizontal table order)
   const allVisibleKeys = useMemo(
     () => getDisplayOrderedKeys(allVisibleGroupOrder),
     [getDisplayOrderedKeys, allVisibleGroupOrder]
@@ -162,17 +502,14 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
 
   const [localOrder, setLocalOrder] = useState<string[]>(allVisibleKeys);
 
-  // Sync local order when not in edit mode or when visible keys change
   useEffect(() => {
     if (!editMode) setLocalOrder(allVisibleKeys);
   }, [allVisibleKeys, editMode]);
 
   const handleToggleEditMode = useCallback(async () => {
     if (editMode) {
-      // Exiting edit mode — save the display order to DB
       await updateDisplayOrder(localOrder);
     } else {
-      // Entering edit mode — snapshot current order
       setLocalOrder(allVisibleKeys);
     }
     setEditMode(!editMode);
@@ -204,6 +541,23 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
       defaultVisibleKeys: allExportKeys,
     });
   }, [registerExport, sorted, allVisibleKeys, getLabel]);
+
+  const toggleExpand = useCallback((pid: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (!next.has(pid)) {
+        next.add(pid);
+        setShowAddButton(ab => { const n = new Set(ab); n.delete(pid); return n; });
+      } else if (!showAddButton.has(pid)) {
+        setShowAddButton(ab => { const n = new Set(ab); n.add(pid); return n; });
+        return prev;
+      } else {
+        next.delete(pid);
+        setShowAddButton(ab => { const n = new Set(ab); n.delete(pid); return n; });
+      }
+      return next;
+    });
+  }, [showAddButton]);
 
   const save = useCallback((id: string, field: string, value: string, oldValue: string) => {
     updateProject.mutate({ id, field, value, oldValue });
@@ -281,7 +635,6 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     } : {}),
   });
 
-  // In edit mode use local order, otherwise use DB order
   const renderKeys = editMode ? localOrder : allVisibleKeys;
 
   return (
@@ -299,8 +652,30 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
               <TableHead style={{ width: 32, minWidth: 32, maxWidth: 32 }} className="text-center px-0">
                 <Paperclip className="h-3.5 w-3.5 text-gray-400 mx-auto" />
               </TableHead>
-              {/* Col 2 — Chevron slot (28px) — empty spacer */}
-              <TableHead style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="px-0" />
+              {/* Col 2 — Chevron slot (28px) */}
+              <TableHead style={{ width: 28, minWidth: 28, maxWidth: 28 }} className="shrink-0 px-0">
+                {sorted.length > 0 && (
+                  <button
+                    className="text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                    title={expanded.size === sorted.length ? "Sbalit vše" : "Rozbalit vše"}
+                    onClick={() => {
+                      if (expanded.size === sorted.length) {
+                        setExpanded(new Set());
+                        setShowAddButton(new Set());
+                      } else {
+                        setExpanded(new Set(sorted.map((p) => p.project_id)));
+                        setShowAddButton(new Set());
+                      }
+                    }}
+                  >
+                    {expanded.size === sorted.length ? (
+                      <ChevronsUp className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronsDown className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                )}
+              </TableHead>
               {v("project_id") && renderColumnHeader(headerProps("project_id"))}
               {v("project_name") && renderColumnHeader(headerProps("project_name"))}
               {renderKeys.map((key) => renderColumnHeader(headerProps(key)))}
@@ -309,21 +684,41 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
           </TableHeader>
           <TableBody>
             {sorted.map((p) => (
-              <ProjectRow
-                key={p.id}
-                project={p}
-                docCount={docCounts[p.project_id] ?? 0}
-                isVisible={v}
-                renderKeys={renderKeys}
-                save={save}
-                saveCurrency={saveCurrency}
-                canEdit={canEdit}
-                statusLabels={statusLabels}
-                customColumns={customColumns}
-                saveCustomField={handleSaveCustomField}
-                riskHighlight={riskHighlight}
-                onEditProject={handleEditProject}
-              />
+              <Fragment key={p.id}>
+                <ProjectRow
+                  key={p.id}
+                  project={p}
+                  docCount={docCounts[p.project_id] ?? 0}
+                  isExpanded={expanded.has(p.project_id)}
+                  stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
+                  onToggleExpand={toggleExpand}
+                  isVisible={v}
+                  renderKeys={renderKeys}
+                  save={save}
+                  saveCurrency={saveCurrency}
+                  canEdit={canEdit}
+                  statusLabels={statusLabels}
+                  customColumns={customColumns}
+                  saveCustomField={handleSaveCustomField}
+                  riskHighlight={riskHighlight}
+                  onEditProject={handleEditProject}
+                />
+                {expanded.has(p.project_id) && (
+                  <StagesSection
+                    projectId={p.project_id}
+                    project={p}
+                    isVisible={v}
+                    statusLabels={statusLabels}
+                    canEdit={canEdit}
+                    renderKeys={renderKeys}
+                    personFilter={personFilter}
+                    statusFilterSet={statusFilterSet}
+                    searchLower={searchLower}
+                    showAddButton={showAddButton.has(p.project_id)}
+                    saveCurrency={saveCurrency}
+                  />
+                )}
+              </Fragment>
             ))}
           </TableBody>
         </Table>
