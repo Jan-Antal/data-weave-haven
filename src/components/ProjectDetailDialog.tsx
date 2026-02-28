@@ -92,6 +92,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
   
   const [priceEditing, setPriceEditing] = useState(false);
   const [showLocation, setShowLocation] = useState(false);
+  const [mapCoords, setMapCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [deletingFile, setDeletingFile] = useState<string | null>(null); // "catKey:fileName"
@@ -121,6 +122,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
       setDeleteStep(0);
       setOpenCategory(null);
       setShowLocation(false);
+      setMapCoords(null);
       setPriceEditing(false);
       sp.resetCache();
       resetIdCheck();
@@ -134,6 +136,22 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
     }
   }, [project?.project_id, open]);
 
+  // Geocode location for map
+  useEffect(() => {
+    if (!form.location) { setMapCoords(null); return; }
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(form.location)}`);
+        const data = await res.json();
+        if (data?.[0]) {
+          setMapCoords({ lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) });
+        } else {
+          setMapCoords(null);
+        }
+      } catch { setMapCoords(null); }
+    }, 600);
+    return () => clearTimeout(timeout);
+  }, [form.location]);
   const handleToggleCategory = useCallback((key: string) => {
     const willOpen = openCategory !== key;
     setOpenCategory(willOpen ? key : null);
@@ -522,15 +540,23 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                       </div>
                       <div className="flex-[2] flex flex-col">
                         <Label className="text-xs">Mapa</Label>
-                        <div className="mt-1 flex-1 min-h-[48px] rounded-md border border-input bg-muted/50 overflow-hidden">
-                          {form.location ? (
-                            <iframe
-                              title="Map preview"
-                              className="w-full h-full min-h-[48px] border-0"
-                              src={`https://www.google.com/maps?q=${encodeURIComponent(form.location)}&output=embed&z=13`}
-                              loading="lazy"
-                              referrerPolicy="no-referrer-when-downgrade"
-                            />
+                        <div className="mt-1 flex-1 min-h-[48px] rounded-md border border-input bg-muted/50 overflow-hidden relative">
+                          {form.location && mapCoords ? (
+                            <>
+                              <iframe
+                                title="Map preview"
+                                className="w-full h-full min-h-[48px] border-0"
+                                src={`https://www.openstreetmap.org/export/embed.html?bbox=${mapCoords.lon - 0.005}%2C${mapCoords.lat - 0.005}%2C${mapCoords.lon + 0.005}%2C${mapCoords.lat + 0.005}&layer=mapnik&marker=${mapCoords.lat}%2C${mapCoords.lon}`}
+                                loading="lazy"
+                                style={{ border: 0 }}
+                              />
+                              {/* Hide "View Larger Map" overlay */}
+                              <div className="absolute bottom-0 left-0 right-0 h-5 bg-muted/50" />
+                            </>
+                          ) : form.location ? (
+                            <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
+                              Hledání na mapě…
+                            </div>
                           ) : (
                             <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
                               Zadejte adresu pro zobrazení mapy
