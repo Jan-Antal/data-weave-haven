@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon, Upload, ChevronDown, Download, ExternalLink, Loader2, FileText, X, Trash2, RefreshCw } from "lucide-react";
+import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, FileText, X, Trash2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -91,7 +91,7 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
 
   const sp = useSharePointDocs(project?.project_id ?? "");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // Preview removed — files open directly in SharePoint
+  const [previewFile, setPreviewFile] = useState<{ file: SPFile; categoryKey: string; loading: boolean; previewUrl: string | null; webUrl: string | null; downloadUrl: string | null } | null>(null);
 
   useEffect(() => {
     if (project && open) {
@@ -167,17 +167,33 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
     }
   }, [sp]);
 
-  const handlePreview = useCallback((file: SPFile, _categoryKey: string) => {
-    // Open directly in SharePoint's native viewer — instant, no edge function needed
-    const url = file.webUrl;
-    if (url) {
-      window.open(url, "_blank");
-    } else {
-      toast({ title: "Náhled nedostupný", description: "Soubor nemá odkaz pro otevření.", variant: "destructive" });
+  const handlePreview = useCallback(async (file: SPFile, categoryKey: string) => {
+    setPreviewFile({ file, categoryKey, loading: true, previewUrl: null, webUrl: file.webUrl, downloadUrl: file.downloadUrl });
+    try {
+      const preview = await sp.getPreview(file.itemId);
+      setPreviewFile((prev) => prev ? { ...prev, loading: false, previewUrl: preview.previewUrl, webUrl: preview.webUrl ?? file.webUrl, downloadUrl: preview.downloadUrl ?? file.downloadUrl } : null);
+    } catch (err: any) {
+      console.error("Preview error:", err);
+      setPreviewFile((prev) => prev ? { ...prev, loading: false } : null);
     }
-  }, []);
+  }, [sp]);
 
-  // Preview navigation removed — files open directly in SharePoint
+  const handlePreviewNavigate = useCallback((direction: -1 | 1) => {
+    if (!previewFile) return;
+    const files = sp.filesByCategory[previewFile.categoryKey] ?? [];
+    const currentIdx = files.findIndex((f) => f.itemId === previewFile.file.itemId);
+    const nextIdx = currentIdx + direction;
+    if (nextIdx >= 0 && nextIdx < files.length) {
+      handlePreview(files[nextIdx], previewFile.categoryKey);
+    }
+  }, [previewFile, sp.filesByCategory, handlePreview]);
+
+  const previewFiles = previewFile ? (sp.filesByCategory[previewFile.categoryKey] ?? []) : [];
+  const previewCurrentIndex = previewFile ? previewFiles.findIndex((f) => f.itemId === previewFile.file.itemId) : 0;
+  const previewTotal = previewFiles.length;
+  const canGoPrev = previewTotal > 1 && previewCurrentIndex > 0;
+  const canGoNext = previewTotal > 1 && previewCurrentIndex < previewTotal - 1;
+
   if (!project) return null;
 
   const handleSave = async () => {
@@ -252,12 +268,133 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
 
   return (
     <Dialog open={open} onOpenChange={(v) => {
+      if (!v && previewFile) { setPreviewFile(null); return; }
       if (!v) { onOpenChange(false); }
     }}>
       <DialogContent
-        className="p-0 gap-0 overflow-hidden sm:max-w-[920px]"
+        className={cn(
+          "p-0 gap-0 overflow-hidden",
+          previewFile ? "sm:max-w-[92vw] h-[88vh]" : "sm:max-w-[920px]"
+        )}
+        onEscapeKeyDown={(e) => {
+          if (previewFile) {
+            e.preventDefault();
+            setPreviewFile(null);
+          }
+        }}
       >
-          {/* ===== EDIT FORM MODE ===== */}
+        {previewFile ? (
+          /* ===== PREVIEW MODE ===== */
+          <div className="flex flex-col h-full">
+            {/* Top bar */}
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setPreviewFile(null)}>
+                  <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                  Zpět
+                </Button>
+                <FileText className={cn("h-4 w-4 shrink-0", getFileIconColor(previewFile.file.name))} />
+                <span className="text-sm font-medium truncate" title={previewFile.file.name}>
+                  {previewFile.file.name}
+                </span>
+                {previewFile.file.size > 0 && (
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {formatFileSize(previewFile.file.size)}
+                  </span>
+                )}
+                {previewTotal > 1 && (
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    ({previewCurrentIndex + 1}/{previewTotal})
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                {canGoPrev && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handlePreviewNavigate(-1)}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                )}
+                {canGoNext && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handlePreviewNavigate(1)}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Preview body */}
+            <div className="flex-1 relative min-h-0">
+              {previewFile.loading && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-background/80">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground mt-2">Načítání náhledu…</p>
+                </div>
+              )}
+              {!previewFile.loading && previewFile.previewUrl ? (
+                <iframe
+                  src={previewFile.previewUrl}
+                  className="w-full h-full border-0"
+                  title={`Preview: ${previewFile.file.name}`}
+                  sandbox="allow-scripts allow-same-origin allow-forms"
+                />
+              ) : !previewFile.loading && !previewFile.previewUrl ? (
+                <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
+                  <FileText className="h-12 w-12 opacity-30" />
+                  <p className="text-sm">Náhled není dostupný pro tento typ souboru.</p>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Bottom bar */}
+            <div className="flex items-center justify-between px-4 py-2.5 border-t border-border shrink-0">
+              <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+                <span className="text-xs text-muted-foreground truncate">{previewFile.file.name}</span>
+                {previewFile.file.size > 0 && (
+                  <span className="text-xs text-muted-foreground shrink-0">({formatFileSize(previewFile.file.size)})</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0 ml-4">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-gray-300 bg-white px-4 py-2 text-xs text-gray-700 hover:bg-[#EA592A] hover:text-white hover:border-[#EA592A] transition-colors"
+                  onClick={async () => {
+                    toast({ title: "Stahování...", description: "Připravujeme soubor ke stažení." });
+                    try {
+                      let url = previewFile.downloadUrl;
+                      if (!url) {
+                        url = await sp.getDownloadUrl(previewFile.categoryKey, previewFile.file.name);
+                      }
+                      if (!url) throw new Error("Nepodařilo se získat odkaz ke stažení.");
+                      const link = document.createElement("a");
+                      link.href = url;
+                      link.download = previewFile.file.name;
+                      link.target = "_blank";
+                      document.body.appendChild(link);
+                      try { link.click(); } catch { window.open(url, "_blank"); }
+                      document.body.removeChild(link);
+                    } catch (err: any) {
+                      toast({ title: "Chyba stahování", description: err.message, variant: "destructive" });
+                    }
+                  }}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Stáhnout
+                </button>
+                {previewFile.webUrl && (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-gray-300 bg-white px-4 py-2 text-xs text-gray-700 hover:bg-[#EA592A] hover:text-white hover:border-[#EA592A] transition-colors"
+                    onClick={() => window.open(previewFile.webUrl!, "_blank")}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Otevřít v SharePointu
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* ===== EDIT FORM MODE ===== */
           <>
             <DialogHeader className="px-6 pt-6 pb-4">
               <DialogTitle>Projekt {project.project_id}</DialogTitle>
@@ -613,6 +750,7 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
               </div>
             </div>
           </>
+        )}
       </DialogContent>
     </Dialog>
   );
