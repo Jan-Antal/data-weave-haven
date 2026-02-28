@@ -346,6 +346,7 @@ interface ProjectRowProps {
   saveCustomField: (rowId: string, colKey: string, val: string, old: string) => void;
   riskHighlight: any;
   onEditProject: (p: Project) => void;
+  isFieldReadOnly: (field: string) => boolean;
 }
 
 const ProjectRow = memo(function ProjectRow({
@@ -364,6 +365,7 @@ const ProjectRow = memo(function ProjectRow({
   saveCustomField,
   riskHighlight,
   onEditProject,
+  isFieldReadOnly,
 }: ProjectRowProps) {
   const bgStyle = useMemo(() => {
     const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
@@ -390,8 +392,8 @@ const ProjectRow = memo(function ProjectRow({
           {p.project_id}
         </TableCell>
       )}
-      {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit} /></TableCell>}
-      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old) }))}
+      {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><InlineEditableCell value={p.project_name} onSave={(val) => save(p.id, "project_name", val, p.project_name)} className="font-medium" readOnly={!canEdit || isFieldReadOnly("project_name")} /></TableCell>}
+      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly }))}
     </TableRow>
   );
 });
@@ -428,7 +430,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck();
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("project-info");
   const [editMode, setEditMode] = useState(false);
-  const { canEdit, canEditColumns, canDeleteProject, isViewer } = useAuth();
+  const { canEdit, canEditColumns, canDeleteProject, isViewer, isFieldReadOnly } = useAuth();
   const { registerExport } = useExportContext();
   const { stagesByProject } = useStagesByProject();
 
@@ -707,6 +709,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                   saveCustomField={handleSaveCustomField}
                   riskHighlight={riskHighlight}
                   onEditProject={handleEditProject}
+                  isFieldReadOnly={isFieldReadOnly}
                 />
                 {expanded.has(p.project_id) && (
                   <StagesSection

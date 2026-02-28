@@ -75,14 +75,12 @@ const Index = () => {
       window.scrollTo(0, savedPos);
     });
   }, [activeTab, filters, savedStatusFilter]);
-  const { profile, signOut, canAccessSettings, canCreateProject, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, isKonstrukter } = useAuth();
+  const { profile, signOut, canAccessSettings, canCreateProject, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, isKonstrukter, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, defaultTab } = useAuth();
 
-  // Auto-switch to allowed tab when role changes
+  // Auto-switch to default tab when role changes
   useEffect(() => {
-    if (isKonstrukter && activeTab !== "tpv-status" && activeTab !== "plan") {
-      setActiveTab("tpv-status");
-    }
-  }, [isKonstrukter, activeTab]);
+    setActiveTab(defaultTab);
+  }, [defaultTab]);
 
   return (
     <ColumnVisibilityProvider>
@@ -122,7 +120,7 @@ const Index = () => {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Settings gear - admin only */}
+            {/* Settings gear - roles with at least one setting */}
             {(canAccessSettings || realRole === "owner") && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -131,28 +129,34 @@ const Index = () => {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {canAccessSettings && (
-                    <>
-                      <DropdownMenuItem onClick={() => setUserMgmtOpen(true)}>
-                        Správa uživatelů
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={openPeopleManagement}>
-                        Správa osob
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setExchangeRateOpen(true)}>
-                        Kurzovní lístek
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setStatusMgmtOpen(true)}>
-                        Správa statusů
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setRecycleBinOpen(true)}>
-                        Koš
-                      </DropdownMenuItem>
-                    </>
+                  {canManageUsers && (
+                    <DropdownMenuItem onClick={() => setUserMgmtOpen(true)}>
+                      Správa uživatelů
+                    </DropdownMenuItem>
+                  )}
+                  {canManagePeople && (
+                    <DropdownMenuItem onClick={openPeopleManagement}>
+                      Správa osob
+                    </DropdownMenuItem>
+                  )}
+                  {canManageExchangeRates && (
+                    <DropdownMenuItem onClick={() => setExchangeRateOpen(true)}>
+                      Kurzovní lístek
+                    </DropdownMenuItem>
+                  )}
+                  {canManageStatuses && (
+                    <DropdownMenuItem onClick={() => setStatusMgmtOpen(true)}>
+                      Správa statusů
+                    </DropdownMenuItem>
+                  )}
+                  {canAccessRecycleBin && (
+                    <DropdownMenuItem onClick={() => setRecycleBinOpen(true)}>
+                      Koš
+                    </DropdownMenuItem>
                   )}
                   {realRole === "owner" && (
                     <>
-                      {canAccessSettings && <DropdownMenuSeparator />}
+                      <DropdownMenuSeparator />
                       <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Zobrazit jako</div>
                       {(["admin", "pm", "konstrukter", "viewer"] as const).map((r) => (
                         <DropdownMenuItem
@@ -207,16 +211,12 @@ const Index = () => {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center">
               <TabsList className="bg-card border">
-                {!isKonstrukter && (
-                  <TabsTrigger value="project-info" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    Project Info
-                  </TabsTrigger>
-                )}
-                {!isKonstrukter && (
-                  <TabsTrigger value="pm-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    PM Status
-                  </TabsTrigger>
-                )}
+                <TabsTrigger value="project-info" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  Project Info
+                </TabsTrigger>
+                <TabsTrigger value="pm-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  PM Status
+                </TabsTrigger>
                 <TabsTrigger value="tpv-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" onClick={() => tpvCloseDetailRef.current?.()}>
                   TPV Status
                 </TabsTrigger>

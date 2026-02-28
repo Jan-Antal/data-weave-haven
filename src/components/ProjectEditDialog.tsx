@@ -69,7 +69,7 @@ function formatFileSize(bytes: number): string {
 export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDialogProps) {
   const qc = useQueryClient();
   const { data: statusOptions = [] } = useProjectStatusOptions();
-  const { canEdit, canDeleteProject } = useAuth();
+  const { canEdit, canDeleteProject, isViewer, isFieldReadOnly, canUploadDocuments } = useAuth();
   const statusLabels = statusOptions.map((s) => s.label);
   const [form, setForm] = useState({
     project_id: "",
@@ -406,94 +406,159 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
                 <div className="grid grid-cols-2 gap-x-3 gap-y-3">
                   <div>
                     <Label className="text-xs">Project ID</Label>
-                    <Input
-                      value={form.project_id}
-                      onChange={(e) => setForm(s => ({ ...s, project_id: e.target.value }))}
-                      onBlur={() => {
-                        if (form.project_id !== project.project_id) {
-                          checkProjectId(form.project_id);
-                        } else {
-                          resetIdCheck();
-                        }
-                      }}
-                    />
+                    {isViewer ? (
+                      <p className="text-sm py-2">{form.project_id}</p>
+                    ) : (
+                      <Input
+                        value={form.project_id}
+                        onChange={(e) => setForm(s => ({ ...s, project_id: e.target.value }))}
+                        onBlur={() => {
+                          if (form.project_id !== project.project_id) {
+                            checkProjectId(form.project_id);
+                          } else {
+                            resetIdCheck();
+                          }
+                        }}
+                        disabled={isFieldReadOnly("project_id")}
+                        className={cn(isFieldReadOnly("project_id") && "bg-muted text-muted-foreground cursor-not-allowed")}
+                      />
+                    )}
                     {idExists && <p className="text-xs text-destructive mt-1">Toto ID již existuje</p>}
                   </div>
                   <div>
                     <Label className="text-xs">Project Name</Label>
-                    <Input value={form.project_name} onChange={(e) => setForm(s => ({ ...s, project_name: e.target.value }))} />
+                    {isViewer ? (
+                      <p className="text-sm py-2">{form.project_name}</p>
+                    ) : (
+                      <Input
+                        value={form.project_name}
+                        onChange={(e) => setForm(s => ({ ...s, project_name: e.target.value }))}
+                        disabled={isFieldReadOnly("project_name")}
+                        className={cn(isFieldReadOnly("project_name") && "bg-muted text-muted-foreground cursor-not-allowed")}
+                      />
+                    )}
                   </div>
 
                   <div>
                     <Label className="text-xs">Klient</Label>
-                    <Input value={form.klient} onChange={(e) => setForm(s => ({ ...s, klient: e.target.value }))} />
+                    {isViewer ? (
+                      <p className="text-sm py-2">{form.klient || "—"}</p>
+                    ) : (
+                      <Input value={form.klient} onChange={(e) => setForm(s => ({ ...s, klient: e.target.value }))} />
+                    )}
                   </div>
                   <div>
                     <Label className="text-xs">PM</Label>
-                    <PeopleSelectDropdown role="PM" value={form.pm} onValueChange={(v) => setForm(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
+                    {isViewer ? (
+                      <p className="text-sm py-2">{form.pm || "—"}</p>
+                    ) : isFieldReadOnly("pm") ? (
+                      <Input value={form.pm} disabled className="bg-muted text-muted-foreground cursor-not-allowed" />
+                    ) : (
+                      <PeopleSelectDropdown role="PM" value={form.pm} onValueChange={(v) => setForm(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
+                    )}
                   </div>
 
                   <div>
                     <Label className="text-xs">Status</Label>
-                    <Select value={form.status} onValueChange={(v) => setForm(s => ({ ...s, status: v }))}>
-                      <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
-                      <SelectContent className="z-[99999]">
-                        {statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    {isViewer ? (
+                      <p className="text-sm py-2">{form.status || "—"}</p>
+                    ) : (
+                      <Select value={form.status} onValueChange={(v) => setForm(s => ({ ...s, status: v }))}>
+                        <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
+                        <SelectContent className="z-[99999]">
+                          {statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
                   <div>
                     <Label className="text-xs">Konstruktér</Label>
-                    <PeopleSelectDropdown role="Konstruktér" value={form.konstrukter} onValueChange={(v) => setForm(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
+                    {isViewer ? (
+                      <p className="text-sm py-2">{form.konstrukter || "—"}</p>
+                    ) : (
+                      <PeopleSelectDropdown role="Konstruktér" value={form.konstrukter} onValueChange={(v) => setForm(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
+                    )}
                   </div>
 
                   <div>
                     <Label className="text-xs">Prodejní cena</Label>
-                    <div className="flex items-center gap-1">
-                      <Input type="number" className="no-spinners" value={form.prodejni_cena} onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))} />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-10 px-3 font-mono shrink-0"
-                        onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
-                      >
-                        {form.currency}
-                      </Button>
-                    </div>
+                    {isViewer ? (
+                      <p className="text-sm py-2">{form.prodejni_cena ? `${form.prodejni_cena} ${form.currency}` : "—"}</p>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          className={cn("no-spinners", isFieldReadOnly("prodejni_cena") && "bg-muted text-muted-foreground cursor-not-allowed")}
+                          value={form.prodejni_cena}
+                          onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))}
+                          disabled={isFieldReadOnly("prodejni_cena")}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-10 px-3 font-mono shrink-0"
+                          onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
+                          disabled={isFieldReadOnly("prodejni_cena")}
+                        >
+                          {form.currency}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <Label className="text-xs">Kalkulant</Label>
-                    <PeopleSelectDropdown role="Kalkulant" value={form.kalkulant} onValueChange={(v) => setForm(s => ({ ...s, kalkulant: v }))} placeholder="Vyberte kalkulanta" />
+                    {isViewer ? (
+                      <p className="text-sm py-2">{form.kalkulant || "—"}</p>
+                    ) : (
+                      <PeopleSelectDropdown role="Kalkulant" value={form.kalkulant} onValueChange={(v) => setForm(s => ({ ...s, kalkulant: v }))} placeholder="Vyberte kalkulanta" />
+                    )}
                   </div>
 
                   <div>
                     <Label className="text-xs">Marže</Label>
-                    <div className="flex items-center gap-1">
-                      <Input type="number" className="no-spinners" value={form.marze} onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))} placeholder="0" />
-                      <span className="text-sm text-muted-foreground shrink-0">%</span>
-                    </div>
+                    {isViewer ? (
+                      <p className="text-sm py-2">{form.marze ? `${form.marze} %` : "—"}</p>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          className={cn("no-spinners", isFieldReadOnly("marze") && "bg-muted text-muted-foreground cursor-not-allowed")}
+                          value={form.marze}
+                          onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
+                          placeholder="0"
+                          disabled={isFieldReadOnly("marze")}
+                        />
+                        <span className="text-sm text-muted-foreground shrink-0">%</span>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <Label className="text-xs">Datum Smluvní</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !form.datum_smluvni && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {form.datum_smluvni || "Vyberte datum"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 z-[99999]" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={form.datum_smluvni ? parseAppDate(form.datum_smluvni) : undefined}
-                          onSelect={(d) => {
-                            if (d) setForm(s => ({ ...s, datum_smluvni: formatAppDate(d) }));
-                          }}
-                          className="p-3 pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    {isViewer ? (
+                      <p className="text-sm py-2">{form.datum_smluvni || "—"}</p>
+                    ) : isFieldReadOnly("datum_smluvni") ? (
+                      <Input value={form.datum_smluvni} disabled className="bg-muted text-muted-foreground cursor-not-allowed" />
+                    ) : (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !form.datum_smluvni && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {form.datum_smluvni || "Vyberte datum"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 z-[99999]" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={form.datum_smluvni ? parseAppDate(form.datum_smluvni) : undefined}
+                            onSelect={(d) => {
+                              if (d) setForm(s => ({ ...s, datum_smluvni: formatAppDate(d) }));
+                            }}
+                            className="p-3 pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    )}
                   </div>
                 </div>
               </div>
@@ -582,47 +647,53 @@ export function ProjectEditDialog({ project, open, onOpenChange }: ProjectEditDi
                                           {f.name}
                                         </span>
                                         <span className="text-muted-foreground shrink-0 text-[10px] group-hover:hidden">{formatFileSize(f.size)}</span>
-                                        <button
-                                          type="button"
-                                          className="hidden group-hover:block shrink-0 text-gray-300 hover:text-red-400 transition-colors"
-                                          onClick={(e) => { e.stopPropagation(); setDeletingFile(fileKey); }}
-                                        >
-                                          <Trash2 className="h-3.5 w-3.5" />
-                                        </button>
+                                        {canUploadDocuments && (
+                                          <button
+                                            type="button"
+                                            className="hidden group-hover:block shrink-0 text-gray-300 hover:text-red-400 transition-colors"
+                                            onClick={(e) => { e.stopPropagation(); setDeletingFile(fileKey); }}
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </button>
+                                        )}
                                       </div>
                                     );
                                   })}
                                 </div>
                               )}
 
-                              {/* Upload zone */}
-                              <div
-                                className={cn(
-                                  "relative rounded-md border border-dashed border-muted-foreground/30 bg-background flex flex-col items-center justify-center py-3 px-2 cursor-pointer hover:border-muted-foreground/50 transition-colors",
-                                  sp.uploading && "pointer-events-none opacity-60"
-                                )}
-                                onDragOver={(e) => e.preventDefault()}
-                                onDrop={(e) => handleFileDrop(e, cat.key)}
-                                onClick={() => fileInputRef.current?.click()}
-                              >
-                                {sp.uploading ? (
-                                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                ) : (
-                                  <>
-                                    <Upload className="h-4 w-4 text-muted-foreground mb-1" />
-                                    <p className="text-[10px] text-muted-foreground text-center">
-                                      Přetáhněte soubor nebo vyberte
-                                    </p>
-                                  </>
-                                )}
-                              </div>
-                              <input
-                                ref={fileInputRef}
-                                type="file"
-                                className="hidden"
-                                multiple
-                                onChange={(e) => handleFileSelect(e, cat.key)}
-                              />
+                              {/* Upload zone - hidden for viewers */}
+                              {canUploadDocuments && (
+                                <>
+                                  <div
+                                    className={cn(
+                                      "relative rounded-md border border-dashed border-muted-foreground/30 bg-background flex flex-col items-center justify-center py-3 px-2 cursor-pointer hover:border-muted-foreground/50 transition-colors",
+                                      sp.uploading && "pointer-events-none opacity-60"
+                                    )}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={(e) => handleFileDrop(e, cat.key)}
+                                    onClick={() => fileInputRef.current?.click()}
+                                  >
+                                    {sp.uploading ? (
+                                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                    ) : (
+                                      <>
+                                        <Upload className="h-4 w-4 text-muted-foreground mb-1" />
+                                        <p className="text-[10px] text-muted-foreground text-center">
+                                          Přetáhněte soubor nebo vyberte
+                                        </p>
+                                      </>
+                                    )}
+                                  </div>
+                                  <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    className="hidden"
+                                    multiple
+                                    onChange={(e) => handleFileSelect(e, cat.key)}
+                                  />
+                                </>
+                              )}
                             </div>
                           )}
                         </div>
