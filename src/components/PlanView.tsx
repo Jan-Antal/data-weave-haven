@@ -67,7 +67,7 @@ const CZECH_MONTHS_SHORT = [
 ];
 
 const ROW_HEIGHT = 36;
-const SUBSTAGE_ROW_HEIGHT = 28;
+const SUBSTAGE_ROW_HEIGHT = 36;
 const LEFT_PANEL_WIDTH = 398; // 36 (warning) + 36 (chevron) + 110 (ID) + 180 (Name) + padding
 const BAR_HEIGHT = 16;
 const SUBSTAGE_BAR_HEIGHT = 10;
@@ -593,7 +593,7 @@ function SubstageRow({
   const isHovered = hoveredRow === stage.id;
 
   return (
-    <div className={`border-b transition-colors ${isHovered ? "bg-muted/50" : "bg-muted/10"}`} style={{ height: SUBSTAGE_ROW_HEIGHT, position: "relative", width: timelineWidth }} onMouseEnter={() => setHoveredRow(stage.id)} onMouseLeave={() => setHoveredRow(null)}>
+    <div className={`border-b transition-colors ${isHovered ? "bg-muted/50" : "bg-muted/20"}`} style={{ height: SUBSTAGE_ROW_HEIGHT, position: "relative", width: timelineWidth }} onMouseEnter={() => setHoveredRow(stage.id)} onMouseLeave={() => setHoveredRow(null)}>
       {/* Grid lines — same as project rows */}
       {showWeeks && weeks.map((w, i) => (
         <div key={i} className="absolute top-0 bottom-0 border-l border-border/20" style={{ left: w.x, zIndex: 1 }} />
@@ -1155,13 +1155,13 @@ function SubstageLeftRows({ projectId, project, statusColorMap, onClickStage, ho
         const barData = getStageBarData(stage, project, statusColorMap);
         const isHovered = hoveredRow === stage.id;
         return (
-          <div key={stage.id} className={`flex items-center border-b transition-colors ${isHovered ? "bg-muted/50" : "bg-muted/10"}`} style={{ height: SUBSTAGE_ROW_HEIGHT }} onMouseEnter={() => setHoveredRow(stage.id)} onMouseLeave={() => setHoveredRow(null)}>
+          <div key={stage.id} className={`flex items-center border-b transition-colors ${isHovered ? "bg-muted/50" : "bg-muted/20"}`} style={{ height: SUBSTAGE_ROW_HEIGHT }} onMouseEnter={() => setHoveredRow(stage.id)} onMouseLeave={() => setHoveredRow(null)}>
              <div className="shrink-0 flex items-center justify-center" style={{ width: 36, minWidth: 36, maxWidth: 36 }}>
                {barData.warnings.length > 0 && <WarningIcon warnings={barData.warnings} />}
              </div>
              <div style={{ width: 36, minWidth: 36, maxWidth: 36 }} />
             <span className="text-xs font-mono text-muted-foreground truncate pl-4 px-2 cursor-pointer hover:underline" style={{ width: 110, minWidth: 110 }} onClick={() => onClickStage(stage)}>{stage.stage_name}</span>
-            <span className="text-xs text-muted-foreground truncate px-2" style={{ width: 180, minWidth: 180, maxWidth: 180 }}>{stage.stage_name}</span>
+            <span className="text-xs text-muted-foreground truncate px-2" style={{ width: 180, minWidth: 180, maxWidth: 180 }} title={project.project_name}>{project.project_name}</span>
           </div>
         );
       })}
