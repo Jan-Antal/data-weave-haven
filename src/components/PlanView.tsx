@@ -1131,12 +1131,11 @@ function SubstageLeftRows({ projectId, project, statusColorMap, onClickStage, ho
         const isHovered = hoveredRow === stage.id;
         return (
           <div key={stage.id} className={`flex items-center border-b transition-colors ${isHovered ? "bg-muted/50" : "bg-muted/10"}`} style={{ height: SUBSTAGE_ROW_HEIGHT }} onMouseEnter={() => setHoveredRow(stage.id)} onMouseLeave={() => setHoveredRow(null)}>
-            <div style={{ width: 36, minWidth: 36 }} />
-            <div style={{ width: 36, minWidth: 36 }} />
-            <div className="flex items-center gap-1 px-2 cursor-pointer hover:underline" style={{ width: 110, minWidth: 110 }} onClick={() => onClickStage(stage)}>
+            <div className="shrink-0 flex items-center justify-center" style={{ width: 36, minWidth: 36 }}>
               {barData.warnings.length > 0 && <WarningIcon warnings={barData.warnings} />}
-              <span className="text-[10px] font-mono text-muted-foreground truncate">{stage.stage_name}</span>
             </div>
+            <div style={{ width: 36, minWidth: 36 }} />
+            <span className="text-[10px] font-mono text-muted-foreground truncate px-2 cursor-pointer hover:underline" style={{ width: 110, minWidth: 110 }} onClick={() => onClickStage(stage)}>{stage.stage_name}</span>
             <span className="text-[10px] text-muted-foreground truncate px-2" style={{ width: 180, minWidth: 180, maxWidth: 180 }}>{stage.stage_name}</span>
           </div>
         );
