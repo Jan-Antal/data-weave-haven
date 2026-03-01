@@ -803,7 +803,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     </div>
                   </div>
 
-                  <div className="col-span-2">
+                  <div>
                     <Label className="text-xs">Kalkulant</Label>
                     {isSectionReadOnly("finance") ? (
                       <Input value={form.kalkulant || "—"} disabled className={roClass} />
@@ -813,7 +813,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                   </div>
 
                   {/* Rozpad ceny placeholder */}
-                  <div className="col-span-2 rounded-md border border-dashed border-muted-foreground/30 px-4 py-3 opacity-50">
+                  <div className="rounded-md border border-dashed border-muted-foreground/30 px-4 py-3 opacity-50 flex items-center">
                     <p className="text-xs italic text-muted-foreground">Rozpad ceny — v přípravě</p>
                   </div>
                 </div>
