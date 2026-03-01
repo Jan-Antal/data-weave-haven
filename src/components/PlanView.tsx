@@ -181,7 +181,7 @@ interface Segment {
   start: Date;
   end: Date;
   color: string;
-  hatched?: boolean; // diagonal stripe overlay for overdue portions
+  overlapColor?: string; // second color when two stages overlap
 }
 
 interface Diamond {
@@ -265,46 +265,80 @@ function getBarDataFromFields(
   if (EXP) dItems.push({ date: EXP, color: milestoneColors.expedice, name: "Expedice" });
   if (PRE) dItems.push({ date: PRE, color: milestoneColors.predani, name: "Předání" });
 
-  // Build segments from S to latestDate using ALL milestones as split points
-  const allMilestones: Date[] = [];
-  if (TPV) allMilestones.push(TPV);
-  if (EXP) allMilestones.push(EXP);
-  if (PRE) allMilestones.push(PRE);
-  allMilestones.sort((a, b) => a.getTime() - b.getTime());
+  // Define stages with their color and time range based on milestones
+  // Konstrukce: S → first(TPV, EXP, PRE, safeE)
+  // Výroba: TPV → first(EXP, PRE, safeE)  (only if TPV exists)
+  // Expedice→Montáž: EXP → first(PRE, safeE)  (only if EXP exists)
+  // Montáž/Dokončeno: PRE → safeE  (only if PRE exists)
+  interface StageRange { start: Date; end: Date; color: string; label: string }
+  const stageRanges: StageRange[] = [];
 
-  // Build point sequence: S → milestones → safeE → latestDate
-  const rawPts = [S, ...allMilestones, safeE];
-  if (latestDate > safeE) rawPts.push(latestDate);
-  rawPts.sort((a, b) => a.getTime() - b.getTime());
-
-  // Deduplicate
-  const uniquePts: Date[] = [rawPts[0]];
-  for (let i = 1; i < rawPts.length; i++) {
-    if (rawPts[i].getTime() !== rawPts[i - 1].getTime()) uniquePts.push(rawPts[i]);
+  // Konstrukce runs from S to TPV (or EXP or PRE or safeE)
+  const konstrukceEnd = TPV ?? EXP ?? PRE ?? safeE;
+  if (konstrukceEnd > S) {
+    stageRanges.push({ start: S, end: konstrukceEnd, color: phaseColors.konstrukce, label: "Konstrukce" });
   }
 
-  const colorSeq = [phaseColors.konstrukce, phaseColors.vyroba, phaseColors.montaz, phaseColors.dokonceno];
-  const segs: Segment[] = [];
-  for (let i = 0; i < uniquePts.length - 1; i++) {
-    const segStart = uniquePts[i];
-    const segEnd = uniquePts[i + 1];
-    const w = differenceInDays(segEnd, segStart);
-    if (w <= 0) continue;
-    const color = colorSeq[Math.min(i, colorSeq.length - 1)];
-    // Hatch if any part of this segment is after Datum Smluvní
-    const isAfterDeadline = segStart >= safeE;
-    segs.push({ start: segStart, end: segEnd, color, hatched: isAfterDeadline });
+  // Výroba runs from TPV to EXP (or PRE or safeE)
+  if (TPV) {
+    const vyrobaEnd = EXP ?? PRE ?? safeE;
+    if (vyrobaEnd > TPV) {
+      stageRanges.push({ start: TPV, end: vyrobaEnd, color: phaseColors.vyroba, label: "Výroba" });
+    } else if (vyrobaEnd < TPV) {
+      // Milestone out of order: Výroba runs backwards, use the reversed range
+      stageRanges.push({ start: vyrobaEnd, end: TPV, color: phaseColors.vyroba, label: "Výroba" });
+    }
   }
 
-  // If segment spans across safeE, split it
+  // Montáž runs from EXP to PRE (or safeE)
+  if (EXP) {
+    const montazEnd = PRE ?? safeE;
+    if (montazEnd > EXP) {
+      stageRanges.push({ start: EXP, end: montazEnd, color: phaseColors.montaz, label: "Montáž" });
+    } else if (montazEnd < EXP) {
+      stageRanges.push({ start: montazEnd, end: EXP, color: phaseColors.montaz, label: "Montáž" });
+    }
+  }
+
+  // Dokončeno runs from PRE to safeE
+  if (PRE) {
+    if (safeE > PRE) {
+      stageRanges.push({ start: PRE, end: safeE, color: phaseColors.dokonceno, label: "Dokončeno" });
+    } else if (safeE < PRE) {
+      stageRanges.push({ start: safeE, end: PRE, color: phaseColors.dokonceno, label: "Dokončeno" });
+    }
+  }
+
+  // If bar extends past safeE (latestDate > safeE), extend the last stage
+  // Actually handled by using latestDate in some stage ends already via safeE fallback
+
+  // Collect all unique time points from stage ranges
+  const allPts = new Set<number>();
+  for (const sr of stageRanges) {
+    allPts.add(sr.start.getTime());
+    allPts.add(sr.end.getTime());
+  }
+  // Also include S and latestDate
+  allPts.add(S.getTime());
+  allPts.add(latestDate.getTime());
+
+  const sortedPts = [...allPts].sort((a, b) => a - b);
+
+  // For each time slice, determine which stages are active
   const finalSegs: Segment[] = [];
-  for (const seg of segs) {
-    if (!seg.hatched && seg.end > safeE && seg.start < safeE) {
-      // Split: solid part before safeE, hatched part after
-      finalSegs.push({ start: seg.start, end: safeE, color: seg.color });
-      finalSegs.push({ start: safeE, end: seg.end, color: seg.color, hatched: true });
+  for (let i = 0; i < sortedPts.length - 1; i++) {
+    const sliceStart = new Date(sortedPts[i]);
+    const sliceEnd = new Date(sortedPts[i + 1]);
+    if (differenceInDays(sliceEnd, sliceStart) <= 0) continue;
+
+    const activeStages = stageRanges.filter(sr => sr.start <= sliceStart && sr.end >= sliceEnd);
+    if (activeStages.length === 0) continue;
+
+    if (activeStages.length === 1) {
+      finalSegs.push({ start: sliceStart, end: sliceEnd, color: activeStages[0].color });
     } else {
-      finalSegs.push(seg);
+      // Overlap: use first two stages' colors
+      finalSegs.push({ start: sliceStart, end: sliceEnd, color: activeStages[0].color, overlapColor: activeStages[1].color });
     }
   }
 
@@ -431,13 +465,18 @@ function MilestoneDiamond({
   );
 }
 
-// ── Hatch pattern helper ─────────────────────────────────────────────
-function hatchOverlay(baseColor: string): string {
+// ── Overlap stripe pattern helper ─────────────────────────────────────
+function overlapStripes(color1: string, color2: string): string {
   return `repeating-linear-gradient(
     45deg,
-    transparent 0px, transparent 3px,
-    rgba(255,255,255,0.35) 3px, rgba(255,255,255,0.35) 6px
-  ), ${baseColor}`;
+    ${color1} 0px, ${color1} 4px,
+    ${color2} 4px, ${color2} 8px
+  )`;
+}
+
+function segmentBackground(seg: Segment): string {
+  if (seg.overlapColor) return overlapStripes(seg.color, seg.overlapColor);
+  return seg.color;
 }
 
 // ── Warning icon ────────────────────────────────────────────────────
@@ -530,16 +569,18 @@ function SubstageRow({
         const w = dayOffset(seg.end, origin, dayPx) - x;
         if (w <= 0) return null;
         const wkLabel = weeksLabel(seg.start, seg.end);
-        const phaseLabel = PHASE_LABELS[seg.color];
-        const hasHatch = !!seg.hatched;
+        const phaseLabel = seg.overlapColor
+          ? `${PHASE_LABELS[seg.color] ?? "?"} + ${PHASE_LABELS[seg.overlapColor] ?? "?"}`
+          : PHASE_LABELS[seg.color];
+        const isOverlap = !!seg.overlapColor;
         const isFirst = i === 0;
         const isLast = i === barData.segments.length - 1;
-        const prevHatched = i > 0 && !!barData.segments[i - 1].hatched;
-        const nextHatched = i < barData.segments.length - 1 && !!barData.segments[i + 1]?.hatched;
-        const rTL = isFirst ? 4 : (hasHatch && prevHatched ? 0 : 4);
-        const rBL = isFirst ? 4 : (hasHatch && prevHatched ? 0 : 4);
-        const rTR = isLast ? 4 : (hasHatch && nextHatched ? 0 : 4);
-        const rBR = isLast ? 4 : (hasHatch && nextHatched ? 0 : 4);
+        const prevOverlap = i > 0 && !!barData.segments[i - 1].overlapColor;
+        const nextOverlap = i < barData.segments.length - 1 && !!barData.segments[i + 1]?.overlapColor;
+        const rTL = isFirst ? 4 : (isOverlap && prevOverlap ? 0 : 4);
+        const rBL = isFirst ? 4 : (isOverlap && prevOverlap ? 0 : 4);
+        const rTR = isLast ? 4 : (isOverlap && nextOverlap ? 0 : 4);
+        const rBR = isLast ? 4 : (isOverlap && nextOverlap ? 0 : 4);
         const segDiv = (
           <div
             key={i}
@@ -547,7 +588,7 @@ function SubstageRow({
               position: "absolute",
               left: x, top: midY - SUBSTAGE_BAR_HEIGHT / 2,
               width: Math.max(w, 4), height: SUBSTAGE_BAR_HEIGHT,
-              background: hasHatch ? hatchOverlay(seg.color) : seg.color,
+              background: segmentBackground(seg),
               zIndex: 2, borderRadius: `${rTL}px ${rTR}px ${rBR}px ${rBL}px`,
             }}
           >
@@ -896,18 +937,19 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                       const segW = Math.max(w, 4);
                       const wkLabel = weeksLabel(seg.start, seg.end);
 
-                      const phaseLabel = PHASE_LABELS[seg.color];
-                      const hasHatch = !!seg.hatched;
+                      const phaseLabel = seg.overlapColor
+                        ? `${PHASE_LABELS[seg.color] ?? "?"} + ${PHASE_LABELS[seg.overlapColor] ?? "?"}`
+                        : PHASE_LABELS[seg.color];
+                      const isOverlap = !!seg.overlapColor;
                       const isFirst = i === 0;
                       const isLast = i === barData.segments.length - 1;
-                      const prevHatched = i > 0 && !!barData.segments[i - 1].hatched;
-                      const nextHatched = i < barData.segments.length - 1 && !!barData.segments[i + 1]?.hatched;
+                      const prevOverlap = i > 0 && !!barData.segments[i - 1].overlapColor;
+                      const nextOverlap = i < barData.segments.length - 1 && !!barData.segments[i + 1]?.overlapColor;
 
-                      // Determine border-radius per corner
-                      const rTL = isFirst ? 4 : (hasHatch && prevHatched ? 0 : 4);
-                      const rBL = isFirst ? 4 : (hasHatch && prevHatched ? 0 : 4);
-                      const rTR = isLast ? 4 : (hasHatch && nextHatched ? 0 : 4);
-                      const rBR = isLast ? 4 : (hasHatch && nextHatched ? 0 : 4);
+                      const rTL = isFirst ? 4 : (isOverlap && prevOverlap ? 0 : 4);
+                      const rBL = isFirst ? 4 : (isOverlap && prevOverlap ? 0 : 4);
+                      const rTR = isLast ? 4 : (isOverlap && nextOverlap ? 0 : 4);
+                      const rBR = isLast ? 4 : (isOverlap && nextOverlap ? 0 : 4);
 
                       const segDiv = (
                         <div
@@ -918,7 +960,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                             top: 16,
                             width: segW,
                             height: BAR_HEIGHT,
-                            background: hasHatch ? hatchOverlay(seg.color) : seg.color,
+                            background: segmentBackground(seg),
                             zIndex: 2,
                             borderRadius: `${rTL}px ${rTR}px ${rBR}px ${rBL}px`,
                             minWidth: 4,
