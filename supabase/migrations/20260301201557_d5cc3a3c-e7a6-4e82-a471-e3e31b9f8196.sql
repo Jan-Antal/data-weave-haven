@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN person_id uuid REFERENCES public.people(id) ON DELETE SET NULL DEFAULT NULL;

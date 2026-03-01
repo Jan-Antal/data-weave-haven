@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,12 @@ interface UserRow {
   full_name: string;
   is_active: boolean;
   role: AppRole | null;
+  person_id: string | null;
+}
+
+interface PersonOption {
+  id: string;
+  name: string;
 }
 
 const ROLE_LABELS: Record<AppRole, string> = {
@@ -38,6 +44,7 @@ interface Props {
 
 export function UserManagement({ open, onOpenChange }: Props) {
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [people, setPeople] = useState<PersonOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -75,8 +82,13 @@ export function UserManagement({ open, onOpenChange }: Props) {
 
   const fetchUsers = async () => {
     setLoading(true);
-    const { data: profiles } = await supabase.from("profiles").select("*").order("full_name");
-    const { data: roles } = await supabase.from("user_roles").select("*");
+    const [{ data: profiles }, { data: roles }, { data: peopleData }] = await Promise.all([
+      supabase.from("profiles").select("*").order("full_name"),
+      supabase.from("user_roles").select("*"),
+      supabase.from("people").select("id, name").eq("is_active", true).order("name"),
+    ]);
+
+    if (peopleData) setPeople(peopleData);
 
     if (profiles) {
       const roleMap = new Map<string, AppRole>();
@@ -88,6 +100,7 @@ export function UserManagement({ open, onOpenChange }: Props) {
           full_name: p.full_name,
           is_active: p.is_active,
           role: roleMap.get(p.id) ?? null,
+          person_id: p.person_id ?? null,
         }))
       );
     }
@@ -138,6 +151,16 @@ export function UserManagement({ open, onOpenChange }: Props) {
       setSubmitError(e.message || "Neočekávaná chyba");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleUpdatePerson = async (userId: string, personId: string | null) => {
+    const { error } = await supabase.from("profiles").update({ person_id: personId } as any).eq("id", userId);
+    if (error) {
+      toast({ title: "Chyba", variant: "destructive" });
+    } else {
+      toast({ title: "Osoba přiřazena" });
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, person_id: personId } : u));
     }
   };
 
@@ -231,7 +254,7 @@ export function UserManagement({ open, onOpenChange }: Props) {
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange} modal={true}>
-        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
           <div className="px-5 pt-5 pb-3 border-b">
             <DialogHeader>
               <DialogTitle>Správa uživatelů</DialogTitle>
@@ -242,21 +265,22 @@ export function UserManagement({ open, onOpenChange }: Props) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[150px]">Jméno</TableHead>
-                  <TableHead className="min-w-[180px]">Email</TableHead>
-                  <TableHead className="w-[140px]">Role</TableHead>
-                  <TableHead className="w-[80px] text-center">Aktivní</TableHead>
+                   <TableHead className="min-w-[150px]">Jméno</TableHead>
+                  <TableHead className="min-w-[160px]">Email</TableHead>
+                  <TableHead className="w-[130px]">Role</TableHead>
+                  <TableHead className="w-[160px]">Osoba</TableHead>
+                  <TableHead className="w-[70px] text-center">Aktivní</TableHead>
                   <TableHead className="w-[80px]" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Načítání...</TableCell>
+                     <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Načítání...</TableCell>
                   </TableRow>
                 ) : users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Žádní uživatelé</TableCell>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Žádní uživatelé</TableCell>
                   </TableRow>
                 ) : (
                   users.map((u) => (
@@ -278,6 +302,22 @@ export function UserManagement({ open, onOpenChange }: Props) {
                             </SelectContent>
                           </Select>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={u.person_id ?? "__none__"}
+                          onValueChange={(v) => handleUpdatePerson(u.id, v === "__none__" ? null : v)}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">— Nepřiřazeno —</SelectItem>
+                            {people.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell className="text-center">
                         {isOwner(u) ? (
