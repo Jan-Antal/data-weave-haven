@@ -21,6 +21,7 @@ import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { cn } from "@/lib/utils";
 import { exportToExcel, buildFileName } from "@/lib/exportExcel";
 import { ExportPopup } from "./ExportPopup";
+import { ExcelImportWizard } from "./ExcelImportWizard";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean }[] = [
   { key: "item_name", label: "Název", locked: true },
@@ -144,6 +145,7 @@ export function TPVList({ projectId, projectName, onBack }: Props) {
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importData, setImportData] = useState<any[]>([]);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [deleteIds, setDeleteIds] = useState<string[] | null>(null);
   const [bulkStatusValue, setBulkStatusValue] = useState("");
   const [newItem, setNewItem] = useState({ item_name: "", item_type: "", status: "", sent_date: "", accepted_date: "", notes: "" });
@@ -307,6 +309,9 @@ export function TPVList({ projectId, projectName, onBack }: Props) {
             </Button>
             <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
               <Upload className="h-3 w-3 mr-1" /> Import z Excelu
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setWizardOpen(true)}>
+              <Upload className="h-3 w-3 mr-1" /> Import (průvodce)
             </Button>
             <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileSelect} />
           </>
@@ -505,6 +510,14 @@ export function TPVList({ projectId, projectName, onBack }: Props) {
         }}
         onCancel={() => setDeleteIds(null)}
         description={deleteIds && deleteIds.length > 1 ? `Smazat ${deleteIds.length} položek?` : "Tato akce je nevratná."}
+      />
+
+      {/* Excel Import Wizard */}
+      <ExcelImportWizard
+        projectId={projectId}
+        projectName={projectName}
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
       />
     </div>
   );
