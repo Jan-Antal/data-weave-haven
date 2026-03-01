@@ -5,24 +5,22 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Upload, X, Check, AlertTriangle, ChevronLeft, ChevronRight, FileSpreadsheet, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "./ConfirmDialog";
 
-// ── Target field definitions ──────────────────────────────────────
+// ── Target fields: ONLY columns that exist in tpv_items table ────
 const TARGET_FIELDS = [
   { key: "item_name", label: "Název položky", required: true },
-  { key: "description", label: "Popis" },
-  { key: "quantity", label: "Množství" },
-  { key: "unit", label: "Jednotka" },
-  { key: "unit_price", label: "Jednotková cena" },
-  { key: "total_price", label: "Celková cena" },
+  { key: "item_type", label: "Typ" },
+  { key: "konstrukter", label: "Konstruktér" },
+  { key: "status", label: "Status" },
+  { key: "sent_date", label: "Odesláno" },
+  { key: "accepted_date", label: "Přijato" },
   { key: "notes", label: "Poznámka" },
-  { key: "material", label: "Materiál" },
-  { key: "category", label: "Kategorie" },
 ] as const;
 
 type TargetKey = (typeof TARGET_FIELDS)[number]["key"];
@@ -30,14 +28,12 @@ type TargetKey = (typeof TARGET_FIELDS)[number]["key"];
 // ── Fuzzy matching keywords ───────────────────────────────────────
 const FUZZY_MAP: { keywords: string[]; target: TargetKey }[] = [
   { keywords: ["nazev", "název", "name", "položka", "polozka", "item"], target: "item_name" },
-  { keywords: ["popis", "description", "desc"], target: "description" },
-  { keywords: ["mnozstvi", "množství", "qty", "quantity", "ks", "počet", "pocet"], target: "quantity" },
-  { keywords: ["jednotka", "unit", "mj", "j."], target: "unit" },
-  { keywords: ["jednotkova", "jednotková", "unit price", "cena/ks", "cena / ks", "jc", "j.c."], target: "unit_price" },
-  { keywords: ["celkova", "celková", "total", "celkem", "cena celk"], target: "total_price" },
+  { keywords: ["typ", "type", "druh"], target: "item_type" },
+  { keywords: ["konstrukter", "konstruktér", "designer"], target: "konstrukter" },
+  { keywords: ["status", "stav"], target: "status" },
+  { keywords: ["odeslano", "odesláno", "sent"], target: "sent_date" },
+  { keywords: ["prijato", "přijato", "accepted"], target: "accepted_date" },
   { keywords: ["poznamka", "poznámka", "note", "notes"], target: "notes" },
-  { keywords: ["material", "materiál", "mat"], target: "material" },
-  { keywords: ["kategorie", "category", "cat", "skupina"], target: "category" },
 ];
 
 function normalize(s: string): string {
@@ -104,6 +100,7 @@ interface RowData {
 export function ExcelImportWizard({ projectId, projectName, open, onClose }: Props) {
   const qc = useQueryClient();
   const [step, setStep] = useState(1);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
 
   // Step 1 state
   const [file, setFile] = useState<File | null>(null);
@@ -122,6 +119,21 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
   const [importResult, setImportResult] = useState<{ imported: number; warnings: number; skipped: number; totalValue: number } | null>(null);
   const [importing, setImporting] = useState(false);
 
+  // ── Cancel handler ──────────────────────────────────────────
+  const handleCancel = () => {
+    if (file) {
+      setCancelConfirmOpen(true);
+    } else {
+      onClose();
+    }
+  };
+
+  const confirmCancel = () => {
+    setCancelConfirmOpen(false);
+    reset();
+    onClose();
+  };
+
   // ── Step 1: File handling ─────────────────────────────────────
   const handleFile = useCallback((f: File) => {
     setFile(f);
@@ -137,7 +149,6 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
         return { name, headers, rows: dataRows };
       });
       setSheets(parsed);
-      // Auto-map
       if (parsed.length > 0) {
         const autoMap: Mapping = {};
         const used = new Set<TargetKey>();
@@ -180,7 +191,6 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
       if (value === "__skip__" || value === "") {
         delete next[colIdx];
       } else {
-        // Remove duplicate
         for (const k of Object.keys(next)) {
           if (next[Number(k)] === value) delete next[Number(k)];
         }
@@ -192,7 +202,6 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
 
   const usedTargets = useMemo(() => new Set(Object.values(mapping).filter(v => v !== "__skip__")), [mapping]);
 
-  // When sheet changes, re-automap
   const handleSheetChange = (idx: number) => {
     setActiveSheet(idx);
     const sheet = sheets[idx];
@@ -209,13 +218,25 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
     setMapping(autoMap);
   };
 
-  // ── Step 2 → 3: Build rows ─────────────────────────────────
+  // ── Step 2 → 3: Build rows (filter empty) ──────────────────
   const buildRows = () => {
     if (!currentSheet) return;
     const nameColIdx = Object.entries(mapping).find(([, v]) => v === "item_name")?.[0];
     const nameIdx = nameColIdx !== undefined ? Number(nameColIdx) : null;
+    const mappedColIndices = Object.entries(mapping)
+      .filter(([, v]) => v !== "__skip__")
+      .map(([k]) => Number(k));
 
-    const built: RowData[] = currentSheet.rows.map((row, rawIdx) => {
+    const built: RowData[] = [];
+    for (let rawIdx = 0; rawIdx < currentSheet.rows.length; rawIdx++) {
+      const row = currentSheet.rows[rawIdx];
+      // Filter: skip rows where ALL mapped columns are empty
+      const hasAnyData = mappedColIndices.some(ci => {
+        const v = String(row[ci] ?? "").trim();
+        return v !== "";
+      });
+      if (!hasAnyData) continue;
+
       const values: Record<string, string> = {} as any;
       for (const [colIdxStr, target] of Object.entries(mapping)) {
         if (target === "__skip__") continue;
@@ -224,8 +245,8 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
       const skip = isSkipRow(row, nameIdx);
       const hasName = !!values.item_name;
       const status: "valid" | "warning" | "error" = !hasName ? "error" : "valid";
-      return { values: values as Record<TargetKey, string>, selected: !skip && hasName, status, rawIdx };
-    });
+      built.push({ values: values as Record<TargetKey, string>, selected: !skip && hasName, status, rawIdx });
+    }
     setRows(built);
   };
 
@@ -235,12 +256,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
     const skipped = rows.length - selected.length;
     const warnings = selected.filter(r => r.status === "warning").length;
     const errors = rows.filter(r => r.status === "error" && r.selected).length;
-    let totalValue = 0;
-    for (const r of selected) {
-      const tp = parseFloat(String(r.values.total_price ?? "").replace(/[^\d.,\-]/g, "").replace(",", "."));
-      if (!isNaN(tp)) totalValue += tp;
-    }
-    return { selected: selected.length, skipped, warnings, errors, totalValue };
+    return { selected: selected.length, skipped, warnings, errors, totalValue: 0 };
   }, [rows]);
 
   const toggleRow = (idx: number) => {
@@ -260,21 +276,14 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
     const items = toImport.map(r => ({
       project_id: projectId,
       item_name: r.values.item_name || "Bez názvu",
-      item_type: r.values.category || r.values.material || null,
-      notes: [r.values.description, r.values.notes].filter(Boolean).join(" | ") || null,
-      status: null,
-      sent_date: null,
-      accepted_date: null,
+      item_type: r.values.item_type || null,
+      konstrukter: r.values.konstrukter || null,
+      status: r.values.status || null,
+      sent_date: r.values.sent_date || null,
+      accepted_date: r.values.accepted_date || null,
+      notes: r.values.notes || null,
       imported_at: new Date().toISOString(),
       import_source: file?.name || null,
-      custom_fields: {
-        custom_quantity: r.values.quantity || null,
-        custom_unit: r.values.unit || null,
-        custom_unit_price: r.values.unit_price || null,
-        custom_total_price: r.values.total_price || null,
-        custom_material: r.values.material || null,
-        custom_category: r.values.category || null,
-      },
     }));
 
     try {
@@ -329,7 +338,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
           <span className="font-semibold">Import Excel — {projectId}</span>
           <span className="text-sm opacity-70">{projectName}</span>
         </div>
-        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={onClose}>
+        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleCancel}>
           <X className="h-5 w-5" />
         </Button>
       </div>
@@ -362,7 +371,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto px-6 pb-6">
+      <div className={cn("flex-1 overflow-auto px-6 pb-6", step === 3 && "overflow-hidden flex flex-col")}>
         {/* ─── STEP 1 ─────────────────────────────────────── */}
         {step === 1 && (
           <div className="max-w-xl mx-auto mt-8">
@@ -399,9 +408,12 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
-                    <Button className="w-full" onClick={() => setStep(2)} disabled={sheets.length === 0}>
-                      Pokračovat na mapování <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={handleCancel}>Zrušit</Button>
+                      <Button className="flex-1" onClick={() => setStep(2)} disabled={sheets.length === 0}>
+                        Pokračovat na mapování <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -412,7 +424,6 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
         {/* ─── STEP 2 ─────────────────────────────────────── */}
         {step === 2 && currentSheet && (
           <div className="max-w-3xl mx-auto mt-4 space-y-4">
-            {/* Sheet tabs */}
             {sheets.length > 1 && (
               <div className="flex gap-1">
                 {sheets.map((s, i) => (
@@ -429,13 +440,11 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
               </div>
             )}
 
-            {/* Auto-detect banner */}
             <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-800">
               <Check className="h-3.5 w-3.5" />
               Automaticky rozpoznáno {mappedCount} z {totalCols} sloupců
             </div>
 
-            {/* Mapping grid */}
             <Card>
               <CardContent className="p-4 space-y-2">
                 {currentSheet.headers.map((header, colIdx) => {
@@ -463,7 +472,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                           <SelectTrigger className="w-[200px] h-8 text-xs">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="z-[100001]">
                             <SelectItem value="__skip__">— Přeskočit —</SelectItem>
                             {TARGET_FIELDS.map(f => (
                               <SelectItem key={f.key} value={f.key} disabled={usedTargets.has(f.key) && mapping[colIdx] !== f.key}>
@@ -487,9 +496,12 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
             )}
 
             <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep(1)}>
-                <ChevronLeft className="h-4 w-4 mr-1" /> Zpět
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setStep(1)}>
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Zpět
+                </Button>
+                <Button variant="outline" onClick={handleCancel}>Zrušit</Button>
+              </div>
               <Button onClick={() => { buildRows(); setStep(3); }} disabled={!hasNameMapped}>
                 Pokračovat na náhled <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
@@ -499,55 +511,93 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
 
         {/* ─── STEP 3 ─────────────────────────────────────── */}
         {step === 3 && (
-          <div className="space-y-4 mt-2">
-            {/* Stats bar */}
-            <div className="flex flex-wrap gap-3">
-              {[
-                { label: "Vybrané", value: stats.selected, color: "text-green-700 bg-green-50 border-green-200" },
-                { label: "Přeskočené", value: stats.skipped, color: "text-gray-600 bg-gray-50 border-gray-200" },
-                { label: "Varování", value: stats.warnings, color: "text-orange-700 bg-orange-50 border-orange-200" },
-                { label: "Chyby", value: stats.errors, color: "text-red-700 bg-red-50 border-red-200" },
-              ].map(s => (
-                <div key={s.label} className={cn("px-3 py-1.5 rounded-md border text-xs font-medium", s.color)}>
-                  {s.label}: {s.value}
+          <>
+            {/* Sticky stats + actions bar */}
+            <div className="sticky top-0 z-10 bg-[#f5f3ef] pb-2 space-y-2 shrink-0">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: "Vybrané", value: stats.selected, color: "text-green-700 bg-green-50 border-green-200" },
+                    { label: "Přeskočené", value: stats.skipped, color: "text-gray-600 bg-gray-50 border-gray-200" },
+                    { label: "Varování", value: stats.warnings, color: "text-orange-700 bg-orange-50 border-orange-200" },
+                    { label: "Chyby", value: stats.errors, color: "text-red-700 bg-red-50 border-red-200" },
+                  ].map(s => (
+                    <div key={s.label} className={cn("px-3 py-1.5 rounded-md border text-xs font-medium", s.color)}>
+                      {s.label}: {s.value}
+                    </div>
+                  ))}
+                  {stats.totalValue > 0 && (
+                    <div className="px-3 py-1.5 rounded-md border border-blue-200 bg-blue-50 text-xs font-medium text-blue-700">
+                      Celkem: {formatCzNumber(stats.totalValue)} Kč
+                    </div>
+                  )}
                 </div>
-              ))}
-              {stats.totalValue > 0 && (
-                <div className="px-3 py-1.5 rounded-md border border-blue-200 bg-blue-50 text-xs font-medium text-blue-700">
-                  Celkem: {formatCzNumber(stats.totalValue)} Kč
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setStep(2)}>
+                    <ChevronLeft className="h-4 w-4 mr-1" /> Zpět na mapování
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleCancel}>Zrušit</Button>
+                  <Button size="sm" onClick={doImport} disabled={importing || stats.selected === 0}>
+                    {importing ? (
+                      <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Importuji {stats.selected} položek...</>
+                    ) : (
+                      <>Importovat {stats.selected} řádků <ChevronRight className="h-4 w-4 ml-1" /></>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {stats.errors > 0 && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-md text-xs text-orange-700">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  {stats.errors} řádků má chyby (chybí povinná pole)
                 </div>
               )}
             </div>
 
-            {/* Table */}
-            <Card>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10">
-                        <Checkbox
-                          checked={rows.filter(r => r.status !== "error").every(r => r.selected)}
-                          onCheckedChange={(v) => selectAll(!!v)}
-                        />
-                      </TableHead>
-                      <TableHead className="w-10">#</TableHead>
-                      <TableHead className="w-10"></TableHead>
-                      {mappedFields.map(f => (
-                        <TableHead key={f} className="text-xs">{fieldLabel(f)}</TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.map((row, idx) => (
+            {/* Scrollable table */}
+            <div className="flex-1 overflow-auto rounded-lg border bg-card">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10 sticky top-0 bg-card z-10">
+                      <Checkbox
+                        checked={rows.filter(r => r.status !== "error").every(r => r.selected)}
+                        onCheckedChange={(v) => selectAll(!!v)}
+                      />
+                    </TableHead>
+                    <TableHead className="w-10 sticky top-0 bg-card z-10">#</TableHead>
+                    <TableHead className="w-10 sticky top-0 bg-card z-10"></TableHead>
+                    {mappedFields.map(f => {
+                      const isName = f === "item_name";
+                      return (
+                        <TableHead
+                          key={f}
+                          className={cn(
+                            "text-xs sticky top-0 bg-card z-10",
+                            isName && "max-w-[400px]",
+                          )}
+                          style={isName ? { maxWidth: 400 } : undefined}
+                        >
+                          {fieldLabel(f)}
+                        </TableHead>
+                      );
+                    })}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((row, idx) => {
+                    const isExcluded = !row.selected;
+                    return (
                       <TableRow
                         key={idx}
                         className={cn(
                           "text-xs",
-                          !row.selected && "opacity-40",
-                          row.status === "warning" && row.selected && "bg-yellow-50",
-                          row.status === "error" && "bg-red-50/30",
+                          isExcluded && "bg-gray-50",
+                          !isExcluded && row.status === "warning" && "bg-yellow-50",
+                          !isExcluded && row.status === "error" && "bg-red-50/30",
                         )}
+                        style={isExcluded ? { opacity: 0.55 } : undefined}
                       >
                         <TableCell>
                           <Checkbox
@@ -556,42 +606,34 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                             disabled={row.status === "error"}
                           />
                         </TableCell>
-                        <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
+                        <TableCell className="text-muted-foreground">{row.rawIdx + 1}</TableCell>
                         <TableCell>
                           {row.status === "valid" && row.selected && <Check className="h-3.5 w-3.5 text-green-600" />}
                           {row.status === "warning" && <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />}
-                          {row.status === "error" && <X className="h-3.5 w-3.5 text-red-500" />}
+                          {row.status === "error" && <X className="h-3.5 w-3.5 text-red-500" style={{ opacity: 1 }} />}
                         </TableCell>
                         {mappedFields.map(f => {
                           const val = row.values[f] ?? "";
-                          const isNum = ["quantity", "unit_price", "total_price"].includes(f);
-                          const numVal = isNum ? parseFloat(String(val).replace(/[^\d.,\-]/g, "").replace(",", ".")) : NaN;
+                          const isName = f === "item_name";
                           return (
-                            <TableCell key={f} className={cn(isNum && "text-right font-mono")}>
-                              {isNum && !isNaN(numVal) ? formatCzNumber(numVal) + (f === "total_price" || f === "unit_price" ? " Kč" : "") : val}
+                            <TableCell
+                              key={f}
+                              className={cn(
+                                isName && "max-w-[400px] truncate",
+                              )}
+                              style={isName ? { maxWidth: 400 } : undefined}
+                            >
+                              {val}
                             </TableCell>
                           );
                         })}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </Card>
-
-            <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep(2)}>
-                <ChevronLeft className="h-4 w-4 mr-1" /> Zpět na mapování
-              </Button>
-              <Button onClick={doImport} disabled={importing || stats.selected === 0}>
-                {importing ? (
-                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Importuji {stats.selected} položek...</>
-                ) : (
-                  <>Importovat {stats.selected} řádků <ChevronRight className="h-4 w-4 ml-1" /></>
-                )}
-              </Button>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
-          </div>
+          </>
         )}
 
         {/* ─── STEP 4 ─────────────────────────────────────── */}
@@ -634,6 +676,15 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
           </div>
         )}
       </div>
+
+      {/* Cancel confirmation */}
+      <ConfirmDialog
+        open={cancelConfirmOpen}
+        onConfirm={confirmCancel}
+        onCancel={() => setCancelConfirmOpen(false)}
+        title="Zrušit import?"
+        description="Opravdu chcete zrušit import? Nahraná data budou ztracena."
+      />
     </div>
   );
 }
