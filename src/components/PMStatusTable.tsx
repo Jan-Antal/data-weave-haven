@@ -84,7 +84,7 @@ function singleStageMatches(
   return false;
 }
 
-const INHERITABLE_FIELDS = ["status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "datum_smluvni", "konstrukter", "narocnost", "architekt"];
+const INHERITABLE_FIELDS = ["status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "datum_smluvni", "konstrukter", "narocnost", "architekt", "pm"];
 const INHERITABLE_DATE_MAP: Record<string, string> = { datum_objednavky: "start_date" };
 
 interface StageRowProps {
@@ -127,7 +127,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
   const renderStageCell = (key: string) => {
     switch (key) {
       case "datum_smluvni": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "datum_smluvni")} type="date" onSave={(val) => saveStage("datum_smluvni", val)} readOnly={!canEdit} className={ihClass("datum_smluvni")} /></TableCell>;
-      case "pm": return <TableCell key={key}><InlineEditableCell value={stage.pm} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} /></TableCell>;
+      case "pm": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "pm")} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} className={ihClass("pm")} /></TableCell>;
       case "status": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "status")} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={getStageDisplayValue(stage, project, "status") ? <StatusBadge status={getStageDisplayValue(stage, project, "status")} /> : "—"} readOnly={!canEdit} className={ihClass("status")} /></TableCell>;
       case "risk": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "risk")} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("risk", val)} displayValue={<RiskBadge level={getStageDisplayValue(stage, project, "risk") || ""} />} readOnly={!canEdit} className={ihClass("risk")} /></TableCell>;
       case "zamereni": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "zamereni")} type="date" onSave={(val) => saveStage("zamereni", val)} readOnly={!canEdit} className={ihClass("zamereni")} /></TableCell>;
@@ -240,7 +240,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     const queryKey = ["project_stages", projectId];
     qc.setQueryData<ProjectStage[]>(queryKey, (old) => [
       ...(old || []),
-      { ...newStage, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, start_date: inheritedData.start_date ?? null, end_date: null, notes: null, datum_smluvni: inheritedData.datum_smluvni ?? null, pm: null, status: inheritedData.status ?? null, risk: inheritedData.risk ?? null, zamereni: inheritedData.zamereni ?? null, tpv_date: inheritedData.tpv_date ?? null, expedice: inheritedData.expedice ?? null, montaz: inheritedData.montaz ?? null, predani: inheritedData.predani ?? null, pm_poznamka: inheritedData.pm_poznamka ?? null, konstrukter: inheritedData.konstrukter ?? null, narocnost: inheritedData.narocnost ?? null, hodiny_tpv: null, percent_tpv: null, architekt: inheritedData.architekt ?? null, prodejni_cena: null, currency: null, kalkulant: null, marze: null } as ProjectStage,
+      { ...newStage, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, start_date: inheritedData.start_date ?? null, end_date: null, notes: null, datum_smluvni: inheritedData.datum_smluvni ?? null, pm: inheritedData.pm ?? null, status: inheritedData.status ?? null, risk: inheritedData.risk ?? null, zamereni: inheritedData.zamereni ?? null, tpv_date: inheritedData.tpv_date ?? null, expedice: inheritedData.expedice ?? null, montaz: inheritedData.montaz ?? null, predani: inheritedData.predani ?? null, pm_poznamka: inheritedData.pm_poznamka ?? null, konstrukter: inheritedData.konstrukter ?? null, narocnost: inheritedData.narocnost ?? null, hodiny_tpv: null, percent_tpv: null, architekt: inheritedData.architekt ?? null, prodejni_cena: null, currency: null, kalkulant: null, marze: null } as ProjectStage,
     ]);
     setFreshStages(prev => new Map(prev).set(id, inheritedKeys));
 
