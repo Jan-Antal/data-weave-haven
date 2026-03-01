@@ -54,12 +54,37 @@ function normalize(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
-function fuzzyMatch(header: string): TargetKey | null {
+function fuzzyMatch(header: string, customLabels?: Record<string, string>): TargetKey | null {
   const n = normalize(header);
+
+  // First try matching against custom column labels (renamed columns)
+  if (customLabels) {
+    for (const [key, label] of Object.entries(customLabels)) {
+      if (normalize(label) === n) return key as TargetKey;
+    }
+  }
+
+  // Then try keyword-based fuzzy matching
   for (const { keywords, target } of FUZZY_MAP) {
     if (keywords.some(k => n.includes(k))) return target;
   }
   return null;
+}
+
+function parseNumericValue(value: string | number | null): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "number") return value;
+  let cleaned = value.toString().replace(/\s/g, "").replace(/[€$Kč]/gi, "").trim();
+  if (!cleaned) return null;
+  const lastDot = cleaned.lastIndexOf(".");
+  const lastComma = cleaned.lastIndexOf(",");
+  if (lastComma > lastDot) {
+    cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+  } else if (lastDot > lastComma) {
+    cleaned = cleaned.replace(/,/g, "");
+  }
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? null : num;
 }
 
 function colLetter(i: number): string {
@@ -114,6 +139,14 @@ interface RowData {
 export function ExcelImportWizard({ projectId, projectName, open, onClose }: Props) {
   const qc = useQueryClient();
   const { getLabel } = useColumnLabels("tpv-list");
+  const customLabelsMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const f of TARGET_FIELDS) {
+      const custom = getLabel(f.key, f.label);
+      map[f.key] = custom;
+    }
+    return map;
+  }, [getLabel]);
   const [step, setStep] = useState(1);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
 
@@ -168,7 +201,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
         const autoMap: Mapping = {};
         const used = new Set<TargetKey>();
         parsed[0].headers.forEach((h, i) => {
-          const match = fuzzyMatch(h);
+          const match = fuzzyMatch(h, customLabelsMap);
           if (match && !used.has(match)) {
             autoMap[i] = match;
             used.add(match);
@@ -179,7 +212,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
       }
     };
     reader.readAsArrayBuffer(f);
-  }, []);
+  }, [customLabelsMap]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -224,7 +257,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
     const autoMap: Mapping = {};
     const used = new Set<TargetKey>();
     sheet.headers.forEach((h, i) => {
-      const match = fuzzyMatch(h);
+      const match = fuzzyMatch(h, customLabelsMap);
       if (match && !used.has(match)) {
         autoMap[i] = match;
         used.add(match);
@@ -297,6 +330,8 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
       sent_date: r.values.sent_date || null,
       accepted_date: r.values.accepted_date || null,
       notes: r.values.notes || null,
+      pocet: r.values.pocet ? parseNumericValue(r.values.pocet) : null,
+      cena: r.values.cena ? parseNumericValue(r.values.cena) : null,
       imported_at: new Date().toISOString(),
       import_source: file?.name || null,
     }));
