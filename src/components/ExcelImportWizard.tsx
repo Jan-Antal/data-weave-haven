@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import { useColumnLabels } from "@/hooks/useColumnLabels";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -112,6 +113,7 @@ interface RowData {
 
 export function ExcelImportWizard({ projectId, projectName, open, onClose }: Props) {
   const qc = useQueryClient();
+  const { getLabel } = useColumnLabels("tpv-list");
   const [step, setStep] = useState(1);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
 
@@ -336,8 +338,8 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
     .filter(([, v]) => v !== "__skip__")
     .sort((a, b) => Number(a[0]) - Number(b[0]))
     .map(([, v]) => v as TargetKey);
-
-  const fieldLabel = (key: TargetKey) => TARGET_FIELDS.find(f => f.key === key)?.label ?? key;
+  const DEFAULT_LABELS: Record<string, string> = Object.fromEntries(TARGET_FIELDS.map(f => [f.key, f.label]));
+  const fieldLabel = (key: TargetKey) => getLabel(key, DEFAULT_LABELS[key] ?? key);
 
   // ── Stepper ─────────────────────────────────────────────────
   const STEPS = ["Nahrání souboru", "Mapování sloupců", "Náhled & výběr", "Import"];
@@ -489,7 +491,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                             <SelectItem value="__skip__">— Přeskočit —</SelectItem>
                             {TARGET_FIELDS.map(f => (
                               <SelectItem key={f.key} value={f.key} disabled={usedTargets.has(f.key) && mapping[colIdx] !== f.key}>
-                                {f.label}{"required" in f && f.required ? " *" : ""}
+                                {fieldLabel(f.key)}{"required" in f && f.required ? " *" : ""}
                               </SelectItem>
                             ))}
                           </SelectContent>
