@@ -885,11 +885,11 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
         <div className="border-r shrink-0 flex items-start" style={{ width: LEFT_PANEL_WIDTH, height: HEADER_HEIGHT }}>
           <div style={{ width: 36, minWidth: 36 }} />
           <div style={{ width: 36, minWidth: 36 }} />
-          <button onClick={() => togglePlanSort("project_id")} className="flex items-center gap-1 h-8 px-2 text-left text-[11px] font-medium text-muted-foreground whitespace-nowrap hover:text-foreground transition-colors" style={{ width: 110, minWidth: 110, flexShrink: 0 }}>
+          <button onClick={() => togglePlanSort("project_id")} className="flex items-center gap-1 h-9 px-2 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap hover:bg-muted/50 transition-colors" style={{ width: 110, minWidth: 110, flexShrink: 0 }}>
             {planIdLabel}
-            {planSortCol === "project_id" ? (planSortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}
+            {planSortCol === "project_id" ? (planSortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
           </button>
-          <button onClick={() => togglePlanSort("project_name")} className="flex items-center gap-1 h-8 px-2 text-left text-[11px] font-medium text-muted-foreground whitespace-nowrap hover:text-foreground transition-colors" style={{ width: 180, minWidth: 180, maxWidth: 180 }}>
+          <button onClick={() => togglePlanSort("project_name")} className="flex items-center gap-1 h-9 px-2 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap hover:bg-muted/50 transition-colors" style={{ width: 180, minWidth: 180, maxWidth: 180 }}>
             {planNameLabel}
             {planSortCol === "project_name" ? (planSortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}
           </button>
