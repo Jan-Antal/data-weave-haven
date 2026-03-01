@@ -37,6 +37,7 @@ import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 import { useExportContext } from "./ExportContext";
 import { getProjectCellValue } from "@/lib/exportExcel";
 import { useStagesByProject } from "@/hooks/useAllProjectStages";
+import { matchesStatusFilter } from "@/lib/statusFilter";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...PM_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
@@ -54,7 +55,7 @@ function stageMatchesFilters(
 
   for (const stage of stages) {
     if (personFilter && stage.pm && String(stage.pm).includes(personFilter)) return true;
-    if (statusFilterSet && stage.status && statusFilterSet.has(stage.status)) return true;
+    if (statusFilterSet && matchesStatusFilter(stage.status, statusFilterSet)) return true;
     if (searchLower) {
       const searchable = [stage.stage_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
       for (const v of searchable) {
@@ -74,7 +75,7 @@ function singleStageMatches(
 ): boolean {
   if (!personFilter && !statusFilterSet && !searchLower) return true;
   if (personFilter && stage.pm && String(stage.pm).includes(personFilter)) return true;
-  if (statusFilterSet && stage.status && statusFilterSet.has(stage.status)) return true;
+  if (statusFilterSet && matchesStatusFilter(stage.status, statusFilterSet)) return true;
   if (searchLower) {
     const searchable = [stage.stage_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
     for (const v of searchable) {

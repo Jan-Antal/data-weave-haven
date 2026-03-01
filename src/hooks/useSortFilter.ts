@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
+import { matchesStatusFilter } from "@/lib/statusFilter";
 
 type SortDir = "asc" | "desc" | null;
-
 
 
 interface ExternalFilters {
@@ -41,12 +41,8 @@ export function useSortFilter<T extends Record<string, any>>(data: T[], external
 
     // Status filter
     if (externalFilters?.statusFilter && externalFilters.statusFilter.length > 0) {
-      const allowed = externalFilters.statusFilter;
-      result = result.filter(row => {
-        const status = row.status;
-        if (!status) return true; // Always show projects with null/empty status
-        return allowed.includes(status);
-      });
+      const allowed = new Set(externalFilters.statusFilter);
+      result = result.filter(row => matchesStatusFilter(row.status, allowed));
     } else if (externalFilters?.statusFilter && externalFilters.statusFilter.length === 0) {
       result = [];
     }

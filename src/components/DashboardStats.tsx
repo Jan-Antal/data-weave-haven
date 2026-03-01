@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useProjects } from "@/hooks/useProjects";
 import { useExchangeRates, getExchangeRate } from "@/hooks/useExchangeRates";
 import { parseAppDate } from "@/lib/dateFormat";
+import { matchesStatusFilter } from "@/lib/statusFilter";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
 import {
   BarChart,
@@ -119,7 +120,8 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
       );
     }
     if (statusFilter && statusFilter.length > 0) {
-      list = list.filter((p) => statusFilter.includes(p.status || ""));
+      const allowedStatuses = new Set(statusFilter);
+      list = list.filter((p) => matchesStatusFilter(p.status, allowedStatuses));
     }
     if (search) {
       const q = search.toLowerCase();
