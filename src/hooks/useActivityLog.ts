@@ -13,7 +13,7 @@ export interface ActivityLogEntry {
   created_at: string;
 }
 
-const PAGE_SIZE = 40;
+const PAGE_SIZE = 30;
 
 interface Filters {
   category: "all" | "status" | "terminy" | "documents" | "projects";

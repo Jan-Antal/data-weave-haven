@@ -95,7 +95,7 @@ const Index = () => {
     <ColumnVisibilityProvider>
     <ExportProvider>
     <DataLogHighlightProvider>
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       {/* Role simulation banner */}
       {simulatedRole && (
         <div className="bg-amber-50 border-b border-amber-200 px-6 flex items-center justify-between" style={{ height: 32 }}>
@@ -217,13 +217,13 @@ const Index = () => {
 
       {/* Split layout: main content + data log panel */}
       <div className="flex flex-1 overflow-hidden">
-        <main className="px-6 flex-1 min-w-0 overflow-y-auto">
-          <div className={dashboardCollapsed ? "py-2" : "py-4"}>
+        <main className="px-6 flex-1 min-w-0 flex flex-col overflow-hidden">
+          <div className={cn("shrink-0", dashboardCollapsed ? "py-2" : "py-4")}>
             <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRiskHighlightChange={setRiskHighlight} activeTab={activeTab} onCollapsedChange={setDashboardCollapsed} />
           </div>
 
-          <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <div className="flex items-center justify-between mb-3">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-col flex-1 min-h-0">
+            <div className="flex items-center justify-between mb-3 shrink-0">
               <div className="flex items-center">
                 <TabsList className="bg-card border">
                   <TabsTrigger value="project-info" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
@@ -281,16 +281,16 @@ const Index = () => {
               </div>
             </div>
 
-            <TabsContent value="project-info" forceMount className={activeTab !== "project-info" ? "hidden" : ""}>
+            <TabsContent value="project-info" forceMount className={cn("flex-1 min-h-0 overflow-y-auto", activeTab !== "project-info" ? "hidden" : "")}>
               <ProjectInfoTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
             </TabsContent>
-            <TabsContent value="pm-status" forceMount className={activeTab !== "pm-status" ? "hidden" : ""}>
+            <TabsContent value="pm-status" forceMount className={cn("flex-1 min-h-0 overflow-y-auto", activeTab !== "pm-status" ? "hidden" : "")}>
               <PMStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
             </TabsContent>
-            <TabsContent value="tpv-status" forceMount className={activeTab !== "tpv-status" ? "hidden" : ""}>
+            <TabsContent value="tpv-status" forceMount className={cn("flex-1 min-h-0 overflow-y-auto", activeTab !== "tpv-status" ? "hidden" : "")}>
               <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRequestTab={() => handleTabChange("tpv-status")} closeDetailRef={tpvCloseDetailRef} />
             </TabsContent>
-            <TabsContent value="plan" forceMount className={activeTab !== "plan" ? "hidden" : ""}>
+            <TabsContent value="plan" forceMount className={cn("flex-1 min-h-0 overflow-y-auto", activeTab !== "plan" ? "hidden" : "")}>
               <PlanView personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} zoom={planZoom} />
             </TabsContent>
           </Tabs>
