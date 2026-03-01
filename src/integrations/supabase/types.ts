@@ -540,6 +540,7 @@ export type Database = {
       tpv_items: {
         Row: {
           accepted_date: string | null
+          cena: number | null
           created_at: string
           custom_fields: Json | null
           deleted_at: string | null
@@ -550,6 +551,7 @@ export type Database = {
           item_type: string | null
           konstrukter: string | null
           notes: string | null
+          pocet: number | null
           project_id: string
           sent_date: string | null
           status: string | null
@@ -557,6 +559,7 @@ export type Database = {
         }
         Insert: {
           accepted_date?: string | null
+          cena?: number | null
           created_at?: string
           custom_fields?: Json | null
           deleted_at?: string | null
@@ -567,6 +570,7 @@ export type Database = {
           item_type?: string | null
           konstrukter?: string | null
           notes?: string | null
+          pocet?: number | null
           project_id: string
           sent_date?: string | null
           status?: string | null
@@ -574,6 +578,7 @@ export type Database = {
         }
         Update: {
           accepted_date?: string | null
+          cena?: number | null
           created_at?: string
           custom_fields?: Json | null
           deleted_at?: string | null
@@ -584,6 +589,7 @@ export type Database = {
           item_type?: string | null
           konstrukter?: string | null
           notes?: string | null
+          pocet?: number | null
           project_id?: string
           sent_date?: string | null
           status?: string | null

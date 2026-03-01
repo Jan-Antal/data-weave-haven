@@ -30,6 +30,8 @@ const TARGET_FIELDS = [
   { key: "sent_date", label: "Odesláno" },
   { key: "accepted_date", label: "Přijato" },
   { key: "notes", label: "Poznámka" },
+  { key: "pocet", label: "Počet" },
+  { key: "cena", label: "Cena" },
 ] as const;
 
 type TargetKey = (typeof TARGET_FIELDS)[number]["key"];
@@ -43,6 +45,8 @@ const FUZZY_MAP: { keywords: string[]; target: TargetKey }[] = [
   { keywords: ["odeslano", "odesláno", "sent"], target: "sent_date" },
   { keywords: ["prijato", "přijato", "accepted"], target: "accepted_date" },
   { keywords: ["poznamka", "poznámka", "note", "notes"], target: "notes" },
+  { keywords: ["pocet", "počet", "quantity", "mnozstvi", "množství", "ks", "pcs"], target: "pocet" },
+  { keywords: ["cena", "price", "castka", "částka"], target: "cena" },
 ];
 
 function normalize(s: string): string {
