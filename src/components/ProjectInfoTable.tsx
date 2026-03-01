@@ -44,7 +44,7 @@ import { useExportContext } from "./ExportContext";
 import { getProjectCellValue } from "@/lib/exportExcel";
 import { getColumnLabel } from "./CrossTabColumns";
 import { useStagesByProject } from "@/hooks/useAllProjectStages";
-import { matchesStatusFilter } from "@/lib/statusFilter";
+import { matchesStatusFilter, normalizedIncludes, normalizeSearch } from "@/lib/statusFilter";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -71,7 +71,7 @@ const emptyProject = {
 
 // (inheritance constants now in stageInheritance.ts)
 
-// ── Smart filtering helpers ─────────────────────────────────────────
+// ── Smart filtering helpers (AND logic — all active filters must match) ──
 function stageMatchesFilters(
   stages: ProjectStage[],
   personFilter: string | null,
@@ -79,14 +79,7 @@ function stageMatchesFilters(
   searchLower: string | null
 ): boolean {
   for (const stage of stages) {
-    if (personFilter && stage.pm && String(stage.pm).includes(personFilter)) return true;
-    if (statusFilterSet && matchesStatusFilter(stage.status, statusFilterSet)) return true;
-    if (searchLower) {
-      const searchable = [stage.stage_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
-      for (const v of searchable) {
-        if (v && String(v).toLowerCase().includes(searchLower)) return true;
-      }
-    }
+    if (singleStageMatches(stage, personFilter, statusFilterSet, searchLower)) return true;
   }
   return false;
 }
@@ -97,16 +90,15 @@ function singleStageMatches(
   statusFilterSet: Set<string> | null,
   searchLower: string | null
 ): boolean {
-  if (!personFilter && !statusFilterSet && !searchLower) return true;
-  if (personFilter && stage.pm && String(stage.pm).includes(personFilter)) return true;
-  if (statusFilterSet && matchesStatusFilter(stage.status, statusFilterSet)) return true;
+  // AND logic: every active filter must pass
+  if (personFilter && !(stage.pm && String(stage.pm).includes(personFilter))) return false;
+  if (statusFilterSet && !matchesStatusFilter(stage.status, statusFilterSet)) return false;
   if (searchLower) {
     const searchable = [stage.stage_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
-    for (const v of searchable) {
-      if (v && String(v).toLowerCase().includes(searchLower)) return true;
-    }
+    const found = searchable.some(v => normalizedIncludes(v, searchLower));
+    if (!found) return false;
   }
-  return false;
+  return true;
 }
 
 // ── Expand arrow ────────────────────────────────────────────────────
@@ -471,7 +463,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     [statusFilter]
   );
   const searchLower = useMemo(
-    () => externalSearch ? externalSearch.toLowerCase() : null,
+    () => externalSearch ? normalizeSearch(externalSearch) : null,
     [externalSearch]
   );
 
@@ -762,6 +754,13 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                 )}
               </Fragment>
             ))}
+            {sorted.length === 0 && !isLoading && (
+              <TableRow>
+                <TableCell colSpan={99} className="text-center py-8 text-muted-foreground text-sm">
+                  Žádné výsledky
+                </TableCell>
+              </TableRow>
+            )}
             {hasMore && (
               <TableRow>
                 <TableCell colSpan={99} className="text-center py-3">

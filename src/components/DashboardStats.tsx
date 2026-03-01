@@ -61,14 +61,13 @@ function formatNumber(v: number): string {
 export interface DashboardStatsProps {
   personFilter?: string | null;
   statusFilter?: string[];
-  search?: string;
   riskHighlight: RiskHighlightType;
   onRiskHighlightChange: (v: RiskHighlightType) => void;
   activeTab?: string;
   onCollapsedChange?: (collapsed: boolean) => void;
 }
 
-export function DashboardStats({ personFilter, statusFilter, search, riskHighlight, onRiskHighlightChange, activeTab, onCollapsedChange }: DashboardStatsProps) {
+export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRiskHighlightChange, activeTab, onCollapsedChange }: DashboardStatsProps) {
   const { data: projects = [] } = useProjects();
   const { data: rates = [] } = useExchangeRates();
 
@@ -123,14 +122,8 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
       const allowedStatuses = new Set(statusFilter);
       list = list.filter((p) => matchesStatusFilter(p.status, allowedStatuses));
     }
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter((p) =>
-        Object.values(p).some((v) => typeof v === "string" && v.toLowerCase().includes(q))
-      );
-    }
     return list;
-  }, [projects, personFilter, statusFilter, search]);
+  }, [projects, personFilter, statusFilter]);
 
   const activeProjects = useMemo(
     () => filtered.filter((p) => !EXCLUDED_STATUSES.includes(p.status || "")),

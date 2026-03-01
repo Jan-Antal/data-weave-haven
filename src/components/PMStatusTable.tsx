@@ -37,14 +37,14 @@ import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 import { useExportContext } from "./ExportContext";
 import { getProjectCellValue } from "@/lib/exportExcel";
 import { useStagesByProject } from "@/hooks/useAllProjectStages";
-import { matchesStatusFilter } from "@/lib/statusFilter";
+import { matchesStatusFilter, normalizedIncludes, normalizeSearch } from "@/lib/statusFilter";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...PM_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
 
 const stageStatuses = ["Plánováno", "Probíhá", "Dokončeno", "Pozastaveno"];
 
-/** Check if any stage matches the active filters — optimized with Set lookups */
+/** Check if any stage matches ALL active filters (AND logic) */
 function stageMatchesFilters(
   stages: ProjectStage[],
   personFilter: string | null,
@@ -52,37 +52,27 @@ function stageMatchesFilters(
   searchLower: string | null
 ): boolean {
   if (stages.length === 0) return false;
-
   for (const stage of stages) {
-    if (personFilter && stage.pm && String(stage.pm).includes(personFilter)) return true;
-    if (statusFilterSet && matchesStatusFilter(stage.status, statusFilterSet)) return true;
-    if (searchLower) {
-      const searchable = [stage.stage_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
-      for (const v of searchable) {
-        if (v && String(v).toLowerCase().includes(searchLower)) return true;
-      }
-    }
+    if (singleStageMatches(stage, personFilter, statusFilterSet, searchLower)) return true;
   }
   return false;
 }
 
-/** Check if a single stage matches the active filters */
+/** Check if a single stage matches ALL active filters (AND logic) */
 function singleStageMatches(
   stage: ProjectStage,
   personFilter: string | null,
   statusFilterSet: Set<string> | null,
   searchLower: string | null
 ): boolean {
-  if (!personFilter && !statusFilterSet && !searchLower) return true;
-  if (personFilter && stage.pm && String(stage.pm).includes(personFilter)) return true;
-  if (statusFilterSet && matchesStatusFilter(stage.status, statusFilterSet)) return true;
+  if (personFilter && !(stage.pm && String(stage.pm).includes(personFilter))) return false;
+  if (statusFilterSet && !matchesStatusFilter(stage.status, statusFilterSet)) return false;
   if (searchLower) {
     const searchable = [stage.stage_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
-    for (const v of searchable) {
-      if (v && String(v).toLowerCase().includes(searchLower)) return true;
-    }
+    const found = searchable.some(v => normalizedIncludes(v, searchLower));
+    if (!found) return false;
   }
-  return false;
+  return true;
 }
 
 // (inheritance constants now in stageInheritance.ts)
@@ -441,7 +431,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
     [statusFilter]
   );
   const searchLower = useMemo(
-    () => externalSearch ? externalSearch.toLowerCase() : null,
+    () => externalSearch ? normalizeSearch(externalSearch) : null,
     [externalSearch]
   );
 
@@ -683,6 +673,13 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                 )}
               </Fragment>
             ))}
+            {sorted.length === 0 && !isLoading && (
+              <TableRow>
+                <TableCell colSpan={99} className="text-center py-8 text-muted-foreground text-sm">
+                  Žádné výsledky
+                </TableCell>
+              </TableRow>
+            )}
             {hasMore && (
               <TableRow>
                 <TableCell colSpan={99} className="text-center py-3">
