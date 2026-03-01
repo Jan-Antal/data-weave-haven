@@ -23,7 +23,7 @@ import { exportToExcel, buildFileName } from "@/lib/exportExcel";
 import { ExportPopup } from "./ExportPopup";
 import { ExcelImportWizard } from "./ExcelImportWizard";
 
-const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean }[] = [
+const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
   { key: "item_name", label: "Název", locked: true },
   { key: "item_type", label: "Typ" },
   { key: "konstrukter", label: "Konstruktér" },
@@ -31,6 +31,8 @@ const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean }[] = [
   { key: "sent_date", label: "Odesláno" },
   { key: "accepted_date", label: "Přijato" },
   { key: "notes", label: "Poznámka" },
+  { key: "pocet", label: "Počet", defaultHidden: true },
+  { key: "cena", label: "Cena", defaultHidden: true },
 ];
 
 const TPV_LIST_LABEL_MAP = Object.fromEntries(TPV_LIST_COLUMNS.map(c => [c.key, c.label]));
@@ -50,6 +52,10 @@ function getTPVListColumnStyle(key: string, customWidth?: number | null): React.
       return { minWidth: 140 };
     case "konstrukter":
       return { minWidth: 124, maxWidth: 124, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } as React.CSSProperties;
+    case "pocet":
+      return { width: 80, minWidth: 80, textAlign: "right" } as React.CSSProperties;
+    case "cena":
+      return { width: 120, minWidth: 120, textAlign: "right" } as React.CSSProperties;
     default:
       return { minWidth: 120 };
   }
@@ -83,10 +89,12 @@ export function TPVList({ projectId, projectName, onBack }: Props) {
   } = useColumnLabels("tpv-list");
 
   const visMap = useMemo(() => getVisibilityMap(), [getVisibilityMap]);
+  const DEFAULT_HIDDEN_KEYS = useMemo(() => new Set(TPV_LIST_COLUMNS.filter(c => c.defaultHidden).map(c => c.key)), []);
   const isColVisible = useCallback((key: string) => {
     if (key === "item_name") return true;
+    if (visMap[key] === undefined) return !DEFAULT_HIDDEN_KEYS.has(key);
     return visMap[key] !== false;
-  }, [visMap]);
+  }, [visMap, DEFAULT_HIDDEN_KEYS]);
   const toggleColVis = useCallback((key: string) => {
     updateVisibility(key, !isColVisible(key));
   }, [isColVisible, updateVisibility]);
@@ -391,6 +399,8 @@ export function TPVList({ projectId, projectName, onBack }: Props) {
                   if (key === "sent_date") return <TableCell key={key}><InlineEditableCell value={item.sent_date} onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>;
                   if (key === "accepted_date") return <TableCell key={key}><InlineEditableCell value={item.accepted_date} onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>;
                   if (key === "notes") return <TableCell key={key}><InlineEditableCell value={item.notes} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} readOnly={!canManageTPV} /></TableCell>;
+                  if (key === "pocet") return <TableCell key={key} className="text-right"><InlineEditableCell value={item.pocet != null ? String(item.pocet) : ""} type="number" onSave={(v) => saveField(item.id, "pocet", v, item.pocet != null ? String(item.pocet) : "")} readOnly={!canManageTPV} /></TableCell>;
+                  if (key === "cena") return <TableCell key={key} className="text-right"><InlineEditableCell value={item.cena != null ? String(item.cena) : ""} type="number" onSave={(v) => saveField(item.id, "cena", v, item.cena != null ? String(item.cena) : "")} readOnly={!canManageTPV} /></TableCell>;
                   // Custom columns
                   if (key.startsWith("custom_")) {
                     const def = customColumns.find(c => c.column_key === key);
