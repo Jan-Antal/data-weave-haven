@@ -307,13 +307,9 @@ export function TPVList({ projectId, projectName, onBack }: Props) {
             <Button size="sm" variant="outline" onClick={() => { setNewItem({ item_name: "", item_type: "", status: "", sent_date: "", accepted_date: "", notes: "" }); setAddOpen(true); }}>
               <Plus className="h-3 w-3 mr-1" /> Přidat položku
             </Button>
-            <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
+            <Button size="sm" variant="outline" onClick={() => setWizardOpen(true)}>
               <Upload className="h-3 w-3 mr-1" /> Import z Excelu
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setWizardOpen(true)}>
-              <Upload className="h-3 w-3 mr-1" /> Import (průvodce)
-            </Button>
-            <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileSelect} />
           </>
         )}
 
