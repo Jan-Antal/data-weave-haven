@@ -422,8 +422,7 @@ function MilestoneDiamond({
   };
   const solidInfo = small ? null : DIAMOND_SOLID_MAP[color];
   const fillColor = solidInfo ? solidInfo.fill : color;
-  const borderStyle = solidInfo ? `2px solid ${solidInfo.border}` : (small ? "none" : "2px solid #95a5a6");
-  const bgColor = solidInfo ? fillColor : (small ? color : "#c8c8c8");
+  const bgColor = solidInfo ? solidInfo.fill : (small ? color : "#c8c8c8");
 
   const diamondStyle: React.CSSProperties = {
     left: currentX - size / 2,
@@ -431,7 +430,6 @@ function MilestoneDiamond({
     width: size,
     height: size,
     backgroundColor: bgColor,
-    border: borderStyle,
     transform: "rotate(45deg)",
     zIndex: dragOffset !== null ? 50 : (zIndex ?? 10),
     cursor: isDraggable ? (dragOffset !== null ? "grabbing" : "grab") : "default",
