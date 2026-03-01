@@ -544,6 +544,8 @@ export type Database = {
           custom_fields: Json | null
           deleted_at: string | null
           id: string
+          import_source: string | null
+          imported_at: string | null
           item_name: string
           item_type: string | null
           konstrukter: string | null
@@ -559,6 +561,8 @@ export type Database = {
           custom_fields?: Json | null
           deleted_at?: string | null
           id?: string
+          import_source?: string | null
+          imported_at?: string | null
           item_name: string
           item_type?: string | null
           konstrukter?: string | null
@@ -574,6 +578,8 @@ export type Database = {
           custom_fields?: Json | null
           deleted_at?: string | null
           id?: string
+          import_source?: string | null
+          imported_at?: string | null
           item_name?: string
           item_type?: string | null
           konstrukter?: string | null
