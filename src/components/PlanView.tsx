@@ -66,7 +66,7 @@ const CZECH_MONTHS_SHORT = [
 
 const ROW_HEIGHT = 36;
 const SUBSTAGE_ROW_HEIGHT = 28;
-const LEFT_PANEL_WIDTH = 362;
+const LEFT_PANEL_WIDTH = 398; // 36 (warning) + 36 (chevron) + 110 (ID) + 180 (Name) + padding
 const BAR_HEIGHT = 16;
 const SUBSTAGE_BAR_HEIGHT = 10;
 const DIAMOND_SIZE = 10;
@@ -414,13 +414,24 @@ function MilestoneDiamond({
     window.addEventListener("mouseup", handleMouseUp);
   }, [isDraggable, baseX, dayPx, date, onDragEnd]);
 
+  // Map milestone colors to solid pastel fills and borders
+  const DIAMOND_SOLID_MAP: Record<string, { fill: string; border: string }> = {
+    "#52b788": { fill: "#a8d4ae", border: "#4a9e5c" },
+    "#f4a261": { fill: "#f0c8a0", border: "#e8913a" },
+    "#e76f51": { fill: "#e8b0a8", border: "#c0392b" },
+  };
+  const solidInfo = small ? null : DIAMOND_SOLID_MAP[color];
+  const fillColor = solidInfo ? solidInfo.fill : color;
+  const borderStyle = solidInfo ? `2px solid ${solidInfo.border}` : (small ? "none" : "2px solid #95a5a6");
+  const bgColor = solidInfo ? fillColor : (small ? color : "#c8c8c8");
+
   const diamondStyle: React.CSSProperties = {
     left: currentX - size / 2,
     top: midY - size / 2,
     width: size,
     height: size,
-    backgroundColor: color,
-    opacity: small ? 1 : 0.45,
+    backgroundColor: bgColor,
+    border: borderStyle,
     transform: "rotate(45deg)",
     zIndex: dragOffset !== null ? 50 : (zIndex ?? 10),
     cursor: isDraggable ? (dragOffset !== null ? "grabbing" : "grab") : "default",
@@ -620,9 +631,7 @@ function SubstageRow({
 }
 
 // ── Substage expand button ──────────────────────────────────────────
-function ExpandButton({ projectId, expanded, onClick }: { projectId: string; expanded: boolean; onClick: () => void }) {
-  const { data: stages = [] } = useProjectStages(projectId);
-  if (stages.length === 0) return <div style={{ width: 20 }} />;
+function ExpandButton({ expanded, onClick }: { expanded: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} className="p-0 shrink-0">
       {expanded ? <ChevronDown className="h-4 w-4 text-accent stroke-[3]" /> : <ChevronRight className="h-4 w-4 text-accent stroke-[3]" />}
@@ -823,6 +832,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
         {/* Left panel header */}
         <div className="border-r shrink-0 flex items-center" style={{ width: LEFT_PANEL_WIDTH, height: HEADER_HEIGHT }}>
           <div style={{ width: 36, minWidth: 36 }} />
+          <div style={{ width: 36, minWidth: 36 }} />
           <button onClick={() => togglePlanSort("project_id")} className="flex items-center gap-1 h-9 px-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap hover:text-foreground transition-colors" style={{ width: 110, minWidth: 110, flexShrink: 0 }}>
             {planIdLabel}
             {planSortCol === "project_id" ? (planSortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}
@@ -886,15 +896,18 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                   <div
                     className="shrink-0 flex items-center justify-center"
                     style={{ width: 36, minWidth: 36 }}
+                  >
+                    {warnings.length > 0 ? <WarningIcon warnings={warnings} /> : null}
+                  </div>
+                  <div
+                    className="shrink-0 flex items-center justify-center"
+                    style={{ width: 36, minWidth: 36 }}
                     onClick={(e) => { e.stopPropagation(); toggleExpand(p.project_id); }}
                   >
-                    <ExpandButton projectId={p.project_id} expanded={isExp} onClick={() => {}} />
+                    <ExpandButton expanded={isExp} onClick={() => {}} />
                   </div>
                   <span className="text-xs font-mono text-muted-foreground whitespace-nowrap shrink-0 cursor-pointer hover:underline px-2" style={{ width: 110, minWidth: 110 }} onClick={() => setEditProject(p)}>{p.project_id}</span>
-                  <div className="flex items-center gap-1 px-2" style={{ width: 180, minWidth: 180, maxWidth: 180, overflow: "hidden" }}>
-                    {warnings.length > 0 && <WarningIcon warnings={warnings} />}
-                    <span className="text-xs font-medium truncate cursor-pointer hover:underline" onClick={() => setEditProject(p)}>{p.project_name}</span>
-                  </div>
+                  <span className="text-xs font-medium truncate cursor-pointer hover:underline px-2" style={{ width: 180, minWidth: 180, maxWidth: 180 }} onClick={() => setEditProject(p)}>{p.project_name}</span>
                 </div>
                 {isExp && <SubstageLeftRows projectId={p.project_id} project={p} statusColorMap={statusColorMap} />}
               </div>
