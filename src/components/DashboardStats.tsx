@@ -260,24 +260,29 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
           <div className="rounded-lg border bg-card p-3 flex flex-col min-w-0" style={{ width: "35%" }}>
             <div className="flex items-center justify-between mb-1">
               <p style={{ fontSize: 10 }} className="uppercase tracking-wider text-muted-foreground">Pipeline zakázek</p>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPipelineMode("count")}
-                  className={`text-[9px] transition-colors ${
-                    pipelineMode === "count" ? "text-foreground font-semibold" : "text-muted-foreground/40 hover:text-muted-foreground"
-                  }`}
-                >
-                  #
-                </button>
-                <span className="text-muted-foreground/30 text-[9px]">/</span>
-                <button
-                  onClick={() => setPipelineMode("value")}
-                  className={`text-[9px] transition-colors ${
-                    pipelineMode === "value" ? "text-foreground font-semibold" : "text-muted-foreground/40 hover:text-muted-foreground"
-                  }`}
-                >
-                  Kč
-                </button>
+              <div className="flex flex-col items-end gap-0">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPipelineMode("count")}
+                    className={`text-[9px] transition-colors ${
+                      pipelineMode === "count" ? "text-foreground font-semibold" : "text-muted-foreground/40 hover:text-muted-foreground"
+                    }`}
+                  >
+                    #
+                  </button>
+                  <span className="text-muted-foreground/30 text-[9px]">/</span>
+                  <button
+                    onClick={() => setPipelineMode("value")}
+                    className={`text-[9px] transition-colors ${
+                      pipelineMode === "value" ? "text-foreground font-semibold" : "text-muted-foreground/40 hover:text-muted-foreground"
+                    }`}
+                  >
+                    Kč
+                  </button>
+                </div>
+                {pipelineMode === "value" && (
+                  <p style={{ fontSize: 8 }} className="text-muted-foreground/50">v tis. Kč</p>
+                )}
               </div>
             </div>
             <div className="flex-1 min-h-0 flex items-center">
@@ -304,9 +309,6 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            {pipelineMode === "value" && (
-              <p style={{ fontSize: 9 }} className="text-muted-foreground text-right mt-0.5">v tis. Kč</p>
-            )}
           </div>
 
           {/* Card 3: Riziko & Termíny */}
