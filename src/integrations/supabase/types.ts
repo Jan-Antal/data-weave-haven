@@ -216,6 +216,7 @@ export type Database = {
           full_name: string
           id: string
           is_active: boolean
+          person_id: string | null
         }
         Insert: {
           created_at?: string
@@ -223,6 +224,7 @@ export type Database = {
           full_name?: string
           id: string
           is_active?: boolean
+          person_id?: string | null
         }
         Update: {
           created_at?: string
@@ -230,8 +232,17 @@ export type Database = {
           full_name?: string
           id?: string
           is_active?: boolean
+          person_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       project_stages: {
         Row: {
