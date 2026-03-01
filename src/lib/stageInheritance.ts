@@ -13,7 +13,7 @@ const STAGE_TO_PROJECT_FIELD: Record<string, string> = {
 const INHERITABLE_STAGE_FIELDS = new Set([
   "status", "risk", "zamereni", "tpv_date", "expedice", "montaz",
   "predani", "datum_smluvni", "konstrukter", "narocnost", "architekt",
-  "start_date",
+  "start_date", "pm",
 ]);
 
 /** Fields always shown from parent (stage doesn't have its own column) */
