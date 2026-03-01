@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { InlineEditableCell } from "./InlineEditableCell";
 import { CurrencyEditCell } from "./CurrencyEditCell";
 import { formatCurrency, formatMarze, marzeInputToStorage, marzeStorageToInput } from "@/lib/currency";
-import { isStageFieldInherited, getStageDisplayValue, inheritedTextClass } from "@/lib/stageInheritance";
+import { getStageDisplayValue, stageFieldClass, buildInheritedStageData, getInheritedFieldKeys, addEditedField, EDITABLE_INHERITED, READ_ONLY_INHERITED } from "@/lib/stageInheritance";
 import { StatusBadge, RiskBadge } from "./StatusBadge";
 import { SortableHeader } from "./SortableHeader";
 import { useProjects } from "@/hooks/useProjects";
@@ -68,8 +68,7 @@ const emptyProject = {
   fakturace: "",
 };
 
-const INHERITABLE_FIELDS = ["status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "datum_smluvni", "konstrukter", "narocnost", "architekt", "pm"];
-const INHERITABLE_DATE_MAP: Record<string, string> = { datum_objednavky: "start_date" }; // project field → stage field
+// (inheritance constants now in stageInheritance.ts)
 
 // ── Smart filtering helpers ─────────────────────────────────────────
 function stageMatchesFilters(
@@ -127,8 +126,6 @@ interface StageRowProps {
   statusLabels: string[];
   canEdit: boolean;
   renderKeys: string[];
-  isFieldInherited?: (field: string) => boolean;
-  onFieldTouched?: (field: string) => void;
   cancelConfirm?: boolean;
   onCancelConfirm?: () => void;
   onCancelDismiss?: () => void;
@@ -137,32 +134,33 @@ interface StageRowProps {
   freshInheritedFields?: Set<string>;
 }
 
-function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys, isFieldInherited, onFieldTouched, cancelConfirm, onCancelConfirm, onCancelDismiss, dimmed, saveCurrency, freshInheritedFields }: StageRowProps) {
+function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys, cancelConfirm, onCancelConfirm, onCancelDismiss, dimmed, saveCurrency, freshInheritedFields }: StageRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
   const updateStage = useUpdateStage();
   const style = { transform: CSS.Transform.toString(transform), transition };
   const saveStage = useCallback((field: string, value: string) => {
-    onFieldTouched?.(field);
     const tracked = ["konstrukter", "status", "datum_smluvni"];
     // Convert numeric fields
     const finalValue = field === "prodejni_cena" ? (value === "" ? null : Number(value)) : value;
+    // Mark field as manually edited
+    const newEditedFields = addEditedField(stage, field);
     updateStage.mutate({
       id: stage.id, field, value: finalValue, projectId: project.project_id,
       oldValue: tracked.includes(field) ? ((stage as any)[field] ?? "") : undefined,
       stageName: tracked.includes(field) ? stage.stage_name : undefined,
+      editedFields: newEditedFields,
     });
-  }, [stage.id, stage.stage_name, (stage as any).konstrukter, (stage as any).status, (stage as any).datum_smluvni, project.project_id, onFieldTouched, updateStage]);
+  }, [stage.id, stage.stage_name, (stage as any).konstrukter, (stage as any).status, (stage as any).datum_smluvni, (stage as any).manually_edited_fields, project.project_id, updateStage]);
   const v = isVisible;
   const ihClass = (field: string) => {
-    const base = inheritedTextClass(stage, project, field);
     if (freshInheritedFields?.has(field)) return "stage-inherit-highlight";
-    return base;
+    return stageFieldClass(stage, field);
   };
 
   const renderStageCell = (key: string) => {
     switch (key) {
-      case "klient": return <TableCell key={key}><span className={cn("text-xs text-muted-foreground/60", freshInheritedFields?.has("klient") && "stage-inherit-highlight")}>{project.klient || "—"}</span></TableCell>;
-      case "kalkulant": return <TableCell key={key}><InlineEditableCell value={(stage as any).kalkulant} type="people" peopleRole="Kalkulant" onSave={(val) => saveStage("kalkulant", val)} readOnly={!canEdit} /></TableCell>;
+      case "klient": return <TableCell key={key}><span className="text-xs">{project.klient || "—"}</span></TableCell>;
+      case "kalkulant": return <TableCell key={key}><InlineEditableCell value={(stage as any).kalkulant} type="people" peopleRole="Kalkulant" onSave={(val) => saveStage("kalkulant", val)} readOnly={!canEdit} className={ihClass("kalkulant")} /></TableCell>;
       case "pm": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "pm")} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} className={ihClass("pm")} /></TableCell>;
       case "status": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "status")} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={getStageDisplayValue(stage, project, "status") ? <StatusBadge status={getStageDisplayValue(stage, project, "status")} /> : "—"} readOnly={!canEdit} className={ihClass("status")} /></TableCell>;
       case "datum_smluvni": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "datum_smluvni")} type="date" onSave={(val) => saveStage("datum_smluvni", val)} readOnly={!canEdit} className={ihClass("datum_smluvni")} /></TableCell>;
@@ -174,7 +172,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
         return <TableCell key={key} className="text-right"><span className="text-xs font-mono text-muted-foreground">{formatCurrency((stage as any).prodejni_cena, (stage as any).currency || "CZK")}</span></TableCell>;
       }
       case "marze": return <TableCell key={key} className="text-right"><InlineEditableCell value={marzeStorageToInput((stage as any).marze)} onSave={(val) => saveStage("marze", marzeInputToStorage(val) || "")} readOnly={!canEdit} displayValue={<span className="text-xs font-mono">{formatMarze((stage as any).marze)}</span>} /></TableCell>;
-      case "location": return <TableCell key={key}><span className={cn("text-xs text-muted-foreground/60", freshInheritedFields?.has("location") && "stage-inherit-highlight")}>{project.location || "—"}</span></TableCell>;
+      case "location": return <TableCell key={key}><span className="text-xs">{project.location || "—"}</span></TableCell>;
       case "architekt": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "architekt")} onSave={(val) => saveStage("architekt", val)} readOnly={!canEdit} className={ihClass("architekt")} /></TableCell>;
       case "konstrukter": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "konstrukter")} type="people" peopleRole="Konstruktér" onSave={(val) => saveStage("konstrukter", val)} readOnly={!canEdit} className={ihClass("konstrukter")} /></TableCell>;
       case "risk": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "risk")} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("risk", val)} displayValue={<RiskBadge level={getStageDisplayValue(stage, project, "risk") || ""} />} readOnly={!canEdit} className={ihClass("risk")} /></TableCell>;
@@ -241,29 +239,18 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     const stageName = `${projectId}-${suffix}`;
     const id = crypto.randomUUID();
 
-    const inheritedKeys = new Set<string>();
-    for (const field of INHERITABLE_FIELDS) {
-      const val = (project as any)[field];
-      if (val != null && val !== "") {
-        inheritedKeys.add(field);
-      }
-    }
-    for (const [projField, stageField] of Object.entries(INHERITABLE_DATE_MAP)) {
-      const val = (project as any)[projField];
-      if (val != null && val !== "") {
-        inheritedKeys.add(stageField);
-      }
-    }
+    const inheritedData = buildInheritedStageData(project);
+    const inheritedKeys = getInheritedFieldKeys(project);
 
-    const newStage = { id, project_id: projectId, stage_name: stageName, stage_order: stages.length };
+    const newStage = { id, project_id: projectId, stage_name: stageName, stage_order: stages.length, ...inheritedData, manually_edited_fields: [] };
     const queryKey = ["project_stages", projectId];
     qc.setQueryData<ProjectStage[]>(queryKey, (old) => [
       ...(old || []),
-      { ...newStage, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, start_date: null, end_date: null, notes: null, datum_smluvni: null, pm: null, status: null, risk: null, zamereni: null, tpv_date: null, expedice: null, montaz: null, predani: null, pm_poznamka: null, konstrukter: null, narocnost: null, hodiny_tpv: null, percent_tpv: null, architekt: null, prodejni_cena: null, currency: null, kalkulant: null, marze: null } as ProjectStage,
+      { ...newStage, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, end_date: null, notes: null, pm_poznamka: null, narocnost: null, hodiny_tpv: null, percent_tpv: null, prodejni_cena: null, currency: null, marze: null } as any as ProjectStage,
     ]);
     setFreshStages(prev => new Map(prev).set(id, inheritedKeys));
 
-    const { error } = await supabase.from("project_stages").insert(newStage);
+    const { error } = await supabase.from("project_stages").insert(newStage as any);
     if (error) {
       toast({ title: "Chyba", description: "Nepodařilo se vytvořit etapu", variant: "destructive" });
       qc.invalidateQueries({ queryKey });
@@ -295,12 +282,12 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     qc.invalidateQueries({ queryKey: ["all_project_stages"] });
   }, [projectId, qc]);
 
-  // Auto-clear freshStages after animation duration (2.5s)
+  // Auto-clear freshStages after animation duration (2s)
   useEffect(() => {
     if (freshStages.size === 0) return;
     const timer = setTimeout(() => {
       setFreshStages(new Map());
-    }, 2500);
+    }, 2000);
     return () => clearTimeout(timer);
   }, [freshStages.size]);
 
@@ -341,8 +328,8 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
               statusLabels={statusLabels}
               canEdit={canEdit}
               renderKeys={renderKeys}
-              isFieldInherited={freshStages.has(stage.id) ? (field) => freshStages.get(stage.id)?.has(field) ?? false : undefined}
-              onFieldTouched={freshStages.has(stage.id) ? (field) => markFieldTouched(stage.id, field) : undefined}
+
+
               cancelConfirm={cancelConfirmId === stage.id}
               onCancelConfirm={() => handleCancelStage(stage.id)}
               onCancelDismiss={() => setCancelConfirmId(null)}

@@ -246,6 +246,7 @@ export type Database = {
           id: string
           kalkulant: string | null
           konstrukter: string | null
+          manually_edited_fields: Json
           marze: string | null
           montaz: string | null
           narocnost: string | null
@@ -277,6 +278,7 @@ export type Database = {
           id?: string
           kalkulant?: string | null
           konstrukter?: string | null
+          manually_edited_fields?: Json
           marze?: string | null
           montaz?: string | null
           narocnost?: string | null
@@ -308,6 +310,7 @@ export type Database = {
           id?: string
           kalkulant?: string | null
           konstrukter?: string | null
+          manually_edited_fields?: Json
           marze?: string | null
           montaz?: string | null
           narocnost?: string | null

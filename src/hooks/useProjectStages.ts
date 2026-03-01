@@ -27,8 +27,12 @@ export function useProjectStages(projectId: string) {
 export function useUpdateStage() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, field, value, projectId, oldValue, stageName }: { id: string; field: string; value: any; projectId: string; oldValue?: string; stageName?: string }) => {
-      const { error } = await supabase.from("project_stages").update({ [field]: value } as any).eq("id", id);
+    mutationFn: async ({ id, field, value, projectId, oldValue, stageName, editedFields }: { id: string; field: string; value: any; projectId: string; oldValue?: string; stageName?: string; editedFields?: string[] }) => {
+      const updatePayload: any = { [field]: value };
+      if (editedFields) {
+        updatePayload.manually_edited_fields = editedFields;
+      }
+      const { error } = await supabase.from("project_stages").update(updatePayload).eq("id", id);
       if (error) throw error;
       if (field === "konstrukter" && String(value) !== String(oldValue ?? "")) {
         logActivity({ projectId, actionType: "stage_konstrukter_change", oldValue: oldValue || "—", newValue: String(value) || "—", detail: stageName || null });
