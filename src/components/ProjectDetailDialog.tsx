@@ -641,7 +641,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
           /* ===== EDIT FORM MODE ===== */
           <>
             <DialogHeader className="px-6 pt-6 pb-4">
-              <DialogTitle>Projekt {project.project_id}</DialogTitle>
+              <DialogTitle>{project.project_id} — {project.project_name}</DialogTitle>
             </DialogHeader>
 
             <div className="flex" style={{ maxHeight: '90vh' }}>
