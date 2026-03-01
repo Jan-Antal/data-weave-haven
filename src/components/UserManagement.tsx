@@ -91,7 +91,7 @@ export function UserManagement({ open, onOpenChange }: Props) {
     if (peopleData) {
       const uniqueMap = new Map<string, PersonOption>();
       peopleData.forEach((p: any) => {
-        if (!uniqueMap.has(p.id)) uniqueMap.set(p.id, { id: p.id, name: p.name });
+        if (!uniqueMap.has(p.name)) uniqueMap.set(p.name, { id: p.id, name: p.name });
       });
       setPeople(Array.from(uniqueMap.values()).sort((a, b) => a.name.localeCompare(b.name, "cs")));
     }
