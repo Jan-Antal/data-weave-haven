@@ -134,9 +134,10 @@ interface StageRowProps {
   onCancelDismiss?: () => void;
   dimmed?: boolean;
   saveCurrency?: (id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => void;
+  freshInheritedFields?: Set<string>;
 }
 
-function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys, isFieldInherited, onFieldTouched, cancelConfirm, onCancelConfirm, onCancelDismiss, dimmed, saveCurrency }: StageRowProps) {
+function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys, isFieldInherited, onFieldTouched, cancelConfirm, onCancelConfirm, onCancelDismiss, dimmed, saveCurrency, freshInheritedFields }: StageRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
   const updateStage = useUpdateStage();
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -152,11 +153,15 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
     });
   }, [stage.id, stage.stage_name, (stage as any).konstrukter, (stage as any).status, (stage as any).datum_smluvni, project.project_id, onFieldTouched, updateStage]);
   const v = isVisible;
-  const ihClass = (field: string) => inheritedTextClass(stage, project, field);
+  const ihClass = (field: string) => {
+    const base = inheritedTextClass(stage, project, field);
+    if (freshInheritedFields?.has(field)) return "stage-inherit-highlight";
+    return base;
+  };
 
   const renderStageCell = (key: string) => {
     switch (key) {
-      case "klient": return <TableCell key={key}><span className="text-xs text-muted-foreground/60">{project.klient || "—"}</span></TableCell>;
+      case "klient": return <TableCell key={key}><span className={cn("text-xs text-muted-foreground/60", freshInheritedFields?.has("klient") && "stage-inherit-highlight")}>{project.klient || "—"}</span></TableCell>;
       case "kalkulant": return <TableCell key={key}><InlineEditableCell value={(stage as any).kalkulant} type="people" peopleRole="Kalkulant" onSave={(val) => saveStage("kalkulant", val)} readOnly={!canEdit} /></TableCell>;
       case "pm": return <TableCell key={key}><InlineEditableCell value={stage.pm} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} /></TableCell>;
       case "status": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "status")} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={getStageDisplayValue(stage, project, "status") ? <StatusBadge status={getStageDisplayValue(stage, project, "status")} /> : "—"} readOnly={!canEdit} className={ihClass("status")} /></TableCell>;
@@ -169,7 +174,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
         return <TableCell key={key} className="text-right"><span className="text-xs font-mono text-muted-foreground">{formatCurrency((stage as any).prodejni_cena, (stage as any).currency || "CZK")}</span></TableCell>;
       }
       case "marze": return <TableCell key={key}><InlineEditableCell value={(stage as any).marze} onSave={(val) => saveStage("marze", val)} readOnly={!canEdit} /></TableCell>;
-      case "location": return <TableCell key={key}><span className="text-xs text-muted-foreground/60">{project.location || "—"}</span></TableCell>;
+      case "location": return <TableCell key={key}><span className={cn("text-xs text-muted-foreground/60", freshInheritedFields?.has("location") && "stage-inherit-highlight")}>{project.location || "—"}</span></TableCell>;
       case "architekt": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "architekt")} onSave={(val) => saveStage("architekt", val)} readOnly={!canEdit} className={ihClass("architekt")} /></TableCell>;
       case "konstrukter": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "konstrukter")} type="people" peopleRole="Konstruktér" onSave={(val) => saveStage("konstrukter", val)} readOnly={!canEdit} className={ihClass("konstrukter")} /></TableCell>;
       case "risk": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "risk")} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("risk", val)} displayValue={<RiskBadge level={getStageDisplayValue(stage, project, "risk") || ""} />} readOnly={!canEdit} className={ihClass("risk")} /></TableCell>;
@@ -294,6 +299,15 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     qc.invalidateQueries({ queryKey: ["all_project_stages"] });
   }, [projectId, qc]);
 
+  // Auto-clear freshStages after animation duration (2.5s)
+  useEffect(() => {
+    if (freshStages.size === 0) return;
+    const timer = setTimeout(() => {
+      setFreshStages(new Map());
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [freshStages.size]);
+
   useEffect(() => {
     if (freshStages.size === 0) return;
     const handler = (e: KeyboardEvent) => {
@@ -338,6 +352,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
               onCancelDismiss={() => setCancelConfirmId(null)}
               dimmed={!singleStageMatches(stage, personFilter, statusFilterSet, searchLower)}
               saveCurrency={saveCurrency}
+              freshInheritedFields={freshStages.get(stage.id)}
             />
           ))}
         </SortableContext>
