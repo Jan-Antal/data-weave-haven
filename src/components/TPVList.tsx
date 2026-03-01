@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useTPVItems, useUpdateTPVItem, useAddTPVItem, useDeleteTPVItems, useBulkUpdateTPVStatus, useBulkInsertTPVItems } from "@/hooks/useTPVItems";
@@ -151,13 +151,14 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack }: Pr
 
   // ── Selection & CRUD state ──────────────────────────────────────
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importData, setImportData] = useState<any[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [deleteIds, setDeleteIds] = useState<string[] | null>(null);
   const [bulkStatusValue, setBulkStatusValue] = useState("");
-  const [newItem, setNewItem] = useState({ item_name: "", item_type: "", status: "", sent_date: "", accepted_date: "", notes: "" });
+  const [addingInline, setAddingInline] = useState(false);
+  const [inlineName, setInlineName] = useState("");
+  const inlineRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const visibleColCount = renderKeys.length + 3; // +checkbox +item_name +actions
@@ -175,20 +176,17 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack }: Pr
     else setSelected(new Set(items.map(i => i.id)));
   };
 
-  const handleAdd = () => {
-    if (!newItem.item_name) return;
-    addItem.mutate({
-      project_id: projectId,
-      item_name: newItem.item_name,
-      item_type: newItem.item_type || undefined,
-      status: newItem.status || undefined,
-      sent_date: newItem.sent_date || undefined,
-      accepted_date: newItem.accepted_date || undefined,
-      notes: newItem.notes || undefined,
-    });
-    setNewItem({ item_name: "", item_type: "", status: "", sent_date: "", accepted_date: "", notes: "" });
-    setAddOpen(false);
+  const handleInlineAdd = () => {
+    const name = inlineName.trim();
+    if (!name) { setAddingInline(false); return; }
+    addItem.mutate({ project_id: projectId, item_name: name });
+    setInlineName("");
+    setAddingInline(false);
   };
+
+  useEffect(() => {
+    if (addingInline && inlineRef.current) inlineRef.current.focus();
+  }, [addingInline]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -312,14 +310,9 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack }: Pr
           )}
         </div>
         {canManageTPV && (
-          <>
-            <Button size="sm" variant="outline" onClick={() => { setNewItem({ item_name: "", item_type: "", status: "", sent_date: "", accepted_date: "", notes: "" }); setAddOpen(true); }}>
-              <Plus className="h-3 w-3 mr-1" /> Přidat položku
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setWizardOpen(true)}>
-              <Upload className="h-3 w-3 mr-1" /> Import z Excelu
-            </Button>
-          </>
+          <Button size="sm" variant="outline" onClick={() => setWizardOpen(true)}>
+            <Upload className="h-3 w-3 mr-1" /> Import z Excelu
+          </Button>
         )}
 
         {selected.size > 0 && canManageTPV && (
@@ -448,33 +441,43 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack }: Pr
                 </TableCell>
               </TableRow>
             ))}
+            {/* Inline add row */}
+            {canManageTPV && (
+              <TableRow className="h-9 hover:bg-muted/30">
+                <TableCell />
+                <TableCell colSpan={renderKeys.length + 2}>
+                  {addingInline ? (
+                    <div className="flex items-center gap-2">
+                      <Plus className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                      <Input
+                        ref={inlineRef}
+                        value={inlineName}
+                        onChange={e => setInlineName(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") handleInlineAdd();
+                          if (e.key === "Escape") { setAddingInline(false); setInlineName(""); }
+                        }}
+                        onBlur={handleInlineAdd}
+                        placeholder="Název položky…"
+                        className="h-7 text-sm border-0 shadow-none focus-visible:ring-0 px-0"
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setAddingInline(true)}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Přidat položku
+                    </button>
+                  )}
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
 
-      {/* Add Item Dialog */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Nová položka</DialogTitle></DialogHeader>
-          <div className="grid gap-3">
-            <div><Label>Název</Label><Input value={newItem.item_name} onChange={(e) => setNewItem(s => ({ ...s, item_name: e.target.value }))} /></div>
-            <div><Label>Typ</Label><Input value={newItem.item_type} onChange={(e) => setNewItem(s => ({ ...s, item_type: e.target.value }))} /></div>
-            <div><Label>Status</Label>
-              <Select value={newItem.status} onValueChange={(v) => setNewItem(s => ({ ...s, status: v }))}>
-                <SelectTrigger><SelectValue placeholder="Vyberte status..." /></SelectTrigger>
-                <SelectContent>{TPV_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div><Label>Odesláno</Label><Input value={newItem.sent_date} onChange={(e) => setNewItem(s => ({ ...s, sent_date: e.target.value }))} /></div>
-            <div><Label>Přijato</Label><Input value={newItem.accepted_date} onChange={(e) => setNewItem(s => ({ ...s, accepted_date: e.target.value }))} /></div>
-            <div><Label>Poznámka</Label><Input value={newItem.notes} onChange={(e) => setNewItem(s => ({ ...s, notes: e.target.value }))} /></div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Zrušit</Button>
-            <Button onClick={handleAdd}>Přidat</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Import Dialog */}
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
