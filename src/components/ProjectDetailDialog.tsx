@@ -48,6 +48,7 @@ interface ProjectDetailDialogProps {
 const DOC_CATEGORIES = [
   { key: "cenova_nabidka", icon: "📄", label: "Cenová nabídka" },
   { key: "smlouva", icon: "📋", label: "Smlouva" },
+  { key: "zadani", icon: "📝", label: "Zadání" },
   { key: "vykresy", icon: "📐", label: "Výkresy" },
   { key: "dokumentace", icon: "📁", label: "Dokumentace" },
   { key: "dodaci_list", icon: "📦", label: "Dodací list" },

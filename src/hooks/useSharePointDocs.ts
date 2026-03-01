@@ -20,6 +20,7 @@ export interface SPPreview {
 const CATEGORY_FOLDER_MAP: Record<string, string> = {
   cenova_nabidka: "Cenova-nabidka",
   smlouva: "Smlouva",
+  zadani: "Zadani",
   vykresy: "Vykresy",
   dokumentace: "Dokumentace",
   dodaci_list: "Dodaci-list",
