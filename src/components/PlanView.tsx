@@ -652,10 +652,12 @@ function SubstageRow({
 
 // ── Substage expand button ──────────────────────────────────────────
 function ExpandButton({ expanded, onClick, hasStages }: { expanded: boolean; onClick: () => void; hasStages?: boolean }) {
-  const color = hasStages ? "#f4a261" : "#95a5a6";
   return (
     <button onClick={onClick} className="p-0 shrink-0">
-      {expanded ? <ChevronDown className="h-4 w-4 stroke-[3]" style={{ color }} /> : <ChevronRight className="h-4 w-4 stroke-[3]" style={{ color }} />}
+      {expanded
+        ? <ChevronDown className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent" : "text-muted-foreground"}`} />
+        : <ChevronRight className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent fill-accent/20" : "text-muted-foreground/50"}`} />
+      }
     </button>
   );
 }
