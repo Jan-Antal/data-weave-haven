@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSortFilter } from "@/hooks/useSortFilter";
 import { parseAppDate, formatAppDate } from "@/lib/dateFormat";
 import { ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
-import { ChevronRight, ChevronDown, AlertTriangle, Lock } from "lucide-react";
+import { ChevronRight, ChevronDown, AlertTriangle, Lock, ChevronsDown, ChevronsUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { format, differenceInDays, addDays, startOfWeek, startOfMonth, addMonths, getISOWeek } from "date-fns";
@@ -884,7 +884,27 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
         {/* Left panel header */}
         <div className="border-r shrink-0 flex items-start" style={{ width: LEFT_PANEL_WIDTH, height: HEADER_HEIGHT }}>
           <div style={{ width: 36, minWidth: 36, maxWidth: 36 }} />
-          <div style={{ width: 36, minWidth: 36, maxWidth: 36 }} />
+          <div className="flex items-center justify-center" style={{ width: 36, minWidth: 36, maxWidth: 36 }}>
+            {sorted.length > 0 && (
+              <button
+                className="text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                title={expanded.size === sorted.length ? "Sbalit vše" : "Rozbalit vše"}
+                onClick={() => {
+                  if (expanded.size === sorted.length) {
+                    setExpanded(new Set());
+                  } else {
+                    setExpanded(new Set(sorted.map((p) => p.project_id)));
+                  }
+                }}
+              >
+                {expanded.size === sorted.length ? (
+                  <ChevronsUp className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronsDown className="h-3.5 w-3.5" />
+                )}
+              </button>
+            )}
+          </div>
           <button onClick={() => togglePlanSort("project_id")} className="flex items-center gap-1 h-9 px-2 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap hover:bg-muted/50 transition-colors" style={{ width: 110, minWidth: 110, flexShrink: 0 }}>
             {planIdLabel}
             {planSortCol === "project_id" ? (planSortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
