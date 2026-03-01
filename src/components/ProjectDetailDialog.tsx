@@ -644,7 +644,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
               <DialogTitle>{project.project_id} — {project.project_name}</DialogTitle>
             </DialogHeader>
 
-            <div className="flex" style={{ maxHeight: '90vh' }}>
+            <div className="flex" style={{ maxHeight: '78vh' }}>
               {/* LEFT PANEL — Form fields */}
               <div className="flex-1 px-6 pb-4 overflow-y-auto">
                 {/* ── ZÁKLADNÍ INFORMACE ────────────────────── */}
