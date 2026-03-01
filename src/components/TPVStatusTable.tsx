@@ -1,4 +1,5 @@
 import React, { useState, Fragment, useMemo, useEffect, useCallback, memo, useRef, type MutableRefObject } from "react";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { logActivity } from "@/lib/activityLog";
 import { useDataLogRowHighlight } from "@/hooks/useDataLogRowHighlight";
 import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColumns";
@@ -492,6 +493,11 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projects, sortCol, sortDir, computeKey]);
 
+  // Infinite scroll
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const scrollResetKey = `${computeKey}|${sortCol}|${sortDir}`;
+  const { visible, hasMore } = useInfiniteScroll(sorted, tableScrollRef, scrollResetKey);
+
   const orderedNativeKeys = useMemo(() => getOrderedKeys(TPV_NATIVE), [getOrderedKeys]);
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
 
@@ -597,7 +603,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
           Režim úpravy sloupců
         </div>
       )}
-      <div className={cn("rounded-lg border bg-card overflow-auto always-scrollbar", editMode && "rounded-t-none border-t-0")} style={{ maxHeight: "calc(100vh - 260px)" }}>
+      <div ref={tableScrollRef} className={cn("rounded-lg border bg-card overflow-auto always-scrollbar", editMode && "rounded-t-none border-t-0")} style={{ maxHeight: "calc(100vh - 260px)" }}>
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
@@ -627,7 +633,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sorted.map((p) => (
+            {visible.map((p) => (
               <Fragment key={p.id}>
                 <TPVProjectRow
                   project={p}
@@ -663,6 +669,16 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                 )}
               </Fragment>
             ))}
+            {hasMore && (
+              <TableRow>
+                <TableCell colSpan={99} className="text-center py-3">
+                  <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                    Načítání…
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
