@@ -900,12 +900,17 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                   </div>
                   <div>
                     <Label className="text-xs">Náročnost</Label>
-                    <Input
-                      value={form.narocnost}
-                      onChange={(e) => setForm(s => ({ ...s, narocnost: e.target.value }))}
-                      disabled={isSectionReadOnly("tpv")}
-                      className={cn(isSectionReadOnly("tpv") && roClass)}
-                    />
+                    {isSectionReadOnly("tpv") ? (
+                      <Select value={form.narocnost} disabled>
+                        <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent className="z-[99999]">{["Low", "Medium", "High"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                      </Select>
+                    ) : (
+                      <Select value={form.narocnost} onValueChange={(v) => setForm(s => ({ ...s, narocnost: v }))}>
+                        <SelectTrigger><SelectValue placeholder="Vyberte náročnost" /></SelectTrigger>
+                        <SelectContent className="z-[99999]">{["Low", "Medium", "High"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                      </Select>
+                    )}
                   </div>
                   <div>
                     <Label className="text-xs">Hodiny TPV</Label>
