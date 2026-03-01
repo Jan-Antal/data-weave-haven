@@ -573,10 +573,12 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
 
   // If TPV List detail is open, show it
   if (activeProject) {
+    const proj = projects.find(p => p.project_id === activeProject.projectId);
     return (
       <TPVList
         projectId={activeProject.projectId}
         projectName={activeProject.projectName}
+        currency={proj?.currency || "CZK"}
         onBack={() => { setActiveProject(null); onRequestTab?.(); }}
       />
     );
