@@ -44,7 +44,7 @@ export function useSortFilter<T extends Record<string, any>>(data: T[], external
       const allowed = externalFilters.statusFilter;
       result = result.filter(row => {
         const status = row.status;
-        if (!status) return false;
+        if (!status) return true; // Always show projects with null/empty status
         return allowed.includes(status);
       });
     } else if (externalFilters?.statusFilter && externalFilters.statusFilter.length === 0) {
