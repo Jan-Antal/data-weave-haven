@@ -11,6 +11,28 @@ import { useAuth } from "@/hooks/useAuth";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import type { Project } from "@/hooks/useProjects";
 
+function WarningIconForField({ fieldKey, orderWarnings }: { fieldKey: string; orderWarnings: { message: string; fields: Set<string>; severity: "orange" | "red" }[] }) {
+  const fieldWarnings = orderWarnings.filter(w => w.fields.has(fieldKey));
+  if (fieldWarnings.length === 0) return <div className="w-6 shrink-0" />;
+  const hasRed = fieldWarnings.some(w => w.severity === "red");
+  return (
+    <div className="w-6 shrink-0 flex items-center justify-center">
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <AlertTriangle className="h-3.5 w-3.5" style={{ color: hasRed ? "#dc2626" : "#f4a261" }} />
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs max-w-[220px]">
+            {fieldWarnings.map((w, i) => (
+              <div key={i} style={{ color: w.severity === "red" ? "#dc2626" : undefined }}>{w.message}</div>
+            ))}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
+  );
+}
+
 const DATE_FIELDS = [
   { key: "datum_objednavky", label: "Datum Objednání" },
   { key: "tpv_date", label: "TPV" },
@@ -60,7 +82,7 @@ export function PlanDateEditDialog({ project, open, onOpenChange }: PlanDateEdit
       { key: "predani", label: "Předání" },
       { key: "datum_smluvni", label: "Smluvní" },
     ];
-    const warnings: { message: string; fields: Set<string> }[] = [];
+    const warnings: { message: string; fields: Set<string>; severity: "orange" | "red" }[] = [];
     for (let i = 0; i < ORDER.length; i++) {
       const aRaw = values[ORDER[i].key];
       const aDate = aRaw ? parseAppDate(aRaw) : null;
@@ -70,9 +92,11 @@ export function PlanDateEditDialog({ project, open, onOpenChange }: PlanDateEdit
         const bDate = bRaw ? parseAppDate(bRaw) : null;
         if (!bDate) continue;
         if (aDate > bDate) {
+          const isSevere = (ORDER[j].key === "datum_smluvni") && (ORDER[i].key === "expedice" || ORDER[i].key === "predani");
           warnings.push({
             message: `${ORDER[i].label} je po ${ORDER[j].label}`,
             fields: new Set([ORDER[i].key, ORDER[j].key]),
+            severity: isSevere ? "red" : "orange",
           });
         }
       }
@@ -138,22 +162,7 @@ export function PlanDateEditDialog({ project, open, onOpenChange }: PlanDateEdit
                   "text-xs font-medium w-[120px] shrink-0",
                   readOnly && "text-muted-foreground"
                 )}>{f.label}</span>
-                <div className="w-6 shrink-0 flex items-center justify-center">
-                  {hasWarning ? (
-                    <TooltipProvider delayDuration={200}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="text-xs max-w-[220px]">
-                          {orderWarnings.filter(w => w.fields.has(f.key)).map((w, i) => (
-                            <div key={i}>{w.message}</div>
-                          ))}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  ) : null}
-                </div>
+                <WarningIconForField fieldKey={f.key} orderWarnings={orderWarnings} />
                 <Popover
                   open={openPickers[f.key] || false}
                   onOpenChange={(o) => {
