@@ -542,7 +542,7 @@ function ConnectorLine({
 // ── Substage loader ─────────────────────────────────────────────────
 function SubstageRows({
   projectId, project, origin, dayPx, timelineWidth, statusColorMap, isFieldReadOnly,
-  weeks, months, showWeeks,
+  weeks, months, showWeeks, hoveredRow, setHoveredRow,
 }: {
   projectId: string; project: Project; origin: Date; dayPx: number;
   timelineWidth: number; statusColorMap: Record<string, string>;
@@ -550,6 +550,8 @@ function SubstageRows({
   weeks: { label: string; x: number }[];
   months: { label: string; startX: number; width: number; date: Date }[];
   showWeeks: boolean;
+  hoveredRow: string | null;
+  setHoveredRow: (id: string | null) => void;
 }) {
   const { data: stages = [] } = useProjectStages(projectId);
   const updateStage = useUpdateStage();
@@ -557,7 +559,7 @@ function SubstageRows({
   return (
     <>
       {stages.map((stage) => (
-        <SubstageRow key={stage.id} stage={stage} project={project} origin={origin} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} updateStage={updateStage} weeks={weeks} months={months} showWeeks={showWeeks} />
+        <SubstageRow key={stage.id} stage={stage} project={project} origin={origin} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} updateStage={updateStage} weeks={weeks} months={months} showWeeks={showWeeks} hoveredRow={hoveredRow} setHoveredRow={setHoveredRow} />
       ))}
     </>
   );
@@ -565,7 +567,7 @@ function SubstageRows({
 
 function SubstageRow({
   stage, project, origin, dayPx, timelineWidth, statusColorMap, isFieldReadOnly, updateStage,
-  weeks, months, showWeeks,
+  weeks, months, showWeeks, hoveredRow, setHoveredRow,
 }: {
   stage: ProjectStage; project: Project; origin: Date; dayPx: number;
   timelineWidth: number; statusColorMap: Record<string, string>;
@@ -574,12 +576,15 @@ function SubstageRow({
   weeks: { label: string; x: number }[];
   months: { label: string; startX: number; width: number; date: Date }[];
   showWeeks: boolean;
+  hoveredRow: string | null;
+  setHoveredRow: (id: string | null) => void;
 }) {
   const barData = getStageBarData(stage, project, statusColorMap);
   const midY = SUBSTAGE_ROW_HEIGHT / 2;
+  const isHovered = hoveredRow === stage.id;
 
   return (
-    <div className="border-b bg-muted/10" style={{ height: SUBSTAGE_ROW_HEIGHT, position: "relative", width: timelineWidth }}>
+    <div className={`border-b transition-colors ${isHovered ? "bg-muted/50" : "bg-muted/10"}`} style={{ height: SUBSTAGE_ROW_HEIGHT, position: "relative", width: timelineWidth }} onMouseEnter={() => setHoveredRow(stage.id)} onMouseLeave={() => setHoveredRow(null)}>
       {/* Grid lines — same as project rows */}
       {showWeeks && weeks.map((w, i) => (
         <div key={i} className="absolute top-0 bottom-0 border-l border-border/20" style={{ left: w.x, zIndex: 1 }} />
@@ -711,6 +716,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
     });
   }, [filteredProjects, planSortCol, planSortDir]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [editStage, setEditStage] = useState<ProjectStage | null>(null);
@@ -930,8 +936,10 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
             return (
               <div key={p.id}>
                 <div
-                  className="flex items-center border-b hover:bg-muted/30 transition-colors"
+                  className={`flex items-center border-b transition-colors ${hoveredRow === p.id ? "bg-muted/50" : ""}`}
                   style={{ height: ROW_HEIGHT }}
+                  onMouseEnter={() => setHoveredRow(p.id)}
+                  onMouseLeave={() => setHoveredRow(null)}
                 >
                   <div
                     className="shrink-0 flex items-center justify-center"
@@ -949,7 +957,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                   <span className="text-xs font-mono text-muted-foreground whitespace-nowrap shrink-0 cursor-pointer hover:underline px-2" style={{ width: 110, minWidth: 110 }} onClick={() => setEditProject(p)}>{p.project_id}</span>
                   <span className="text-xs font-medium truncate cursor-pointer hover:underline px-2" style={{ width: 180, minWidth: 180, maxWidth: 180 }} onClick={() => setEditProject(p)}>{p.project_name}</span>
                 </div>
-                {isExp && <SubstageLeftRows projectId={p.project_id} project={p} statusColorMap={statusColorMap} onClickStage={(stage) => setEditStage(stage)} />}
+                {isExp && <SubstageLeftRows projectId={p.project_id} project={p} statusColorMap={statusColorMap} onClickStage={(stage) => setEditStage(stage)} hoveredRow={hoveredRow} setHoveredRow={setHoveredRow} />}
               </div>
             );
           })}
@@ -967,8 +975,10 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
               return (
                 <div key={p.id}>
                   <div
-                    className="border-b hover:bg-muted/10 transition-colors"
+                    className={`border-b transition-colors ${hoveredRow === p.id ? "bg-muted/50" : ""}`}
                     style={{ position: "relative", overflow: "visible", height: ROW_HEIGHT, width: timelineWidth }}
+                    onMouseEnter={() => setHoveredRow(p.id)}
+                    onMouseLeave={() => setHoveredRow(null)}
                   >
                     {/* Grid lines */}
                     {showWeeks && weeks.map((w, i) => (
@@ -1069,7 +1079,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
 
                   {/* Substage rows */}
                   {isExp && (
-                    <SubstageRows projectId={p.project_id} project={p} origin={timelineStart} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} weeks={weeks} months={months} showWeeks={showWeeks} />
+                    <SubstageRows projectId={p.project_id} project={p} origin={timelineStart} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} weeks={weeks} months={months} showWeeks={showWeeks} hoveredRow={hoveredRow} setHoveredRow={setHoveredRow} />
                   )}
                 </div>
               );
@@ -1106,14 +1116,15 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
 }
 
 // ── Substage left panel rows ────────────────────────────────────────
-function SubstageLeftRows({ projectId, project, statusColorMap, onClickStage }: { projectId: string; project: Project; statusColorMap: Record<string, string>; onClickStage: (stage: ProjectStage) => void }) {
+function SubstageLeftRows({ projectId, project, statusColorMap, onClickStage, hoveredRow, setHoveredRow }: { projectId: string; project: Project; statusColorMap: Record<string, string>; onClickStage: (stage: ProjectStage) => void; hoveredRow: string | null; setHoveredRow: (id: string | null) => void }) {
   const { data: stages = [] } = useProjectStages(projectId);
   return (
     <>
       {stages.map((stage) => {
         const barData = getStageBarData(stage, project, statusColorMap);
+        const isHovered = hoveredRow === stage.id;
         return (
-          <div key={stage.id} className="flex items-center border-b bg-muted/10" style={{ height: SUBSTAGE_ROW_HEIGHT }}>
+          <div key={stage.id} className={`flex items-center border-b transition-colors ${isHovered ? "bg-muted/50" : "bg-muted/10"}`} style={{ height: SUBSTAGE_ROW_HEIGHT }} onMouseEnter={() => setHoveredRow(stage.id)} onMouseLeave={() => setHoveredRow(null)}>
             <div style={{ width: 36, minWidth: 36 }} />
             <div style={{ width: 36, minWidth: 36 }} />
             <div className="flex items-center gap-1 px-2 cursor-pointer hover:underline" style={{ width: 110, minWidth: 110 }} onClick={() => onClickStage(stage)}>
