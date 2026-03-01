@@ -10,7 +10,16 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
-import { ConfirmDialog } from "./ConfirmDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // ── Target fields: ONLY columns that exist in tpv_items table ────
 const TARGET_FIELDS = [
@@ -677,14 +686,19 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
         )}
       </div>
 
-      {/* Cancel confirmation */}
-      <ConfirmDialog
-        open={cancelConfirmOpen}
-        onConfirm={confirmCancel}
-        onCancel={() => setCancelConfirmOpen(false)}
-        title="Zrušit import?"
-        description="Opravdu chcete zrušit import? Nahraná data budou ztracena."
-      />
+      {/* Cancel confirmation — must be above wizard z-index */}
+      <AlertDialog open={cancelConfirmOpen} onOpenChange={(o) => { if (!o) setCancelConfirmOpen(false); }}>
+        <AlertDialogContent className="z-[100001]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Zrušit import?</AlertDialogTitle>
+            <AlertDialogDescription>Opravdu chcete zrušit import? Nahraná data budou ztracena.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setCancelConfirmOpen(false)}>Zrušit</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmCancel} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Smazat</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
