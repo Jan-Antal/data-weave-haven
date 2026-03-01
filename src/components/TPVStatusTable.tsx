@@ -26,7 +26,7 @@ import { ProjectDetailDialog } from "./ProjectDetailDialog";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { isStageFieldInherited, getStageDisplayValue, inheritedTextClass } from "@/lib/stageInheritance";
+import { getStageDisplayValue, stageFieldClass, buildInheritedStageData, getInheritedFieldKeys, addEditedField, EDITABLE_INHERITED, READ_ONLY_INHERITED } from "@/lib/stageInheritance";
 import { getTPVDashboardRiskColor } from "@/hooks/useRiskHighlight";
 import { useAllColumnVisibility, PROJECT_INFO_NATIVE, PM_NATIVE, TPV_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
 import { getColumnStyle, renderColumnHeader, renderColumnCell, getColumnLabel, COL_ICON_STYLE, COL_CHEVRON_STYLE } from "./CrossTabColumns";
@@ -42,8 +42,7 @@ import { useAllTPVItems } from "@/hooks/useAllTPVItems";
 const NATIVE_KEYS = ["project_id", "project_name", ...TPV_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
 
-const INHERITABLE_FIELDS = ["status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "datum_smluvni", "konstrukter", "narocnost", "architekt", "pm"];
-const INHERITABLE_DATE_MAP: Record<string, string> = { datum_objednavky: "start_date" };
+// (inheritance constants now in stageInheritance.ts)
 
 /** Check if any stage matches the active filters */
 function stageMatchesFilters(
@@ -102,7 +101,6 @@ const TPVListIcon = memo(function TPVListIcon({ projectId, itemCount, onClick }:
   );
 });
 
-// ── Stage row for TPV tab ───────────────────────────────────────────
 interface StageRowProps {
   stage: ProjectStage;
   project: Project;
@@ -111,8 +109,6 @@ interface StageRowProps {
   statusLabels: string[];
   canEdit: boolean;
   renderKeys: string[];
-  isFieldInherited?: (field: string) => boolean;
-  onFieldTouched?: (field: string) => void;
   cancelConfirm?: boolean;
   onCancelConfirm?: () => void;
   onCancelDismiss?: () => void;
@@ -120,24 +116,24 @@ interface StageRowProps {
   freshInheritedFields?: Set<string>;
 }
 
-function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys, isFieldInherited, onFieldTouched, cancelConfirm, onCancelConfirm, onCancelDismiss, dimmed, freshInheritedFields }: StageRowProps) {
+function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys, cancelConfirm, onCancelConfirm, onCancelDismiss, dimmed, freshInheritedFields }: StageRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
   const updateStage = useUpdateStage();
   const style = { transform: CSS.Transform.toString(transform), transition };
   const saveStage = useCallback((field: string, value: string) => {
-    onFieldTouched?.(field);
     const tracked = ["konstrukter", "status", "datum_smluvni"];
+    const newEditedFields = addEditedField(stage, field);
     updateStage.mutate({
       id: stage.id, field, value, projectId: project.project_id,
       oldValue: tracked.includes(field) ? ((stage as any)[field] ?? "") : undefined,
       stageName: tracked.includes(field) ? stage.stage_name : undefined,
+      editedFields: newEditedFields,
     });
-  }, [stage.id, stage.stage_name, (stage as any).konstrukter, (stage as any).status, (stage as any).datum_smluvni, project.project_id, onFieldTouched, updateStage]);
+  }, [stage.id, stage.stage_name, (stage as any).konstrukter, (stage as any).status, (stage as any).datum_smluvni, (stage as any).manually_edited_fields, project.project_id, updateStage]);
   const v = isVisible;
   const ihClass = (field: string) => {
-    const base = inheritedTextClass(stage, project, field);
     if (freshInheritedFields?.has(field)) return "stage-inherit-highlight";
-    return base;
+    return stageFieldClass(stage, field);
   };
 
   const renderStageCell = (key: string) => {
@@ -220,29 +216,19 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     const suffix = lastChar ? String.fromCharCode(lastChar.charCodeAt(0) + 1) : "A";
     const stageName = `${projectId}-${suffix}`;
     const id = crypto.randomUUID();
-    const inheritedKeys = new Set<string>();
-    for (const field of INHERITABLE_FIELDS) {
-      const val = (project as any)[field];
-      if (val != null && val !== "") {
-        inheritedKeys.add(field);
-      }
-    }
-    for (const [projField, stageField] of Object.entries(INHERITABLE_DATE_MAP)) {
-      const val = (project as any)[projField];
-      if (val != null && val !== "") {
-        inheritedKeys.add(stageField);
-      }
-    }
 
-    const newStage = { id, project_id: projectId, stage_name: stageName, stage_order: stages.length };
+    const inheritedData = buildInheritedStageData(project);
+    const inheritedKeys = getInheritedFieldKeys(project);
+
+    const newStage = { id, project_id: projectId, stage_name: stageName, stage_order: stages.length, ...inheritedData, manually_edited_fields: [] };
     const queryKey = ["project_stages", projectId];
     qc.setQueryData<ProjectStage[]>(queryKey, (old) => [
       ...(old || []),
-      { ...newStage, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, start_date: null, end_date: null, notes: null, datum_smluvni: null, pm: null, status: null, risk: null, zamereni: null, tpv_date: null, expedice: null, montaz: null, predani: null, pm_poznamka: null, konstrukter: null, narocnost: null, hodiny_tpv: null, percent_tpv: null, architekt: null, prodejni_cena: null, currency: null, kalkulant: null, marze: null } as ProjectStage,
+      { ...newStage, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, end_date: null, notes: null, pm_poznamka: null, narocnost: null, hodiny_tpv: null, percent_tpv: null, prodejni_cena: null, currency: null, marze: null } as any as ProjectStage,
     ]);
     setFreshStages(prev => new Map(prev).set(id, inheritedKeys));
 
-    const { error } = await supabase.from("project_stages").insert(newStage);
+    const { error } = await supabase.from("project_stages").insert(newStage as any);
     if (error) {
       toast({ title: "Chyba", description: "Nepodařilo se vytvořit etapu", variant: "destructive" });
       qc.invalidateQueries({ queryKey });
@@ -274,10 +260,10 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     qc.invalidateQueries({ queryKey: ["all_project_stages"] });
   }, [projectId, qc]);
 
-  // Auto-clear freshStages after animation duration (2.5s)
+  // Auto-clear freshStages after animation duration (2s)
   useEffect(() => {
     if (freshStages.size === 0) return;
-    const timer = setTimeout(() => setFreshStages(new Map()), 2500);
+    const timer = setTimeout(() => setFreshStages(new Map()), 2000);
     return () => clearTimeout(timer);
   }, [freshStages.size]);
 
@@ -318,8 +304,8 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
               statusLabels={statusLabels}
               canEdit={canEdit}
               renderKeys={renderKeys}
-              isFieldInherited={freshStages.has(stage.id) ? (field) => freshStages.get(stage.id)?.has(field) ?? false : undefined}
-              onFieldTouched={freshStages.has(stage.id) ? (field) => markFieldTouched(stage.id, field) : undefined}
+
+
               cancelConfirm={cancelConfirmId === stage.id}
               onCancelConfirm={() => handleCancelStage(stage.id)}
               onCancelDismiss={() => setCancelConfirmId(null)}

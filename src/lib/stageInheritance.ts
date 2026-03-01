@@ -1,65 +1,131 @@
+/**
+ * Stage Inheritance System — Clean rewrite
+ *
+ * Tracks which stage fields are inherited from the parent project
+ * using a `manually_edited_fields` JSON array on each stage record.
+ */
 import type { ProjectStage } from "@/hooks/useProjectStages";
 import type { Project } from "@/hooks/useProjects";
 
+// ── Field classification ─────────────────────────────────────────────
+
+/** Read-only inherited fields — always show parent value, normal font */
+export const READ_ONLY_INHERITED = new Set(["project_name", "klient"]);
+
+/** Editable inherited fields — copied from parent on creation, gray until manually edited */
+export const EDITABLE_INHERITED = new Set([
+  "kalkulant", "pm", "status", "start_date", "datum_smluvni",
+  "tpv_date", "expedice", "montaz", "predani",
+  "architekt", "konstrukter", "risk", "zamereni",
+]);
+
+/** NOT inherited — always start empty, always normal font */
+export const NOT_INHERITED = new Set([
+  "prodejni_cena", "marze", "narocnost", "hodiny_tpv",
+  "percent_tpv", "pm_poznamka", "tpv_poznamka",
+]);
+
 /**
- * Maps stage field keys to their parent project field keys.
- * Fields not listed here use the same key name on both stage and project.
+ * Maps stage field keys to their parent project field keys
+ * when the names differ between stage and project.
  */
-const STAGE_TO_PROJECT_FIELD: Record<string, string> = {
+export const STAGE_TO_PROJECT_FIELD: Record<string, string> = {
   start_date: "datum_objednavky",
 };
 
-/** Fields that can be inherited from parent project */
-const INHERITABLE_STAGE_FIELDS = new Set([
-  "status", "risk", "zamereni", "tpv_date", "expedice", "montaz",
-  "predani", "datum_smluvni", "konstrukter", "narocnost", "architekt",
-  "start_date", "pm",
-]);
+/** Reverse: project field → stage field */
+export const PROJECT_TO_STAGE_FIELD: Record<string, string> = {
+  datum_objednavky: "start_date",
+};
 
-/** Fields always shown from parent (stage doesn't have its own column) */
-const PARENT_ONLY_FIELDS = new Set(["klient", "location"]);
+// ── manually_edited_fields helpers ───────────────────────────────────
 
-/**
- * Check if a stage field is inherited (stage's own value is null/empty
- * but parent has a value).
- */
-export function isStageFieldInherited(
-  stage: ProjectStage, project: Project, field: string
-): boolean {
-  if (PARENT_ONLY_FIELDS.has(field)) return true;
-  if (!INHERITABLE_STAGE_FIELDS.has(field)) return false;
-
-  const stageVal = (stage as any)[field];
-  if (stageVal != null && stageVal !== "" && String(stageVal).trim() !== "") return false;
-
-  const projectField = STAGE_TO_PROJECT_FIELD[field] || field;
-  const projectVal = (project as any)[projectField];
-  return projectVal != null && projectVal !== "";
+/** Read the manually_edited_fields array from a stage */
+export function getEditedFields(stage: ProjectStage): string[] {
+  const raw = (stage as any).manually_edited_fields;
+  if (Array.isArray(raw)) return raw;
+  return [];
 }
 
+/** Check if a field has been manually edited */
+export function isFieldManuallyEdited(stage: ProjectStage, field: string): boolean {
+  return getEditedFields(stage).includes(field);
+}
+
+/** Add a field to the manually_edited_fields array (returns new array) */
+export function addEditedField(stage: ProjectStage, field: string): string[] {
+  const current = getEditedFields(stage);
+  if (current.includes(field)) return current;
+  return [...current, field];
+}
+
+// ── Display value logic ──────────────────────────────────────────────
+
 /**
- * Get the display value for a stage field — own value if set,
- * otherwise fall back to parent project value.
+ * Get the display value for a stage field.
+ * - READ_ONLY_INHERITED: always from parent project
+ * - EDITABLE_INHERITED: stage's own value (which was copied at creation)
+ * - NOT_INHERITED: stage's own value
  */
 export function getStageDisplayValue(
   stage: ProjectStage, project: Project, field: string
 ): any {
-  if (PARENT_ONLY_FIELDS.has(field)) {
+  if (READ_ONLY_INHERITED.has(field)) {
     return (project as any)[field] ?? null;
   }
-
-  const stageVal = (stage as any)[field];
-  if (stageVal != null && stageVal !== "" && String(stageVal).trim() !== "") {
-    return stageVal;
-  }
-
-  const projectField = STAGE_TO_PROJECT_FIELD[field] || field;
-  return (project as any)[projectField] ?? null;
+  // For editable inherited and non-inherited, always use stage's own value
+  return (stage as any)[field] ?? null;
 }
 
-/** CSS class for inherited (gray) vs own (normal) stage field text */
-export function inheritedTextClass(
-  stage: ProjectStage, project: Project, field: string
+// ── CSS class logic ──────────────────────────────────────────────────
+
+/**
+ * Returns the CSS class for a stage field value.
+ * - READ_ONLY_INHERITED: empty (normal dark font)
+ * - EDITABLE_INHERITED + NOT manually edited: gray
+ * - EDITABLE_INHERITED + manually edited: empty (normal)
+ * - NOT_INHERITED: empty (normal)
+ */
+export function stageFieldClass(
+  stage: ProjectStage, field: string
 ): string {
-  return isStageFieldInherited(stage, project, field) ? "text-muted-foreground/60" : "";
+  if (READ_ONLY_INHERITED.has(field)) return "";
+  if (!EDITABLE_INHERITED.has(field)) return "";
+  return isFieldManuallyEdited(stage, field) ? "" : "text-muted-foreground/60";
+}
+
+// ── Values to copy on stage creation ─────────────────────────────────
+
+/**
+ * Build the initial field values for a new stage, copying from parent project.
+ * Only copies EDITABLE_INHERITED fields that have a value on the project.
+ */
+export function buildInheritedStageData(
+  project: Project
+): Record<string, any> {
+  const data: Record<string, any> = {};
+  for (const field of EDITABLE_INHERITED) {
+    const projectField = STAGE_TO_PROJECT_FIELD[field] || field;
+    const val = (project as any)[projectField];
+    if (val != null && val !== "") {
+      data[field] = val;
+    }
+  }
+  return data;
+}
+
+/**
+ * Returns the set of field names that were actually inherited (had values on parent).
+ * Used for the creation animation.
+ */
+export function getInheritedFieldKeys(project: Project): Set<string> {
+  const keys = new Set<string>();
+  for (const field of EDITABLE_INHERITED) {
+    const projectField = STAGE_TO_PROJECT_FIELD[field] || field;
+    const val = (project as any)[projectField];
+    if (val != null && val !== "") {
+      keys.add(field);
+    }
+  }
+  return keys;
 }

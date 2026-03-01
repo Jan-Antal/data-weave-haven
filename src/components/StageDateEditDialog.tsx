@@ -7,6 +7,7 @@ import { CalendarIcon, Trash2, AlertTriangle } from "lucide-react";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
 import { cn } from "@/lib/utils";
 import { useUpdateStage } from "@/hooks/useProjectStages";
+import { addEditedField } from "@/lib/stageInheritance";
 import { useAuth } from "@/hooks/useAuth";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import type { ProjectStage } from "@/hooks/useProjectStages";
@@ -22,14 +23,7 @@ const DATE_FIELDS = [
 
 type FieldKey = (typeof DATE_FIELDS)[number]["key"];
 
-// Map stage field keys to project field keys for inheritance fallback
-const STAGE_TO_PROJECT_FIELD: Record<string, string> = {
-  start_date: "datum_objednavky",
-  datum_smluvni: "datum_smluvni",
-  tpv_date: "tpv_date",
-  expedice: "expedice",
-  predani: "predani",
-};
+// No longer needed — values are now stored directly on stage
 
 interface StageDateEditDialogProps {
   stage: ProjectStage | null;
@@ -54,28 +48,16 @@ export function StageDateEditDialog({ stage, project, open, onOpenChange }: Stag
 
   useEffect(() => {
     if (stage && open) {
-      const inherited = new Set<FieldKey>();
-      const getVal = (stageKey: FieldKey): string | null => {
-        const stageVal = (stage as any)[stageKey] ?? null;
-        if (stageVal) return stageVal;
-        if (project) {
-          const projectKey = STAGE_TO_PROJECT_FIELD[stageKey];
-          const parentVal = projectKey ? ((project as any)[projectKey] ?? null) : null;
-          if (parentVal) inherited.add(stageKey);
-          return parentVal;
-        }
-        return null;
-      };
       setValues({
-        start_date: getVal("start_date"),
-        datum_smluvni: getVal("datum_smluvni"),
-        tpv_date: getVal("tpv_date"),
-        expedice: getVal("expedice"),
-        predani: getVal("predani"),
+        start_date: (stage as any).start_date ?? null,
+        datum_smluvni: (stage as any).datum_smluvni ?? null,
+        tpv_date: (stage as any).tpv_date ?? null,
+        expedice: (stage as any).expedice ?? null,
+        predani: (stage as any).predani ?? null,
       });
-      setInheritedFields(inherited);
+      setInheritedFields(new Set());
     }
-  }, [stage, project, open]);
+  }, [stage, open]);
 
   const orderWarnings = useMemo(() => {
     const ORDER: { key: FieldKey; label: string }[] = [
@@ -125,10 +107,12 @@ export function StageDateEditDialog({ stage, project, open, onOpenChange }: Stag
   };
 
   const handleSave = async () => {
+    let currentStage = stage;
     for (const f of DATE_FIELDS) {
       const oldVal = (stage as any)[f.key] ?? "";
       const newVal = values[f.key] ?? "";
       if (oldVal !== newVal) {
+        const newEditedFields = addEditedField(currentStage, f.key);
         updateStage.mutate({
           id: stage.id,
           field: f.key,
@@ -136,7 +120,10 @@ export function StageDateEditDialog({ stage, project, open, onOpenChange }: Stag
           projectId: stage.project_id,
           oldValue: oldVal,
           stageName: stage.stage_name,
+          editedFields: newEditedFields,
         });
+        // Update local reference so subsequent calls accumulate edited fields
+        currentStage = { ...currentStage, manually_edited_fields: newEditedFields } as any;
       }
     }
     onOpenChange(false);

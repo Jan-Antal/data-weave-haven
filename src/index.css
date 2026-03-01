@@ -177,7 +177,7 @@
   0% {
     color: hsl(15 82% 54%);
   }
-  70% {
+  50% {
     color: hsl(15 82% 54%);
   }
   100% {
@@ -186,5 +186,6 @@
 }
 
 .stage-inherit-highlight {
-  animation: stage-inherit-flash 3.5s ease-out forwards;
+  animation: stage-inherit-flash 2s ease-out forwards;
+  color: hsl(var(--muted-foreground) / 0.6);
 }
