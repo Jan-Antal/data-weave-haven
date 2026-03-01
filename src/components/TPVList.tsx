@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { exportToExcel, buildFileName } from "@/lib/exportExcel";
 import { ExportPopup } from "./ExportPopup";
 import { ExcelImportWizard } from "./ExcelImportWizard";
-
+import { formatCurrency } from "@/lib/currency";
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
   { key: "item_name", label: "Název", locked: true },
   { key: "item_type", label: "Typ" },
@@ -64,10 +64,11 @@ function getTPVListColumnStyle(key: string, customWidth?: number | null): React.
 interface Props {
   projectId: string;
   projectName: string;
+  currency?: string;
   onBack: () => void;
 }
 
-export function TPVList({ projectId, projectName, onBack }: Props) {
+export function TPVList({ projectId, projectName, currency = "CZK", onBack }: Props) {
   const { canManageTPV, canEdit, canEditColumns } = useAuth();
   const { data: items = [], isLoading } = useTPVItems(projectId);
   const { data: statusOptions = [] } = useTPVStatusOptions();
@@ -400,7 +401,22 @@ export function TPVList({ projectId, projectName, onBack }: Props) {
                   if (key === "accepted_date") return <TableCell key={key}><InlineEditableCell value={item.accepted_date} onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>;
                   if (key === "notes") return <TableCell key={key}><InlineEditableCell value={item.notes} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} readOnly={!canManageTPV} /></TableCell>;
                   if (key === "pocet") return <TableCell key={key} className="text-right"><InlineEditableCell value={item.pocet != null ? String(item.pocet) : ""} type="number" onSave={(v) => saveField(item.id, "pocet", v, item.pocet != null ? String(item.pocet) : "")} readOnly={!canManageTPV} /></TableCell>;
-                  if (key === "cena") return <TableCell key={key} className="text-right"><InlineEditableCell value={item.cena != null ? String(item.cena) : ""} type="number" onSave={(v) => saveField(item.id, "cena", v, item.cena != null ? String(item.cena) : "")} readOnly={!canManageTPV} /></TableCell>;
+                  if (key === "cena") {
+                    const displayVal = item.cena != null && item.cena !== 0
+                      ? formatCurrency(Math.round(item.cena), currency)
+                      : "—";
+                    return (
+                      <TableCell key={key} className="text-right">
+                        <InlineEditableCell
+                          value={item.cena != null ? String(item.cena) : ""}
+                          type="number"
+                          displayValue={<span>{displayVal}</span>}
+                          onSave={(v) => saveField(item.id, "cena", v, item.cena != null ? String(item.cena) : "")}
+                          readOnly={!canManageTPV}
+                        />
+                      </TableCell>
+                    );
+                  }
                   // Custom columns
                   if (key.startsWith("custom_")) {
                     const def = customColumns.find(c => c.column_key === key);
