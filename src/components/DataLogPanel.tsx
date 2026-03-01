@@ -249,7 +249,7 @@ export function DataLogPanel({ open, onOpenChange }: DataLogPanelProps) {
   if (!open) return null;
 
   return (
-    <div className="w-[340px] shrink-0 border-l border-border bg-card flex flex-col datalog-panel overflow-hidden">
+    <div className="w-[340px] shrink-0 border-l border-border bg-card flex flex-col datalog-panel overflow-hidden h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b bg-card sticky top-0 z-10">
         <div className="flex items-center gap-2">
@@ -332,6 +332,12 @@ export function DataLogPanel({ open, onOpenChange }: DataLogPanelProps) {
             ))}
           </div>
         ))}
+
+        {entries.length > 0 && (
+          <p className="text-[10px] text-muted-foreground text-center px-3 pt-2">
+            Zobrazeno {entries.length} záznamů
+          </p>
+        )}
 
         {hasNextPage && (
           <div className="p-3 text-center">
