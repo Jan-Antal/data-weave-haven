@@ -831,8 +831,8 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                     {newProj.datum_smluvni ? formatAppDate(parseAppDate(newProj.datum_smluvni)!) : "Vyberte datum"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-[9999]" align="start">
-                  <Calendar mode="single" selected={newProj.datum_smluvni ? parseAppDate(newProj.datum_smluvni) : undefined} onSelect={(date) => { if (date) { const iso = date.toISOString().split("T")[0]; setNewProj((p) => ({ ...p, datum_smluvni: iso })); } }} />
+                <PopoverContent className="w-auto p-0 z-[99999]" align="start">
+                  <Calendar mode="single" selected={newProj.datum_smluvni ? parseAppDate(newProj.datum_smluvni) : undefined} defaultMonth={newProj.datum_smluvni ? parseAppDate(newProj.datum_smluvni) ?? undefined : undefined} onSelect={(date) => { if (date) { const iso = date.toISOString().split("T")[0]; setNewProj((p) => ({ ...p, datum_smluvni: iso })); } }} className={cn("p-3 pointer-events-auto")} />
                 </PopoverContent>
               </Popover>
               {datumWarning && <p className="text-[hsl(var(--accent))] text-xs mt-1">Datum smluvní není vyplněn. Klikněte znovu pro uložení bez data.</p>}
