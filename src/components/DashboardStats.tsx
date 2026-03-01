@@ -260,22 +260,23 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
           <div className="rounded-lg border bg-card p-3 flex flex-col min-w-0" style={{ width: "35%" }}>
             <div className="flex items-center justify-between mb-1">
               <p style={{ fontSize: 10 }} className="uppercase tracking-wider text-muted-foreground">Pipeline zakázek</p>
-              <div className="flex items-center rounded-md border bg-muted p-0.5 gap-0.5">
+              <div className="flex items-center gap-1">
                 <button
                   onClick={() => setPipelineMode("count")}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
-                    pipelineMode === "count" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  className={`text-[9px] transition-colors ${
+                    pipelineMode === "count" ? "text-foreground font-semibold" : "text-muted-foreground/40 hover:text-muted-foreground"
                   }`}
                 >
-                  Počet
+                  #
                 </button>
+                <span className="text-muted-foreground/30 text-[9px]">/</span>
                 <button
                   onClick={() => setPipelineMode("value")}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
-                    pipelineMode === "value" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  className={`text-[9px] transition-colors ${
+                    pipelineMode === "value" ? "text-foreground font-semibold" : "text-muted-foreground/40 hover:text-muted-foreground"
                   }`}
                 >
-                  Hodnota
+                  Kč
                 </button>
               </div>
             </div>
