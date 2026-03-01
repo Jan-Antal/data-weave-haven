@@ -290,9 +290,11 @@ const Index = () => {
             <TabsContent value="tpv-status" forceMount className={cn("flex-1 min-h-0 overflow-y-auto", activeTab !== "tpv-status" ? "hidden" : "")}>
               <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRequestTab={() => handleTabChange("tpv-status")} closeDetailRef={tpvCloseDetailRef} />
             </TabsContent>
-            <TabsContent value="plan" forceMount className={cn("flex-1 min-h-0 overflow-y-auto", activeTab !== "plan" ? "hidden" : "")}>
-              <PlanView personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} zoom={planZoom} />
-            </TabsContent>
+            {activeTab === "plan" && (
+              <TabsContent value="plan" className="flex-1 min-h-0 overflow-y-auto">
+                <PlanView personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} zoom={planZoom} />
+              </TabsContent>
+            )}
           </Tabs>
         </main>
 

@@ -3,21 +3,29 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { logActivity } from "@/lib/activityLog";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
+import type { Project } from "@/hooks/useProjects";
+
+const NUMERIC_FIELDS = ["prodejni_cena", "material", "subdodavky", "vyroba", "tpv_cost", "percent_tpv"];
+
+function parseField(field: string, value: string): string | number | null {
+  if (NUMERIC_FIELDS.includes(field)) return value === "" ? null : Number(value);
+  return value;
+}
 
 export function useUpdateProject() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, field, value, oldValue, projectId }: { id: string; field: string; value: string; oldValue: string; projectId?: string }) => {
-      let parsed: string | number | null = value;
-      // Handle numeric fields
-      const numericFields = ["prodejni_cena", "material", "subdodavky", "vyroba", "tpv_cost", "percent_tpv"];
-      if (numericFields.includes(field)) {
-        parsed = value === "" ? null : Number(value);
-      }
-      const { error } = await supabase.from("projects").update({ [field]: parsed } as any).eq("id", id);
+      const parsed = parseField(field, value);
+      const { data, error } = await supabase
+        .from("projects")
+        .update({ [field]: parsed } as any)
+        .eq("id", id)
+        .select()
+        .single();
       if (error) throw error;
 
-      // Log status and konstrukter changes
+      // Log activity
       if (field === "status" && value !== oldValue && projectId) {
         logActivity({ projectId, actionType: "status_change", oldValue: oldValue || "—", newValue: value || "—" });
       }
@@ -30,10 +38,15 @@ export function useUpdateProject() {
         logActivity({ projectId, actionType: "datum_smluvni_change", oldValue: fmtOld, newValue: fmtNew });
       }
 
-      return { id, field, oldValue };
+      return { id, field, oldValue, updatedProject: data as Project };
     },
-    onSuccess: ({ id, field, oldValue }) => {
-      qc.invalidateQueries({ queryKey: ["projects"] });
+    onSuccess: ({ id, field, oldValue, updatedProject }) => {
+      // Patch single project in cache instead of full refetch
+      qc.setQueryData<Project[]>(["projects"], (old) => {
+        if (!old) return old;
+        return old.map((p) => (p.id === id ? { ...p, ...updatedProject } : p));
+      });
+
       toast({
         title: "Uloženo",
         description: "Klikněte pro vrácení změny",
@@ -41,11 +54,21 @@ export function useUpdateProject() {
           <button
             className="text-xs underline px-2 py-1"
             onClick={async () => {
-              let parsed: string | number | null = oldValue;
-              const numericFields = ["prodejni_cena", "material", "subdodavky", "vyroba", "tpv_cost", "percent_tpv"];
-              if (numericFields.includes(field)) parsed = oldValue === "" ? null : Number(oldValue);
-              await supabase.from("projects").update({ [field]: parsed } as any).eq("id", id);
-              qc.invalidateQueries({ queryKey: ["projects"] });
+              const parsed = parseField(field, oldValue);
+              const { data } = await supabase
+                .from("projects")
+                .update({ [field]: parsed } as any)
+                .eq("id", id)
+                .select()
+                .single();
+              if (data) {
+                qc.setQueryData<Project[]>(["projects"], (old) => {
+                  if (!old) return old;
+                  return old.map((p) => (p.id === id ? { ...p, ...data } : p));
+                });
+              } else {
+                qc.invalidateQueries({ queryKey: ["projects"] });
+              }
             }}
           >
             Undo
