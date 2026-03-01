@@ -77,7 +77,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack }: Pr
   const updateItem = useUpdateTPVItem();
   const addItem = useAddTPVItem();
   const deleteItems = useDeleteTPVItems();
-  const bulkStatus = useBulkUpdateTPVStatus();
+  
   const bulkInsert = useBulkInsertTPVItems();
   const { columns: customColumns } = useAllCustomColumns("tpv_items");
   const updateCustomField = useUpdateCustomField();
@@ -155,7 +155,6 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack }: Pr
   const [importData, setImportData] = useState<any[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [deleteIds, setDeleteIds] = useState<string[] | null>(null);
-  const [bulkStatusValue, setBulkStatusValue] = useState("");
   const [addingInline, setAddingInline] = useState(false);
   const [inlineName, setInlineName] = useState("");
   const inlineRef = useRef<HTMLInputElement>(null);
@@ -217,15 +216,20 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack }: Pr
     setImportData([]);
   };
 
-  const handleBulkStatusApply = () => {
-    if (!bulkStatusValue || selected.size === 0) return;
-    bulkStatus.mutate({ ids: Array.from(selected), status: bulkStatusValue, projectId });
-    setSelected(new Set());
-    setBulkStatusValue("");
-  };
+  // ── Bulk-aware field save ────────────────────────────────────────
+  // When multiple items are selected, editing a bulk-editable field on any
+  // selected row applies the change to ALL selected rows.
+  const BULK_FIELDS = new Set(["status", "konstrukter", "sent_date", "accepted_date"]);
 
   const saveField = (itemId: string, field: string, value: string, oldValue: string) => {
-    updateItem.mutate({ id: itemId, field, value, projectId, oldValue });
+    if (BULK_FIELDS.has(field) && selected.size > 1 && selected.has(itemId)) {
+      // Apply to all selected rows
+      for (const id of selected) {
+        updateItem.mutate({ id, field, value, projectId });
+      }
+    } else {
+      updateItem.mutate({ id: itemId, field, value, projectId, oldValue });
+    }
   };
 
   // ── Header helpers ──────────────────────────────────────────────
@@ -317,16 +321,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack }: Pr
 
         {selected.size > 0 && canManageTPV && (
           <div className="flex items-center gap-2 ml-4 border-l pl-4">
-            <span className="text-sm text-muted-foreground">{selected.size} vybráno</span>
-            <Select value={bulkStatusValue} onValueChange={setBulkStatusValue}>
-              <SelectTrigger className="h-8 w-[180px] text-xs">
-                <SelectValue placeholder="Změnit status..." />
-              </SelectTrigger>
-              <SelectContent>
-                {TPV_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Button size="sm" variant="outline" onClick={handleBulkStatusApply} disabled={!bulkStatusValue}>Aplikovat</Button>
+            <span className="text-sm text-muted-foreground">{selected.size} vybráno — úprava Status, Konstruktér nebo data se aplikuje na všechny vybrané</span>
             <Button size="sm" variant="destructive" onClick={() => setDeleteIds(Array.from(selected))}>
               <Trash2 className="h-3 w-3 mr-1" /> Smazat
             </Button>
