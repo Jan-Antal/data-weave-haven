@@ -22,6 +22,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { useSharePointDocs, type SPFile } from "@/hooks/useSharePointDocs";
 import { dispatchDocCountUpdate } from "@/hooks/useDocumentCounts";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Project {
   id: string;
@@ -32,12 +34,24 @@ interface Project {
   pm: string | null;
   konstrukter: string | null;
   kalkulant: string | null;
+  architekt: string | null;
   status: string | null;
   datum_smluvni: string | null;
   datum_objednavky: string | null;
   prodejni_cena: number | null;
   currency: string | null;
   marze: string | null;
+  risk: string | null;
+  zamereni: string | null;
+  tpv_date: string | null;
+  expedice: string | null;
+  montaz: string | null;
+  predani: string | null;
+  pm_poznamka: string | null;
+  narocnost: string | null;
+  hodiny_tpv: string | null;
+  percent_tpv: number | null;
+  tpv_poznamka: string | null;
 }
 
 interface ProjectDetailDialogProps {
@@ -71,65 +85,142 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+const RISK_OPTIONS = ["Low", "Medium", "High"];
+
+// ── Helper: Date picker field ──────────────────────────────────
+function DateField({ label, value, onChange, disabled }: { label: string; value: string; onChange: (v: string) => void; disabled: boolean }) {
+  if (disabled) {
+    return (
+      <div>
+        <Label className="text-xs">{label}</Label>
+        <Button variant="outline" disabled className="w-full justify-start text-left font-normal bg-muted text-muted-foreground cursor-not-allowed opacity-70">
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {value || "—"}
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <Label className="text-xs">{label}</Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !value && "text-muted-foreground")}>
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {value || "Vyberte datum"}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0 z-[99999]" align="start">
+          <Calendar
+            mode="single"
+            defaultMonth={value ? parseAppDate(value) : undefined}
+            selected={value ? parseAppDate(value) : undefined}
+            onSelect={(d) => { if (d) onChange(formatAppDate(d)); }}
+            className="p-3 pointer-events-auto"
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+// ── Form state shape ──────────────────────────────────────────
+function buildFormState(p: Project | null) {
+  if (!p) return defaultForm();
+  return {
+    project_id: p.project_id || "",
+    project_name: p.project_name || "",
+    klient: p.klient || "",
+    location: (p as any).location || "",
+    pm: p.pm || "",
+    konstrukter: p.konstrukter || "",
+    kalkulant: p.kalkulant || "",
+    architekt: p.architekt || "",
+    status: p.status || "",
+    datum_smluvni: p.datum_smluvni || "",
+    datum_objednavky: (p as any).datum_objednavky || "",
+    prodejni_cena: p.prodejni_cena != null ? String(p.prodejni_cena) : "",
+    currency: p.currency || "CZK",
+    marze: marzeStorageToInput(p.marze),
+    risk: p.risk || "",
+    zamereni: p.zamereni || "",
+    tpv_date: p.tpv_date || "",
+    expedice: p.expedice || "",
+    montaz: p.montaz || "",
+    predani: p.predani || "",
+    pm_poznamka: p.pm_poznamka || "",
+    narocnost: p.narocnost || "",
+    hodiny_tpv: p.hodiny_tpv || "",
+    percent_tpv: p.percent_tpv != null ? String(p.percent_tpv) : "",
+    tpv_poznamka: p.tpv_poznamka || "",
+  };
+}
+
+function defaultForm() {
+  return {
+    project_id: "", project_name: "", klient: "", location: "", pm: "", konstrukter: "", kalkulant: "", architekt: "",
+    status: "", datum_smluvni: "", datum_objednavky: "", prodejni_cena: "", currency: "CZK", marze: "",
+    risk: "", zamereni: "", tpv_date: "", expedice: "", montaz: "", predani: "", pm_poznamka: "",
+    narocnost: "", hodiny_tpv: "", percent_tpv: "", tpv_poznamka: "",
+  };
+}
+
 export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDetailDialogProps) {
   const qc = useQueryClient();
   const { data: statusOptions = [] } = useProjectStatusOptions();
-  const { canEdit, canDeleteProject, isViewer, isFieldReadOnly, canUploadDocuments } = useAuth();
+  const { canEdit, canDeleteProject, isViewer, isKonstrukter, isPM, isFieldReadOnly, canUploadDocuments } = useAuth();
   const statusLabels = statusOptions.map((s) => s.label);
-  const [form, setForm] = useState({
-    project_id: "",
-    project_name: "",
-    klient: "",
-    location: "",
-    pm: "",
-    konstrukter: "",
-    kalkulant: "",
-    status: "",
-    datum_smluvni: "",
-    datum_objednavky: "",
-    prodejni_cena: "",
-    currency: "CZK",
-    marze: "",
-  });
-  
+  const [form, setForm] = useState(defaultForm());
+  const [initialForm, setInitialForm] = useState(defaultForm());
+
   const [priceEditing, setPriceEditing] = useState(false);
   const [showLocation, setShowLocation] = useState(false);
-  
+  const [unsavedConfirmOpen, setUnsavedConfirmOpen] = useState(false);
+
   const [locSuggestions, setLocSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
   const [showLocDropdown, setShowLocDropdown] = useState(false);
   const locDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const locInputRef = useRef<HTMLInputElement>(null);
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
-  const [deletingFile, setDeletingFile] = useState<string | null>(null); // "catKey:fileName"
+  const [deletingFile, setDeletingFile] = useState<string | null>(null);
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck(project?.id);
 
   const sp = useSharePointDocs(project?.project_id ?? "");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewFile, setPreviewFile] = useState<{ file: SPFile; categoryKey: string; loading: boolean; previewUrl: string | null; webUrl: string | null; downloadUrl: string | null } | null>(null);
 
+  // ── Dirty check ─────────────────────────────────────────────
+  const isDirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initialForm), [form, initialForm]);
+
+  const tryClose = useCallback(() => {
+    if (isDirty) {
+      setUnsavedConfirmOpen(true);
+    } else {
+      onOpenChange(false);
+    }
+  }, [isDirty, onOpenChange]);
+
+  // ── Role-based section read-only ────────────────────────────
+  // PM: can edit Základní, Finance, PM section. TPV read-only.
+  // Konstruktér: can edit TPV section only.
+  // Viewer: all read-only.
+  const isSectionReadOnly = useCallback((section: "basic" | "finance" | "pm" | "tpv") => {
+    if (isViewer) return true;
+    if (isKonstrukter) return section !== "tpv";
+    if (isPM) return section === "tpv";
+    return false;
+  }, [isViewer, isKonstrukter, isPM]);
+
   useEffect(() => {
     if (project && open) {
-      setForm({
-        project_id: project.project_id || "",
-        project_name: project.project_name || "",
-        klient: project.klient || "",
-        location: (project as any).location || "",
-        pm: project.pm || "",
-        konstrukter: project.konstrukter || "",
-        kalkulant: project.kalkulant || "",
-        status: project.status || "",
-        datum_smluvni: project.datum_smluvni || "",
-        datum_objednavky: (project as any).datum_objednavky || "",
-        prodejni_cena: project.prodejni_cena != null ? String(project.prodejni_cena) : "",
-        currency: project.currency || "CZK",
-        marze: marzeStorageToInput(project.marze),
-      });
+      const f = buildFormState(project);
+      setForm(f);
+      setInitialForm(f);
       setDeleteStep(0);
       setOpenCategory(null);
       setShowLocation(false);
       setPriceEditing(false);
-      
       setLocSuggestions([]);
       setShowLocDropdown(false);
       sp.resetCache();
@@ -137,9 +228,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
     }
   }, [project, open, resetIdCheck]);
 
-  // Google Maps iframe handles its own geocoding via q= parameter — no Nominatim needed for map display
-
-  // Debounced Nominatim autocomplete
   const handleLocationInput = useCallback((value: string) => {
     setForm(s => ({ ...s, location: value }));
     if (locDebounceRef.current) clearTimeout(locDebounceRef.current);
@@ -174,7 +262,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
     if (e.key === "Enter") {
       e.preventDefault();
       setShowLocDropdown(false);
-      // Map updates automatically via iframe q= parameter
     }
   }, [form.location]);
 
@@ -186,7 +273,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
     }
   }, [openCategory, sp]);
 
-  // Fetch all category counts on dialog open
   useEffect(() => {
     if (project && open) {
       sp.fetchAllCategories();
@@ -266,7 +352,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
   const handleSave = async () => {
     if (idExists) return;
 
-    // Store previous values for undo
     const previousValues: Record<string, any> = {
       project_id: project.project_id,
       project_name: project.project_name,
@@ -275,12 +360,24 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
       pm: project.pm,
       konstrukter: project.konstrukter,
       kalkulant: project.kalkulant,
+      architekt: project.architekt,
       status: project.status,
       datum_smluvni: project.datum_smluvni,
       datum_objednavky: (project as any).datum_objednavky,
       prodejni_cena: project.prodejni_cena,
       currency: project.currency,
       marze: project.marze,
+      risk: project.risk,
+      zamereni: project.zamereni,
+      tpv_date: project.tpv_date,
+      expedice: project.expedice,
+      montaz: project.montaz,
+      predani: project.predani,
+      pm_poznamka: project.pm_poznamka,
+      narocnost: project.narocnost,
+      hodiny_tpv: project.hodiny_tpv,
+      percent_tpv: project.percent_tpv,
+      tpv_poznamka: project.tpv_poznamka,
     };
 
     const newValues = {
@@ -291,19 +388,30 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
       pm: form.pm || null,
       konstrukter: form.konstrukter || null,
       kalkulant: form.kalkulant || null,
+      architekt: form.architekt || null,
       status: form.status || null,
       datum_smluvni: form.datum_smluvni || null,
       datum_objednavky: form.datum_objednavky || null,
       prodejni_cena: form.prodejni_cena ? Number(form.prodejni_cena) : null,
       currency: form.currency || "CZK",
       marze: marzeInputToStorage(form.marze),
+      risk: form.risk || null,
+      zamereni: form.zamereni || null,
+      tpv_date: form.tpv_date || null,
+      expedice: form.expedice || null,
+      montaz: form.montaz || null,
+      predani: form.predani || null,
+      pm_poznamka: form.pm_poznamka || null,
+      narocnost: form.narocnost || null,
+      hodiny_tpv: form.hodiny_tpv || null,
+      percent_tpv: form.percent_tpv ? Number(form.percent_tpv) : null,
+      tpv_poznamka: form.tpv_poznamka || null,
     };
 
     const { error } = await supabase.from("projects").update(newValues).eq("id", project.id);
     if (error) {
       toast({ title: "Chyba", description: error.message, variant: "destructive" });
     } else {
-      // Log status and konstrukter changes
       if (newValues.status !== previousValues.status) {
         logActivity({ projectId: project.project_id, actionType: "status_change", oldValue: previousValues.status || "—", newValue: newValues.status || "—" });
       }
@@ -322,7 +430,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
   };
 
   const handleDelete = async () => {
-    // Archive documents first (best-effort)
     try {
       await sp.archiveProject();
     } catch (err: any) {
@@ -352,10 +459,14 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
     setDeletingFile(null);
   };
 
+  // ── Read-only style helper ──────────────────────────────────
+  const roClass = "bg-[#f3f4f6] text-muted-foreground cursor-not-allowed opacity-70";
+
   return (
+    <>
     <Dialog open={open} onOpenChange={(v) => {
       if (!v && previewFile) { setPreviewFile(null); return; }
-      if (!v) { onOpenChange(false); }
+      if (!v) { tryClose(); return; }
     }}>
       <DialogContent
         className={cn(
@@ -372,7 +483,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
         {previewFile ? (
           /* ===== PREVIEW MODE ===== */
           <div className="flex flex-col h-full">
-            {/* Top bar */}
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setPreviewFile(null)}>
@@ -408,7 +518,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
               </div>
             </div>
 
-            {/* Preview body */}
             <div className="flex-1 relative min-h-0">
               {previewFile.loading && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-background/80">
@@ -431,7 +540,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
               ) : null}
             </div>
 
-            {/* Bottom bar */}
             <div className="flex items-center justify-between px-4 py-2.5 border-t border-border shrink-0">
               <div className="flex items-center gap-2 min-w-0 overflow-hidden">
                 <span className="text-xs text-muted-foreground truncate">{previewFile.file.name}</span>
@@ -486,9 +594,11 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
               <DialogTitle>Projekt {project.project_id}</DialogTitle>
             </DialogHeader>
 
-            <div className="flex min-h-[380px]">
+            <div className="flex min-h-[380px] max-h-[70vh]">
               {/* LEFT PANEL — Form fields */}
-              <div className="flex-1 px-6 pb-4">
+              <div className="flex-1 px-6 pb-4 overflow-y-auto">
+                {/* ── Základní informace ────────────────────── */}
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Základní informace</h4>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-3">
                   <div>
                     <Label className="text-xs">Project ID</Label>
@@ -502,8 +612,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                           resetIdCheck();
                         }
                       }}
-                      disabled={isViewer || isFieldReadOnly("project_id")}
-                      className={cn((isViewer || isFieldReadOnly("project_id")) && "bg-muted text-muted-foreground cursor-not-allowed opacity-70")}
+                      disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_id")}
+                      className={cn((isSectionReadOnly("basic") || isFieldReadOnly("project_id")) && roClass)}
                     />
                     {idExists && <p className="text-xs text-destructive mt-1">Toto ID již existuje</p>}
                   </div>
@@ -512,21 +622,17 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     <Input
                       value={form.project_name}
                       onChange={(e) => setForm(s => ({ ...s, project_name: e.target.value }))}
-                      disabled={isViewer || isFieldReadOnly("project_name")}
-                      className={cn((isViewer || isFieldReadOnly("project_name")) && "bg-muted text-muted-foreground cursor-not-allowed opacity-70")}
+                      disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_name")}
+                      className={cn((isSectionReadOnly("basic") || isFieldReadOnly("project_name")) && roClass)}
                     />
                   </div>
 
                   <div>
                     <Label className="text-xs">Klient</Label>
-                    {isViewer ? (
+                    {isSectionReadOnly("basic") ? (
                       <div className="relative flex items-center gap-1">
-                        <Input value={form.klient || "—"} disabled className="bg-muted text-muted-foreground cursor-not-allowed opacity-70" />
-                        <button
-                          type="button"
-                          disabled
-                          className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-muted opacity-70 cursor-not-allowed"
-                        >
+                        <Input value={form.klient || "—"} disabled className={roClass} />
+                        <button type="button" disabled className={cn("h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input", roClass)}>
                           <MapPin className={cn("h-4 w-4", form.location ? "text-primary" : "text-muted-foreground/30")} />
                         </button>
                       </div>
@@ -546,20 +652,15 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                   </div>
                   <div>
                     <Label className="text-xs">PM</Label>
-                    {isViewer || isFieldReadOnly("pm") ? (
-                      <Input value={form.pm || "—"} disabled className="bg-muted text-muted-foreground cursor-not-allowed opacity-70" />
+                    {isSectionReadOnly("basic") || isFieldReadOnly("pm") ? (
+                      <Input value={form.pm || "—"} disabled className={roClass} />
                     ) : (
                       <PeopleSelectDropdown role="PM" value={form.pm} onValueChange={(v) => setForm(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
                     )}
                   </div>
 
                   {/* Collapsible location row */}
-                  <div
-                    className={cn(
-                      "col-span-2 overflow-hidden transition-all duration-300 ease-in-out",
-                      showLocation ? "max-h-[280px] opacity-100" : "max-h-0 opacity-0"
-                    )}
-                  >
+                  <div className={cn("col-span-2 overflow-hidden transition-all duration-300 ease-in-out", showLocation ? "max-h-[280px] opacity-100" : "max-h-0 opacity-0")}>
                     <div className="grid grid-cols-2 gap-3 pb-1">
                       <div className="relative">
                         <Label className="text-xs">Lokace</Label>
@@ -576,12 +677,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                         {showLocDropdown && locSuggestions.length > 0 && (
                           <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-md border border-border bg-popover shadow-lg max-h-48 overflow-y-auto">
                             {locSuggestions.map((s, i) => (
-                              <button
-                                key={i}
-                                type="button"
-                                className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors truncate"
-                                onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(s); }}
-                              >
+                              <button key={i} type="button" className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors truncate" onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(s); }}>
                                 {s.display_name}
                               </button>
                             ))}
@@ -601,9 +697,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                               referrerPolicy="no-referrer-when-downgrade"
                             />
                           ) : (
-                            <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
-                              Zadejte adresu
-                            </div>
+                            <div className="flex items-center justify-center h-full text-xs text-muted-foreground">Zadejte adresu</div>
                           )}
                         </div>
                       </div>
@@ -611,29 +705,52 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                   </div>
 
                   <div>
+                    <Label className="text-xs">Konstruktér</Label>
+                    {isSectionReadOnly("basic") ? (
+                      <Input value={form.konstrukter || "—"} disabled className={roClass} />
+                    ) : (
+                      <PeopleSelectDropdown role="Konstruktér" value={form.konstrukter} onValueChange={(v) => setForm(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
+                    )}
+                  </div>
+                  <div>
+                    <Label className="text-xs">Architekt</Label>
+                    {isSectionReadOnly("basic") ? (
+                      <Input value={form.architekt || "—"} disabled className={roClass} />
+                    ) : (
+                      <Input value={form.architekt} onChange={(e) => setForm(s => ({ ...s, architekt: e.target.value }))} placeholder="Architekt" />
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Finance ──────────────────────────────── */}
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-5 mb-2">Finance</h4>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-3">
+                  <div>
                     <Label className="text-xs">Status</Label>
-                    {isViewer ? (
+                    {isSectionReadOnly("finance") ? (
                       <Select value={form.status} disabled>
-                        <SelectTrigger className="bg-muted text-muted-foreground cursor-not-allowed opacity-70"><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">
-                          {statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                        </SelectContent>
+                        <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                       </Select>
                     ) : (
                       <Select value={form.status} onValueChange={(v) => setForm(s => ({ ...s, status: v }))}>
                         <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">
-                          {statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                        </SelectContent>
+                        <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                       </Select>
                     )}
                   </div>
                   <div>
-                    <Label className="text-xs">Konstruktér</Label>
-                    {isViewer ? (
-                      <Input value={form.konstrukter || "—"} disabled className="bg-muted text-muted-foreground cursor-not-allowed opacity-70" />
+                    <Label className="text-xs">Risk</Label>
+                    {isSectionReadOnly("finance") || isFieldReadOnly("risk") ? (
+                      <Select value={form.risk} disabled>
+                        <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                      </Select>
                     ) : (
-                      <PeopleSelectDropdown role="Konstruktér" value={form.konstrukter} onValueChange={(v) => setForm(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
+                      <Select value={form.risk} onValueChange={(v) => setForm(s => ({ ...s, risk: v }))}>
+                        <SelectTrigger><SelectValue placeholder="Vyberte risk" /></SelectTrigger>
+                        <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                      </Select>
                     )}
                   </div>
 
@@ -641,24 +758,24 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     <Label className="text-xs">Prodejní cena</Label>
                     <div className="flex items-center gap-1">
                       <Input
-                        type={!isViewer && priceEditing ? "number" : "text"}
-                        className={cn("no-spinners", (isViewer || isFieldReadOnly("prodejni_cena")) && "bg-muted text-muted-foreground cursor-not-allowed opacity-70")}
-                        value={isViewer
+                        type={!isSectionReadOnly("finance") && priceEditing ? "number" : "text"}
+                        className={cn("no-spinners", (isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")) && roClass)}
+                        value={isSectionReadOnly("finance")
                           ? (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : "—")
                           : (priceEditing ? form.prodejni_cena : (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : ""))
                         }
                         onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))}
                         onFocus={() => setPriceEditing(true)}
                         onBlur={() => setPriceEditing(false)}
-                        disabled={isViewer || isFieldReadOnly("prodejni_cena")}
+                        disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
                       />
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        className={cn("h-10 px-3 font-mono shrink-0", isViewer && "opacity-70 cursor-not-allowed")}
+                        className={cn("h-10 px-3 font-mono shrink-0", isSectionReadOnly("finance") && "opacity-70 cursor-not-allowed")}
                         onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
-                        disabled={isViewer || isFieldReadOnly("prodejni_cena")}
+                        disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
                       >
                         {form.currency}
                       </Button>
@@ -666,87 +783,97 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                   </div>
                   <div>
                     <Label className="text-xs">Kalkulant</Label>
-                    {isViewer ? (
-                      <Input value={form.kalkulant || "—"} disabled className="bg-muted text-muted-foreground cursor-not-allowed opacity-70" />
+                    {isSectionReadOnly("finance") ? (
+                      <Input value={form.kalkulant || "—"} disabled className={roClass} />
                     ) : (
                       <PeopleSelectDropdown role="Kalkulant" value={form.kalkulant} onValueChange={(v) => setForm(s => ({ ...s, kalkulant: v }))} placeholder="Vyberte kalkulanta" />
                     )}
                   </div>
 
-                  {/* Bottom row: 3 columns */}
                   <div className="col-span-2 grid grid-cols-3 gap-x-3">
                     <div>
                       <Label className="text-xs">Marže</Label>
                       <div className="flex items-center gap-1">
                         <Input
-                          type={isViewer ? "text" : "number"}
-                          className={cn("no-spinners", (isViewer || isFieldReadOnly("marze")) && "bg-muted text-muted-foreground cursor-not-allowed opacity-70")}
-                          value={isViewer ? (form.marze ? `${form.marze}` : "—") : form.marze}
+                          type={isSectionReadOnly("finance") ? "text" : "number"}
+                          className={cn("no-spinners", (isSectionReadOnly("finance") || isFieldReadOnly("marze")) && roClass)}
+                          value={isSectionReadOnly("finance") ? (form.marze ? `${form.marze}` : "—") : form.marze}
                           onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
                           placeholder="0"
-                          disabled={isViewer || isFieldReadOnly("marze")}
+                          disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
                         />
                         <span className="text-sm text-muted-foreground shrink-0">%</span>
                       </div>
                     </div>
-                    <div>
-                      <Label className="text-xs">Datum Objednávky</Label>
-                      {isViewer ? (
-                        <Button variant="outline" disabled className="w-full justify-start text-left font-normal bg-muted text-muted-foreground cursor-not-allowed opacity-70">
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {form.datum_objednavky || "—"}
-                        </Button>
-                      ) : (
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !form.datum_objednavky && "text-muted-foreground")}>
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {form.datum_objednavky || "Vyberte datum"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0 z-[99999]" align="start">
-                            <Calendar
-                              mode="single"
-                              defaultMonth={form.datum_objednavky ? parseAppDate(form.datum_objednavky) : undefined}
-                              selected={form.datum_objednavky ? parseAppDate(form.datum_objednavky) : undefined}
-                              onSelect={(d) => {
-                                if (d) setForm(s => ({ ...s, datum_objednavky: formatAppDate(d) }));
-                              }}
-                              className="p-3 pointer-events-auto"
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      )}
+                    <DateField label="Datum Objednávky" value={form.datum_objednavky} onChange={(v) => setForm(s => ({ ...s, datum_objednavky: v }))} disabled={isSectionReadOnly("finance") || isFieldReadOnly("datum_objednavky")} />
+                    <DateField label="Datum Smluvní" value={form.datum_smluvni} onChange={(v) => setForm(s => ({ ...s, datum_smluvni: v }))} disabled={isSectionReadOnly("finance") || isFieldReadOnly("datum_smluvni")} />
+                  </div>
+                </div>
+
+                {/* ── PM sekce ─────────────────────────────── */}
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-5 mb-2">PM</h4>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-3">
+                  <DateField label="Zaměření" value={form.zamereni} onChange={(v) => setForm(s => ({ ...s, zamereni: v }))} disabled={isSectionReadOnly("pm")} />
+                  <DateField label="TPV" value={form.tpv_date} onChange={(v) => setForm(s => ({ ...s, tpv_date: v }))} disabled={isSectionReadOnly("pm")} />
+                  <DateField label="Expedice" value={form.expedice} onChange={(v) => setForm(s => ({ ...s, expedice: v }))} disabled={isSectionReadOnly("pm")} />
+                  <DateField label="Montáž" value={form.montaz} onChange={(v) => setForm(s => ({ ...s, montaz: v }))} disabled={isSectionReadOnly("pm")} />
+                  <DateField label="Předání" value={form.predani} onChange={(v) => setForm(s => ({ ...s, predani: v }))} disabled={isSectionReadOnly("pm")} />
+                  <div>
+                    <Label className="text-xs">Poznámka PM</Label>
+                    <Textarea
+                      value={form.pm_poznamka}
+                      onChange={(e) => setForm(s => ({ ...s, pm_poznamka: e.target.value }))}
+                      disabled={isSectionReadOnly("pm")}
+                      className={cn("min-h-[60px] text-sm", isSectionReadOnly("pm") && roClass)}
+                      placeholder="Poznámka…"
+                    />
+                  </div>
+                </div>
+
+                {/* ── TPV sekce ────────────────────────────── */}
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-5 mb-2">TPV</h4>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-3 pb-2">
+                  <div>
+                    <Label className="text-xs">Náročnost</Label>
+                    <Input
+                      value={form.narocnost}
+                      onChange={(e) => setForm(s => ({ ...s, narocnost: e.target.value }))}
+                      disabled={isSectionReadOnly("tpv")}
+                      className={cn(isSectionReadOnly("tpv") && roClass)}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Hodiny TPV</Label>
+                    <Input
+                      value={form.hodiny_tpv}
+                      onChange={(e) => setForm(s => ({ ...s, hodiny_tpv: e.target.value }))}
+                      disabled={isSectionReadOnly("tpv")}
+                      className={cn(isSectionReadOnly("tpv") && roClass)}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">% Rozpracovanost</Label>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type={isSectionReadOnly("tpv") ? "text" : "number"}
+                        className={cn("no-spinners", isSectionReadOnly("tpv") && roClass)}
+                        value={isSectionReadOnly("tpv") ? (form.percent_tpv ? `${form.percent_tpv} %` : "—") : form.percent_tpv}
+                        onChange={(e) => setForm(s => ({ ...s, percent_tpv: e.target.value }))}
+                        placeholder="0"
+                        disabled={isSectionReadOnly("tpv")}
+                      />
+                      {!isSectionReadOnly("tpv") && <span className="text-sm text-muted-foreground shrink-0">%</span>}
                     </div>
-                    <div>
-                      <Label className="text-xs">Datum Smluvní</Label>
-                      {isViewer || isFieldReadOnly("datum_smluvni") ? (
-                        <Button variant="outline" disabled className="w-full justify-start text-left font-normal bg-muted text-muted-foreground cursor-not-allowed opacity-70">
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {form.datum_smluvni || "—"}
-                        </Button>
-                      ) : (
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !form.datum_smluvni && "text-muted-foreground")}>
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {form.datum_smluvni || "Vyberte datum"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0 z-[99999]" align="start">
-                            <Calendar
-                              mode="single"
-                              defaultMonth={form.datum_smluvni ? parseAppDate(form.datum_smluvni) : undefined}
-                              selected={form.datum_smluvni ? parseAppDate(form.datum_smluvni) : undefined}
-                              onSelect={(d) => {
-                                if (d) setForm(s => ({ ...s, datum_smluvni: formatAppDate(d) }));
-                              }}
-                              className="p-3 pointer-events-auto"
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      )}
-                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Poznámka TPV</Label>
+                    <Textarea
+                      value={form.tpv_poznamka}
+                      onChange={(e) => setForm(s => ({ ...s, tpv_poznamka: e.target.value }))}
+                      disabled={isSectionReadOnly("tpv")}
+                      className={cn("min-h-[60px] text-sm", isSectionReadOnly("tpv") && roClass)}
+                      placeholder="Poznámka…"
+                    />
                   </div>
                 </div>
               </div>
@@ -775,7 +902,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     {DOC_CATEGORIES.map((cat) => {
                       const isOpen = openCategory === cat.key;
                       const files = sp.filesByCategory[cat.key] ?? [];
-                      const isLoading = sp.loadingCategory === cat.key;
 
                       return (
                         <div key={cat.key}>
@@ -850,7 +976,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                                 </div>
                               )}
 
-                              {/* Upload zone - hidden for viewers */}
                               {canUploadDocuments && (
                                 <>
                                   <div
@@ -933,7 +1058,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                 )}
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => onOpenChange(false)}>Zavřít</Button>
+                <Button variant="outline" onClick={tryClose}>Zavřít</Button>
                 {canEdit && <Button onClick={handleSave} disabled={idExists || !form.project_id}>Uložit</Button>}
               </div>
             </div>
@@ -941,5 +1066,17 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
         )}
       </DialogContent>
     </Dialog>
+
+    {/* Unsaved changes confirmation */}
+    <ConfirmDialog
+      open={unsavedConfirmOpen}
+      onConfirm={() => {
+        setUnsavedConfirmOpen(false);
+        onOpenChange(false);
+      }}
+      onCancel={() => setUnsavedConfirmOpen(false)}
+      description="Máte neuložené změny. Opravdu chcete zavřít?"
+    />
+    </>
   );
 }
