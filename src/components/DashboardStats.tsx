@@ -16,6 +16,7 @@ import {
 
 const STORAGE_KEY = "dashboard-collapsed";
 const PIPELINE_MODE_KEY = "dashboard-pipeline-mode";
+const WORKLOAD_MODE_KEY = "dashboard-workload-mode";
 
 const PIPELINE_STAGES: { statuses: string[]; label: string }[] = [
   { statuses: ["Příprava"], label: "Příprava" },
@@ -86,13 +87,22 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
     }
   });
 
+  const [workloadMode, setWorkloadMode] = useState<"count" | "value">(() => {
+    try {
+      return (sessionStorage.getItem(WORKLOAD_MODE_KEY) as "count" | "value") || "count";
+    } catch {
+      return "count";
+    }
+  });
+
   useEffect(() => {
     try {
       sessionStorage.setItem(STORAGE_KEY, String(collapsed));
       sessionStorage.setItem(PIPELINE_MODE_KEY, pipelineMode);
+      sessionStorage.setItem(WORKLOAD_MODE_KEY, workloadMode);
     } catch {}
     onCollapsedChange?.(collapsed);
-  }, [collapsed, pipelineMode, onCollapsedChange]);
+  }, [collapsed, pipelineMode, workloadMode, onCollapsedChange]);
 
   // Listen for external toggle events
   useEffect(() => {
@@ -350,7 +360,28 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
 
           {/* Card 4: Vytížení PM / Konstruktér */}
           <div className="rounded-lg border bg-card px-4 py-3 flex flex-col" style={{ width: "25%", minWidth: 180 }}>
-            <p style={{ fontSize: 10, color: "#999" }} className="uppercase tracking-wider mb-1">{isTPV ? "Vytížení Konstruktér" : "Vytížení PM"}</p>
+            <div className="flex items-center justify-between mb-1">
+              <p style={{ fontSize: 10 }} className="uppercase tracking-wider text-muted-foreground">{isTPV ? "Vytížení Konstruktér" : "Vytížení PM"}</p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setWorkloadMode("count")}
+                  className={`text-[9px] transition-colors ${
+                    workloadMode === "count" ? "text-foreground font-semibold" : "text-muted-foreground/40 hover:text-muted-foreground"
+                  }`}
+                >
+                  #
+                </button>
+                <span className="text-muted-foreground/30 text-[9px]">/</span>
+                <button
+                  onClick={() => setWorkloadMode("value")}
+                  className={`text-[9px] transition-colors ${
+                    workloadMode === "value" ? "text-foreground font-semibold" : "text-muted-foreground/40 hover:text-muted-foreground"
+                  }`}
+                >
+                  Kč
+                </button>
+              </div>
+            </div>
             <div className="flex-1 min-h-0 flex items-center gap-2">
               {/* Donut */}
               <div className="relative" style={{ width: 110, height: 110, flexShrink: 0 }}>
@@ -358,7 +389,7 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
                   <PieChart>
                     <Pie
                       data={workloadData}
-                      dataKey="value"
+                      dataKey={workloadMode === "count" ? "value" : "valueCZK"}
                       nameKey="name"
                       cx="50%"
                       cy="50%"
@@ -373,9 +404,18 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
                     </Pie>
                   </PieChart>
                 </ResponsiveContainer>
-                {/* Center count */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <span className="font-serif font-bold" style={{ fontSize: 20 }}>{workloadData.reduce((s, d) => s + d.value, 0)}</span>
+                {/* Center count/value */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  {workloadMode === "count" ? (
+                    <span className="font-serif font-bold" style={{ fontSize: 20 }}>{workloadData.reduce((s, d) => s + d.value, 0)}</span>
+                  ) : (
+                    <>
+                      <span className="font-serif font-bold leading-tight" style={{ fontSize: 14 }}>
+                        {formatNumber(Math.round(workloadData.reduce((s, d) => s + d.valueCZK, 0) / 1000))}
+                      </span>
+                      <span className="text-muted-foreground" style={{ fontSize: 8 }}>tis. Kč</span>
+                    </>
+                  )}
                 </div>
               </div>
               {/* Legend */}
@@ -384,11 +424,19 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
                   <div key={entry.name} className="flex items-center gap-1.5 whitespace-nowrap" style={{ fontSize: 11 }}>
                     <span className="inline-block rounded-full shrink-0" style={{ width: 7, height: 7, backgroundColor: entry.fill }} />
                     <span className="text-muted-foreground truncate" style={{ maxWidth: 90 }}>{entry.name}</span>
-                    <span className="font-bold text-foreground">{entry.value}</span>
-                    <span className="text-muted-foreground" style={{ fontSize: 10 }}>|</span>
-                    <span className="font-bold text-foreground">
-                      {entry.valueCZK > 0 ? `${formatNumber(entry.valueCZK)} Kč` : "—"}
-                    </span>
+                    {workloadMode === "count" ? (
+                      <>
+                        <span className="font-bold text-foreground">{entry.value}</span>
+                        <span className="text-muted-foreground" style={{ fontSize: 10 }}>|</span>
+                        <span className="font-bold text-foreground">
+                          {entry.valueCZK > 0 ? `${formatNumber(entry.valueCZK)} Kč` : "—"}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="font-bold text-foreground">
+                        {entry.valueCZK > 0 ? `${formatNumber(Math.round(entry.valueCZK / 1000))}` : "—"}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
