@@ -1,0 +1,6 @@
+
+ALTER TABLE public.project_stages
+  ADD COLUMN IF NOT EXISTS prodejni_cena numeric DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS currency text DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS kalkulant text DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS marze text DEFAULT NULL;

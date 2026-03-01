@@ -10,6 +10,7 @@ import { useUpdateStage } from "@/hooks/useProjectStages";
 import { useAuth } from "@/hooks/useAuth";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import type { ProjectStage } from "@/hooks/useProjectStages";
+import type { Project } from "@/hooks/useProjects";
 
 const DATE_FIELDS = [
   { key: "start_date", label: "Datum Objednání" },
@@ -21,13 +22,23 @@ const DATE_FIELDS = [
 
 type FieldKey = (typeof DATE_FIELDS)[number]["key"];
 
+// Map stage field keys to project field keys for inheritance fallback
+const STAGE_TO_PROJECT_FIELD: Record<string, string> = {
+  start_date: "datum_objednavky",
+  datum_smluvni: "datum_smluvni",
+  tpv_date: "tpv_date",
+  expedice: "expedice",
+  predani: "predani",
+};
+
 interface StageDateEditDialogProps {
   stage: ProjectStage | null;
+  project?: Project | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function StageDateEditDialog({ stage, open, onOpenChange }: StageDateEditDialogProps) {
+export function StageDateEditDialog({ stage, project, open, onOpenChange }: StageDateEditDialogProps) {
   const updateStage = useUpdateStage();
   const { isViewer, isFieldReadOnly } = useAuth();
   const [values, setValues] = useState<Record<FieldKey, string | null>>({
@@ -41,15 +52,25 @@ export function StageDateEditDialog({ stage, open, onOpenChange }: StageDateEdit
 
   useEffect(() => {
     if (stage && open) {
+      // For each field, use stage's own value; if null and project provided, inherit from project
+      const getVal = (stageKey: FieldKey): string | null => {
+        const stageVal = (stage as any)[stageKey] ?? null;
+        if (stageVal) return stageVal;
+        if (project) {
+          const projectKey = STAGE_TO_PROJECT_FIELD[stageKey];
+          return projectKey ? ((project as any)[projectKey] ?? null) : null;
+        }
+        return null;
+      };
       setValues({
-        start_date: stage.start_date ?? null,
-        datum_smluvni: stage.datum_smluvni ?? null,
-        tpv_date: stage.tpv_date ?? null,
-        expedice: stage.expedice ?? null,
-        predani: stage.predani ?? null,
+        start_date: getVal("start_date"),
+        datum_smluvni: getVal("datum_smluvni"),
+        tpv_date: getVal("tpv_date"),
+        expedice: getVal("expedice"),
+        predani: getVal("predani"),
       });
     }
-  }, [stage, open]);
+  }, [stage, project, open]);
 
   const orderWarnings = useMemo(() => {
     const ORDER: { key: FieldKey; label: string }[] = [
