@@ -542,10 +542,14 @@ function ConnectorLine({
 // ── Substage loader ─────────────────────────────────────────────────
 function SubstageRows({
   projectId, project, origin, dayPx, timelineWidth, statusColorMap, isFieldReadOnly,
+  weeks, months, showWeeks,
 }: {
   projectId: string; project: Project; origin: Date; dayPx: number;
   timelineWidth: number; statusColorMap: Record<string, string>;
   isFieldReadOnly: (field: string) => boolean;
+  weeks: { label: string; x: number }[];
+  months: { label: string; startX: number; width: number; date: Date }[];
+  showWeeks: boolean;
 }) {
   const { data: stages = [] } = useProjectStages(projectId);
   const updateStage = useUpdateStage();
@@ -553,7 +557,7 @@ function SubstageRows({
   return (
     <>
       {stages.map((stage) => (
-        <SubstageRow key={stage.id} stage={stage} project={project} origin={origin} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} updateStage={updateStage} />
+        <SubstageRow key={stage.id} stage={stage} project={project} origin={origin} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} updateStage={updateStage} weeks={weeks} months={months} showWeeks={showWeeks} />
       ))}
     </>
   );
@@ -561,17 +565,28 @@ function SubstageRows({
 
 function SubstageRow({
   stage, project, origin, dayPx, timelineWidth, statusColorMap, isFieldReadOnly, updateStage,
+  weeks, months, showWeeks,
 }: {
   stage: ProjectStage; project: Project; origin: Date; dayPx: number;
   timelineWidth: number; statusColorMap: Record<string, string>;
   isFieldReadOnly: (field: string) => boolean;
   updateStage: ReturnType<typeof useUpdateStage>;
+  weeks: { label: string; x: number }[];
+  months: { label: string; startX: number; width: number; date: Date }[];
+  showWeeks: boolean;
 }) {
   const barData = getStageBarData(stage, project, statusColorMap);
   const midY = SUBSTAGE_ROW_HEIGHT / 2;
 
   return (
-    <div style={{ height: SUBSTAGE_ROW_HEIGHT, position: "relative", width: timelineWidth }}>
+    <div className="border-b bg-muted/10" style={{ height: SUBSTAGE_ROW_HEIGHT, position: "relative", width: timelineWidth }}>
+      {/* Grid lines — same as project rows */}
+      {showWeeks && weeks.map((w, i) => (
+        <div key={i} className="absolute top-0 bottom-0 border-l border-border/20" style={{ left: w.x, zIndex: 1 }} />
+      ))}
+      {!showWeeks && months.map((m, i) => (
+        <div key={`mg-${i}`} className="absolute top-0 bottom-0 border-l border-border/20" style={{ left: m.startX, zIndex: 1 }} />
+      ))}
       {/* Connector line */}
       {barData.connectorLine && (
         <ConnectorLine
@@ -1054,7 +1069,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
 
                   {/* Substage rows */}
                   {isExp && (
-                    <SubstageRows projectId={p.project_id} project={p} origin={timelineStart} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} />
+                    <SubstageRows projectId={p.project_id} project={p} origin={timelineStart} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} weeks={weeks} months={months} showWeeks={showWeeks} />
                   )}
                 </div>
               );
