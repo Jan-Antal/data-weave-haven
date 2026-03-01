@@ -883,8 +883,8 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
       <div className="flex shrink-0 border-b bg-primary/5">
         {/* Left panel header */}
         <div className="border-r shrink-0 flex items-center" style={{ width: LEFT_PANEL_WIDTH, height: HEADER_HEIGHT }}>
-          <div style={{ width: 36, minWidth: 36, maxWidth: 36 }} />
-          <div className="flex items-center justify-center" style={{ width: 36, minWidth: 36, maxWidth: 36 }}>
+          <div className="flex items-center justify-center h-9" style={{ width: 36, minWidth: 36, maxWidth: 36 }} />
+          <div className="flex items-center justify-center h-9" style={{ width: 36, minWidth: 36, maxWidth: 36 }}>
             {sorted.length > 0 && (
               <button
                 className="text-muted-foreground/60 hover:text-muted-foreground transition-colors"
