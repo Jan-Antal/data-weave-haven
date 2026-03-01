@@ -173,7 +173,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
         }
         return <TableCell key={key} className="text-right"><span className="text-xs font-mono text-muted-foreground">{formatCurrency((stage as any).prodejni_cena, (stage as any).currency || "CZK")}</span></TableCell>;
       }
-      case "marze": return <TableCell key={key}><InlineEditableCell value={marzeStorageToInput((stage as any).marze)} onSave={(val) => saveStage("marze", marzeInputToStorage(val) || "")} readOnly={!canEdit} displayValue={<span className="text-xs font-mono">{formatMarze((stage as any).marze)}</span>} /></TableCell>;
+      case "marze": return <TableCell key={key} className="text-right"><InlineEditableCell value={marzeStorageToInput((stage as any).marze)} onSave={(val) => saveStage("marze", marzeInputToStorage(val) || "")} readOnly={!canEdit} displayValue={<span className="text-xs font-mono">{formatMarze((stage as any).marze)}</span>} /></TableCell>;
       case "location": return <TableCell key={key}><span className={cn("text-xs text-muted-foreground/60", freshInheritedFields?.has("location") && "stage-inherit-highlight")}>{project.location || "—"}</span></TableCell>;
       case "architekt": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "architekt")} onSave={(val) => saveStage("architekt", val)} readOnly={!canEdit} className={ihClass("architekt")} /></TableCell>;
       case "konstrukter": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "konstrukter")} type="people" peopleRole="Konstruktér" onSave={(val) => saveStage("konstrukter", val)} readOnly={!canEdit} className={ihClass("konstrukter")} /></TableCell>;
