@@ -386,7 +386,7 @@ const ProjectRow = memo(function ProjectRow({
       {/* Col 1 — Icon slot */}
       <TableCell style={COL_ICON_STYLE} className="text-center px-0">
         {(docCount ?? 0) > 0 && (
-          <span className="inline-flex items-center gap-0.5 text-gray-400 text-[10px]">
+          <span className="inline-flex items-center gap-0.5 text-muted-foreground text-[10px] cursor-pointer" onClick={() => onEditProject(p)}>
             <Paperclip className="h-3 w-3" />
             {docCount}
           </span>
