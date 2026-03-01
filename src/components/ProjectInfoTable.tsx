@@ -169,7 +169,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
         if (canEdit) {
           return <TableCell key={key} className="text-right"><CurrencyEditCell value={(stage as any).prodejni_cena} currency={(stage as any).currency || "CZK"} onSave={(a, c) => { saveStage("prodejni_cena", a); saveStage("currency", c); }} /></TableCell>;
         }
-        return <TableCell key={key} className="text-right"><span className="text-xs font-mono text-muted-foreground">{formatCurrency((stage as any).prodejni_cena, (stage as any).currency || "CZK")}</span></TableCell>;
+        return <TableCell key={key} className="text-right"><span className="text-xs font-mono">{formatCurrency((stage as any).prodejni_cena, (stage as any).currency || "CZK")}</span></TableCell>;
       }
       case "marze": return <TableCell key={key} className="text-right"><InlineEditableCell value={marzeStorageToInput((stage as any).marze)} onSave={(val) => saveStage("marze", marzeInputToStorage(val) || "")} readOnly={!canEdit} displayValue={<span className="text-xs font-mono">{formatMarze((stage as any).marze)}</span>} /></TableCell>;
       case "location": return <TableCell key={key}><span className="text-xs">{project.location || "—"}</span></TableCell>;
