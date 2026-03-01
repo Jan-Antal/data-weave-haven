@@ -59,7 +59,7 @@ export function StageDateEditDialog({ stage, open, onOpenChange }: StageDateEdit
       { key: "predani", label: "Předání" },
       { key: "datum_smluvni", label: "Smluvní" },
     ];
-    const warnings: { message: string; fields: Set<string> }[] = [];
+    const warnings: { message: string; fields: Set<string>; severity: "orange" | "red" }[] = [];
     for (let i = 0; i < ORDER.length; i++) {
       const aRaw = values[ORDER[i].key];
       const aDate = aRaw ? parseAppDate(aRaw) : null;
@@ -69,9 +69,11 @@ export function StageDateEditDialog({ stage, open, onOpenChange }: StageDateEdit
         const bDate = bRaw ? parseAppDate(bRaw) : null;
         if (!bDate) continue;
         if (aDate > bDate) {
+          const isSevere = (ORDER[j].key === "datum_smluvni") && (ORDER[i].key === "expedice" || ORDER[i].key === "predani");
           warnings.push({
             message: `${ORDER[i].label} je po ${ORDER[j].label}`,
             fields: new Set([ORDER[i].key, ORDER[j].key]),
+            severity: isSevere ? "red" : "orange",
           });
         }
       }
@@ -148,20 +150,24 @@ export function StageDateEditDialog({ stage, open, onOpenChange }: StageDateEdit
                   readOnly && "text-muted-foreground"
                 )}>{f.label}</span>
                 <div className="w-6 shrink-0 flex items-center justify-center">
-                  {hasWarning ? (
+                  {hasWarning ? (() => {
+                    const fieldWarnings = orderWarnings.filter(w => w.fields.has(f.key));
+                    const hasRed = fieldWarnings.some(w => w.severity === "red");
+                    return (
                     <TooltipProvider delayDuration={200}>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
+                          <AlertTriangle className="h-3.5 w-3.5" style={{ color: hasRed ? "#dc2626" : "#f4a261" }} />
                         </TooltipTrigger>
                         <TooltipContent side="top" className="text-xs max-w-[220px]">
-                          {orderWarnings.filter(w => w.fields.has(f.key)).map((w, i) => (
-                            <div key={i}>{w.message}</div>
+                          {fieldWarnings.map((w, i) => (
+                            <div key={i} style={{ color: w.severity === "red" ? "#dc2626" : undefined }}>{w.message}</div>
                           ))}
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                  ) : null}
+                    );
+                  })() : null}
                 </div>
                 <Popover
                   open={openPickers[f.key] || false}

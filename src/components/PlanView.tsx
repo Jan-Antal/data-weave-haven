@@ -112,6 +112,7 @@ function weeksLabel(startDate: Date, endDate: Date): string {
 interface MilestoneWarning {
   message: string;
   fields?: string[]; // field keys that are out of order
+  severity?: "orange" | "red"; // orange = order issue, red = past deadline
 }
 
 const ORDER_SEQUENCE: { key: string; label: string }[] = [
@@ -140,9 +141,12 @@ function getChronologicalWarnings(
       const a = vals[i];
       const b = vals[j];
       if (a.date && b.date && a.date > b.date) {
+        // Red if expedice or predani is after smluvní
+        const isSevere = (b.key === "datum_smluvni") && (a.key === "expedice" || a.key === "predani");
         warnings.push({
           message: `${a.label} (${format(a.date, "dd-MMM")}) je po ${b.label} (${format(b.date, "dd-MMM")})`,
           fields: [a.key, b.key],
+          severity: isSevere ? "red" : "orange",
         });
       }
     }
@@ -494,15 +498,17 @@ function segmentBackground(seg: Segment): string {
 // ── Warning icon ────────────────────────────────────────────────────
 function WarningIcon({ warnings }: { warnings: MilestoneWarning[] }) {
   if (warnings.length === 0) return null;
+  const hasRed = warnings.some(w => w.severity === "red");
+  const iconColor = hasRed ? "#dc2626" : "#f4a261";
   return (
     <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: "#f4a261" }} />
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: iconColor }} />
         </TooltipTrigger>
-        <TooltipContent side="right" className="text-xs max-w-[200px]">
+        <TooltipContent side="right" className="text-xs max-w-[220px]">
           {warnings.map((w, i) => (
-            <div key={i}>{w.message}</div>
+            <div key={i} style={{ color: w.severity === "red" ? "#dc2626" : undefined }}>{w.message}</div>
           ))}
         </TooltipContent>
       </Tooltip>
