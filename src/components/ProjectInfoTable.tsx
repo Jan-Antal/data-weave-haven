@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { InlineEditableCell } from "./InlineEditableCell";
 import { CurrencyEditCell } from "./CurrencyEditCell";
 import { formatCurrency } from "@/lib/currency";
+import { isStageFieldInherited, getStageDisplayValue, inheritedTextClass } from "@/lib/stageInheritance";
 import { StatusBadge, RiskBadge } from "./StatusBadge";
 import { SortableHeader } from "./SortableHeader";
 import { useProjects } from "@/hooks/useProjects";
@@ -151,16 +152,16 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
     });
   }, [stage.id, stage.stage_name, (stage as any).konstrukter, (stage as any).status, (stage as any).datum_smluvni, project.project_id, onFieldTouched, updateStage]);
   const v = isVisible;
-  const inheritedClass = (field: string) => isFieldInherited?.(field) ? "text-blue-300" : "";
+  const ihClass = (field: string) => inheritedTextClass(stage, project, field);
 
   const renderStageCell = (key: string) => {
     switch (key) {
-      case "klient": return <TableCell key={key}><span className="text-xs text-muted-foreground">{project.klient || "—"}</span></TableCell>;
+      case "klient": return <TableCell key={key}><span className="text-xs text-muted-foreground/60">{project.klient || "—"}</span></TableCell>;
       case "kalkulant": return <TableCell key={key}><InlineEditableCell value={(stage as any).kalkulant} type="people" peopleRole="Kalkulant" onSave={(val) => saveStage("kalkulant", val)} readOnly={!canEdit} /></TableCell>;
       case "pm": return <TableCell key={key}><InlineEditableCell value={stage.pm} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} /></TableCell>;
-      case "status": return <TableCell key={key}><InlineEditableCell value={stage.status} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={stage.status ? <StatusBadge status={stage.status} /> : "—"} readOnly={!canEdit} className={inheritedClass("status")} /></TableCell>;
-      case "datum_smluvni": return <TableCell key={key}><span className={cn("text-xs px-1", isFieldInherited?.(key) ? "text-blue-300" : "text-muted-foreground")}>{project.datum_smluvni || "—"}</span></TableCell>;
-      case "datum_objednavky": return <TableCell key={key}><span className="text-xs text-muted-foreground">{project.datum_objednavky || "—"}</span></TableCell>;
+      case "status": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "status")} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={getStageDisplayValue(stage, project, "status") ? <StatusBadge status={getStageDisplayValue(stage, project, "status")} /> : "—"} readOnly={!canEdit} className={ihClass("status")} /></TableCell>;
+      case "datum_smluvni": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "datum_smluvni")} type="date" onSave={(val) => saveStage("datum_smluvni", val)} readOnly={!canEdit} className={ihClass("datum_smluvni")} /></TableCell>;
+      case "datum_objednavky": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "start_date")} type="date" onSave={(val) => saveStage("start_date", val)} readOnly={!canEdit} className={ihClass("start_date")} /></TableCell>;
       case "prodejni_cena": {
         if (canEdit) {
           return <TableCell key={key} className="text-right"><CurrencyEditCell value={(stage as any).prodejni_cena} currency={(stage as any).currency || "CZK"} onSave={(a, c) => { saveStage("prodejni_cena", a); saveStage("currency", c); }} /></TableCell>;
@@ -168,10 +169,10 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
         return <TableCell key={key} className="text-right"><span className="text-xs font-mono text-muted-foreground">{formatCurrency((stage as any).prodejni_cena, (stage as any).currency || "CZK")}</span></TableCell>;
       }
       case "marze": return <TableCell key={key}><InlineEditableCell value={(stage as any).marze} onSave={(val) => saveStage("marze", val)} readOnly={!canEdit} /></TableCell>;
-      case "location": return <TableCell key={key}><span className="text-xs text-muted-foreground">{project.location || "—"}</span></TableCell>;
-      case "architekt": return <TableCell key={key}><InlineEditableCell value={(stage as any).architekt} onSave={(val) => saveStage("architekt", val)} readOnly={!canEdit} className={inheritedClass("architekt")} /></TableCell>;
-      case "konstrukter": return <TableCell key={key}><InlineEditableCell value={(stage as any).konstrukter} type="people" peopleRole="Konstruktér" onSave={(val) => saveStage("konstrukter", val)} readOnly={!canEdit} className={inheritedClass("konstrukter")} /></TableCell>;
-      case "risk": return <TableCell key={key}><InlineEditableCell value={stage.risk} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("risk", val)} displayValue={<RiskBadge level={stage.risk || ""} />} readOnly={!canEdit} className={inheritedClass("risk")} /></TableCell>;
+      case "location": return <TableCell key={key}><span className="text-xs text-muted-foreground/60">{project.location || "—"}</span></TableCell>;
+      case "architekt": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "architekt")} onSave={(val) => saveStage("architekt", val)} readOnly={!canEdit} className={ihClass("architekt")} /></TableCell>;
+      case "konstrukter": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "konstrukter")} type="people" peopleRole="Konstruktér" onSave={(val) => saveStage("konstrukter", val)} readOnly={!canEdit} className={ihClass("konstrukter")} /></TableCell>;
+      case "risk": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "risk")} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("risk", val)} displayValue={<RiskBadge level={getStageDisplayValue(stage, project, "risk") || ""} />} readOnly={!canEdit} className={ihClass("risk")} /></TableCell>;
       default: return <TableCell key={key} />;
     }
   };
