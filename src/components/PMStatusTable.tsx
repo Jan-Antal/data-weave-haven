@@ -101,9 +101,10 @@ interface StageRowProps {
   onCancelConfirm?: () => void;
   onCancelDismiss?: () => void;
   dimmed?: boolean;
+  freshInheritedFields?: Set<string>;
 }
 
-function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys, isFieldInherited, onFieldTouched, cancelConfirm, onCancelConfirm, onCancelDismiss, dimmed }: StageRowProps) {
+function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys, isFieldInherited, onFieldTouched, cancelConfirm, onCancelConfirm, onCancelDismiss, dimmed, freshInheritedFields }: StageRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
   const updateStage = useUpdateStage();
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -117,7 +118,11 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
     });
   }, [stage.id, stage.stage_name, (stage as any).konstrukter, (stage as any).status, (stage as any).datum_smluvni, project.project_id, onFieldTouched, updateStage]);
   const v = isVisible;
-  const ihClass = (field: string) => inheritedTextClass(stage, project, field);
+  const ihClass = (field: string) => {
+    const base = inheritedTextClass(stage, project, field);
+    if (freshInheritedFields?.has(field)) return "stage-inherit-highlight";
+    return base;
+  };
 
   const renderStageCell = (key: string) => {
     switch (key) {
@@ -275,6 +280,13 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     qc.invalidateQueries({ queryKey: ["all_project_stages"] });
   }, [projectId, qc]);
 
+  // Auto-clear freshStages after animation duration (2.5s)
+  useEffect(() => {
+    if (freshStages.size === 0) return;
+    const timer = setTimeout(() => setFreshStages(new Map()), 2500);
+    return () => clearTimeout(timer);
+  }, [freshStages.size]);
+
   // Handle Escape key for fresh stages
   useEffect(() => {
     if (freshStages.size === 0) return;
@@ -324,6 +336,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
               onCancelConfirm={() => handleCancelStage(stage.id)}
               onCancelDismiss={() => setCancelConfirmId(null)}
               dimmed={!singleStageMatches(stage, personFilter, statusFilterSet, searchLower)}
+              freshInheritedFields={freshStages.get(stage.id)}
             />
           ))}
         </SortableContext>
