@@ -64,9 +64,9 @@ const CZECH_MONTHS_SHORT = [
   "Čvc", "Srp", "Zář", "Říj", "Lis", "Pro",
 ];
 
-const ROW_HEIGHT = 48;
-const SUBSTAGE_ROW_HEIGHT = 36;
-const LEFT_PANEL_WIDTH = 280;
+const ROW_HEIGHT = 36;
+const SUBSTAGE_ROW_HEIGHT = 28;
+const LEFT_PANEL_WIDTH = 362;
 const BAR_HEIGHT = 16;
 const SUBSTAGE_BAR_HEIGHT = 10;
 const DIAMOND_SIZE = 10;
@@ -420,6 +420,7 @@ function MilestoneDiamond({
     width: size,
     height: size,
     backgroundColor: color,
+    opacity: small ? 1 : 0.45,
     transform: "rotate(45deg)",
     zIndex: dragOffset !== null ? 50 : (zIndex ?? 10),
     cursor: isDraggable ? (dragOffset !== null ? "grabbing" : "grab") : "default",
@@ -820,12 +821,13 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
       {/* PART 1 — FIXED HEADER ROW (never scrolls vertically) */}
       <div className="flex shrink-0 border-b bg-primary/5">
         {/* Left panel header */}
-        <div className="border-r shrink-0 flex items-center px-2 gap-2" style={{ width: LEFT_PANEL_WIDTH, height: HEADER_HEIGHT }}>
-          <button onClick={() => togglePlanSort("project_id")} className="flex items-center gap-1 h-9 px-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap hover:text-foreground transition-colors" style={{ width: 110, flexShrink: 0 }}>
+        <div className="border-r shrink-0 flex items-center" style={{ width: LEFT_PANEL_WIDTH, height: HEADER_HEIGHT }}>
+          <div style={{ width: 36, minWidth: 36 }} />
+          <button onClick={() => togglePlanSort("project_id")} className="flex items-center gap-1 h-9 px-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap hover:text-foreground transition-colors" style={{ width: 110, minWidth: 110, flexShrink: 0 }}>
             {planIdLabel}
             {planSortCol === "project_id" ? (planSortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}
           </button>
-          <button onClick={() => togglePlanSort("project_name")} className="flex items-center gap-1 h-9 px-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap hover:text-foreground transition-colors flex-1">
+          <button onClick={() => togglePlanSort("project_name")} className="flex items-center gap-1 h-9 px-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap hover:text-foreground transition-colors" style={{ width: 180, minWidth: 180, maxWidth: 180 }}>
             {planNameLabel}
             {planSortCol === "project_name" ? (planSortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}
           </button>
@@ -878,18 +880,21 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
             return (
               <div key={p.id}>
                 <div
-                  className="flex items-center gap-1 px-3 border-b hover:bg-muted/30 transition-colors"
+                  className="flex items-center border-b hover:bg-muted/30 transition-colors"
                   style={{ height: ROW_HEIGHT }}
                 >
                   <div
-                    className="shrink-0"
+                    className="shrink-0 flex items-center justify-center"
+                    style={{ width: 36, minWidth: 36 }}
                     onClick={(e) => { e.stopPropagation(); toggleExpand(p.project_id); }}
                   >
                     <ExpandButton projectId={p.project_id} expanded={isExp} onClick={() => {}} />
                   </div>
-                  <span className="text-xs font-mono text-muted-foreground whitespace-nowrap shrink-0 cursor-pointer hover:underline" style={{ width: 80 }} onClick={() => setEditProject(p)}>{p.project_id}</span>
-                  {warnings.length > 0 && <WarningIcon warnings={warnings} />}
-                  <span className="text-xs font-medium truncate flex-1 min-w-0 cursor-pointer hover:underline" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} onClick={() => setEditProject(p)}>{p.project_name}</span>
+                  <span className="text-xs font-mono text-muted-foreground whitespace-nowrap shrink-0 cursor-pointer hover:underline px-2" style={{ width: 110, minWidth: 110 }} onClick={() => setEditProject(p)}>{p.project_id}</span>
+                  <div className="flex items-center gap-1 px-2" style={{ width: 180, minWidth: 180, maxWidth: 180, overflow: "hidden" }}>
+                    {warnings.length > 0 && <WarningIcon warnings={warnings} />}
+                    <span className="text-xs font-medium truncate cursor-pointer hover:underline" onClick={() => setEditProject(p)}>{p.project_name}</span>
+                  </div>
                 </div>
                 {isExp && <SubstageLeftRows projectId={p.project_id} project={p} statusColorMap={statusColorMap} />}
               </div>
@@ -957,7 +962,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                           style={{
                             position: "absolute",
                             left: x,
-                            top: 16,
+                            top: midY - BAR_HEIGHT / 2,
                             width: segW,
                             height: BAR_HEIGHT,
                             background: segmentBackground(seg),
@@ -1050,9 +1055,12 @@ function SubstageLeftRows({ projectId, project, statusColorMap }: { projectId: s
       {stages.map((stage) => {
         const barData = getStageBarData(stage, project, statusColorMap);
         return (
-          <div key={stage.id} className="flex items-center gap-2 pl-8 pr-3 border-b bg-muted/10" style={{ height: SUBSTAGE_ROW_HEIGHT }}>
-            {barData.warnings.length > 0 && <WarningIcon warnings={barData.warnings} />}
-            <span className="text-[10px] text-muted-foreground truncate">{stage.stage_name}</span>
+          <div key={stage.id} className="flex items-center border-b bg-muted/10" style={{ height: SUBSTAGE_ROW_HEIGHT }}>
+            <div style={{ width: 36, minWidth: 36 }} />
+            <div className="flex items-center gap-1 px-2" style={{ width: 110, minWidth: 110 }}>
+              {barData.warnings.length > 0 && <WarningIcon warnings={barData.warnings} />}
+            </div>
+            <span className="text-[10px] text-muted-foreground truncate px-2" style={{ width: 180, minWidth: 180, maxWidth: 180 }}>{stage.stage_name}</span>
           </div>
         );
       })}
