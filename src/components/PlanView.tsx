@@ -926,7 +926,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
               {months.map((m, i) => (
                 <div
                   key={i}
-                  className={`border-r font-medium text-muted-foreground flex items-center justify-center shrink-0 ${zoom === "1R" ? "text-[10px]" : "text-[11px]"}`}
+                  className={`border-r font-semibold text-muted-foreground flex items-center justify-center shrink-0 ${zoom === "1R" ? "text-[10px]" : "text-xs"}`}
                   style={{ width: m.width }}
                 >
                   {m.label}
