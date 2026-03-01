@@ -492,43 +492,44 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                 <div className="grid grid-cols-2 gap-x-3 gap-y-3">
                   <div>
                     <Label className="text-xs">Project ID</Label>
-                    {isViewer ? (
-                      <p className="text-sm py-2">{form.project_id}</p>
-                    ) : (
-                      <Input
-                        value={form.project_id}
-                        onChange={(e) => setForm(s => ({ ...s, project_id: e.target.value }))}
-                        onBlur={() => {
-                          if (form.project_id !== project.project_id) {
-                            checkProjectId(form.project_id);
-                          } else {
-                            resetIdCheck();
-                          }
-                        }}
-                        disabled={isFieldReadOnly("project_id")}
-                        className={cn(isFieldReadOnly("project_id") && "bg-muted text-muted-foreground cursor-not-allowed")}
-                      />
-                    )}
+                    <Input
+                      value={form.project_id}
+                      onChange={(e) => setForm(s => ({ ...s, project_id: e.target.value }))}
+                      onBlur={() => {
+                        if (form.project_id !== project.project_id) {
+                          checkProjectId(form.project_id);
+                        } else {
+                          resetIdCheck();
+                        }
+                      }}
+                      disabled={isViewer || isFieldReadOnly("project_id")}
+                      className={cn((isViewer || isFieldReadOnly("project_id")) && "bg-muted text-muted-foreground cursor-not-allowed opacity-70")}
+                    />
                     {idExists && <p className="text-xs text-destructive mt-1">Toto ID již existuje</p>}
                   </div>
                   <div>
                     <Label className="text-xs">Project Name</Label>
-                    {isViewer ? (
-                      <p className="text-sm py-2">{form.project_name}</p>
-                    ) : (
-                      <Input
-                        value={form.project_name}
-                        onChange={(e) => setForm(s => ({ ...s, project_name: e.target.value }))}
-                        disabled={isFieldReadOnly("project_name")}
-                        className={cn(isFieldReadOnly("project_name") && "bg-muted text-muted-foreground cursor-not-allowed")}
-                      />
-                    )}
+                    <Input
+                      value={form.project_name}
+                      onChange={(e) => setForm(s => ({ ...s, project_name: e.target.value }))}
+                      disabled={isViewer || isFieldReadOnly("project_name")}
+                      className={cn((isViewer || isFieldReadOnly("project_name")) && "bg-muted text-muted-foreground cursor-not-allowed opacity-70")}
+                    />
                   </div>
 
                   <div>
                     <Label className="text-xs">Klient</Label>
                     {isViewer ? (
-                      <p className="text-sm py-2">{form.klient || "—"}{form.location ? ` (${form.location})` : ""}</p>
+                      <div className="relative flex items-center gap-1">
+                        <Input value={form.klient || "—"} disabled className="bg-muted text-muted-foreground cursor-not-allowed opacity-70" />
+                        <button
+                          type="button"
+                          disabled
+                          className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-muted opacity-70 cursor-not-allowed"
+                        >
+                          <MapPin className={cn("h-4 w-4", form.location ? "text-primary" : "text-muted-foreground/30")} />
+                        </button>
+                      </div>
                     ) : (
                       <div className="relative flex items-center gap-1">
                         <Input value={form.klient} onChange={(e) => setForm(s => ({ ...s, klient: e.target.value }))} />
@@ -545,10 +546,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                   </div>
                   <div>
                     <Label className="text-xs">PM</Label>
-                    {isViewer ? (
-                      <p className="text-sm py-2">{form.pm || "—"}</p>
-                    ) : isFieldReadOnly("pm") ? (
-                      <Input value={form.pm} disabled className="bg-muted text-muted-foreground cursor-not-allowed" />
+                    {isViewer || isFieldReadOnly("pm") ? (
+                      <Input value={form.pm || "—"} disabled className="bg-muted text-muted-foreground cursor-not-allowed opacity-70" />
                     ) : (
                       <PeopleSelectDropdown role="PM" value={form.pm} onValueChange={(v) => setForm(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
                     )}
@@ -614,7 +613,12 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                   <div>
                     <Label className="text-xs">Status</Label>
                     {isViewer ? (
-                      <p className="text-sm py-2">{form.status || "—"}</p>
+                      <Select value={form.status} disabled>
+                        <SelectTrigger className="bg-muted text-muted-foreground cursor-not-allowed opacity-70"><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent className="z-[99999]">
+                          {statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     ) : (
                       <Select value={form.status} onValueChange={(v) => setForm(s => ({ ...s, status: v }))}>
                         <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
@@ -627,7 +631,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                   <div>
                     <Label className="text-xs">Konstruktér</Label>
                     {isViewer ? (
-                      <p className="text-sm py-2">{form.konstrukter || "—"}</p>
+                      <Input value={form.konstrukter || "—"} disabled className="bg-muted text-muted-foreground cursor-not-allowed opacity-70" />
                     ) : (
                       <PeopleSelectDropdown role="Konstruktér" value={form.konstrukter} onValueChange={(v) => setForm(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
                     )}
@@ -635,36 +639,35 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
 
                   <div>
                     <Label className="text-xs">Prodejní cena</Label>
-                    {isViewer ? (
-                      <p className="text-sm py-2">{form.prodejni_cena ? `${Number(form.prodejni_cena).toLocaleString("cs-CZ")} ${form.currency}` : "—"}</p>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          type={priceEditing ? "number" : "text"}
-                          className={cn("no-spinners", isFieldReadOnly("prodejni_cena") && "bg-muted text-muted-foreground cursor-not-allowed")}
-                          value={priceEditing ? form.prodejni_cena : (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : "")}
-                          onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))}
-                          onFocus={() => setPriceEditing(true)}
-                          onBlur={() => setPriceEditing(false)}
-                          disabled={isFieldReadOnly("prodejni_cena")}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-10 px-3 font-mono shrink-0"
-                          onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
-                          disabled={isFieldReadOnly("prodejni_cena")}
-                        >
-                          {form.currency}
-                        </Button>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type={!isViewer && priceEditing ? "number" : "text"}
+                        className={cn("no-spinners", (isViewer || isFieldReadOnly("prodejni_cena")) && "bg-muted text-muted-foreground cursor-not-allowed opacity-70")}
+                        value={isViewer
+                          ? (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : "—")
+                          : (priceEditing ? form.prodejni_cena : (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : ""))
+                        }
+                        onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))}
+                        onFocus={() => setPriceEditing(true)}
+                        onBlur={() => setPriceEditing(false)}
+                        disabled={isViewer || isFieldReadOnly("prodejni_cena")}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={cn("h-10 px-3 font-mono shrink-0", isViewer && "opacity-70 cursor-not-allowed")}
+                        onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
+                        disabled={isViewer || isFieldReadOnly("prodejni_cena")}
+                      >
+                        {form.currency}
+                      </Button>
+                    </div>
                   </div>
                   <div>
                     <Label className="text-xs">Kalkulant</Label>
                     {isViewer ? (
-                      <p className="text-sm py-2">{form.kalkulant || "—"}</p>
+                      <Input value={form.kalkulant || "—"} disabled className="bg-muted text-muted-foreground cursor-not-allowed opacity-70" />
                     ) : (
                       <PeopleSelectDropdown role="Kalkulant" value={form.kalkulant} onValueChange={(v) => setForm(s => ({ ...s, kalkulant: v }))} placeholder="Vyberte kalkulanta" />
                     )}
@@ -674,26 +677,25 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                   <div className="col-span-2 grid grid-cols-3 gap-x-3">
                     <div>
                       <Label className="text-xs">Marže</Label>
-                      {isViewer ? (
-                        <p className="text-sm py-2">{formatMarze(project.marze)}</p>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          <Input
-                            type="number"
-                            className={cn("no-spinners", isFieldReadOnly("marze") && "bg-muted text-muted-foreground cursor-not-allowed")}
-                            value={form.marze}
-                            onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
-                            placeholder="0"
-                            disabled={isFieldReadOnly("marze")}
-                          />
-                          <span className="text-sm text-muted-foreground shrink-0">%</span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type={isViewer ? "text" : "number"}
+                          className={cn("no-spinners", (isViewer || isFieldReadOnly("marze")) && "bg-muted text-muted-foreground cursor-not-allowed opacity-70")}
+                          value={isViewer ? (form.marze ? `${form.marze}` : "—") : form.marze}
+                          onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
+                          placeholder="0"
+                          disabled={isViewer || isFieldReadOnly("marze")}
+                        />
+                        <span className="text-sm text-muted-foreground shrink-0">%</span>
+                      </div>
                     </div>
                     <div>
                       <Label className="text-xs">Datum Objednávky</Label>
                       {isViewer ? (
-                        <p className="text-sm py-2">{form.datum_objednavky || "—"}</p>
+                        <Button variant="outline" disabled className="w-full justify-start text-left font-normal bg-muted text-muted-foreground cursor-not-allowed opacity-70">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {form.datum_objednavky || "—"}
+                        </Button>
                       ) : (
                         <Popover>
                           <PopoverTrigger asChild>
@@ -718,10 +720,11 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     </div>
                     <div>
                       <Label className="text-xs">Datum Smluvní</Label>
-                      {isViewer ? (
-                        <p className="text-sm py-2">{form.datum_smluvni || "—"}</p>
-                      ) : isFieldReadOnly("datum_smluvni") ? (
-                        <Input value={form.datum_smluvni} disabled className="bg-muted text-muted-foreground cursor-not-allowed" />
+                      {isViewer || isFieldReadOnly("datum_smluvni") ? (
+                        <Button variant="outline" disabled className="w-full justify-start text-left font-normal bg-muted text-muted-foreground cursor-not-allowed opacity-70">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {form.datum_smluvni || "—"}
+                        </Button>
                       ) : (
                         <Popover>
                           <PopoverTrigger asChild>
