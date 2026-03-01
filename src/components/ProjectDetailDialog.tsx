@@ -87,6 +87,20 @@ function formatFileSize(bytes: number): string {
 
 const RISK_OPTIONS = ["Low", "Medium", "High"];
 
+// ── Section header with line-through styling ───────────────────
+function SectionHeader({ icon, label }: { icon: string; label: string }) {
+  return (
+    <div className="relative flex items-center mt-5 mb-3">
+      <div className="absolute inset-0 flex items-center" aria-hidden="true">
+        <div className="w-full border-t border-border" />
+      </div>
+      <span className="relative bg-background pr-2 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground flex items-center gap-1">
+        <span>{icon}</span> {label}
+      </span>
+    </div>
+  );
+}
+
 // ── Helper: Date picker field ──────────────────────────────────
 function DateField({ label, value, onChange, disabled }: { label: string; value: string; onChange: (v: string) => void; disabled: boolean }) {
   if (disabled) {
@@ -124,6 +138,42 @@ function DateField({ label, value, onChange, disabled }: { label: string; value:
   );
 }
 
+// ── Compact milestone date field ───────────────────────────────
+function CompactDateField({ label, value, onChange, disabled }: { label: string; value: string; onChange: (v: string) => void; disabled: boolean }) {
+  if (disabled) {
+    return (
+      <div className="flex flex-col items-center">
+        <span className="text-[9px] uppercase text-muted-foreground mb-0.5">{label}</span>
+        <Button variant="outline" disabled className="w-full justify-center text-center font-normal text-xs px-1.5 py-1 h-8 bg-muted text-muted-foreground cursor-not-allowed opacity-70">
+          <CalendarIcon className="mr-1 h-3 w-3" />
+          {value || "—"}
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col items-center">
+      <span className="text-[9px] uppercase text-muted-foreground mb-0.5">{label}</span>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" className={cn("w-full justify-center text-center font-normal text-xs px-1.5 py-1 h-8", !value && "text-muted-foreground")}>
+            <CalendarIcon className="mr-1 h-3 w-3" />
+            {value || "—"}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0 z-[99999]" align="center">
+          <Calendar
+            mode="single"
+            defaultMonth={value ? parseAppDate(value) : undefined}
+            selected={value ? parseAppDate(value) : undefined}
+            onSelect={(d) => { if (d) onChange(formatAppDate(d)); }}
+            className="p-3 pointer-events-auto"
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
 // ── Form state shape ──────────────────────────────────────────
 function buildFormState(p: Project | null) {
   if (!p) return defaultForm();
@@ -594,12 +644,12 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
               <DialogTitle>Projekt {project.project_id}</DialogTitle>
             </DialogHeader>
 
-            <div className="flex min-h-[380px] max-h-[70vh]">
+            <div className="flex" style={{ maxHeight: '90vh' }}>
               {/* LEFT PANEL — Form fields */}
               <div className="flex-1 px-6 pb-4 overflow-y-auto">
-                {/* ── Základní informace ────────────────────── */}
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Základní informace</h4>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-3">
+                {/* ── ZÁKLADNÍ INFORMACE ────────────────────── */}
+                <SectionHeader icon="📋" label="ZÁKLADNÍ INFORMACE" />
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
                   <div>
                     <Label className="text-xs">Project ID</Label>
                     <Input
@@ -651,11 +701,11 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     )}
                   </div>
                   <div>
-                    <Label className="text-xs">PM</Label>
-                    {isSectionReadOnly("basic") || isFieldReadOnly("pm") ? (
-                      <Input value={form.pm || "—"} disabled className={roClass} />
+                    <Label className="text-xs">Architekt</Label>
+                    {isSectionReadOnly("basic") ? (
+                      <Input value={form.architekt || "—"} disabled className={roClass} />
                     ) : (
-                      <PeopleSelectDropdown role="PM" value={form.pm} onValueChange={(v) => setForm(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
+                      <Input value={form.architekt} onChange={(e) => setForm(s => ({ ...s, architekt: e.target.value }))} placeholder="Architekt" />
                     )}
                   </div>
 
@@ -704,56 +754,13 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     </div>
                   </div>
 
-                  <div>
-                    <Label className="text-xs">Konstruktér</Label>
-                    {isSectionReadOnly("basic") ? (
-                      <Input value={form.konstrukter || "—"} disabled className={roClass} />
-                    ) : (
-                      <PeopleSelectDropdown role="Konstruktér" value={form.konstrukter} onValueChange={(v) => setForm(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
-                    )}
-                  </div>
-                  <div>
-                    <Label className="text-xs">Architekt</Label>
-                    {isSectionReadOnly("basic") ? (
-                      <Input value={form.architekt || "—"} disabled className={roClass} />
-                    ) : (
-                      <Input value={form.architekt} onChange={(e) => setForm(s => ({ ...s, architekt: e.target.value }))} placeholder="Architekt" />
-                    )}
-                  </div>
+                  <DateField label="Datum Objednávky" value={form.datum_objednavky} onChange={(v) => setForm(s => ({ ...s, datum_objednavky: v }))} disabled={isSectionReadOnly("basic") || isFieldReadOnly("datum_objednavky")} />
+                  <DateField label="Datum Smluvní" value={form.datum_smluvni} onChange={(v) => setForm(s => ({ ...s, datum_smluvni: v }))} disabled={isSectionReadOnly("basic") || isFieldReadOnly("datum_smluvni")} />
                 </div>
 
-                {/* ── Finance ──────────────────────────────── */}
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-5 mb-2">Finance</h4>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-3">
-                  <div>
-                    <Label className="text-xs">Status</Label>
-                    {isSectionReadOnly("finance") ? (
-                      <Select value={form.status} disabled>
-                        <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                      </Select>
-                    ) : (
-                      <Select value={form.status} onValueChange={(v) => setForm(s => ({ ...s, status: v }))}>
-                        <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                      </Select>
-                    )}
-                  </div>
-                  <div>
-                    <Label className="text-xs">Risk</Label>
-                    {isSectionReadOnly("finance") || isFieldReadOnly("risk") ? (
-                      <Select value={form.risk} disabled>
-                        <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-                      </Select>
-                    ) : (
-                      <Select value={form.risk} onValueChange={(v) => setForm(s => ({ ...s, risk: v }))}>
-                        <SelectTrigger><SelectValue placeholder="Vyberte risk" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-                      </Select>
-                    )}
-                  </div>
-
+                {/* ── FINANCE ──────────────────────────────── */}
+                <SectionHeader icon="💰" label="FINANCE" />
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
                   <div>
                     <Label className="text-xs">Prodejní cena</Label>
                     <div className="flex items-center gap-1">
@@ -782,6 +789,21 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     </div>
                   </div>
                   <div>
+                    <Label className="text-xs">Marže</Label>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type={isSectionReadOnly("finance") ? "text" : "number"}
+                        className={cn("no-spinners", (isSectionReadOnly("finance") || isFieldReadOnly("marze")) && roClass)}
+                        value={isSectionReadOnly("finance") ? (form.marze ? `${form.marze}` : "—") : form.marze}
+                        onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
+                        placeholder="0"
+                        disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
+                      />
+                      <span className="text-sm text-muted-foreground shrink-0">%</span>
+                    </div>
+                  </div>
+
+                  <div className="col-span-2">
                     <Label className="text-xs">Kalkulant</Label>
                     {isSectionReadOnly("finance") ? (
                       <Input value={form.kalkulant || "—"} disabled className={roClass} />
@@ -790,49 +812,92 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     )}
                   </div>
 
-                  <div className="col-span-2 grid grid-cols-3 gap-x-3">
-                    <div>
-                      <Label className="text-xs">Marže</Label>
-                      <div className="flex items-center gap-1">
-                        <Input
-                          type={isSectionReadOnly("finance") ? "text" : "number"}
-                          className={cn("no-spinners", (isSectionReadOnly("finance") || isFieldReadOnly("marze")) && roClass)}
-                          value={isSectionReadOnly("finance") ? (form.marze ? `${form.marze}` : "—") : form.marze}
-                          onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
-                          placeholder="0"
-                          disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
-                        />
-                        <span className="text-sm text-muted-foreground shrink-0">%</span>
-                      </div>
-                    </div>
-                    <DateField label="Datum Objednávky" value={form.datum_objednavky} onChange={(v) => setForm(s => ({ ...s, datum_objednavky: v }))} disabled={isSectionReadOnly("finance") || isFieldReadOnly("datum_objednavky")} />
-                    <DateField label="Datum Smluvní" value={form.datum_smluvni} onChange={(v) => setForm(s => ({ ...s, datum_smluvni: v }))} disabled={isSectionReadOnly("finance") || isFieldReadOnly("datum_smluvni")} />
+                  {/* Rozpad ceny placeholder */}
+                  <div className="col-span-2 rounded-md border border-dashed border-muted-foreground/30 px-4 py-3 opacity-50">
+                    <p className="text-xs italic text-muted-foreground">Rozpad ceny — v přípravě</p>
                   </div>
                 </div>
 
-                {/* ── PM sekce ─────────────────────────────── */}
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-5 mb-2">PM</h4>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-3">
-                  <DateField label="Zaměření" value={form.zamereni} onChange={(v) => setForm(s => ({ ...s, zamereni: v }))} disabled={isSectionReadOnly("pm")} />
-                  <DateField label="TPV" value={form.tpv_date} onChange={(v) => setForm(s => ({ ...s, tpv_date: v }))} disabled={isSectionReadOnly("pm")} />
-                  <DateField label="Expedice" value={form.expedice} onChange={(v) => setForm(s => ({ ...s, expedice: v }))} disabled={isSectionReadOnly("pm")} />
-                  <DateField label="Montáž" value={form.montaz} onChange={(v) => setForm(s => ({ ...s, montaz: v }))} disabled={isSectionReadOnly("pm")} />
-                  <DateField label="Předání" value={form.predani} onChange={(v) => setForm(s => ({ ...s, predani: v }))} disabled={isSectionReadOnly("pm")} />
+                {/* ── PM — ŘÍZENÍ PROJEKTU ─────────────────── */}
+                <SectionHeader icon="📊" label="PM — ŘÍZENÍ PROJEKTU" />
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
                   <div>
+                    <Label className="text-xs">PM</Label>
+                    {isSectionReadOnly("pm") || isFieldReadOnly("pm") ? (
+                      <Input value={form.pm || "—"} disabled className={roClass} />
+                    ) : (
+                      <PeopleSelectDropdown role="PM" value={form.pm} onValueChange={(v) => setForm(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
+                    )}
+                  </div>
+                  <div>
+                    <Label className="text-xs">Status</Label>
+                    {isSectionReadOnly("pm") ? (
+                      <Select value={form.status} disabled>
+                        <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                      </Select>
+                    ) : (
+                      <Select value={form.status} onValueChange={(v) => setForm(s => ({ ...s, status: v }))}>
+                        <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
+                        <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                      </Select>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label className="text-xs">Risk</Label>
+                    {isSectionReadOnly("pm") || isFieldReadOnly("risk") ? (
+                      <Select value={form.risk} disabled>
+                        <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                      </Select>
+                    ) : (
+                      <Select value={form.risk} onValueChange={(v) => setForm(s => ({ ...s, risk: v }))}>
+                        <SelectTrigger><SelectValue placeholder="Vyberte risk" /></SelectTrigger>
+                        <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                  <div>{/* empty cell */}</div>
+
+                  {/* Sub-section: Milníky */}
+                  <div className="col-span-2 mt-1">
+                    <span className="text-[9px] uppercase font-semibold text-muted-foreground tracking-wider">Milníky</span>
+                    <div className="grid grid-cols-3 gap-2 mt-1.5">
+                      <CompactDateField label="Zaměření" value={form.zamereni} onChange={(v) => setForm(s => ({ ...s, zamereni: v }))} disabled={isSectionReadOnly("pm")} />
+                      <CompactDateField label="TPV" value={form.tpv_date} onChange={(v) => setForm(s => ({ ...s, tpv_date: v }))} disabled={isSectionReadOnly("pm")} />
+                      <CompactDateField label="Expedice" value={form.expedice} onChange={(v) => setForm(s => ({ ...s, expedice: v }))} disabled={isSectionReadOnly("pm")} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mt-1.5">
+                      <CompactDateField label="Montáž" value={form.montaz} onChange={(v) => setForm(s => ({ ...s, montaz: v }))} disabled={isSectionReadOnly("pm")} />
+                      <CompactDateField label="Předání" value={form.predani} onChange={(v) => setForm(s => ({ ...s, predani: v }))} disabled={isSectionReadOnly("pm")} />
+                      <div>{/* empty cell for alignment */}</div>
+                    </div>
+                  </div>
+
+                  <div className="col-span-2">
                     <Label className="text-xs">Poznámka PM</Label>
                     <Textarea
                       value={form.pm_poznamka}
                       onChange={(e) => setForm(s => ({ ...s, pm_poznamka: e.target.value }))}
                       disabled={isSectionReadOnly("pm")}
-                      className={cn("min-h-[60px] text-sm", isSectionReadOnly("pm") && roClass)}
+                      className={cn("min-h-[50px] text-sm", isSectionReadOnly("pm") && roClass)}
                       placeholder="Poznámka…"
                     />
                   </div>
                 </div>
 
-                {/* ── TPV sekce ────────────────────────────── */}
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-5 mb-2">TPV</h4>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-3 pb-2">
+                {/* ── TPV — TECHNICKÁ PŘÍPRAVA ─────────────── */}
+                <SectionHeader icon="🔧" label="TPV — TECHNICKÁ PŘÍPRAVA" />
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 pb-2">
+                  <div>
+                    <Label className="text-xs">Konstruktér</Label>
+                    {isSectionReadOnly("tpv") ? (
+                      <Input value={form.konstrukter || "—"} disabled className={roClass} />
+                    ) : (
+                      <PeopleSelectDropdown role="Konstruktér" value={form.konstrukter} onValueChange={(v) => setForm(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
+                    )}
+                  </div>
                   <div>
                     <Label className="text-xs">Náročnost</Label>
                     <Input
@@ -865,13 +930,13 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                       {!isSectionReadOnly("tpv") && <span className="text-sm text-muted-foreground shrink-0">%</span>}
                     </div>
                   </div>
-                  <div>
+                  <div className="col-span-2">
                     <Label className="text-xs">Poznámka TPV</Label>
                     <Textarea
                       value={form.tpv_poznamka}
                       onChange={(e) => setForm(s => ({ ...s, tpv_poznamka: e.target.value }))}
                       disabled={isSectionReadOnly("tpv")}
-                      className={cn("min-h-[60px] text-sm", isSectionReadOnly("tpv") && roClass)}
+                      className={cn("min-h-[50px] text-sm", isSectionReadOnly("tpv") && roClass)}
                       placeholder="Poznámka…"
                     />
                   </div>
@@ -880,20 +945,27 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
 
               {/* RIGHT PANEL — Documents */}
               <div className="w-[340px] shrink-0 border-l border-border bg-muted/30 flex flex-col">
-                <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-foreground">Dokumenty</h3>
-                  <div className="flex items-center gap-1.5">
-                    {sp.refreshing && (
-                      <span className="text-[10px] text-muted-foreground">Aktualizace...</span>
-                    )}
-                    <button
-                      type="button"
-                      className="text-muted-foreground hover:text-foreground transition-colors"
-                      title="Obnovit dokumenty"
-                      onClick={() => sp.manualRefresh()}
-                    >
-                      <RefreshCw className={cn("h-3.5 w-3.5", sp.refreshing && "animate-spin")} />
-                    </button>
+                <div className="px-4 pt-4 pb-2">
+                  <div className="relative flex items-center">
+                    <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                      <div className="w-full border-t border-border" />
+                    </div>
+                    <span className="relative bg-muted/30 pr-2 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground flex items-center gap-1">
+                      <span>📎</span> DOKUMENTY
+                    </span>
+                    <div className="ml-auto relative flex items-center gap-1.5 pl-2 bg-muted/30">
+                      {sp.refreshing && (
+                        <span className="text-[10px] text-muted-foreground">Aktualizace...</span>
+                      )}
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        title="Obnovit dokumenty"
+                        onClick={() => sp.manualRefresh()}
+                      >
+                        <RefreshCw className={cn("h-3.5 w-3.5", sp.refreshing && "animate-spin")} />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -947,9 +1019,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                                     if (isDeleting) {
                                       return (
                                         <div key={f.name} className="flex items-center gap-2 py-1 px-1 rounded bg-accent/50 text-xs">
-                                          <span className="text-gray-600">Smazat soubor?</span>
-                                          <button type="button" className="text-red-500 font-medium hover:underline" onClick={() => setDeletingFile(null)}>Zrušit</button>
-                                          <button type="button" className="text-gray-400 font-medium hover:underline" onClick={() => handleDeleteFile(cat.key, f.name)}>Smazat</button>
+                                          <span className="text-muted-foreground">Smazat soubor?</span>
+                                          <button type="button" className="text-destructive font-medium hover:underline" onClick={() => setDeletingFile(null)}>Zrušit</button>
+                                          <button type="button" className="text-muted-foreground font-medium hover:underline" onClick={() => handleDeleteFile(cat.key, f.name)}>Smazat</button>
                                         </div>
                                       );
                                     }
@@ -964,7 +1036,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                                         {canUploadDocuments && (
                                           <button
                                             type="button"
-                                            className="hidden group-hover:block shrink-0 text-gray-300 hover:text-red-400 transition-colors"
+                                            className="hidden group-hover:block shrink-0 text-muted-foreground/30 hover:text-destructive transition-colors"
                                             onClick={(e) => { e.stopPropagation(); setDeletingFile(fileKey); }}
                                           >
                                             <Trash2 className="h-3.5 w-3.5" />
