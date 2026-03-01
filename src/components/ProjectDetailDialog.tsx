@@ -142,9 +142,9 @@ function DateField({ label, value, onChange, disabled }: { label: string; value:
 function CompactDateField({ label, value, onChange, disabled }: { label: string; value: string; onChange: (v: string) => void; disabled: boolean }) {
   if (disabled) {
     return (
-      <div className="flex flex-col items-center">
-        <span className="text-[9px] uppercase text-muted-foreground mb-0.5">{label}</span>
-        <Button variant="outline" disabled className="w-full justify-center text-center font-normal text-xs px-1.5 py-1 h-8 bg-muted text-muted-foreground cursor-not-allowed opacity-70">
+      <div>
+        <Label className="text-xs">{label}</Label>
+        <Button variant="outline" disabled className="w-full justify-start text-left font-normal text-xs h-8 bg-muted text-muted-foreground cursor-not-allowed opacity-70">
           <CalendarIcon className="mr-1 h-3 w-3" />
           {value || "—"}
         </Button>
@@ -152,16 +152,16 @@ function CompactDateField({ label, value, onChange, disabled }: { label: string;
     );
   }
   return (
-    <div className="flex flex-col items-center">
-      <span className="text-[9px] uppercase text-muted-foreground mb-0.5">{label}</span>
+    <div>
+      <Label className="text-xs">{label}</Label>
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="outline" className={cn("w-full justify-center text-center font-normal text-xs px-1.5 py-1 h-8", !value && "text-muted-foreground")}>
+          <Button variant="outline" className={cn("w-full justify-start text-left font-normal text-xs h-8", !value && "text-muted-foreground")}>
             <CalendarIcon className="mr-1 h-3 w-3" />
             {value || "—"}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0 z-[99999]" align="center">
+        <PopoverContent className="w-auto p-0 z-[99999]" align="start">
           <Calendar
             mode="single"
             defaultMonth={value ? parseAppDate(value) : undefined}
