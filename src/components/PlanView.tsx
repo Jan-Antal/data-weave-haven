@@ -872,7 +872,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Načítání...</div>;
 
-  const HEADER_HEIGHT = showWeeks ? 52 : 32;
+  const HEADER_HEIGHT = showWeeks ? 52 : 36;
   const weekFontClass = zoom === "3M" ? "text-[9px] text-muted-foreground/60" : "text-[8px] text-muted-foreground/40";
 
   return (
@@ -883,8 +883,8 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
       <div className="flex shrink-0 border-b bg-primary/5">
         {/* Left panel header */}
         <div className="border-r shrink-0 flex items-start" style={{ width: LEFT_PANEL_WIDTH, height: HEADER_HEIGHT }}>
-          <div style={{ width: 36, minWidth: 36 }} />
-          <div style={{ width: 36, minWidth: 36 }} />
+          <div style={{ width: 36, minWidth: 36, maxWidth: 36 }} />
+          <div style={{ width: 36, minWidth: 36, maxWidth: 36 }} />
           <button onClick={() => togglePlanSort("project_id")} className="flex items-center gap-1 h-9 px-2 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap hover:bg-muted/50 transition-colors" style={{ width: 110, minWidth: 110, flexShrink: 0 }}>
             {planIdLabel}
             {planSortCol === "project_id" ? (planSortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
