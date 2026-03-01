@@ -26,6 +26,7 @@ import { ProjectDetailDialog } from "./ProjectDetailDialog";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { isStageFieldInherited, getStageDisplayValue, inheritedTextClass } from "@/lib/stageInheritance";
 import { getProjectRiskColor } from "@/hooks/useRiskHighlight";
 import { useAllColumnVisibility, PROJECT_INFO_NATIVE, PM_NATIVE, TPV_NATIVE, ALL_COLUMNS } from "./ColumnVisibilityContext";
 import { getColumnStyle, renderColumnHeader, renderColumnCell, getColumnLabel, COL_ICON_STYLE, COL_CHEVRON_STYLE } from "./CrossTabColumns";
@@ -116,20 +117,20 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
     });
   }, [stage.id, stage.stage_name, (stage as any).konstrukter, (stage as any).status, (stage as any).datum_smluvni, project.project_id, onFieldTouched, updateStage]);
   const v = isVisible;
-  const inheritedClass = (field: string) => isFieldInherited?.(field) ? "text-blue-300" : "";
+  const ihClass = (field: string) => inheritedTextClass(stage, project, field);
 
   const renderStageCell = (key: string) => {
     switch (key) {
-      case "datum_smluvni": return <TableCell key={key}><span className={cn("text-xs px-1", isFieldInherited?.(key) ? "text-blue-300" : "text-muted-foreground")}>{project.datum_smluvni || "—"}</span></TableCell>;
-      case "pm": return <TableCell key={key}><InlineEditableCell value={stage.pm} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} className={inheritedClass("pm")} /></TableCell>;
-      case "status": return <TableCell key={key}><InlineEditableCell value={stage.status} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={stage.status ? <StatusBadge status={stage.status} /> : "—"} readOnly={!canEdit} className={inheritedClass("status")} /></TableCell>;
-      case "risk": return <TableCell key={key}><InlineEditableCell value={stage.risk} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("risk", val)} displayValue={<RiskBadge level={stage.risk || ""} />} readOnly={!canEdit} className={inheritedClass("risk")} /></TableCell>;
-      case "zamereni": return <TableCell key={key}><InlineEditableCell value={stage.zamereni} type="date" onSave={(val) => saveStage("zamereni", val)} readOnly={!canEdit} className={inheritedClass("zamereni")} /></TableCell>;
-      case "tpv_date": return <TableCell key={key}><InlineEditableCell value={stage.tpv_date} type="date" onSave={(val) => saveStage("tpv_date", val)} readOnly={!canEdit} className={inheritedClass("tpv_date")} /></TableCell>;
-      case "expedice": return <TableCell key={key}><InlineEditableCell value={stage.expedice} type="date" onSave={(val) => saveStage("expedice", val)} readOnly={!canEdit} className={inheritedClass("expedice")} /></TableCell>;
-      case "montaz": return <TableCell key={key}><InlineEditableCell value={(stage as any).montaz} type="date" onSave={(val) => saveStage("montaz", val)} readOnly={!canEdit} className={inheritedClass("montaz")} /></TableCell>;
-      case "predani": return <TableCell key={key}><InlineEditableCell value={stage.predani} type="date" onSave={(val) => saveStage("predani", val)} readOnly={!canEdit} className={inheritedClass("predani")} /></TableCell>;
-      case "pm_poznamka": return <TableCell key={key}><InlineEditableCell value={stage.pm_poznamka} type="textarea" onSave={(val) => saveStage("pm_poznamka", val)} readOnly={!canEdit} className={inheritedClass("pm_poznamka")} /></TableCell>;
+      case "datum_smluvni": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "datum_smluvni")} type="date" onSave={(val) => saveStage("datum_smluvni", val)} readOnly={!canEdit} className={ihClass("datum_smluvni")} /></TableCell>;
+      case "pm": return <TableCell key={key}><InlineEditableCell value={stage.pm} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} /></TableCell>;
+      case "status": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "status")} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={getStageDisplayValue(stage, project, "status") ? <StatusBadge status={getStageDisplayValue(stage, project, "status")} /> : "—"} readOnly={!canEdit} className={ihClass("status")} /></TableCell>;
+      case "risk": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "risk")} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("risk", val)} displayValue={<RiskBadge level={getStageDisplayValue(stage, project, "risk") || ""} />} readOnly={!canEdit} className={ihClass("risk")} /></TableCell>;
+      case "zamereni": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "zamereni")} type="date" onSave={(val) => saveStage("zamereni", val)} readOnly={!canEdit} className={ihClass("zamereni")} /></TableCell>;
+      case "tpv_date": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "tpv_date")} type="date" onSave={(val) => saveStage("tpv_date", val)} readOnly={!canEdit} className={ihClass("tpv_date")} /></TableCell>;
+      case "expedice": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "expedice")} type="date" onSave={(val) => saveStage("expedice", val)} readOnly={!canEdit} className={ihClass("expedice")} /></TableCell>;
+      case "montaz": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "montaz")} type="date" onSave={(val) => saveStage("montaz", val)} readOnly={!canEdit} className={ihClass("montaz")} /></TableCell>;
+      case "predani": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "predani")} type="date" onSave={(val) => saveStage("predani", val)} readOnly={!canEdit} className={ihClass("predani")} /></TableCell>;
+      case "pm_poznamka": return <TableCell key={key}><InlineEditableCell value={stage.pm_poznamka} type="textarea" onSave={(val) => saveStage("pm_poznamka", val)} readOnly={!canEdit} /></TableCell>;
       default: return <TableCell key={key} />;
     }
   };

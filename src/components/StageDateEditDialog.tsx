@@ -48,17 +48,21 @@ export function StageDateEditDialog({ stage, project, open, onOpenChange }: Stag
     expedice: null,
     predani: null,
   });
+  // Track which fields are inherited (stage has no own value)
+  const [inheritedFields, setInheritedFields] = useState<Set<FieldKey>>(new Set());
   const [openPickers, setOpenPickers] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (stage && open) {
-      // For each field, use stage's own value; if null and project provided, inherit from project
+      const inherited = new Set<FieldKey>();
       const getVal = (stageKey: FieldKey): string | null => {
         const stageVal = (stage as any)[stageKey] ?? null;
         if (stageVal) return stageVal;
         if (project) {
           const projectKey = STAGE_TO_PROJECT_FIELD[stageKey];
-          return projectKey ? ((project as any)[projectKey] ?? null) : null;
+          const parentVal = projectKey ? ((project as any)[projectKey] ?? null) : null;
+          if (parentVal) inherited.add(stageKey);
+          return parentVal;
         }
         return null;
       };
@@ -69,6 +73,7 @@ export function StageDateEditDialog({ stage, project, open, onOpenChange }: Stag
         expedice: getVal("expedice"),
         predani: getVal("predani"),
       });
+      setInheritedFields(inherited);
     }
   }, [stage, project, open]);
 
@@ -168,8 +173,9 @@ export function StageDateEditDialog({ stage, project, open, onOpenChange }: Stag
               <div key={f.key} className="flex items-center gap-0">
                 <span className={cn(
                   "text-xs font-medium w-[120px] shrink-0",
-                  readOnly && "text-muted-foreground"
-                )}>{f.label}</span>
+                  readOnly && "text-muted-foreground",
+                  !readOnly && inheritedFields.has(f.key) && "text-muted-foreground/60"
+                )}>{f.label}{inheritedFields.has(f.key) && <span className="text-[10px] ml-1 text-muted-foreground/40">(zděděno)</span>}</span>
                 <div className="w-6 shrink-0 flex items-center justify-center">
                   {hasWarning ? (() => {
                     const fieldWarnings = orderWarnings.filter(w => w.fields.has(f.key));
@@ -205,6 +211,7 @@ export function StageDateEditDialog({ stage, project, open, onOpenChange }: Stag
                       className={cn(
                         "h-8 w-[140px] justify-start text-left font-normal text-xs",
                         !parsed && "text-muted-foreground",
+                        parsed && inheritedFields.has(f.key) && "text-muted-foreground/60",
                         readOnly && "opacity-50 cursor-not-allowed"
                       )}
                     >
@@ -222,6 +229,7 @@ export function StageDateEditDialog({ stage, project, open, onOpenChange }: Stag
                           ...prev,
                           [f.key]: date ? formatAppDate(date) : null,
                         }));
+                        setInheritedFields((prev) => { const next = new Set(prev); next.delete(f.key); return next; });
                         setOpenPickers((prev) => ({ ...prev, [f.key]: false }));
                       }}
                       disabled={isWeekend}
