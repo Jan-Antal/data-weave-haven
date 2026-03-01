@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { PlanDateEditDialog } from "@/components/PlanDateEditDialog";
+import { StageDateEditDialog } from "@/components/StageDateEditDialog";
 import { useProjects, Project } from "@/hooks/useProjects";
-import { useProjectStages, ProjectStage } from "@/hooks/useProjectStages";
+import { useProjectStages, ProjectStage, useUpdateStage } from "@/hooks/useProjectStages";
+import { useStagesByProject } from "@/hooks/useAllProjectStages";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { useUpdateProject } from "@/hooks/useProjectMutations";
 import { useAuth } from "@/hooks/useAuth";
@@ -539,27 +541,31 @@ function ConnectorLine({
 
 // ── Substage loader ─────────────────────────────────────────────────
 function SubstageRows({
-  projectId, project, origin, dayPx, timelineWidth, statusColorMap,
+  projectId, project, origin, dayPx, timelineWidth, statusColorMap, isFieldReadOnly,
 }: {
   projectId: string; project: Project; origin: Date; dayPx: number;
   timelineWidth: number; statusColorMap: Record<string, string>;
+  isFieldReadOnly: (field: string) => boolean;
 }) {
   const { data: stages = [] } = useProjectStages(projectId);
+  const updateStage = useUpdateStage();
   if (stages.length === 0) return null;
   return (
     <>
       {stages.map((stage) => (
-        <SubstageRow key={stage.id} stage={stage} project={project} origin={origin} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} />
+        <SubstageRow key={stage.id} stage={stage} project={project} origin={origin} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} updateStage={updateStage} />
       ))}
     </>
   );
 }
 
 function SubstageRow({
-  stage, project, origin, dayPx, timelineWidth, statusColorMap,
+  stage, project, origin, dayPx, timelineWidth, statusColorMap, isFieldReadOnly, updateStage,
 }: {
   stage: ProjectStage; project: Project; origin: Date; dayPx: number;
   timelineWidth: number; statusColorMap: Record<string, string>;
+  isFieldReadOnly: (field: string) => boolean;
+  updateStage: ReturnType<typeof useUpdateStage>;
 }) {
   const barData = getStageBarData(stage, project, statusColorMap);
   const midY = SUBSTAGE_ROW_HEIGHT / 2;
@@ -618,10 +624,26 @@ function SubstageRow({
         );
       })}
       {barData.diamonds.map((m, i, arr) => {
-        // Hide label if a later diamond is within 5 days
         const showLabel = !arr.some((other, j) => j > i && Math.abs(differenceInDays(other.date, m.date)) <= 5);
+        const canDrag = DRAGGABLE_MILESTONES.has(m.name) && m.fieldKey && !isFieldReadOnly(m.fieldKey);
         return (
-          <MilestoneDiamond key={i} date={m.date} color={m.color} label={m.label} name={m.name} origin={origin} dayPx={dayPx} midY={midY} small showLabel={showLabel} zIndex={10 + m.priority} />
+          <MilestoneDiamond
+            key={i} date={m.date} color={m.color} label={m.label} name={m.name}
+            origin={origin} dayPx={dayPx} midY={midY} small showLabel={showLabel}
+            zIndex={10 + m.priority}
+            draggable={canDrag}
+            onDragEnd={canDrag && m.fieldKey ? (newDate) => {
+              const oldVal = (stage as any)[m.fieldKey!] ?? "";
+              updateStage.mutate({
+                id: stage.id,
+                field: m.fieldKey!,
+                value: formatAppDate(newDate),
+                projectId: stage.project_id,
+                oldValue: oldVal,
+                stageName: stage.stage_name,
+              });
+            } : undefined}
+          />
         );
       })}
     </div>
@@ -629,10 +651,11 @@ function SubstageRow({
 }
 
 // ── Substage expand button ──────────────────────────────────────────
-function ExpandButton({ expanded, onClick }: { expanded: boolean; onClick: () => void }) {
+function ExpandButton({ expanded, onClick, hasStages }: { expanded: boolean; onClick: () => void; hasStages?: boolean }) {
+  const color = hasStages ? "#f4a261" : "#95a5a6";
   return (
     <button onClick={onClick} className="p-0 shrink-0">
-      {expanded ? <ChevronDown className="h-4 w-4 text-accent stroke-[3]" /> : <ChevronRight className="h-4 w-4 text-accent stroke-[3]" />}
+      {expanded ? <ChevronDown className="h-4 w-4 stroke-[3]" style={{ color }} /> : <ChevronRight className="h-4 w-4 stroke-[3]" style={{ color }} />}
     </button>
   );
 }
@@ -650,6 +673,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
   const planIdLabel = getLabel("project_id", "ID");
   const planNameLabel = getLabel("project_name", "Název");
   const { sorted: filteredProjects } = useSortFilter(projects, { personFilter, statusFilter }, search);
+  const { stagesByProject } = useStagesByProject();
   const zoom = zoomProp ?? ("3M" as ZoomLevel);
   const [planSortCol, setPlanSortCol] = useState<string | null>(null);
   const [planSortDir, setPlanSortDir] = useState<"asc" | "desc" | null>(null);
@@ -672,6 +696,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [containerWidth, setContainerWidth] = useState(0);
   const [editProject, setEditProject] = useState<Project | null>(null);
+  const [editStage, setEditStage] = useState<ProjectStage | null>(null);
   const updateProject = useUpdateProject();
   const { isFieldReadOnly } = useAuth();
 
@@ -902,12 +927,12 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                     style={{ width: 36, minWidth: 36 }}
                     onClick={(e) => { e.stopPropagation(); toggleExpand(p.project_id); }}
                   >
-                    <ExpandButton expanded={isExp} onClick={() => {}} />
+                    <ExpandButton expanded={isExp} onClick={() => {}} hasStages={(stagesByProject.get(p.project_id)?.length ?? 0) > 0} />
                   </div>
                   <span className="text-xs font-mono text-muted-foreground whitespace-nowrap shrink-0 cursor-pointer hover:underline px-2" style={{ width: 110, minWidth: 110 }} onClick={() => setEditProject(p)}>{p.project_id}</span>
                   <span className="text-xs font-medium truncate cursor-pointer hover:underline px-2" style={{ width: 180, minWidth: 180, maxWidth: 180 }} onClick={() => setEditProject(p)}>{p.project_name}</span>
                 </div>
-                {isExp && <SubstageLeftRows projectId={p.project_id} project={p} statusColorMap={statusColorMap} />}
+                {isExp && <SubstageLeftRows projectId={p.project_id} project={p} statusColorMap={statusColorMap} onClickStage={(stage) => setEditStage(stage)} />}
               </div>
             );
           })}
@@ -1027,7 +1052,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
 
                   {/* Substage rows */}
                   {isExp && (
-                    <SubstageRows projectId={p.project_id} project={p} origin={timelineStart} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} />
+                    <SubstageRows projectId={p.project_id} project={p} origin={timelineStart} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} />
                   )}
                 </div>
               );
@@ -1054,12 +1079,17 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
         open={!!editProject}
         onOpenChange={(open) => { if (!open) setEditProject(null); }}
       />
+      <StageDateEditDialog
+        stage={editStage}
+        open={!!editStage}
+        onOpenChange={(open) => { if (!open) setEditStage(null); }}
+      />
     </>
   );
 }
 
 // ── Substage left panel rows ────────────────────────────────────────
-function SubstageLeftRows({ projectId, project, statusColorMap }: { projectId: string; project: Project; statusColorMap: Record<string, string> }) {
+function SubstageLeftRows({ projectId, project, statusColorMap, onClickStage }: { projectId: string; project: Project; statusColorMap: Record<string, string>; onClickStage: (stage: ProjectStage) => void }) {
   const { data: stages = [] } = useProjectStages(projectId);
   return (
     <>
@@ -1068,8 +1098,10 @@ function SubstageLeftRows({ projectId, project, statusColorMap }: { projectId: s
         return (
           <div key={stage.id} className="flex items-center border-b bg-muted/10" style={{ height: SUBSTAGE_ROW_HEIGHT }}>
             <div style={{ width: 36, minWidth: 36 }} />
-            <div className="flex items-center gap-1 px-2" style={{ width: 110, minWidth: 110 }}>
+            <div style={{ width: 36, minWidth: 36 }} />
+            <div className="flex items-center gap-1 px-2 cursor-pointer hover:underline" style={{ width: 110, minWidth: 110 }} onClick={() => onClickStage(stage)}>
               {barData.warnings.length > 0 && <WarningIcon warnings={barData.warnings} />}
+              <span className="text-[10px] font-mono text-muted-foreground truncate">{stage.stage_name}</span>
             </div>
             <span className="text-[10px] text-muted-foreground truncate px-2" style={{ width: 180, minWidth: 180, maxWidth: 180 }}>{stage.stage_name}</span>
           </div>
