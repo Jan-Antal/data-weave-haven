@@ -532,6 +532,14 @@ function SubstageRow({
         const wkLabel = weeksLabel(seg.start, seg.end);
         const phaseLabel = PHASE_LABELS[seg.color];
         const hasHatch = !!seg.hatched;
+        const isFirst = i === 0;
+        const isLast = i === barData.segments.length - 1;
+        const prevHatched = i > 0 && !!barData.segments[i - 1].hatched;
+        const nextHatched = i < barData.segments.length - 1 && !!barData.segments[i + 1]?.hatched;
+        const rTL = isFirst ? 4 : (hasHatch && prevHatched ? 0 : 4);
+        const rBL = isFirst ? 4 : (hasHatch && prevHatched ? 0 : 4);
+        const rTR = isLast ? 4 : (hasHatch && nextHatched ? 0 : 4);
+        const rBR = isLast ? 4 : (hasHatch && nextHatched ? 0 : 4);
         const segDiv = (
           <div
             key={i}
@@ -540,7 +548,7 @@ function SubstageRow({
               left: x, top: midY - SUBSTAGE_BAR_HEIGHT / 2,
               width: Math.max(w, 4), height: SUBSTAGE_BAR_HEIGHT,
               background: hasHatch ? hatchOverlay(seg.color) : seg.color,
-              zIndex: 2, borderRadius: 4,
+              zIndex: 2, borderRadius: `${rTL}px ${rTR}px ${rBR}px ${rBL}px`,
             }}
           >
             {w > 32 && wkLabel && (
@@ -890,6 +898,17 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
 
                       const phaseLabel = PHASE_LABELS[seg.color];
                       const hasHatch = !!seg.hatched;
+                      const isFirst = i === 0;
+                      const isLast = i === barData.segments.length - 1;
+                      const prevHatched = i > 0 && !!barData.segments[i - 1].hatched;
+                      const nextHatched = i < barData.segments.length - 1 && !!barData.segments[i + 1]?.hatched;
+
+                      // Determine border-radius per corner
+                      const rTL = isFirst ? 4 : (hasHatch && prevHatched ? 0 : 4);
+                      const rBL = isFirst ? 4 : (hasHatch && prevHatched ? 0 : 4);
+                      const rTR = isLast ? 4 : (hasHatch && nextHatched ? 0 : 4);
+                      const rBR = isLast ? 4 : (hasHatch && nextHatched ? 0 : 4);
+
                       const segDiv = (
                         <div
                           key={`seg-${i}`}
@@ -901,7 +920,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                             height: BAR_HEIGHT,
                             background: hasHatch ? hatchOverlay(seg.color) : seg.color,
                             zIndex: 2,
-                            borderRadius: 4,
+                            borderRadius: `${rTL}px ${rTR}px ${rBR}px ${rBL}px`,
                             minWidth: 4,
                           }}
                         >
