@@ -241,29 +241,25 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     const stageName = `${projectId}-${suffix}`;
     const id = crypto.randomUUID();
 
-    const inheritedData: Record<string, any> = {};
     const inheritedKeys = new Set<string>();
     for (const field of INHERITABLE_FIELDS) {
       const val = (project as any)[field];
       if (val != null && val !== "") {
-        inheritedData[field] = val;
         inheritedKeys.add(field);
       }
     }
-    // Map project date fields to stage date fields
     for (const [projField, stageField] of Object.entries(INHERITABLE_DATE_MAP)) {
       const val = (project as any)[projField];
       if (val != null && val !== "") {
-        inheritedData[stageField] = val;
         inheritedKeys.add(stageField);
       }
     }
 
-    const newStage = { id, project_id: projectId, stage_name: stageName, stage_order: stages.length, ...inheritedData };
+    const newStage = { id, project_id: projectId, stage_name: stageName, stage_order: stages.length };
     const queryKey = ["project_stages", projectId];
     qc.setQueryData<ProjectStage[]>(queryKey, (old) => [
       ...(old || []),
-      { ...newStage, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, start_date: inheritedData.start_date ?? null, end_date: null, notes: null, datum_smluvni: inheritedData.datum_smluvni ?? null, pm: inheritedData.pm ?? null, status: inheritedData.status ?? null, risk: inheritedData.risk ?? null, zamereni: inheritedData.zamereni ?? null, tpv_date: inheritedData.tpv_date ?? null, expedice: inheritedData.expedice ?? null, montaz: inheritedData.montaz ?? null, predani: inheritedData.predani ?? null, pm_poznamka: null, konstrukter: inheritedData.konstrukter ?? null, narocnost: inheritedData.narocnost ?? null, hodiny_tpv: null, percent_tpv: null, architekt: inheritedData.architekt ?? null, prodejni_cena: null, currency: null, kalkulant: null, marze: null } as ProjectStage,
+      { ...newStage, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, start_date: null, end_date: null, notes: null, datum_smluvni: null, pm: null, status: null, risk: null, zamereni: null, tpv_date: null, expedice: null, montaz: null, predani: null, pm_poznamka: null, konstrukter: null, narocnost: null, hodiny_tpv: null, percent_tpv: null, architekt: null, prodejni_cena: null, currency: null, kalkulant: null, marze: null } as ProjectStage,
     ]);
     setFreshStages(prev => new Map(prev).set(id, inheritedKeys));
 
