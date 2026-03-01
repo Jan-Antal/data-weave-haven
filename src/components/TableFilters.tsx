@@ -8,6 +8,7 @@ import { useAllPeople } from "@/hooks/usePeople";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { cn } from "@/lib/utils";
 import { TableSearchBar } from "./TableSearchBar";
+import { useAuth } from "@/hooks/useAuth";
 
 interface TableFiltersProps {
   personFilter: string | null;
@@ -20,10 +21,12 @@ const defaultHiddenStatuses = ["Dokončeno"];
 
 export function useTableFilters() {
   const { data: statusOptions = [] } = useProjectStatusOptions();
+  const { linkedPersonName, isAdmin, isOwner, loading: authLoading } = useAuth();
   const [personFilter, setPersonFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [initialized, setInitialized] = useState(false);
+  const [personInitialized, setPersonInitialized] = useState(false);
 
   // Initialize status filter once options are loaded
   useEffect(() => {
@@ -33,6 +36,16 @@ export function useTableFilters() {
       setInitialized(true);
     }
   }, [statusOptions, initialized]);
+
+  // Auto-set person filter for non-admin roles with a linked person
+  useEffect(() => {
+    if (!authLoading && !personInitialized) {
+      if (linkedPersonName && !isAdmin && !isOwner) {
+        setPersonFilter(linkedPersonName);
+      }
+      setPersonInitialized(true);
+    }
+  }, [authLoading, linkedPersonName, isAdmin, isOwner, personInitialized]);
 
   const allLabels = statusOptions.map((s) => s.label);
   const hasActiveFilters = personFilter !== null || (initialized && statusFilter.length !== allLabels.length);

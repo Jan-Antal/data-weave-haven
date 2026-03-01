@@ -11,6 +11,7 @@ interface AuthContextType {
   role: AppRole | null;
   realRole: AppRole | null;
   loading: boolean;
+  linkedPersonName: string | null;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   isOwner: boolean;
@@ -50,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [realRole, setRealRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [simulatedRole, setSimulatedRole] = useState<AppRole | null>(null);
+  const [linkedPersonName, setLinkedPersonName] = useState<string | null>(null);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -59,25 +61,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (session?.user) {
           setTimeout(async () => {
-            const { data: profileData } = await supabase
-              .from("profiles")
-              .select("full_name, email, is_active")
-              .eq("id", session.user.id)
-              .single();
-            setProfile(profileData);
-
-            const { data: roleData } = await supabase
-              .from("user_roles")
-              .select("role")
-              .eq("user_id", session.user.id)
-              .single();
+            const [{ data: profileData }, { data: roleData }] = await Promise.all([
+              supabase
+                .from("profiles")
+                .select("full_name, email, is_active, person_id")
+                .eq("id", session.user.id)
+                .single(),
+              supabase
+                .from("user_roles")
+                .select("role")
+                .eq("user_id", session.user.id)
+                .single(),
+            ]);
+            setProfile(profileData ? { full_name: profileData.full_name, email: profileData.email, is_active: profileData.is_active } : null);
             setRealRole((roleData?.role as AppRole) ?? null);
+
+            // Fetch linked person name
+            const personId = (profileData as any)?.person_id;
+            if (personId) {
+              const { data: personData } = await supabase
+                .from("people")
+                .select("name")
+                .eq("id", personId)
+                .single();
+              setLinkedPersonName(personData?.name ?? null);
+            } else {
+              setLinkedPersonName(null);
+            }
+
             setLoading(false);
           }, 0);
         } else {
           setProfile(null);
           setRealRole(null);
           setSimulatedRole(null);
+          setLinkedPersonName(null);
           setLoading(false);
         }
       }
@@ -152,6 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     role: effectiveRole,
     realRole,
     loading,
+    linkedPersonName,
     signIn,
     signOut,
     isOwner,
