@@ -321,7 +321,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack }: Pr
 
         {selected.size > 0 && canManageTPV && (
           <div className="flex items-center gap-2 ml-4 border-l pl-4">
-            <span className="text-sm text-muted-foreground">{selected.size} vybráno — úprava Status, Konstruktér nebo data se aplikuje na všechny vybrané</span>
+            <span className="text-sm text-muted-foreground">{selected.size} vybráno</span>
             <Button size="sm" variant="destructive" onClick={() => setDeleteIds(Array.from(selected))}>
               <Trash2 className="h-3 w-3 mr-1" /> Smazat
             </Button>
