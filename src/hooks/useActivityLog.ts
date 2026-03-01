@@ -19,6 +19,7 @@ interface Filters {
   category: "all" | "status" | "terminy" | "documents" | "projects";
   projectId: string | null;
   userEmail: string | null;
+  enabled?: boolean;
 }
 
 function getActionTypes(category: Filters["category"]): string[] | null {
@@ -33,7 +34,7 @@ function getActionTypes(category: Filters["category"]): string[] | null {
 
 export function useActivityLog(filters: Filters) {
   return useInfiniteQuery({
-    queryKey: ["activity-log", filters],
+    queryKey: ["activity-log", filters.category, filters.projectId, filters.userEmail],
     queryFn: async ({ pageParam = 0 }) => {
       let q = (supabase.from("data_log") as any)
         .select("*")
@@ -54,5 +55,6 @@ export function useActivityLog(filters: Filters) {
       return allPages.flat().length;
     },
     initialPageParam: 0,
+    enabled: filters.enabled !== false,
   });
 }

@@ -217,7 +217,7 @@ export function DataLogPanel({ open, onOpenChange }: DataLogPanelProps) {
     hasNextPage,
     isFetchingNextPage,
     isLoading,
-  } = useActivityLog({ category, projectId: projectFilter, userEmail: userFilter });
+  } = useActivityLog({ category, projectId: projectFilter, userEmail: userFilter, enabled: open });
 
   const entries = useMemo(() => data?.pages.flat() ?? [], [data]);
 
