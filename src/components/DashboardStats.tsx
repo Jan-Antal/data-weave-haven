@@ -362,24 +362,29 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
           <div className="rounded-lg border bg-card px-4 py-3 flex flex-col" style={{ width: "25%", minWidth: 180 }}>
             <div className="flex items-center justify-between mb-1">
               <p style={{ fontSize: 10 }} className="uppercase tracking-wider text-muted-foreground">{isTPV ? "Vytížení Konstruktér" : "Vytížení PM"}</p>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setWorkloadMode("count")}
-                  className={`text-[9px] transition-colors ${
-                    workloadMode === "count" ? "text-foreground font-semibold" : "text-muted-foreground/40 hover:text-muted-foreground"
-                  }`}
-                >
-                  #
-                </button>
-                <span className="text-muted-foreground/30 text-[9px]">/</span>
-                <button
-                  onClick={() => setWorkloadMode("value")}
-                  className={`text-[9px] transition-colors ${
-                    workloadMode === "value" ? "text-foreground font-semibold" : "text-muted-foreground/40 hover:text-muted-foreground"
-                  }`}
-                >
-                  Kč
-                </button>
+              <div className="flex flex-col items-end gap-0">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setWorkloadMode("count")}
+                    className={`text-[9px] transition-colors ${
+                      workloadMode === "count" ? "text-foreground font-semibold" : "text-muted-foreground/40 hover:text-muted-foreground"
+                    }`}
+                  >
+                    #
+                  </button>
+                  <span className="text-muted-foreground/30 text-[9px]">/</span>
+                  <button
+                    onClick={() => setWorkloadMode("value")}
+                    className={`text-[9px] transition-colors ${
+                      workloadMode === "value" ? "text-foreground font-semibold" : "text-muted-foreground/40 hover:text-muted-foreground"
+                    }`}
+                  >
+                    Kč
+                  </button>
+                </div>
+                {workloadMode === "value" && (
+                  <p style={{ fontSize: 8 }} className="text-muted-foreground/50">v tis. Kč</p>
+                )}
               </div>
             </div>
             <div className="flex-1 min-h-0 flex items-center gap-2">
@@ -425,13 +430,7 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
                     <span className="inline-block rounded-full shrink-0" style={{ width: 7, height: 7, backgroundColor: entry.fill }} />
                     <span className="text-muted-foreground truncate" style={{ maxWidth: 90 }}>{entry.name}</span>
                     {workloadMode === "count" ? (
-                      <>
-                        <span className="font-bold text-foreground">{entry.value}</span>
-                        <span className="text-muted-foreground" style={{ fontSize: 10 }}>|</span>
-                        <span className="font-bold text-foreground">
-                          {entry.valueCZK > 0 ? `${formatNumber(entry.valueCZK)} Kč` : "—"}
-                        </span>
-                      </>
+                      <span className="font-bold text-foreground">{entry.value}</span>
                     ) : (
                       <span className="font-bold text-foreground">
                         {entry.valueCZK > 0 ? `${formatNumber(Math.round(entry.valueCZK / 1000))}` : "—"}
