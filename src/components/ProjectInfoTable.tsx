@@ -6,7 +6,7 @@ import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColu
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { InlineEditableCell } from "./InlineEditableCell";
 import { CurrencyEditCell } from "./CurrencyEditCell";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency, formatMarze, marzeInputToStorage, marzeStorageToInput } from "@/lib/currency";
 import { isStageFieldInherited, getStageDisplayValue, inheritedTextClass } from "@/lib/stageInheritance";
 import { StatusBadge, RiskBadge } from "./StatusBadge";
 import { SortableHeader } from "./SortableHeader";
@@ -173,7 +173,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
         }
         return <TableCell key={key} className="text-right"><span className="text-xs font-mono text-muted-foreground">{formatCurrency((stage as any).prodejni_cena, (stage as any).currency || "CZK")}</span></TableCell>;
       }
-      case "marze": return <TableCell key={key}><InlineEditableCell value={(stage as any).marze} onSave={(val) => saveStage("marze", val)} readOnly={!canEdit} /></TableCell>;
+      case "marze": return <TableCell key={key}><InlineEditableCell value={marzeStorageToInput((stage as any).marze)} onSave={(val) => saveStage("marze", marzeInputToStorage(val) || "")} readOnly={!canEdit} displayValue={<span className="text-xs font-mono">{formatMarze((stage as any).marze)}</span>} /></TableCell>;
       case "location": return <TableCell key={key}><span className={cn("text-xs text-muted-foreground/60", freshInheritedFields?.has("location") && "stage-inherit-highlight")}>{project.location || "—"}</span></TableCell>;
       case "architekt": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "architekt")} onSave={(val) => saveStage("architekt", val)} readOnly={!canEdit} className={ihClass("architekt")} /></TableCell>;
       case "konstrukter": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "konstrukter")} type="people" peopleRole="Konstruktér" onSave={(val) => saveStage("konstrukter", val)} readOnly={!canEdit} className={ihClass("konstrukter")} /></TableCell>;
@@ -655,7 +655,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
       datum_smluvni: newProj.datum_smluvni || null,
       prodejni_cena: newProj.prodejni_cena ? Number(newProj.prodejni_cena) : null,
       currency: newProj.currency || "CZK",
-      marze: newProj.marze || null,
+      marze: marzeInputToStorage(newProj.marze),
       fakturace: newProj.fakturace || null,
     });
     if (error) {
@@ -869,8 +869,11 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
               </Select>
             </div>
             <div>
-              <Label>Marže</Label>
-              <Input value={newProj.marze} onChange={(e) => setNewProj((p) => ({ ...p, marze: e.target.value }))} />
+              <Label>Marže (%)</Label>
+              <div className="flex items-center gap-1">
+                <Input type="number" className="no-spinners" value={newProj.marze} onChange={(e) => setNewProj((p) => ({ ...p, marze: e.target.value }))} placeholder="0" />
+                <span className="text-sm text-muted-foreground shrink-0">%</span>
+              </div>
             </div>
             <div>
               <Label>Fakturace</Label>

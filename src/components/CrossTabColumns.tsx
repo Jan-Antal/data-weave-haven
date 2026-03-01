@@ -3,6 +3,7 @@ import { TableCell } from "@/components/ui/table";
 import { SortableHeader } from "./SortableHeader";
 import { InlineEditableCell } from "./InlineEditableCell";
 import { CurrencyEditCell } from "./CurrencyEditCell";
+import { formatCurrency, formatMarze, marzeInputToStorage, marzeStorageToInput } from "@/lib/currency";
 import { StatusBadge, RiskBadge, ProgressBar } from "./StatusBadge";
 import type { Project } from "@/hooks/useProjects";
 import { ALL_COLUMNS } from "./ColumnVisibilityContext";
@@ -168,7 +169,7 @@ function renderCell(
       }
       return <TableCell key={key} className="text-right"><InlineEditableCell value={String(p.prodejni_cena ?? "")} onSave={(x) => s("prodejni_cena", x, String(p.prodejni_cena ?? ""))} readOnly={ro("prodejni_cena")} /></TableCell>;
     case "marze":
-      return <TableCell key={key} className="text-right"><InlineEditableCell value={p.marze} onSave={(x) => s("marze", x, v("marze"))} readOnly={ro("marze")} /></TableCell>;
+      return <TableCell key={key} className="text-right"><InlineEditableCell value={marzeStorageToInput(p.marze)} onSave={(x) => s("marze", marzeInputToStorage(x) || "", v("marze"))} readOnly={ro("marze")} displayValue={<span className="text-xs font-mono">{formatMarze(p.marze)}</span>} /></TableCell>;
     case "pm":
       return <TableCell key={key}><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(x) => s("pm", x, v("pm"))} readOnly={ro("pm")} /></TableCell>;
     case "status":
