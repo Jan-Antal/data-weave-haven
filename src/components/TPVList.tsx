@@ -322,9 +322,6 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack }: Pr
         {selected.size > 0 && canManageTPV && (
           <div className="flex items-center gap-2 ml-4 border-l pl-4">
             <span className="text-sm text-muted-foreground">{selected.size} vybráno</span>
-            <Button size="sm" variant="destructive" onClick={() => setDeleteIds(Array.from(selected))}>
-              <Trash2 className="h-3 w-3 mr-1" /> Smazat
-            </Button>
           </div>
         )}
       </div>
@@ -429,7 +426,13 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack }: Pr
                 })}
                 <TableCell>
                   {canManageTPV && (
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDeleteIds([item.id])}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
+                      if (selected.size > 1 && selected.has(item.id)) {
+                        setDeleteIds(Array.from(selected));
+                      } else {
+                        setDeleteIds([item.id]);
+                      }
+                    }}>
                       <Trash2 className="h-3 w-3 text-destructive" />
                     </Button>
                   )}
@@ -529,7 +532,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack }: Pr
           }
         }}
         onCancel={() => setDeleteIds(null)}
-        description={deleteIds && deleteIds.length > 1 ? `Smazat ${deleteIds.length} položek?` : "Tato akce je nevratná."}
+        description={deleteIds && deleteIds.length > 1 ? `Chystáte se smazat ${deleteIds.length} položek. Tato akce je nevratná.` : "Tato akce je nevratná."}
       />
 
       {/* Excel Import Wizard */}
