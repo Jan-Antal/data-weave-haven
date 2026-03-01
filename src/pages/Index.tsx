@@ -219,7 +219,7 @@ const Index = () => {
       <div className="flex flex-1 overflow-hidden">
         <main className="px-6 flex-1 min-w-0 flex flex-col overflow-hidden">
           <div className={cn("shrink-0", dashboardCollapsed ? "py-2" : "py-4")}>
-            <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRiskHighlightChange={setRiskHighlight} activeTab={activeTab} onCollapsedChange={setDashboardCollapsed} />
+            <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} riskHighlight={riskHighlight} onRiskHighlightChange={setRiskHighlight} activeTab={activeTab} onCollapsedChange={setDashboardCollapsed} />
           </div>
 
           <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-col flex-1 min-h-0">

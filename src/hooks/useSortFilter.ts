@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { matchesStatusFilter } from "@/lib/statusFilter";
+import { matchesStatusFilter, normalizeSearch } from "@/lib/statusFilter";
 
 type SortDir = "asc" | "desc" | null;
 
@@ -47,11 +47,17 @@ export function useSortFilter<T extends Record<string, any>>(data: T[], external
       result = [];
     }
 
-    // Text search
+    // Text search — diacritics-insensitive
     if (search) {
-      const q = search.toLowerCase();
+      const q = normalizeSearch(search);
       result = result.filter(row =>
-        Object.values(row).some(v => v != null && String(v).toLowerCase().includes(q))
+        Object.values(row).some(v => {
+          if (v == null) return false;
+          const s = String(v);
+          // Skip long JSON-like values
+          if (s.length > 500 || s.startsWith("{") || s.startsWith("[")) return false;
+          return normalizeSearch(s).includes(q);
+        })
       );
     }
 
