@@ -882,7 +882,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
       {/* PART 1 — FIXED HEADER ROW (never scrolls vertically) */}
       <div className="flex shrink-0 border-b bg-primary/5">
         {/* Left panel header */}
-        <div className="border-r shrink-0 flex items-start" style={{ width: LEFT_PANEL_WIDTH, height: HEADER_HEIGHT }}>
+        <div className="border-r shrink-0 flex items-center" style={{ width: LEFT_PANEL_WIDTH, height: HEADER_HEIGHT }}>
           <div style={{ width: 36, minWidth: 36, maxWidth: 36 }} />
           <div className="flex items-center justify-center" style={{ width: 36, minWidth: 36, maxWidth: 36 }}>
             {sorted.length > 0 && (
@@ -969,13 +969,13 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                 >
                   <div
                     className="shrink-0 flex items-center justify-center"
-                    style={{ width: 36, minWidth: 36 }}
+                    style={{ width: 36, minWidth: 36, maxWidth: 36 }}
                   >
                     {warnings.length > 0 ? <WarningIcon warnings={warnings} /> : null}
                   </div>
                   <div
                     className="shrink-0 flex items-center justify-center"
-                    style={{ width: 36, minWidth: 36 }}
+                    style={{ width: 36, minWidth: 36, maxWidth: 36 }}
                     onClick={(e) => { e.stopPropagation(); toggleExpand(p.project_id); }}
                   >
                     <ExpandButton expanded={isExp} onClick={() => {}} hasStages={(stagesByProject.get(p.project_id)?.length ?? 0) > 0} />
@@ -1151,10 +1151,10 @@ function SubstageLeftRows({ projectId, project, statusColorMap, onClickStage, ho
         const isHovered = hoveredRow === stage.id;
         return (
           <div key={stage.id} className={`flex items-center border-b transition-colors ${isHovered ? "bg-muted/50" : "bg-muted/10"}`} style={{ height: SUBSTAGE_ROW_HEIGHT }} onMouseEnter={() => setHoveredRow(stage.id)} onMouseLeave={() => setHoveredRow(null)}>
-            <div className="shrink-0 flex items-center justify-center" style={{ width: 36, minWidth: 36 }}>
-              {barData.warnings.length > 0 && <WarningIcon warnings={barData.warnings} />}
-            </div>
-            <div style={{ width: 36, minWidth: 36 }} />
+             <div className="shrink-0 flex items-center justify-center" style={{ width: 36, minWidth: 36, maxWidth: 36 }}>
+               {barData.warnings.length > 0 && <WarningIcon warnings={barData.warnings} />}
+             </div>
+             <div style={{ width: 36, minWidth: 36, maxWidth: 36 }} />
             <span className="text-[10px] font-mono text-muted-foreground truncate px-2 cursor-pointer hover:underline" style={{ width: 110, minWidth: 110 }} onClick={() => onClickStage(stage)}>{stage.stage_name}</span>
             <span className="text-[10px] text-muted-foreground truncate px-2" style={{ width: 180, minWidth: 180, maxWidth: 180 }}>{stage.stage_name}</span>
           </div>
