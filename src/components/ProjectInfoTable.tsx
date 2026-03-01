@@ -44,6 +44,7 @@ import { useExportContext } from "./ExportContext";
 import { getProjectCellValue } from "@/lib/exportExcel";
 import { getColumnLabel } from "./CrossTabColumns";
 import { useStagesByProject } from "@/hooks/useAllProjectStages";
+import { matchesStatusFilter } from "@/lib/statusFilter";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -79,7 +80,7 @@ function stageMatchesFilters(
 ): boolean {
   for (const stage of stages) {
     if (personFilter && stage.pm && String(stage.pm).includes(personFilter)) return true;
-    if (statusFilterSet && stage.status && statusFilterSet.has(stage.status)) return true;
+    if (statusFilterSet && matchesStatusFilter(stage.status, statusFilterSet)) return true;
     if (searchLower) {
       const searchable = [stage.stage_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
       for (const v of searchable) {
@@ -98,7 +99,7 @@ function singleStageMatches(
 ): boolean {
   if (!personFilter && !statusFilterSet && !searchLower) return true;
   if (personFilter && stage.pm && String(stage.pm).includes(personFilter)) return true;
-  if (statusFilterSet && stage.status && statusFilterSet.has(stage.status)) return true;
+  if (statusFilterSet && matchesStatusFilter(stage.status, statusFilterSet)) return true;
   if (searchLower) {
     const searchable = [stage.stage_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
     for (const v of searchable) {

@@ -9,6 +9,7 @@ import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { cn } from "@/lib/utils";
 import { TableSearchBar } from "./TableSearchBar";
 import { useAuth } from "@/hooks/useAuth";
+import { EMPTY_STATUS_FILTER_VALUE, getStatusFilterLabel, getStatusFilterOptionValues } from "@/lib/statusFilter";
 
 interface TableFiltersProps {
   personFilter: string | null;
@@ -31,8 +32,8 @@ export function useTableFilters() {
   // Initialize status filter once options are loaded
   useEffect(() => {
     if (statusOptions.length > 0 && !initialized) {
-      const allLabels = statusOptions.map((s) => s.label);
-      setStatusFilter(allLabels.filter((s) => !defaultHiddenStatuses.includes(s)));
+      const allLabels = getStatusFilterOptionValues(statusOptions.map((s) => s.label));
+      setStatusFilter(allLabels.filter((s) => s === EMPTY_STATUS_FILTER_VALUE || !defaultHiddenStatuses.includes(s)));
       setInitialized(true);
     }
   }, [statusOptions, initialized]);
@@ -47,7 +48,7 @@ export function useTableFilters() {
     }
   }, [authLoading, linkedPersonName, isAdmin, isOwner, personInitialized]);
 
-  const allLabels = statusOptions.map((s) => s.label);
+  const allLabels = getStatusFilterOptionValues(statusOptions.map((s) => s.label));
   const hasActiveFilters = personFilter !== null || (initialized && statusFilter.length !== allLabels.length);
 
   const clearFilters = () => {
@@ -135,9 +136,9 @@ function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: 
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const allLabels = statusOptions.map((s) => s.label);
-  const filtered = allLabels.filter((s) =>
-    s.toLowerCase().includes(search.toLowerCase())
+  const statusValues = getStatusFilterOptionValues(statusOptions.map((s) => s.label));
+  const filtered = statusValues.filter((statusValue) =>
+    getStatusFilterLabel(statusValue).toLowerCase().includes(search.toLowerCase())
   );
 
   useEffect(() => {
@@ -147,15 +148,15 @@ function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: 
     }
   }, [open]);
 
-  const toggle = (status: string) => {
-    if (value.includes(status)) {
-      onChange(value.filter((s) => s !== status));
+  const toggle = (statusValue: string) => {
+    if (value.includes(statusValue)) {
+      onChange(value.filter((s) => s !== statusValue));
     } else {
-      onChange([...value, status]);
+      onChange([...value, statusValue]);
     }
   };
 
-  const allSelected = value.length === allLabels.length;
+  const allSelected = value.length === statusValues.length;
   const label = allSelected ? "Všechny statusy" : `Status (${value.length})`;
 
   return (
@@ -175,18 +176,18 @@ function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: 
           className="h-7 text-xs mb-1"
         />
         <div className="max-h-[250px] overflow-y-auto">
-          {filtered.map((status) => (
+          {filtered.map((statusValue) => (
             <div
-              key={status}
+              key={statusValue}
               className="flex items-center gap-2 px-2 py-1.5 text-xs rounded cursor-pointer hover:bg-accent hover:text-accent-foreground"
-              onClick={() => toggle(status)}
+              onClick={() => toggle(statusValue)}
             >
               <Checkbox
-                checked={value.includes(status)}
-                onCheckedChange={() => toggle(status)}
+                checked={value.includes(statusValue)}
+                onCheckedChange={() => toggle(statusValue)}
                 className="h-3.5 w-3.5"
               />
-              <span>{status}</span>
+              <span>{getStatusFilterLabel(statusValue)}</span>
             </div>
           ))}
         </div>
@@ -195,7 +196,7 @@ function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: 
             variant="ghost"
             size="sm"
             className="h-6 text-xs flex-1"
-            onClick={() => onChange([...allLabels])}
+            onClick={() => onChange([...statusValues])}
           >
             Vybrat vše
           </Button>
@@ -221,7 +222,7 @@ interface FullTableFiltersProps extends TableFiltersProps {
 
 export function TableFilters({ personFilter, onPersonFilterChange, statusFilter, onStatusFilterChange, search, onSearchChange, rightSlot }: FullTableFiltersProps) {
   const { data: statusOptions = [] } = useProjectStatusOptions();
-  const allLabels = statusOptions.map((s) => s.label);
+  const allLabels = getStatusFilterOptionValues(statusOptions.map((s) => s.label));
   const hasActiveFilters = personFilter !== null || statusFilter.length !== allLabels.length;
 
   return (
