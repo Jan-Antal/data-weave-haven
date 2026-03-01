@@ -10,6 +10,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
 import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, FileText, X, Trash2, RefreshCw, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { marzeStorageToInput, marzeInputToStorage, formatMarze } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
@@ -122,7 +123,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
         datum_objednavky: (project as any).datum_objednavky || "",
         prodejni_cena: project.prodejni_cena != null ? String(project.prodejni_cena) : "",
         currency: project.currency || "CZK",
-        marze: project.marze || "",
+        marze: marzeStorageToInput(project.marze),
       });
       setDeleteStep(0);
       setOpenCategory(null);
@@ -295,7 +296,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
       datum_objednavky: form.datum_objednavky || null,
       prodejni_cena: form.prodejni_cena ? Number(form.prodejni_cena) : null,
       currency: form.currency || "CZK",
-      marze: form.marze || null,
+      marze: marzeInputToStorage(form.marze),
     };
 
     const { error } = await supabase.from("projects").update(newValues).eq("id", project.id);
@@ -674,7 +675,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     <div>
                       <Label className="text-xs">Marže</Label>
                       {isViewer ? (
-                        <p className="text-sm py-2">{form.marze ? `${form.marze} %` : "—"}</p>
+                        <p className="text-sm py-2">{formatMarze(project.marze)}</p>
                       ) : (
                         <div className="flex items-center gap-1">
                           <Input
