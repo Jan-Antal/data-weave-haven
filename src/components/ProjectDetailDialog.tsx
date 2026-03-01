@@ -790,16 +790,16 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                   </div>
                   <div>
                     <Label className="text-xs">Marže</Label>
-                    <div className="flex items-center gap-1">
+                    <div className="relative">
                       <Input
                         type={isSectionReadOnly("finance") ? "text" : "number"}
-                        className={cn("no-spinners", (isSectionReadOnly("finance") || isFieldReadOnly("marze")) && roClass)}
+                        className={cn("no-spinners pr-8", (isSectionReadOnly("finance") || isFieldReadOnly("marze")) && roClass)}
                         value={isSectionReadOnly("finance") ? (form.marze ? `${form.marze}` : "—") : form.marze}
                         onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
                         placeholder="0"
                         disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
                       />
-                      <span className="text-sm text-muted-foreground shrink-0">%</span>
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
                     </div>
                   </div>
 
