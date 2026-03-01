@@ -15,6 +15,7 @@ import {
 } from "recharts";
 
 const STORAGE_KEY = "dashboard-collapsed";
+const PIPELINE_MODE_KEY = "dashboard-pipeline-mode";
 
 const PIPELINE_STAGES: { statuses: string[]; label: string }[] = [
   { statuses: ["Příprava"], label: "Příprava" },
@@ -77,12 +78,21 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
     }
   });
 
+  const [pipelineMode, setPipelineMode] = useState<"count" | "value">(() => {
+    try {
+      return (sessionStorage.getItem(PIPELINE_MODE_KEY) as "count" | "value") || "count";
+    } catch {
+      return "count";
+    }
+  });
+
   useEffect(() => {
     try {
       sessionStorage.setItem(STORAGE_KEY, String(collapsed));
+      sessionStorage.setItem(PIPELINE_MODE_KEY, pipelineMode);
     } catch {}
     onCollapsedChange?.(collapsed);
-  }, [collapsed, onCollapsedChange]);
+  }, [collapsed, pipelineMode, onCollapsedChange]);
 
   // Listen for external toggle events
   useEffect(() => {
@@ -130,12 +140,25 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
   }, [activeProjects, rates]);
 
   const pipelineData = useMemo(() => {
-    return PIPELINE_STAGES.map(({ statuses, label }) => ({
-      name: label,
-      count: filtered.filter((p) => statuses.includes(p.status || "")).length,
-      fill: PIPELINE_COLORS[label] || "#6b7280",
-    }));
-  }, [filtered]);
+    return PIPELINE_STAGES.map(({ statuses, label }) => {
+      const matching = filtered.filter((p) => statuses.includes(p.status || ""));
+      const valueCZK = matching.reduce((sum, p) => {
+        const amount = p.prodejni_cena || 0;
+        if (amount === 0) return sum;
+        const currency = p.currency || "CZK";
+        if (currency === "CZK") return sum + amount;
+        const year = getProjectYear(p.datum_smluvni);
+        const rate = getExchangeRate(rates, year);
+        return sum + amount * rate;
+      }, 0);
+      return {
+        name: label,
+        count: matching.length,
+        value: Math.round(valueCZK / 1000), // in thousands
+        fill: PIPELINE_COLORS[label] || "#6b7280",
+      };
+    });
+  }, [filtered, rates]);
 
   const riskCounts = useMemo(() => {
     const now = new Date();
@@ -235,7 +258,27 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
 
           {/* Card 2: Pipeline */}
           <div className="rounded-lg border bg-card p-3 flex flex-col min-w-0" style={{ width: "35%" }}>
-            <p style={{ fontSize: 10, color: "#999" }} className="uppercase tracking-wider mb-1">Pipeline zakázek</p>
+            <div className="flex items-center justify-between mb-1">
+              <p style={{ fontSize: 10 }} className="uppercase tracking-wider text-muted-foreground">Pipeline zakázek</p>
+              <div className="flex items-center rounded-md border bg-muted p-0.5 gap-0.5">
+                <button
+                  onClick={() => setPipelineMode("count")}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                    pipelineMode === "count" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Počet
+                </button>
+                <button
+                  onClick={() => setPipelineMode("value")}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                    pipelineMode === "value" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Hodnota
+                </button>
+              </div>
+            </div>
             <div className="flex-1 min-h-0 flex items-center">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={pipelineData} margin={{ top: 18, right: 4, left: 4, bottom: 0 }}>
@@ -246,19 +289,23 @@ export function DashboardStats({ personFilter, statusFilter, search, riskHighlig
                     tick={{ fontSize: 10, fill: "#999" }}
                     interval={0}
                   />
-                  <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={36}>
+                  <Bar dataKey={pipelineMode === "count" ? "count" : "value"} radius={[3, 3, 0, 0]} maxBarSize={36}>
                     {pipelineData.map((entry, i) => (
                       <Cell key={i} fill={entry.fill} />
                     ))}
                     <LabelList
-                      dataKey="count"
+                      dataKey={pipelineMode === "count" ? "count" : "value"}
                       position="top"
+                      formatter={(v: number) => pipelineMode === "value" ? `${formatNumber(v)}` : v}
                       style={{ fontSize: 11, fontWeight: 700, fill: "hsl(var(--foreground))" }}
                     />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            {pipelineMode === "value" && (
+              <p style={{ fontSize: 9 }} className="text-muted-foreground text-right mt-0.5">v tis. Kč</p>
+            )}
           </div>
 
           {/* Card 3: Riziko & Termíny */}
