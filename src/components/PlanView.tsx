@@ -363,7 +363,10 @@ function getProjectBarData(p: Project, statusColorMap: Record<string, string>): 
 function getStageBarData(stage: ProjectStage, project: Project, statusColorMap: Record<string, string>): BarData {
   const datumObjednavky = stage.start_date ?? project.datum_objednavky;
   const datumSmluvni = stage.end_date ?? stage.datum_smluvni ?? project.datum_smluvni;
-  return getBarDataFromFields(datumObjednavky, datumSmluvni, stage.tpv_date, stage.expedice, stage.predani, statusColorMap, PHASE_COLORS_LIGHT, MILESTONE_COLORS_SOLID);
+  const tpvDate = stage.tpv_date ?? project.tpv_date;
+  const expedice = stage.expedice ?? project.expedice;
+  const predani = stage.predani ?? project.predani;
+  return getBarDataFromFields(datumObjednavky, datumSmluvni, tpvDate, expedice, predani, statusColorMap, PHASE_COLORS_LIGHT, MILESTONE_COLORS_SOLID);
 }
 
 // ── Milestone Diamond ───────────────────────────────────────────────
@@ -726,6 +729,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
   const [containerWidth, setContainerWidth] = useState(0);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [editStage, setEditStage] = useState<ProjectStage | null>(null);
+  const [editStageProject, setEditStageProject] = useState<Project | null>(null);
   const updateProject = useUpdateProject();
   const { isFieldReadOnly } = useAuth();
 
@@ -983,7 +987,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                   <span className="text-xs font-mono text-primary whitespace-nowrap shrink-0 cursor-pointer hover:underline px-2" style={{ width: 110, minWidth: 110 }} onClick={() => setEditProject(p)}>{p.project_id}</span>
                   <span className="text-xs font-medium truncate cursor-pointer hover:underline px-2" style={{ width: 180, minWidth: 180, maxWidth: 180 }} onClick={() => setEditProject(p)}>{p.project_name}</span>
                 </div>
-                {isExp && <SubstageLeftRows projectId={p.project_id} project={p} statusColorMap={statusColorMap} onClickStage={(stage) => setEditStage(stage)} hoveredRow={hoveredRow} setHoveredRow={setHoveredRow} />}
+                {isExp && <SubstageLeftRows projectId={p.project_id} project={p} statusColorMap={statusColorMap} onClickStage={(stage) => { setEditStage(stage); setEditStageProject(p); }} hoveredRow={hoveredRow} setHoveredRow={setHoveredRow} />}
               </div>
             );
           })}
@@ -1134,8 +1138,9 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
       />
       <StageDateEditDialog
         stage={editStage}
+        project={editStageProject}
         open={!!editStage}
-        onOpenChange={(open) => { if (!open) setEditStage(null); }}
+        onOpenChange={(open) => { if (!open) { setEditStage(null); setEditStageProject(null); } }}
       />
     </>
   );

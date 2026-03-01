@@ -237,13 +237,16 @@ export type Database = {
         Row: {
           architekt: string | null
           created_at: string
+          currency: string | null
           datum_smluvni: string | null
           deleted_at: string | null
           end_date: string | null
           expedice: string | null
           hodiny_tpv: string | null
           id: string
+          kalkulant: string | null
           konstrukter: string | null
+          marze: string | null
           montaz: string | null
           narocnost: string | null
           notes: string | null
@@ -251,6 +254,7 @@ export type Database = {
           pm: string | null
           pm_poznamka: string | null
           predani: string | null
+          prodejni_cena: number | null
           project_id: string
           risk: string | null
           stage_name: string
@@ -264,13 +268,16 @@ export type Database = {
         Insert: {
           architekt?: string | null
           created_at?: string
+          currency?: string | null
           datum_smluvni?: string | null
           deleted_at?: string | null
           end_date?: string | null
           expedice?: string | null
           hodiny_tpv?: string | null
           id?: string
+          kalkulant?: string | null
           konstrukter?: string | null
+          marze?: string | null
           montaz?: string | null
           narocnost?: string | null
           notes?: string | null
@@ -278,6 +285,7 @@ export type Database = {
           pm?: string | null
           pm_poznamka?: string | null
           predani?: string | null
+          prodejni_cena?: number | null
           project_id: string
           risk?: string | null
           stage_name: string
@@ -291,13 +299,16 @@ export type Database = {
         Update: {
           architekt?: string | null
           created_at?: string
+          currency?: string | null
           datum_smluvni?: string | null
           deleted_at?: string | null
           end_date?: string | null
           expedice?: string | null
           hodiny_tpv?: string | null
           id?: string
+          kalkulant?: string | null
           konstrukter?: string | null
+          marze?: string | null
           montaz?: string | null
           narocnost?: string | null
           notes?: string | null
@@ -305,6 +316,7 @@ export type Database = {
           pm?: string | null
           pm_poznamka?: string | null
           predani?: string | null
+          prodejni_cena?: number | null
           project_id?: string
           risk?: string | null
           stage_name?: string

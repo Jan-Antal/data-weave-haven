@@ -41,7 +41,8 @@ import { useAllTPVItems } from "@/hooks/useAllTPVItems";
 const NATIVE_KEYS = ["project_id", "project_name", ...TPV_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
 
-const INHERITABLE_FIELDS = ["pm", "status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "datum_smluvni", "konstrukter", "narocnost", "architekt"];
+const INHERITABLE_FIELDS = ["status", "risk", "zamereni", "tpv_date", "expedice", "montaz", "predani", "datum_smluvni", "konstrukter", "narocnost", "architekt"];
+const INHERITABLE_DATE_MAP: Record<string, string> = { datum_objednavky: "start_date" };
 
 /** Check if any stage matches the active filters */
 function stageMatchesFilters(
@@ -222,12 +223,19 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
         inheritedKeys.add(field);
       }
     }
+    for (const [projField, stageField] of Object.entries(INHERITABLE_DATE_MAP)) {
+      const val = (project as any)[projField];
+      if (val != null && val !== "") {
+        inheritedData[stageField] = val;
+        inheritedKeys.add(stageField);
+      }
+    }
 
     const newStage = { id, project_id: projectId, stage_name: stageName, stage_order: stages.length, ...inheritedData };
     const queryKey = ["project_stages", projectId];
     qc.setQueryData<ProjectStage[]>(queryKey, (old) => [
       ...(old || []),
-      { ...newStage, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, start_date: null, end_date: null, notes: null, datum_smluvni: inheritedData.datum_smluvni ?? null, pm: inheritedData.pm ?? null, status: inheritedData.status ?? null, risk: inheritedData.risk ?? null, zamereni: inheritedData.zamereni ?? null, tpv_date: inheritedData.tpv_date ?? null, expedice: inheritedData.expedice ?? null, montaz: inheritedData.montaz ?? null, predani: inheritedData.predani ?? null, pm_poznamka: inheritedData.pm_poznamka ?? null, konstrukter: inheritedData.konstrukter ?? null, narocnost: inheritedData.narocnost ?? null, hodiny_tpv: null, percent_tpv: null, architekt: inheritedData.architekt ?? null } as ProjectStage,
+      { ...newStage, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, start_date: inheritedData.start_date ?? null, end_date: null, notes: null, datum_smluvni: inheritedData.datum_smluvni ?? null, pm: null, status: inheritedData.status ?? null, risk: inheritedData.risk ?? null, zamereni: inheritedData.zamereni ?? null, tpv_date: inheritedData.tpv_date ?? null, expedice: inheritedData.expedice ?? null, montaz: inheritedData.montaz ?? null, predani: inheritedData.predani ?? null, pm_poznamka: inheritedData.pm_poznamka ?? null, konstrukter: inheritedData.konstrukter ?? null, narocnost: inheritedData.narocnost ?? null, hodiny_tpv: null, percent_tpv: null, architekt: inheritedData.architekt ?? null, prodejni_cena: null, currency: null, kalkulant: null, marze: null } as ProjectStage,
     ]);
     setFreshStages(prev => new Map(prev).set(id, inheritedKeys));
 
