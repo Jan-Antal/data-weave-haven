@@ -94,8 +94,8 @@ function SectionHeader({ icon, label }: { icon: string; label: string }) {
       <div className="absolute inset-0 flex items-center" aria-hidden="true">
         <div className="w-full border-t border-border" />
       </div>
-      <span className="relative bg-background pr-2 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground flex items-center gap-1">
-        <span>{icon}</span> {label}
+      <span className="relative bg-background pr-2 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground flex items-center gap-1.5">
+        <span className="text-[18px] leading-none">{icon}</span> {label}
       </span>
     </div>
   );
@@ -955,8 +955,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                     <div className="absolute inset-0 flex items-center" aria-hidden="true">
                       <div className="w-full border-t border-border" />
                     </div>
-                    <span className="relative bg-muted/30 pr-2 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground flex items-center gap-1">
-                      <span>📎</span> DOKUMENTY
+                    <span className="relative bg-muted/30 pr-2 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground flex items-center gap-1.5">
+                      <span className="text-[18px] leading-none">📎</span> DOKUMENTY
                     </span>
                     <div className="ml-auto relative flex items-center gap-1.5 pl-2 bg-muted/30">
                       {sp.refreshing && (
