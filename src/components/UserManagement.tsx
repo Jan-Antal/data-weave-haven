@@ -88,7 +88,13 @@ export function UserManagement({ open, onOpenChange }: Props) {
       supabase.from("people").select("id, name").eq("is_active", true).order("name"),
     ]);
 
-    if (peopleData) setPeople(peopleData);
+    if (peopleData) {
+      const uniqueMap = new Map<string, PersonOption>();
+      peopleData.forEach((p: any) => {
+        if (!uniqueMap.has(p.id)) uniqueMap.set(p.id, { id: p.id, name: p.name });
+      });
+      setPeople(Array.from(uniqueMap.values()).sort((a, b) => a.name.localeCompare(b.name, "cs")));
+    }
 
     if (profiles) {
       const roleMap = new Map<string, AppRole>();
