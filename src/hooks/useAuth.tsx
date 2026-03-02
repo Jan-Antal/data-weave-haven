@@ -107,7 +107,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!session) setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // Listen for profile updates from AccountSettings
+    const handleProfileUpdate = async () => {
+      const { data: { session: s } } = await supabase.auth.getSession();
+      if (s?.user) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("full_name, email, is_active, person_id")
+          .eq("id", s.user.id)
+          .single();
+        if (profileData) {
+          setProfile({ full_name: profileData.full_name, email: profileData.email, is_active: profileData.is_active });
+        }
+      }
+    };
+    window.addEventListener("profile-updated", handleProfileUpdate);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("profile-updated", handleProfileUpdate);
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {

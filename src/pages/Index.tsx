@@ -12,7 +12,7 @@ import { DashboardStats } from "@/components/DashboardStats";
 import { TableFilters, useTableFilters } from "@/components/TableFilters";
 import { ExportButton } from "@/components/ExportButton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Settings, Plus, LogOut, User, Check, ChevronUp, ChevronDown } from "lucide-react";
+import { Settings, Plus, LogOut, User, Check, ChevronUp, ChevronDown, UserCog } from "lucide-react";
 import { FeedbackWidget } from "@/components/FeedbackWidget";
 import { AdminInboxButton } from "@/components/AdminInbox";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
@@ -22,10 +22,12 @@ import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
 import { StatusManagement } from "@/components/StatusManagement";
 import { RecycleBin } from "@/components/RecycleBin";
 import { UserManagement } from "@/components/UserManagement";
+import { AccountSettings } from "@/components/AccountSettings";
 import { DataLogPanel } from "@/components/DataLogPanel";
 import { DataLogHighlightProvider } from "@/components/DataLogHighlightContext";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
@@ -41,6 +43,7 @@ const Index = () => {
   const [statusMgmtOpen, setStatusMgmtOpen] = useState(false);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [userMgmtOpen, setUserMgmtOpen] = useState(false);
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [dataLogOpen, setDataLogOpen] = useState(() => {
     try { return sessionStorage.getItem("datalog-open") === "true"; } catch { return false; }
   });
@@ -87,10 +90,25 @@ const Index = () => {
 
   const { profile, signOut, canAccessSettings, canCreateProject, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, isKonstrukter, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, defaultTab } = useAuth();
 
+  const { data: userPrefs } = useUserPreferences();
+
+  // Apply user preferences on load
+  const prefsApplied = useRef(false);
+  useEffect(() => {
+    if (userPrefs && !prefsApplied.current) {
+      prefsApplied.current = true;
+      if (userPrefs.default_view && !simulatedRole) {
+        setActiveTab(userPrefs.default_view);
+      }
+      if (userPrefs.default_person_filter) {
+        filters.setPersonFilter(userPrefs.default_person_filter);
+      }
+    }
+  }, [userPrefs]);
+
   useEffect(() => {
     setActiveTab(defaultTab);
   }, [defaultTab]);
-
   return (
     <ColumnVisibilityProvider>
     <ExportProvider>
@@ -122,6 +140,11 @@ const Index = () => {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setAccountSettingsOpen(true)}>
+                  <UserCog className="h-4 w-4 mr-2" />
+                  Nastavení účtu
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={signOut}>
                   <LogOut className="h-4 w-4 mr-2" />
                   Odhlásit se
@@ -316,6 +339,7 @@ const Index = () => {
       <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
       <UserManagement open={userMgmtOpen} onOpenChange={setUserMgmtOpen} />
+      <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
       {canAccessSettings && <FeedbackWidget />}
     </div>
     </DataLogHighlightProvider>
