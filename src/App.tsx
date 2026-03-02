@@ -8,7 +8,7 @@ import { PeopleManagementProvider } from "@/components/PeopleManagementContext";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
-import ResetPassword from "./pages/ResetPassword";
+import ResetPassword from "./pages/ResetPassword"; // kept for direct URL access
 import SetPassword from "./pages/SetPassword";
 import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
