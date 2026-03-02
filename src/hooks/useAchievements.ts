@@ -112,6 +112,15 @@ export function useAchievementChecker() {
   };
 
   const checkKonstrukterTier = async () => {
+    // Only award to users with konstrukter role
+    if (!profile) return;
+    const { data: roleData } = await (supabase as any)
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user!.id)
+      .maybeSingle();
+    if (roleData?.role !== "konstrukter") return;
+
     const { count } = await supabase
       .from("projects")
       .select("*", { count: "exact", head: true })
