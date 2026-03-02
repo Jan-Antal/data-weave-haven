@@ -129,10 +129,13 @@ export function useProductionDragDrop() {
 
   const moveItemBackToInbox = useCallback(async (scheduleItemId: string) => {
     try {
-      // Get the schedule item to find the inbox_item_id
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Get the full schedule item
       const { data: schedItem, error: fetchErr } = await supabase
         .from("production_schedule")
-        .select("inbox_item_id")
+        .select("*")
         .eq("id", scheduleItemId)
         .single();
       if (fetchErr) throw fetchErr;
@@ -144,13 +147,27 @@ export function useProductionDragDrop() {
         .eq("id", scheduleItemId);
       if (delErr) throw delErr;
 
-      // If linked to inbox item, restore it
       if (schedItem?.inbox_item_id) {
+        // Restore existing inbox item
         const { error: updateErr } = await supabase
           .from("production_inbox")
           .update({ status: "pending" })
           .eq("id", schedItem.inbox_item_id);
         if (updateErr) throw updateErr;
+      } else {
+        // Create a new inbox item from schedule data
+        const { error: insertErr } = await supabase
+          .from("production_inbox")
+          .insert({
+            project_id: schedItem.project_id,
+            stage_id: schedItem.stage_id,
+            item_name: schedItem.item_name,
+            estimated_hours: schedItem.scheduled_hours,
+            estimated_czk: schedItem.scheduled_czk,
+            sent_by: user.id,
+            status: "pending",
+          });
+        if (insertErr) throw insertErr;
       }
 
       invalidateAll();
@@ -203,10 +220,13 @@ export function useProductionDragDrop() {
 
   const returnBundleToInbox = useCallback(async (projectId: string, weekDate: string) => {
     try {
-      // Get all schedule items for this bundle
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Get all schedule items for this bundle (full data for re-creation)
       const { data: items, error: fetchErr } = await supabase
         .from("production_schedule")
-        .select("id, inbox_item_id")
+        .select("*")
         .eq("project_id", projectId)
         .eq("scheduled_week", weekDate)
         .in("status", ["scheduled", "in_progress"]);
@@ -214,19 +234,36 @@ export function useProductionDragDrop() {
       if (!items || items.length === 0) return;
 
       const ids = items.map((i) => i.id);
-      const inboxIds = items.map((i) => i.inbox_item_id).filter(Boolean) as string[];
+      const withInbox = items.filter((i) => i.inbox_item_id);
+      const withoutInbox = items.filter((i) => !i.inbox_item_id);
 
       // Delete schedule rows
       const { error: delErr } = await supabase.from("production_schedule").delete().in("id", ids);
       if (delErr) throw delErr;
 
-      // Restore inbox items
+      // Restore existing inbox items
+      const inboxIds = withInbox.map((i) => i.inbox_item_id).filter(Boolean) as string[];
       if (inboxIds.length > 0) {
         const { error: updateErr } = await supabase
           .from("production_inbox")
           .update({ status: "pending" })
           .in("id", inboxIds);
         if (updateErr) throw updateErr;
+      }
+
+      // Create new inbox items for those without inbox_item_id
+      if (withoutInbox.length > 0) {
+        const newItems = withoutInbox.map((item) => ({
+          project_id: item.project_id,
+          stage_id: item.stage_id,
+          item_name: item.item_name,
+          estimated_hours: item.scheduled_hours,
+          estimated_czk: item.scheduled_czk,
+          sent_by: user.id,
+          status: "pending" as const,
+        }));
+        const { error: insertErr } = await supabase.from("production_inbox").insert(newItems);
+        if (insertErr) throw insertErr;
       }
 
       invalidateAll();
