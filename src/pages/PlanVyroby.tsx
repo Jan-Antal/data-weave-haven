@@ -39,6 +39,7 @@ export default function PlanVyroby() {
     moveScheduleItemToWeek,
     moveBundleToWeek,
     moveItemBackToInbox,
+    returnBundleToInbox,
   } = useProductionDragDrop();
 
   // Global Escape key handler for context menus
@@ -72,6 +73,8 @@ export default function PlanVyroby() {
     if (targetId === "inbox-drop-zone") {
       if (dragData.type === "silo-item" && dragData.itemId) {
         await moveItemBackToInbox(dragData.itemId);
+      } else if (dragData.type === "silo-bundle" && dragData.projectId && dragData.weekDate) {
+        await returnBundleToInbox(dragData.projectId, dragData.weekDate);
       }
       return;
     }
