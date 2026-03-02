@@ -28,55 +28,64 @@ export function ProductionHeader() {
   };
 
   return (
-    <div
-      className="shrink-0 flex items-center px-4 py-1.5 border-b"
-      style={{ backgroundColor: "#f4f2f0", borderColor: "#ece8e2" }}
-    >
-      <div className="flex items-center gap-0">
-        <StatBox label="Kapacita / měsíc" value={`${monthlyHours.toLocaleString("cs-CZ")} h`} />
-        <Divider />
-        <StatBox label="CZK ekvivalent" value={formatCzk(monthlyCzk)} />
-        <Divider />
-        <StatBox
-          label="Naplánováno"
-          value={`${Math.round(scheduledHours).toLocaleString("cs-CZ")} h`}
-          valueColor={isOverCapacity ? "#dc3545" : "#3a8a36"}
-        />
-        <Divider />
-        <StatBox
-          label="V Inboxu"
-          value={`${Math.round(inboxHours).toLocaleString("cs-CZ")} h`}
-          valueColor="#d97706"
-        />
-      </div>
+    <header className="border-b bg-primary px-6 py-2.5 shrink-0">
+      <div className="flex items-center justify-between">
+        {/* Left: Logo */}
+        <div className="flex items-center gap-3 shrink-0">
+          <h1 className="text-xl font-serif text-primary-foreground tracking-wide">
+            A→M <span className="font-sans font-normal text-base opacity-80">Interior</span>
+          </h1>
+          <span className="text-primary-foreground/30 text-sm">|</span>
+          <span className="text-primary-foreground/70 text-sm font-sans font-medium">Plán Výroby</span>
+        </div>
 
-      <div className="flex items-center gap-3 ml-auto">
-        <span className="flex items-center gap-1.5 text-xs" style={{ color: "#6b7a78" }}>
-          <Settings className="h-3 w-3" />
-          <span className="font-mono text-[10px]">Sazba: {hourlyRate} Kč/h</span>
-        </span>
-        <button
-          className="flex items-center gap-1 text-xs transition-colors hover:opacity-80"
-          style={{ color: "#6b7a78" }}
-          onClick={() => navigate("/")}
-        >
-          <ArrowLeft className="h-3 w-3" />
-          Zpět
-        </button>
+        {/* Center: Stats */}
+        <div className="flex items-center gap-0">
+          <StatBox label="Kapacita / měsíc" value={`${monthlyHours.toLocaleString("cs-CZ")} h`} />
+          <Divider />
+          <StatBox label="CZK ekvivalent" value={formatCzk(monthlyCzk)} />
+          <Divider />
+          <StatBox
+            label="Naplánováno"
+            value={`${Math.round(scheduledHours).toLocaleString("cs-CZ")} h`}
+            valueColor={isOverCapacity ? "#fca5a5" : "#a7d9a2"}
+          />
+          <Divider />
+          <StatBox
+            label="V Inboxu"
+            value={`${Math.round(inboxHours).toLocaleString("cs-CZ")} h`}
+            valueColor="#fcd34d"
+          />
+        </div>
+
+        {/* Right: Settings + Back */}
+        <div className="flex items-center gap-4 shrink-0">
+          <span className="flex items-center gap-1.5 text-primary-foreground/50 text-xs">
+            <Settings className="h-3 w-3" />
+            <span className="font-mono text-[10px]">Sazba: {hourlyRate} Kč/h</span>
+          </span>
+          <button
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors text-sm"
+            onClick={() => navigate("/")}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Zpět
+          </button>
+        </div>
       </div>
-    </div>
+    </header>
   );
 }
 
 function StatBox({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
   return (
     <div className="px-3.5 text-center">
-      <div className="text-[8px] uppercase tracking-[0.08em] font-medium" style={{ color: "#99a5a3" }}>
+      <div className="text-[8px] uppercase tracking-[0.08em] font-medium text-primary-foreground/40">
         {label}
       </div>
       <div
         className="font-mono font-semibold text-[13px] leading-tight"
-        style={{ color: valueColor || "#223937" }}
+        style={{ color: valueColor || "rgba(255,255,255,0.9)" }}
       >
         {value}
       </div>
@@ -85,5 +94,5 @@ function StatBox({ label, value, valueColor }: { label: string; value: string; v
 }
 
 function Divider() {
-  return <div className="w-px h-6" style={{ backgroundColor: "#e2ddd6" }} />;
+  return <div className="w-px h-6 bg-primary-foreground/15" />;
 }
