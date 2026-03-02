@@ -51,7 +51,6 @@ export default function SetPassword() {
 
       if (updateError) {
         console.error("updateUser error:", updateError);
-        // Show the actual Supabase error message for debugging
         const msg = updateError.message || "Nepodařilo se nastavit heslo.";
         setError(msg);
         setLoading(false);
@@ -66,9 +65,13 @@ export default function SetPassword() {
         return;
       }
 
+      await supabase.auth.refreshSession();
+
       setSuccess(true);
       toast({ title: "Účet byl úspěšně nastaven" });
-      setTimeout(() => navigate("/", { replace: true }), 1500);
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 500);
     } catch (err: any) {
       console.error("SetPassword unexpected error:", err);
       setError(err?.message || "Neočekávaná chyba.");
