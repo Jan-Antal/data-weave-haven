@@ -7,6 +7,37 @@ const corsHeaders = {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const VALID_ROLES = ["admin", "pm", "konstrukter", "viewer"];
+const DEFAULT_APP_ORIGIN = "https://data-weave-haven.lovable.app";
+
+const resolveAppOrigin = (originUrl: unknown, req: Request): string => {
+  if (typeof originUrl === "string" && originUrl.trim()) {
+    try {
+      return new URL(originUrl).origin;
+    } catch {
+      // fallback below
+    }
+  }
+
+  const headerOrigin = req.headers.get("origin");
+  if (headerOrigin) {
+    try {
+      return new URL(headerOrigin).origin;
+    } catch {
+      // fallback below
+    }
+  }
+
+  const referer = req.headers.get("referer");
+  if (referer) {
+    try {
+      return new URL(referer).origin;
+    } catch {
+      // fallback below
+    }
+  }
+
+  return DEFAULT_APP_ORIGIN;
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -30,7 +61,9 @@ Deno.serve(async (req) => {
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user: caller } } = await callerClient.auth.getUser();
+    const {
+      data: { user: caller },
+    } = await callerClient.auth.getUser();
     if (!caller) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -88,10 +121,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use dynamic redirect URL from the calling app
-    const redirectTo = origin_url
-      ? `${String(origin_url).replace(/\/$/, "")}/auth/callback`
-      : `${req.headers.get("origin") || "https://projekty.am-interior.cz"}/auth/callback`;
+    const redirectTo = `${resolveAppOrigin(origin_url, req)}/auth/callback`;
 
     // Invite user by email (sends invite email, no password needed)
     const { data: newUser, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
@@ -110,12 +140,15 @@ Deno.serve(async (req) => {
     // Save profile immediately
     const { error: profileError } = await adminClient
       .from("profiles")
-      .upsert({
-        id: newUser.user.id,
-        email: email,
-        full_name: trimmedName,
-        is_active: true,
-      }, { onConflict: "id" });
+      .upsert(
+        {
+          id: newUser.user.id,
+          email: email,
+          full_name: trimmedName,
+          is_active: true,
+        },
+        { onConflict: "id" }
+      );
 
     if (profileError) {
       console.error("Profile save failed:", profileError);

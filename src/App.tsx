@@ -32,6 +32,7 @@ function AppRoutes() {
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/set-password" element={<SetPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/login" element={<Login />} />
           <Route path="*" element={<Login />} />
         </Routes>
       </BrowserRouter>

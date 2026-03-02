@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +11,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Trash2, KeyRound, ArrowRightLeft, Link2 } from "lucide-react";
 import type { AppRole } from "@/hooks/useAuth";
-import { PasswordChecklist } from "@/components/PasswordChecklist";
-import { usePasswordValidation } from "@/hooks/usePasswordValidation";
 
 interface UserRow {
   id: string;
@@ -39,50 +37,6 @@ const ROLE_LABELS: Record<AppRole, string> = {
 // Roles assignable via dropdown (owner excluded — can only be set via transfer)
 const ASSIGNABLE_ROLES: AppRole[] = ["admin", "pm", "konstrukter", "viewer"];
 
-function ResetPasswordDialog({
-  resetTarget, onClose, resetPassword, setResetPassword, resetError, resetSubmitting, onSubmit,
-}: {
-  resetTarget: string | null;
-  onClose: () => void;
-  resetPassword: string;
-  setResetPassword: (v: string) => void;
-  resetError: string;
-  resetSubmitting: boolean;
-  onSubmit: () => void;
-}) {
-  const validation = usePasswordValidation(resetPassword);
-  return (
-    <Dialog open={resetTarget !== null} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Reset hesla</DialogTitle>
-        </DialogHeader>
-        {resetError && (
-          <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded px-3 py-2">
-            {resetError}
-          </div>
-        )}
-        <div>
-          <Label>Nové heslo</Label>
-          <Input
-            type="text"
-            value={resetPassword}
-            onChange={(e) => setResetPassword(e.target.value)}
-            placeholder="Zadejte nové heslo..."
-          />
-          <PasswordChecklist password={resetPassword} />
-        </div>
-        <div className="flex justify-end gap-2 mt-2">
-          <Button variant="outline" onClick={onClose}>Zrušit</Button>
-          <Button onClick={onSubmit} disabled={resetSubmitting || !validation.isValid}>
-            {resetSubmitting ? "Ukládám..." : "Uložit nové heslo"}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -98,14 +52,11 @@ export function UserManagement({ open, onOpenChange }: Props) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [resetTarget, setResetTarget] = useState<string | null>(null);
-  const [resetPassword, setResetPassword] = useState("");
-  const [resetSubmitting, setResetSubmitting] = useState(false);
-  const [resetError, setResetError] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferTarget, setTransferTarget] = useState<string>("");
   const [transferSubmitting, setTransferSubmitting] = useState(false);
   const [copyingLinkId, setCopyingLinkId] = useState<string | null>(null);
+  const [sendingAuthEmailId, setSendingAuthEmailId] = useState<string | null>(null);
 
   const handleCopyInviteLink = async (userId: string) => {
     setCopyingLinkId(userId);
@@ -254,34 +205,32 @@ export function UserManagement({ open, onOpenChange }: Props) {
     }
   };
 
-  const handleResetPassword = async () => {
-    if (!resetTarget || !resetPassword.trim()) {
-      setResetError("Heslo je povinné");
-      return;
-    }
-    // Password policy is enforced by the dialog's disabled button, 
-    // but double-check here as well
-    if (resetPassword.length < 8 || !/[0-9!@#$%^&*_\-+=]/.test(resetPassword)) {
-      setResetError("Heslo nesplňuje požadavky");
-      return;
-    }
-    setResetSubmitting(true);
-    setResetError("");
+  const handleSendAccessEmail = async (userId: string) => {
+    setSendingAuthEmailId(userId);
+
     try {
-      const { data, error } = await supabase.functions.invoke("update-user", {
-        body: { user_id: resetTarget, password: resetPassword },
+      const { data, error } = await supabase.functions.invoke("generate-invite-link", {
+        body: {
+          user_id: userId,
+          origin_url: window.location.origin,
+          mode: "send_email",
+        },
       });
+
       if (error || data?.error) {
-        setResetError(data?.error || error?.message || "Chyba při změně hesla");
+        toast({ title: "Chyba", description: data?.error || error?.message, variant: "destructive" });
+        return;
+      }
+
+      if (data?.mode === "password_reset") {
+        toast({ title: `Email pro obnovení hesla byl odeslán na ${data.email}` });
       } else {
-        toast({ title: "Heslo bylo změněno" });
-        setResetTarget(null);
-        setResetPassword("");
+        toast({ title: `Pozvánka byla znovu odeslána na ${data.email}` });
       }
     } catch (e: any) {
-      setResetError(e.message || "Neočekávaná chyba");
+      toast({ title: "Chyba", description: e.message, variant: "destructive" });
     } finally {
-      setResetSubmitting(false);
+      setSendingAuthEmailId(null);
     }
   };
 
@@ -395,9 +344,10 @@ export function UserManagement({ open, onOpenChange }: Props) {
                           <Link2 className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => { setResetTarget(u.id); setResetPassword(""); setResetError(""); }}
+                          onClick={() => handleSendAccessEmail(u.id)}
                           className="text-muted-foreground hover:text-foreground transition-colors"
-                          title="Reset hesla"
+                          title="Znovu odeslat přístupový email"
+                          disabled={sendingAuthEmailId === u.id}
                         >
                           <KeyRound className="h-4 w-4" />
                         </button>
@@ -479,16 +429,6 @@ export function UserManagement({ open, onOpenChange }: Props) {
         </DialogContent>
       </Dialog>
 
-      {/* Reset Password Dialog */}
-      <ResetPasswordDialog
-        resetTarget={resetTarget}
-        onClose={() => { setResetTarget(null); setResetPassword(""); setResetError(""); }}
-        resetPassword={resetPassword}
-        setResetPassword={(v) => { setResetPassword(v); setResetError(""); }}
-        resetError={resetError}
-        resetSubmitting={resetSubmitting}
-        onSubmit={handleResetPassword}
-      />
 
       {/* Transfer Ownership Dialog */}
       <Dialog open={transferOpen} onOpenChange={(v) => { if (!v) { setTransferOpen(false); setTransferTarget(""); } }}>
