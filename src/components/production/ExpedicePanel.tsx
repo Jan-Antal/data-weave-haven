@@ -115,10 +115,10 @@ export function ExpedicePanel() {
           >
             <div className="flex items-center justify-between">
               <div className="min-w-0">
-                <div className="text-[11px] font-semibold truncate" style={{ color: "#3a8a36" }}>
+                <div className="text-[12px] font-semibold truncate" style={{ color: "#3a8a36" }}>
                   {group.project_name}
                 </div>
-                <div className="font-mono text-[8px]" style={{ color: "#99a5a3" }}>
+                <div className="font-mono text-[9px]" style={{ color: "#99a5a3" }}>
                   {group.project_id}
                 </div>
               </div>
@@ -139,11 +139,11 @@ export function ExpedicePanel() {
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                 >
                   <Check className="shrink-0" style={{ width: 12, height: 12, color: "#3a8a36", strokeWidth: 3 }} />
-                  <span className="text-[10px] truncate flex-1" style={{ color: "#6b7a78" }}>
+                  <span className="text-[11px] truncate flex-1" style={{ color: "#6b7a78" }}>
                     {item.item_name}
                   </span>
                   {item.completed_at && (
-                    <span className="font-mono text-[8px] shrink-0" style={{ color: "#99a5a3" }}>
+                    <span className="font-mono text-[9px] shrink-0" style={{ color: "#99a5a3" }}>
                       {new Date(item.completed_at).toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric" })}
                     </span>
                   )}

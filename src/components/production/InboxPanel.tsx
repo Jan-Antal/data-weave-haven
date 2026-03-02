@@ -193,18 +193,18 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded }: { project: 
           style={{ color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}
         />
         <div className="flex-1 min-w-0">
-          <div className="text-[11px] font-semibold truncate" style={{ color: "#223937" }}>
+          <div className="text-[12px] font-semibold truncate" style={{ color: "#223937" }}>
             {project.project_name}
           </div>
-          <div className="font-mono text-[8px]" style={{ color: "#99a5a3" }}>
+          <div className="font-mono text-[9px]" style={{ color: "#99a5a3" }}>
             {project.project_id}
           </div>
         </div>
         <div className="text-right shrink-0">
-          <span className="font-mono text-[11px] font-semibold" style={{ color: "#223937" }}>
+          <span className="font-mono text-[12px] font-semibold" style={{ color: "#223937" }}>
             {Math.round(project.total_hours)}h
           </span>
-          <span className="font-mono text-[8px] ml-1" style={{ color: "#6b7a78" }}>
+          <span className="font-mono text-[9px] ml-1" style={{ color: "#6b7a78" }}>
             {totalCzkK}K
           </span>
         </div>
@@ -258,10 +258,10 @@ function DraggableInboxItem({ item, projectName }: { item: InboxItem; projectNam
       }}
     >
       <GripVertical className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />
-      <span className="text-[10px] font-medium flex-1 truncate" style={{ color: "#223937" }}>
+      <span className="text-[11px] font-medium flex-1 truncate" style={{ color: "#223937" }}>
         {item.item_name}
       </span>
-      <span className="font-mono text-[9px] shrink-0" style={{ color: "#6b7a78" }}>
+      <span className="font-mono text-[10px] shrink-0" style={{ color: "#6b7a78" }}>
         {item.estimated_hours}h
       </span>
     </div>

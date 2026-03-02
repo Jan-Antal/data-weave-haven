@@ -185,7 +185,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
 
       {/* Silos */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden">
-        <div className="flex gap-[6px] p-2 h-full" style={{ minWidth: `${weeks.length * 181}px` }}>
+        <div className="flex gap-[6px] p-2 h-full" style={{ minWidth: `${weeks.length * 216}px` }}>
           {weeks.map((week) => (
             <SiloColumn
               key={week.key}
@@ -296,7 +296,7 @@ function SiloColumn({
   return (
     <div
       ref={setNodeRef}
-      className="w-[175px] shrink-0 flex flex-col transition-all"
+      className="w-[210px] shrink-0 flex flex-col transition-all"
       style={{
         backgroundColor: "#ffffff",
         borderRadius: 9,
@@ -312,10 +312,10 @@ function SiloColumn({
       {/* Header */}
       <div className="px-2.5 py-1.5 text-center" style={{ borderBottom: "1px solid #ece8e2" }}>
         <div className="flex items-center justify-center gap-1.5">
-          <span className="font-mono text-[12px] font-bold" style={{ color: "#223937" }}>T{weekNum}</span>
+          <span className="font-mono text-[14px] font-bold" style={{ color: "#223937" }}>T{weekNum}</span>
           {isCurrent && <span className="w-[5px] h-[5px] rounded-full" style={{ backgroundColor: "#3a8a36" }} />}
         </div>
-        <div className="text-[8px] mt-0.5" style={{ color: "#99a5a3" }}>
+        <div className="text-[9px] mt-0.5" style={{ color: "#99a5a3" }}>
           {formatDateShort(startDate)} – {formatDateShort(endDate)}
         </div>
 
@@ -328,13 +328,13 @@ function SiloColumn({
             />
           </div>
           <div className="flex items-baseline justify-between mt-[3px]">
-            <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>
+            <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>
               {Math.round(totalHours)}h
             </span>
-            <span className="font-mono text-[9px]" style={{ color: "#99a5a3" }}>
+            <span className="font-mono text-[10px]" style={{ color: "#99a5a3" }}>
               / {weeklyCapacity}h
             </span>
-            <span className="font-mono text-[9px] font-bold" style={{ color: barColor }}>
+            <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>
               {Math.round(pct)}%
             </span>
           </div>
@@ -436,20 +436,20 @@ function CollapsibleBundleCard({
           style={{ width: 10, height: 10, color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}
         />
         <div className="flex-1 min-w-0">
-          <div className="text-[9px] font-semibold truncate" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>
+          <div className="text-[11px] font-semibold truncate" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>
             {bundle.project_name}
           </div>
-          <div className="font-mono text-[7px]" style={{ color: "#99a5a3" }}>
+          <div className="font-mono text-[8px]" style={{ color: "#99a5a3" }}>
             {bundle.project_id}
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {completedCount > 0 && (
-            <span className="text-[8px] font-medium" style={{ color: "#3a8a36" }}>
+            <span className="text-[9px] font-medium" style={{ color: "#3a8a36" }}>
               {completedCount}/{totalCount} ✓
             </span>
           )}
-          <span className="font-mono text-[9px] font-bold" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>
+          <span className="font-mono text-[11px] font-bold" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>
             {Math.round(bundle.total_hours)}h
           </span>
         </div>
@@ -494,11 +494,11 @@ function CompletedSiloItem({
       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
       onContextMenu={onContextMenu}
     >
-      <span style={{ width: 8, fontSize: 8, color: "#3a8a36", fontWeight: 700 }}>✓</span>
-      <span className="text-[9px] flex-1 truncate" style={{ color: "#99a5a3", textDecoration: "line-through" }}>
+      <span style={{ width: 10, fontSize: 9, color: "#3a8a36", fontWeight: 700 }}>✓</span>
+      <span className="text-[10px] flex-1 truncate" style={{ color: "#99a5a3", textDecoration: "line-through" }}>
         {item.item_name}
       </span>
-      <span className="font-mono text-[8px] shrink-0" style={{ color: "#c4ccc9" }}>
+      <span className="font-mono text-[9px] shrink-0" style={{ color: "#c4ccc9" }}>
         {item.scheduled_hours}h
       </span>
     </div>
@@ -536,10 +536,10 @@ function DraggableSiloItem({
       onContextMenu={onContextMenu}
     >
       <GripVertical className="shrink-0" style={{ width: 8, height: 8, color: "#99a5a3" }} />
-      <span className="text-[9px] flex-1 truncate" style={{ color: "#223937" }}>
+      <span className="text-[10px] flex-1 truncate" style={{ color: "#223937" }}>
         {item.item_name}
       </span>
-      <span className="font-mono text-[8px] shrink-0" style={{ color: "#99a5a3" }}>
+      <span className="font-mono text-[9px] shrink-0" style={{ color: "#99a5a3" }}>
         {item.scheduled_hours}h
         {showCzk && ` ${Math.round(item.scheduled_czk / 1000)}K`}
       </span>
