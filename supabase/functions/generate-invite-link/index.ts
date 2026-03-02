@@ -73,8 +73,8 @@ Deno.serve(async (req) => {
 
     // Use dynamic redirect URL from the calling app
     const redirectTo = origin_url
-      ? `${String(origin_url).replace(/\/$/, "")}/accept-invite`
-      : `${req.headers.get("origin") || "https://projekty.am-interior.cz"}/accept-invite`;
+      ? `${String(origin_url).replace(/\/$/, "")}/auth/callback`
+      : `${req.headers.get("origin") || "https://projekty.am-interior.cz"}/auth/callback`;
 
     // Try invite first, fall back to recovery for already-registered users
     let actionLink: string | undefined;

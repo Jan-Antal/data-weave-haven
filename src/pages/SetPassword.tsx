@@ -6,49 +6,27 @@ import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { PasswordChecklist } from "@/components/PasswordChecklist";
 import { usePasswordValidation } from "@/hooks/usePasswordValidation";
+import { toast } from "@/hooks/use-toast";
 
-export default function AcceptInvite() {
+export default function SetPassword() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [tokenValid, setTokenValid] = useState<boolean | null>(null);
   const [success, setSuccess] = useState(false);
+  const [hasSession, setHasSession] = useState<boolean | null>(null);
   const navigate = useNavigate();
   const validation = usePasswordValidation(password);
 
   useEffect(() => {
-    // Listen for auth state changes — Supabase processes the token from the URL hash
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (
-          (event === "SIGNED_IN" || event === "PASSWORD_RECOVERY" || event === "TOKEN_REFRESHED") &&
-          session
-        ) {
-          setTokenValid(true);
-        }
-      }
-    );
-
-    // Check if there's already a session (token was processed before listener registered)
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setTokenValid(true);
-      } else {
-        // Wait for Supabase to process the URL hash token
-        setTimeout(async () => {
-          const { data: { session: s } } = await supabase.auth.getSession();
-          if (s) {
-            setTokenValid(true);
-          } else {
-            setTokenValid(false);
-          }
-        }, 2500);
+      setHasSession(!!session);
+      if (!session) {
+        // No session = user shouldn't be here, redirect to login
+        setTimeout(() => navigate("/", { replace: true }), 2000);
       }
     });
-
-    return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,14 +46,33 @@ export default function AcceptInvite() {
     const { error: updateError } = await supabase.auth.updateUser({ password });
 
     if (updateError) {
-      setError("Nepodařilo se nastavit heslo. Odkaz mohl vypršet. Kontaktujte administrátora.");
+      setError("Nepodařilo se nastavit heslo. Zkuste to znovu.");
       setLoading(false);
       return;
     }
 
     setSuccess(true);
-    setTimeout(() => navigate("/"), 1500);
+    toast({ title: "Účet byl úspěšně nastaven" });
+    setTimeout(() => navigate("/", { replace: true }), 1500);
   };
+
+  if (hasSession === null) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Načítání...</p>
+      </div>
+    );
+  }
+
+  if (hasSession === false) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <div className="bg-card border rounded-lg p-6 text-center">
+          <p className="text-sm text-muted-foreground">Žádná aktivní relace. Přesměrování na přihlášení...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
@@ -87,28 +84,17 @@ export default function AcceptInvite() {
           <p className="text-sm text-muted-foreground mt-1">Project Info 2026</p>
         </div>
 
-        {tokenValid === null && (
-          <div className="bg-card border rounded-lg p-6 text-center">
-            <p className="text-muted-foreground">Ověřování odkazu...</p>
-          </div>
-        )}
-
-        {tokenValid === false && (
-          <div className="bg-card border rounded-lg p-6 text-center space-y-3">
-            <p className="text-sm text-destructive bg-destructive/10 rounded px-3 py-2">
-              Odkaz je neplatný nebo vypršel. Kontaktujte administrátora pro novou pozvánku.
-            </p>
-          </div>
-        )}
-
-        {tokenValid && !success && (
+        {!success ? (
           <form onSubmit={handleSubmit} className="bg-card border rounded-lg p-6 space-y-4 shadow-sm">
-            <p className="text-sm text-muted-foreground">
-              Nastavte si heslo pro přístup do aplikace.
-            </p>
+            <div>
+              <h2 className="text-lg font-semibold">Nastavení hesla</h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                Vítejte! Nastavte si heslo pro svůj účet.
+              </p>
+            </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Heslo</Label>
+              <Label htmlFor="password">Nové heslo</Label>
               <Input
                 id="password"
                 type="password"
@@ -147,9 +133,7 @@ export default function AcceptInvite() {
               {loading ? "Ukládám..." : "Nastavit heslo"}
             </Button>
           </form>
-        )}
-
-        {success && (
+        ) : (
           <div className="bg-card border rounded-lg p-6 text-center space-y-3">
             <p className="text-sm text-green-600">Heslo bylo nastaveno. Přesměrování...</p>
           </div>
