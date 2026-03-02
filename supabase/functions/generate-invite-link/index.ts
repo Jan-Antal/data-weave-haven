@@ -59,7 +59,6 @@ Deno.serve(async (req) => {
 
     const payload = await req.json();
     const user_id: string | undefined = payload?.user_id;
-    const origin_url: string | undefined = payload?.origin_url;
     const mode: InviteMode = payload?.mode === "send_email" ? "send_email" : "link";
 
     if (!user_id) {

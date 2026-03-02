@@ -116,6 +116,7 @@ Deno.serve(async (req) => {
           email: email,
           full_name: trimmedName,
           is_active: true,
+          password_set: false,
         },
         { onConflict: "id" }
       );

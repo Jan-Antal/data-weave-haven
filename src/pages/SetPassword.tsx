@@ -51,6 +51,13 @@ export default function SetPassword() {
       return;
     }
 
+    const { error: profileFlagError } = await supabase.rpc("mark_password_set");
+    if (profileFlagError) {
+      setError("Heslo bylo nastaveno, ale aktivace účtu selhala. Kontaktujte administrátora.");
+      setLoading(false);
+      return;
+    }
+
     setSuccess(true);
     toast({ title: "Účet byl úspěšně nastaven" });
     setTimeout(() => navigate("/", { replace: true }), 1500);

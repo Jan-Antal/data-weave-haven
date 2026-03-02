@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 
 type CallbackType = "invite" | "recovery" | "signup" | null;
 
+const INVALID_LINK_MESSAGE = "Odkaz je neplatný nebo vypršel.";
+
 const getCallbackType = (): CallbackType => {
   const queryParams = new URLSearchParams(window.location.search);
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
@@ -13,6 +15,16 @@ const getCallbackType = (): CallbackType => {
 
   if (type === "invite" || type === "recovery" || type === "signup") return type;
   return null;
+};
+
+const shouldForceSetPassword = async (userId: string): Promise<boolean> => {
+  const { data: profileData } = await supabase
+    .from("profiles")
+    .select("password_set")
+    .eq("id", userId)
+    .single();
+
+  return profileData?.password_set === false;
 };
 
 const getRedirectPathForType = (type: CallbackType) => {
@@ -31,11 +43,11 @@ export default function AuthCallback() {
       try {
         const queryParams = new URLSearchParams(window.location.search);
         const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        const callbackType = getCallbackType();
 
         const code = queryParams.get("code");
         const accessToken = hashParams.get("access_token");
         const refreshToken = hashParams.get("refresh_token");
-        const callbackType = getCallbackType();
 
         const errorCode =
           hashParams.get("error_code") ||
@@ -44,54 +56,67 @@ export default function AuthCallback() {
           queryParams.get("error");
 
         if (errorCode) {
-          setError("Odkaz je neplatný nebo vypršel.");
+          setError(INVALID_LINK_MESSAGE);
           setProcessing(false);
           return;
         }
 
+        const redirectFromSession = async () => {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+
+          if (!session) return false;
+
+          const mustSetPassword =
+            callbackType === "invite" ||
+            callbackType === "signup" ||
+            (await shouldForceSetPassword(session.user.id));
+
+          navigate(mustSetPassword ? "/set-password" : getRedirectPathForType(callbackType), {
+            replace: true,
+          });
+          return true;
+        };
+
+        // 1) Supabase verify endpoint may have already established cookies/session
+        if (await redirectFromSession()) return;
+
+        // 2) PKCE flow (?code=...)
         if (code) {
           const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-          if (exchangeError) {
-            setError("Odkaz je neplatný nebo vypršel.");
+          if (exchangeError && !(await redirectFromSession())) {
+            setError(INVALID_LINK_MESSAGE);
             setProcessing(false);
             return;
           }
-        } else if (accessToken && refreshToken) {
+        }
+
+        // 3) Hash token flow (#access_token=...)
+        if (accessToken && refreshToken) {
           const { error: sessionError } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
 
-          if (sessionError) {
-            setError("Odkaz je neplatný nebo vypršel.");
+          if (sessionError && !(await redirectFromSession())) {
+            setError(INVALID_LINK_MESSAGE);
             setProcessing(false);
             return;
           }
         }
 
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (session) {
-          navigate(getRedirectPathForType(callbackType), { replace: true });
-          return;
+        // 4) Retry to catch delayed cookie/session propagation
+        const retryDelays = [300, 1000, 1500];
+        for (const delay of retryDelays) {
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          if (await redirectFromSession()) return;
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 1200));
-        const {
-          data: { session: retrySession },
-        } = await supabase.auth.getSession();
-
-        if (retrySession) {
-          navigate(getRedirectPathForType(callbackType), { replace: true });
-          return;
-        }
-
-        setError("Odkaz je neplatný nebo vypršel.");
+        setError(INVALID_LINK_MESSAGE);
         setProcessing(false);
       } catch {
-        setError("Odkaz je neplatný nebo vypršel.");
+        setError(INVALID_LINK_MESSAGE);
         setProcessing(false);
       }
     };
