@@ -1,17 +1,19 @@
 import { usePasswordValidation } from "@/hooks/usePasswordValidation";
-import { Check } from "lucide-react";
+import { Check, X } from "lucide-react";
 
 interface PasswordChecklistProps {
   password: string;
 }
 
 export function PasswordChecklist({ password }: PasswordChecklistProps) {
-  const { minLength, hasNumberOrSpecial } = usePasswordValidation(password);
+  const { minLength, hasUppercase, hasNumber, hasSpecial } = usePasswordValidation(password);
   const started = password.length > 0;
 
   const items = [
     { met: minLength, label: "Alespoň 8 znaků" },
-    { met: hasNumberOrSpecial, label: "Obsahuje číslo nebo speciální znak" },
+    { met: hasUppercase, label: "Obsahuje velké písmeno (A-Z)" },
+    { met: hasNumber, label: "Obsahuje číslo (0-9)" },
+    { met: hasSpecial, label: "Obsahuje speciální znak (!@#$%^&*_-+=)" },
   ];
 
   return (
@@ -25,7 +27,11 @@ export function PasswordChecklist({ password }: PasswordChecklistProps) {
               : "text-muted-foreground"
           }`}
         >
-          <Check className="h-3 w-3 flex-shrink-0" />
+          {started && item.met ? (
+            <Check className="h-3 w-3 flex-shrink-0" />
+          ) : (
+            <X className="h-3 w-3 flex-shrink-0" />
+          )}
           {item.label}
         </li>
       ))}

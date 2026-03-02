@@ -90,29 +90,28 @@ Deno.serve(async (req) => {
 
     const redirectTo = `${PRODUCTION_ORIGIN}/auth/callback`;
 
-    // Create user WITHOUT sending invite email — use a random password
-    const randomPassword = crypto.randomUUID() + "!Aa1";
-    const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
-      email,
-      password: randomPassword,
-      email_confirm: true, // mark email as confirmed so generateLink works
-      user_metadata: { full_name: trimmedName },
+    // Step 1: Invite user via email — this SENDS the invite email automatically
+    const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
+      data: { full_name: trimmedName },
+      redirectTo,
     });
 
-    if (createError) {
-      console.error("User creation failed:", createError);
-      return new Response(JSON.stringify({ error: "Unable to create user: " + createError.message }), {
+    if (inviteError) {
+      console.error("Invite failed:", inviteError);
+      return new Response(JSON.stringify({ error: "Unable to create user: " + inviteError.message }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const newUser = inviteData.user;
 
     // Save profile immediately
     const { error: profileError } = await adminClient
       .from("profiles")
       .upsert(
         {
-          id: newUser.user.id,
+          id: newUser.id,
           email: email,
           full_name: trimmedName,
           is_active: true,
@@ -128,10 +127,10 @@ Deno.serve(async (req) => {
     // Assign role immediately
     const { error: roleError } = await adminClient
       .from("user_roles")
-      .insert({ user_id: newUser.user.id, role });
+      .insert({ user_id: newUser.id, role });
 
     if (roleError) {
-      await adminClient.auth.admin.deleteUser(newUser.user.id);
+      await adminClient.auth.admin.deleteUser(newUser.id);
       console.error("Role assignment failed:", roleError);
       return new Response(JSON.stringify({ error: "Unable to assign role" }), {
         status: 400,
@@ -139,7 +138,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Generate invite link (same format as the 🔗 copy button)
+    // Step 2: Also generate a recovery link for the admin copy button
     let actionLink: string | undefined;
     const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
       type: "recovery",
@@ -153,7 +152,7 @@ Deno.serve(async (req) => {
       actionLink = linkData?.properties?.action_link;
     }
 
-    return new Response(JSON.stringify({ user: newUser.user, link: actionLink }), {
+    return new Response(JSON.stringify({ user: newUser, link: actionLink }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Check } from "lucide-react";
 
-type View = "login" | "forgot" | "sent";
+type View = "login" | "magic" | "magic-sent";
 
 export default function Login() {
   const { signIn } = useAuth();
@@ -25,16 +25,20 @@ export default function Login() {
     setLoading(false);
   };
 
-  const handleForgot = async (e: React.FormEvent) => {
+  const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback`,
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin },
     });
+    if (error) {
+      setError(error.message);
+    } else {
+      setView("magic-sent");
+    }
     setLoading(false);
-    setView("sent");
-    setTimeout(() => setView("login"), 5000);
   };
 
   return (
@@ -48,65 +52,75 @@ export default function Login() {
         </div>
 
         {view === "login" && (
-          <form onSubmit={handleLogin} className="bg-card border rounded-lg p-6 space-y-4 shadow-sm">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="vas@email.cz"
-                required
-                autoFocus
-              />
+          <div className="space-y-4">
+            <form onSubmit={handleLogin} className="bg-card border rounded-lg p-6 space-y-4 shadow-sm">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="vas@email.cz"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Heslo</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+
+              {error && (
+                <p className="text-sm text-destructive bg-destructive/10 rounded px-3 py-2">
+                  Nesprávný email nebo heslo
+                </p>
+              )}
+
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Přihlašování..." : "Přihlásit se"}
+              </Button>
+            </form>
+
+            {/* Divider */}
+            <div className="relative flex items-center">
+              <div className="flex-grow border-t border-border" />
+              <span className="mx-3 text-xs text-muted-foreground">nebo</span>
+              <div className="flex-grow border-t border-border" />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Heslo</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={() => { setError(null); setView("forgot"); }}
-              className="text-[12px] text-muted-foreground hover:underline hover:text-foreground transition-colors"
+            {/* Magic link button */}
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => { setError(null); setView("magic"); }}
             >
-              Zapomenuté heslo?
-            </button>
-
-            {error && (
-              <p className="text-sm text-destructive bg-destructive/10 rounded px-3 py-2">
-                Nesprávný email nebo heslo
-              </p>
-            )}
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Přihlašování..." : "Přihlásit se"}
+              Přihlásit se odkazem
             </Button>
-          </form>
+          </div>
         )}
 
-        {view === "forgot" && (
-          <form onSubmit={handleForgot} className="bg-card border rounded-lg p-6 space-y-4 shadow-sm">
+        {view === "magic" && (
+          <form onSubmit={handleMagicLink} className="bg-card border rounded-lg p-6 space-y-4 shadow-sm">
             <div>
-              <h2 className="text-lg font-semibold">Obnovení hesla</h2>
+              <h2 className="text-lg font-semibold">Přihlášení odkazem</h2>
               <p className="text-xs text-muted-foreground mt-1">
-                Zadejte svůj email a pošleme vám odkaz pro obnovení hesla.
+                Zadejte svůj email a pošleme vám přihlašovací odkaz.
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="reset-email">Email</Label>
+              <Label htmlFor="magic-email">Email</Label>
               <Input
-                id="reset-email"
+                id="magic-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -121,7 +135,7 @@ export default function Login() {
             )}
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Odesílám..." : "Odeslat odkaz"}
+              {loading ? "Odesílám..." : "Odeslat přihlašovací odkaz"}
             </Button>
 
             <button
@@ -129,27 +143,27 @@ export default function Login() {
               onClick={() => { setError(null); setView("login"); }}
               className="text-[12px] text-muted-foreground hover:underline hover:text-foreground transition-colors w-full text-center"
             >
-              Zpět na přihlášení
+              Zpět na přihlášení heslem
             </button>
           </form>
         )}
 
-        {view === "sent" && (
+        {view === "magic-sent" && (
           <div className="bg-card border rounded-lg p-6 space-y-3 shadow-sm text-center">
             <div className="flex justify-center">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Check className="h-5 w-5 text-primary" />
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Check className="h-5 w-5 text-primary" />
               </div>
             </div>
             <p className="text-sm text-foreground font-medium">
-              Odkaz pro obnovení hesla byl odeslán na váš email.
+              Přihlašovací odkaz byl odeslán na váš email.
             </p>
             <button
               type="button"
               onClick={() => setView("login")}
               className="text-[12px] text-muted-foreground hover:underline hover:text-foreground transition-colors"
             >
-              Zpět na přihlášení
+              Zpět na přihlášení heslem
             </button>
           </div>
         )}
