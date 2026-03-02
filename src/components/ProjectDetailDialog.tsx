@@ -923,16 +923,16 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                   </div>
                   <div>
                     <Label className="text-xs">% Rozpracovanost</Label>
-                    <div className="flex items-center gap-1">
+                    <div className="relative">
                       <Input
                         type={isSectionReadOnly("tpv") ? "text" : "number"}
-                        className={cn("no-spinners", isSectionReadOnly("tpv") && roClass)}
-                        value={isSectionReadOnly("tpv") ? (form.percent_tpv ? `${form.percent_tpv} %` : "—") : form.percent_tpv}
+                        className={cn("no-spinners pr-8", isSectionReadOnly("tpv") && roClass)}
+                        value={isSectionReadOnly("tpv") ? (form.percent_tpv ? `${form.percent_tpv}` : "—") : form.percent_tpv}
                         onChange={(e) => setForm(s => ({ ...s, percent_tpv: e.target.value }))}
                         placeholder="0"
                         disabled={isSectionReadOnly("tpv")}
                       />
-                      {!isSectionReadOnly("tpv") && <span className="text-sm text-muted-foreground shrink-0">%</span>}
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
                     </div>
                   </div>
                   <div className="col-span-2">
