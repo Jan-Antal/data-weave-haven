@@ -53,6 +53,57 @@ export type Database = {
         }
         Relationships: []
       }
+      cost_breakdown_presets: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_default: boolean
+          logistics_pct: number
+          margin_pct: number
+          material_pct: number
+          name: string
+          overhead_pct: number
+          production_pct: number
+          sort_order: number
+          subcontractors_pct: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          logistics_pct?: number
+          margin_pct?: number
+          material_pct?: number
+          name: string
+          overhead_pct?: number
+          production_pct?: number
+          sort_order?: number
+          subcontractors_pct?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          logistics_pct?: number
+          margin_pct?: number
+          material_pct?: number
+          name?: string
+          overhead_pct?: number
+          production_pct?: number
+          sort_order?: number
+          subcontractors_pct?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       custom_column_definitions: {
         Row: {
           column_key: string
@@ -206,6 +257,160 @@ export type Database = {
           is_active?: boolean
           name?: string
           role?: string
+        }
+        Relationships: []
+      }
+      production_inbox: {
+        Row: {
+          created_at: string
+          estimated_czk: number
+          estimated_hours: number
+          id: string
+          item_name: string
+          project_id: string
+          sent_at: string
+          sent_by: string
+          stage_id: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          estimated_czk: number
+          estimated_hours: number
+          id?: string
+          item_name: string
+          project_id: string
+          sent_at?: string
+          sent_by: string
+          stage_id?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          estimated_czk?: number
+          estimated_hours?: number
+          id?: string
+          item_name?: string
+          project_id?: string
+          sent_at?: string
+          sent_by?: string
+          stage_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_inbox_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "production_inbox_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "project_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_schedule: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          inbox_item_id: string | null
+          item_name: string
+          position: number
+          project_id: string
+          scheduled_czk: number
+          scheduled_hours: number
+          scheduled_week: string
+          stage_id: string | null
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inbox_item_id?: string | null
+          item_name: string
+          position?: number
+          project_id: string
+          scheduled_czk: number
+          scheduled_hours: number
+          scheduled_week: string
+          stage_id?: string | null
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inbox_item_id?: string | null
+          item_name?: string
+          position?: number
+          project_id?: string
+          scheduled_czk?: number
+          scheduled_hours?: number
+          scheduled_week?: string
+          stage_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_schedule_inbox_item_id_fkey"
+            columns: ["inbox_item_id"]
+            isOneToOne: false
+            referencedRelation: "production_inbox"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_schedule_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "production_schedule_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "project_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_settings: {
+        Row: {
+          hourly_rate: number
+          id: string
+          monthly_capacity_hours: number
+          updated_at: string
+          updated_by: string | null
+          weekly_capacity_hours: number
+        }
+        Insert: {
+          hourly_rate?: number
+          id?: string
+          monthly_capacity_hours?: number
+          updated_at?: string
+          updated_by?: string | null
+          weekly_capacity_hours?: number
+        }
+        Update: {
+          hourly_rate?: number
+          id?: string
+          monthly_capacity_hours?: number
+          updated_at?: string
+          updated_by?: string | null
+          weekly_capacity_hours?: number
         }
         Relationships: []
       }
@@ -382,6 +587,14 @@ export type Database = {
         Row: {
           architekt: string | null
           contract_link: string | null
+          cost_is_custom: boolean | null
+          cost_logistics_pct: number | null
+          cost_margin_pct: number | null
+          cost_material_pct: number | null
+          cost_overhead_pct: number | null
+          cost_preset_id: string | null
+          cost_production_pct: number | null
+          cost_subcontractors_pct: number | null
           created_at: string
           currency: string | null
           custom_fields: Json | null
@@ -427,6 +640,14 @@ export type Database = {
         Insert: {
           architekt?: string | null
           contract_link?: string | null
+          cost_is_custom?: boolean | null
+          cost_logistics_pct?: number | null
+          cost_margin_pct?: number | null
+          cost_material_pct?: number | null
+          cost_overhead_pct?: number | null
+          cost_preset_id?: string | null
+          cost_production_pct?: number | null
+          cost_subcontractors_pct?: number | null
           created_at?: string
           currency?: string | null
           custom_fields?: Json | null
@@ -472,6 +693,14 @@ export type Database = {
         Update: {
           architekt?: string | null
           contract_link?: string | null
+          cost_is_custom?: boolean | null
+          cost_logistics_pct?: number | null
+          cost_margin_pct?: number | null
+          cost_material_pct?: number | null
+          cost_overhead_pct?: number | null
+          cost_preset_id?: string | null
+          cost_production_pct?: number | null
+          cost_subcontractors_pct?: number | null
           created_at?: string
           currency?: string | null
           custom_fields?: Json | null
@@ -514,7 +743,15 @@ export type Database = {
           vyroba?: number | null
           zamereni?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "projects_cost_preset_id_fkey"
+            columns: ["cost_preset_id"]
+            isOneToOne: false
+            referencedRelation: "cost_breakdown_presets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sharepoint_document_cache: {
         Row: {
