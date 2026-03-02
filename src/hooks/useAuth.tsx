@@ -173,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Settings menu item visibility
   const canManageUsers = isAdmin;
-  const canManagePeople = isAdmin || isPM;
+  const canManagePeople = isAdmin || isPM || isKonstrukter;
   const canManageExchangeRates = isAdmin;
   const canManageStatuses = isAdmin || isPM;
   const canAccessRecycleBin = isAdmin || isPM || isKonstrukter;

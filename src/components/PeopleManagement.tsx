@@ -43,7 +43,10 @@ interface PeopleManagementProps {
 export function PeopleManagement({ open, onOpenChange }: PeopleManagementProps) {
   const { data: allPeople = [] } = useAllPeople();
   const addPerson = useAddPerson();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isKonstrukter } = useAuth();
+  const canDelete = isAdmin;
+  const canRename = isAdmin;
+  const canToggleAllRoles = isAdmin;
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -145,14 +148,14 @@ export function PeopleManagement({ open, onOpenChange }: PeopleManagementProps) 
                   {roles.map((r) => (
                     <TableHead key={r} className="w-[100px] text-center">{r}</TableHead>
                   ))}
-                  {isAdmin && <TableHead className="w-[48px]" />}
+                  {canDelete && <TableHead className="w-[48px]" />}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map((person) => (
                   <TableRow key={person.name}>
                     <TableCell className="py-2 px-4">
-                      {editingName === person.name ? (
+                      {canRename && editingName === person.name ? (
                         <Input
                           ref={editInputRef}
                           value={editValue}
@@ -166,8 +169,8 @@ export function PeopleManagement({ open, onOpenChange }: PeopleManagementProps) 
                         />
                       ) : (
                         <span
-                          className="cursor-pointer hover:underline text-sm"
-                          onClick={() => { setEditingName(person.name); setEditValue(person.name); }}
+                          className={`text-sm ${canRename ? "cursor-pointer hover:underline" : ""}`}
+                          onClick={() => { if (canRename) { setEditingName(person.name); setEditValue(person.name); } }}
                         >
                           {person.name}
                         </span>
@@ -175,16 +178,18 @@ export function PeopleManagement({ open, onOpenChange }: PeopleManagementProps) 
                     </TableCell>
                     {roles.map((role) => {
                       const has = person.roles.has(role);
+                      const canToggle = canToggleAllRoles || (isKonstrukter && role === "Konstruktér");
                       return (
                         <TableCell key={role} className="py-2 px-4 text-center">
                           <Checkbox
                             checked={has}
-                            onCheckedChange={() => handleToggleRole(person.name, role, has)}
+                            onCheckedChange={() => canToggle && handleToggleRole(person.name, role, has)}
+                            disabled={!canToggle}
                           />
                         </TableCell>
                       );
                     })}
-                    {isAdmin && (
+                    {canDelete && (
                       <TableCell className="py-2 px-2">
                         <button
                           onClick={() => setDeleteTarget(person.name)}
