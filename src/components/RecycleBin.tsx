@@ -107,25 +107,33 @@ function RecordList({ table, nameField, idField, emptyText, canPermanentDelete }
 }
 
 export function RecycleBin({ open, onOpenChange }: RecycleBinProps) {
-  const { canPermanentDelete } = useAuth();
+  const { canPermanentDelete, isKonstrukter } = useAuth();
+
+  // Konstruktér only sees TPV items
+  const defaultTab = isKonstrukter ? "tpv" : "projects";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[650px]">
         <DialogHeader>
           <DialogTitle>Koš</DialogTitle>
         </DialogHeader>
-        <Tabs defaultValue="projects" className="space-y-3">
+        <Tabs defaultValue={defaultTab} className="space-y-3">
           <TabsList className="w-full">
-            <TabsTrigger value="projects" className="flex-1">Projekty</TabsTrigger>
-            <TabsTrigger value="stages" className="flex-1">Etapy</TabsTrigger>
+            {!isKonstrukter && <TabsTrigger value="projects" className="flex-1">Projekty</TabsTrigger>}
+            {!isKonstrukter && <TabsTrigger value="stages" className="flex-1">Etapy</TabsTrigger>}
             <TabsTrigger value="tpv" className="flex-1">TPV položky</TabsTrigger>
           </TabsList>
-          <TabsContent value="projects">
-            <RecordList table="projects" nameField="project_name" idField="project_id" emptyText="Žádné smazané projekty" canPermanentDelete={canPermanentDelete} />
-          </TabsContent>
-          <TabsContent value="stages">
-            <RecordList table="project_stages" nameField="stage_name" emptyText="Žádné smazané etapy" canPermanentDelete={canPermanentDelete} />
-          </TabsContent>
+          {!isKonstrukter && (
+            <TabsContent value="projects">
+              <RecordList table="projects" nameField="project_name" idField="project_id" emptyText="Žádné smazané projekty" canPermanentDelete={canPermanentDelete} />
+            </TabsContent>
+          )}
+          {!isKonstrukter && (
+            <TabsContent value="stages">
+              <RecordList table="project_stages" nameField="stage_name" emptyText="Žádné smazané etapy" canPermanentDelete={canPermanentDelete} />
+            </TabsContent>
+          )}
           <TabsContent value="tpv">
             <RecordList table="tpv_items" nameField="item_name" emptyText="Žádné smazané TPV položky" canPermanentDelete={canPermanentDelete} />
           </TabsContent>
