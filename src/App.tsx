@@ -8,7 +8,7 @@ import { PeopleManagementProvider } from "@/components/PeopleManagementContext";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
-import ResetPassword from "./pages/ResetPassword"; // kept for direct URL access
+
 import SetPassword from "./pages/SetPassword";
 import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
@@ -68,7 +68,6 @@ function AppRoutes() {
           <Route path="/" element={<RootAuthRoute />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/set-password" element={<SetPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/login" element={<Login />} />
           <Route path="*" element={<Login />} />
         </Routes>
@@ -82,7 +81,7 @@ function AppRoutes() {
         <Routes>
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/set-password" element={<SetPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
+          
           <Route path="*" element={<SetPassword />} />
         </Routes>
       </BrowserRouter>

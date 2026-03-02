@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { PasswordChecklist } from "@/components/PasswordChecklist";
 import { usePasswordValidation } from "@/hooks/usePasswordValidation";
+import { Eye, EyeOff } from "lucide-react";
 
 const ROLE_LABELS: Record<string, string> = {
   owner: "Owner",
@@ -59,11 +60,12 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
   const [fullName, setFullName] = useState("");
 
   // Password
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const passwordValidation = usePasswordValidation(newPassword);
 
@@ -81,10 +83,11 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
   useEffect(() => {
     if (open) {
       setFullName(profile?.full_name || "");
-      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       setPasswordError("");
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
       setDefaultPerson(prefs?.default_person_filter || "__all__");
       setDefaultView(prefs?.default_view || "project-info");
     }
@@ -92,10 +95,6 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
 
   const handleChangePassword = async () => {
     setPasswordError("");
-    if (!currentPassword) {
-      setPasswordError("Zadejte současné heslo");
-      return;
-    }
     if (!passwordValidation.isValid) {
       setPasswordError("Heslo nesplňuje požadavky");
       return;
@@ -107,23 +106,11 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
 
     setPasswordLoading(true);
     try {
-      // Verify current password by re-signing in
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user?.email || "",
-        password: currentPassword,
-      });
-      if (signInError) {
-        setPasswordError("Současné heslo není správné");
-        setPasswordLoading(false);
-        return;
-      }
-
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) {
         setPasswordError(error.message);
       } else {
-        toast({ title: "Heslo bylo změněno" });
-        setCurrentPassword("");
+        toast({ title: "Heslo bylo úspěšně změněno" });
         setNewPassword("");
         setConfirmPassword("");
       }
@@ -215,32 +202,46 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
           <SectionHeader icon="🔑" label="Změna hesla" />
           <div className="space-y-3">
             <div>
-              <Label className="text-xs">Současné heslo</Label>
-              <Input
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                className="h-9"
-              />
-            </div>
-            <div>
               <Label className="text-xs">Nové heslo</Label>
-              <Input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="h-9"
-              />
+              <div className="relative">
+                <Input
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="h-9 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               <PasswordChecklist password={newPassword} />
             </div>
             <div>
-              <Label className="text-xs">Potvrzení hesla</Label>
-              <Input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="h-9"
-              />
+              <Label className="text-xs">Potvrdit heslo</Label>
+              <div className="relative">
+                <Input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="h-9 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {confirmPassword && newPassword !== confirmPassword && (
+                <p className="text-xs text-destructive mt-1">Hesla se neshodují</p>
+              )}
             </div>
             {passwordError && (
               <p className="text-xs text-destructive">{passwordError}</p>
@@ -248,7 +249,7 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
             <Button
               size="sm"
               onClick={handleChangePassword}
-              disabled={passwordLoading || !currentPassword || !passwordValidation.isValid || newPassword !== confirmPassword}
+              disabled={passwordLoading || !passwordValidation.isValid || newPassword !== confirmPassword || !confirmPassword}
             >
               {passwordLoading ? "Měním heslo..." : "Změnit heslo"}
             </Button>
