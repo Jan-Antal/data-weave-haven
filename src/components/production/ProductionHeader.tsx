@@ -14,14 +14,11 @@ export function ProductionHeader() {
   const hourlyRate = settings?.hourly_rate ?? 550;
   const monthlyCzk = monthlyHours * hourlyRate;
 
-  // Sum scheduled hours
   const scheduledHours = scheduleData
     ? Array.from(scheduleData.values()).reduce((s, w) => s + w.total_hours, 0)
     : 0;
 
-  // Sum inbox hours
   const inboxHours = inboxProjects.reduce((s, p) => s + p.total_hours, 0);
-
   const isOverCapacity = scheduledHours > monthlyHours;
 
   const formatCzk = (v: number) => {
@@ -31,14 +28,11 @@ export function ProductionHeader() {
   };
 
   return (
-    <header className="h-14 flex items-center px-4 shrink-0" style={{ backgroundColor: "#223937" }}>
-      <div className="flex items-center gap-3 mr-auto">
-        <span className="text-white/90 font-serif text-sm tracking-wide">A→M Interior</span>
-        <span className="text-white/40">|</span>
-        <span className="text-white font-semibold text-sm">Plán Výroby</span>
-      </div>
-
-      <div className="flex items-center gap-0 mx-auto">
+    <div
+      className="shrink-0 flex items-center px-4 py-1.5 border-b"
+      style={{ backgroundColor: "#f4f2f0", borderColor: "#ece8e2" }}
+    >
+      <div className="flex items-center gap-0">
         <StatBox label="Kapacita / měsíc" value={`${monthlyHours.toLocaleString("cs-CZ")} h`} />
         <Divider />
         <StatBox label="CZK ekvivalent" value={formatCzk(monthlyCzk)} />
@@ -46,45 +40,50 @@ export function ProductionHeader() {
         <StatBox
           label="Naplánováno"
           value={`${Math.round(scheduledHours).toLocaleString("cs-CZ")} h`}
-          className={isOverCapacity ? "text-red-400" : "text-emerald-400"}
+          valueColor={isOverCapacity ? "#dc3545" : "#3a8a36"}
         />
         <Divider />
         <StatBox
           label="V Inboxu"
           value={`${Math.round(inboxHours).toLocaleString("cs-CZ")} h`}
-          className="text-amber-400"
+          valueColor="#d97706"
         />
       </div>
 
       <div className="flex items-center gap-3 ml-auto">
+        <span className="flex items-center gap-1.5 text-xs" style={{ color: "#6b7a78" }}>
+          <Settings className="h-3 w-3" />
+          <span className="font-mono text-[10px]">Sazba: {hourlyRate} Kč/h</span>
+        </span>
         <button
-          className="flex items-center gap-1.5 text-white/60 hover:text-white/90 transition-colors text-xs"
+          className="flex items-center gap-1 text-xs transition-colors hover:opacity-80"
+          style={{ color: "#6b7a78" }}
           onClick={() => navigate("/")}
         >
-          <Settings className="h-3.5 w-3.5" />
-          <span className="font-mono text-xs">Sazba: {hourlyRate} Kč/h</span>
-        </button>
-        <button
-          className="flex items-center gap-1 text-white/60 hover:text-white/90 transition-colors text-xs"
-          onClick={() => navigate("/")}
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
+          <ArrowLeft className="h-3 w-3" />
           Zpět
         </button>
       </div>
-    </header>
+    </div>
   );
 }
 
-function StatBox({ label, value, className }: { label: string; value: string; className?: string }) {
+function StatBox({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
   return (
-    <div className="px-4 text-center">
-      <div className="text-white/50 text-[9px] uppercase tracking-wider">{label}</div>
-      <div className={`font-mono font-semibold text-sm ${className || "text-white"}`}>{value}</div>
+    <div className="px-3.5 text-center">
+      <div className="text-[8px] uppercase tracking-[0.08em] font-medium" style={{ color: "#99a5a3" }}>
+        {label}
+      </div>
+      <div
+        className="font-mono font-semibold text-[13px] leading-tight"
+        style={{ color: valueColor || "#223937" }}
+      >
+        {value}
+      </div>
     </div>
   );
 }
 
 function Divider() {
-  return <div className="w-px h-7 bg-white/15" />;
+  return <div className="w-px h-6" style={{ backgroundColor: "#e2ddd6" }} />;
 }
