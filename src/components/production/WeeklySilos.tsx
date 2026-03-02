@@ -48,7 +48,7 @@ interface CompletionState {
 export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
-  const { moveItemBackToInbox, returnBundleToInbox } = useProductionDragDrop();
+  const { moveItemBackToInbox, returnBundleToInbox, returnToProduction } = useProductionDragDrop();
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [completionState, setCompletionState] = useState<CompletionState | null>(null);
@@ -95,34 +95,35 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
     (e: React.MouseEvent, bundle: ScheduleBundle, weekKey: string, weekNum: number, startDate: Date, endDate: Date, toggleExpand: () => void) => {
       e.preventDefault();
       e.stopPropagation();
-      setContextMenu({
-        x: e.clientX,
-        y: e.clientY,
-        actions: [
-          {
-            label: "Dokončit položky → Expedice",
-            icon: "✓",
-            onClick: () => {
-              setCompletionState({
-                projectName: bundle.project_name,
-                projectId: bundle.project_id,
-                weekLabel: `Výroba T${weekNum} · ${formatDateShort(startDate)} – ${formatDateShort(endDate)}`,
-                items: bundle.items,
-              });
-            },
+      const hasUncompleted = bundle.items.some((i) => i.status !== "completed");
+      const actions: ContextMenuAction[] = [];
+
+      if (hasUncompleted) {
+        actions.push({
+          label: "Dokončit položky → Expedice",
+          icon: "✓",
+          onClick: () => {
+            setCompletionState({
+              projectName: bundle.project_name,
+              projectId: bundle.project_id,
+              weekLabel: `Výroba T${weekNum} · ${formatDateShort(startDate)} – ${formatDateShort(endDate)}`,
+              items: bundle.items,
+            });
           },
-          {
-            label: "Vrátit do Inboxu",
-            icon: "←",
-            onClick: () => returnBundleToInbox(bundle.project_id, weekKey),
-          },
-          {
-            label: "Rozbalit / Sbalit",
-            icon: "⇅",
-            onClick: toggleExpand,
-          },
-        ],
+        });
+        actions.push({
+          label: "Vrátit do Inboxu",
+          icon: "←",
+          onClick: () => returnBundleToInbox(bundle.project_id, weekKey),
+        });
+      }
+      actions.push({
+        label: "Rozbalit / Sbalit",
+        icon: "⇅",
+        onClick: toggleExpand,
       });
+
+      setContextMenu({ x: e.clientX, y: e.clientY, actions });
     },
     [returnBundleToInbox]
   );
@@ -131,32 +132,40 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
     (e: React.MouseEvent, item: ScheduleItem, weekKey: string, weekNum: number, startDate: Date, endDate: Date, bundle: ScheduleBundle) => {
       e.preventDefault();
       e.stopPropagation();
-      setContextMenu({
-        x: e.clientX,
-        y: e.clientY,
-        actions: [
-          {
-            label: "Dokončit tuto položku → Expedice",
-            icon: "✓",
-            onClick: () => {
-              setCompletionState({
-                projectName: bundle.project_name,
-                projectId: bundle.project_id,
-                weekLabel: `Výroba T${weekNum} · ${formatDateShort(startDate)} – ${formatDateShort(endDate)}`,
-                items: bundle.items,
-                preCheckedIds: [item.id],
-              });
-            },
+
+      const isCompleted = item.status === "completed";
+      const actions: ContextMenuAction[] = [];
+
+      if (isCompleted) {
+        actions.push({
+          label: "Vrátit do výroby",
+          icon: "↩",
+          onClick: () => returnToProduction(item.id),
+        });
+      } else {
+        actions.push({
+          label: "Dokončit tuto položku → Expedice",
+          icon: "✓",
+          onClick: () => {
+            setCompletionState({
+              projectName: bundle.project_name,
+              projectId: bundle.project_id,
+              weekLabel: `Výroba T${weekNum} · ${formatDateShort(startDate)} – ${formatDateShort(endDate)}`,
+              items: bundle.items,
+              preCheckedIds: [item.id],
+            });
           },
-          {
-            label: "Vrátit do Inboxu",
-            icon: "←",
-            onClick: () => moveItemBackToInbox(item.id),
-          },
-        ],
-      });
+        });
+        actions.push({
+          label: "Vrátit do Inboxu",
+          icon: "←",
+          onClick: () => moveItemBackToInbox(item.id),
+        });
+      }
+
+      setContextMenu({ x: e.clientX, y: e.clientY, actions });
     },
-    [moveItemBackToInbox]
+    [moveItemBackToInbox, returnToProduction]
   );
 
   return (
@@ -380,6 +389,11 @@ function CollapsibleBundleCard({
   const [expanded, setExpanded] = useState(false);
   const color = getProjectColor(bundle.project_id);
 
+  const completedCount = bundle.items.filter((i) => i.status === "completed").length;
+  const totalCount = bundle.items.length;
+  const allCompleted = completedCount === totalCount && totalCount > 0;
+  const hasUncompleted = completedCount < totalCount;
+
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: `silo-bundle-${bundle.project_id}-${weekKey}`,
     data: {
@@ -390,6 +404,7 @@ function CollapsibleBundleCard({
       hours: bundle.total_hours,
       itemCount: bundle.items.length,
     },
+    disabled: allCompleted,
   });
 
   const toggleExpand = useCallback(() => setExpanded((v) => !v), []);
@@ -399,7 +414,7 @@ function CollapsibleBundleCard({
       className="rounded-[6px] overflow-hidden"
       style={{
         border: "1px solid #ece8e2",
-        borderLeft: `4px solid ${color}`,
+        borderLeft: `4px solid ${allCompleted ? "#3a8a36" : color}`,
         backgroundColor: "#ffffff",
         opacity: isDragging ? 0.3 : 1,
       }}
@@ -408,8 +423,8 @@ function CollapsibleBundleCard({
       <div
         ref={setDragRef}
         {...attributes}
-        {...listeners}
-        className="flex items-center gap-1 px-[6px] py-[5px] cursor-grab"
+        {...(hasUncompleted ? listeners : {})}
+        className={`flex items-center gap-1 px-[6px] py-[5px] ${hasUncompleted ? "cursor-grab" : "cursor-default"}`}
         style={{ borderBottom: expanded ? "1px solid #ece8e2" : "none" }}
         onClick={(e) => {
           if (!(e as any).__isDrag) setExpanded(!expanded);
@@ -421,32 +436,71 @@ function CollapsibleBundleCard({
           style={{ width: 10, height: 10, color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}
         />
         <div className="flex-1 min-w-0">
-          <div className="text-[9px] font-semibold truncate" style={{ color: "#223937" }}>
+          <div className="text-[9px] font-semibold truncate" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>
             {bundle.project_name}
           </div>
           <div className="font-mono text-[7px]" style={{ color: "#99a5a3" }}>
             {bundle.project_id}
           </div>
         </div>
-        <span className="font-mono text-[9px] font-bold shrink-0" style={{ color: "#223937" }}>
-          {Math.round(bundle.total_hours)}h
-        </span>
+        <div className="flex items-center gap-1 shrink-0">
+          {completedCount > 0 && (
+            <span className="text-[8px] font-medium" style={{ color: "#3a8a36" }}>
+              {completedCount}/{totalCount} ✓
+            </span>
+          )}
+          <span className="font-mono text-[9px] font-bold" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>
+            {Math.round(bundle.total_hours)}h
+          </span>
+        </div>
       </div>
 
       {/* Items — only when expanded */}
       {expanded && (
         <div className="px-[3px] py-[2px]">
           {bundle.items.map((item) => (
-            <DraggableSiloItem
-              key={item.id}
-              item={item}
-              weekKey={weekKey}
-              showCzk={showCzk}
-              onContextMenu={(e) => onItemContextMenu(e, item, bundle)}
-            />
+            item.status === "completed" ? (
+              <CompletedSiloItem
+                key={item.id}
+                item={item}
+                onContextMenu={(e) => onItemContextMenu(e, item, bundle)}
+              />
+            ) : (
+              <DraggableSiloItem
+                key={item.id}
+                item={item}
+                weekKey={weekKey}
+                showCzk={showCzk}
+                onContextMenu={(e) => onItemContextMenu(e, item, bundle)}
+              />
+            )
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function CompletedSiloItem({
+  item, onContextMenu,
+}: {
+  item: ScheduleItem;
+  onContextMenu: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <div
+      className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-default transition-colors"
+      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#f8f7f5"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+      onContextMenu={onContextMenu}
+    >
+      <span style={{ width: 8, fontSize: 8, color: "#3a8a36", fontWeight: 700 }}>✓</span>
+      <span className="text-[9px] flex-1 truncate" style={{ color: "#99a5a3", textDecoration: "line-through" }}>
+        {item.item_name}
+      </span>
+      <span className="font-mono text-[8px] shrink-0" style={{ color: "#c4ccc9" }}>
+        {item.scheduled_hours}h
+      </span>
     </div>
   );
 }
