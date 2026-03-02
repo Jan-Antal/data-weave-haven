@@ -7,7 +7,7 @@ const corsHeaders = {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const VALID_ROLES = ["admin", "pm", "konstrukter", "viewer"];
-const DEFAULT_APP_ORIGIN = "https://data-weave-haven.lovable.app";
+const DEFAULT_APP_ORIGIN = "https://projekty.am-interior.cz";
 
 const resolveAppOrigin = (originUrl: unknown, req: Request): string => {
   if (typeof originUrl === "string" && originUrl.trim()) {
