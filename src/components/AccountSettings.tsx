@@ -11,6 +11,8 @@ import { useAllPeople } from "@/hooks/usePeople";
 import { useUserPreferences, useUpsertPreferences } from "@/hooks/useUserPreferences";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import { PasswordChecklist } from "@/components/PasswordChecklist";
+import { usePasswordValidation } from "@/hooks/usePasswordValidation";
 
 const ROLE_LABELS: Record<string, string> = {
   owner: "Owner",
@@ -63,6 +65,8 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
   const [passwordError, setPasswordError] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
 
+  const passwordValidation = usePasswordValidation(newPassword);
+
   // Preferences
   const [defaultPerson, setDefaultPerson] = useState<string>("__all__");
   const [defaultView, setDefaultView] = useState("project-info");
@@ -92,12 +96,8 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
       setPasswordError("Zadejte současné heslo");
       return;
     }
-    if (newPassword.length < 8) {
-      setPasswordError("Nové heslo musí mít alespoň 8 znaků");
-      return;
-    }
-    if (newPassword.length > 72) {
-      setPasswordError("Nové heslo může mít maximálně 72 znaků");
+    if (!passwordValidation.isValid) {
+      setPasswordError("Heslo nesplňuje požadavky");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -231,6 +231,7 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="h-9"
               />
+              <PasswordChecklist password={newPassword} />
             </div>
             <div>
               <Label className="text-xs">Potvrzení hesla</Label>
@@ -247,7 +248,7 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
             <Button
               size="sm"
               onClick={handleChangePassword}
-              disabled={passwordLoading || !currentPassword || !newPassword || !confirmPassword}
+              disabled={passwordLoading || !currentPassword || !passwordValidation.isValid || newPassword !== confirmPassword}
             >
               {passwordLoading ? "Měním heslo..." : "Změnit heslo"}
             </Button>
