@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { GripVertical } from "lucide-react";
-import { useProductionSchedule, getISOWeekNumber, type WeekSilo, type ScheduleBundle } from "@/hooks/useProductionSchedule";
+import { useProductionSchedule, getISOWeekNumber, type WeekSilo, type ScheduleBundle, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { getProjectColor } from "@/lib/projectColors";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 
 function getMonday(date: Date): Date {
   const d = new Date(date);
@@ -22,9 +23,10 @@ const MONTH_NAMES = ["Leden", "Únor", "Březen", "Duben", "Květen", "Červen",
 interface Props {
   showCzk: boolean;
   onToggleCzk: (v: boolean) => void;
+  overDroppableId?: string | null;
 }
 
-export function WeeklySilos({ showCzk, onToggleCzk }: Props) {
+export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
 
@@ -74,6 +76,7 @@ export function WeeklySilos({ showCzk, onToggleCzk }: Props) {
           {weeks.map((week) => (
             <SiloColumn
               key={week.key}
+              weekKey={week.key}
               weekNum={week.weekNum}
               startDate={week.start}
               endDate={week.end}
@@ -82,6 +85,7 @@ export function WeeklySilos({ showCzk, onToggleCzk }: Props) {
               weeklyCapacity={weeklyCapacity}
               showCzk={showCzk}
               hourlyRate={settings?.hourly_rate ?? 550}
+              isOverTarget={overDroppableId === `silo-week-${week.key}`}
             />
           ))}
         </div>
@@ -109,6 +113,7 @@ function ToolbarButton({ active, disabled, label, onClick }: { active?: boolean;
 }
 
 interface SiloProps {
+  weekKey: string;
   weekNum: number;
   startDate: Date;
   endDate: Date;
@@ -117,9 +122,10 @@ interface SiloProps {
   weeklyCapacity: number;
   showCzk: boolean;
   hourlyRate: number;
+  isOverTarget: boolean;
 }
 
-function SiloColumn({ weekNum, startDate, endDate, isCurrent, silo, weeklyCapacity, showCzk, hourlyRate }: SiloProps) {
+function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, silo, weeklyCapacity, showCzk, hourlyRate, isOverTarget }: SiloProps) {
   const totalHours = silo?.total_hours ?? 0;
   const pct = weeklyCapacity > 0 ? (totalHours / weeklyCapacity) * 100 : 0;
   const isOverloaded = pct > 100;
@@ -133,13 +139,23 @@ function SiloColumn({ weekNum, startDate, endDate, isCurrent, silo, weeklyCapaci
     ? "linear-gradient(90deg, #fcd34d, #d97706)"
     : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
 
+  const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}` });
+
+  const highlighted = isOver || isOverTarget;
+  const dropBorderColor = highlighted
+    ? isOverloaded ? "#d97706" : "#3b82f6"
+    : undefined;
+
   return (
     <div
-      className="w-[175px] shrink-0 flex flex-col"
+      ref={setNodeRef}
+      className="w-[175px] shrink-0 flex flex-col transition-all"
       style={{
-        backgroundColor: "#ffffff",
+        backgroundColor: highlighted ? "rgba(59,130,246,0.04)" : "#ffffff",
         borderRadius: 9,
-        border: isCurrent
+        border: highlighted
+          ? `2px solid ${dropBorderColor}`
+          : isCurrent
           ? "2px solid #3a8a36"
           : isOverloaded
           ? "1px solid rgba(220,53,69,0.4)"
@@ -182,14 +198,17 @@ function SiloColumn({ weekNum, startDate, endDate, isCurrent, silo, weeklyCapaci
       <div className="flex-1 overflow-y-auto p-1.5" style={{ display: "flex", flexDirection: "column", gap: 3 }}>
         {(!silo || silo.bundles.length === 0) && (
           <div
-            className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px]"
-            style={{ border: "1.5px dashed #e2ddd6" }}
+            className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all"
+            style={{
+              border: "1.5px dashed #e2ddd6",
+              animation: highlighted ? "pulse 1.5s ease-in-out infinite" : undefined,
+            }}
           >
             <span className="text-[9px] text-center" style={{ color: "#99a5a3" }}>Přetáhni sem z Inboxu</span>
           </div>
         )}
         {silo?.bundles.map((bundle) => (
-          <BundleCard key={bundle.project_id} bundle={bundle} showCzk={showCzk} hourlyRate={hourlyRate} />
+          <DraggableBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey} showCzk={showCzk} hourlyRate={hourlyRate} />
         ))}
       </div>
 
@@ -210,13 +229,35 @@ function SiloColumn({ weekNum, startDate, endDate, isCurrent, silo, weeklyCapaci
   );
 }
 
-function BundleCard({ bundle, showCzk, hourlyRate }: { bundle: ScheduleBundle; showCzk: boolean; hourlyRate: number }) {
+function DraggableBundleCard({ bundle, weekKey, showCzk, hourlyRate }: { bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number }) {
   const color = getProjectColor(bundle.project_id);
 
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
+    id: `silo-bundle-${bundle.project_id}-${weekKey}`,
+    data: {
+      type: "silo-bundle",
+      projectId: bundle.project_id,
+      projectName: bundle.project_name,
+      weekDate: weekKey,
+      hours: bundle.total_hours,
+      itemCount: bundle.items.length,
+    },
+  });
+
   return (
-    <div className="rounded-[6px] overflow-hidden" style={{ border: "1px solid #ece8e2", backgroundColor: "#ffffff" }}>
-      {/* Bundle header */}
+    <div
+      className="rounded-[6px] overflow-hidden"
+      style={{
+        border: "1px solid #ece8e2",
+        backgroundColor: "#ffffff",
+        opacity: isDragging ? 0.3 : 1,
+      }}
+    >
+      {/* Bundle header — draggable as bundle */}
       <div
+        ref={setDragRef}
+        {...attributes}
+        {...listeners}
         className="flex items-center gap-1.5 px-[7px] py-[5px] cursor-grab"
         style={{ backgroundColor: "#f0eee9", borderLeft: `4px solid ${color}` }}
       >
@@ -235,23 +276,45 @@ function BundleCard({ bundle, showCzk, hourlyRate }: { bundle: ScheduleBundle; s
       {/* Items */}
       <div className="px-[3px] py-[2px]">
         {bundle.items.map((item) => (
-          <div
-            key={item.id}
-            className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-grab transition-colors"
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f0eee9")}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-          >
-            <GripVertical className="shrink-0" style={{ width: 8, height: 8, color: "#99a5a3" }} />
-            <span className="text-[9px] flex-1 truncate" style={{ color: "#6b7a78" }}>
-              {item.item_name}
-            </span>
-            <span className="font-mono text-[8px] shrink-0" style={{ color: "#99a5a3" }}>
-              {item.scheduled_hours}h
-              {showCzk && ` ${Math.round(item.scheduled_czk / 1000)}K`}
-            </span>
-          </div>
+          <DraggableSiloItem key={item.id} item={item} weekKey={weekKey} showCzk={showCzk} />
         ))}
       </div>
+    </div>
+  );
+}
+
+function DraggableSiloItem({ item, weekKey, showCzk }: { item: ScheduleItem; weekKey: string; showCzk: boolean }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `silo-item-${item.id}`,
+    data: {
+      type: "silo-item",
+      itemId: item.id,
+      itemName: item.item_name,
+      projectId: item.project_id,
+      projectName: item.project_name,
+      weekDate: weekKey,
+      hours: item.scheduled_hours,
+    },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-grab transition-colors"
+      style={{ opacity: isDragging ? 0.3 : 1 }}
+      onMouseEnter={(e) => { if (!isDragging) e.currentTarget.style.backgroundColor = "#f0eee9"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+    >
+      <GripVertical className="shrink-0" style={{ width: 8, height: 8, color: "#99a5a3" }} />
+      <span className="text-[9px] flex-1 truncate" style={{ color: "#6b7a78" }}>
+        {item.item_name}
+      </span>
+      <span className="font-mono text-[8px] shrink-0" style={{ color: "#99a5a3" }}>
+        {item.scheduled_hours}h
+        {showCzk && ` ${Math.round(item.scheduled_czk / 1000)}K`}
+      </span>
     </div>
   );
 }
