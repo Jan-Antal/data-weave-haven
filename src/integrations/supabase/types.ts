@@ -216,6 +216,7 @@ export type Database = {
           full_name: string
           id: string
           is_active: boolean
+          password_set: boolean
           person_id: string | null
         }
         Insert: {
@@ -224,6 +225,7 @@ export type Database = {
           full_name?: string
           id: string
           is_active?: boolean
+          password_set?: boolean
           person_id?: string | null
         }
         Update: {
@@ -232,6 +234,7 @@ export type Database = {
           full_name?: string
           id?: string
           is_active?: boolean
+          password_set?: boolean
           person_id?: string | null
         }
         Relationships: [
@@ -691,6 +694,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      mark_password_set: { Args: never; Returns: boolean }
       purge_soft_deleted_records: { Args: never; Returns: undefined }
     }
     Enums: {

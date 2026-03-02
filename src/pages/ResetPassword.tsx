@@ -52,6 +52,13 @@ export default function ResetPassword() {
     if (updateError) {
       setError(updateError.message);
     } else {
+      const { error: profileFlagError } = await supabase.rpc("mark_password_set");
+      if (profileFlagError) {
+        setError("Heslo bylo změněno, ale aktivace účtu selhala. Kontaktujte administrátora.");
+        setLoading(false);
+        return;
+      }
+
       toast({ title: "Heslo bylo úspěšně změněno" });
       setTimeout(() => navigate("/"), 2000);
     }

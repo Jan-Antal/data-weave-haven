@@ -7,7 +7,7 @@ export type AppRole = "owner" | "admin" | "pm" | "konstrukter" | "viewer";
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  profile: { full_name: string; email: string; is_active: boolean } | null;
+  profile: { full_name: string; email: string; is_active: boolean; password_set: boolean } | null;
   role: AppRole | null;
   realRole: AppRole | null;
   loading: boolean;
@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const [{ data: profileData }, { data: roleData }] = await Promise.all([
               supabase
                 .from("profiles")
-                .select("full_name, email, is_active, person_id")
+                .select("full_name, email, is_active, person_id, password_set")
                 .eq("id", session.user.id)
                 .single(),
               supabase
@@ -73,7 +73,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 .eq("user_id", session.user.id)
                 .single(),
             ]);
-            setProfile(profileData ? { full_name: profileData.full_name, email: profileData.email, is_active: profileData.is_active } : null);
+            setProfile(
+              profileData
+                ? {
+                    full_name: profileData.full_name,
+                    email: profileData.email,
+                    is_active: profileData.is_active,
+                    password_set: profileData.password_set ?? true,
+                  }
+                : null
+            );
             setRealRole((roleData?.role as AppRole) ?? null);
 
             // Fetch linked person name
@@ -113,11 +122,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (s?.user) {
         const { data: profileData } = await supabase
           .from("profiles")
-          .select("full_name, email, is_active, person_id")
+          .select("full_name, email, is_active, person_id, password_set")
           .eq("id", s.user.id)
           .single();
         if (profileData) {
-          setProfile({ full_name: profileData.full_name, email: profileData.email, is_active: profileData.is_active });
+          setProfile({
+            full_name: profileData.full_name,
+            email: profileData.email,
+            is_active: profileData.is_active,
+            password_set: profileData.password_set ?? true,
+          });
         }
       }
     };
