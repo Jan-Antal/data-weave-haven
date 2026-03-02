@@ -5,9 +5,10 @@ import { useProductionSchedule } from "@/hooks/useProductionSchedule";
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
-import { LayoutDashboard, Settings, Check } from "lucide-react";
+import { LayoutDashboard, Settings, Check, User, UserCog, LogOut } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { UserManagement } from "@/components/UserManagement";
+import { AccountSettings } from "@/components/AccountSettings";
 import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
 import { StatusManagement } from "@/components/StatusManagement";
 import { RecycleBin } from "@/components/RecycleBin";
@@ -26,7 +27,7 @@ export function ProductionHeader() {
   const { data: settings } = useProductionSettings();
   const { data: scheduleData } = useProductionSchedule();
   const { data: inboxProjects = [] } = useProductionInbox();
-  const { canAccessSettings, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin } = useAuth();
+  const { canAccessSettings, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, profile, signOut } = useAuth();
   const { openPeopleManagement } = usePeopleManagement();
 
   const [userMgmtOpen, setUserMgmtOpen] = useState(false);
@@ -35,6 +36,7 @@ export function ProductionHeader() {
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [costPresetsOpen, setCostPresetsOpen] = useState(false);
   const [dataLogOpen, setDataLogOpen] = useState(false);
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
 
   const toggleDataLog = useCallback(() => setDataLogOpen((p) => !p), []);
 
@@ -87,7 +89,7 @@ export function ProductionHeader() {
             />
           </div>
 
-          {/* Right: Back icon + Settings gear */}
+          {/* Right: Back icon + User menu + Settings gear */}
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => navigate("/")}
@@ -96,6 +98,26 @@ export function ProductionHeader() {
             >
               <LayoutDashboard className="h-5 w-5" />
             </button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors text-sm">
+                  <User className="h-4 w-4" />
+                  <span className="font-sans">{profile?.full_name || profile?.email || "Uživatel"}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setAccountSettingsOpen(true)}>
+                  <UserCog className="h-4 w-4 mr-2" />
+                  Nastavení účtu
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={signOut}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Odhlásit se
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {(canAccessSettings || realRole === "owner") && (
               <DropdownMenu>
@@ -171,6 +193,7 @@ export function ProductionHeader() {
       <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
       <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} />
+      <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
     </>
   );
 }
