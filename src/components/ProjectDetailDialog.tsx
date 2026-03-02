@@ -947,41 +947,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                       placeholder="Poznámka…"
                     />
                   </div>
-
-                  {/* TPV Items shortcut row */}
-                  <div className="col-span-2 flex items-center gap-2 mt-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs gap-1.5"
-                      onClick={() => {
-                        if (onOpenTPVList && project) {
-                          onOpenChange(false);
-                          onOpenTPVList(project.project_id, project.project_name);
-                        }
-                      }}
-                    >
-                      <FileSpreadsheet className="h-3.5 w-3.5" />
-                      Import z Excelu
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs gap-1.5"
-                      onClick={() => {
-                        if (onOpenTPVList && project) {
-                          onOpenChange(false);
-                          onOpenTPVList(project.project_id, project.project_name);
-                        }
-                      }}
-                    >
-                      <List className="h-3.5 w-3.5" />
-                      TPV položky
-                      <Badge variant="secondary" className="h-5 min-w-[20px] justify-center px-1.5 text-[10px]">
-                        {tpvItemCount ?? 0}
-                      </Badge>
-                    </Button>
-                  </div>
                 </div>
               </div>
 
@@ -1132,8 +1097,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-border">
-              <div>
+            <div className="flex items-center justify-between px-6 py-3 border-t border-border">
+              <div className="flex items-center gap-2">
                 {canDeleteProject && (
                   <>
                     {deleteStep === 0 && (
@@ -1146,9 +1111,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                     )}
                     {deleteStep === 1 && (
                       <div className="flex items-center gap-3">
-                        <span className="text-sm text-gray-600">Opravdu smazat?</span>
-                        <button type="button" className="text-sm text-red-500 font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
-                        <button type="button" className="text-sm text-gray-400 font-medium hover:underline" onClick={() => {
+                        <span className="text-sm text-muted-foreground">Opravdu smazat?</span>
+                        <button type="button" className="text-sm text-destructive font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
+                        <button type="button" className="text-sm text-muted-foreground font-medium hover:underline" onClick={() => {
                           const totalDocs = Object.values(sp.filesByCategory).reduce((sum, files) => sum + files.length, 0);
                           if (totalDocs > 0) {
                             setDeleteStep(2);
@@ -1160,17 +1125,51 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                     )}
                     {deleteStep === 2 && (
                       <div className="flex items-center gap-3">
-                        <span className="text-sm text-gray-600">
+                        <span className="text-sm text-muted-foreground">
                           Tento projekt obsahuje {Object.values(sp.filesByCategory).reduce((sum, files) => sum + files.length, 0)} dokumentů. Opravdu chcete smazat?
                         </span>
-                        <button type="button" className="text-sm text-red-500 font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
-                        <button type="button" className="text-sm text-gray-400 font-medium hover:underline" onClick={handleDelete}>Potvrdit smazání</button>
+                        <button type="button" className="text-sm text-destructive font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
+                        <button type="button" className="text-sm text-muted-foreground font-medium hover:underline" onClick={handleDelete}>Potvrdit smazání</button>
                       </div>
                     )}
                   </>
                 )}
               </div>
-              <div className="flex gap-2">
+
+              <div className="flex items-center gap-2">
+                {onOpenTPVList && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (project) {
+                          onOpenChange(false);
+                          onOpenTPVList(project.project_id, project.project_name);
+                        }
+                      }}
+                    >
+                      <Upload className="h-3 w-3 mr-1" /> Import z Excelu
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="gap-1.5"
+                      onClick={() => {
+                        if (project) {
+                          onOpenChange(false);
+                          onOpenTPVList(project.project_id, project.project_name);
+                        }
+                      }}
+                    >
+                      <List className="h-3.5 w-3.5" />
+                      počet položek
+                      <Badge variant="secondary" className="h-5 min-w-[20px] justify-center px-1.5 text-[10px]">
+                        {tpvItemCount ?? 0}
+                      </Badge>
+                    </Button>
+                  </>
+                )}
                 <Button variant="outline" onClick={tryClose}>Zavřít</Button>
                 {canEdit && <Button onClick={handleSave} disabled={idExists || !form.project_id}>Uložit</Button>}
               </div>
