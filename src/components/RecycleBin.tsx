@@ -107,10 +107,13 @@ function RecordList({ table, nameField, idField, emptyText, canPermanentDelete }
 }
 
 export function RecycleBin({ open, onOpenChange }: RecycleBinProps) {
-  const { canPermanentDelete, isKonstrukter } = useAuth();
+  const { canPermanentDelete, isKonstrukter, isPM, isAdmin } = useAuth();
 
   // Konstruktér only sees TPV items
   const defaultTab = isKonstrukter ? "tpv" : "projects";
+
+  // PM can see projects/stages but cannot permanently delete them — only Admin/Owner can
+  const canPermDeleteProjectsStages = isAdmin;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -126,12 +129,12 @@ export function RecycleBin({ open, onOpenChange }: RecycleBinProps) {
           </TabsList>
           {!isKonstrukter && (
             <TabsContent value="projects">
-              <RecordList table="projects" nameField="project_name" idField="project_id" emptyText="Žádné smazané projekty" canPermanentDelete={canPermanentDelete} />
+              <RecordList table="projects" nameField="project_name" idField="project_id" emptyText="Žádné smazané projekty" canPermanentDelete={canPermDeleteProjectsStages} />
             </TabsContent>
           )}
           {!isKonstrukter && (
             <TabsContent value="stages">
-              <RecordList table="project_stages" nameField="stage_name" emptyText="Žádné smazané etapy" canPermanentDelete={canPermanentDelete} />
+              <RecordList table="project_stages" nameField="stage_name" emptyText="Žádné smazané etapy" canPermanentDelete={canPermDeleteProjectsStages} />
             </TabsContent>
           )}
           <TabsContent value="tpv">
