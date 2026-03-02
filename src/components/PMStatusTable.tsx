@@ -37,6 +37,7 @@ import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 import { useExportContext } from "./ExportContext";
 import { getProjectCellValue } from "@/lib/exportExcel";
 import { useStagesByProject } from "@/hooks/useAllProjectStages";
+import { useAllTPVItems } from "@/hooks/useAllTPVItems";
 import { matchesStatusFilter, normalizedIncludes, normalizeSearch } from "@/lib/statusFilter";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...PM_NATIVE];
@@ -424,6 +425,11 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   }, [projects]);
   const { counts: docCounts } = useDocumentCounts(allProjectIds, projectStatuses);
   const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
+  const { itemsByProject: tpvItemsByProject } = useAllTPVItems();
+  const [activeTPVProject, setActiveTPVProject] = useState<{ projectId: string; projectName: string } | null>(null);
+  const handleOpenTPVList = useCallback((projectId: string, projectName: string) => {
+    setActiveTPVProject({ projectId, projectName });
+  }, []);
 
   // Memoize filter Sets to avoid re-creation on every render
   const statusFilterSet = useMemo(
@@ -694,7 +700,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
         </Table>
       </div>
 
-      {editProject && <ProjectDetailDialog project={editProject} open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }} />}
+      {editProject && <ProjectDetailDialog project={editProject} open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }} onOpenTPVList={handleOpenTPVList} tpvItemCount={tpvItemsByProject.get(editProject.project_id)?.length ?? 0} />}
     </div>
   );
 }
