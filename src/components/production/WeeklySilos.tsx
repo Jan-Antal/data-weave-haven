@@ -408,17 +408,22 @@ function CollapsibleBundleCard({
       <div
         ref={setDragRef}
         {...attributes}
-        {...listeners}
-        className="flex items-center gap-1 px-[6px] py-[5px] cursor-grab"
+        className="flex items-center gap-1 px-[6px] py-[5px]"
         style={{ borderBottom: expanded ? "1px solid #ece8e2" : "none" }}
-        onClick={(e) => {
-          if (!(e as any).__isDrag) setExpanded(!expanded);
-        }}
+        onClick={toggleExpand}
         onContextMenu={(e) => onBundleContextMenu(e, bundle, toggleExpand)}
       >
+        <div
+          {...listeners}
+          className="shrink-0 cursor-grab flex items-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical style={{ width: 8, height: 8, color: "#99a5a3" }} />
+        </div>
         <ChevronRight
-          className="shrink-0 transition-transform duration-150"
+          className="shrink-0 transition-transform duration-150 cursor-pointer"
           style={{ width: 10, height: 10, color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}
+          onClick={(e) => { e.stopPropagation(); toggleExpand(); }}
         />
         <div className="flex-1 min-w-0">
           <div className="text-[9px] font-semibold truncate" style={{ color: "#223937" }}>
