@@ -33,6 +33,7 @@ interface RozpadCenyProps {
   costValues: CostValues;
   onChange: (updates: Partial<CostValues>) => void;
   readOnly?: boolean;
+  kalkulantSlot?: React.ReactNode;
 }
 
 function BreakdownBar({ values }: { values: Record<string, number> }) {
@@ -55,7 +56,7 @@ function BreakdownBar({ values }: { values: Record<string, number> }) {
   );
 }
 
-export function RozpadCeny({ projectId, prodejniCena, costValues, onChange, readOnly }: RozpadCenyProps) {
+export function RozpadCeny({ projectId, prodejniCena, costValues, onChange, readOnly, kalkulantSlot }: RozpadCenyProps) {
   const { data: presets = [] } = useCostBreakdownPresets();
   const { data: settings } = useProductionSettings();
   const [expanded, setExpanded] = useState(false);
@@ -137,26 +138,32 @@ export function RozpadCeny({ projectId, prodejniCena, costValues, onChange, read
 
   return (
     <div className="col-span-2 space-y-2">
-      <Label className="text-xs">Rozpad ceny</Label>
-
-      {!readOnly && (
-        <Select
-          value={costValues.cost_preset_id || "__none__"}
-          onValueChange={handlePresetSelect}
-        >
-          <SelectTrigger className="h-9">
-            <SelectValue placeholder="Vybrat šablonu...">{presetLabel}</SelectValue>
-          </SelectTrigger>
-          <SelectContent className="z-[99999]">
-            <SelectItem value="__none__">— Žádná šablona —</SelectItem>
-            {presets.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
+      <div className="grid grid-cols-2 gap-x-3">
+        <div>
+          <Label className="text-xs">Rozpad ceny</Label>
+          {!readOnly ? (
+            <Select
+              value={costValues.cost_preset_id || "__none__"}
+              onValueChange={handlePresetSelect}
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Vybrat šablonu...">{presetLabel}</SelectValue>
+              </SelectTrigger>
+              <SelectContent className="z-[99999]">
+                <SelectItem value="__none__">— Žádná šablona —</SelectItem>
+                {presets.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input value={presetLabel || "—"} disabled className="h-9 bg-muted text-muted-foreground cursor-not-allowed opacity-70" />
+          )}
+        </div>
+        {kalkulantSlot}
+      </div>
 
       {hasValues && (
         <>
