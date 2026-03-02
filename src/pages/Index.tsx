@@ -12,7 +12,8 @@ import { DashboardStats } from "@/components/DashboardStats";
 import { TableFilters, useTableFilters } from "@/components/TableFilters";
 import { ExportButton } from "@/components/ExportButton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Settings, Plus, LogOut, User, Check, ChevronUp, ChevronDown, UserCog } from "lucide-react";
+import { Settings, Plus, LogOut, User, Check, ChevronUp, ChevronDown, UserCog, Factory } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { FeedbackWidget } from "@/components/FeedbackWidget";
 import { AdminInboxButton } from "@/components/AdminInbox";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
@@ -39,6 +40,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const Index = () => {
+  const navigate = useNavigate();
   const filters = useTableFilters();
   const { openPeopleManagement } = usePeopleManagement();
   const [exchangeRateOpen, setExchangeRateOpen] = useState(false);
@@ -142,6 +144,15 @@ const Index = () => {
             <span className="text-primary-foreground/70 text-sm font-sans">Project Info 2026</span>
           </div>
           <div className="flex items-center gap-1">
+            {isAdmin && (
+              <button
+                onClick={() => navigate("/plan-vyroby")}
+                className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+                title="Plán Výroby"
+              >
+                <Factory className="h-5 w-5" />
+              </button>
+            )}
             {canAccessSettings && <AdminInboxButton />}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
