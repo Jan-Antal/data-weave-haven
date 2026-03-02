@@ -462,23 +462,34 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
 
     const { error } = await supabase.from("projects").update(newValues).eq("id", project.id);
     if (error) {
-      toast({ title: "Chyba", description: error.message, variant: "destructive" });
-    } else {
-      if (newValues.status !== previousValues.status) {
-        logActivity({ projectId: project.project_id, actionType: "status_change", oldValue: previousValues.status || "—", newValue: newValues.status || "—" });
+      if (error.code === "23505") {
+        toast({ title: "Chyba", description: "Projekt s tímto ID již existuje", variant: "destructive" });
+      } else {
+        toast({ title: "Chyba", description: error.message, variant: "destructive" });
       }
-      if (newValues.konstrukter !== previousValues.konstrukter) {
-        logActivity({ projectId: project.project_id, actionType: "konstrukter_change", oldValue: previousValues.konstrukter || "—", newValue: newValues.konstrukter || "—" });
-      }
-      if (newValues.datum_smluvni !== previousValues.datum_smluvni) {
-        const fmtOld = previousValues.datum_smluvni ? (parseAppDate(previousValues.datum_smluvni) ? formatAppDate(parseAppDate(previousValues.datum_smluvni)!) : previousValues.datum_smluvni) : "—";
-        const fmtNew = newValues.datum_smluvni ? (parseAppDate(newValues.datum_smluvni) ? formatAppDate(parseAppDate(newValues.datum_smluvni)!) : newValues.datum_smluvni) : "—";
-        logActivity({ projectId: project.project_id, actionType: "datum_smluvni_change", oldValue: fmtOld, newValue: fmtNew });
-      }
-      qc.invalidateQueries({ queryKey: ["projects"] });
-      onOpenChange(false);
-      showUndoToast(project.id, previousValues, qc);
+      return;
     }
+    // Log activity using original project_id for reference
+    const logPid = form.project_id !== project.project_id ? form.project_id : project.project_id;
+    if (newValues.status !== previousValues.status) {
+      logActivity({ projectId: logPid, actionType: "status_change", oldValue: previousValues.status || "—", newValue: newValues.status || "—" });
+    }
+    if (newValues.konstrukter !== previousValues.konstrukter) {
+      logActivity({ projectId: logPid, actionType: "konstrukter_change", oldValue: previousValues.konstrukter || "—", newValue: newValues.konstrukter || "—" });
+    }
+    if (newValues.datum_smluvni !== previousValues.datum_smluvni) {
+      const fmtOld = previousValues.datum_smluvni ? (parseAppDate(previousValues.datum_smluvni) ? formatAppDate(parseAppDate(previousValues.datum_smluvni)!) : previousValues.datum_smluvni) : "—";
+      const fmtNew = newValues.datum_smluvni ? (parseAppDate(newValues.datum_smluvni) ? formatAppDate(parseAppDate(newValues.datum_smluvni)!) : newValues.datum_smluvni) : "—";
+      logActivity({ projectId: logPid, actionType: "datum_smluvni_change", oldValue: fmtOld, newValue: fmtNew });
+    }
+    if (form.project_id !== project.project_id) {
+      logActivity({ projectId: logPid, actionType: "project_id_change", oldValue: project.project_id, newValue: form.project_id });
+    }
+    qc.invalidateQueries({ queryKey: ["projects"] });
+    qc.invalidateQueries({ queryKey: ["project-stages"] });
+    qc.invalidateQueries({ queryKey: ["tpv-items"] });
+    onOpenChange(false);
+    showUndoToast(project.id, previousValues, qc);
   };
 
   const handleDelete = async () => {
