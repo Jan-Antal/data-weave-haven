@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
 
     const { email, full_name, role } = await req.json();
 
-    // Validate required fields (no password needed — invite flow)
+    // Validate required fields
     if (!email || !full_name || !role) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
@@ -66,7 +66,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Validate email
     if (typeof email !== "string" || !EMAIL_REGEX.test(email) || email.length > 255) {
       return new Response(JSON.stringify({ error: "Invalid email format" }), {
         status: 400,
@@ -74,7 +73,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Validate full_name
     const trimmedName = String(full_name).trim();
     if (trimmedName.length < 1 || trimmedName.length > 100) {
       return new Response(JSON.stringify({ error: "Full name must be between 1 and 100 characters" }), {
@@ -83,7 +81,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Validate role against enum
     if (!VALID_ROLES.includes(role)) {
       return new Response(JSON.stringify({ error: "Invalid role. Must be one of: " + VALID_ROLES.join(", ") }), {
         status: 400,
@@ -93,15 +90,18 @@ Deno.serve(async (req) => {
 
     const redirectTo = `${PRODUCTION_ORIGIN}/auth/callback`;
 
-    // Invite user by email (sends invite email, no password needed)
-    const { data: newUser, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
-      data: { full_name: trimmedName },
-      redirectTo,
+    // Create user WITHOUT sending invite email — use a random password
+    const randomPassword = crypto.randomUUID() + "!Aa1";
+    const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
+      email,
+      password: randomPassword,
+      email_confirm: true, // mark email as confirmed so generateLink works
+      user_metadata: { full_name: trimmedName },
     });
 
-    if (inviteError) {
-      console.error("User invite failed:", inviteError);
-      return new Response(JSON.stringify({ error: "Unable to invite user: " + inviteError.message }), {
+    if (createError) {
+      console.error("User creation failed:", createError);
+      return new Response(JSON.stringify({ error: "Unable to create user: " + createError.message }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -131,7 +131,6 @@ Deno.serve(async (req) => {
       .insert({ user_id: newUser.user.id, role });
 
     if (roleError) {
-      // Clean up auth user if role insert fails
       await adminClient.auth.admin.deleteUser(newUser.user.id);
       console.error("Role assignment failed:", roleError);
       return new Response(JSON.stringify({ error: "Unable to assign role" }), {
@@ -140,7 +139,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ user: newUser.user }), {
+    // Generate invite link (same format as the 🔗 copy button)
+    let actionLink: string | undefined;
+    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+      type: "recovery",
+      email,
+      options: { redirectTo },
+    });
+
+    if (linkError) {
+      console.error("Link generation failed:", linkError);
+    } else {
+      actionLink = linkData?.properties?.action_link;
+    }
+
+    return new Response(JSON.stringify({ user: newUser.user, link: actionLink }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -6,10 +6,6 @@ const corsHeaders = {
 };
 
 const PRODUCTION_ORIGIN = "https://projekty.am-interior.cz";
-type InviteMode = "link" | "send_email";
-
-const isAlreadyRegisteredError = (message?: string, code?: string) =>
-  Boolean(message?.includes("already been registered") || code === "email_exists");
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -59,7 +55,7 @@ Deno.serve(async (req) => {
 
     const payload = await req.json();
     const user_id: string | undefined = payload?.user_id;
-    const mode: InviteMode = payload?.mode === "send_email" ? "send_email" : "link";
+    const mode: string = payload?.mode ?? "link";
 
     if (!user_id) {
       return new Response(JSON.stringify({ error: "user_id is required" }), {
@@ -84,107 +80,21 @@ Deno.serve(async (req) => {
 
     const redirectTo = `${PRODUCTION_ORIGIN}/auth/callback`;
 
-    if (mode === "send_email") {
-      const { data: authUserData, error: authUserError } = await adminClient.auth.admin.getUserById(user_id);
-      if (authUserError || !authUserData?.user) {
-        return new Response(JSON.stringify({ error: authUserError?.message || "User not found in auth" }), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const isConfirmed = Boolean(authUserData.user.email_confirmed_at);
-
-      if (isConfirmed) {
-        const { error: resetError } = await adminClient.auth.resetPasswordForEmail(profile.email, {
-          redirectTo,
-        });
-
-        if (resetError) {
-          return new Response(JSON.stringify({ error: resetError.message }), {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-
-        return new Response(JSON.stringify({ mode: "password_reset", email: profile.email }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const { error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(profile.email, {
-        redirectTo,
-        data: { full_name: profile.full_name ?? "" },
-      });
-
-      if (inviteError) {
-        const inviteErrorCode = (inviteError as { code?: string }).code;
-        if (isAlreadyRegisteredError(inviteError.message, inviteErrorCode)) {
-          const { error: resetError } = await adminClient.auth.resetPasswordForEmail(profile.email, {
-            redirectTo,
-          });
-          if (resetError) {
-            return new Response(JSON.stringify({ error: resetError.message }), {
-              status: 400,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          }
-
-          return new Response(JSON.stringify({ mode: "password_reset", email: profile.email }), {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-
-        return new Response(JSON.stringify({ error: inviteError.message }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      return new Response(JSON.stringify({ mode: "invite", email: profile.email }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Generate a direct action link for manual copy/share
-    let actionLink: string | undefined;
-
-    const { data: inviteLinkData, error: inviteLinkError } = await adminClient.auth.admin.generateLink({
-      type: "invite",
+    // Always generate a recovery link — this format works reliably
+    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+      type: "recovery",
       email: profile.email,
       options: { redirectTo },
     });
 
-    if (inviteLinkError) {
-      const inviteErrorCode = (inviteLinkError as { code?: string }).code;
-      if (isAlreadyRegisteredError(inviteLinkError.message, inviteErrorCode)) {
-        const { data: recoveryData, error: recoveryError } = await adminClient.auth.admin.generateLink({
-          type: "recovery",
-          email: profile.email,
-          options: { redirectTo },
-        });
-
-        if (recoveryError) {
-          return new Response(JSON.stringify({ error: recoveryError.message }), {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-
-        actionLink = recoveryData?.properties?.action_link;
-      } else {
-        return new Response(JSON.stringify({ error: inviteLinkError.message }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    } else {
-      actionLink = inviteLinkData?.properties?.action_link;
+    if (linkError) {
+      return new Response(JSON.stringify({ error: linkError.message }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
+    const actionLink = linkData?.properties?.action_link;
     if (!actionLink) {
       return new Response(JSON.stringify({ error: "Failed to generate link" }), {
         status: 500,
@@ -192,6 +102,20 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (mode === "send_email") {
+      // For "send_email" mode: generate link and return it for the frontend to copy
+      // We return the link so the admin can share it manually
+      return new Response(JSON.stringify({
+        mode: "link_generated",
+        link: actionLink,
+        email: profile.email,
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Default "link" mode — just return the link
     return new Response(JSON.stringify({ link: actionLink }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
