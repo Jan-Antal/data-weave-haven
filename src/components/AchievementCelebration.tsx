@@ -37,13 +37,16 @@ function fireConfetti(isRare: boolean) {
     colors: ["#FFD700", "#4CAF50", "#FFFFFF", "#2D5A3D"],
     spread: 360,
     startVelocity: 30,
-    ticks: 80,
+    ticks: 150,
     origin: { x: 0.5, y: 0.45 },
   };
 
   confetti({ ...defaults, particleCount: count, scalar: 1.1 });
   if (isRare) {
     setTimeout(() => confetti({ ...defaults, particleCount: 100, scalar: 0.9, startVelocity: 40 }), 500);
+    setTimeout(() => confetti({ ...defaults, particleCount: 80, scalar: 1.0, startVelocity: 35 }), 1200);
+  } else {
+    setTimeout(() => confetti({ ...defaults, particleCount: 60, scalar: 0.9, startVelocity: 25 }), 800);
   }
 }
 
@@ -63,8 +66,8 @@ export function AchievementCelebration() {
     const soundEnabled = (prefs as any)?.achievement_sound ?? false;
     if (soundEnabled) playChime();
 
-    setTimeout(() => setVisible(false), 5000);
-    setTimeout(() => setCurrent(null), 5500);
+    setTimeout(() => setVisible(false), 3500);
+    setTimeout(() => setCurrent(null), 4000);
   }, [prefs]);
 
   useEffect(() => {
