@@ -66,9 +66,10 @@ interface Props {
   projectName: string;
   currency?: string;
   onBack: () => void;
+  autoOpenImport?: boolean;
 }
 
-export function TPVList({ projectId, projectName, currency = "CZK", onBack }: Props) {
+export function TPVList({ projectId, projectName, currency = "CZK", onBack, autoOpenImport }: Props) {
   const { canManageTPV, canEdit, canEditColumns } = useAuth();
   const { data: items = [], isLoading } = useTPVItems(projectId);
   const { data: statusOptions = [] } = useTPVStatusOptions();
@@ -153,7 +154,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack }: Pr
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importOpen, setImportOpen] = useState(false);
   const [importData, setImportData] = useState<any[]>([]);
-  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(!!autoOpenImport);
   const [deleteIds, setDeleteIds] = useState<string[] | null>(null);
   const [addingInline, setAddingInline] = useState(false);
   const [inlineName, setInlineName] = useState("");
