@@ -1,11 +1,10 @@
 import { useState, useMemo } from "react";
-import { ChevronDown, ChevronRight, GripVertical } from "lucide-react";
+import { ChevronRight, GripVertical } from "lucide-react";
 import { useProductionInbox, type InboxProject } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { getProjectColor } from "@/lib/projectColors";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
 const SAMPLE_ITEMS = [
@@ -24,11 +23,11 @@ export function InboxPanel() {
   const [loading, setLoading] = useState(false);
 
   const totalHours = useMemo(() => projects.reduce((s, p) => s + p.total_hours, 0), [projects]);
+  const hourlyRate = settings?.hourly_rate ?? 550;
 
   const handleSeedData = async () => {
     setLoading(true);
     try {
-      const hourlyRate = settings?.hourly_rate ?? 550;
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
@@ -43,7 +42,6 @@ export function InboxPanel() {
         }))
       );
 
-      // Also seed some schedule data
       const now = new Date();
       const monday = new Date(now);
       monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
@@ -62,7 +60,6 @@ export function InboxPanel() {
         const weekDate = new Date(monday);
         weekDate.setDate(monday.getDate() + week.offset * 7);
         const weekStr = weekDate.toISOString().split("T")[0];
-
         for (let i = 0; i < week.items.length; i++) {
           const item = week.items[i];
           scheduleRows.push({
@@ -82,7 +79,6 @@ export function InboxPanel() {
 
       const { error: inboxErr } = await supabase.from("production_inbox").insert(rows);
       if (inboxErr) throw inboxErr;
-
       const { error: schedErr } = await supabase.from("production_schedule").insert(scheduleRows);
       if (schedErr) throw schedErr;
 
@@ -97,77 +93,131 @@ export function InboxPanel() {
   };
 
   return (
-    <div className="w-[270px] shrink-0 flex flex-col border-r bg-card">
-      <div className="px-3 py-2.5 border-b flex items-center justify-between">
+    <div className="w-[270px] shrink-0 flex flex-col" style={{ borderRight: "1px solid #ece8e2" }}>
+      {/* Header */}
+      <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "1px solid #ece8e2" }}>
         <div className="flex items-center gap-2">
           <span className="text-sm">📥</span>
-          <span className="text-sm font-semibold">Inbox</span>
+          <span className="text-[13px] font-semibold" style={{ color: "#223937" }}>Inbox</span>
           {projects.length > 0 && (
-            <span className="bg-amber-100 text-amber-800 text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
+            <span
+              className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+              style={{ backgroundColor: "rgba(217,151,6,0.12)", color: "#d97706" }}
+            >
               {projects.reduce((s, p) => s + p.items.length, 0)}
             </span>
           )}
         </div>
-        <span className="font-mono text-xs text-muted-foreground">{Math.round(totalHours).toLocaleString("cs-CZ")}h</span>
+        <span className="font-mono text-[11px] font-medium" style={{ color: "#6b7a78" }}>
+          {Math.round(totalHours).toLocaleString("cs-CZ")}h
+        </span>
       </div>
 
+      {/* Items */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
         {projects.length === 0 && !isLoading && (
           <div className="text-center py-8">
-            <p className="text-xs text-muted-foreground mb-3">Inbox je prázdný</p>
-            <Button
-              variant="outline"
-              size="sm"
+            <p className="text-[10px] mb-3" style={{ color: "#99a5a3" }}>Inbox je prázdný</p>
+            <button
               onClick={handleSeedData}
               disabled={loading}
-              className="border-amber-400 text-amber-700 hover:bg-amber-50 text-xs"
+              className="text-[10px] underline transition-colors hover:opacity-70"
+              style={{ color: "#d97706" }}
             >
               {loading ? "Vkládám..." : "🧪 Naplnit testovací data"}
-            </Button>
+            </button>
           </div>
         )}
         {projects.map((project) => (
-          <InboxProjectGroup key={project.project_id} project={project} />
+          <InboxProjectGroup key={project.project_id} project={project} hourlyRate={hourlyRate} />
         ))}
       </div>
     </div>
   );
 }
 
-function InboxProjectGroup({ project }: { project: InboxProject }) {
+function InboxProjectGroup({ project, hourlyRate }: { project: InboxProject; hourlyRate: number }) {
   const [expanded, setExpanded] = useState(true);
   const color = getProjectColor(project.project_id);
+  const totalCzkK = Math.round((project.total_hours * hourlyRate) / 1000);
 
   return (
-    <div className="rounded-lg overflow-hidden" style={{ borderLeft: `3px solid ${color}` }}>
+    <div
+      className="rounded-lg overflow-hidden"
+      style={{ backgroundColor: "#ffffff", border: "1px solid #ece8e2", borderLeft: `4px solid ${color}` }}
+    >
+      {/* Project header */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-1.5 px-2 py-1.5 hover:bg-muted/50 transition-colors text-left"
+        className="w-full flex items-center gap-1.5 px-2.5 py-2 text-left transition-colors"
+        style={{ backgroundColor: expanded ? "transparent" : "transparent" }}
+        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f0eee9")}
+        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
       >
-        {expanded ? <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" /> : <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
+        <ChevronRight
+          className="h-3 w-3 shrink-0 transition-transform duration-150"
+          style={{ color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}
+        />
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-semibold truncate">{project.project_name}</div>
-          <div className="font-mono text-[10px] text-muted-foreground">{project.project_id}</div>
+          <div className="text-[11px] font-semibold truncate" style={{ color: "#223937" }}>
+            {project.project_name}
+          </div>
+          <div className="font-mono text-[8px]" style={{ color: "#99a5a3" }}>
+            {project.project_id}
+          </div>
         </div>
-        <span className="font-mono text-xs font-semibold shrink-0">{Math.round(project.total_hours)}h</span>
+        <div className="text-right shrink-0">
+          <span className="font-mono text-[11px] font-semibold" style={{ color: "#223937" }}>
+            {Math.round(project.total_hours)}h
+          </span>
+          <span className="font-mono text-[8px] ml-1" style={{ color: "#6b7a78" }}>
+            {totalCzkK}K
+          </span>
+        </div>
       </button>
 
+      {/* Expanded items */}
       {expanded && (
-        <div className="px-1 pb-1.5 space-y-1">
+        <div className="px-2 pb-2 space-y-[2px]">
           {project.items.map((item) => (
             <div
               key={item.id}
-              className="flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-grab hover:border-blue-400 hover:bg-blue-50/50 transition-colors"
+              className="flex items-center gap-1.5 px-2 py-[5px] rounded-[5px] cursor-grab transition-all"
               style={{ backgroundColor: "#f0eee9" }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(59,130,246,0.06)";
+                e.currentTarget.style.boxShadow = "inset 0 0 0 1px #3b82f6";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "#f0eee9";
+                e.currentTarget.style.boxShadow = "none";
+              }}
             >
-              <GripVertical className="h-3 w-3 text-muted-foreground/40 shrink-0" />
-              <span className="text-xs flex-1 truncate">{item.item_name}</span>
-              <span className="font-mono text-[10px] text-muted-foreground shrink-0">{item.estimated_hours}h</span>
+              <GripVertical className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />
+              <span className="text-[10px] font-medium flex-1 truncate" style={{ color: "#223937" }}>
+                {item.item_name}
+              </span>
+              <span className="font-mono text-[9px] shrink-0" style={{ color: "#6b7a78" }}>
+                {item.estimated_hours}h
+              </span>
             </div>
           ))}
+          {/* Drag whole project */}
           <div
-            className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-md border border-dashed cursor-grab text-xs text-muted-foreground hover:border-emerald-500 hover:text-emerald-700 transition-colors"
-            style={{ borderColor: "rgba(58,138,54,0.4)" }}
+            className="flex items-center justify-center px-2 py-[5px] rounded-[5px] cursor-grab transition-all text-[9px] font-semibold"
+            style={{
+              border: "1.5px dashed #3a8a36",
+              backgroundColor: "rgba(58,138,54,0.08)",
+              color: "#3a8a36",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderStyle = "solid";
+              e.currentTarget.style.backgroundColor = "rgba(58,138,54,0.14)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderStyle = "dashed";
+              e.currentTarget.style.backgroundColor = "rgba(58,138,54,0.08)";
+            }}
           >
             Přetáhni celý projekt ({Math.round(project.total_hours)}h)
           </div>
