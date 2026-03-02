@@ -285,20 +285,6 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label className="text-xs">Jazyk</Label>
-              <Select value="cs" disabled>
-                <SelectTrigger className="h-9 opacity-60">
-                  <SelectValue placeholder="Čeština" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cs">Čeština</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-[10px] text-muted-foreground mt-1">
-                Další jazyky — v přípravě
-              </p>
-            </div>
           </div>
         </div>
 
