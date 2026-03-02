@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { PasswordChecklist } from "@/components/PasswordChecklist";
 import { usePasswordValidation } from "@/hooks/usePasswordValidation";
 import { toast } from "@/hooks/use-toast";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function SetPassword() {
   const [password, setPassword] = useState("");
@@ -15,6 +16,8 @@ export default function SetPassword() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [hasSession, setHasSession] = useState<boolean | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
   const validation = usePasswordValidation(password);
 
@@ -22,7 +25,6 @@ export default function SetPassword() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setHasSession(!!session);
       if (!session) {
-        // No session = user shouldn't be here, redirect to login
         setTimeout(() => navigate("/", { replace: true }), 2000);
       }
     });
@@ -43,24 +45,35 @@ export default function SetPassword() {
     }
 
     setLoading(true);
-    const { error: updateError } = await supabase.auth.updateUser({ password });
 
-    if (updateError) {
-      setError("Nepodařilo se nastavit heslo. Zkuste to znovu.");
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+
+      if (updateError) {
+        console.error("updateUser error:", updateError);
+        // Show the actual Supabase error message for debugging
+        const msg = updateError.message || "Nepodařilo se nastavit heslo.";
+        setError(msg);
+        setLoading(false);
+        return;
+      }
+
+      const { error: profileFlagError } = await supabase.rpc("mark_password_set");
+      if (profileFlagError) {
+        console.error("mark_password_set error:", profileFlagError);
+        setError("Heslo bylo nastaveno, ale aktivace účtu selhala. Kontaktujte administrátora.");
+        setLoading(false);
+        return;
+      }
+
+      setSuccess(true);
+      toast({ title: "Účet byl úspěšně nastaven" });
+      setTimeout(() => navigate("/", { replace: true }), 1500);
+    } catch (err: any) {
+      console.error("SetPassword unexpected error:", err);
+      setError(err?.message || "Neočekávaná chyba.");
       setLoading(false);
-      return;
     }
-
-    const { error: profileFlagError } = await supabase.rpc("mark_password_set");
-    if (profileFlagError) {
-      setError("Heslo bylo nastaveno, ale aktivace účtu selhala. Kontaktujte administrátora.");
-      setLoading(false);
-      return;
-    }
-
-    setSuccess(true);
-    toast({ title: "Účet byl úspěšně nastaven" });
-    setTimeout(() => navigate("/", { replace: true }), 1500);
   };
 
   if (hasSession === null) {
@@ -102,28 +115,50 @@ export default function SetPassword() {
 
             <div className="space-y-2">
               <Label htmlFor="password">Nové heslo</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Alespoň 8 znaků"
-                required
-                autoFocus
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Alespoň 8 znaků"
+                  required
+                  autoFocus
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               <PasswordChecklist password={password} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Potvrdit heslo</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Zopakujte heslo"
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Zopakujte heslo"
+                  required
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
             {error && (

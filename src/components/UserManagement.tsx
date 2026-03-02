@@ -136,20 +136,21 @@ export function UserManagement({ open, onOpenChange }: Props) {
       });
 
       if (error) {
-        setSubmitError(error.message || "Chyba při odesílání pozvánky");
+        setSubmitError(error.message || "Chyba při vytváření uživatele");
       } else if (data?.error) {
         setSubmitError(data.error);
       } else {
-        const userId = data?.user?.id;
-        toast({ title: `Pozvánka odeslána na ${newUser.email.trim()}` });
+        // Auto-copy the invite link returned from create-user
+        if (data?.link) {
+          await navigator.clipboard.writeText(data.link);
+          toast({ title: `Uživatel vytvořen. Odkaz zkopírován do schránky.`, description: `Odešlete odkaz uživateli ${newUser.email.trim()}` });
+        } else {
+          toast({ title: `Uživatel vytvořen: ${newUser.email.trim()}` });
+        }
         setAddOpen(false);
         setNewUser({ full_name: "", email: "", role: "viewer" });
         setFieldErrors({});
         fetchUsers();
-        // Auto-copy invite link after creation
-        if (userId) {
-          handleCopyInviteLink(userId);
-        }
       }
     } catch (e: any) {
       setSubmitError(e.message || "Neočekávaná chyba");
@@ -222,10 +223,11 @@ export function UserManagement({ open, onOpenChange }: Props) {
         return;
       }
 
-      if (data?.mode === "password_reset") {
-        toast({ title: `Email pro obnovení hesla byl odeslán na ${data.email}` });
+      if (data?.link) {
+        await navigator.clipboard.writeText(data.link);
+        toast({ title: "Odkaz zkopírován do schránky", description: `Odešlete odkaz uživateli ${data.email}` });
       } else {
-        toast({ title: `Pozvánka byla znovu odeslána na ${data.email}` });
+        toast({ title: "Odkaz vygenerován" });
       }
     } catch (e: any) {
       toast({ title: "Chyba", description: e.message, variant: "destructive" });
