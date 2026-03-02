@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, FileText, X, Trash2, RefreshCw, MapPin } from "lucide-react";
+import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, FileText, X, Trash2, RefreshCw, MapPin, List, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { marzeStorageToInput, marzeInputToStorage, formatMarze } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
@@ -58,6 +58,8 @@ interface ProjectDetailDialogProps {
   project: Project | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onOpenTPVList?: (projectId: string, projectName: string) => void;
+  tpvItemCount?: number;
 }
 
 const DOC_CATEGORIES = [
@@ -215,7 +217,7 @@ function defaultForm() {
   };
 }
 
-export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDetailDialogProps) {
+export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList, tpvItemCount }: ProjectDetailDialogProps) {
   const qc = useQueryClient();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const { canEdit, canDeleteProject, isViewer, isKonstrukter, isPM, isFieldReadOnly, canUploadDocuments } = useAuth();
@@ -945,6 +947,41 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                       placeholder="Poznámka…"
                     />
                   </div>
+
+                  {/* TPV Items shortcut row */}
+                  <div className="col-span-2 flex items-center gap-2 mt-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs gap-1.5"
+                      onClick={() => {
+                        if (onOpenTPVList && project) {
+                          onOpenChange(false);
+                          onOpenTPVList(project.project_id, project.project_name);
+                        }
+                      }}
+                    >
+                      <FileSpreadsheet className="h-3.5 w-3.5" />
+                      Import z Excelu
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs gap-1.5"
+                      onClick={() => {
+                        if (onOpenTPVList && project) {
+                          onOpenChange(false);
+                          onOpenTPVList(project.project_id, project.project_name);
+                        }
+                      }}
+                    >
+                      <List className="h-3.5 w-3.5" />
+                      TPV položky
+                      <Badge variant="secondary" className="h-5 min-w-[20px] justify-center px-1.5 text-[10px]">
+                        {tpvItemCount ?? 0}
+                      </Badge>
+                    </Button>
+                  </div>
                 </div>
               </div>
 
@@ -1100,13 +1137,12 @@ export function ProjectDetailDialog({ project, open, onOpenChange }: ProjectDeta
                 {canDeleteProject && (
                   <>
                     {deleteStep === 0 && (
-                      <button
-                        type="button"
-                        className="rounded-md border border-gray-200 bg-gray-100 px-4 py-2 text-sm text-gray-500 hover:bg-gray-200 transition-colors"
+                      <Button
+                        variant="outline"
                         onClick={() => setDeleteStep(1)}
                       >
                         Smazat projekt
-                      </button>
+                      </Button>
                     )}
                     {deleteStep === 1 && (
                       <div className="flex items-center gap-3">
