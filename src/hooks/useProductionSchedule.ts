@@ -50,7 +50,7 @@ export function useProductionSchedule() {
       const { data, error } = await supabase
         .from("production_schedule")
         .select("*, projects!production_schedule_project_id_fkey(project_name)")
-        .in("status", ["scheduled", "in_progress"])
+        .in("status", ["scheduled", "in_progress", "completed"])
         .order("position", { ascending: true });
       if (error) throw error;
 
