@@ -24,6 +24,7 @@ import { StatusManagement } from "@/components/StatusManagement";
 import { RecycleBin } from "@/components/RecycleBin";
 import { UserManagement } from "@/components/UserManagement";
 import { AccountSettings } from "@/components/AccountSettings";
+import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDialog";
 import { DataLogPanel } from "@/components/DataLogPanel";
 import { DataLogHighlightProvider } from "@/components/DataLogHighlightContext";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ const Index = () => {
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [userMgmtOpen, setUserMgmtOpen] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [costPresetsOpen, setCostPresetsOpen] = useState(false);
   const [dataLogOpen, setDataLogOpen] = useState(() => {
     try { return sessionStorage.getItem("datalog-open") === "true"; } catch { return false; }
   });
@@ -195,6 +197,11 @@ const Index = () => {
                   {canManageExchangeRates && (
                     <DropdownMenuItem onClick={() => setExchangeRateOpen(true)}>
                       Kurzovní lístek
+                    </DropdownMenuItem>
+                  )}
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => setCostPresetsOpen(true)}>
+                      Rozpad ceny
                     </DropdownMenuItem>
                   )}
                   {canManageStatuses && (
@@ -362,6 +369,7 @@ const Index = () => {
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
       <UserManagement open={userMgmtOpen} onOpenChange={setUserMgmtOpen} />
       <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
+      <CostBreakdownPresetsDialog open={costPresetsOpen} onOpenChange={setCostPresetsOpen} />
       {canAccessSettings && <FeedbackWidget />}
       <AchievementCelebration />
     </div>
