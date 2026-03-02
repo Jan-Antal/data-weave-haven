@@ -24,6 +24,7 @@ import { useSharePointDocs, type SPFile } from "@/hooks/useSharePointDocs";
 import { dispatchDocCountUpdate } from "@/hooks/useDocumentCounts";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Textarea } from "@/components/ui/textarea";
+import { RozpadCeny } from "./RozpadCeny";
 
 interface Project {
   id: string;
@@ -52,6 +53,14 @@ interface Project {
   hodiny_tpv: string | null;
   percent_tpv: number | null;
   tpv_poznamka: string | null;
+  cost_preset_id: string | null;
+  cost_material_pct: number | null;
+  cost_overhead_pct: number | null;
+  cost_logistics_pct: number | null;
+  cost_production_pct: number | null;
+  cost_subcontractors_pct: number | null;
+  cost_margin_pct: number | null;
+  cost_is_custom: boolean | null;
 }
 
 interface ProjectDetailDialogProps {
@@ -205,6 +214,14 @@ function buildFormState(p: Project | null) {
     hodiny_tpv: p.hodiny_tpv || "",
     percent_tpv: p.percent_tpv != null ? String(p.percent_tpv) : "",
     tpv_poznamka: p.tpv_poznamka || "",
+    cost_preset_id: p.cost_preset_id || null,
+    cost_material_pct: p.cost_material_pct ?? null,
+    cost_overhead_pct: p.cost_overhead_pct ?? null,
+    cost_logistics_pct: p.cost_logistics_pct ?? null,
+    cost_production_pct: p.cost_production_pct ?? null,
+    cost_subcontractors_pct: p.cost_subcontractors_pct ?? null,
+    cost_margin_pct: p.cost_margin_pct ?? null,
+    cost_is_custom: p.cost_is_custom ?? false,
   };
 }
 
@@ -214,13 +231,21 @@ function defaultForm() {
     status: "", datum_smluvni: "", datum_objednavky: "", prodejni_cena: "", currency: "CZK", marze: "",
     risk: "", zamereni: "", tpv_date: "", expedice: "", montaz: "", predani: "", pm_poznamka: "",
     narocnost: "", hodiny_tpv: "", percent_tpv: "", tpv_poznamka: "",
+    cost_preset_id: null as string | null,
+    cost_material_pct: null as number | null,
+    cost_overhead_pct: null as number | null,
+    cost_logistics_pct: null as number | null,
+    cost_production_pct: null as number | null,
+    cost_subcontractors_pct: null as number | null,
+    cost_margin_pct: null as number | null,
+    cost_is_custom: false,
   };
 }
 
 export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList, tpvItemCount }: ProjectDetailDialogProps) {
   const qc = useQueryClient();
   const { data: statusOptions = [] } = useProjectStatusOptions();
-  const { canEdit, canDeleteProject, isViewer, isKonstrukter, isPM, isFieldReadOnly, canUploadDocuments } = useAuth();
+  const { canEdit, canDeleteProject, isViewer, isKonstrukter, isPM, isFieldReadOnly, canUploadDocuments, isAdmin } = useAuth();
   const statusLabels = statusOptions.map((s) => s.label);
   const [form, setForm] = useState(defaultForm());
   const [initialForm, setInitialForm] = useState(defaultForm());
@@ -458,6 +483,14 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       hodiny_tpv: form.hodiny_tpv || null,
       percent_tpv: form.percent_tpv ? Number(form.percent_tpv) : null,
       tpv_poznamka: form.tpv_poznamka || null,
+      cost_preset_id: form.cost_preset_id || null,
+      cost_material_pct: form.cost_material_pct,
+      cost_overhead_pct: form.cost_overhead_pct,
+      cost_logistics_pct: form.cost_logistics_pct,
+      cost_production_pct: form.cost_production_pct,
+      cost_subcontractors_pct: form.cost_subcontractors_pct,
+      cost_margin_pct: form.cost_margin_pct,
+      cost_is_custom: form.cost_is_custom,
     };
 
     const { error } = await supabase.from("projects").update(newValues).eq("id", project.id);
@@ -825,10 +858,25 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                     )}
                   </div>
 
-                  {/* Rozpad ceny placeholder */}
-                  <div className="rounded-md border border-dashed border-muted-foreground/30 px-4 py-3 opacity-50 flex items-center">
-                    <p className="text-xs italic text-muted-foreground">Rozpad ceny — v přípravě</p>
-                  </div>
+                  {/* Rozpad ceny — admin only */}
+                  {isAdmin && (
+                    <RozpadCeny
+                      projectId={project.project_id}
+                      prodejniCena={form.prodejni_cena ? Number(form.prodejni_cena) : null}
+                      costValues={{
+                        cost_preset_id: form.cost_preset_id,
+                        cost_material_pct: form.cost_material_pct,
+                        cost_overhead_pct: form.cost_overhead_pct,
+                        cost_logistics_pct: form.cost_logistics_pct,
+                        cost_production_pct: form.cost_production_pct,
+                        cost_subcontractors_pct: form.cost_subcontractors_pct,
+                        cost_margin_pct: form.cost_margin_pct,
+                        cost_is_custom: form.cost_is_custom,
+                      }}
+                      onChange={(updates) => setForm((s) => ({ ...s, ...updates }))}
+                      readOnly={isSectionReadOnly("finance")}
+                    />
+                  )}
                 </div>
 
                 {/* ── PM — ŘÍZENÍ PROJEKTU ─────────────────── */}

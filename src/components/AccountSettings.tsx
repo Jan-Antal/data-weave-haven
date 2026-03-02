@@ -17,6 +17,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { useUserAchievements } from "@/hooks/useAchievements";
 import { AchievementShowcase } from "@/components/AchievementShowcase";
 import { Switch } from "@/components/ui/switch";
+import { CostBreakdownPresetsSection } from "@/components/CostBreakdownPresetsSection";
 
 const ROLE_LABELS: Record<string, string> = {
   owner: "Owner",
@@ -53,7 +54,7 @@ interface AccountSettingsProps {
 }
 
 export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
-  const { user, profile, role } = useAuth();
+  const { user, profile, role, isAdmin } = useAuth();
   const { data: allPeople = [] } = useAllPeople();
   const { data: prefs } = useUserPreferences();
   const upsertPrefs = useUpsertPreferences();
@@ -304,6 +305,14 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
           {/* ÚSPĚCHY */}
           <SectionHeader icon="🏆" label="Úspěchy" />
           <AchievementShowcase earned={achievements} userRole={role || undefined} />
+
+          {/* ROZPAD CENY — only for Admin */}
+          {isAdmin && (
+            <>
+              <SectionHeader icon="💰" label="ROZPAD CENY — Šablony" />
+              <CostBreakdownPresetsSection />
+            </>
+          )}
         </div>
 
         {/* Footer */}
