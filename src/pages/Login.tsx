@@ -30,7 +30,7 @@ export default function Login() {
     setError(null);
     setLoading(true);
     await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${window.location.origin}/auth/callback`,
     });
     setLoading(false);
     setView("sent");
@@ -137,8 +137,8 @@ export default function Login() {
         {view === "sent" && (
           <div className="bg-card border rounded-lg p-6 space-y-3 shadow-sm text-center">
             <div className="flex justify-center">
-              <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                <Check className="h-5 w-5 text-green-600" />
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Check className="h-5 w-5 text-primary" />
               </div>
             </div>
             <p className="text-sm text-foreground font-medium">

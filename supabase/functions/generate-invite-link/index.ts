@@ -5,6 +5,42 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const DEFAULT_APP_ORIGIN = "https://data-weave-haven.lovable.app";
+type InviteMode = "link" | "send_email";
+
+const resolveAppOrigin = (originUrl: unknown, req: Request): string => {
+  if (typeof originUrl === "string" && originUrl.trim()) {
+    try {
+      return new URL(originUrl).origin;
+    } catch {
+      // fallback below
+    }
+  }
+
+  const headerOrigin = req.headers.get("origin");
+  if (headerOrigin) {
+    try {
+      return new URL(headerOrigin).origin;
+    } catch {
+      // fallback below
+    }
+  }
+
+  const referer = req.headers.get("referer");
+  if (referer) {
+    try {
+      return new URL(referer).origin;
+    } catch {
+      // fallback below
+    }
+  }
+
+  return DEFAULT_APP_ORIGIN;
+};
+
+const isAlreadyRegisteredError = (message?: string, code?: string) =>
+  Boolean(message?.includes("already been registered") || code === "email_exists");
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -27,7 +63,9 @@ Deno.serve(async (req) => {
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user: caller } } = await callerClient.auth.getUser();
+    const {
+      data: { user: caller },
+    } = await callerClient.auth.getUser();
     if (!caller) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -49,7 +87,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { user_id, origin_url } = await req.json();
+    const payload = await req.json();
+    const user_id: string | undefined = payload?.user_id;
+    const origin_url: string | undefined = payload?.origin_url;
+    const mode: InviteMode = payload?.mode === "send_email" ? "send_email" : "link";
+
     if (!user_id) {
       return new Response(JSON.stringify({ error: "user_id is required" }), {
         status: 400,
@@ -60,7 +102,7 @@ Deno.serve(async (req) => {
     // Get user email
     const { data: profile } = await adminClient
       .from("profiles")
-      .select("email")
+      .select("email, full_name")
       .eq("id", user_id)
       .single();
 
@@ -71,12 +113,74 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use dynamic redirect URL from the calling app
-    const redirectTo = origin_url
-      ? `${String(origin_url).replace(/\/$/, "")}/auth/callback`
-      : `${req.headers.get("origin") || "https://projekty.am-interior.cz"}/auth/callback`;
+    const redirectTo = `${resolveAppOrigin(origin_url, req)}/auth/callback`;
 
-    // Try invite first, fall back to recovery for already-registered users
+    if (mode === "send_email") {
+      const { data: authUserData, error: authUserError } = await adminClient.auth.admin.getUserById(user_id);
+      if (authUserError || !authUserData?.user) {
+        return new Response(JSON.stringify({ error: authUserError?.message || "User not found in auth" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const isConfirmed = Boolean(authUserData.user.email_confirmed_at);
+
+      if (isConfirmed) {
+        const { error: resetError } = await adminClient.auth.resetPasswordForEmail(profile.email, {
+          redirectTo,
+        });
+
+        if (resetError) {
+          return new Response(JSON.stringify({ error: resetError.message }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ mode: "password_reset", email: profile.email }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(profile.email, {
+        redirectTo,
+        data: { full_name: profile.full_name ?? "" },
+      });
+
+      if (inviteError) {
+        const inviteErrorCode = (inviteError as { code?: string }).code;
+        if (isAlreadyRegisteredError(inviteError.message, inviteErrorCode)) {
+          const { error: resetError } = await adminClient.auth.resetPasswordForEmail(profile.email, {
+            redirectTo,
+          });
+          if (resetError) {
+            return new Response(JSON.stringify({ error: resetError.message }), {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+
+          return new Response(JSON.stringify({ mode: "password_reset", email: profile.email }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ error: inviteError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ mode: "invite", email: profile.email }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Generate a direct action link for manual copy/share
     let actionLink: string | undefined;
 
     const { data: inviteLinkData, error: inviteLinkError } = await adminClient.auth.admin.generateLink({
@@ -86,9 +190,8 @@ Deno.serve(async (req) => {
     });
 
     if (inviteLinkError) {
-      // If user already exists, use recovery link instead (works the same for password setup)
-      if (inviteLinkError.message?.includes("already been registered") || (inviteLinkError as any).code === "email_exists") {
-        console.log("User already registered, generating recovery link instead");
+      const inviteErrorCode = (inviteLinkError as { code?: string }).code;
+      if (isAlreadyRegisteredError(inviteLinkError.message, inviteErrorCode)) {
         const { data: recoveryData, error: recoveryError } = await adminClient.auth.admin.generateLink({
           type: "recovery",
           email: profile.email,
@@ -96,15 +199,14 @@ Deno.serve(async (req) => {
         });
 
         if (recoveryError) {
-          console.error("Recovery link error:", recoveryError);
           return new Response(JSON.stringify({ error: recoveryError.message }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
+
         actionLink = recoveryData?.properties?.action_link;
       } else {
-        console.error("Generate link error:", inviteLinkError);
         return new Response(JSON.stringify({ error: inviteLinkError.message }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

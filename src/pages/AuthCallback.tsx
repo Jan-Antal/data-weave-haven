@@ -1,14 +1,26 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
-/**
- * /auth/callback
- * Handles the redirect from Supabase auth (invite, recovery, signup).
- * Supabase appends tokens as URL hash fragments after /verify redirect.
- * This page extracts them, sets the session, and redirects.
- */
+type CallbackType = "invite" | "recovery" | "signup" | null;
+
+const getCallbackType = (): CallbackType => {
+  const queryParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const type = hashParams.get("type") || queryParams.get("type");
+
+  if (type === "invite" || type === "recovery" || type === "signup") return type;
+  return null;
+};
+
+const getRedirectPathForType = (type: CallbackType) => {
+  if (type === "recovery") return "/reset-password";
+  if (type === "invite" || type === "signup") return "/set-password";
+  return "/";
+};
+
 export default function AuthCallback() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
@@ -17,62 +29,69 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // Parse hash fragment: #access_token=...&refresh_token=...&type=invite
-        const hash = window.location.hash.substring(1);
-        const params = new URLSearchParams(hash);
-        const accessToken = params.get("access_token");
-        const refreshToken = params.get("refresh_token");
-        const type = params.get("type");
-        const errorCode = params.get("error_code") || params.get("error");
-        const errorDescription = params.get("error_description");
+        const queryParams = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
 
-        // Handle error in hash (e.g. expired link)
+        const code = queryParams.get("code");
+        const accessToken = hashParams.get("access_token");
+        const refreshToken = hashParams.get("refresh_token");
+        const callbackType = getCallbackType();
+
+        const errorCode =
+          hashParams.get("error_code") ||
+          queryParams.get("error_code") ||
+          hashParams.get("error") ||
+          queryParams.get("error");
+
         if (errorCode) {
-          setError(errorDescription || "Odkaz je neplatný nebo vypršel.");
+          setError("Odkaz je neplatný nebo vypršel.");
           setProcessing(false);
           return;
         }
 
-        if (accessToken && refreshToken) {
+        if (code) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeError) {
+            setError("Odkaz je neplatný nebo vypršel.");
+            setProcessing(false);
+            return;
+          }
+        } else if (accessToken && refreshToken) {
           const { error: sessionError } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
 
           if (sessionError) {
-            setError("Nepodařilo se ověřit odkaz. Zkuste to znovu.");
+            setError("Odkaz je neplatný nebo vypršel.");
             setProcessing(false);
             return;
           }
-
-          // Redirect based on type
-          if (type === "invite" || type === "recovery") {
-            navigate("/set-password", { replace: true });
-          } else {
-            navigate("/", { replace: true });
-          }
-          return;
         }
 
-        // If no tokens in hash, check if Supabase already processed them via onAuthStateChange
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
         if (session) {
-          navigate("/set-password", { replace: true });
+          navigate(getRedirectPathForType(callbackType), { replace: true });
           return;
         }
 
-        // Wait a moment for Supabase client to process the hash
-        await new Promise((r) => setTimeout(r, 2000));
-        const { data: { session: retrySession } } = await supabase.auth.getSession();
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        const {
+          data: { session: retrySession },
+        } = await supabase.auth.getSession();
+
         if (retrySession) {
-          navigate("/set-password", { replace: true });
+          navigate(getRedirectPathForType(callbackType), { replace: true });
           return;
         }
 
         setError("Odkaz je neplatný nebo vypršel.");
         setProcessing(false);
-      } catch (e) {
-        setError("Došlo k neočekávané chybě.");
+      } catch {
+        setError("Odkaz je neplatný nebo vypršel.");
         setProcessing(false);
       }
     };
@@ -113,15 +132,35 @@ function ExpiredLinkHandler({ errorMessage }: { errorMessage: string }) {
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [resendError, setResendError] = useState<string | null>(null);
 
   const handleResend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
+
     setSending(true);
-    // Use signUp resend or just inform user to contact admin
-    // Since we can't call admin.inviteUserByEmail from client, we show contact info
-    await supabase.auth.resend({ type: "signup", email: email.trim() });
+    setResendError(null);
+
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: email.trim(),
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
     setSending(false);
+
+    if (error) {
+      const lowerMessage = error.message.toLowerCase();
+      if (lowerMessage.includes("security purposes") || lowerMessage.includes("rate")) {
+        setResendError("Počkejte prosím chvíli a zkuste to znovu.");
+      } else {
+        setResendError("Nepodařilo se odeslat nový odkaz. Zkuste to znovu.");
+      }
+      return;
+    }
+
     setSent(true);
   };
 
@@ -137,40 +176,46 @@ function ExpiredLinkHandler({ errorMessage }: { errorMessage: string }) {
       <div className="bg-card border rounded-lg p-6 space-y-4 shadow-sm">
         <div className="text-center">
           <p className="text-sm font-medium text-destructive">{errorMessage}</p>
+          <p className="text-xs text-muted-foreground mt-1">Odkaz pro pozvánku vypršel.</p>
         </div>
 
         {!sent ? (
           <form onSubmit={handleResend} className="space-y-3">
-            <p className="text-xs text-muted-foreground text-center">
-              Zadejte svůj email a pokusíme se odeslat nový odkaz. Případně kontaktujte administrátora.
-            </p>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="vas@email.cz"
-              required
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            />
+            <div className="space-y-2">
+              <label className="text-xs text-muted-foreground block">
+                Zadejte svůj email pro zaslání nového odkazu
+              </label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="vas@email.cz"
+                required
+              />
+            </div>
+
+            {resendError && (
+              <p className="text-sm text-destructive bg-destructive/10 rounded px-3 py-2">{resendError}</p>
+            )}
+
             <Button type="submit" className="w-full" size="sm" disabled={sending}>
-              {sending ? "Odesílám..." : "Požádat o nový odkaz"}
+              {sending ? "Odesílám..." : "Odeslat nový odkaz"}
             </Button>
           </form>
         ) : (
           <div className="text-center space-y-2">
-            <p className="text-sm text-green-600">
-              Pokud je váš email v systému, nový odkaz byl odeslán.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Pokud odkaz neobdržíte, kontaktujte administrátora.
-            </p>
+            <p className="text-sm text-primary">Nový odkaz byl odeslán na váš email.</p>
+            <p className="text-xs text-muted-foreground">Pokud odkaz neobdržíte, kontaktujte administrátora.</p>
           </div>
         )}
 
-        <div className="text-center pt-2 border-t">
+        <div className="flex flex-col items-center gap-1 pt-2 border-t">
+          <Button type="button" variant="ghost" size="sm" onClick={() => window.location.reload()}>
+            Zkusit znovu
+          </Button>
           <button
             type="button"
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/login")}
             className="text-[12px] text-muted-foreground hover:underline hover:text-foreground transition-colors"
           >
             Zpět na přihlášení
