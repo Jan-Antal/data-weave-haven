@@ -212,6 +212,14 @@ export function UserManagement({ open, onOpenChange }: Props) {
       setResetError("Heslo je povinné");
       return;
     }
+    if (resetPassword.length < 8) {
+      setResetError("Heslo musí mít alespoň 8 znaků");
+      return;
+    }
+    if (resetPassword.length > 72) {
+      setResetError("Heslo může mít maximálně 72 znaků");
+      return;
+    }
     setResetSubmitting(true);
     setResetError("");
     try {
