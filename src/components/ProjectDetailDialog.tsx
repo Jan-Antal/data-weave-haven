@@ -849,15 +849,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                     </div>
                   </div>
 
-                  <div>
-                    <Label className="text-xs">Kalkulant</Label>
-                    {isSectionReadOnly("finance") ? (
-                      <Input value={form.kalkulant || "—"} disabled className={roClass} />
-                    ) : (
-                      <PeopleSelectDropdown role="Kalkulant" value={form.kalkulant} onValueChange={(v) => setForm(s => ({ ...s, kalkulant: v }))} placeholder="Vyberte kalkulanta" />
-                    )}
-                  </div>
-
                   {/* Rozpad ceny — admin only */}
                   {isAdmin && (
                     <RozpadCeny
@@ -875,7 +866,27 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                       }}
                       onChange={(updates) => setForm((s) => ({ ...s, ...updates }))}
                       readOnly={isSectionReadOnly("finance")}
+                      kalkulantSlot={
+                        <div>
+                          <Label className="text-xs">Kalkulant</Label>
+                          {isSectionReadOnly("finance") ? (
+                            <Input value={form.kalkulant || "—"} disabled className={roClass} />
+                          ) : (
+                            <PeopleSelectDropdown role="Kalkulant" value={form.kalkulant} onValueChange={(v) => setForm(s => ({ ...s, kalkulant: v }))} placeholder="Vyberte kalkulanta" />
+                          )}
+                        </div>
+                      }
                     />
+                  )}
+                  {!isAdmin && (
+                    <div>
+                      <Label className="text-xs">Kalkulant</Label>
+                      {isSectionReadOnly("finance") ? (
+                        <Input value={form.kalkulant || "—"} disabled className={roClass} />
+                      ) : (
+                        <PeopleSelectDropdown role="Kalkulant" value={form.kalkulant} onValueChange={(v) => setForm(s => ({ ...s, kalkulant: v }))} placeholder="Vyberte kalkulanta" />
+                      )}
+                    </div>
                   )}
                 </div>
 
