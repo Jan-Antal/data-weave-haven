@@ -52,60 +52,50 @@ export default function Login() {
         </div>
 
         {view === "login" && (
-          <div className="space-y-4">
-            <form onSubmit={handleLogin} className="bg-card border rounded-lg p-6 space-y-4 shadow-sm">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="vas@email.cz"
-                  required
-                  autoFocus
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Heslo</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                />
-              </div>
-
-              {error && (
-                <p className="text-sm text-destructive bg-destructive/10 rounded px-3 py-2">
-                  Nesprávný email nebo heslo
-                </p>
-              )}
-
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Přihlašování..." : "Přihlásit se"}
-              </Button>
-            </form>
-
-            {/* Divider */}
-            <div className="relative flex items-center">
-              <div className="flex-grow border-t border-border" />
-              <span className="mx-3 text-xs text-muted-foreground">nebo</span>
-              <div className="flex-grow border-t border-border" />
+          <form onSubmit={handleLogin} className="bg-card border rounded-lg p-6 space-y-4 shadow-sm">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="vas@email.cz"
+                required
+                autoFocus
+              />
             </div>
 
-            {/* Magic link button */}
-            <Button
-              variant="outline"
-              className="w-full"
+            <div className="space-y-2">
+              <Label htmlFor="password">Heslo</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
+            </div>
+
+            <button
+              type="button"
               onClick={() => { setError(null); setView("magic"); }}
+              className="text-[12px] text-muted-foreground hover:underline hover:text-foreground transition-colors"
             >
               Přihlásit se odkazem
+            </button>
+
+            {error && (
+              <p className="text-sm text-destructive bg-destructive/10 rounded px-3 py-2">
+                Nesprávný email nebo heslo
+              </p>
+            )}
+
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Přihlašování..." : "Přihlásit se"}
             </Button>
-          </div>
+          </form>
         )}
 
         {view === "magic" && (
