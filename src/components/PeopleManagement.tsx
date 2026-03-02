@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useAllPeople, useAddPerson } from "@/hooks/usePeople";
+import { useAuth } from "@/hooks/useAuth";
 import { Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -42,6 +43,7 @@ interface PeopleManagementProps {
 export function PeopleManagement({ open, onOpenChange }: PeopleManagementProps) {
   const { data: allPeople = [] } = useAllPeople();
   const addPerson = useAddPerson();
+  const { isAdmin } = useAuth();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -143,7 +145,7 @@ export function PeopleManagement({ open, onOpenChange }: PeopleManagementProps) 
                   {roles.map((r) => (
                     <TableHead key={r} className="w-[100px] text-center">{r}</TableHead>
                   ))}
-                  <TableHead className="w-[48px]" />
+                  {isAdmin && <TableHead className="w-[48px]" />}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -182,14 +184,16 @@ export function PeopleManagement({ open, onOpenChange }: PeopleManagementProps) 
                         </TableCell>
                       );
                     })}
-                    <TableCell className="py-2 px-2">
-                      <button
-                        onClick={() => setDeleteTarget(person.name)}
-                        className="text-muted-foreground hover:text-destructive transition-colors"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </TableCell>
+                    {isAdmin && (
+                      <TableCell className="py-2 px-2">
+                        <button
+                          onClick={() => setDeleteTarget(person.name)}
+                          className="text-muted-foreground hover:text-destructive transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
                 {addingNew && (
