@@ -11,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Trash2, KeyRound, ArrowRightLeft, Link2 } from "lucide-react";
 import type { AppRole } from "@/hooks/useAuth";
+import { PasswordChecklist } from "@/components/PasswordChecklist";
+import { usePasswordValidation } from "@/hooks/usePasswordValidation";
 
 interface UserRow {
   id: string;
@@ -36,6 +38,50 @@ const ROLE_LABELS: Record<AppRole, string> = {
 
 // Roles assignable via dropdown (owner excluded — can only be set via transfer)
 const ASSIGNABLE_ROLES: AppRole[] = ["admin", "pm", "konstrukter", "viewer"];
+
+function ResetPasswordDialog({
+  resetTarget, onClose, resetPassword, setResetPassword, resetError, resetSubmitting, onSubmit,
+}: {
+  resetTarget: string | null;
+  onClose: () => void;
+  resetPassword: string;
+  setResetPassword: (v: string) => void;
+  resetError: string;
+  resetSubmitting: boolean;
+  onSubmit: () => void;
+}) {
+  const validation = usePasswordValidation(resetPassword);
+  return (
+    <Dialog open={resetTarget !== null} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Reset hesla</DialogTitle>
+        </DialogHeader>
+        {resetError && (
+          <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded px-3 py-2">
+            {resetError}
+          </div>
+        )}
+        <div>
+          <Label>Nové heslo</Label>
+          <Input
+            type="text"
+            value={resetPassword}
+            onChange={(e) => setResetPassword(e.target.value)}
+            placeholder="Zadejte nové heslo..."
+          />
+          <PasswordChecklist password={resetPassword} />
+        </div>
+        <div className="flex justify-end gap-2 mt-2">
+          <Button variant="outline" onClick={onClose}>Zrušit</Button>
+          <Button onClick={onSubmit} disabled={resetSubmitting || !validation.isValid}>
+            {resetSubmitting ? "Ukládám..." : "Uložit nové heslo"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 interface Props {
   open: boolean;
@@ -65,7 +111,7 @@ export function UserManagement({ open, onOpenChange }: Props) {
     setCopyingLinkId(userId);
     try {
       const { data, error } = await supabase.functions.invoke("generate-invite-link", {
-        body: { user_id: userId },
+        body: { user_id: userId, origin_url: window.location.origin },
       });
       if (error || data?.error) {
         toast({ title: "Chyba", description: data?.error || error?.message, variant: "destructive" });
@@ -134,6 +180,7 @@ export function UserManagement({ open, onOpenChange }: Props) {
           email: newUser.email.trim(),
           full_name: newUser.full_name.trim(),
           role: newUser.role,
+          origin_url: window.location.origin,
         },
       });
 
@@ -212,12 +259,10 @@ export function UserManagement({ open, onOpenChange }: Props) {
       setResetError("Heslo je povinné");
       return;
     }
-    if (resetPassword.length < 8) {
-      setResetError("Heslo musí mít alespoň 8 znaků");
-      return;
-    }
-    if (resetPassword.length > 72) {
-      setResetError("Heslo může mít maximálně 72 znaků");
+    // Password policy is enforced by the dialog's disabled button, 
+    // but double-check here as well
+    if (resetPassword.length < 8 || !/[0-9!@#$%^&*_\-+=]/.test(resetPassword)) {
+      setResetError("Heslo nesplňuje požadavky");
       return;
     }
     setResetSubmitting(true);
@@ -435,33 +480,15 @@ export function UserManagement({ open, onOpenChange }: Props) {
       </Dialog>
 
       {/* Reset Password Dialog */}
-      <Dialog open={resetTarget !== null} onOpenChange={(v) => { if (!v) { setResetTarget(null); setResetPassword(""); setResetError(""); } }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Reset hesla</DialogTitle>
-          </DialogHeader>
-          {resetError && (
-            <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded px-3 py-2">
-              {resetError}
-            </div>
-          )}
-          <div>
-            <Label>Nové heslo</Label>
-            <Input
-              type="text"
-              value={resetPassword}
-              onChange={(e) => { setResetPassword(e.target.value); setResetError(""); }}
-              placeholder="Zadejte nové heslo..."
-            />
-          </div>
-          <div className="flex justify-end gap-2 mt-2">
-            <Button variant="outline" onClick={() => { setResetTarget(null); setResetPassword(""); setResetError(""); }}>Zrušit</Button>
-            <Button onClick={handleResetPassword} disabled={resetSubmitting || !resetPassword.trim()}>
-              {resetSubmitting ? "Ukládám..." : "Uložit nové heslo"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ResetPasswordDialog
+        resetTarget={resetTarget}
+        onClose={() => { setResetTarget(null); setResetPassword(""); setResetError(""); }}
+        resetPassword={resetPassword}
+        setResetPassword={(v) => { setResetPassword(v); setResetError(""); }}
+        resetError={resetError}
+        resetSubmitting={resetSubmitting}
+        onSubmit={handleResetPassword}
+      />
 
       {/* Transfer Ownership Dialog */}
       <Dialog open={transferOpen} onOpenChange={(v) => { if (!v) { setTransferOpen(false); setTransferTarget(""); } }}>
