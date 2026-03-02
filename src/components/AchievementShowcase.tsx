@@ -5,14 +5,20 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 interface AchievementShowcaseProps {
   earned: UserAchievement[];
+  userRole?: string;
 }
 
-export function AchievementShowcase({ earned }: AchievementShowcaseProps) {
+const KONSTRUKTER_KEYS = new Set(["konstr_1", "konstr_10", "konstr_25", "konstr_50", "konstr_100"]);
+
+export function AchievementShowcase({ earned, userRole }: AchievementShowcaseProps) {
   const earnedMap = Object.fromEntries(earned.map(e => [e.achievement_key, e]));
+  const filteredAchievements = ACHIEVEMENTS.filter(
+    (def) => !KONSTRUKTER_KEYS.has(def.key) || userRole === "konstrukter"
+  );
 
   return (
     <div className="grid grid-cols-6 gap-2">
-      {ACHIEVEMENTS.map((def) => {
+      {filteredAchievements.map((def) => {
         const achievement = earnedMap[def.key];
         const isEarned = !!achievement;
 

@@ -303,7 +303,7 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
 
           {/* ÚSPĚCHY */}
           <SectionHeader icon="🏆" label="Úspěchy" />
-          <AchievementShowcase earned={achievements} />
+          <AchievementShowcase earned={achievements} userRole={role || undefined} />
         </div>
 
         {/* Footer */}
