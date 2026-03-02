@@ -172,6 +172,70 @@ export function useProductionDragDrop() {
     }
   }, [invalidateAll]);
 
+  const completeItems = useCallback(async (itemIds: string[]) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const { error } = await supabase
+        .from("production_schedule")
+        .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user.id })
+        .in("id", itemIds);
+      if (error) throw error;
+      invalidateAll();
+      toast({ title: `${itemIds.length} položek přesunuto do Expedice` });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [invalidateAll]);
+
+  const returnToProduction = useCallback(async (scheduleItemId: string) => {
+    try {
+      const { error } = await supabase
+        .from("production_schedule")
+        .update({ status: "scheduled", completed_at: null, completed_by: null })
+        .eq("id", scheduleItemId);
+      if (error) throw error;
+      invalidateAll();
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [invalidateAll]);
+
+  const returnBundleToInbox = useCallback(async (projectId: string, weekDate: string) => {
+    try {
+      // Get all schedule items for this bundle
+      const { data: items, error: fetchErr } = await supabase
+        .from("production_schedule")
+        .select("id, inbox_item_id")
+        .eq("project_id", projectId)
+        .eq("scheduled_week", weekDate)
+        .in("status", ["scheduled", "in_progress"]);
+      if (fetchErr) throw fetchErr;
+      if (!items || items.length === 0) return;
+
+      const ids = items.map((i) => i.id);
+      const inboxIds = items.map((i) => i.inbox_item_id).filter(Boolean) as string[];
+
+      // Delete schedule rows
+      const { error: delErr } = await supabase.from("production_schedule").delete().in("id", ids);
+      if (delErr) throw delErr;
+
+      // Restore inbox items
+      if (inboxIds.length > 0) {
+        const { error: updateErr } = await supabase
+          .from("production_inbox")
+          .update({ status: "pending" })
+          .in("id", inboxIds);
+        if (updateErr) throw updateErr;
+      }
+
+      invalidateAll();
+      toast({ title: `${items.length} položek vráceno do Inboxu` });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [invalidateAll]);
+
   return {
     moveInboxItemToWeek,
     moveInboxProjectToWeek,
@@ -179,5 +243,8 @@ export function useProductionDragDrop() {
     moveBundleToWeek,
     moveItemBackToInbox,
     reorderItemsInWeek,
+    completeItems,
+    returnToProduction,
+    returnBundleToInbox,
   };
 }
