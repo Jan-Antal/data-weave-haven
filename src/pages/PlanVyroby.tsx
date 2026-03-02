@@ -41,6 +41,9 @@ export default function PlanVyroby() {
     moveItemBackToInbox,
   } = useProductionDragDrop();
 
+  // Global Escape key handler for context menus
+  // (context menus handle their own Escape internally)
+
   useEffect(() => {
     if (!loading && !isAdmin) {
       navigate("/", { replace: true });

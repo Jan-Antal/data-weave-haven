@@ -1,9 +1,13 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { GripVertical, ChevronRight } from "lucide-react";
 import { useProductionSchedule, getISOWeekNumber, type WeekSilo, type ScheduleBundle, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { getProjectColor } from "@/lib/projectColors";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
+import { CompletionDialog } from "./CompletionDialog";
+import { SpillSuggestionPanel } from "./SpillSuggestionPanel";
+import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 
 function getMonday(date: Date): Date {
   const d = new Date(date);
@@ -26,9 +30,28 @@ interface Props {
   overDroppableId?: string | null;
 }
 
+// Context menu state shared across silos
+interface ContextMenuState {
+  x: number;
+  y: number;
+  actions: ContextMenuAction[];
+}
+
+interface CompletionState {
+  projectName: string;
+  projectId: string;
+  weekLabel: string;
+  items: ScheduleItem[];
+  preCheckedIds?: string[];
+}
+
 export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
+  const { moveItemBackToInbox, returnBundleToInbox } = useProductionDragDrop();
+
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [completionState, setCompletionState] = useState<CompletionState | null>(null);
 
   const weeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
 
@@ -45,6 +68,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
     return result;
   }, []);
 
+  const weekKeys = useMemo(() => weeks.map((w) => w.key), [weeks]);
+
   const periodLabel = useMemo(() => {
     if (weeks.length === 0) return "";
     const first = weeks[0].start;
@@ -54,6 +79,85 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
   }, [weeks]);
 
   const currentWeekKey = useMemo(() => getMonday(new Date()).toISOString().split("T")[0], []);
+
+  // Build a simple map for spill panel
+  const weeksCapacityMap = useMemo(() => {
+    const map = new Map<string, { total_hours: number }>();
+    if (scheduleData) {
+      for (const [key, silo] of scheduleData) {
+        map.set(key, { total_hours: silo.total_hours });
+      }
+    }
+    return map;
+  }, [scheduleData]);
+
+  const handleBundleContextMenu = useCallback(
+    (e: React.MouseEvent, bundle: ScheduleBundle, weekKey: string, weekNum: number, startDate: Date, endDate: Date, toggleExpand: () => void) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        actions: [
+          {
+            label: "Dokončit položky → Expedice",
+            icon: "✓",
+            onClick: () => {
+              setCompletionState({
+                projectName: bundle.project_name,
+                projectId: bundle.project_id,
+                weekLabel: `Výroba T${weekNum} · ${formatDateShort(startDate)} – ${formatDateShort(endDate)}`,
+                items: bundle.items,
+              });
+            },
+          },
+          {
+            label: "Vrátit do Inboxu",
+            icon: "←",
+            onClick: () => returnBundleToInbox(bundle.project_id, weekKey),
+          },
+          {
+            label: "Rozbalit / Sbalit",
+            icon: "⇅",
+            onClick: toggleExpand,
+          },
+        ],
+      });
+    },
+    [returnBundleToInbox]
+  );
+
+  const handleItemContextMenu = useCallback(
+    (e: React.MouseEvent, item: ScheduleItem, weekKey: string, weekNum: number, startDate: Date, endDate: Date, bundle: ScheduleBundle) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        actions: [
+          {
+            label: "Dokončit tuto položku → Expedice",
+            icon: "✓",
+            onClick: () => {
+              setCompletionState({
+                projectName: bundle.project_name,
+                projectId: bundle.project_id,
+                weekLabel: `Výroba T${weekNum} · ${formatDateShort(startDate)} – ${formatDateShort(endDate)}`,
+                items: bundle.items,
+                preCheckedIds: [item.id],
+              });
+            },
+          },
+          {
+            label: "Vrátit do Inboxu",
+            icon: "←",
+            onClick: () => moveItemBackToInbox(item.id),
+          },
+        ],
+      });
+    },
+    [moveItemBackToInbox]
+  );
 
   return (
     <div className="flex-1 flex flex-col min-w-0">
@@ -86,10 +190,37 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
               showCzk={showCzk}
               hourlyRate={settings?.hourly_rate ?? 550}
               isOverTarget={overDroppableId === `silo-week-${week.key}`}
+              onBundleContextMenu={(e, bundle, toggleExpand) =>
+                handleBundleContextMenu(e, bundle, week.key, week.weekNum, week.start, week.end, toggleExpand)
+              }
+              onItemContextMenu={(e, item, bundle) =>
+                handleItemContextMenu(e, item, week.key, week.weekNum, week.start, week.end, bundle)
+              }
+              allWeeksData={weeksCapacityMap}
+              weekKeys={weekKeys}
             />
           ))}
         </div>
       </div>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <ProductionContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          actions={contextMenu.actions}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {/* Completion dialog */}
+      {completionState && (
+        <CompletionDialog
+          open={!!completionState}
+          onOpenChange={(open) => !open && setCompletionState(null)}
+          {...completionState}
+        />
+      )}
     </div>
   );
 }
@@ -123,9 +254,17 @@ interface SiloProps {
   showCzk: boolean;
   hourlyRate: number;
   isOverTarget: boolean;
+  onBundleContextMenu: (e: React.MouseEvent, bundle: ScheduleBundle, toggleExpand: () => void) => void;
+  onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem, bundle: ScheduleBundle) => void;
+  allWeeksData: Map<string, { total_hours: number }>;
+  weekKeys: string[];
 }
 
-function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, silo, weeklyCapacity, showCzk, hourlyRate, isOverTarget }: SiloProps) {
+function SiloColumn({
+  weekKey, weekNum, startDate, endDate, isCurrent, silo, weeklyCapacity,
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu,
+  allWeeksData, weekKeys,
+}: SiloProps) {
   const totalHours = silo?.total_hours ?? 0;
   const pct = weeklyCapacity > 0 ? (totalHours / weeklyCapacity) * 100 : 0;
   const isOverloaded = pct > 100;
@@ -204,28 +343,40 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, silo, wee
           </div>
         )}
         {silo?.bundles.map((bundle) => (
-          <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey} showCzk={showCzk} hourlyRate={hourlyRate} />
+          <CollapsibleBundleCard
+            key={bundle.project_id}
+            bundle={bundle}
+            weekKey={weekKey}
+            showCzk={showCzk}
+            hourlyRate={hourlyRate}
+            onBundleContextMenu={onBundleContextMenu}
+            onItemContextMenu={onItemContextMenu}
+          />
         ))}
       </div>
 
-      {/* Overload banner */}
-      {isOverloaded && (
-        <div
-          className="px-2 py-[3px] text-[9px] font-semibold text-center"
-          style={{
-            backgroundColor: "rgba(239,68,68,0.06)",
-            color: "#dc3545",
-            borderRadius: "0 0 8px 8px",
-          }}
-        >
-          ⚠ Přetížení +{Math.round(overloadHours)}h
-        </div>
+      {/* Spill suggestion or simple overload banner */}
+      {isOverloaded && silo && (
+        <SpillSuggestionPanel
+          overloadHours={overloadHours}
+          bundles={silo.bundles}
+          weekKey={weekKey}
+          allWeeksData={allWeeksData}
+          weeklyCapacity={weeklyCapacity}
+          weekKeys={weekKeys}
+        />
       )}
     </div>
   );
 }
 
-function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate }: { bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number }) {
+function CollapsibleBundleCard({
+  bundle, weekKey, showCzk, hourlyRate, onBundleContextMenu, onItemContextMenu,
+}: {
+  bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number;
+  onBundleContextMenu: (e: React.MouseEvent, bundle: ScheduleBundle, toggleExpand: () => void) => void;
+  onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem, bundle: ScheduleBundle) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const color = getProjectColor(bundle.project_id);
 
@@ -241,6 +392,8 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate }: { bundl
     },
   });
 
+  const toggleExpand = useCallback(() => setExpanded((v) => !v), []);
+
   return (
     <div
       className="rounded-[6px] overflow-hidden"
@@ -251,7 +404,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate }: { bundl
         opacity: isDragging ? 0.3 : 1,
       }}
     >
-      {/* Bundle header — draggable + collapsible */}
+      {/* Bundle header */}
       <div
         ref={setDragRef}
         {...attributes}
@@ -259,9 +412,9 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate }: { bundl
         className="flex items-center gap-1 px-[6px] py-[5px] cursor-grab"
         style={{ borderBottom: expanded ? "1px solid #ece8e2" : "none" }}
         onClick={(e) => {
-          // Only toggle if not dragging (click vs drag)
           if (!(e as any).__isDrag) setExpanded(!expanded);
         }}
+        onContextMenu={(e) => onBundleContextMenu(e, bundle, toggleExpand)}
       >
         <ChevronRight
           className="shrink-0 transition-transform duration-150"
@@ -284,7 +437,13 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate }: { bundl
       {expanded && (
         <div className="px-[3px] py-[2px]">
           {bundle.items.map((item) => (
-            <DraggableSiloItem key={item.id} item={item} weekKey={weekKey} showCzk={showCzk} />
+            <DraggableSiloItem
+              key={item.id}
+              item={item}
+              weekKey={weekKey}
+              showCzk={showCzk}
+              onContextMenu={(e) => onItemContextMenu(e, item, bundle)}
+            />
           ))}
         </div>
       )}
@@ -292,7 +451,12 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate }: { bundl
   );
 }
 
-function DraggableSiloItem({ item, weekKey, showCzk }: { item: ScheduleItem; weekKey: string; showCzk: boolean }) {
+function DraggableSiloItem({
+  item, weekKey, showCzk, onContextMenu,
+}: {
+  item: ScheduleItem; weekKey: string; showCzk: boolean;
+  onContextMenu: (e: React.MouseEvent) => void;
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `silo-item-${item.id}`,
     data: {
@@ -315,6 +479,7 @@ function DraggableSiloItem({ item, weekKey, showCzk }: { item: ScheduleItem; wee
       style={{ opacity: isDragging ? 0.3 : 1 }}
       onMouseEnter={(e) => { if (!isDragging) e.currentTarget.style.backgroundColor = "#f8f7f5"; }}
       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+      onContextMenu={onContextMenu}
     >
       <GripVertical className="shrink-0" style={{ width: 8, height: 8, color: "#99a5a3" }} />
       <span className="text-[9px] flex-1 truncate" style={{ color: "#223937" }}>

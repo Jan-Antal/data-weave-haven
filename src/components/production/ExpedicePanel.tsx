@@ -1,11 +1,53 @@
-import { useState } from "react";
-import { useProductionExpedice } from "@/hooks/useProductionSchedule";
+import { useState, useCallback } from "react";
+import { useProductionExpedice, type ScheduleItem } from "@/hooks/useProductionSchedule";
+import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 import { getProjectColor } from "@/lib/projectColors";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
+
+interface ContextMenuState {
+  x: number;
+  y: number;
+  actions: ContextMenuAction[];
+}
 
 export function ExpedicePanel() {
   const { data: projects = [] } = useProductionExpedice();
+  const { returnToProduction, moveItemBackToInbox } = useProductionDragDrop();
   const [collapsed, setCollapsed] = useState(true);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+
+  const handleItemContextMenu = useCallback(
+    (e: React.MouseEvent, item: ScheduleItem) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const weekNum = (() => {
+        const d = new Date(item.scheduled_week);
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+      })();
+
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        actions: [
+          {
+            label: `Vrátit do výroby (T${weekNum})`,
+            icon: "↩",
+            onClick: () => returnToProduction(item.id),
+          },
+          {
+            label: "Vrátit do Inboxu",
+            icon: "↩",
+            onClick: () => moveItemBackToInbox(item.id),
+          },
+        ],
+      });
+    },
+    [returnToProduction, moveItemBackToInbox]
+  );
 
   if (collapsed) {
     return (
@@ -89,7 +131,13 @@ export function ExpedicePanel() {
             </div>
             <div className="space-y-[2px]">
               {group.items.map((item) => (
-                <div key={item.id} className="flex items-center gap-1.5">
+                <div
+                  key={item.id}
+                  className="flex items-center gap-1.5 rounded px-1 py-[2px] cursor-default transition-colors"
+                  onContextMenu={(e) => handleItemContextMenu(e, item)}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                >
                   <Check className="shrink-0" style={{ width: 12, height: 12, color: "#3a8a36", strokeWidth: 3 }} />
                   <span className="text-[10px] truncate flex-1" style={{ color: "#6b7a78" }}>
                     {item.item_name}
@@ -105,6 +153,16 @@ export function ExpedicePanel() {
           </div>
         ))}
       </div>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <ProductionContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          actions={contextMenu.actions}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 }
