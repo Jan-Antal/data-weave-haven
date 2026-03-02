@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
 import { ChevronRight, GripVertical } from "lucide-react";
-import { useProductionInbox, type InboxProject } from "@/hooks/useProductionInbox";
+import { useProductionInbox, type InboxProject, type InboxItem } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { getProjectColor } from "@/lib/projectColors";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 
 const SAMPLE_ITEMS = [
   { pid: "Z-2601-001", items: [{ name: "Kuchyňská linka A", h: 120 }, { name: "Obývací stěna", h: 85 }, { name: "Vestavěné skříně", h: 95 }] },
@@ -16,14 +17,22 @@ const SAMPLE_ITEMS = [
   { pid: "Z-2607-002", items: [{ name: "Skříň PPF Gate", h: 280 }] },
 ];
 
-export function InboxPanel() {
+interface InboxPanelProps {
+  overDroppableId?: string | null;
+}
+
+export function InboxPanel({ overDroppableId }: InboxPanelProps) {
   const { data: projects = [], isLoading } = useProductionInbox();
   const { data: settings } = useProductionSettings();
   const qc = useQueryClient();
   const [loading, setLoading] = useState(false);
 
+  const { setNodeRef, isOver } = useDroppable({ id: "inbox-drop-zone" });
+
   const totalHours = useMemo(() => projects.reduce((s, p) => s + p.total_hours, 0), [projects]);
   const hourlyRate = settings?.hourly_rate ?? 550;
+
+  const isHighlighted = isOver || overDroppableId === "inbox-drop-zone";
 
   const handleSeedData = async () => {
     setLoading(true);
@@ -93,7 +102,15 @@ export function InboxPanel() {
   };
 
   return (
-    <div className="w-[270px] shrink-0 flex flex-col" style={{ borderRight: "1px solid #ece8e2" }}>
+    <div
+      ref={setNodeRef}
+      className="w-[270px] shrink-0 flex flex-col transition-colors"
+      style={{
+        borderRight: "1px solid #ece8e2",
+        backgroundColor: isHighlighted ? "rgba(59,130,246,0.04)" : undefined,
+        boxShadow: isHighlighted ? "inset 0 0 0 2px #3b82f6" : undefined,
+      }}
+    >
       {/* Header */}
       <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "1px solid #ece8e2" }}>
         <div className="flex items-center gap-2">
@@ -150,7 +167,6 @@ function InboxProjectGroup({ project, hourlyRate }: { project: InboxProject; hou
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center gap-1.5 px-2.5 py-2 text-left transition-colors"
-        style={{ backgroundColor: expanded ? "transparent" : "transparent" }}
         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f0eee9")}
         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
       >
@@ -180,49 +196,94 @@ function InboxProjectGroup({ project, hourlyRate }: { project: InboxProject; hou
       {expanded && (
         <div className="px-2 pb-2 space-y-[2px]">
           {project.items.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center gap-1.5 px-2 py-[5px] rounded-[5px] cursor-grab transition-all"
-              style={{ backgroundColor: "#f0eee9" }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(59,130,246,0.06)";
-                e.currentTarget.style.boxShadow = "inset 0 0 0 1px #3b82f6";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#f0eee9";
-                e.currentTarget.style.boxShadow = "none";
-              }}
-            >
-              <GripVertical className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />
-              <span className="text-[10px] font-medium flex-1 truncate" style={{ color: "#223937" }}>
-                {item.item_name}
-              </span>
-              <span className="font-mono text-[9px] shrink-0" style={{ color: "#6b7a78" }}>
-                {item.estimated_hours}h
-              </span>
-            </div>
+            <DraggableInboxItem key={item.id} item={item} projectName={project.project_name} />
           ))}
           {/* Drag whole project */}
-          <div
-            className="flex items-center justify-center px-2 py-[5px] rounded-[5px] cursor-grab transition-all text-[9px] font-semibold"
-            style={{
-              border: "1.5px dashed #3a8a36",
-              backgroundColor: "rgba(58,138,54,0.08)",
-              color: "#3a8a36",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderStyle = "solid";
-              e.currentTarget.style.backgroundColor = "rgba(58,138,54,0.14)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderStyle = "dashed";
-              e.currentTarget.style.backgroundColor = "rgba(58,138,54,0.08)";
-            }}
-          >
-            Přetáhni celý projekt ({Math.round(project.total_hours)}h)
-          </div>
+          <DraggableInboxProject project={project} />
         </div>
       )}
+    </div>
+  );
+}
+
+function DraggableInboxItem({ item, projectName }: { item: InboxItem; projectName: string }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `inbox-item-${item.id}`,
+    data: {
+      type: "inbox-item",
+      itemId: item.id,
+      itemName: item.item_name,
+      projectId: item.project_id,
+      projectName,
+      hours: item.estimated_hours,
+    },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className="flex items-center gap-1.5 px-2 py-[5px] rounded-[5px] cursor-grab transition-all"
+      style={{
+        backgroundColor: "#f0eee9",
+        opacity: isDragging ? 0.3 : 1,
+      }}
+      onMouseEnter={(e) => {
+        if (!isDragging) {
+          e.currentTarget.style.backgroundColor = "rgba(59,130,246,0.06)";
+          e.currentTarget.style.boxShadow = "inset 0 0 0 1px #3b82f6";
+        }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "#f0eee9";
+        e.currentTarget.style.boxShadow = "none";
+      }}
+    >
+      <GripVertical className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />
+      <span className="text-[10px] font-medium flex-1 truncate" style={{ color: "#223937" }}>
+        {item.item_name}
+      </span>
+      <span className="font-mono text-[9px] shrink-0" style={{ color: "#6b7a78" }}>
+        {item.estimated_hours}h
+      </span>
+    </div>
+  );
+}
+
+function DraggableInboxProject({ project }: { project: InboxProject }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `inbox-project-${project.project_id}`,
+    data: {
+      type: "inbox-project",
+      projectId: project.project_id,
+      projectName: project.project_name,
+      hours: project.total_hours,
+    },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className="flex items-center justify-center px-2 py-[5px] rounded-[5px] cursor-grab transition-all text-[9px] font-semibold"
+      style={{
+        border: "1.5px dashed #3a8a36",
+        backgroundColor: "rgba(58,138,54,0.08)",
+        color: "#3a8a36",
+        opacity: isDragging ? 0.3 : 1,
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderStyle = "solid";
+        e.currentTarget.style.backgroundColor = "rgba(58,138,54,0.14)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderStyle = "dashed";
+        e.currentTarget.style.backgroundColor = "rgba(58,138,54,0.08)";
+      }}
+    >
+      Přetáhni celý projekt ({Math.round(project.total_hours)}h)
     </div>
   );
 }
