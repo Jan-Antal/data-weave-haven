@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { GripVertical } from "lucide-react";
+import { useMemo, useState } from "react";
+import { GripVertical, ChevronRight } from "lucide-react";
 import { useProductionSchedule, getISOWeekNumber, type WeekSilo, type ScheduleBundle, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { getProjectColor } from "@/lib/projectColors";
@@ -140,7 +140,6 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, silo, wee
     : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
 
   const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}` });
-
   const highlighted = isOver || isOverTarget;
   const dropBorderColor = highlighted
     ? isOverloaded ? "#d97706" : "#3b82f6"
@@ -151,7 +150,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, silo, wee
       ref={setNodeRef}
       className="w-[175px] shrink-0 flex flex-col transition-all"
       style={{
-        backgroundColor: highlighted ? "rgba(59,130,246,0.04)" : "#ffffff",
+        backgroundColor: "#ffffff",
         borderRadius: 9,
         border: highlighted
           ? `2px solid ${dropBorderColor}`
@@ -199,16 +198,13 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, silo, wee
         {(!silo || silo.bundles.length === 0) && (
           <div
             className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all"
-            style={{
-              border: "1.5px dashed #e2ddd6",
-              animation: highlighted ? "pulse 1.5s ease-in-out infinite" : undefined,
-            }}
+            style={{ border: "1.5px dashed #e2ddd6" }}
           >
             <span className="text-[9px] text-center" style={{ color: "#99a5a3" }}>Přetáhni sem z Inboxu</span>
           </div>
         )}
         {silo?.bundles.map((bundle) => (
-          <DraggableBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey} showCzk={showCzk} hourlyRate={hourlyRate} />
+          <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey} showCzk={showCzk} hourlyRate={hourlyRate} />
         ))}
       </div>
 
@@ -229,7 +225,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, silo, wee
   );
 }
 
-function DraggableBundleCard({ bundle, weekKey, showCzk, hourlyRate }: { bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number }) {
+function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate }: { bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number }) {
+  const [expanded, setExpanded] = useState(false);
   const color = getProjectColor(bundle.project_id);
 
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
@@ -249,18 +246,27 @@ function DraggableBundleCard({ bundle, weekKey, showCzk, hourlyRate }: { bundle:
       className="rounded-[6px] overflow-hidden"
       style={{
         border: "1px solid #ece8e2",
+        borderLeft: `4px solid ${color}`,
         backgroundColor: "#ffffff",
         opacity: isDragging ? 0.3 : 1,
       }}
     >
-      {/* Bundle header — draggable as bundle */}
+      {/* Bundle header — draggable + collapsible */}
       <div
         ref={setDragRef}
         {...attributes}
         {...listeners}
-        className="flex items-center gap-1.5 px-[7px] py-[5px] cursor-grab"
-        style={{ backgroundColor: "#f0eee9", borderLeft: `4px solid ${color}` }}
+        className="flex items-center gap-1 px-[6px] py-[5px] cursor-grab"
+        style={{ borderBottom: expanded ? "1px solid #ece8e2" : "none" }}
+        onClick={(e) => {
+          // Only toggle if not dragging (click vs drag)
+          if (!(e as any).__isDrag) setExpanded(!expanded);
+        }}
       >
+        <ChevronRight
+          className="shrink-0 transition-transform duration-150"
+          style={{ width: 10, height: 10, color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}
+        />
         <div className="flex-1 min-w-0">
           <div className="text-[9px] font-semibold truncate" style={{ color: "#223937" }}>
             {bundle.project_name}
@@ -273,12 +279,15 @@ function DraggableBundleCard({ bundle, weekKey, showCzk, hourlyRate }: { bundle:
           {Math.round(bundle.total_hours)}h
         </span>
       </div>
-      {/* Items */}
-      <div className="px-[3px] py-[2px]">
-        {bundle.items.map((item) => (
-          <DraggableSiloItem key={item.id} item={item} weekKey={weekKey} showCzk={showCzk} />
-        ))}
-      </div>
+
+      {/* Items — only when expanded */}
+      {expanded && (
+        <div className="px-[3px] py-[2px]">
+          {bundle.items.map((item) => (
+            <DraggableSiloItem key={item.id} item={item} weekKey={weekKey} showCzk={showCzk} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -304,11 +313,11 @@ function DraggableSiloItem({ item, weekKey, showCzk }: { item: ScheduleItem; wee
       {...listeners}
       className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-grab transition-colors"
       style={{ opacity: isDragging ? 0.3 : 1 }}
-      onMouseEnter={(e) => { if (!isDragging) e.currentTarget.style.backgroundColor = "#f0eee9"; }}
+      onMouseEnter={(e) => { if (!isDragging) e.currentTarget.style.backgroundColor = "#f8f7f5"; }}
       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
     >
       <GripVertical className="shrink-0" style={{ width: 8, height: 8, color: "#99a5a3" }} />
-      <span className="text-[9px] flex-1 truncate" style={{ color: "#6b7a78" }}>
+      <span className="text-[9px] flex-1 truncate" style={{ color: "#223937" }}>
         {item.item_name}
       </span>
       <span className="font-mono text-[8px] shrink-0" style={{ color: "#99a5a3" }}>

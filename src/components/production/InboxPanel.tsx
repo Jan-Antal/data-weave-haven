@@ -26,13 +26,17 @@ export function InboxPanel({ overDroppableId }: InboxPanelProps) {
   const { data: settings } = useProductionSettings();
   const qc = useQueryClient();
   const [loading, setLoading] = useState(false);
+  const [allExpanded, setAllExpanded] = useState(false);
+  const [expandKey, setExpandKey] = useState(0);
 
   const { setNodeRef, isOver } = useDroppable({ id: "inbox-drop-zone" });
 
   const totalHours = useMemo(() => projects.reduce((s, p) => s + p.total_hours, 0), [projects]);
   const hourlyRate = settings?.hourly_rate ?? 550;
-
   const isHighlighted = isOver || overDroppableId === "inbox-drop-zone";
+
+  const handleExpandAll = () => { setAllExpanded(true); setExpandKey((k) => k + 1); };
+  const handleCollapseAll = () => { setAllExpanded(false); setExpandKey((k) => k + 1); };
 
   const handleSeedData = async () => {
     setLoading(true);
@@ -107,7 +111,7 @@ export function InboxPanel({ overDroppableId }: InboxPanelProps) {
       className="w-[270px] shrink-0 flex flex-col transition-colors"
       style={{
         borderRight: "1px solid #ece8e2",
-        backgroundColor: isHighlighted ? "rgba(59,130,246,0.04)" : undefined,
+        backgroundColor: isHighlighted ? "rgba(59,130,246,0.04)" : "#ffffff",
         boxShadow: isHighlighted ? "inset 0 0 0 2px #3b82f6" : undefined,
       }}
     >
@@ -125,9 +129,18 @@ export function InboxPanel({ overDroppableId }: InboxPanelProps) {
             </span>
           )}
         </div>
-        <span className="font-mono text-[11px] font-medium" style={{ color: "#6b7a78" }}>
-          {Math.round(totalHours).toLocaleString("cs-CZ")}h
-        </span>
+        <div className="flex items-center gap-1">
+          {projects.length > 0 && (
+            <>
+              <button onClick={handleExpandAll} className="text-[9px] hover:underline" style={{ color: "#6b7a78" }}>Rozbalit</button>
+              <span className="text-[9px]" style={{ color: "#99a5a3" }}>|</span>
+              <button onClick={handleCollapseAll} className="text-[9px] hover:underline" style={{ color: "#6b7a78" }}>Sbalit</button>
+              <span className="text-[9px] ml-1.5 font-mono font-medium" style={{ color: "#6b7a78" }}>
+                {Math.round(totalHours).toLocaleString("cs-CZ")}h
+              </span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Items */}
@@ -135,26 +148,32 @@ export function InboxPanel({ overDroppableId }: InboxPanelProps) {
         {projects.length === 0 && !isLoading && (
           <div className="text-center py-8">
             <p className="text-[10px] mb-3" style={{ color: "#99a5a3" }}>Inbox je prázdný</p>
-            <button
-              onClick={handleSeedData}
-              disabled={loading}
-              className="text-[10px] underline transition-colors hover:opacity-70"
-              style={{ color: "#d97706" }}
-            >
-              {loading ? "Vkládám..." : "🧪 Naplnit testovací data"}
-            </button>
           </div>
         )}
         {projects.map((project) => (
-          <InboxProjectGroup key={project.project_id} project={project} hourlyRate={hourlyRate} />
+          <InboxProjectGroup key={`${project.project_id}-${expandKey}`} project={project} hourlyRate={hourlyRate} defaultExpanded={allExpanded} />
         ))}
       </div>
+
+      {/* Subtle test data button at bottom */}
+      {projects.length === 0 && !isLoading && (
+        <div className="px-3 py-2 text-center" style={{ borderTop: "1px solid #ece8e2" }}>
+          <button
+            onClick={handleSeedData}
+            disabled={loading}
+            className="text-[9px] hover:underline transition-colors"
+            style={{ color: "#99a5a3" }}
+          >
+            🧪 {loading ? "Vkládám..." : "Naplnit testovací data"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function InboxProjectGroup({ project, hourlyRate }: { project: InboxProject; hourlyRate: number }) {
-  const [expanded, setExpanded] = useState(true);
+function InboxProjectGroup({ project, hourlyRate, defaultExpanded }: { project: InboxProject; hourlyRate: number; defaultExpanded: boolean }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const color = getProjectColor(project.project_id);
   const totalCzkK = Math.round((project.total_hours * hourlyRate) / 1000);
 
@@ -163,11 +182,10 @@ function InboxProjectGroup({ project, hourlyRate }: { project: InboxProject; hou
       className="rounded-lg overflow-hidden"
       style={{ backgroundColor: "#ffffff", border: "1px solid #ece8e2", borderLeft: `4px solid ${color}` }}
     >
-      {/* Project header */}
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center gap-1.5 px-2.5 py-2 text-left transition-colors"
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f0eee9")}
+        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
       >
         <ChevronRight
@@ -192,13 +210,11 @@ function InboxProjectGroup({ project, hourlyRate }: { project: InboxProject; hou
         </div>
       </button>
 
-      {/* Expanded items */}
       {expanded && (
         <div className="px-2 pb-2 space-y-[2px]">
           {project.items.map((item) => (
             <DraggableInboxItem key={item.id} item={item} projectName={project.project_name} />
           ))}
-          {/* Drag whole project */}
           <DraggableInboxProject project={project} />
         </div>
       )}
@@ -226,18 +242,19 @@ function DraggableInboxItem({ item, projectName }: { item: InboxItem; projectNam
       {...listeners}
       className="flex items-center gap-1.5 px-2 py-[5px] rounded-[5px] cursor-grab transition-all"
       style={{
-        backgroundColor: "#f0eee9",
+        backgroundColor: "#ffffff",
+        border: "1px solid #ece8e2",
         opacity: isDragging ? 0.3 : 1,
       }}
       onMouseEnter={(e) => {
         if (!isDragging) {
-          e.currentTarget.style.backgroundColor = "rgba(59,130,246,0.06)";
-          e.currentTarget.style.boxShadow = "inset 0 0 0 1px #3b82f6";
+          e.currentTarget.style.backgroundColor = "rgba(59,130,246,0.04)";
+          e.currentTarget.style.borderColor = "#3b82f6";
         }
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = "#f0eee9";
-        e.currentTarget.style.boxShadow = "none";
+        e.currentTarget.style.backgroundColor = "#ffffff";
+        e.currentTarget.style.borderColor = "#ece8e2";
       }}
     >
       <GripVertical className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />
@@ -270,17 +287,17 @@ function DraggableInboxProject({ project }: { project: InboxProject }) {
       className="flex items-center justify-center px-2 py-[5px] rounded-[5px] cursor-grab transition-all text-[9px] font-semibold"
       style={{
         border: "1.5px dashed #3a8a36",
-        backgroundColor: "rgba(58,138,54,0.08)",
+        backgroundColor: "rgba(58,138,54,0.05)",
         color: "#3a8a36",
         opacity: isDragging ? 0.3 : 1,
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderStyle = "solid";
-        e.currentTarget.style.backgroundColor = "rgba(58,138,54,0.14)";
+        e.currentTarget.style.backgroundColor = "rgba(58,138,54,0.1)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderStyle = "dashed";
-        e.currentTarget.style.backgroundColor = "rgba(58,138,54,0.08)";
+        e.currentTarget.style.backgroundColor = "rgba(58,138,54,0.05)";
       }}
     >
       Přetáhni celý projekt ({Math.round(project.total_hours)}h)
