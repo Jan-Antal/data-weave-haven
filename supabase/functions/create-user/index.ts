@@ -7,37 +7,7 @@ const corsHeaders = {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const VALID_ROLES = ["admin", "pm", "konstrukter", "viewer"];
-const DEFAULT_APP_ORIGIN = "https://projekty.am-interior.cz";
-
-const resolveAppOrigin = (originUrl: unknown, req: Request): string => {
-  if (typeof originUrl === "string" && originUrl.trim()) {
-    try {
-      return new URL(originUrl).origin;
-    } catch {
-      // fallback below
-    }
-  }
-
-  const headerOrigin = req.headers.get("origin");
-  if (headerOrigin) {
-    try {
-      return new URL(headerOrigin).origin;
-    } catch {
-      // fallback below
-    }
-  }
-
-  const referer = req.headers.get("referer");
-  if (referer) {
-    try {
-      return new URL(referer).origin;
-    } catch {
-      // fallback below
-    }
-  }
-
-  return DEFAULT_APP_ORIGIN;
-};
+const PRODUCTION_ORIGIN = "https://projekty.am-interior.cz";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -86,7 +56,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { email, full_name, role, origin_url } = await req.json();
+    const { email, full_name, role } = await req.json();
 
     // Validate required fields (no password needed — invite flow)
     if (!email || !full_name || !role) {
@@ -121,7 +91,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const redirectTo = `${resolveAppOrigin(origin_url, req)}/auth/callback`;
+    const redirectTo = `${PRODUCTION_ORIGIN}/auth/callback`;
 
     // Invite user by email (sends invite email, no password needed)
     const { data: newUser, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {

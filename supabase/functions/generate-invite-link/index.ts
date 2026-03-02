@@ -5,38 +5,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const DEFAULT_APP_ORIGIN = "https://projekty.am-interior.cz";
+const PRODUCTION_ORIGIN = "https://projekty.am-interior.cz";
 type InviteMode = "link" | "send_email";
-
-const resolveAppOrigin = (originUrl: unknown, req: Request): string => {
-  if (typeof originUrl === "string" && originUrl.trim()) {
-    try {
-      return new URL(originUrl).origin;
-    } catch {
-      // fallback below
-    }
-  }
-
-  const headerOrigin = req.headers.get("origin");
-  if (headerOrigin) {
-    try {
-      return new URL(headerOrigin).origin;
-    } catch {
-      // fallback below
-    }
-  }
-
-  const referer = req.headers.get("referer");
-  if (referer) {
-    try {
-      return new URL(referer).origin;
-    } catch {
-      // fallback below
-    }
-  }
-
-  return DEFAULT_APP_ORIGIN;
-};
 
 const isAlreadyRegisteredError = (message?: string, code?: string) =>
   Boolean(message?.includes("already been registered") || code === "email_exists");
@@ -113,7 +83,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const redirectTo = `${resolveAppOrigin(origin_url, req)}/auth/callback`;
+    const redirectTo = `${PRODUCTION_ORIGIN}/auth/callback`;
 
     if (mode === "send_email") {
       const { data: authUserData, error: authUserError } = await adminClient.auth.admin.getUserById(user_id);
