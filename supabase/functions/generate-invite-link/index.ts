@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { user_id } = await req.json();
+    const { user_id, origin_url } = await req.json();
     if (!user_id) {
       return new Response(JSON.stringify({ error: "user_id is required" }), {
         status: 400,
@@ -71,7 +71,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const redirectTo = "https://id-preview--ce3e87ee-9f18-44df-921b-691cc44882ec.lovable.app/accept-invite";
+    // Use dynamic redirect URL from the calling app
+    const redirectTo = origin_url
+      ? `${String(origin_url).replace(/\/$/, "")}/accept-invite`
+      : `${req.headers.get("origin") || "https://projekty.am-interior.cz"}/accept-invite`;
 
     // Try invite first, fall back to recovery for already-registered users
     let actionLink: string | undefined;

@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
+import { PasswordChecklist } from "@/components/PasswordChecklist";
+import { usePasswordValidation } from "@/hooks/usePasswordValidation";
 
 export default function AcceptInvite() {
   const [password, setPassword] = useState("");
@@ -13,28 +15,35 @@ export default function AcceptInvite() {
   const [tokenValid, setTokenValid] = useState<boolean | null>(null);
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
+  const validation = usePasswordValidation(password);
 
   useEffect(() => {
-    // Supabase automatically picks up the token from the URL hash
-    // and establishes a session when the page loads.
+    // Listen for auth state changes — Supabase processes the token from the URL hash
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (event === "SIGNED_IN" && session) {
+        if (
+          (event === "SIGNED_IN" || event === "PASSWORD_RECOVERY" || event === "TOKEN_REFRESHED") &&
+          session
+        ) {
           setTokenValid(true);
         }
       }
     );
 
-    // Check if there's already a session (token was processed)
+    // Check if there's already a session (token was processed before listener registered)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setTokenValid(true);
       } else {
-        // Wait a moment for token processing
+        // Wait for Supabase to process the URL hash token
         setTimeout(async () => {
           const { data: { session: s } } = await supabase.auth.getSession();
-          setTokenValid(!!s);
-        }, 1500);
+          if (s) {
+            setTokenValid(true);
+          } else {
+            setTokenValid(false);
+          }
+        }, 2500);
       }
     });
 
@@ -45,8 +54,8 @@ export default function AcceptInvite() {
     e.preventDefault();
     setError(null);
 
-    if (password.length < 8) {
-      setError("Heslo musí mít alespoň 8 znaků.");
+    if (!validation.isValid) {
+      setError("Heslo nesplňuje požadavky.");
       return;
     }
 
@@ -109,6 +118,7 @@ export default function AcceptInvite() {
                 required
                 autoFocus
               />
+              <PasswordChecklist password={password} />
             </div>
 
             <div className="space-y-2">
@@ -129,7 +139,11 @@ export default function AcceptInvite() {
               </p>
             )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loading || !validation.isValid || password !== confirmPassword}
+            >
               {loading ? "Ukládám..." : "Nastavit heslo"}
             </Button>
           </form>

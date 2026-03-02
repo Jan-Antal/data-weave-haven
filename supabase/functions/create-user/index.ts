@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { email, full_name, role } = await req.json();
+    const { email, full_name, role, origin_url } = await req.json();
 
     // Validate required fields (no password needed — invite flow)
     if (!email || !full_name || !role) {
@@ -88,10 +88,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Use dynamic redirect URL from the calling app
+    const redirectTo = origin_url
+      ? `${String(origin_url).replace(/\/$/, "")}/accept-invite`
+      : `${req.headers.get("origin") || "https://projekty.am-interior.cz"}/accept-invite`;
+
     // Invite user by email (sends invite email, no password needed)
     const { data: newUser, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
       data: { full_name: trimmedName },
-      redirectTo: "https://id-preview--ce3e87ee-9f18-44df-921b-691cc44882ec.lovable.app/accept-invite",
+      redirectTo,
     });
 
     if (inviteError) {
