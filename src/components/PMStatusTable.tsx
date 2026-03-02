@@ -23,6 +23,7 @@ import type { ProjectStage } from "@/hooks/useProjectStages";
 import type { Project } from "@/hooks/useProjects";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { ProjectDetailDialog } from "./ProjectDetailDialog";
+import { TPVList } from "./TPVList";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -573,6 +574,18 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const handleSaveCustomField = useCallback((rowId: string, colKey: string, val: string, old: string) => {
     updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old });
   }, [updateCustomField]);
+
+  if (activeTPVProject) {
+    const proj = projects.find(p => p.project_id === activeTPVProject.projectId);
+    return (
+      <TPVList
+        projectId={activeTPVProject.projectId}
+        projectName={activeTPVProject.projectName}
+        currency={proj?.currency || "CZK"}
+        onBack={() => setActiveTPVProject(null)}
+      />
+    );
+  }
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Načítání...</div>;
 

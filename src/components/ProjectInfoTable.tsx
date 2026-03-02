@@ -31,6 +31,7 @@ import { CalendarIcon, Paperclip, ChevronRight, ChevronDown, Plus, Trash2, GripV
 import { cn } from "@/lib/utils";
 import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 import { ProjectDetailDialog } from "./ProjectDetailDialog";
+import { TPVList } from "./TPVList";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
@@ -651,6 +652,18 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
       setDatumWarning(false);
     }
   };
+
+  if (activeTPVProject) {
+    const proj = projects.find(p => p.project_id === activeTPVProject.projectId);
+    return (
+      <TPVList
+        projectId={activeTPVProject.projectId}
+        projectName={activeTPVProject.projectName}
+        currency={proj?.currency || "CZK"}
+        onBack={() => setActiveTPVProject(null)}
+      />
+    );
+  }
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Načítání...</div>;
 
