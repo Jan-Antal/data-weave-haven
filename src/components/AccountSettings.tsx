@@ -14,6 +14,9 @@ import { toast } from "@/hooks/use-toast";
 import { PasswordChecklist } from "@/components/PasswordChecklist";
 import { usePasswordValidation } from "@/hooks/usePasswordValidation";
 import { Eye, EyeOff } from "lucide-react";
+import { useUserAchievements } from "@/hooks/useAchievements";
+import { AchievementShowcase } from "@/components/AchievementShowcase";
+import { Switch } from "@/components/ui/switch";
 
 const ROLE_LABELS: Record<string, string> = {
   owner: "Owner",
@@ -72,6 +75,9 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
   // Preferences
   const [defaultPerson, setDefaultPerson] = useState<string>("__all__");
   const [defaultView, setDefaultView] = useState("project-info");
+  const [achievementSound, setAchievementSound] = useState(false);
+
+  const { data: achievements = [] } = useUserAchievements();
 
   const [saving, setSaving] = useState(false);
 
@@ -90,6 +96,7 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
       setShowConfirmPassword(false);
       setDefaultPerson(prefs?.default_person_filter || "__all__");
       setDefaultView(prefs?.default_view || "project-info");
+      setAchievementSound((prefs as any)?.achievement_sound ?? false);
     }
   }, [open, profile, prefs]);
 
@@ -136,7 +143,8 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
       await upsertPrefs.mutateAsync({
         default_person_filter: defaultPerson === "__all__" ? null : defaultPerson,
         default_view: defaultView,
-      });
+        achievement_sound: achievementSound,
+      } as any);
 
       // Refresh profile in auth context
       qc.invalidateQueries({ queryKey: ["people"] });
@@ -287,7 +295,15 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Zvuky úspěchů</Label>
+              <Switch checked={achievementSound} onCheckedChange={setAchievementSound} />
+            </div>
           </div>
+
+          {/* ÚSPĚCHY */}
+          <SectionHeader icon="🏆" label="Úspěchy" />
+          <AchievementShowcase earned={achievements} />
         </div>
 
         {/* Footer */}

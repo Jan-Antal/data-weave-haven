@@ -632,8 +632,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_achievements: {
+        Row: {
+          achieved_at: string
+          achievement_key: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          achieved_at?: string
+          achievement_key: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          achieved_at?: string
+          achievement_key?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_preferences: {
         Row: {
+          achievement_sound: boolean
           created_at: string
           default_person_filter: string | null
           default_view: string
@@ -642,6 +664,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          achievement_sound?: boolean
           created_at?: string
           default_person_filter?: string | null
           default_view?: string
@@ -650,6 +673,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          achievement_sound?: boolean
           created_at?: string
           default_person_filter?: string | null
           default_view?: string

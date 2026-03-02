@@ -28,6 +28,8 @@ import { DataLogHighlightProvider } from "@/components/DataLogHighlightContext";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
+import { AchievementCelebration } from "@/components/AchievementCelebration";
+import { useAchievementChecker } from "@/hooks/useAchievements";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
@@ -67,6 +69,11 @@ const Index = () => {
     });
   }, []);
 
+  const { profile, signOut, canAccessSettings, canCreateProject, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, isKonstrukter, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, defaultTab } = useAuth();
+
+  const { data: userPrefs } = useUserPreferences();
+  const achievementChecker = useAchievementChecker();
+
   const handleTabChange = useCallback((tab: string) => {
     scrollPositions.current[activeTab] = window.scrollY;
     tpvCloseDetailRef.current?.();
@@ -80,17 +87,21 @@ const Index = () => {
         setSavedStatusFilter(null);
       }
     }
+    if (tab === "plan") {
+      achievementChecker.checkPlanViewCount();
+    }
     setActiveTab(tab);
 
     requestAnimationFrame(() => {
       const savedPos = scrollPositions.current[tab] ?? 0;
       window.scrollTo(0, savedPos);
     });
-  }, [activeTab, filters, savedStatusFilter]);
+  }, [activeTab, filters, savedStatusFilter, achievementChecker]);
 
-  const { profile, signOut, canAccessSettings, canCreateProject, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, isKonstrukter, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, defaultTab } = useAuth();
-
-  const { data: userPrefs } = useUserPreferences();
+  // Check time-based achievements on load
+  useEffect(() => {
+    achievementChecker.checkTimeBasedAchievements();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Apply user preferences on load
   const prefsApplied = useRef(false);
@@ -341,6 +352,7 @@ const Index = () => {
       <UserManagement open={userMgmtOpen} onOpenChange={setUserMgmtOpen} />
       <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
       {canAccessSettings && <FeedbackWidget />}
+      <AchievementCelebration />
     </div>
     </DataLogHighlightProvider>
     </ExportProvider>
