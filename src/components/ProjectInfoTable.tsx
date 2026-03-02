@@ -448,9 +448,9 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const qc = useQueryClient();
   const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
   const { itemsByProject: tpvItemsByProject } = useAllTPVItems();
-  const [activeTPVProject, setActiveTPVProject] = useState<{ projectId: string; projectName: string } | null>(null);
-  const handleOpenTPVList = useCallback((projectId: string, projectName: string) => {
-    setActiveTPVProject({ projectId, projectName });
+  const [activeTPVProject, setActiveTPVProject] = useState<{ projectId: string; projectName: string; autoImport?: boolean } | null>(null);
+  const handleOpenTPVList = useCallback((projectId: string, projectName: string, autoImport?: boolean) => {
+    setActiveTPVProject({ projectId, projectName, autoImport });
   }, []);
   const { projectInfo: { isVisible } } = useAllColumnVisibility();
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck();
@@ -661,6 +661,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
         projectName={activeTPVProject.projectName}
         currency={proj?.currency || "CZK"}
         onBack={() => setActiveTPVProject(null)}
+        autoOpenImport={activeTPVProject.autoImport}
       />
     );
   }

@@ -424,7 +424,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const { registerExport } = useExportContext();
   const { stagesByProject } = useStagesByProject();
   const { itemsByProject: tpvItemsByProject } = useAllTPVItems();
-  const [activeProject, setActiveProject] = useState<{ projectId: string; projectName: string } | null>(null);
+  const [activeProject, setActiveProject] = useState<{ projectId: string; projectName: string; autoImport?: boolean } | null>(null);
   const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
 
   // Memoize filter Sets
@@ -567,8 +567,8 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
     updateCustomField.mutate({ rowId, tableName: "projects", columnKey: colKey, value: val, oldValue: old });
   }, [updateCustomField]);
 
-  const handleOpenTPVList = useCallback((projectId: string, projectName: string) => {
-    setActiveProject({ projectId, projectName });
+  const handleOpenTPVList = useCallback((projectId: string, projectName: string, autoImport?: boolean) => {
+    setActiveProject({ projectId, projectName, autoImport });
   }, []);
 
   // If TPV List detail is open, show it
@@ -580,6 +580,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
         projectName={activeProject.projectName}
         currency={proj?.currency || "CZK"}
         onBack={() => { setActiveProject(null); onRequestTab?.(); }}
+        autoOpenImport={activeProject.autoImport}
       />
     );
   }

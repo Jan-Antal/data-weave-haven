@@ -58,7 +58,7 @@ interface ProjectDetailDialogProps {
   project: Project | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onOpenTPVList?: (projectId: string, projectName: string) => void;
+  onOpenTPVList?: (projectId: string, projectName: string, autoImport?: boolean) => void;
   tpvItemCount?: number;
 }
 
@@ -1145,7 +1145,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                       onClick={() => {
                         if (project) {
                           onOpenChange(false);
-                          onOpenTPVList(project.project_id, project.project_name);
+                          onOpenTPVList(project.project_id, project.project_name, true);
                         }
                       }}
                     >
