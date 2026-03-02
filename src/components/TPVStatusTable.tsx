@@ -689,7 +689,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
         </Table>
       </div>
 
-      {editProject && <ProjectDetailDialog project={editProject} open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }} />}
+      {editProject && <ProjectDetailDialog project={editProject} open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }} onOpenTPVList={handleOpenTPVList} tpvItemCount={tpvItemsByProject.get(editProject.project_id)?.length ?? 0} />}
     </div>
   );
 }

@@ -43,6 +43,7 @@ import { useDocumentCounts } from "@/hooks/useDocumentCounts";
 import { useExportContext } from "./ExportContext";
 import { getProjectCellValue } from "@/lib/exportExcel";
 import { getColumnLabel } from "./CrossTabColumns";
+import { useAllTPVItems } from "@/hooks/useAllTPVItems";
 import { useStagesByProject } from "@/hooks/useAllProjectStages";
 import { matchesStatusFilter, normalizedIncludes, normalizeSearch } from "@/lib/statusFilter";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
@@ -445,6 +446,11 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const [datumWarning, setDatumWarning] = useState(false);
   const qc = useQueryClient();
   const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
+  const { itemsByProject: tpvItemsByProject } = useAllTPVItems();
+  const [activeTPVProject, setActiveTPVProject] = useState<{ projectId: string; projectName: string } | null>(null);
+  const handleOpenTPVList = useCallback((projectId: string, projectName: string) => {
+    setActiveTPVProject({ projectId, projectName });
+  }, []);
   const { projectInfo: { isVisible } } = useAllColumnVisibility();
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck();
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("project-info");
@@ -870,7 +876,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
         </DialogContent>
       </Dialog>
 
-      {editProject && <ProjectDetailDialog project={editProject} open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }} />}
+      {editProject && <ProjectDetailDialog project={editProject} open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }} onOpenTPVList={handleOpenTPVList} tpvItemCount={tpvItemsByProject.get(editProject.project_id)?.length ?? 0} />}
     </div>
   );
 }
