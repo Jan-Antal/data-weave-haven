@@ -801,7 +801,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                   </div>
 
                   <DateField label="Datum Objednávky" value={form.datum_objednavky} onChange={(v) => setForm(s => ({ ...s, datum_objednavky: v }))} disabled={isSectionReadOnly("basic") || isFieldReadOnly("datum_objednavky")} />
-                  <DateField label="Datum Smluvní" value={form.datum_smluvni} onChange={(v) => setForm(s => ({ ...s, datum_smluvni: v }))} disabled={isSectionReadOnly("basic") || isFieldReadOnly("datum_smluvni")} />
+                  <DateField label="Datum Smluvní" value={form.datum_smluvni} onChange={(v) => setForm(s => ({ ...s, datum_smluvni: v }))} disabled={isSectionReadOnly("basic") || isFieldReadOnly("datum_smluvni", project?.datum_smluvni ?? null)} />
                 </div>
 
                 {/* ── FINANCE ──────────────────────────────── */}

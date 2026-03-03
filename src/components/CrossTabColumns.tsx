@@ -129,7 +129,7 @@ interface CellProps {
   saveCurrency?: (id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => void;
   customColumns?: CustomColumnDef[];
   saveCustomField?: (rowId: string, columnKey: string, value: string, oldValue: string) => void;
-  isFieldReadOnly?: (field: string) => boolean;
+  isFieldReadOnly?: (field: string, currentValue?: string | null) => boolean;
 }
 
 export function renderColumnCell(props: CellProps) {
@@ -144,11 +144,11 @@ function renderCell(
   saveCurrency?: (id: string, a: string, c: string, oa: string, oc: string) => void,
   customColumns?: CustomColumnDef[],
   saveCustomField?: (rowId: string, columnKey: string, value: string, oldValue: string) => void,
-  isFieldReadOnly?: (field: string) => boolean,
+  isFieldReadOnly?: (field: string, currentValue?: string | null) => boolean,
 ) {
   const s = (field: string, val: string, old: string) => save(p.id, field, val, old, p.project_id);
   const v = (field: keyof Project) => (p as any)[field] ?? "";
-  const ro = (field: string) => !canEdit || (isFieldReadOnly?.(field) ?? false);
+  const ro = (field: string) => !canEdit || (isFieldReadOnly?.(field, (p as any)[field] ?? null) ?? false);
 
   switch (key) {
     case "klient":

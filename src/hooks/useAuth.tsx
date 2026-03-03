@@ -6,6 +6,7 @@ export type AppRole = "owner" | "admin" | "pm" | "konstrukter" | "viewer";
 
 interface AuthContextType {
   user: User | null;
+
   session: Session | null;
   profile: { full_name: string; email: string; is_active: boolean; password_set: boolean } | null;
   role: AppRole | null;
@@ -32,7 +33,7 @@ interface AuthContextType {
   canManageExchangeRates: boolean;
   canManageStatuses: boolean;
   canAccessRecycleBin: boolean;
-  isFieldReadOnly: (field: string) => boolean;
+  isFieldReadOnly: (field: string, currentValue?: string | null) => boolean;
   defaultTab: string;
   simulatedRole: AppRole | null;
   setSimulatedRole: (role: AppRole | null) => void;
@@ -186,10 +187,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fields that are read-only for PM
   const pmReadOnlyFields = new Set(["project_id"]);
 
-  const isFieldReadOnly = (field: string): boolean => {
+  const isFieldReadOnly = (field: string, currentValue?: string | null): boolean => {
     if (isViewer) return true;
     if (isKonstrukter && konstrukterReadOnlyFields.has(field)) return true;
     if (isPM && pmReadOnlyFields.has(field)) return true;
+    // PM can set datum_smluvni only when empty; once set it's read-only
+    if (isPM && field === "datum_smluvni" && currentValue) return true;
     return false;
   };
 
