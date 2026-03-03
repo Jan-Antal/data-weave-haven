@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { GripVertical, ChevronRight } from "lucide-react";
 import { useProductionSchedule, getISOWeekNumber, type WeekSilo, type ScheduleBundle, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
@@ -8,6 +8,12 @@ import { ProductionContextMenu, type ContextMenuAction } from "./ProductionConte
 import { CompletionDialog } from "./CompletionDialog";
 import { SpillSuggestionPanel } from "./SpillSuggestionPanel";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
+
+function formatCompactCzk(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${Math.round(v / 1_000)}K`;
+  return `${Math.round(v)}`;
+}
 
 function getMonday(date: Date): Date {
   const d = new Date(date);
@@ -52,18 +58,28 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [completionState, setCompletionState] = useState<CompletionState | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to current week on mount
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    // Current week is at index 4 (4 past weeks before it)
+    const scrollTarget = 4 * 216; // 4 past weeks × 216px each
+    el.scrollLeft = scrollTarget;
+  }, []);
 
   const weeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
 
   const weeks = useMemo(() => {
     const monday = getMonday(new Date());
-    const result: { start: Date; end: Date; weekNum: number; key: string }[] = [];
-    for (let i = 0; i < 12; i++) {
+    const result: { start: Date; end: Date; weekNum: number; key: string; isPast: boolean }[] = [];
+    for (let i = -4; i < 12; i++) {
       const start = new Date(monday);
       start.setDate(monday.getDate() + i * 7);
       const end = new Date(start);
       end.setDate(start.getDate() + 6);
-      result.push({ start, end, weekNum: getISOWeekNumber(start), key: start.toISOString().split("T")[0] });
+      result.push({ start, end, weekNum: getISOWeekNumber(start), key: start.toISOString().split("T")[0], isPast: i < 0 });
     }
     return result;
   }, []);
@@ -172,10 +188,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
     <div className="flex-1 flex flex-col min-w-0">
       {/* Toolbar */}
       <div className="px-3 py-[6px] flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid #ece8e2" }}>
-        <div className="flex items-center gap-[2px]">
-          <ToolbarButton active label="Týdny" />
-          <ToolbarButton disabled label="Dny" />
-        </div>
+        <div />
         <span className="text-[9px] font-medium" style={{ color: "#99a5a3" }}>{periodLabel}</span>
         <div className="flex items-center gap-[2px]">
           <ToolbarButton active={!showCzk} label="Hodiny" onClick={() => onToggleCzk(false)} />
@@ -184,7 +197,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
       </div>
 
       {/* Silos */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden" ref={scrollContainerRef}>
         <div className="flex gap-[6px] p-2 h-full" style={{ minWidth: `${weeks.length * 216}px` }}>
           {weeks.map((week) => (
             <SiloColumn
@@ -194,6 +207,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
               startDate={week.start}
               endDate={week.end}
               isCurrent={week.key === currentWeekKey}
+              isPast={week.isPast}
               silo={scheduleData?.get(week.key) || null}
               weeklyCapacity={weeklyCapacity}
               showCzk={showCzk}
@@ -258,6 +272,7 @@ interface SiloProps {
   startDate: Date;
   endDate: Date;
   isCurrent: boolean;
+  isPast: boolean;
   silo: WeekSilo | null;
   weeklyCapacity: number;
   showCzk: boolean;
@@ -270,7 +285,7 @@ interface SiloProps {
 }
 
 function SiloColumn({
-  weekKey, weekNum, startDate, endDate, isCurrent, silo, weeklyCapacity,
+  weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
   showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu,
   allWeeksData, weekKeys,
 }: SiloProps) {
@@ -280,18 +295,22 @@ function SiloColumn({
   const isWarning = pct > 85 && pct <= 100;
   const overloadHours = totalHours - weeklyCapacity;
 
-  const barColor = isOverloaded ? "#dc3545" : isWarning ? "#d97706" : "#3a8a36";
-  const barBg = isOverloaded
+  const barColor = isPast ? "#b0bab8" : isOverloaded ? "#dc3545" : isWarning ? "#d97706" : "#3a8a36";
+  const barBg = isPast
+    ? "linear-gradient(90deg, #d0d7d5, #b0bab8)"
+    : isOverloaded
     ? "linear-gradient(90deg, #fca5a5, #dc3545)"
     : isWarning
     ? "linear-gradient(90deg, #fcd34d, #d97706)"
     : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
 
-  const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}` });
-  const highlighted = isOver || isOverTarget;
+  const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}`, disabled: isPast });
+  const highlighted = !isPast && (isOver || isOverTarget);
   const dropBorderColor = highlighted
     ? isOverloaded ? "#d97706" : "#3b82f6"
     : undefined;
+
+  const headerColor = isPast ? "#99a5a3" : "#223937";
 
   return (
     <div
@@ -304,7 +323,7 @@ function SiloColumn({
           ? `2px solid ${dropBorderColor}`
           : isCurrent
           ? "2px solid #3a8a36"
-          : isOverloaded
+          : isOverloaded && !isPast
           ? "1px solid rgba(220,53,69,0.4)"
           : "1px solid #ece8e2",
       }}
@@ -312,7 +331,7 @@ function SiloColumn({
       {/* Header */}
       <div className="px-2.5 py-1.5 text-center" style={{ borderBottom: "1px solid #ece8e2" }}>
         <div className="flex items-center justify-center gap-1.5">
-          <span className="font-mono text-[14px] font-bold" style={{ color: "#223937" }}>T{weekNum}</span>
+          <span className="font-mono text-[14px] font-bold" style={{ color: headerColor }}>T{weekNum}</span>
           {isCurrent && <span className="w-[5px] h-[5px] rounded-full" style={{ backgroundColor: "#3a8a36" }} />}
         </div>
         <div className="text-[9px] mt-0.5" style={{ color: "#99a5a3" }}>
@@ -320,7 +339,7 @@ function SiloColumn({
         </div>
 
         {/* Capacity meter */}
-        <div className="mt-1.5">
+        <div className="mt-1.5" style={{ opacity: isPast ? 0.6 : 1 }}>
           <div className="h-[7px] rounded" style={{ backgroundColor: "#f0eee9", overflow: "hidden" }}>
             <div
               className="h-full rounded transition-all duration-300"
@@ -342,13 +361,18 @@ function SiloColumn({
       </div>
 
       {/* Items */}
-      <div className="flex-1 overflow-y-auto p-1.5" style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-        {(!silo || silo.bundles.length === 0) && (
+      <div className="flex-1 overflow-y-auto p-1.5" style={{ display: "flex", flexDirection: "column", gap: 3, opacity: isPast ? 0.7 : 1 }}>
+        {(!silo || silo.bundles.length === 0) && !isPast && (
           <div
             className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all"
             style={{ border: "1.5px dashed #e2ddd6" }}
           >
             <span className="text-[9px] text-center" style={{ color: "#99a5a3" }}>Přetáhni sem z Inboxu</span>
+          </div>
+        )}
+        {(!silo || silo.bundles.length === 0) && isPast && (
+          <div className="flex-1 flex items-center justify-center px-2 py-[14px]">
+            <span className="text-[9px] text-center" style={{ color: "#c4ccc9" }}>Prázdný týden</span>
           </div>
         )}
         {silo?.bundles.map((bundle) => (
@@ -365,7 +389,7 @@ function SiloColumn({
       </div>
 
       {/* Spill suggestion or simple overload banner */}
-      {isOverloaded && silo && (
+      {isOverloaded && !isPast && silo && (
         <SpillSuggestionPanel
           overloadHours={overloadHours}
           bundles={silo.bundles}
@@ -452,6 +476,11 @@ function CollapsibleBundleCard({
           <span className="font-mono text-[11px] font-bold" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>
             {Math.round(bundle.total_hours)}h
           </span>
+          {showCzk && (
+            <span className="font-mono text-[9px]" style={{ color: "#6b7a78" }}>
+              {formatCompactCzk(bundle.total_hours * hourlyRate)}
+            </span>
+          )}
         </div>
       </div>
 

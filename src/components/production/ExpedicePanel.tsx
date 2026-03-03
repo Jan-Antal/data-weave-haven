@@ -1,9 +1,16 @@
 import { useState, useCallback } from "react";
 import { useProductionExpedice, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
+import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { getProjectColor } from "@/lib/projectColors";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
+
+function formatCompactCzk(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${Math.round(v / 1_000)}K`;
+  return `${Math.round(v)}`;
+}
 
 interface ContextMenuState {
   x: number;
@@ -11,9 +18,11 @@ interface ContextMenuState {
   actions: ContextMenuAction[];
 }
 
-export function ExpedicePanel() {
+export function ExpedicePanel({ showCzk }: { showCzk?: boolean }) {
   const { data: projects = [] } = useProductionExpedice();
   const { returnToProduction, moveItemBackToInbox } = useProductionDragDrop();
+  const { data: settings } = useProductionSettings();
+  const hourlyRate = settings?.hourly_rate ?? 550;
   const [collapsed, setCollapsed] = useState(true);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
@@ -122,12 +131,19 @@ export function ExpedicePanel() {
                   {group.project_id}
                 </div>
               </div>
-              <span
-                className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
-                style={{ backgroundColor: "#3a8a36", color: "#ffffff" }}
-              >
-                {group.count} ks
-              </span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {showCzk && (
+                  <span className="font-mono text-[9px]" style={{ color: "#6b7a78" }}>
+                    {formatCompactCzk(group.items.reduce((s, i) => s + i.scheduled_hours, 0) * hourlyRate)}
+                  </span>
+                )}
+                <span
+                  className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                  style={{ backgroundColor: "#3a8a36", color: "#ffffff" }}
+                >
+                  {group.count} ks
+                </span>
+              </div>
             </div>
             <div className="space-y-[2px]">
               {group.items.map((item) => (

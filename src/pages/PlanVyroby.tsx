@@ -121,9 +121,9 @@ export default function PlanVyroby() {
 
         {/* Three-zone layout */}
         <div className="flex-1 flex min-h-0">
-          <InboxPanel overDroppableId={overDroppableId} />
+          <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} />
           <WeeklySilos showCzk={showCzk} onToggleCzk={setShowCzk} overDroppableId={overDroppableId} />
-          <ExpedicePanel />
+          <ExpedicePanel showCzk={showCzk} />
         </div>
       </div>
 
