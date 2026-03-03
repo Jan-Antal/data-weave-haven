@@ -59,13 +59,14 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [completionState, setCompletionState] = useState<CompletionState | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const siloRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const [visiblePeriodLabel, setVisiblePeriodLabel] = useState("");
 
   // Auto-scroll to current week on mount
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
-    // Current week is at index 4 (4 past weeks before it)
-    const scrollTarget = 4 * 216; // 4 past weeks × 216px each
+    const scrollTarget = 4 * 216;
     el.scrollLeft = scrollTarget;
   }, []);
 
@@ -86,13 +87,61 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
 
   const weekKeys = useMemo(() => weeks.map((w) => w.key), [weeks]);
 
-  const periodLabel = useMemo(() => {
-    if (weeks.length === 0) return "";
-    const first = weeks[0].start;
-    const last = weeks[weeks.length - 1].end;
-    if (first.getMonth() === last.getMonth()) return `${MONTH_NAMES[first.getMonth()]} ${first.getFullYear()}`;
-    return `${MONTH_NAMES[first.getMonth()]} – ${MONTH_NAMES[last.getMonth()]} ${last.getFullYear()}`;
+  // IntersectionObserver to detect visible silos and update period label
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || weeks.length === 0) return;
+
+    const visibleKeys = new Set<string>();
+    let debounceTimer: ReturnType<typeof setTimeout>;
+
+    const updateLabel = () => {
+      const visibleWeeks = weeks.filter((w) => visibleKeys.has(w.key));
+      if (visibleWeeks.length === 0) return;
+      const first = visibleWeeks[0].start;
+      const last = visibleWeeks[visibleWeeks.length - 1].start;
+      const m1 = first.getMonth();
+      const m2 = last.getMonth();
+      const y1 = first.getFullYear();
+      const y2 = last.getFullYear();
+      if (m1 === m2 && y1 === y2) {
+        setVisiblePeriodLabel(`${MONTH_NAMES[m1]} ${y1}`);
+      } else if (y1 === y2) {
+        setVisiblePeriodLabel(`${MONTH_NAMES[m1]} – ${MONTH_NAMES[m2]} ${y1}`);
+      } else {
+        setVisiblePeriodLabel(`${MONTH_NAMES[m1]} ${y1} – ${MONTH_NAMES[m2]} ${y2}`);
+      }
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const key = (entry.target as HTMLElement).dataset.weekKey;
+          if (!key) continue;
+          if (entry.isIntersecting) visibleKeys.add(key);
+          else visibleKeys.delete(key);
+        }
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(updateLabel, 100);
+      },
+      { root: container, threshold: 0.3 }
+    );
+
+    // Observe all registered silo elements
+    for (const [, el] of siloRefs.current) {
+      observer.observe(el);
+    }
+
+    return () => {
+      clearTimeout(debounceTimer);
+      observer.disconnect();
+    };
   }, [weeks]);
+
+  const registerSiloRef = useCallback((key: string, el: HTMLDivElement | null) => {
+    if (el) siloRefs.current.set(key, el);
+    else siloRefs.current.delete(key);
+  }, []);
 
   const currentWeekKey = useMemo(() => getMonday(new Date()).toISOString().split("T")[0], []);
 
@@ -189,7 +238,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
       {/* Toolbar */}
       <div className="px-3 py-[6px] flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid #ece8e2" }}>
         <div />
-        <span className="text-[9px] font-medium" style={{ color: "#99a5a3" }}>{periodLabel}</span>
+        <span className="text-[9px] font-medium" style={{ color: "#99a5a3" }}>{visiblePeriodLabel}</span>
         <div className="flex items-center gap-[2px]">
           <ToolbarButton active={!showCzk} label="Hodiny" onClick={() => onToggleCzk(false)} />
           <ToolbarButton active={showCzk} label="Hod + Kč" onClick={() => onToggleCzk(true)} />
@@ -221,6 +270,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
               }
               allWeeksData={weeksCapacityMap}
               weekKeys={weekKeys}
+              registerRef={registerSiloRef}
             />
           ))}
         </div>
@@ -282,12 +332,13 @@ interface SiloProps {
   onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem, bundle: ScheduleBundle) => void;
   allWeeksData: Map<string, { total_hours: number }>;
   weekKeys: string[];
+  registerRef: (key: string, el: HTMLDivElement | null) => void;
 }
 
 function SiloColumn({
   weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
   showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu,
-  allWeeksData, weekKeys,
+  allWeeksData, weekKeys, registerRef,
 }: SiloProps) {
   const totalHours = silo?.total_hours ?? 0;
   const pct = weeklyCapacity > 0 ? (totalHours / weeklyCapacity) * 100 : 0;
@@ -312,9 +363,15 @@ function SiloColumn({
 
   const headerColor = isPast ? "#99a5a3" : "#223937";
 
+  const combinedRef = useCallback((el: HTMLDivElement | null) => {
+    setNodeRef(el);
+    registerRef(weekKey, el);
+  }, [setNodeRef, registerRef, weekKey]);
+
   return (
     <div
-      ref={setNodeRef}
+      ref={combinedRef}
+      data-week-key={weekKey}
       className="w-[210px] shrink-0 flex flex-col transition-all"
       style={{
         backgroundColor: "#ffffff",
