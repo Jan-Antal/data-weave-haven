@@ -266,6 +266,7 @@ export type Database = {
           estimated_czk: number
           estimated_hours: number
           id: string
+          item_code: string | null
           item_name: string
           project_id: string
           sent_at: string
@@ -281,6 +282,7 @@ export type Database = {
           estimated_czk: number
           estimated_hours: number
           id?: string
+          item_code?: string | null
           item_name: string
           project_id: string
           sent_at?: string
@@ -296,6 +298,7 @@ export type Database = {
           estimated_czk?: number
           estimated_hours?: number
           id?: string
+          item_code?: string | null
           item_name?: string
           project_id?: string
           sent_at?: string
@@ -331,6 +334,7 @@ export type Database = {
           created_by: string | null
           id: string
           inbox_item_id: string | null
+          item_code: string | null
           item_name: string
           position: number
           project_id: string
@@ -350,6 +354,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           inbox_item_id?: string | null
+          item_code?: string | null
           item_name: string
           position?: number
           project_id: string
@@ -369,6 +374,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           inbox_item_id?: string | null
+          item_code?: string | null
           item_name?: string
           position?: number
           project_id?: string
