@@ -85,6 +85,38 @@ export function CompletionDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Select all / Deselect all */}
+        {(() => {
+          const uncompleted = items.filter((i) => i.status !== "completed");
+          const allChecked = uncompleted.length > 0 && uncompleted.every((i) => checkedIds.has(i.id));
+          return uncompleted.length > 1 ? (
+            <div className="px-5 pb-1.5">
+              <label
+                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors"
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              >
+                <Checkbox
+                  checked={allChecked}
+                  onCheckedChange={() => {
+                    if (allChecked) {
+                      setCheckedIds(new Set());
+                    } else {
+                      setCheckedIds(new Set(uncompleted.map((i) => i.id)));
+                    }
+                  }}
+                />
+                <span className="text-[11px] font-semibold" style={{ color: "#6b7a78" }}>
+                  {allChecked ? "Odznačit vše" : "Vybrat vše"}
+                </span>
+                <span className="font-mono text-[10px] ml-auto" style={{ color: "#99a5a3" }}>
+                  {checkedIds.size}/{uncompleted.length}
+                </span>
+              </label>
+            </div>
+          ) : null;
+        })()}
+
         <div className="px-5 pb-3 space-y-1.5 max-h-[300px] overflow-y-auto">
           {items.map((item) => {
             const isCompleted = item.status === "completed";
