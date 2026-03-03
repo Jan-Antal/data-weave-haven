@@ -156,7 +156,7 @@ export function ExpedicePanel({ showCzk }: { showCzk?: boolean }) {
                 >
                    <Check className="shrink-0" style={{ width: 12, height: 12, color: "#3a8a36", strokeWidth: 3 }} />
                    {item.item_code && (
-                     <span className="font-mono text-[10px] font-bold shrink-0" style={{ color: "#223937" }}>
+                     <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>
                        {item.item_code}
                      </span>
                    )}

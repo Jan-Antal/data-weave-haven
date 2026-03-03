@@ -722,7 +722,7 @@ function DraggableSiloItem({
     >
       <GripVertical className="shrink-0" style={{ width: 8, height: 8, color: "#99a5a3" }} />
       {item.item_code && (
-        <span className="font-mono text-[9px] font-bold shrink-0" style={{ color: "#223937" }}>
+        <span className="font-mono text-[9px] shrink-0" style={{ color: "#223937" }}>
           {item.item_code}
         </span>
       )}
