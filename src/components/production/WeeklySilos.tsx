@@ -237,7 +237,16 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
     <div className="flex-1 flex flex-col min-w-0">
       {/* Toolbar */}
       <div className="px-3 py-[6px] flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid #ece8e2" }}>
-        <div />
+        <button
+          onClick={() => {
+            const el = scrollContainerRef.current;
+            if (el) el.scrollTo({ left: 4 * 216, behavior: "smooth" });
+          }}
+          className="px-2 py-[3px] text-[10px] font-medium rounded transition-colors"
+          style={{ backgroundColor: "#ffffff", color: "#6b7a78", border: "1px solid #e2ddd6", cursor: "pointer" }}
+        >
+          Tento týden
+        </button>
         <span className="text-[9px] font-medium" style={{ color: "#99a5a3" }}>{visiblePeriodLabel}</span>
         <div className="flex items-center gap-[2px]">
           <ToolbarButton active={!showCzk} label="Hodiny" onClick={() => onToggleCzk(false)} />
