@@ -133,7 +133,12 @@ export function CompletionDialog({
                   disabled={isCompleted}
                   onCheckedChange={() => !isCompleted && toggleItem(item.id)}
                 />
-                <span className="text-[11px] flex-1 truncate" style={{ color: "#223937" }}>
+                {item.item_code && (
+                  <span className="font-mono text-[10px] font-bold shrink-0" style={{ color: "#223937" }}>
+                    {item.item_code}
+                  </span>
+                )}
+                <span className="text-[11px] flex-1 truncate" style={{ color: "#6b7a78" }}>
                   {item.item_name}
                 </span>
                 <span className="font-mono text-[10px] shrink-0" style={{ color: "#6b7a78" }}>

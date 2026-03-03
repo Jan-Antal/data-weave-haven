@@ -7,6 +7,7 @@ export interface InboxItem {
   project_id: string;
   stage_id: string | null;
   item_name: string;
+  item_code: string | null;
   estimated_hours: number;
   estimated_czk: number;
   sent_by: string;
@@ -61,6 +62,7 @@ export function useProductionInbox() {
           project_id: row.project_id,
           stage_id: row.stage_id,
           item_name: row.item_name,
+          item_code: row.item_code ?? null,
           estimated_hours: row.estimated_hours,
           estimated_czk: row.estimated_czk,
           sent_by: row.sent_by,

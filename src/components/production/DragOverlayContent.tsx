@@ -3,6 +3,7 @@ import { getProjectColor } from "@/lib/projectColors";
 interface DragData {
   type: "inbox-item" | "inbox-project" | "silo-item" | "silo-bundle";
   itemName?: string;
+  itemCode?: string | null;
   projectName?: string;
   projectId?: string;
   hours?: number;
@@ -25,8 +26,15 @@ export function DragOverlayContent({ data }: { data: DragData }) {
           opacity: 0.92,
         }}
       >
-        <div className="text-[10px] font-medium truncate" style={{ color: "#223937" }}>
-          {data.itemName}
+        <div className="flex items-center gap-1.5">
+          {data.itemCode && (
+            <span className="font-mono text-[10px] font-bold shrink-0" style={{ color: "#223937" }}>
+              {data.itemCode}
+            </span>
+          )}
+          <span className="text-[10px] font-medium truncate" style={{ color: "#6b7a78" }}>
+            {data.itemName}
+          </span>
         </div>
         <div className="font-mono text-[9px] mt-0.5" style={{ color: "#6b7a78" }}>
           {data.hours}h

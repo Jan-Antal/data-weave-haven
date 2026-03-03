@@ -8,6 +8,7 @@ export interface ScheduleItem {
   project_name: string;
   stage_id: string | null;
   item_name: string;
+  item_code: string | null;
   scheduled_week: string;
   scheduled_hours: number;
   scheduled_czk: number;
@@ -79,6 +80,7 @@ export function useProductionSchedule() {
           project_name: (row as any).projects?.project_name || pid,
           stage_id: row.stage_id,
           item_name: row.item_name,
+          item_code: row.item_code ?? null,
           scheduled_week: row.scheduled_week,
           scheduled_hours: row.scheduled_hours,
           scheduled_czk: row.scheduled_czk,
@@ -149,6 +151,7 @@ export function useProductionExpedice() {
           project_name: (row as any).projects?.project_name || pid,
           stage_id: row.stage_id,
           item_name: row.item_name,
+          item_code: row.item_code ?? null,
           scheduled_week: row.scheduled_week,
           scheduled_hours: row.scheduled_hours,
           scheduled_czk: row.scheduled_czk,

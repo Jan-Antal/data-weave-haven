@@ -22,6 +22,7 @@ interface SplitItemDialogProps {
   onOpenChange: (open: boolean) => void;
   itemId: string;
   itemName: string;
+  itemCode?: string | null;
   totalHours: number;
   projectId: string;
   stageId: string | null;
@@ -66,7 +67,7 @@ function findWeeksWithCapacity(weeks: WeekOption[], hoursNeeded: number, exclude
 }
 
 export function SplitItemDialog({
-  open, onOpenChange, itemId, itemName, totalHours, projectId, stageId,
+  open, onOpenChange, itemId, itemName, itemCode, totalHours, projectId, stageId,
   scheduledCzk, source, currentWeekKey, weeks, weeklyCapacity,
 }: SplitItemDialogProps) {
   const qc = useQueryClient();
@@ -156,6 +157,7 @@ export function SplitItemDialog({
           project_id: projectId,
           stage_id: stageId,
           item_name: `${cleanName} (${i + 2}/${n})`,
+          item_code: itemCode ?? null,
           scheduled_week: part.weekKey,
           scheduled_hours: part.hours,
           scheduled_czk: part.hours * czkPerHour,
@@ -192,6 +194,7 @@ export function SplitItemDialog({
           project_id: projectId,
           stage_id: stageId,
           item_name: `${cleanName} (1/${n})`,
+          item_code: itemCode ?? null,
           scheduled_week: parts[0].weekKey,
           scheduled_hours: parts[0].hours,
           scheduled_czk: parts[0].hours * czkPerHour,
@@ -216,6 +219,7 @@ export function SplitItemDialog({
           project_id: projectId,
           stage_id: stageId,
           item_name: `${cleanName} (${i + 2}/${n})`,
+          item_code: itemCode ?? null,
           scheduled_week: part.weekKey,
           scheduled_hours: part.hours,
           scheduled_czk: part.hours * czkPerHour,
