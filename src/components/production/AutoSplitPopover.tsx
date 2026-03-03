@@ -9,6 +9,7 @@ interface AutoSplitPopoverProps {
   onOpenChange: (open: boolean) => void;
   itemId: string;
   itemName: string;
+  itemCode: string | null;
   itemHours: number;
   projectId: string;
   stageId: string | null;
@@ -30,7 +31,7 @@ interface AutoSplitPopoverProps {
 }
 
 export function AutoSplitPopover({
-  open, onOpenChange, itemId, itemName, itemHours, projectId, stageId, czkPerHour,
+  open, onOpenChange, itemId, itemName, itemCode, itemHours, projectId, stageId, czkPerHour,
   targetWeekKey, targetWeekNum, availableHours, spillWeekKey, spillWeekNum,
   source, inboxItemId, onInsertWhole,
 }: AutoSplitPopoverProps) {
@@ -68,6 +69,7 @@ export function AutoSplitPopover({
           project_id: projectId,
           stage_id: stageId,
           item_name: `${cleanName} (1/2)`,
+          item_code: itemCode,
           scheduled_week: targetWeekKey,
           scheduled_hours: part1Hours,
           scheduled_czk: part1Hours * czkPerHour,
@@ -92,6 +94,7 @@ export function AutoSplitPopover({
           project_id: projectId,
           stage_id: stageId,
           item_name: `${cleanName} (2/2)`,
+          item_code: itemCode,
           scheduled_week: spillWeekKey,
           scheduled_hours: part2Hours,
           scheduled_czk: part2Hours * czkPerHour,
@@ -121,6 +124,7 @@ export function AutoSplitPopover({
           project_id: projectId,
           stage_id: stageId,
           item_name: `${cleanName} (2/2)`,
+          item_code: itemCode,
           scheduled_week: spillWeekKey,
           scheduled_hours: part2Hours,
           scheduled_czk: part2Hours * czkPerHour,

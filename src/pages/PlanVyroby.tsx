@@ -23,6 +23,7 @@ interface ActiveDragData {
   type: "inbox-item" | "inbox-project" | "silo-item" | "silo-bundle";
   itemId?: string;
   itemName?: string;
+  itemCode?: string | null;
   projectId?: string;
   projectName?: string;
   weekDate?: string;
@@ -36,6 +37,7 @@ interface ActiveDragData {
 interface AutoSplitState {
   itemId: string;
   itemName: string;
+  itemCode: string | null;
   itemHours: number;
   projectId: string;
   stageId: string | null;
@@ -160,6 +162,7 @@ export default function PlanVyroby() {
           setAutoSplitState({
             itemId: dragData.itemId!,
             itemName: dragData.itemName || "Položka",
+            itemCode: dragData.itemCode ?? null,
             itemHours: dragData.hours,
             projectId: dragData.projectId || "",
             stageId: dragData.stageId ?? null,

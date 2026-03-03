@@ -174,7 +174,12 @@ export function SpillSuggestionPanel({
                 checked={checkedIds.has(item.id)}
                 onCheckedChange={() => toggleItem(item.id)}
               />
-              <span className="flex-1 truncate" style={{ color: "#223937" }}>
+              {item.item_code && (
+                <span className="font-mono font-bold shrink-0" style={{ color: "#223937", fontSize: 8 }}>
+                  {item.item_code}
+                </span>
+              )}
+              <span className="flex-1 truncate" style={{ color: "#6b7a78" }}>
                 {item.item_name}
               </span>
               <span className="font-mono shrink-0" style={{ color: "#99a5a3" }}>

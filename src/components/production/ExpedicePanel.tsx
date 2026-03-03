@@ -154,10 +154,15 @@ export function ExpedicePanel({ showCzk }: { showCzk?: boolean }) {
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                 >
-                  <Check className="shrink-0" style={{ width: 12, height: 12, color: "#3a8a36", strokeWidth: 3 }} />
-                  <span className="text-[11px] truncate flex-1" style={{ color: "#6b7a78" }}>
-                    {item.item_name}
-                  </span>
+                   <Check className="shrink-0" style={{ width: 12, height: 12, color: "#3a8a36", strokeWidth: 3 }} />
+                   {item.item_code && (
+                     <span className="font-mono text-[10px] font-bold shrink-0" style={{ color: "#223937" }}>
+                       {item.item_code}
+                     </span>
+                   )}
+                   <span className="text-[11px] truncate flex-1" style={{ color: "#6b7a78" }}>
+                     {item.item_name}
+                   </span>
                   {item.completed_at && (
                     <span className="font-mono text-[9px] shrink-0" style={{ color: "#99a5a3" }}>
                       {new Date(item.completed_at).toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric" })}

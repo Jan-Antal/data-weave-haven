@@ -55,6 +55,7 @@ interface CompletionState {
 interface SplitState {
   itemId: string;
   itemName: string;
+  itemCode: string | null;
   totalHours: number;
   projectId: string;
   stageId: string | null;
@@ -258,6 +259,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
               setSplitState({
                 itemId: item.id,
                 itemName: item.item_name,
+                itemCode: item.item_code,
                 totalHours: item.scheduled_hours,
                 projectId: item.project_id,
                 stageId: item.stage_id,
@@ -367,6 +369,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
           open={!!splitState}
           onOpenChange={(open) => !open && setSplitState(null)}
           {...splitState}
+          itemCode={splitState.itemCode}
           weeks={weekOptions}
           weeklyCapacity={weeklyCapacity}
         />
@@ -660,6 +663,11 @@ function CompletedSiloItem({
       onContextMenu={onContextMenu}
     >
       <span style={{ width: 10, fontSize: 9, color: "#3a8a36", fontWeight: 700 }}>✓</span>
+      {item.item_code && (
+        <span className="font-mono text-[9px] font-bold shrink-0" style={{ color: "#c4ccc9" }}>
+          {item.item_code}
+        </span>
+      )}
       <span className="text-[10px] flex-1 truncate" style={{ color: "#99a5a3", textDecoration: "line-through" }}>
         {item.item_name}
       </span>
@@ -688,6 +696,7 @@ function DraggableSiloItem({
       type: "silo-item",
       itemId: item.id,
       itemName: item.item_name,
+      itemCode: item.item_code,
       projectId: item.project_id,
       projectName: item.project_name,
       weekDate: weekKey,
@@ -712,7 +721,12 @@ function DraggableSiloItem({
       onContextMenu={onContextMenu}
     >
       <GripVertical className="shrink-0" style={{ width: 8, height: 8, color: "#99a5a3" }} />
-      <span className="text-[10px] flex-1 truncate" style={{ color: "#223937" }}>
+      {item.item_code && (
+        <span className="font-mono text-[9px] font-bold shrink-0" style={{ color: "#223937" }}>
+          {item.item_code}
+        </span>
+      )}
+      <span className="text-[10px] flex-1 truncate" style={{ color: "#6b7a78" }}>
         {item.item_name}
       </span>
       {isSplit && (
