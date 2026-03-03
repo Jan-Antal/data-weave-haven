@@ -242,6 +242,8 @@ function DraggableInboxItem({ item, projectName }: { item: InboxItem; projectNam
       projectId: item.project_id,
       projectName,
       hours: item.estimated_hours,
+      stageId: item.stage_id,
+      scheduledCzk: item.estimated_czk,
     },
   });
 

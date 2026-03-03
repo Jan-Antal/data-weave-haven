@@ -270,6 +270,9 @@ export type Database = {
           project_id: string
           sent_at: string
           sent_by: string
+          split_group_id: string | null
+          split_part: number | null
+          split_total: number | null
           stage_id: string | null
           status: string
         }
@@ -282,6 +285,9 @@ export type Database = {
           project_id: string
           sent_at?: string
           sent_by: string
+          split_group_id?: string | null
+          split_part?: number | null
+          split_total?: number | null
           stage_id?: string | null
           status?: string
         }
@@ -294,6 +300,9 @@ export type Database = {
           project_id?: string
           sent_at?: string
           sent_by?: string
+          split_group_id?: string | null
+          split_part?: number | null
+          split_total?: number | null
           stage_id?: string | null
           status?: string
         }
@@ -328,6 +337,9 @@ export type Database = {
           scheduled_czk: number
           scheduled_hours: number
           scheduled_week: string
+          split_group_id: string | null
+          split_part: number | null
+          split_total: number | null
           stage_id: string | null
           status: string
         }
@@ -344,6 +356,9 @@ export type Database = {
           scheduled_czk: number
           scheduled_hours: number
           scheduled_week: string
+          split_group_id?: string | null
+          split_part?: number | null
+          split_total?: number | null
           stage_id?: string | null
           status?: string
         }
@@ -360,6 +375,9 @@ export type Database = {
           scheduled_czk?: number
           scheduled_hours?: number
           scheduled_week?: string
+          split_group_id?: string | null
+          split_part?: number | null
+          split_total?: number | null
           stage_id?: string | null
           status?: string
         }
@@ -377,6 +395,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "production_schedule_split_group_id_fkey"
+            columns: ["split_group_id"]
+            isOneToOne: false
+            referencedRelation: "production_schedule"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "production_schedule_stage_id_fkey"

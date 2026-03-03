@@ -15,6 +15,9 @@ export interface ScheduleItem {
   status: string;
   completed_at: string | null;
   completed_by: string | null;
+  split_group_id: string | null;
+  split_part: number | null;
+  split_total: number | null;
 }
 
 export interface ScheduleBundle {
@@ -83,6 +86,9 @@ export function useProductionSchedule() {
           status: row.status,
           completed_at: row.completed_at,
           completed_by: row.completed_by,
+          split_group_id: (row as any).split_group_id ?? null,
+          split_part: (row as any).split_part ?? null,
+          split_total: (row as any).split_total ?? null,
         });
         bundle.total_hours += row.scheduled_hours;
       }
@@ -150,6 +156,9 @@ export function useProductionExpedice() {
           status: row.status,
           completed_at: row.completed_at,
           completed_by: row.completed_by,
+          split_group_id: (row as any).split_group_id ?? null,
+          split_part: (row as any).split_part ?? null,
+          split_total: (row as any).split_total ?? null,
         });
         g.count++;
       }

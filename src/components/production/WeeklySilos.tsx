@@ -7,6 +7,7 @@ import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
 import { CompletionDialog } from "./CompletionDialog";
 import { SpillSuggestionPanel } from "./SpillSuggestionPanel";
+import { SplitItemDialog } from "./SplitItemDialog";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 
 function formatCompactCzk(v: number): string {
@@ -51,13 +52,25 @@ interface CompletionState {
   preCheckedIds?: string[];
 }
 
+interface SplitState {
+  itemId: string;
+  itemName: string;
+  totalHours: number;
+  projectId: string;
+  stageId: string | null;
+  scheduledCzk: number;
+  source: "schedule" | "inbox";
+  currentWeekKey?: string;
+}
+
 export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
-  const { moveItemBackToInbox, returnBundleToInbox, returnToProduction } = useProductionDragDrop();
+  const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [completionState, setCompletionState] = useState<CompletionState | null>(null);
+  const [splitState, setSplitState] = useState<SplitState | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const siloRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [visiblePeriodLabel, setVisiblePeriodLabel] = useState("");
@@ -145,6 +158,20 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
 
   const currentWeekKey = useMemo(() => getMonday(new Date()).toISOString().split("T")[0], []);
 
+  // Build week options for split dialog
+  const weekOptions = useMemo(() => {
+    return weeks.map(w => {
+      const siloData = scheduleData?.get(w.key);
+      const usedHours = siloData?.total_hours ?? 0;
+      return {
+        key: w.key,
+        weekNum: w.weekNum,
+        label: `${formatDateShort(w.start)}–${formatDateShort(w.end)}`,
+        remainingCapacity: weeklyCapacity - usedHours,
+      };
+    });
+  }, [weeks, scheduleData, weeklyCapacity]);
+
   // Build a simple map for spill panel
   const weeksCapacityMap = useMemo(() => {
     const map = new Map<string, { total_hours: number }>();
@@ -221,6 +248,36 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
             });
           },
         });
+
+        // Split option — only if item > 50h
+        if (item.scheduled_hours > 50) {
+          actions.push({
+            label: "Rozdělit položku",
+            icon: "✂",
+            onClick: () => {
+              setSplitState({
+                itemId: item.id,
+                itemName: item.item_name,
+                totalHours: item.scheduled_hours,
+                projectId: item.project_id,
+                stageId: item.stage_id,
+                scheduledCzk: item.scheduled_czk,
+                source: "schedule",
+                currentWeekKey: weekKey,
+              });
+            },
+          });
+        }
+
+        // Merge option — only if item has split_group_id
+        if (item.split_group_id) {
+          actions.push({
+            label: "Spojit části",
+            icon: "🔗",
+            onClick: () => mergeSplitItems(item.split_group_id!),
+          });
+        }
+
         actions.push({
           label: "Vrátit do Inboxu",
           icon: "←",
@@ -230,7 +287,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
 
       setContextMenu({ x: e.clientX, y: e.clientY, actions });
     },
-    [moveItemBackToInbox, returnToProduction]
+    [moveItemBackToInbox, returnToProduction, mergeSplitItems]
   );
 
   return (
@@ -301,6 +358,17 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
           open={!!completionState}
           onOpenChange={(open) => !open && setCompletionState(null)}
           {...completionState}
+        />
+      )}
+
+      {/* Split dialog */}
+      {splitState && (
+        <SplitItemDialog
+          open={!!splitState}
+          onOpenChange={(open) => !open && setSplitState(null)}
+          {...splitState}
+          weeks={weekOptions}
+          weeklyCapacity={weeklyCapacity}
         />
       )}
     </div>
@@ -582,9 +650,11 @@ function CompletedSiloItem({
   item: ScheduleItem;
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
+  const isSplit = !!item.split_group_id;
   return (
     <div
       className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-default transition-colors"
+      style={{ borderLeft: isSplit ? "2px dashed #c4ccc9" : undefined }}
       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#f8f7f5"; }}
       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
       onContextMenu={onContextMenu}
@@ -593,6 +663,11 @@ function CompletedSiloItem({
       <span className="text-[10px] flex-1 truncate" style={{ color: "#99a5a3", textDecoration: "line-through" }}>
         {item.item_name}
       </span>
+      {isSplit && (
+        <span className="text-[8px] font-mono shrink-0" style={{ color: "#c4ccc9" }}>
+          {item.split_part}/{item.split_total}
+        </span>
+      )}
       <span className="font-mono text-[9px] shrink-0" style={{ color: "#c4ccc9" }}>
         {item.scheduled_hours}h
       </span>
@@ -606,6 +681,7 @@ function DraggableSiloItem({
   item: ScheduleItem; weekKey: string; showCzk: boolean;
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
+  const isSplit = !!item.split_group_id;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `silo-item-${item.id}`,
     data: {
@@ -616,6 +692,8 @@ function DraggableSiloItem({
       projectName: item.project_name,
       weekDate: weekKey,
       hours: item.scheduled_hours,
+      stageId: item.stage_id,
+      scheduledCzk: item.scheduled_czk,
     },
   });
 
@@ -625,7 +703,10 @@ function DraggableSiloItem({
       {...attributes}
       {...listeners}
       className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-grab transition-colors"
-      style={{ opacity: isDragging ? 0.3 : 1 }}
+      style={{
+        opacity: isDragging ? 0.3 : 1,
+        borderLeft: isSplit ? "2px dashed #99a5a3" : undefined,
+      }}
       onMouseEnter={(e) => { if (!isDragging) e.currentTarget.style.backgroundColor = "#f8f7f5"; }}
       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
       onContextMenu={onContextMenu}
@@ -634,6 +715,11 @@ function DraggableSiloItem({
       <span className="text-[10px] flex-1 truncate" style={{ color: "#223937" }}>
         {item.item_name}
       </span>
+      {isSplit && (
+        <span className="text-[8px] font-mono shrink-0" style={{ color: "#99a5a3" }}>
+          {item.split_part}/{item.split_total}
+        </span>
+      )}
       <span className="font-mono text-[9px] shrink-0" style={{ color: "#99a5a3" }}>
         {item.scheduled_hours}h
         {showCzk && ` ${Math.round(item.scheduled_czk / 1000)}K`}

@@ -273,6 +273,58 @@ export function useProductionDragDrop() {
     }
   }, [invalidateAll]);
 
+  const mergeSplitItems = useCallback(async (splitGroupId: string) => {
+    try {
+      // Find all parts with this split_group_id, plus the original
+      const { data: parts, error: fetchErr } = await supabase
+        .from("production_schedule")
+        .select("*")
+        .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`)
+        .order("split_part", { ascending: true });
+      if (fetchErr) throw fetchErr;
+      if (!parts || parts.length <= 1) {
+        toast({ title: "Není co spojit", description: "Nebyla nalezena žádná další část." });
+        return;
+      }
+
+      const totalHours = parts.reduce((s, p) => s + p.scheduled_hours, 0);
+      const totalCzk = parts.reduce((s, p) => s + p.scheduled_czk, 0);
+      const primary = parts[0]; // Part 1
+
+      // Clean name: remove (X/Y) suffix
+      const cleanName = primary.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
+
+      // Update Part 1 with merged totals, clear split fields
+      const { error: updateErr } = await supabase
+        .from("production_schedule")
+        .update({
+          scheduled_hours: totalHours,
+          scheduled_czk: totalCzk,
+          item_name: cleanName,
+          split_group_id: null,
+          split_part: null,
+          split_total: null,
+        })
+        .eq("id", primary.id);
+      if (updateErr) throw updateErr;
+
+      // Delete all other parts
+      const otherIds = parts.filter(p => p.id !== primary.id).map(p => p.id);
+      if (otherIds.length > 0) {
+        const { error: delErr } = await supabase
+          .from("production_schedule")
+          .delete()
+          .in("id", otherIds);
+        if (delErr) throw delErr;
+      }
+
+      invalidateAll();
+      toast({ title: `${parts.length} částí spojeno zpět do "${cleanName}" (${totalHours}h)` });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [invalidateAll]);
+
   return {
     moveInboxItemToWeek,
     moveInboxProjectToWeek,
@@ -283,5 +335,6 @@ export function useProductionDragDrop() {
     completeItems,
     returnToProduction,
     returnBundleToInbox,
+    mergeSplitItems,
   };
 }
