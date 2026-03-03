@@ -8,6 +8,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 
+function formatCompactCzk(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${Math.round(v / 1_000)}K`;
+  return `${Math.round(v)}`;
+}
+
 const SAMPLE_ITEMS = [
   { pid: "Z-2601-001", items: [{ name: "Kuchyňská linka A", h: 120 }, { name: "Obývací stěna", h: 85 }, { name: "Vestavěné skříně", h: 95 }] },
   { pid: "Z-2502-011", items: [{ name: "Recepční pult", h: 180 }, { name: "Jednací stoly 6ks", h: 65 }, { name: "Knihovna lobby", h: 140 }, { name: "Kancelářské příčky", h: 210 }] },
@@ -19,9 +25,10 @@ const SAMPLE_ITEMS = [
 
 interface InboxPanelProps {
   overDroppableId?: string | null;
+  showCzk?: boolean;
 }
 
-export function InboxPanel({ overDroppableId }: InboxPanelProps) {
+export function InboxPanel({ overDroppableId, showCzk }: InboxPanelProps) {
   const { data: projects = [], isLoading } = useProductionInbox();
   const { data: settings } = useProductionSettings();
   const qc = useQueryClient();
@@ -137,6 +144,7 @@ export function InboxPanel({ overDroppableId }: InboxPanelProps) {
               <button onClick={handleCollapseAll} className="text-[9px] hover:underline" style={{ color: "#6b7a78" }}>Sbalit</button>
               <span className="text-[9px] ml-1.5 font-mono font-medium" style={{ color: "#6b7a78" }}>
                 {Math.round(totalHours).toLocaleString("cs-CZ")}h
+                {showCzk && ` ${formatCompactCzk(totalHours * hourlyRate)}`}
               </span>
             </>
           )}
@@ -151,7 +159,7 @@ export function InboxPanel({ overDroppableId }: InboxPanelProps) {
           </div>
         )}
         {projects.map((project) => (
-          <InboxProjectGroup key={`${project.project_id}-${expandKey}`} project={project} hourlyRate={hourlyRate} defaultExpanded={allExpanded} />
+          <InboxProjectGroup key={`${project.project_id}-${expandKey}`} project={project} hourlyRate={hourlyRate} defaultExpanded={allExpanded} showCzk={showCzk} />
         ))}
       </div>
 
@@ -172,7 +180,7 @@ export function InboxPanel({ overDroppableId }: InboxPanelProps) {
   );
 }
 
-function InboxProjectGroup({ project, hourlyRate, defaultExpanded }: { project: InboxProject; hourlyRate: number; defaultExpanded: boolean }) {
+function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk }: { project: InboxProject; hourlyRate: number; defaultExpanded: boolean; showCzk?: boolean }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const color = getProjectColor(project.project_id);
   const totalCzkK = Math.round((project.total_hours * hourlyRate) / 1000);
@@ -204,9 +212,11 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded }: { project: 
           <span className="font-mono text-[12px] font-semibold" style={{ color: "#223937" }}>
             {Math.round(project.total_hours)}h
           </span>
-          <span className="font-mono text-[9px] ml-1" style={{ color: "#6b7a78" }}>
-            {totalCzkK}K
-          </span>
+          {showCzk && (
+            <span className="font-mono text-[9px] ml-1" style={{ color: "#6b7a78" }}>
+              {formatCompactCzk(project.total_hours * hourlyRate)}
+            </span>
+          )}
         </div>
       </button>
 
