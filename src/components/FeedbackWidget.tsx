@@ -42,10 +42,10 @@ export function FeedbackWidget() {
   };
 
   return (
-    <div ref={ref} className="fixed bottom-6 left-6 z-50">
+    <div ref={ref} className="fixed bottom-6 right-6 z-50">
       {/* Popup */}
       {open && (
-        <div className="absolute bottom-16 left-0 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden">
+        <div className="absolute bottom-16 right-0 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden">
           {sent ? (
             <div className="flex flex-col items-center justify-center py-10 gap-3">
               <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center">
