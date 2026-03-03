@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useTPVItems, useUpdateTPVItem, useAddTPVItem, useDeleteTPVItems, useBulkUpdateTPVStatus, useBulkInsertTPVItems } from "@/hooks/useTPVItems";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
-import { ArrowLeft, Plus, Upload, Trash2, Download } from "lucide-react";
+import { ArrowLeft, Plus, Upload, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/useAuth";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
@@ -19,10 +19,9 @@ import { useHeaderDrag } from "@/hooks/useHeaderDrag";
 import { SortableHeader } from "./SortableHeader";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { cn } from "@/lib/utils";
-import { exportToExcel, buildFileName } from "@/lib/exportExcel";
-import { ExportPopup } from "./ExportPopup";
 import { ExcelImportWizard } from "./ExcelImportWizard";
 import { formatCurrency } from "@/lib/currency";
+import { useExportContext } from "./ExportContext";
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
   { key: "item_name", label: "Název", locked: true },
   { key: "item_type", label: "Typ" },
@@ -251,6 +250,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       isDragging: dragKey === key,
     } : {}),
   });
+  const { registerExport } = useExportContext();
 
   const tpvExportMeta = useMemo(() => ({
     getter: (selectedKeys?: string[]) => {
@@ -272,19 +272,14 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     defaultVisibleKeys: ["item_name", ...renderKeys],
   }), [renderKeys, sortedItems, getLabel]);
 
-  const [exportOpen, setExportOpen] = useState(false);
-  const exportWrapperRef = useRef<HTMLDivElement>(null);
-
+  // Register export meta for the main Export button
   useEffect(() => {
-    if (!exportOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (exportWrapperRef.current && !exportWrapperRef.current.contains(e.target as Node)) {
-        setExportOpen(false);
-      }
+    registerExport("tpv-list", tpvExportMeta);
+    return () => {
+      // Unregister on unmount by setting to null-like
+      registerExport("tpv-list", null as any);
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [exportOpen]);
+  }, [registerExport, tpvExportMeta]);
 
   return (
     <div className="w-full min-w-0">
@@ -295,25 +290,6 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         </Button>
         <span className="text-sm font-serif font-bold">{projectId} — {projectName}</span>
         <span className="text-muted-foreground/40 text-sm">|</span>
-        <div ref={exportWrapperRef} className="relative">
-          <button
-            onClick={() => setExportOpen(!exportOpen)}
-            className="border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-sm px-3 py-1.5 rounded-md gap-1.5 flex items-center"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Export
-          </button>
-          {exportOpen && (
-            <ExportPopup
-              tabKey={`tpv-list-${projectId}`}
-              tabLabel="TPV"
-              sheetName="TPV Items"
-              meta={tpvExportMeta}
-              onClose={() => setExportOpen(false)}
-              projectId={projectId}
-            />
-          )}
-        </div>
         {canManageTPV && (
           <Button size="sm" variant="outline" onClick={() => setWizardOpen(true)}>
             <Upload className="h-3 w-3 mr-1" /> Import z Excelu
