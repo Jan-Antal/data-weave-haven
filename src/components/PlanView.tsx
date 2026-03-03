@@ -555,7 +555,7 @@ function SubstageRows({
 }: {
   projectId: string; project: Project; origin: Date; dayPx: number;
   timelineWidth: number; statusColorMap: Record<string, string>;
-  isFieldReadOnly: (field: string) => boolean;
+  isFieldReadOnly: (field: string, currentValue?: string | null) => boolean;
   weeks: { label: string; x: number }[];
   months: { label: string; startX: number; width: number; date: Date }[];
   showWeeks: boolean;
@@ -580,7 +580,7 @@ function SubstageRow({
 }: {
   stage: ProjectStage; project: Project; origin: Date; dayPx: number;
   timelineWidth: number; statusColorMap: Record<string, string>;
-  isFieldReadOnly: (field: string) => boolean;
+  isFieldReadOnly: (field: string, currentValue?: string | null) => boolean;
   updateStage: ReturnType<typeof useUpdateStage>;
   weeks: { label: string; x: number }[];
   months: { label: string; startX: number; width: number; date: Date }[];
@@ -654,7 +654,7 @@ function SubstageRow({
       })}
       {barData.diamonds.map((m, i, arr) => {
         const showLabel = !arr.some((other, j) => j > i && Math.abs(differenceInDays(other.date, m.date)) <= 5);
-        const canDrag = DRAGGABLE_MILESTONES.has(m.name) && m.fieldKey && !isFieldReadOnly(m.fieldKey);
+        const canDrag = DRAGGABLE_MILESTONES.has(m.name) && m.fieldKey && !isFieldReadOnly(m.fieldKey, (stage as any)[m.fieldKey!] ?? null);
         return (
           <MilestoneDiamond
             key={i} date={m.date} color={m.color} label={m.label} name={m.name}
@@ -1085,7 +1085,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                     {/* Milestone diamonds */}
                     {barData.diamonds.map((m, i, arr) => {
                       const showLabel = !arr.some((other, j) => j > i && Math.abs(differenceInDays(other.date, m.date)) <= 5);
-                      const canDrag = DRAGGABLE_MILESTONES.has(m.name) && m.fieldKey && !isFieldReadOnly(m.fieldKey);
+                      const canDrag = DRAGGABLE_MILESTONES.has(m.name) && m.fieldKey && !isFieldReadOnly(m.fieldKey, (p as any)[m.fieldKey!] ?? null);
                       return (
                         <MilestoneDiamond
                           key={i} date={m.date} color={m.color} label={m.label} name={m.name}

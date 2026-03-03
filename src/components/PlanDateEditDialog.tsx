@@ -153,7 +153,7 @@ export function PlanDateEditDialog({ project, open, onOpenChange }: PlanDateEdit
           {DATE_FIELDS.map((f) => {
             const raw = values[f.key];
             const parsed = raw ? parseAppDate(raw) : undefined;
-            const readOnly = isFieldReadOnly(f.key);
+            const readOnly = isFieldReadOnly(f.key, (project as any)[f.key] ?? null);
             const hasWarning = fieldsWithWarning.has(f.key);
 
             return (

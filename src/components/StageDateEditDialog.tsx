@@ -153,7 +153,8 @@ export function StageDateEditDialog({ stage, project, open, onOpenChange }: Stag
           {DATE_FIELDS.map((f) => {
             const raw = values[f.key];
             const parsed = raw ? parseAppDate(raw) : undefined;
-            const readOnly = isFieldReadOnly(fieldPermissionMap[f.key] ?? f.key);
+            const mappedField = fieldPermissionMap[f.key] ?? f.key;
+            const readOnly = isFieldReadOnly(mappedField, (stage as any)[f.key] ?? null);
             const hasWarning = fieldsWithWarning.has(f.key);
 
             return (
