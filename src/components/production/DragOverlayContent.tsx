@@ -28,7 +28,7 @@ export function DragOverlayContent({ data }: { data: DragData }) {
       >
         <div className="flex items-center gap-1.5">
           {data.itemCode && (
-            <span className="font-mono text-[10px] font-bold shrink-0" style={{ color: "#223937" }}>
+            <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>
               {data.itemCode}
             </span>
           )}

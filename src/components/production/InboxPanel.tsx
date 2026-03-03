@@ -274,7 +274,7 @@ function DraggableInboxItem({ item, projectName }: { item: InboxItem; projectNam
     >
       <GripVertical className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />
       {item.item_code && (
-        <span className="font-mono text-[10px] font-bold shrink-0" style={{ color: "#223937" }}>
+        <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>
           {item.item_code}
         </span>
       )}
