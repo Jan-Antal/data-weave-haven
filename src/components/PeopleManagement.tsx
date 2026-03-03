@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { useAllPeople, useAddPerson } from "@/hooks/usePeople";
+import { useAllPeopleIncludingInactive, useAddPerson } from "@/hooks/usePeople";
 import { useAuth } from "@/hooks/useAuth";
 import { Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,18 +17,18 @@ type Role = (typeof roles)[number];
 
 interface GroupedPerson {
   name: string;
-  roles: Map<string, string>; // role -> id
+  roles: Map<string, string>; // role -> id (only active roles)
 }
 
-function groupPeople(people: { id: string; name: string; role: string }[]): GroupedPerson[] {
+function groupPeople(people: { id: string; name: string; role: string; is_active: boolean }[]): GroupedPerson[] {
   const map = new Map<string, GroupedPerson>();
   for (const p of people) {
     const existing = map.get(p.name);
     if (existing) {
-      existing.roles.set(p.role, p.id);
+      if (p.is_active) existing.roles.set(p.role, p.id);
     } else {
       const roles = new Map<string, string>();
-      roles.set(p.role, p.id);
+      if (p.is_active) roles.set(p.role, p.id);
       map.set(p.name, { name: p.name, roles });
     }
   }
@@ -41,12 +41,12 @@ interface PeopleManagementProps {
 }
 
 export function PeopleManagement({ open, onOpenChange }: PeopleManagementProps) {
-  const { data: allPeople = [] } = useAllPeople();
+  const { data: allPeople = [] } = useAllPeopleIncludingInactive();
   const addPerson = useAddPerson();
-  const { isAdmin, isKonstrukter } = useAuth();
-  const canDelete = isAdmin;
-  const canRename = isAdmin;
-  const canToggleAllRoles = isAdmin;
+  const { isAdmin, isPM, isKonstrukter } = useAuth();
+  const canDelete = isAdmin || isPM;
+  const canRename = isAdmin || isPM;
+  const canToggleAllRoles = isAdmin || isPM;
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -85,20 +85,28 @@ export function PeopleManagement({ open, onOpenChange }: PeopleManagementProps) 
 
   const handleToggleRole = async (name: string, role: Role, has: boolean) => {
     if (has) {
-      const row = allPeople.find((p) => p.name === name && p.role === role);
+      // Unchecking: set is_active = false on this role row
+      const row = allPeople.find((p) => p.name === name && p.role === role && p.is_active);
       if (row) {
         await supabase.from("people").update({ is_active: false }).eq("id", row.id);
         qc.invalidateQueries({ queryKey: ["people"] });
       }
     } else {
-      addPerson.mutate({ name, role });
+      // Checking: reactivate existing inactive row or create new
+      const inactiveRow = allPeople.find((p) => p.name === name && p.role === role && !p.is_active);
+      if (inactiveRow) {
+        await supabase.from("people").update({ is_active: true }).eq("id", inactiveRow.id);
+        qc.invalidateQueries({ queryKey: ["people"] });
+      } else {
+        addPerson.mutate({ name, role });
+      }
     }
   };
 
   const handleDelete = async (name: string) => {
     const rows = allPeople.filter((p) => p.name === name);
     for (const row of rows) {
-      await supabase.from("people").update({ is_active: false }).eq("id", row.id);
+      await supabase.from("people").delete().eq("id", row.id);
     }
     qc.invalidateQueries({ queryKey: ["people"] });
     setDeleteTarget(null);

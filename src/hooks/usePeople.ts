@@ -34,6 +34,18 @@ export function useAllPeople() {
   });
 }
 
+/** Fetch ALL people including inactive (for PeopleManagement) */
+export function useAllPeopleIncludingInactive() {
+  return useQuery({
+    queryKey: ["people", "all-including-inactive"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("people").select("*").order("name");
+      if (error) throw error;
+      return data as Person[];
+    },
+  });
+}
+
 export function useAddPerson() {
   const qc = useQueryClient();
   return useMutation({
