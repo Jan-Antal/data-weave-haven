@@ -15,7 +15,7 @@ export interface ExportMeta {
 }
 
 interface ExportContextType {
-  registerExport: (tab: string, meta: ExportMeta) => void;
+  registerExport: (tab: string, meta: ExportMeta | null) => void;
   getExportMeta: (tab: string) => ExportMeta | null;
 }
 
@@ -24,8 +24,12 @@ const ExportCtx = createContext<ExportContextType | null>(null);
 export function ExportProvider({ children }: { children: ReactNode }) {
   const metaRef = useRef<Record<string, ExportMeta>>({});
 
-  const registerExport = useCallback((tab: string, meta: ExportMeta) => {
-    metaRef.current[tab] = meta;
+  const registerExport = useCallback((tab: string, meta: ExportMeta | null) => {
+    if (meta) {
+      metaRef.current[tab] = meta;
+    } else {
+      delete metaRef.current[tab];
+    }
   }, []);
 
   const getExportMeta = useCallback((tab: string) => {

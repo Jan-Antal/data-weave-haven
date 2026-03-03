@@ -10,6 +10,7 @@ const TAB_MAP: Record<string, { key: string; sheet: string; label: string }> = {
   "project-info": { key: "project-info", sheet: "Project Info", label: "Project Info" },
   "pm-status": { key: "pm-status", sheet: "PM Status", label: "PM Status" },
   "tpv-status": { key: "tpv-status", sheet: "TPV Status", label: "TPV Status" },
+  "tpv-list": { key: "tpv-list", sheet: "TPV Items", label: "TPV List" },
 };
 
 interface ExportButtonProps {
@@ -39,7 +40,11 @@ export function ExportButton({ activeTab, personFilter, statusFilter }: ExportBu
     return () => document.removeEventListener("mousedown", handler);
   }, [dropdownOpen, excelPopupOpen]);
 
-  const tabInfo = TAB_MAP[activeTab];
+  // When on tpv-status tab, check if TPV List is active (has registered meta)
+  const tpvListMeta = getExportMeta("tpv-list");
+  const effectiveTab = activeTab === "tpv-status" && tpvListMeta ? "tpv-list" : activeTab;
+  
+  const tabInfo = TAB_MAP[effectiveTab];
   if (!tabInfo) return null;
 
   const meta = getExportMeta(tabInfo.key);
