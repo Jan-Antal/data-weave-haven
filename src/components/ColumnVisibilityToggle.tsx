@@ -362,7 +362,7 @@ export function ColumnVisibilityToggle(props: Props) {
         onConfirm={() => { if (deleteConfirm) { deleteColumn.mutate(deleteConfirm); setDeleteConfirm(null); } }}
         onCancel={() => setDeleteConfirm(null)}
         title="Smazat sloupec"
-        description={`Opravdu chcete smazat sloupec „${deleteConfirm ? (customColumns.find(c => c.id === deleteConfirm)?.label ?? "") : ""}"? Tato akce smaže sloupec a všechna jeho data ze všech projektů. Tuto akci nelze vrátit.`}
+        description={`Opravdu smazat sloupec „${deleteConfirm ? (customColumns.find(c => c.id === deleteConfirm)?.label ?? "") : ""}"? Data v tomto sloupci budou ztracena.`}
       />
     </>
   );

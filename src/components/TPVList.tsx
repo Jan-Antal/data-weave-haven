@@ -218,12 +218,13 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     const labels: string[] = [];
     // locked column
     labels.push(getLabel("item_type", TPV_LIST_LABEL_MAP["item_type"] || "item_type"));
-    // visible columns
+    // visible columns (including custom)
     for (const key of renderKeys) {
-      labels.push(getLabel(key, TPV_LIST_LABEL_MAP[key] || key));
+      const customCol = customColumns.find(c => c.column_key === key);
+      labels.push(customCol ? customCol.label : getLabel(key, TPV_LIST_LABEL_MAP[key] || key));
     }
     return labels;
-  }, [renderKeys, getLabel]);
+  }, [renderKeys, getLabel, customColumns]);
 
   const headerProps = (key: string) => ({
     label: TPV_LIST_LABEL_MAP[key] || key,
