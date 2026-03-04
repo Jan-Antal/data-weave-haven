@@ -136,7 +136,7 @@ const Index = () => {
           <button onClick={() => setSimulatedRole(null)} className="text-amber-700 font-medium hover:text-amber-900 underline text-sm">Zpět na Admin</button>
         </div>
       )}
-      <header className="border-b bg-primary px-6 py-4 sticky top-0 z-50">
+      <header className="border-b bg-primary px-6 py-4 shrink-0 z-50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-serif text-primary-foreground tracking-wide">
@@ -244,7 +244,7 @@ const Index = () => {
         </div>
       </header>
 
-      <div className="sticky top-[65px] z-40 bg-background border-b px-6 py-3">
+      <div className="shrink-0 z-40 bg-background border-b px-6 py-3">
         <div>
           <TableFilters
             personFilter={filters.personFilter}
