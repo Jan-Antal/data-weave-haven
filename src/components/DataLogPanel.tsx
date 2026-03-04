@@ -347,6 +347,7 @@ function UserAnalyticsRow({
 function getActionLabel(actionType: string, newValue: string | null, projectId: string): string {
   switch (actionType) {
     case "user_login": return "Přihlášení";
+    case "session_end": return "Konec session";
     case "page_view": return `Zobrazení: ${newValue || "stránka"}`;
     case "status_change": return `Status změněn (${projectId})`;
     case "project_created": return `Vytvořen projekt ${projectId}`;
