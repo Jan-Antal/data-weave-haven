@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
-import { logLoginEvent, resetLoginTracking } from "@/hooks/useLoginTracking";
+import { logLoginEvent, resetLoginTracking, hasLoginLoggedInCurrentTab } from "@/hooks/useLoginTracking";
 import { startSession, endSession, resetSessionTracking } from "@/hooks/useSessionTracking";
 
 export type AppRole = "owner" | "admin" | "pm" | "konstrukter" | "viewer";
@@ -59,16 +59,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          // Track login when transitioning from no user to signed in
-          if (!prevUserRef.current && session.user.id) {
-            logLoginEvent(session.user.id, session.user.email ?? "");
-            startSession(session.user.id, session.user.email ?? "");
+          if (event === "SIGNED_IN" && session.user.id && !hasLoginLoggedInCurrentTab()) {
+            void logLoginEvent(session.user.id, session.user.email ?? "").then((result) => {
+              if (result.logId && result.sessionStartMs) {
+                startSession(session.user.id, session.user.email ?? "", session.access_token);
+              }
+            });
+          } else if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
+            startSession(session.user.id, session.user.email ?? "", session.access_token);
           }
+
           prevUserRef.current = session.user.id;
 
           setTimeout(async () => {

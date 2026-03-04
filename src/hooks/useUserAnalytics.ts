@@ -17,7 +17,7 @@ export interface AnalyticsSummary {
 }
 
 export function formatSessionDuration(minutes: number): string {
-  if (!minutes || minutes <= 0) return "—";
+  if (!Number.isFinite(minutes) || minutes <= 0) return "0 min";
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
@@ -34,55 +34,56 @@ export function useUserAnalytics(enabled: boolean) {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
-      const [{ data: logins }, { data: sessions }] = await Promise.all([
-        (supabase.from("data_log") as any)
-          .select("user_email, created_at")
-          .eq("action_type", "user_login")
-          .gte("created_at", thirtyDaysAgo)
-          .order("created_at", { ascending: false }),
-        (supabase.from("data_log") as any)
-          .select("user_email, detail")
-          .eq("action_type", "session_end")
-          .gte("created_at", thirtyDaysAgo),
-      ]);
+      const { data: logins } = await (supabase.from("data_log") as any)
+        .select("user_email, created_at, detail")
+        .eq("action_type", "user_login")
+        .gte("created_at", thirtyDaysAgo)
+        .order("created_at", { ascending: false });
 
-      const loginArr = (logins ?? []) as { user_email: string; created_at: string }[];
-      const sessionArr = (sessions ?? []) as { user_email: string; detail: string | null }[];
+      const loginArr = (logins ?? []) as Array<{
+        user_email: string;
+        created_at: string;
+        detail: string | null;
+      }>;
 
-      const loginsToday = loginArr.filter(l => new Date(l.created_at) >= todayStart).length;
-      const uniqueUsers7d = new Set(loginArr.filter(l => l.created_at >= sevenDaysAgo).map(l => l.user_email));
-      const uniqueUsers30d = new Set(loginArr.map(l => l.user_email));
+      const loginsToday = loginArr.filter((l) => new Date(l.created_at) >= todayStart).length;
+      const uniqueUsers7d = new Set(loginArr.filter((l) => l.created_at >= sevenDaysAgo).map((l) => l.user_email));
+      const uniqueUsers30d = new Set(loginArr.map((l) => l.user_email));
 
       const userMap = new Map<string, UserAnalytics>();
+      const sessionMinsByUser = new Map<string, number[]>();
 
-      for (const l of loginArr) {
-        if (!userMap.has(l.user_email)) {
-          userMap.set(l.user_email, {
-            user_email: l.user_email,
-            last_login: l.created_at,
+      for (const login of loginArr) {
+        if (!userMap.has(login.user_email)) {
+          userMap.set(login.user_email, {
+            user_email: login.user_email,
+            last_login: login.created_at,
             login_count_30d: 0,
             avg_session_min: 0,
             total_session_min: 0,
           });
         }
-        userMap.get(l.user_email)!.login_count_30d++;
-      }
 
-      // Session durations per user
-      const userSessionMins = new Map<string, number[]>();
-      for (const s of sessionArr) {
-        if (!s.detail) continue;
+        userMap.get(login.user_email)!.login_count_30d += 1;
+
+        if (!login.detail) continue;
         try {
-          const parsed = JSON.parse(s.detail);
-          const mins = parsed.duration_minutes ?? 0;
-          if (mins > 0) {
-            if (!userSessionMins.has(s.user_email)) userSessionMins.set(s.user_email, []);
-            userSessionMins.get(s.user_email)!.push(mins);
+          const parsed = JSON.parse(login.detail) as { session_duration_minutes?: unknown };
+          const minutesRaw = parsed.session_duration_minutes;
+          const minutes = typeof minutesRaw === "number" ? minutesRaw : Number(minutesRaw);
+
+          if (Number.isFinite(minutes) && minutes >= 0) {
+            if (!sessionMinsByUser.has(login.user_email)) {
+              sessionMinsByUser.set(login.user_email, []);
+            }
+            sessionMinsByUser.get(login.user_email)!.push(Math.round(minutes));
           }
-        } catch {}
+        } catch {
+          // ignore malformed detail rows
+        }
       }
 
-      for (const [email, mins] of userSessionMins) {
+      for (const [email, mins] of sessionMinsByUser) {
         if (!userMap.has(email)) {
           userMap.set(email, {
             user_email: email,
@@ -92,7 +93,8 @@ export function useUserAnalytics(enabled: boolean) {
             total_session_min: 0,
           });
         }
-        const total = mins.reduce((a, b) => a + b, 0);
+
+        const total = mins.reduce((acc, value) => acc + value, 0);
         const avg = mins.length > 0 ? Math.round(total / mins.length) : 0;
         userMap.get(email)!.total_session_min = total;
         userMap.get(email)!.avg_session_min = avg;
