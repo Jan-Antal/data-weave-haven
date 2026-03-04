@@ -821,6 +821,7 @@ export type Database = {
           item_name: string
           item_type: string | null
           konstrukter: string | null
+          nazev_prvku: string | null
           notes: string | null
           pocet: number | null
           project_id: string
@@ -840,6 +841,7 @@ export type Database = {
           item_name: string
           item_type?: string | null
           konstrukter?: string | null
+          nazev_prvku?: string | null
           notes?: string | null
           pocet?: number | null
           project_id: string
@@ -859,6 +861,7 @@ export type Database = {
           item_name?: string
           item_type?: string | null
           konstrukter?: string | null
+          nazev_prvku?: string | null
           notes?: string | null
           pocet?: number | null
           project_id?: string

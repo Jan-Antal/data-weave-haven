@@ -1,0 +1,1 @@
+ALTER TABLE public.tpv_items ADD COLUMN IF NOT EXISTS nazev_prvku text;
