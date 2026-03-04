@@ -12,6 +12,7 @@ export function useProductionDragDrop() {
     qc.invalidateQueries({ queryKey: ["production-inbox"] });
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
     qc.invalidateQueries({ queryKey: ["production-expedice"] });
+    qc.invalidateQueries({ queryKey: ["production-progress"] });
   }, [qc]);
 
   const moveInboxItemToWeek = useCallback(async (inboxItemId: string, weekDate: string) => {
