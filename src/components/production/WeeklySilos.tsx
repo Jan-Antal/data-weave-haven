@@ -122,15 +122,18 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const siloRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [visiblePeriodLabel, setVisiblePeriodLabel] = useState("");
+  const initialScrollDone = useRef(false);
 
   const weeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
 
+  // Initial scroll — run exactly once
   useEffect(() => {
+    if (initialScrollDone.current) return;
     const el = scrollContainerRef.current;
     if (!el) return;
-    const scrollTarget = 4 * 216;
-    el.scrollLeft = scrollTarget;
+    el.scrollLeft = 4 * 216;
+    initialScrollDone.current = true;
   }, []);
 
   const weeks = useMemo(() => {
