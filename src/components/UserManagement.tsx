@@ -212,35 +212,6 @@ export function UserManagement({ open, onOpenChange }: Props) {
     }
   };
 
-  const handleSendAccessEmail = async (userId: string) => {
-    setSendingAuthEmailId(userId);
-
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-invite-link", {
-        body: {
-          user_id: userId,
-          origin_url: window.location.origin,
-          mode: "send_email",
-        },
-      });
-
-      if (error || data?.error) {
-        toast({ title: "Chyba", description: data?.error || error?.message, variant: "destructive" });
-        return;
-      }
-
-      if (data?.link) {
-        await navigator.clipboard.writeText(data.link);
-        toast({ title: "Odkaz zkopírován do schránky", description: `Odešlete odkaz uživateli ${data.email}` });
-      } else {
-        toast({ title: "Odkaz vygenerován" });
-      }
-    } catch (e: any) {
-      toast({ title: "Chyba", description: e.message, variant: "destructive" });
-    } finally {
-      setSendingAuthEmailId(null);
-    }
-  };
 
   const handleTransferOwnership = async () => {
     if (!transferTarget) return;
