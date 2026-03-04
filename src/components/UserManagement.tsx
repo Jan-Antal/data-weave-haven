@@ -9,8 +9,10 @@ import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Trash2, KeyRound, ArrowRightLeft, Link2 } from "lucide-react";
+import { Plus, Trash2, KeyRound, ArrowRightLeft, Link2, Lock, Eye, EyeOff } from "lucide-react";
 import type { AppRole } from "@/hooks/useAuth";
+import { PasswordChecklist } from "@/components/PasswordChecklist";
+import { usePasswordValidation } from "@/hooks/usePasswordValidation";
 
 interface UserRow {
   id: string;
@@ -57,6 +59,10 @@ export function UserManagement({ open, onOpenChange }: Props) {
   const [transferSubmitting, setTransferSubmitting] = useState(false);
   const [copyingLinkId, setCopyingLinkId] = useState<string | null>(null);
   const [sendingAuthEmailId, setSendingAuthEmailId] = useState<string | null>(null);
+  const [passwordTarget, setPasswordTarget] = useState<{ id: string; name: string } | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
 
   const handleCopyInviteLink = async (userId: string) => {
     setCopyingLinkId(userId);
@@ -258,6 +264,28 @@ export function UserManagement({ open, onOpenChange }: Props) {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (!passwordTarget) return;
+    setPasswordSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("update-user", {
+        body: { user_id: passwordTarget.id, password: newPassword },
+      });
+      if (error || data?.error) {
+        toast({ title: "Chyba", description: data?.error || error?.message, variant: "destructive" });
+      } else {
+        toast({ title: "Heslo změněno" });
+        setPasswordTarget(null);
+        setNewPassword("");
+        setShowNewPassword(false);
+      }
+    } catch (e: any) {
+      toast({ title: "Chyba", description: e.message, variant: "destructive" });
+    } finally {
+      setPasswordSubmitting(false);
+    }
+  };
+
   const isOwner = (u: UserRow) => u.role === "owner";
   const nonOwnerUsers = users.filter((u) => u.role !== "owner");
 
@@ -344,6 +372,13 @@ export function UserManagement({ open, onOpenChange }: Props) {
                           disabled={copyingLinkId === u.id}
                         >
                           <Link2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => { setPasswordTarget({ id: u.id, name: u.full_name || u.email }); setNewPassword(""); setShowNewPassword(false); }}
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                          title="Změnit heslo"
+                        >
+                          <Lock className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleSendAccessEmail(u.id)}
@@ -464,6 +499,17 @@ export function UserManagement({ open, onOpenChange }: Props) {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Change Password Dialog */}
+      <PasswordChangeDialog
+        target={passwordTarget}
+        onOpenChange={(open) => { if (!open) { setPasswordTarget(null); setNewPassword(""); setShowNewPassword(false); } }}
+        password={newPassword}
+        onPasswordChange={setNewPassword}
+        showPassword={showNewPassword}
+        onToggleShow={() => setShowNewPassword(!showNewPassword)}
+        onSubmit={handleChangePassword}
+        submitting={passwordSubmitting}
+      />
 
       <ConfirmDialog
         open={deleteTarget !== null}
@@ -473,5 +519,69 @@ export function UserManagement({ open, onOpenChange }: Props) {
         description="Uživatel bude trvale smazán."
       />
     </>
+  );
+}
+
+function PasswordChangeDialog({
+  target,
+  onOpenChange,
+  password,
+  onPasswordChange,
+  showPassword,
+  onToggleShow,
+  onSubmit,
+  submitting,
+}: {
+  target: { id: string; name: string } | null;
+  onOpenChange: (open: boolean) => void;
+  password: string;
+  onPasswordChange: (v: string) => void;
+  showPassword: boolean;
+  onToggleShow: () => void;
+  onSubmit: () => void;
+  submitting: boolean;
+}) {
+  const validation = usePasswordValidation(password);
+
+  return (
+    <Dialog open={!!target} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Změnit heslo</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Nastavit nové heslo pro <strong>{target?.name}</strong>
+        </p>
+        <div className="space-y-2">
+          <Label htmlFor="admin-new-password">Nové heslo</Label>
+          <div className="relative">
+            <Input
+              id="admin-new-password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => onPasswordChange(e.target.value)}
+              placeholder="Alespoň 8 znaků"
+              autoFocus
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={onToggleShow}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          <PasswordChecklist password={password} />
+        </div>
+        <div className="flex justify-end gap-2 mt-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Zrušit</Button>
+          <Button onClick={onSubmit} disabled={submitting || !validation.isValid}>
+            {submitting ? "Ukládám..." : "Změnit heslo"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
