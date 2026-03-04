@@ -445,6 +445,17 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
         <SplitItemDialog open={!!splitState} onOpenChange={open => !open && setSplitState(null)} {...splitState} itemCode={splitState.itemCode} weeks={weekOptions} weeklyCapacity={weeklyCapacity} splitGroupId={splitState.splitGroupId} />
       )}
 
+      {bundleSplitState && (
+        <SplitBundleDialog
+          open={!!bundleSplitState}
+          onOpenChange={open => !open && setBundleSplitState(null)}
+          bundleName={bundleSplitState.bundleName}
+          currentWeekKey={bundleSplitState.currentWeekKey}
+          items={bundleSplitState.items}
+          weeks={weekOptions}
+        />
+      )}
+
       {pauseState && (
         <PauseItemDialog open={!!pauseState} onOpenChange={open => !open && setPauseState(null)} {...pauseState} itemCode={pauseState.itemCode} />
       )}
