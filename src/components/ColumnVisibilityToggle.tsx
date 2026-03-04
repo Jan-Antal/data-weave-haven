@@ -39,6 +39,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 type Props = {
   editMode?: boolean;
   onToggleEditMode?: () => void;
+  onCancelEditMode?: () => void;
 } & (
   | { tabKey: "projectInfo" | "pmStatus" | "tpvStatus"; standalone?: never }
   | {
