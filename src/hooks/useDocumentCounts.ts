@@ -28,13 +28,11 @@ export async function migrateDocCountCache(oldProjectId: string, newProjectId: s
   const count = memoryCache[oldProjectId] ?? 0;
   delete memoryCache[oldProjectId];
   memoryCache[newProjectId] = count;
-  // Update DB cache: delete old, upsert new
+  // Update DB cache: update old row's project_id to new one
   try {
-    await supabase.from("sharepoint_document_cache").delete().eq("project_id", oldProjectId);
-    if (count > 0) {
-      await supabase.from("sharepoint_document_cache")
-        .upsert({ project_id: newProjectId, total_count: count, updated_at: new Date().toISOString() } as any, { onConflict: "project_id" });
-    }
+    await supabase.from("sharepoint_document_cache")
+      .update({ project_id: newProjectId, updated_at: new Date().toISOString() } as any)
+      .eq("project_id", oldProjectId);
   } catch { /* ignore */ }
   window.dispatchEvent(new CustomEvent(DOC_COUNT_EVENT, { detail: { projectId: newProjectId, delta: 0 } }));
 }

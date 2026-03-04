@@ -475,9 +475,10 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     [externalSearch]
   );
 
-  // Frozen filter results
+  // Frozen filter results — include project IDs fingerprint so rename triggers recalculation
   const filterFingerprint = JSON.stringify([personFilter, statusFilter, externalSearch]);
-  const computeKey = `${filterFingerprint}|${projects.length}|${stagesByProject.size}`;
+  const projectIdsFingerprint = useMemo(() => projects.map(p => p.project_id).join(","), [projects]);
+  const computeKey = `${filterFingerprint}|${projects.length}|${stagesByProject.size}|${projectIdsFingerprint}`;
   const hasActiveFilters = !!(personFilter || (statusFilter && statusFilter.length > 0) || externalSearch);
 
   const frozenRef = useRef<{ key: string; ids: Set<string> }>({ key: '', ids: new Set() });
