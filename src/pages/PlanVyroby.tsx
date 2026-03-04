@@ -60,7 +60,8 @@ interface AutoSplitState {
 
 interface MergeState {
   itemName: string;
-  splitGroupId: string;
+  splitGroupIds: string[];
+  mergeItemCount: number;
   draggedItemId: string;
   targetWeekKey: string;
   onKeepSeparate: () => Promise<void>;
@@ -195,7 +196,8 @@ export default function PlanVyroby() {
         if (sibling) {
           setMergeState({
             itemName: dragData.itemName || "Položka",
-            splitGroupId: dragData.splitGroupId,
+            splitGroupIds: [dragData.splitGroupId],
+            mergeItemCount: 1,
             draggedItemId: dragData.itemId,
             targetWeekKey: dragData.weekDate,
             onKeepSeparate: async () => { /* no-op, already in same week */ },
@@ -231,7 +233,8 @@ export default function PlanVyroby() {
           };
           setMergeState({
             itemName: dragData.itemName || "Položka",
-            splitGroupId: dragData.splitGroupId,
+            splitGroupIds: [dragData.splitGroupId],
+            mergeItemCount: 1,
             draggedItemId: dragData.itemId,
             targetWeekKey: weekDate,
             onKeepSeparate: doNormalMove,
@@ -297,14 +300,16 @@ export default function PlanVyroby() {
           const sourceSilo = scheduleData?.get(dragData.weekDate);
           const sourceBundle = sourceSilo?.bundles.find(b => b.project_id === dragData.projectId);
           if (sourceBundle) {
-            const splitItem = sourceBundle.items.find(item =>
+            const splitItems = sourceBundle.items.filter(item =>
               item.split_group_id && findSiblingInWeek(item.split_group_id, weekDate, item.id)
             );
-            if (splitItem && splitItem.split_group_id) {
+            if (splitItems.length > 0) {
+              const uniqueGroupIds = [...new Set(splitItems.map(i => i.split_group_id!))];
               setMergeState({
-                itemName: splitItem.item_name || "Položka",
-                splitGroupId: splitItem.split_group_id,
-                draggedItemId: splitItem.id,
+                itemName: sourceBundle.project_name || dragData.projectName || "Bundle",
+                splitGroupIds: uniqueGroupIds,
+                mergeItemCount: splitItems.length,
+                draggedItemId: splitItems[0].id,
                 targetWeekKey: weekDate,
                 onKeepSeparate: async () => {
                   await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate);
@@ -365,12 +370,13 @@ export default function PlanVyroby() {
           open={!!mergeState}
           onOpenChange={open => !open && setMergeState(null)}
           itemName={mergeState.itemName}
+          mergeItemCount={mergeState.mergeItemCount}
           onMerge={async () => {
-            // For bundle moves, first move to target week, then merge
-            if (mergeState.onKeepSeparate) {
-              await mergeState.onKeepSeparate();
+            // First move (bundle or item), then merge all groups
+            await mergeState.onKeepSeparate();
+            for (const gid of mergeState.splitGroupIds) {
+              await mergeSplitItems(gid);
             }
-            await mergeSplitItems(mergeState.splitGroupId);
           }}
           onKeepSeparate={mergeState.onKeepSeparate}
         />
