@@ -9,8 +9,9 @@ import { ExpedicePanel } from "@/components/production/ExpedicePanel";
 import { DragOverlayContent } from "@/components/production/DragOverlayContent";
 import { AutoSplitPopover } from "@/components/production/AutoSplitPopover";
 import { MergePopover } from "@/components/production/MergePopover";
-import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
+import { TPVList } from "@/components/TPVList";
 import { useProjects } from "@/hooks/useProjects";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   DndContext,
   DragOverlay,
