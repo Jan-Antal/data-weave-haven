@@ -276,9 +276,9 @@ export default function PlanVyroby() {
       <div className="h-screen flex flex-col overflow-hidden" style={{ backgroundColor: "#f4f2f0" }}>
         <ProductionHeader />
         <div className="flex-1 flex min-h-0">
-          <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} />
-          <WeeklySilos showCzk={showCzk} onToggleCzk={setShowCzk} overDroppableId={overDroppableId} />
-          <ExpedicePanel showCzk={showCzk} />
+          <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
+          <WeeklySilos showCzk={showCzk} onToggleCzk={setShowCzk} overDroppableId={overDroppableId} onNavigateToTPV={handleNavigateToTPV} />
+          <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
         </div>
       </div>
 
@@ -303,6 +303,15 @@ export default function PlanVyroby() {
           itemName={mergeState.itemName}
           onMerge={() => mergeSplitItems(mergeState.splitGroupId)}
           onKeepSeparate={mergeState.onKeepSeparate}
+        />
+      )}
+
+      {/* TPV Navigation Dialog */}
+      {tpvProject && (
+        <ProjectDetailDialog
+          project={tpvProject}
+          open={!!tpvProjectId}
+          onOpenChange={(open) => { if (!open) setTpvProjectId(null); }}
         />
       )}
     </DndContext>
