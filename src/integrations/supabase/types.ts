@@ -262,6 +262,7 @@ export type Database = {
       }
       production_inbox: {
         Row: {
+          adhoc_reason: string | null
           created_at: string
           estimated_czk: number
           estimated_hours: number
@@ -278,6 +279,7 @@ export type Database = {
           status: string
         }
         Insert: {
+          adhoc_reason?: string | null
           created_at?: string
           estimated_czk: number
           estimated_hours: number
@@ -294,6 +296,7 @@ export type Database = {
           status?: string
         }
         Update: {
+          adhoc_reason?: string | null
           created_at?: string
           estimated_czk?: number
           estimated_hours?: number
@@ -328,6 +331,8 @@ export type Database = {
       }
       production_schedule: {
         Row: {
+          adhoc_reason: string | null
+          cancel_reason: string | null
           completed_at: string | null
           completed_by: string | null
           created_at: string
@@ -336,6 +341,8 @@ export type Database = {
           inbox_item_id: string | null
           item_code: string | null
           item_name: string
+          pause_expected_date: string | null
+          pause_reason: string | null
           position: number
           project_id: string
           scheduled_czk: number
@@ -348,6 +355,8 @@ export type Database = {
           status: string
         }
         Insert: {
+          adhoc_reason?: string | null
+          cancel_reason?: string | null
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
@@ -356,6 +365,8 @@ export type Database = {
           inbox_item_id?: string | null
           item_code?: string | null
           item_name: string
+          pause_expected_date?: string | null
+          pause_reason?: string | null
           position?: number
           project_id: string
           scheduled_czk: number
@@ -368,6 +379,8 @@ export type Database = {
           status?: string
         }
         Update: {
+          adhoc_reason?: string | null
+          cancel_reason?: string | null
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
@@ -376,6 +389,8 @@ export type Database = {
           inbox_item_id?: string | null
           item_code?: string | null
           item_name?: string
+          pause_expected_date?: string | null
+          pause_reason?: string | null
           position?: number
           project_id?: string
           scheduled_czk?: number
