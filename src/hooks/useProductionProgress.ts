@@ -45,9 +45,12 @@ export function useProductionProgress() {
       const completedByProject = new Map<string, number>();
       const pausedByProject = new Map<string, number>();
       const scheduledItemsByProject = new Map<string, ProjectProgress["scheduled_items"]>();
+      const projectNames = new Map<string, string>();
 
       for (const row of scheduleRes.data || []) {
         const pid = row.project_id;
+        const pName = (row as any).projects?.project_name;
+        if (pName && !projectNames.has(pid)) projectNames.set(pid, pName);
         if (row.status === "completed") {
           completedByProject.set(pid, (completedByProject.get(pid) || 0) + 1);
         } else if (row.status === "paused") {
@@ -86,7 +89,7 @@ export function useProductionProgress() {
         const missing = Math.max(0, totalTpv - accountedFor);
         
         result.set(pid, {
-          project_id: pid, project_name: pid, total_tpv: totalTpv,
+          project_id: pid, project_name: projectNames.get(pid) || pid, total_tpv: totalTpv,
           in_inbox: inInbox, scheduled, completed, paused, missing,
           is_complete: missing === 0 && inInbox === 0 && paused === 0 && (scheduled + completed) > 0,
           scheduled_items: scheduledItemsByProject.get(pid) || [],
