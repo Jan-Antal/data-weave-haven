@@ -291,8 +291,28 @@ export default function PlanVyroby() {
         if (dragData.weekDate !== weekDate) {
           await moveScheduleItemToWeek(dragData.itemId, weekDate);
         }
-      } else if (dragData.type === "silo-bundle" && dragData.projectId && dragData.weekDate) {
+    } else if (dragData.type === "silo-bundle" && dragData.projectId && dragData.weekDate) {
         if (dragData.weekDate !== weekDate) {
+          // Check if any items in the bundle have split siblings in the target week
+          const sourceSilo = scheduleData?.get(dragData.weekDate);
+          const sourceBundle = sourceSilo?.bundles.find(b => b.project_id === dragData.projectId);
+          if (sourceBundle) {
+            const splitItem = sourceBundle.items.find(item =>
+              item.split_group_id && findSiblingInWeek(item.split_group_id, weekDate, item.id)
+            );
+            if (splitItem && splitItem.split_group_id) {
+              setMergeState({
+                itemName: splitItem.item_name || "Položka",
+                splitGroupId: splitItem.split_group_id,
+                draggedItemId: splitItem.id,
+                targetWeekKey: weekDate,
+                onKeepSeparate: async () => {
+                  await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate);
+                },
+              });
+              return;
+            }
+          }
           await moveBundleToWeek(dragData.projectId, dragData.weekDate, weekDate);
         }
       }
@@ -345,7 +365,13 @@ export default function PlanVyroby() {
           open={!!mergeState}
           onOpenChange={open => !open && setMergeState(null)}
           itemName={mergeState.itemName}
-          onMerge={() => mergeSplitItems(mergeState.splitGroupId)}
+          onMerge={async () => {
+            // For bundle moves, first move to target week, then merge
+            if (mergeState.onKeepSeparate) {
+              await mergeState.onKeepSeparate();
+            }
+            await mergeSplitItems(mergeState.splitGroupId);
+          }}
           onKeepSeparate={mergeState.onKeepSeparate}
         />
       )}
