@@ -116,6 +116,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [completionState, setCompletionState] = useState<CompletionState | null>(null);
   const [splitState, setSplitState] = useState<SplitState | null>(null);
+  const [bundleSplitState, setBundleSplitState] = useState<BundleSplitState | null>(null);
   const [pauseState, setPauseState] = useState<PauseState | null>(null);
   const [cancelState, setCancelState] = useState<CancelState | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
