@@ -59,6 +59,8 @@ function getTPVListColumnStyle(key: string, customWidth?: number | null): React.
       return { minWidth: 200 };
     case "status":
       return { minWidth: 140 };
+    case "vyroba_status":
+      return { minWidth: 140, maxWidth: 200 };
     case "konstrukter":
       return { minWidth: 124, maxWidth: 124, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } as React.CSSProperties;
     case "pocet":
