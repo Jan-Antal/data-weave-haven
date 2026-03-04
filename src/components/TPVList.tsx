@@ -24,6 +24,7 @@ import { ExcelImportWizard } from "./ExcelImportWizard";
 import { formatCurrency } from "@/lib/currency";
 import { useExportContext } from "./ExportContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useProductionStatuses } from "@/hooks/useProductionStatuses";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
   { key: "item_type", label: "Kód Prvku" },
@@ -31,6 +32,7 @@ const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultH
   { key: "item_name", label: "Popis" },
   { key: "konstrukter", label: "Konstruktér" },
   { key: "status", label: "Status" },
+  { key: "vyroba_status", label: "Výroba" },
   { key: "sent_date", label: "Odesláno" },
   { key: "accepted_date", label: "Přijato" },
   { key: "notes", label: "Poznámka" },
