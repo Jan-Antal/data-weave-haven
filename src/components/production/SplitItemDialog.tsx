@@ -1,20 +1,16 @@
-import { useState, useMemo, useCallback } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
+import { Slider } from "@/components/ui/slider";
 
 interface WeekOption {
   key: string;
   weekNum: number;
   label: string;
   remainingCapacity: number;
-}
-
-interface SplitPart {
-  hours: number;
-  weekKey: string;
 }
 
 interface SplitItemDialogProps {
@@ -34,6 +30,8 @@ interface SplitItemDialogProps {
   /** Available weeks with capacity info */
   weeks: WeekOption[];
   weeklyCapacity: number;
+  /** Existing split_group_id if re-splitting */
+  splitGroupId?: string | null;
 }
 
 function getMonday(date: Date): Date {
@@ -45,301 +43,329 @@ function getMonday(date: Date): Date {
   return d;
 }
 
-function findWeeksWithCapacity(weeks: WeekOption[], hoursNeeded: number, excludeKey?: string): string[] {
-  const result: string[] = [];
-  let remaining = hoursNeeded;
-  for (const w of weeks) {
-    if (w.key === excludeKey) continue;
-    if (w.remainingCapacity > 0 && remaining > 0) {
-      result.push(w.key);
-      remaining -= w.remainingCapacity;
-      if (remaining <= 0) break;
-    }
+async function renumberSiblings(splitGroupId: string) {
+  const { data: siblings } = await supabase
+    .from("production_schedule")
+    .select("id, scheduled_week")
+    .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`)
+    .order("scheduled_week", { ascending: true });
+  if (!siblings || siblings.length <= 1) return;
+  const total = siblings.length;
+  const updates = siblings.map((s, i) =>
+    supabase.from("production_schedule").update({
+      split_part: i + 1,
+      split_total: total,
+      item_name: undefined, // we'll handle names separately if needed
+    }).eq("id", s.id)
+  );
+  // Actually just update part/total, not names
+  for (let i = 0; i < siblings.length; i++) {
+    await supabase.from("production_schedule").update({
+      split_part: i + 1,
+      split_total: total,
+    }).eq("id", siblings[i].id);
   }
-  // Fallback: if no weeks with capacity, just pick the next week after current
-  if (result.length === 0 && weeks.length > 0) {
-    const currentIdx = excludeKey ? weeks.findIndex(w => w.key === excludeKey) : -1;
-    const nextIdx = currentIdx >= 0 ? currentIdx + 1 : 0;
-    if (nextIdx < weeks.length) result.push(weeks[nextIdx].key);
-    else result.push(weeks[weeks.length - 1].key);
-  }
-  return result;
 }
+
+export { renumberSiblings };
 
 export function SplitItemDialog({
   open, onOpenChange, itemId, itemName, itemCode, totalHours, projectId, stageId,
-  scheduledCzk, source, currentWeekKey, weeks, weeklyCapacity,
+  scheduledCzk, source, currentWeekKey, weeks, weeklyCapacity, splitGroupId,
 }: SplitItemDialogProps) {
   const qc = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
+  const [pct, setPct] = useState(50);
+  const [editingPart, setEditingPart] = useState<1 | 2 | null>(null);
+  const [editValue, setEditValue] = useState("");
 
-  // Calculate CZK rate per hour
   const czkPerHour = totalHours > 0 ? scheduledCzk / totalHours : 550;
+  const part1Hours = Math.round(totalHours * pct / 100);
+  const part2Hours = totalHours - part1Hours;
 
-  // Filter to future weeks only
+  // Filter future weeks
   const futureWeeks = useMemo(() => {
     const today = getMonday(new Date()).toISOString().split("T")[0];
     return weeks.filter(w => w.key >= today);
   }, [weeks]);
 
-  // Default parts
-  const defaultParts = useMemo((): SplitPart[] => {
-    if (source === "schedule" && currentWeekKey) {
-      const currentWeek = futureWeeks.find(w => w.key === currentWeekKey);
-      const remaining = currentWeek ? Math.max(currentWeek.remainingCapacity, 0) : totalHours;
-      const part1Hours = Math.min(remaining, totalHours);
-      const part2Hours = totalHours - part1Hours;
-      const nextWeeks = findWeeksWithCapacity(futureWeeks, part2Hours, currentWeekKey);
-      return [
-        { hours: part1Hours > 0 ? part1Hours : Math.round(totalHours / 2), weekKey: currentWeekKey },
-        { hours: part2Hours > 0 ? part2Hours : totalHours - Math.round(totalHours / 2), weekKey: nextWeeks[0] || currentWeekKey },
-      ];
-    } else {
-      // Inbox: 50% rounded to nearest 10
-      const part1 = Math.round((totalHours * 0.5) / 10) * 10;
-      const part2 = totalHours - part1;
-      const targetWeeks = findWeeksWithCapacity(futureWeeks, totalHours);
-      return [
-        { hours: part1, weekKey: targetWeeks[0] || futureWeeks[0]?.key || "" },
-        { hours: part2, weekKey: targetWeeks[1] || targetWeeks[0] || futureWeeks[1]?.key || futureWeeks[0]?.key || "" },
-      ];
+  // Default target week: next week after current
+  const defaultTargetWeek = useMemo(() => {
+    if (!currentWeekKey) return futureWeeks[0]?.key || "";
+    const idx = futureWeeks.findIndex(w => w.key === currentWeekKey);
+    // Pick next week with capacity, or just next week
+    for (let i = idx + 1; i < futureWeeks.length; i++) {
+      if (futureWeeks[i].remainingCapacity > 0) return futureWeeks[i].key;
     }
-  }, [source, currentWeekKey, totalHours, futureWeeks]);
+    return futureWeeks[idx + 1]?.key || futureWeeks[0]?.key || "";
+  }, [currentWeekKey, futureWeeks]);
 
-  const [parts, setParts] = useState<SplitPart[]>(defaultParts);
+  const [targetWeek, setTargetWeek] = useState(defaultTargetWeek);
 
-  const sum = parts.reduce((s, p) => s + p.hours, 0);
-  const isValid = sum === totalHours && parts.every(p => p.hours > 0) && parts.every(p => p.weekKey);
+  useEffect(() => {
+    setTargetWeek(defaultTargetWeek);
+    setPct(50);
+  }, [defaultTargetWeek, open]);
 
-  const updatePart = (idx: number, field: keyof SplitPart, value: any) => {
-    setParts(prev => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
-  };
+  const currentWeekNum = useMemo(() => {
+    if (!currentWeekKey) return "?";
+    return getISOWeekNumber(new Date(currentWeekKey));
+  }, [currentWeekKey]);
 
-  const addPart = () => {
-    if (parts.length >= 5) return;
-    const nextWeek = futureWeeks.find(w => !parts.some(p => p.weekKey === w.key));
-    setParts(prev => [...prev, { hours: 0, weekKey: nextWeek?.key || futureWeeks[0]?.key || "" }]);
-  };
+  const targetWeekNum = useMemo(() => {
+    const w = futureWeeks.find(w => w.key === targetWeek);
+    return w?.weekNum ?? "?";
+  }, [targetWeek, futureWeeks]);
 
-  const removePart = (idx: number) => {
-    if (parts.length <= 2) return;
-    setParts(prev => prev.filter((_, i) => i !== idx));
-  };
+  const cleanName = itemName.replace(/\s*\(\d+\/\d+\)$/, "");
 
   const handleSplit = useCallback(async () => {
-    if (!isValid) return;
+    if (part1Hours <= 0 || part2Hours <= 0) return;
     setSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const n = parts.length;
+      const groupId = splitGroupId || itemId;
 
       if (source === "schedule") {
-        // Update original item (Part 1)
-        const cleanName = itemName.replace(/\s*\(\d+\/\d+\)$/, "");
-        const { error: updateErr } = await supabase
-          .from("production_schedule")
-          .update({
-            scheduled_hours: parts[0].hours,
-            scheduled_czk: parts[0].hours * czkPerHour,
-            scheduled_week: parts[0].weekKey,
-            item_name: `${cleanName} (1/${n})`,
-            split_group_id: itemId,
-            split_part: 1,
-            split_total: n,
-          })
-          .eq("id", itemId);
-        if (updateErr) throw updateErr;
+        // Update original item (Part 1 - stays)
+        await supabase.from("production_schedule").update({
+          scheduled_hours: part1Hours,
+          scheduled_czk: part1Hours * czkPerHour,
+          split_group_id: groupId,
+          split_part: 1,
+          split_total: 2,
+        }).eq("id", itemId);
 
-        // Create new rows for Parts 2+
-        const newRows = parts.slice(1).map((part, i) => ({
+        // Create Part 2
+        await supabase.from("production_schedule").insert({
           project_id: projectId,
           stage_id: stageId,
-          item_name: `${cleanName} (${i + 2}/${n})`,
+          item_name: cleanName,
           item_code: itemCode ?? null,
-          scheduled_week: part.weekKey,
-          scheduled_hours: part.hours,
-          scheduled_czk: part.hours * czkPerHour,
+          scheduled_week: targetWeek,
+          scheduled_hours: part2Hours,
+          scheduled_czk: part2Hours * czkPerHour,
           position: 999,
-          status: "scheduled" as const,
+          status: "scheduled",
           created_by: user.id,
-          split_group_id: itemId,
-          split_part: i + 2,
-          split_total: n,
-        }));
+          split_group_id: groupId,
+          split_part: 2,
+          split_total: 2,
+        });
 
-        const { error: insertErr } = await supabase.from("production_schedule").insert(newRows);
-        if (insertErr) throw insertErr;
+        // Renumber all siblings
+        await renumberSiblings(groupId);
+
+        // Update item_names for all siblings
+        const { data: allParts } = await supabase
+          .from("production_schedule")
+          .select("id, split_part, split_total")
+          .or(`split_group_id.eq.${groupId},id.eq.${groupId}`)
+          .order("scheduled_week");
+        if (allParts) {
+          for (const p of allParts) {
+            await supabase.from("production_schedule").update({
+              item_name: `${cleanName} (${p.split_part}/${p.split_total})`,
+            }).eq("id", p.id);
+          }
+        }
       } else {
-        // Inbox split: update original, create schedule rows for others
-        const cleanName = itemName.replace(/\s*\(\d+\/\d+\)$/, "");
+        // Inbox split
+        await supabase.from("production_inbox").update({
+          estimated_hours: part1Hours,
+          estimated_czk: part1Hours * czkPerHour,
+          item_name: `${cleanName} (1/2)`,
+          split_group_id: groupId,
+          split_part: 1,
+          split_total: 2,
+        }).eq("id", itemId);
 
-        // Update inbox item to Part 1 hours
-        const { error: updateErr } = await supabase
-          .from("production_inbox")
-          .update({
-            estimated_hours: parts[0].hours,
-            estimated_czk: parts[0].hours * czkPerHour,
-            item_name: `${cleanName} (1/${n})`,
-            split_group_id: itemId,
-            split_part: 1,
-            split_total: n,
-          })
-          .eq("id", itemId);
-        if (updateErr) throw updateErr;
-
-        // Move Part 1 to its target week (create schedule row, mark inbox as scheduled)
-        const { error: schedErr } = await supabase.from("production_schedule").insert({
+        // Create schedule row for part 1
+        await supabase.from("production_schedule").insert({
           project_id: projectId,
           stage_id: stageId,
-          item_name: `${cleanName} (1/${n})`,
+          item_name: `${cleanName} (1/2)`,
           item_code: itemCode ?? null,
-          scheduled_week: parts[0].weekKey,
-          scheduled_hours: parts[0].hours,
-          scheduled_czk: parts[0].hours * czkPerHour,
+          scheduled_week: currentWeekKey || futureWeeks[0]?.key || "",
+          scheduled_hours: part1Hours,
+          scheduled_czk: part1Hours * czkPerHour,
           position: 999,
           status: "scheduled",
           created_by: user.id,
           inbox_item_id: itemId,
-          split_group_id: itemId,
+          split_group_id: groupId,
           split_part: 1,
-          split_total: n,
+          split_total: 2,
         });
-        if (schedErr) throw schedErr;
 
-        const { error: statusErr } = await supabase
-          .from("production_inbox")
-          .update({ status: "scheduled" })
-          .eq("id", itemId);
-        if (statusErr) throw statusErr;
+        await supabase.from("production_inbox").update({ status: "scheduled" }).eq("id", itemId);
 
-        // Create schedule rows for Parts 2+
-        const newRows = parts.slice(1).map((part, i) => ({
+        // Create Part 2
+        await supabase.from("production_schedule").insert({
           project_id: projectId,
           stage_id: stageId,
-          item_name: `${cleanName} (${i + 2}/${n})`,
+          item_name: `${cleanName} (2/2)`,
           item_code: itemCode ?? null,
-          scheduled_week: part.weekKey,
-          scheduled_hours: part.hours,
-          scheduled_czk: part.hours * czkPerHour,
+          scheduled_week: targetWeek,
+          scheduled_hours: part2Hours,
+          scheduled_czk: part2Hours * czkPerHour,
           position: 999,
-          status: "scheduled" as const,
+          status: "scheduled",
           created_by: user.id,
-          split_group_id: itemId,
-          split_part: i + 2,
-          split_total: n,
-        }));
-
-        const { error: insertErr } = await supabase.from("production_schedule").insert(newRows);
-        if (insertErr) throw insertErr;
+          split_group_id: groupId,
+          split_part: 2,
+          split_total: 2,
+        });
       }
 
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
       qc.invalidateQueries({ queryKey: ["production-expedice"] });
 
-      toast({ title: `Položka rozdělena na ${n} částí` });
+      toast({ title: `Položka rozdělena: ${part1Hours}h + ${part2Hours}h` });
       onOpenChange(false);
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
     setSubmitting(false);
-  }, [isValid, parts, itemId, itemName, projectId, stageId, czkPerHour, source, qc, onOpenChange]);
+  }, [part1Hours, part2Hours, itemId, cleanName, projectId, stageId, czkPerHour,
+    source, currentWeekKey, targetWeek, splitGroupId, qc, onOpenChange, futureWeeks, itemCode]);
+
+  const handleHoursClick = (part: 1 | 2) => {
+    setEditingPart(part);
+    setEditValue(String(part === 1 ? part1Hours : part2Hours));
+  };
+
+  const commitHoursEdit = () => {
+    if (editingPart === null) return;
+    const val = Math.max(1, Math.min(totalHours - 1, parseInt(editValue) || 0));
+    if (editingPart === 1) {
+      setPct(Math.round(val / totalHours * 100));
+    } else {
+      setPct(Math.round((totalHours - val) / totalHours * 100));
+    }
+    setEditingPart(null);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[380px] p-0 gap-0" style={{ borderRadius: 12 }}>
-        <DialogHeader className="px-5 pt-5 pb-3">
-          <DialogTitle className="text-[14px] font-semibold" style={{ color: "#223937" }}>
-            ✂ Rozdělit: {itemName}
-          </DialogTitle>
-          <DialogDescription className="text-[11px] font-mono" style={{ color: "#99a5a3" }}>
+      <DialogContent className="max-w-[360px] p-0 gap-0" style={{ borderRadius: 12 }}>
+        <div className="px-5 pt-5 pb-2">
+          <div className="text-[13px] font-semibold" style={{ color: "#223937" }}>
+            ✂ Rozdělit: {cleanName}
+          </div>
+          <div className="text-[11px] font-mono mt-0.5" style={{ color: "#99a5a3" }}>
             Celkem {totalHours}h
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="px-5 pb-3 space-y-2 max-h-[350px] overflow-y-auto">
-          {parts.map((part, idx) => (
-            <div
-              key={idx}
-              className="flex items-center gap-2 px-3 py-2 rounded-md"
-              style={{ border: "1px solid #ece8e2" }}
-            >
-              <span className="text-[10px] font-semibold shrink-0" style={{ color: "#6b7a78" }}>
-                Část {idx + 1}:
-              </span>
-              <input
-                type="number"
-                min={1}
-                value={part.hours || ""}
-                onChange={(e) => updatePart(idx, "hours", Math.max(0, parseInt(e.target.value) || 0))}
-                className="w-[60px] font-mono text-[12px] font-bold px-1.5 py-1 rounded text-center"
-                style={{ border: "1px solid #e2ddd6", color: "#223937", backgroundColor: "#fafaf8" }}
-              />
-              <span className="text-[10px]" style={{ color: "#99a5a3" }}>h →</span>
-              <select
-                value={part.weekKey}
-                onChange={(e) => updatePart(idx, "weekKey", e.target.value)}
-                className="flex-1 text-[10px] font-mono px-1.5 py-1 rounded"
-                style={{ border: "1px solid #e2ddd6", color: "#223937", backgroundColor: "#fafaf8" }}
-              >
-                {futureWeeks.map((w) => (
-                  <option key={w.key} value={w.key}>
-                    T{w.weekNum} · {w.label}
-                  </option>
-                ))}
-              </select>
-              {idx >= 2 && (
-                <button
-                  onClick={() => removePart(idx)}
-                  className="text-[12px] font-bold shrink-0 w-5 h-5 rounded hover:bg-red-50 transition-colors"
-                  style={{ color: "#dc3545" }}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          ))}
-
-          {/* Add part button */}
-          {parts.length < 5 && (
-            <button
-              onClick={addPart}
-              className="w-full text-[10px] font-medium py-1.5 rounded-md transition-colors"
-              style={{ border: "1px dashed #e2ddd6", color: "#6b7a78" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-            >
-              + Přidat část
-            </button>
-          )}
-
-          {/* Validation sum */}
-          <div className="flex items-center justify-center gap-1 pt-1">
-            <span className="text-[11px] font-mono font-semibold" style={{ color: isValid ? "#3a8a36" : "#dc3545" }}>
-              Celkem: {sum}h / {totalHours}h {isValid ? "✓" : "✗"}
-            </span>
           </div>
         </div>
 
+        {/* Slider */}
+        <div className="px-5 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-semibold" style={{ color: "#6b7a78" }}>{pct}%</span>
+            <span className="text-[10px] font-semibold" style={{ color: "#6b7a78" }}>{100 - pct}%</span>
+          </div>
+          <Slider
+            value={[pct]}
+            min={10}
+            max={90}
+            step={5}
+            onValueChange={([v]) => setPct(v)}
+            className="w-full"
+          />
+        </div>
+
+        {/* Two columns showing result */}
+        <div className="px-5 pb-3 grid grid-cols-2 gap-3">
+          {/* Part 1 — stays */}
+          <div className="rounded-md px-3 py-2" style={{ border: "1px solid #ece8e2", backgroundColor: "#fafaf8" }}>
+            <div className="text-[9px] font-semibold mb-1" style={{ color: "#6b7a78" }}>
+              Zde {source === "schedule" ? `(T${currentWeekNum})` : "(Inbox)"}:
+            </div>
+            {editingPart === 1 ? (
+              <input
+                type="number"
+                className="font-mono text-[16px] font-bold w-full bg-transparent border-b outline-none text-center"
+                style={{ color: "#223937", borderColor: "#3a8a36" }}
+                value={editValue}
+                onChange={e => setEditValue(e.target.value)}
+                onBlur={commitHoursEdit}
+                onKeyDown={e => e.key === "Enter" && commitHoursEdit()}
+                autoFocus
+              />
+            ) : (
+              <div
+                className="font-mono text-[16px] font-bold text-center cursor-pointer rounded px-1 transition-colors"
+                style={{ color: "#223937" }}
+                onClick={() => handleHoursClick(1)}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#f0eee9")}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+              >
+                {part1Hours}h
+              </div>
+            )}
+          </div>
+
+          {/* Part 2 — moves */}
+          <div className="rounded-md px-3 py-2" style={{ border: "1px solid #ece8e2", backgroundColor: "#fafaf8" }}>
+            <div className="flex items-center gap-1 mb-1">
+              <span className="text-[9px] font-semibold" style={{ color: "#6b7a78" }}>→</span>
+              <select
+                value={targetWeek}
+                onChange={e => setTargetWeek(e.target.value)}
+                className="text-[9px] font-semibold bg-transparent border-none outline-none cursor-pointer"
+                style={{ color: "#6b7a78" }}
+              >
+                {futureWeeks.map(w => (
+                  <option key={w.key} value={w.key}>T{w.weekNum}</option>
+                ))}
+              </select>
+            </div>
+            {editingPart === 2 ? (
+              <input
+                type="number"
+                className="font-mono text-[16px] font-bold w-full bg-transparent border-b outline-none text-center"
+                style={{ color: "#223937", borderColor: "#3a8a36" }}
+                value={editValue}
+                onChange={e => setEditValue(e.target.value)}
+                onBlur={commitHoursEdit}
+                onKeyDown={e => e.key === "Enter" && commitHoursEdit()}
+                autoFocus
+              />
+            ) : (
+              <div
+                className="font-mono text-[16px] font-bold text-center cursor-pointer rounded px-1 transition-colors"
+                style={{ color: "#223937" }}
+                onClick={() => handleHoursClick(2)}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#f0eee9")}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+              >
+                {part2Hours}h
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
         <div className="flex items-center justify-between px-5 py-3" style={{ borderTop: "1px solid #ece8e2" }}>
           <button
             onClick={() => onOpenChange(false)}
             className="px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors"
             style={{ color: "#6b7a78", border: "1px solid #e2ddd6" }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f0eee9")}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#f0eee9")}
+            onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
           >
             Zrušit
           </button>
           <button
             onClick={handleSplit}
-            disabled={!isValid || submitting}
+            disabled={part1Hours <= 0 || part2Hours <= 0 || submitting}
             className="px-3 py-1.5 text-[11px] font-semibold rounded-md text-white transition-colors"
             style={{
-              backgroundColor: isValid ? "#3a8a36" : "#99a5a3",
-              cursor: isValid ? "pointer" : "not-allowed",
+              backgroundColor: (part1Hours > 0 && part2Hours > 0) ? "#3a8a36" : "#99a5a3",
+              cursor: (part1Hours > 0 && part2Hours > 0) ? "pointer" : "not-allowed",
               opacity: submitting ? 0.7 : 1,
             }}
           >
