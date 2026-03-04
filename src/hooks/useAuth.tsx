@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
-import { logLoginEvent, resetLoginTracking } from "@/hooks/useLoginTracking";
+import { logLoginEvent, resetLoginTracking, hasLoginLoggedInCurrentTab } from "@/hooks/useLoginTracking";
 import { startSession, endSession, resetSessionTracking } from "@/hooks/useSessionTracking";
 
 export type AppRole = "owner" | "admin" | "pm" | "konstrukter" | "viewer";
