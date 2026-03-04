@@ -227,9 +227,43 @@ function ActivityItem({
 function UserAnalyticsTab() {
   const { data: analytics, isLoading } = useUserAnalytics(true);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
+  type SortKey = "user" | "last_login" | "logins" | "session";
+  const [sortKey, setSortKey] = useState<SortKey>("last_login");
+  const [sortAsc, setSortAsc] = useState(false);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortAsc(!sortAsc);
+    else { setSortKey(key); setSortAsc(false); }
+  };
+
+  const sortedUsers = useMemo(() => {
+    if (!analytics) return [];
+    return [...analytics.users].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "user": cmp = a.user_email.localeCompare(b.user_email); break;
+        case "last_login": cmp = (a.last_login ?? "").localeCompare(b.last_login ?? ""); break;
+        case "logins": cmp = a.login_count_30d - b.login_count_30d; break;
+        case "session": cmp = a.avg_session_min - b.avg_session_min; break;
+      }
+      return sortAsc ? cmp : -cmp;
+    });
+  }, [analytics, sortKey, sortAsc]);
 
   if (isLoading) return <p className="text-xs text-muted-foreground p-4 text-center">Načítání…</p>;
   if (!analytics) return null;
+
+  const SortHeader = ({ label, k, align }: { label: string; k: SortKey; align?: string }) => (
+    <th
+      className={cn("py-1.5 font-medium cursor-pointer hover:text-foreground select-none", align)}
+      onClick={() => toggleSort(k)}
+    >
+      <span className="inline-flex items-center gap-0.5">
+        {label}
+        {sortKey === k && <span className="text-[9px]">{sortAsc ? "▲" : "▼"}</span>}
+      </span>
+    </th>
+  );
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -254,13 +288,14 @@ function UserAnalyticsTab() {
         <table className="w-full text-[11px]">
           <thead>
             <tr className="text-left text-muted-foreground border-b">
-              <th className="py-1.5 font-medium">Uživatel</th>
-              <th className="py-1.5 font-medium text-right">Přihlášení</th>
-              <th className="py-1.5 font-medium text-right">Ø Session</th>
+              <SortHeader label="Uživatel" k="user" />
+              <SortHeader label="Poslední" k="last_login" align="text-right" />
+              <SortHeader label="30d" k="logins" align="text-right" />
+              <SortHeader label="Ø Session" k="session" align="text-right" />
             </tr>
           </thead>
           <tbody>
-            {analytics.users.map((u) => (
+            {sortedUsers.map((u) => (
               <UserAnalyticsRow
                 key={u.user_email}
                 user={u}
@@ -308,28 +343,25 @@ function UserAnalyticsRow({
             {expanded ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
             <span className="font-medium">{userName}</span>
           </div>
-          <p className="text-[10px] text-muted-foreground ml-4">
-            {lastLogin}
-          </p>
         </td>
+        <td className="py-1.5 text-right text-muted-foreground">{lastLogin}</td>
         <td className="py-1.5 text-right font-mono">{user.login_count_30d}</td>
-        <td className="py-1.5 text-right font-mono">{user.avg_session_min} min</td>
+        <td className="py-1.5 text-right font-mono">{formatSessionDuration(user.avg_session_min)}</td>
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={3} className="bg-muted/20 px-2 py-1.5">
+          <td colSpan={4} className="bg-muted/20 px-2 py-1.5">
             {isLoading ? (
               <p className="text-[10px] text-muted-foreground">Načítání…</p>
             ) : recentActions && recentActions.length > 0 ? (
               <div className="space-y-0.5 max-h-[200px] overflow-y-auto">
                 {recentActions.map((a) => {
-                  const actionLabel = getActionLabel(a.action_type, a.new_value, a.project_id);
+                  const actionLabel = getActionLabel(a.action_type, a.new_value, a.project_id, a.detail);
+                  const time = format(new Date(a.created_at), "HH:mm");
                   return (
                     <div key={a.id} className="flex justify-between text-[10px]">
                       <span className="truncate mr-2">{actionLabel}</span>
-                      <span className="text-muted-foreground shrink-0">
-                        {format(new Date(a.created_at), "d.M. HH:mm")}
-                      </span>
+                      <span className="text-muted-foreground shrink-0">{time}</span>
                     </div>
                   );
                 })}
@@ -344,15 +376,30 @@ function UserAnalyticsRow({
   );
 }
 
-function getActionLabel(actionType: string, newValue: string | null, projectId: string): string {
+function getActionLabel(actionType: string, newValue: string | null, projectId: string, detail?: string | null): string {
   switch (actionType) {
-    case "user_login": return "Přihlášení";
-    case "session_end": return "Konec session";
-    case "page_view": return `Zobrazení: ${newValue || "stránka"}`;
-    case "status_change": return `Status změněn (${projectId})`;
-    case "project_created": return `Vytvořen projekt ${projectId}`;
-    case "project_deleted": return `Smazán projekt ${projectId}`;
-    case "document_uploaded": return `Nahrán dokument (${projectId})`;
+    case "user_login":
+      return `👤 Přihlášení`;
+    case "session_end": {
+      let durText = "";
+      try {
+        const d = JSON.parse(detail || "{}");
+        durText = formatSessionDuration(d.duration_minutes ?? 0);
+      } catch {}
+      return `🕐 Session ${durText}`;
+    }
+    case "status_change": return `✏️ Upravil ${projectId} · status`;
+    case "konstrukter_change": return `✏️ Upravil ${projectId} · konstruktér`;
+    case "datum_smluvni_change": return `✏️ Upravil ${projectId} · datum`;
+    case "project_created": return `➕ Vytvořen ${projectId}`;
+    case "project_deleted": return `🗑 Smazán ${projectId}`;
+    case "project_restored": return `♻️ Obnoven ${projectId}`;
+    case "document_uploaded": return `📄 Nahrán dokument (${projectId})`;
+    case "document_deleted": return `🗑 Smazán dokument (${projectId})`;
+    case "stage_created": return `➕ Etapa ${detail || ""} (${projectId})`;
+    case "stage_deleted": return `🗑 Etapa ${detail || ""} (${projectId})`;
+    case "stage_status_change": return `✏️ Status etapy ${detail || ""} (${projectId})`;
+    case "stage_konstrukter_change": return `✏️ Konstruktér etapy (${projectId})`;
     default: return `${actionType} (${projectId})`;
   }
 }
