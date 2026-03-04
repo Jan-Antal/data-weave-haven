@@ -32,6 +32,16 @@ export function SpillSuggestionPanel({
 }: SpillSuggestionPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+
+  // Reset dismissed when panel is collapsed (not expanded) — so the warning bar reappears
+  // Only truly dismiss after a successful spill (overload goes to 0)
+  useEffect(() => {
+    if (dismissed && overloadHours > 0 && !expanded) {
+      // User closed the expanded panel but overflow persists — collapse back to warning bar
+      setDismissed(false);
+      setExpanded(false);
+    }
+  }, [dismissed, overloadHours, expanded]);
   const [mode, setMode] = useState<SpillMode>("items");
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [splitPcts, setSplitPcts] = useState<Record<string, number>>({});
