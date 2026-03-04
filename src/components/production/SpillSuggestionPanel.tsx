@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { renumberSiblings } from "./SplitItemDialog";
-import type { ScheduleBundle } from "@/hooks/useProductionSchedule";
+import type { ScheduleBundle, ScheduleItem } from "@/hooks/useProductionSchedule";
 
 interface SpillSuggestionPanelProps {
   overloadHours: number;
@@ -18,6 +19,14 @@ interface SpillSuggestionPanelProps {
 
 type SpillMode = "items" | "split";
 
+interface BundleSpillData {
+  projectId: string;
+  projectName: string;
+  items: ScheduleItem[];
+  totalHours: number;
+  deadline: string | null;
+}
+
 export function SpillSuggestionPanel({
   overloadHours, bundles, weekKey, allWeeksData, weeklyCapacity, weekKeys,
 }: SpillSuggestionPanelProps) {
@@ -26,13 +35,14 @@ export function SpillSuggestionPanel({
   const [mode, setMode] = useState<SpillMode>("items");
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [splitPcts, setSplitPcts] = useState<Record<string, number>>({});
+  const [expandedBundles, setExpandedBundles] = useState<Set<string>>(new Set());
   const [projectDeadlines, setProjectDeadlines] = useState<Map<string, string | null>>(new Map());
   const [submitting, setSubmitting] = useState(false);
   const qc = useQueryClient();
 
   // Fetch project deadlines
   useEffect(() => {
-    const projectIds = [...new Set(bundles.flatMap(b => b.items.map(i => i.project_id)))];
+    const projectIds = [...new Set(bundles.map(b => b.project_id))];
     if (projectIds.length === 0) return;
     supabase.from("projects").select("project_id, datum_smluvni").in("project_id", projectIds)
       .then(({ data }) => {
@@ -63,31 +73,57 @@ export function SpillSuggestionPanel({
     return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
   }, [targetWeek]);
 
-  // All uncompleted items sorted by priority
-  const allItems = useMemo(() => {
-    const items = bundles.flatMap(b => b.items).filter(i => i.status !== "completed");
-    return items.sort((a, b) => {
-      const deadA = projectDeadlines.get(a.project_id);
-      const deadB = projectDeadlines.get(b.project_id);
-      if (!deadA && !deadB) return 0;
-      if (!deadA) return -1;
-      if (!deadB) return 1;
-      return deadB.localeCompare(deadA);
-    });
+  // Build bundle-level data sorted by deadline (least urgent first)
+  const bundleData = useMemo<BundleSpillData[]>(() => {
+    return bundles
+      .map(b => ({
+        projectId: b.project_id,
+        projectName: b.project_name,
+        items: b.items.filter(i => i.status !== "completed" && i.status !== "paused" && i.status !== "cancelled"),
+        totalHours: b.items.filter(i => i.status !== "completed" && i.status !== "paused" && i.status !== "cancelled")
+          .reduce((s, i) => s + i.scheduled_hours, 0),
+        deadline: projectDeadlines.get(b.project_id) ?? null,
+      }))
+      .filter(b => b.items.length > 0)
+      .sort((a, b) => {
+        if (!a.deadline && !b.deadline) return 0;
+        if (!a.deadline) return -1;
+        if (!b.deadline) return 1;
+        return b.deadline.localeCompare(a.deadline); // latest deadline = least urgent = first
+      });
   }, [bundles, projectDeadlines]);
 
-  // Pre-select items to cover overflow (items mode)
+  // All active item IDs for a bundle
+  const bundleItemIds = useCallback((bd: BundleSpillData) => bd.items.map(i => i.id), []);
+
+  // Pre-select bundles to cover overflow
   useEffect(() => {
-    if (allItems.length === 0) return;
+    if (bundleData.length === 0) return;
     const preChecked = new Set<string>();
     let accumulated = 0;
-    for (const item of allItems) {
+    for (const bd of bundleData) {
       if (accumulated >= overloadHours) break;
-      preChecked.add(item.id);
-      accumulated += item.scheduled_hours;
+      for (const item of bd.items) {
+        preChecked.add(item.id);
+      }
+      accumulated += bd.totalHours;
     }
     setCheckedIds(preChecked);
-  }, [allItems, overloadHours]);
+  }, [bundleData, overloadHours]);
+
+  const toggleBundle = (bd: BundleSpillData) => {
+    setCheckedIds(prev => {
+      const next = new Set(prev);
+      const ids = bundleItemIds(bd);
+      const allChecked = ids.every(id => next.has(id));
+      if (allChecked) {
+        ids.forEach(id => next.delete(id));
+      } else {
+        ids.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
 
   const toggleItem = (id: string) => {
     setCheckedIds(prev => {
@@ -98,12 +134,49 @@ export function SpillSuggestionPanel({
     });
   };
 
+  const toggleBundleExpand = (projectId: string) => {
+    setExpandedBundles(prev => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  };
+
   const setSplitPct = (id: string, pct: number) => {
     setSplitPcts(prev => ({ ...prev, [id]: pct }));
   };
 
-  // Calculate total spill hours in split mode
+  // Bundle-level split pct: set all items in bundle to same pct
+  const setBundleSplitPct = (bd: BundleSpillData, pct: number) => {
+    setSplitPcts(prev => {
+      const next = { ...prev };
+      for (const item of bd.items) {
+        next[item.id] = pct;
+      }
+      return next;
+    });
+  };
+
+  const getBundleSplitPct = (bd: BundleSpillData): number => {
+    if (bd.items.length === 0) return 0;
+    const pcts = bd.items.map(i => splitPcts[i.id] || 0);
+    const allSame = pcts.every(p => p === pcts[0]);
+    return allSame ? pcts[0] : Math.round(pcts.reduce((s, p) => s + p, 0) / pcts.length);
+  };
+
+  // Bundle checkbox state
+  const getBundleCheckState = (bd: BundleSpillData): "checked" | "unchecked" | "indeterminate" => {
+    const ids = bundleItemIds(bd);
+    const checkedCount = ids.filter(id => checkedIds.has(id)).length;
+    if (checkedCount === 0) return "unchecked";
+    if (checkedCount === ids.length) return "checked";
+    return "indeterminate";
+  };
+
+  // Calculate total spill hours
   const totalSpillHours = useMemo(() => {
+    const allItems = bundleData.flatMap(b => b.items);
     if (mode === "items") {
       return allItems.filter(i => checkedIds.has(i.id)).reduce((s, i) => s + i.scheduled_hours, 0);
     }
@@ -111,7 +184,7 @@ export function SpillSuggestionPanel({
       const pct = splitPcts[i.id] || 0;
       return s + Math.round(i.scheduled_hours * pct / 100);
     }, 0);
-  }, [mode, allItems, checkedIds, splitPcts]);
+  }, [mode, bundleData, checkedIds, splitPcts]);
 
   const handleSpill = useCallback(async () => {
     if (!targetWeek) return;
@@ -119,6 +192,7 @@ export function SpillSuggestionPanel({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
+      const allItems = bundleData.flatMap(b => b.items);
 
       if (mode === "items") {
         const ids = Array.from(checkedIds);
@@ -128,33 +202,28 @@ export function SpillSuggestionPanel({
         if (error) throw error;
         toast({ title: `${ids.length} položek přelito do T${targetWeekNum}` });
       } else {
-        // Split mode
         let movedCount = 0;
         for (const item of allItems) {
           const pct = splitPcts[item.id] || 0;
           if (pct === 0) continue;
 
           if (pct === 100) {
-            // Move entirely
             await supabase.from("production_schedule")
               .update({ scheduled_week: targetWeek }).eq("id", item.id);
             movedCount++;
           } else {
-            // Split
             const spillHours = Math.round(item.scheduled_hours * pct / 100);
             const keepHours = item.scheduled_hours - spillHours;
             const czkPerHour = item.scheduled_hours > 0 ? item.scheduled_czk / item.scheduled_hours : 550;
             const groupId = item.split_group_id || item.id;
             const cleanName = item.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
 
-            // Update original — keep portion
             await supabase.from("production_schedule").update({
               scheduled_hours: keepHours,
               scheduled_czk: keepHours * czkPerHour,
               split_group_id: groupId,
             }).eq("id", item.id);
 
-            // Create spill portion
             await supabase.from("production_schedule").insert({
               project_id: item.project_id,
               stage_id: item.stage_id,
@@ -171,7 +240,6 @@ export function SpillSuggestionPanel({
 
             await renumberSiblings(groupId);
 
-            // Update names
             const { data: allParts } = await supabase
               .from("production_schedule")
               .select("id, split_part, split_total")
@@ -198,7 +266,7 @@ export function SpillSuggestionPanel({
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
     setSubmitting(false);
-  }, [targetWeek, mode, checkedIds, splitPcts, allItems, qc, targetWeekNum]);
+  }, [targetWeek, mode, checkedIds, splitPcts, bundleData, qc, targetWeekNum]);
 
   if (dismissed) return null;
 
@@ -227,7 +295,7 @@ export function SpillSuggestionPanel({
         {/* Header with mode toggle */}
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-[9px] font-semibold" style={{ color: "#dc3545" }}>
-            Přelít do T{targetWeekNum}:
+            ⚠ Přetížení +{Math.round(overloadHours)}h → T{targetWeekNum}:
           </span>
           <div className="flex items-center gap-0">
             <button
@@ -262,71 +330,137 @@ export function SpillSuggestionPanel({
           </div>
         </div>
 
-        <div className="space-y-[2px] max-h-[140px] overflow-y-auto">
-          {allItems.map(item => (
-            <div key={item.id}>
-              {mode === "items" ? (
-                <label
-                  className="flex items-center gap-1.5 px-1 py-[2px] rounded cursor-pointer text-[8px]"
-                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
-                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+        {/* Bundle list */}
+        <div className="space-y-[2px] max-h-[180px] overflow-y-auto">
+          {bundleData.map(bd => {
+            const isExpanded = expandedBundles.has(bd.projectId);
+            const checkState = getBundleCheckState(bd);
+            const bundlePct = getBundleSplitPct(bd);
+            const bundleSpillHours = mode === "split"
+              ? bd.items.reduce((s, i) => s + Math.round(i.scheduled_hours * (splitPcts[i.id] || 0) / 100), 0)
+              : bd.items.filter(i => checkedIds.has(i.id)).reduce((s, i) => s + i.scheduled_hours, 0);
+
+            return (
+              <div key={bd.projectId}>
+                {/* Bundle header row */}
+                <div
+                  className="flex items-center gap-1 px-1 py-[3px] rounded transition-colors"
+                  style={{ backgroundColor: isExpanded ? "#fafaf8" : "transparent" }}
+                  onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.backgroundColor = "#f8f7f5"; }}
+                  onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.backgroundColor = "transparent"; }}
                 >
-                  <Checkbox
-                    className="h-3 w-3"
-                    checked={checkedIds.has(item.id)}
-                    onCheckedChange={() => toggleItem(item.id)}
-                  />
-                  {item.item_code && (
-                    <span className="font-mono shrink-0" style={{ color: "#223937", fontSize: 8 }}>
-                      {item.item_code}
+                  {mode === "items" ? (
+                    <Checkbox
+                      className="h-3 w-3 shrink-0"
+                      checked={checkState === "checked" ? true : checkState === "indeterminate" ? "indeterminate" : false}
+                      onCheckedChange={() => toggleBundle(bd)}
+                    />
+                  ) : (
+                    <div className="w-3 shrink-0" />
+                  )}
+                  <span className="text-[8px] font-semibold flex-1 truncate" style={{ color: "#223937" }}>
+                    {bd.projectName}
+                  </span>
+                  {mode === "split" && (
+                    <span className="font-mono text-[8px] font-semibold shrink-0" style={{ color: "#223937" }}>
+                      {bundlePct}%
                     </span>
                   )}
-                  <span className="flex-1 truncate" style={{ color: "#6b7a78" }}>
-                    {item.item_name}
+                  <span className="font-mono text-[8px] shrink-0" style={{ color: "#99a5a3" }}>
+                    {mode === "split" && bundleSpillHours > 0 ? `${bundleSpillHours}h/` : ""}{Math.round(bd.totalHours)}h
                   </span>
-                  <span className="font-mono shrink-0" style={{ color: "#99a5a3" }}>
-                    {item.scheduled_hours}h
-                  </span>
-                </label>
-              ) : (
-                <div className="px-1 py-[3px]">
-                  <div className="flex items-center gap-1.5 text-[8px] mb-[2px]">
-                    {item.item_code && (
-                      <span className="font-mono shrink-0" style={{ color: "#223937" }}>
-                        {item.item_code}
-                      </span>
-                    )}
-                    <span className="flex-1 truncate" style={{ color: "#6b7a78" }}>
-                      {item.item_name}
-                    </span>
-                    <span className="font-mono shrink-0 font-semibold" style={{ color: "#223937" }}>
-                      {splitPcts[item.id] || 0}%
-                    </span>
-                    <span className="font-mono shrink-0" style={{ color: "#99a5a3" }}>
-                      {Math.round(item.scheduled_hours * (splitPcts[item.id] || 0) / 100)}h
-                    </span>
-                  </div>
-                  <Slider
-                    value={[splitPcts[item.id] || 0]}
-                    min={0}
-                    max={100}
-                    step={5}
-                    onValueChange={([v]) => setSplitPct(item.id, v)}
-                    className="w-full"
-                  />
+                  <button
+                    onClick={() => toggleBundleExpand(bd.projectId)}
+                    className="shrink-0 p-0 rounded transition-colors"
+                    style={{ color: "#99a5a3" }}
+                  >
+                    {isExpanded
+                      ? <ChevronUp style={{ width: 10, height: 10 }} />
+                      : <ChevronDown style={{ width: 10, height: 10 }} />
+                    }
+                  </button>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {/* Bundle-level slider in split mode (collapsed) */}
+                {mode === "split" && !isExpanded && (
+                  <div className="px-1 pb-[2px]">
+                    <Slider
+                      value={[bundlePct]}
+                      min={0} max={100} step={5}
+                      onValueChange={([v]) => setBundleSplitPct(bd, v)}
+                      className="w-full"
+                    />
+                  </div>
+                )}
+
+                {/* Expanded: individual items */}
+                {isExpanded && (
+                  <div className="ml-3 space-y-[1px] pb-1">
+                    {bd.items.map(item => (
+                      <div key={item.id}>
+                        {mode === "items" ? (
+                          <label
+                            className="flex items-center gap-1.5 px-1 py-[2px] rounded cursor-pointer text-[8px]"
+                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
+                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+                          >
+                            <Checkbox
+                              className="h-3 w-3"
+                              checked={checkedIds.has(item.id)}
+                              onCheckedChange={() => toggleItem(item.id)}
+                            />
+                            {item.item_code && (
+                              <span className="font-mono shrink-0" style={{ color: "#223937", fontSize: 8 }}>
+                                {item.item_code}
+                              </span>
+                            )}
+                            <span className="flex-1 truncate" style={{ color: "#6b7a78" }}>
+                              {item.item_name}
+                            </span>
+                            <span className="font-mono shrink-0" style={{ color: "#99a5a3" }}>
+                              {item.scheduled_hours}h
+                            </span>
+                          </label>
+                        ) : (
+                          <div className="px-1 py-[2px]">
+                            <div className="flex items-center gap-1.5 text-[8px] mb-[2px]">
+                              {item.item_code && (
+                                <span className="font-mono shrink-0" style={{ color: "#223937" }}>
+                                  {item.item_code}
+                                </span>
+                              )}
+                              <span className="flex-1 truncate" style={{ color: "#6b7a78" }}>
+                                {item.item_name}
+                              </span>
+                              <span className="font-mono shrink-0 font-semibold" style={{ color: "#223937" }}>
+                                {splitPcts[item.id] || 0}%
+                              </span>
+                              <span className="font-mono shrink-0" style={{ color: "#99a5a3" }}>
+                                {Math.round(item.scheduled_hours * (splitPcts[item.id] || 0) / 100)}h
+                              </span>
+                            </div>
+                            <Slider
+                              value={[splitPcts[item.id] || 0]}
+                              min={0} max={100} step={5}
+                              onValueChange={([v]) => setSplitPct(item.id, v)}
+                              className="w-full"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {/* Summary for split mode */}
-        {mode === "split" && (
-          <div className="mt-1 text-[8px] font-mono text-center" style={{ color: splitModeSufficient ? "#3a8a36" : "#dc3545" }}>
-            Přelije se: {Math.round(totalSpillHours)}h / Potřeba: {Math.round(overloadHours)}h
-            {splitModeSufficient ? " ✓" : ""}
-          </div>
-        )}
+        {/* Live summary */}
+        <div className="mt-1 text-[8px] font-mono text-center" style={{ color: splitModeSufficient ? "#3a8a36" : "#dc3545" }}>
+          Přelije se: {Math.round(totalSpillHours)}h / Potřeba: {Math.round(overloadHours)}h
+          {splitModeSufficient ? " ✓" : ""}
+        </div>
 
         <div className="flex items-center gap-1.5 mt-1.5">
           <button
