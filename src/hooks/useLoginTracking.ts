@@ -1,61 +1,166 @@
 import { supabase } from "@/integrations/supabase/client";
 
 let lastTrackedUserId: string | null = null;
-let lastLoginTime: number = 0;
+let lastLoginTime = 0;
 
 const LOGIN_DEDUP_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
 
+export const LAST_LOGIN_LOGGED_AT_KEY = "lastLoginLoggedAt";
+export const ACTIVE_LOGIN_LOG_ID_KEY = "activeLoginLogId";
+export const ACTIVE_SESSION_START_KEY = "activeSessionStartTime";
+export const ACTIVE_LOGIN_DETAIL_KEY = "activeLoginDetail";
+
+type LoginDetail = Record<string, unknown>;
+
+export interface LoginTrackingResult {
+  logged: boolean;
+  logId: string | null;
+  sessionStartMs: number | null;
+  detail: LoginDetail | null;
+}
+
+function canUseSessionStorage() {
+  return typeof window !== "undefined" && typeof window.sessionStorage !== "undefined";
+}
+
+function getSessionValue(key: string): string | null {
+  if (!canUseSessionStorage()) return null;
+  return window.sessionStorage.getItem(key);
+}
+
+function setSessionValue(key: string, value: string) {
+  if (!canUseSessionStorage()) return;
+  window.sessionStorage.setItem(key, value);
+}
+
+function parseDetail(detail: string | null | undefined): LoginDetail | null {
+  if (!detail) return null;
+  try {
+    return JSON.parse(detail) as LoginDetail;
+  } catch {
+    return null;
+  }
+}
+
+export function hasLoginLoggedInCurrentTab() {
+  return Boolean(getSessionValue(LAST_LOGIN_LOGGED_AT_KEY));
+}
+
 /**
- * Log a login event, but only if:
- * 1. It's a different user than last tracked, OR
- * 2. More than 30 minutes have passed since last login log
+ * Log a login event only once per browser tab session and deduplicate within 30 minutes.
  */
-export async function logLoginEvent(userId: string, email: string) {
+export async function logLoginEvent(userId: string, email: string): Promise<LoginTrackingResult> {
   const now = Date.now();
 
-  // Same user within dedup window → skip
-  if (lastTrackedUserId === userId && (now - lastLoginTime) < LOGIN_DEDUP_WINDOW_MS) {
-    return;
+  // Tab-level guard: if this tab already logged a login, don't log again.
+  if (hasLoginLoggedInCurrentTab()) {
+    return {
+      logged: false,
+      logId: getSessionValue(ACTIVE_LOGIN_LOG_ID_KEY),
+      sessionStartMs: Number(getSessionValue(ACTIVE_SESSION_START_KEY) ?? "") || null,
+      detail: parseDetail(getSessionValue(ACTIVE_LOGIN_DETAIL_KEY)),
+    };
   }
 
-  // Also check DB for recent login to handle page reloads
+  // In-memory dedup for rapid repeated calls in same runtime.
+  if (lastTrackedUserId === userId && now - lastLoginTime < LOGIN_DEDUP_WINDOW_MS) {
+    return {
+      logged: false,
+      logId: getSessionValue(ACTIVE_LOGIN_LOG_ID_KEY),
+      sessionStartMs: Number(getSessionValue(ACTIVE_SESSION_START_KEY) ?? "") || null,
+      detail: parseDetail(getSessionValue(ACTIVE_LOGIN_DETAIL_KEY)),
+    };
+  }
+
+  // DB dedup for reload/race safety.
   try {
     const thirtyMinAgo = new Date(now - LOGIN_DEDUP_WINDOW_MS).toISOString();
     const { data: recent } = await (supabase.from("data_log") as any)
-      .select("id")
+      .select("id, created_at, detail")
       .eq("action_type", "user_login")
       .eq("user_id", userId)
       .gte("created_at", thirtyMinAgo)
+      .order("created_at", { ascending: false })
       .limit(1);
 
     if (recent && recent.length > 0) {
-      // Already logged recently — just update memory state
+      const recentEntry = recent[0];
+      const startMs = new Date(recentEntry.created_at).getTime();
+      const parsedDetail = parseDetail(recentEntry.detail);
+
+      setSessionValue(LAST_LOGIN_LOGGED_AT_KEY, String(now));
+      setSessionValue(ACTIVE_LOGIN_LOG_ID_KEY, recentEntry.id);
+      setSessionValue(ACTIVE_SESSION_START_KEY, String(startMs));
+      if (parsedDetail) {
+        setSessionValue(ACTIVE_LOGIN_DETAIL_KEY, JSON.stringify(parsedDetail));
+      }
+
       lastTrackedUserId = userId;
       lastLoginTime = now;
-      return;
-    }
-  } catch {}
 
-  lastTrackedUserId = userId;
-  lastLoginTime = now;
+      return {
+        logged: false,
+        logId: recentEntry.id,
+        sessionStartMs: startMs,
+        detail: parsedDetail,
+      };
+    }
+  } catch {
+    // ignore dedup read failures and try insert
+  }
+
+  const baseDetail: LoginDetail = {
+    email,
+    login_method: "password",
+    user_agent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+    timestamp: new Date().toISOString(),
+  };
 
   try {
-    await (supabase.from("data_log") as any).insert({
-      project_id: "_system_",
-      user_id: userId,
-      user_email: email,
-      action_type: "user_login",
-      old_value: null,
-      new_value: null,
-      detail: JSON.stringify({
-        email,
-        login_method: "password",
-        user_agent: navigator.userAgent,
-        timestamp: new Date().toISOString(),
-      }),
-    });
+    const { data: inserted, error } = await (supabase.from("data_log") as any)
+      .insert({
+        project_id: "_system_",
+        user_id: userId,
+        user_email: email,
+        action_type: "user_login",
+        old_value: null,
+        new_value: null,
+        detail: JSON.stringify(baseDetail),
+      })
+      .select("id, created_at")
+      .single();
+
+    if (error) throw error;
+
+    const logId = inserted?.id ?? null;
+    const sessionStartMs = inserted?.created_at
+      ? new Date(inserted.created_at).getTime()
+      : now;
+
+    if (logId) {
+      setSessionValue(LAST_LOGIN_LOGGED_AT_KEY, String(now));
+      setSessionValue(ACTIVE_LOGIN_LOG_ID_KEY, logId);
+      setSessionValue(ACTIVE_SESSION_START_KEY, String(sessionStartMs));
+      setSessionValue(ACTIVE_LOGIN_DETAIL_KEY, JSON.stringify(baseDetail));
+    }
+
+    lastTrackedUserId = userId;
+    lastLoginTime = now;
+
+    return {
+      logged: true,
+      logId,
+      sessionStartMs,
+      detail: baseDetail,
+    };
   } catch (e) {
     console.error("Login tracking error:", e);
+    return {
+      logged: false,
+      logId: null,
+      sessionStartMs: null,
+      detail: null,
+    };
   }
 }
 
