@@ -206,7 +206,7 @@ export function AmiAssistant() {
         <button
           onClick={dismissTooltip}
           className="fixed z-[9998] animate-fade-in"
-          style={{ bottom: 56, right: 16 }}
+          style={{ bottom: 80, right: 16 }}
         >
           <div className="bg-white text-foreground text-xs px-3 py-2 rounded-lg shadow-lg border border-border max-w-[220px]">
             Ahoj! Jsem tu, když budeš potřebovat pomoc 👋
@@ -220,8 +220,8 @@ export function AmiAssistant() {
         <div
           className="fixed z-[9999] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden animate-scale-in"
           style={{
-            bottom: 60,
-            right: 16,
+          bottom: 84,
+          right: 16,
             width: 340,
             height: 440,
             border: "1px solid #e2ddd6",
@@ -320,7 +320,7 @@ export function AmiAssistant() {
         onMouseLeave={() => setCollapsed(true)}
         className="fixed z-[9998] flex items-center gap-2 transition-all duration-300 hover:scale-105 group"
         style={{
-          bottom: 16,
+          bottom: 40,
           right: 16,
           height: 44,
           width: collapsed ? 44 : "auto",
