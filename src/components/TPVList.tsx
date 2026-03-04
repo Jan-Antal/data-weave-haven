@@ -547,6 +547,16 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         open={wizardOpen}
         onClose={() => setWizardOpen(false)}
       />
+
+      {currentProject && (
+        <ProjectDetailDialog
+          project={currentProject}
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+          onOpenTPVList={() => {}}
+          tpvItemCount={items.length}
+        />
+      )}
     </div>
   );
 }
