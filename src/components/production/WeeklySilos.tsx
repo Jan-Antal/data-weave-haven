@@ -80,6 +80,21 @@ interface PauseState {
   source: "schedule" | "inbox";
 }
 
+interface BundleSplitState {
+  bundleName: string;
+  currentWeekKey: string;
+  items: Array<{
+    id: string;
+    item_name: string;
+    item_code: string | null;
+    project_id: string;
+    stage_id: string | null;
+    scheduled_hours: number;
+    scheduled_czk: number;
+    split_group_id: string | null;
+  }>;
+}
+
 interface CancelState {
   itemId: string;
   itemName: string;
