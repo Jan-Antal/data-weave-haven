@@ -624,12 +624,21 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                             </SelectTrigger>
                             <SelectContent className="z-[100001]">
                               <SelectItem value="__none__">— Vyberte sloupec —</SelectItem>
-                              {currentSheet.headers.map((h, i) => (
-                                <SelectItem key={i} value={String(i)} disabled={usedColIndices.has(i) && mapping[field.key] !== i}>
-                                  <span className="text-muted-foreground mr-1">{colLetter(i)}:</span>
-                                  {h || `(sloupec ${i + 1})`}
-                                </SelectItem>
-                              ))}
+                              {currentSheet.headers.map((h, i) => {
+                                const mappedToOther = usedColIndices.has(i) && mapping[field.key] !== i;
+                                const otherField = mappedToOther
+                                  ? TARGET_FIELDS.find(f => f.key !== field.key && mapping[f.key] === i)
+                                  : null;
+                                return (
+                                  <SelectItem key={i} value={String(i)}>
+                                    <span className="text-muted-foreground mr-1">{colLetter(i)}:</span>
+                                    {h || `(sloupec ${i + 1})`}
+                                    {otherField && (
+                                      <span className="text-muted-foreground/60 ml-1 text-[10px]">(→ {otherField.label})</span>
+                                    )}
+                                  </SelectItem>
+                                );
+                              })}
                             </SelectContent>
                           </Select>
                           {isAuto && isMapped && (
