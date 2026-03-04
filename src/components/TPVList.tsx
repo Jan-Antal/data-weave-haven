@@ -75,6 +75,9 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const { data: items = [], isLoading } = useTPVItems(projectId);
   const { data: statusOptions = [] } = useTPVStatusOptions();
   const TPV_STATUSES = statusOptions.map(o => o.label);
+  const { data: allProjects = [] } = useProjects();
+  const [detailOpen, setDetailOpen] = useState(false);
+  const currentProject = useMemo(() => allProjects.find(p => p.project_id === projectId), [allProjects, projectId]);
 
   const updateItem = useUpdateTPVItem();
   const addItem = useAddTPVItem();
