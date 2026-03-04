@@ -232,8 +232,27 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
           label: "Dokončit položky → Expedice", icon: "✓",
           onClick: () => { setCompletionState({ projectName: bundle.project_name, projectId: bundle.project_id, weekLabel: `Výroba T${weekNum} · ${formatDateShort(startDate)} – ${formatDateShort(endDate)}`, weekKey, items: bundle.items }); },
         });
-      }
-      if (hasUncompleted) {
+
+        actions.push({
+          label: `Rozdělit bundle (${activeItems.length})`, icon: "✂",
+          onClick: () => {
+            setBundleSplitState({
+              bundleName: bundle.project_name,
+              currentWeekKey: weekKey,
+              items: activeItems.map(i => ({
+                id: i.id,
+                item_name: i.item_name,
+                item_code: i.item_code,
+                project_id: i.project_id,
+                stage_id: i.stage_id,
+                scheduled_hours: i.scheduled_hours,
+                scheduled_czk: i.scheduled_czk,
+                split_group_id: i.split_group_id,
+              })),
+            });
+          },
+        });
+
         actions.push({
           label: `Pozastavit vše (${activeItems.length})`, icon: "⏸",
           onClick: () => setPauseState({ itemId: activeItems.map(i => i.id).join(","), itemName: `${bundle.project_name} — ${activeItems.length} položek`, itemCode: null, source: "schedule" }),
