@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useActivityLog, type ActivityLogEntry } from "@/hooks/useActivityLog";
-import { useUserAnalytics, useUserRecentActions } from "@/hooks/useUserAnalytics";
+import { useUserAnalytics, useUserRecentActions, type UserAnalytics } from "@/hooks/useUserAnalytics";
 import { useProjects } from "@/hooks/useProjects";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -44,7 +44,7 @@ const DOT_COLORS: Record<string, string> = {
   stage_document_uploaded: "bg-blue-500",
   stage_document_deleted: "bg-orange-500",
   user_login: "bg-emerald-500",
-  page_view: "bg-sky-400",
+  session_end: "bg-teal-400",
 };
 
 function formatDayHeader(dateStr: string): string {
@@ -80,6 +80,15 @@ function ActivityItem({
     case "page_view":
       mainText = <>📄 {userName} zobrazil/a {entry.new_value || "stránku"}</>;
       break;
+    case "session_end": {
+      let durText = "";
+      try {
+        const d = JSON.parse(entry.detail || "{}");
+        durText = ` (${d.duration_minutes ?? 0} min)`;
+      } catch {}
+      mainText = <>🕐 {userName} – session{durText}</>;
+      break;
+    }
     case "status_change":
       mainText = <>{userName} změnil/a status {projectLabel}</>;
       subContent = (
@@ -247,7 +256,7 @@ function UserAnalyticsTab() {
             <tr className="text-left text-muted-foreground border-b">
               <th className="py-1.5 font-medium">Uživatel</th>
               <th className="py-1.5 font-medium text-right">Přihlášení</th>
-              <th className="py-1.5 font-medium text-right">Zobrazení</th>
+              <th className="py-1.5 font-medium text-right">Ø Session</th>
             </tr>
           </thead>
           <tbody>
@@ -274,7 +283,7 @@ function UserAnalyticsRow({
   expanded,
   onToggle,
 }: {
-  user: { user_email: string; last_login: string | null; login_count_30d: number; top_page: string | null; page_view_count_30d: number };
+  user: UserAnalytics;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -300,11 +309,11 @@ function UserAnalyticsRow({
             <span className="font-medium">{userName}</span>
           </div>
           <p className="text-[10px] text-muted-foreground ml-4">
-            {lastLogin} · {user.top_page || "—"}
+            {lastLogin}
           </p>
         </td>
         <td className="py-1.5 text-right font-mono">{user.login_count_30d}</td>
-        <td className="py-1.5 text-right font-mono">{user.page_view_count_30d}</td>
+        <td className="py-1.5 text-right font-mono">{user.avg_session_min} min</td>
       </tr>
       {expanded && (
         <tr>
@@ -338,6 +347,7 @@ function UserAnalyticsRow({
 function getActionLabel(actionType: string, newValue: string | null, projectId: string): string {
   switch (actionType) {
     case "user_login": return "Přihlášení";
+    case "session_end": return "Konec session";
     case "page_view": return `Zobrazení: ${newValue || "stránka"}`;
     case "status_change": return `Status změněn (${projectId})`;
     case "project_created": return `Vytvořen projekt ${projectId}`;

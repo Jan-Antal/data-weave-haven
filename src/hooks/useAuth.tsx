@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useRef, ReactNode } fro
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 import { logLoginEvent, resetLoginTracking } from "@/hooks/useLoginTracking";
+import { startSession, endSession, resetSessionTracking } from "@/hooks/useSessionTracking";
 
 export type AppRole = "owner" | "admin" | "pm" | "konstrukter" | "viewer";
 
@@ -66,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Track login when transitioning from no user to signed in
           if (!prevUserRef.current && session.user.id) {
             logLoginEvent(session.user.id, session.user.email ?? "");
+            startSession(session.user.id, session.user.email ?? "");
           }
           prevUserRef.current = session.user.id;
 
@@ -116,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLinkedPersonName(null);
           prevUserRef.current = null;
           resetLoginTracking();
+          resetSessionTracking();
           setLoading(false);
         }
       }
@@ -160,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    await endSession();
     await supabase.auth.signOut();
   };
 

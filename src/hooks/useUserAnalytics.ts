@@ -5,8 +5,8 @@ export interface UserAnalytics {
   user_email: string;
   last_login: string | null;
   login_count_30d: number;
-  top_page: string | null;
-  page_view_count_30d: number;
+  avg_session_min: number;
+  total_session_min: number;
 }
 
 export interface AnalyticsSummary {
@@ -32,14 +32,14 @@ export function useUserAnalytics(enabled: boolean) {
         .gte("created_at", thirtyDaysAgo)
         .order("created_at", { ascending: false });
 
-      // Fetch page views (last 30 days)
-      const { data: views } = await (supabase.from("data_log") as any)
-        .select("user_email, new_value, created_at")
-        .eq("action_type", "page_view")
+      // Fetch session_end entries (last 30 days) for duration
+      const { data: sessions } = await (supabase.from("data_log") as any)
+        .select("user_email, detail")
+        .eq("action_type", "session_end")
         .gte("created_at", thirtyDaysAgo);
 
       const loginArr = (logins ?? []) as { user_email: string; created_at: string }[];
-      const viewArr = (views ?? []) as { user_email: string; new_value: string; created_at: string }[];
+      const sessionArr = (sessions ?? []) as { user_email: string; detail: string | null }[];
 
       // Summary counts
       const loginsToday = loginArr.filter(l => new Date(l.created_at) >= todayStart).length;
@@ -55,40 +55,39 @@ export function useUserAnalytics(enabled: boolean) {
             user_email: l.user_email,
             last_login: l.created_at,
             login_count_30d: 0,
-            top_page: null,
-            page_view_count_30d: 0,
+            avg_session_min: 0,
+            total_session_min: 0,
           });
         }
         userMap.get(l.user_email)!.login_count_30d++;
       }
 
-      // Page view counts per user
-      const userPageCounts = new Map<string, Map<string, number>>();
-      for (const v of viewArr) {
-        if (!userMap.has(v.user_email)) {
-          userMap.set(v.user_email, {
-            user_email: v.user_email,
-            last_login: null,
-            login_count_30d: 0,
-            top_page: null,
-            page_view_count_30d: 0,
-          });
-        }
-        userMap.get(v.user_email)!.page_view_count_30d++;
-
-        if (!userPageCounts.has(v.user_email)) userPageCounts.set(v.user_email, new Map());
-        const pc = userPageCounts.get(v.user_email)!;
-        pc.set(v.new_value, (pc.get(v.new_value) ?? 0) + 1);
+      // Session durations per user
+      const userSessionMins = new Map<string, number[]>();
+      for (const s of sessionArr) {
+        if (!s.detail) continue;
+        try {
+          const parsed = JSON.parse(s.detail);
+          const mins = parsed.duration_minutes ?? 0;
+          if (!userSessionMins.has(s.user_email)) userSessionMins.set(s.user_email, []);
+          userSessionMins.get(s.user_email)!.push(mins);
+        } catch {}
       }
 
-      // Determine top page per user
-      for (const [email, pages] of userPageCounts) {
-        let topPage = "";
-        let topCount = 0;
-        for (const [page, count] of pages) {
-          if (count > topCount) { topPage = page; topCount = count; }
+      for (const [email, mins] of userSessionMins) {
+        if (!userMap.has(email)) {
+          userMap.set(email, {
+            user_email: email,
+            last_login: null,
+            login_count_30d: 0,
+            avg_session_min: 0,
+            total_session_min: 0,
+          });
         }
-        if (userMap.has(email)) userMap.get(email)!.top_page = topPage;
+        const total = mins.reduce((a, b) => a + b, 0);
+        const avg = mins.length > 0 ? Math.round(total / mins.length) : 0;
+        userMap.get(email)!.total_session_min = total;
+        userMap.get(email)!.avg_session_min = avg;
       }
 
       return {
@@ -115,6 +114,7 @@ export function useUserRecentActions(userEmail: string | null, enabled: boolean)
       const { data } = await (supabase.from("data_log") as any)
         .select("*")
         .eq("user_email", userEmail)
+        .neq("action_type", "page_view")
         .order("created_at", { ascending: false })
         .limit(20);
       return (data ?? []) as Array<{
