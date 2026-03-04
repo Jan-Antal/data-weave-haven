@@ -184,9 +184,27 @@ export default function PlanVyroby() {
     setActiveDrag(null);
     setOverDroppableId(null);
 
-    if (!over || !active.data.current) return;
+    if (!active.data.current) return;
 
     const dragData = active.data.current as ActiveDragData;
+
+    // If dropped with no target (same position), check for same-week merge opportunity
+    if (!over) {
+      if (dragData.type === "silo-item" && dragData.splitGroupId && dragData.itemId && dragData.weekDate) {
+        const sibling = findSiblingInWeek(dragData.splitGroupId, dragData.weekDate, dragData.itemId);
+        if (sibling) {
+          setMergeState({
+            itemName: dragData.itemName || "Položka",
+            splitGroupId: dragData.splitGroupId,
+            draggedItemId: dragData.itemId,
+            targetWeekKey: dragData.weekDate,
+            onKeepSeparate: async () => { /* no-op, already in same week */ },
+          });
+        }
+      }
+      return;
+    }
+
     const targetId = over.id.toString();
 
     if (targetId === "inbox-drop-zone") {
