@@ -122,15 +122,69 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const siloRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [visiblePeriodLabel, setVisiblePeriodLabel] = useState("");
+  const initialScrollDone = useRef(false);
 
   const weeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
 
+  // Initial scroll — run exactly once
   useEffect(() => {
+    if (initialScrollDone.current) return;
     const el = scrollContainerRef.current;
     if (!el) return;
-    const scrollTarget = 4 * 216;
-    el.scrollLeft = scrollTarget;
+    el.scrollLeft = 4 * 216;
+    initialScrollDone.current = true;
+  }, []);
+
+  // Auto-scroll silo container during drag when pointer near edges
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    let animFrame = 0;
+    const EDGE_ZONE = 80;
+    const SCROLL_SPEED = 6;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      cancelAnimationFrame(animFrame);
+      animFrame = 0;
+
+      // Only auto-scroll when a button is pressed (dragging)
+      if (e.buttons === 0) return;
+
+      const rect = container.getBoundingClientRect();
+      const x = e.clientX;
+
+      if (x < rect.left + EDGE_ZONE && x >= rect.left) {
+        const intensity = 1 - (x - rect.left) / EDGE_ZONE;
+        const step = () => {
+          container.scrollLeft -= Math.round(SCROLL_SPEED * intensity);
+          animFrame = requestAnimationFrame(step);
+        };
+        animFrame = requestAnimationFrame(step);
+      } else if (x > rect.right - EDGE_ZONE && x <= rect.right) {
+        const intensity = 1 - (rect.right - x) / EDGE_ZONE;
+        const step = () => {
+          container.scrollLeft += Math.round(SCROLL_SPEED * intensity);
+          animFrame = requestAnimationFrame(step);
+        };
+        animFrame = requestAnimationFrame(step);
+      }
+    };
+
+    const handlePointerUp = () => {
+      cancelAnimationFrame(animFrame);
+      animFrame = 0;
+    };
+
+    document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("pointerup", handlePointerUp);
+      cancelAnimationFrame(animFrame);
+    };
   }, []);
 
   const weeks = useMemo(() => {
