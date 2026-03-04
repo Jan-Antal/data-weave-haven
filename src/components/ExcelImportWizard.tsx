@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { Upload, X, Check, AlertTriangle, ChevronLeft, ChevronRight, FileSpreadsheet, Loader2 } from "lucide-react";
+import { Upload, X, Check, AlertTriangle, ChevronLeft, ChevronRight, FileSpreadsheet, Loader2, Info, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -74,8 +74,14 @@ function parseNumericValue(value: string | number | null): number | null {
   return isNaN(num) ? null : num;
 }
 
-function formatCzNumber(v: number): string {
-  return new Intl.NumberFormat("cs-CZ", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(v);
+function colLetter(idx: number): string {
+  let s = "";
+  let n = idx;
+  while (n >= 0) {
+    s = String.fromCharCode(65 + (n % 26)) + s;
+    n = Math.floor(n / 26) - 1;
+  }
+  return s;
 }
 
 // ── Component ─────────────────────────────────────────────────────
@@ -92,7 +98,6 @@ interface ParsedSheet {
   rows: any[][];
 }
 
-// Mapping: target field key → excel column index
 type Mapping = Record<TargetKey, number | null>;
 
 interface RowData {
@@ -103,28 +108,35 @@ interface RowData {
   duplicateCode?: boolean;
 }
 
+// ── Example data for format guide ─────────────────────────────────
+const EXAMPLE_ROWS = [
+  { kod: "TK.01", nazev: "Kuchyň", popis: "Spodní skříňky, dub", pocet: "1", cena: "85 000" },
+  { kod: "SK.01", nazev: "Šatní skříň", popis: "Vestavná, posuvné dveře", pocet: "2", cena: "42 000" },
+  { kod: "OB.01", nazev: "Obývací stěna", popis: "TV stěna, dýha ořech", pocet: "1", cena: "68 000" },
+];
+
 export function ExcelImportWizard({ projectId, projectName, open, onClose }: Props) {
   const qc = useQueryClient();
   const [step, setStep] = useState(1);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
 
-  // Step 1 state
+  // Step 1
   const [file, setFile] = useState<File | null>(null);
   const [sheets, setSheets] = useState<ParsedSheet[]>([]);
   const [uploadTime, setUploadTime] = useState<Date | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Step 2 state
+  // Step 2
   const [activeSheet, setActiveSheet] = useState(0);
   const [mapping, setMapping] = useState<Mapping>({} as Mapping);
   const [autoMatched, setAutoMatched] = useState<Set<TargetKey>>(new Set());
 
-  // Step 3 state
+  // Step 3
   const [rows, setRows] = useState<RowData[]>([]);
   const [duplicateMode, setDuplicateMode] = useState<"skip" | "overwrite">("skip");
   const [existingCodes, setExistingCodes] = useState<Set<string>>(new Set());
 
-  // Step 4 state
+  // Step 4
   const [importResult, setImportResult] = useState<{ imported: number; warnings: number; skipped: number } | null>(null);
   const [importing, setImporting] = useState(false);
 
@@ -179,7 +191,6 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
         }
       }
     }
-    // Set unmapped fields to null
     for (const f of TARGET_FIELDS) {
       if (!(f.key in newMapping)) newMapping[f.key] = null;
     }
@@ -207,7 +218,6 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
   const setMappingForField = (fieldKey: TargetKey, colIdx: number | null) => {
     setMapping(prev => {
       const next = { ...prev };
-      // Remove previous assignment of this column
       if (colIdx !== null) {
         for (const k of Object.keys(next) as TargetKey[]) {
           if (next[k] === colIdx) next[k] = null;
@@ -216,7 +226,6 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
       next[fieldKey] = colIdx;
       return next;
     });
-    // Remove auto-match indicator when user changes
     setAutoMatched(prev => {
       const next = new Set(prev);
       next.delete(fieldKey);
@@ -225,7 +234,6 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
   };
 
   const usedColIndices = useMemo(() => new Set(Object.values(mapping).filter(v => v !== null) as number[]), [mapping]);
-
   const requiredMapped = TARGET_FIELDS.filter(f => f.required).every(f => mapping[f.key] !== null && mapping[f.key] !== undefined);
 
   const handleSheetChange = (idx: number) => {
@@ -238,7 +246,6 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
   const buildRows = async () => {
     if (!currentSheet) return;
 
-    // Fetch existing item codes for this project
     const { data: existingItems } = await supabase
       .from("tpv_items")
       .select("item_type")
@@ -268,7 +275,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
       const hasCode = !!values.item_type;
       const hasName = !!values.nazev_prvku;
       const isDuplicate = hasCode && codes.has(values.item_type);
-      const status: "valid" | "warning" | "error" = 
+      const status: "valid" | "warning" | "error" =
         (!hasCode || !hasName) ? "error" : isDuplicate ? "warning" : "valid";
 
       built.push({
@@ -306,11 +313,9 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
     setImporting(true);
 
     try {
-      // Separate duplicates from new
       const duplicates = toImport.filter(r => r.duplicateCode);
       const newItems = toImport.filter(r => !r.duplicateCode);
 
-      // Insert new items
       if (newItems.length > 0) {
         const items = newItems.map(r => ({
           project_id: projectId,
@@ -328,7 +333,6 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
         if (error) throw error;
       }
 
-      // Handle duplicates
       if (duplicates.length > 0 && duplicateMode === "overwrite") {
         for (const r of duplicates) {
           await supabase.from("tpv_items")
@@ -378,39 +382,37 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
   if (!open) return null;
 
   const STEPS = ["Nahrání souboru", "Mapování sloupců", "Náhled & validace", "Import"];
-
-  // Preview rows for step 1
   const previewRows = currentSheet?.rows.slice(0, 5) || [];
 
   return (
-    <div className="fixed inset-0 z-[100000] flex flex-col" style={{ background: "#f5f3ef" }}>
+    <div className="fixed inset-0 z-[100000] flex flex-col bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-3 shadow-sm" style={{ background: "#2d3b2d", color: "white" }}>
+      <div className="flex items-center justify-between px-6 py-3 shadow-sm bg-primary text-primary-foreground">
         <div className="flex items-center gap-3">
           <FileSpreadsheet className="h-5 w-5" />
           <span className="font-semibold">Import Excel — {projectId}</span>
           <span className="text-sm opacity-70">{projectName}</span>
         </div>
-        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={handleCancel}>
+        <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/10" onClick={handleCancel}>
           <X className="h-5 w-5" />
         </Button>
       </div>
 
       {/* Stepper */}
-      <div className="flex items-center justify-center py-4 px-6 gap-0">
+      <div className="flex items-center justify-center py-4 px-6 gap-0 bg-card border-b">
         {STEPS.map((label, i) => {
           const stepNum = i + 1;
           const isActive = step === stepNum;
           const isComplete = step > stepNum;
           return (
             <div key={i} className="flex items-center">
-              {i > 0 && <div className={cn("w-12 h-0.5 mx-1", isComplete ? "bg-green-600" : "bg-gray-300")} />}
+              {i > 0 && <div className={cn("w-12 h-0.5 mx-1", isComplete ? "bg-green-600" : "bg-muted-foreground/20")} />}
               <div className="flex items-center gap-2">
                 <div className={cn(
                   "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2",
                   isComplete && "bg-green-600 border-green-600 text-white",
-                  isActive && "bg-[#2d3b2d] border-[#2d3b2d] text-white",
-                  !isComplete && !isActive && "border-gray-300 text-gray-400",
+                  isActive && "bg-primary border-primary text-primary-foreground",
+                  !isComplete && !isActive && "border-muted-foreground/30 text-muted-foreground",
                 )}>
                   {isComplete ? <Check className="h-3.5 w-3.5" /> : stepNum}
                 </div>
@@ -423,14 +425,15 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
 
       {/* Content */}
       <div className={cn("flex-1 overflow-auto px-6 pb-6", step === 3 && "overflow-hidden flex flex-col")}>
-        {/* ─── STEP 1: Upload ──────────────────────────────── */}
+
+        {/* ─── STEP 1: Upload + Format Guide ──────────────── */}
         {step === 1 && (
-          <div className="max-w-2xl mx-auto mt-8">
+          <div className="max-w-2xl mx-auto mt-6 space-y-4">
             <Card>
               <CardContent className="p-8">
                 {!file ? (
                   <div
-                    className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center cursor-pointer hover:border-green-500 hover:bg-green-50/30 transition-colors"
+                    className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-12 text-center cursor-pointer hover:border-green-500 hover:bg-green-50/30 transition-colors"
                     onDragOver={e => e.preventDefault()}
                     onDrop={handleDrop}
                     onClick={() => fileRef.current?.click()}
@@ -462,12 +465,12 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
 
                     {/* Preview first 5 rows */}
                     {currentSheet && currentSheet.headers.length > 0 && (
-                      <div className="rounded border overflow-auto max-h-[240px]">
+                      <div className="rounded border overflow-auto max-h-[200px]">
                         <Table>
                           <TableHeader>
                             <TableRow>
                               {currentSheet.headers.map((h, i) => (
-                                <TableHead key={i} className="text-xs whitespace-nowrap">{h || `(${i + 1})`}</TableHead>
+                                <TableHead key={i} className="text-xs whitespace-nowrap font-semibold bg-muted/50">{h || `(${i + 1})`}</TableHead>
                               ))}
                             </TableRow>
                           </TableHeader>
@@ -496,10 +499,54 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                 )}
               </CardContent>
             </Card>
+
+            {/* Format guide info box */}
+            <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <Info className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-900">Jak připravit Excel pro import:</p>
+                  <ul className="text-xs text-blue-800 mt-1.5 space-y-1 list-disc pl-4">
+                    <li>První řádek musí obsahovat názvy sloupců (hlavičku)</li>
+                    <li>Každý sloupec by měl obsahovat jeden typ informace</li>
+                    <li>Buňky nesmí obsahovat sloučené řádky nebo sloupce</li>
+                    <li><strong>Kód prvku</strong> a <strong>Název prvku</strong> jsou povinné</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-blue-900 mb-1.5">Příklad správného formátu:</p>
+                <div className="rounded border border-blue-200 overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-blue-100/80">
+                        <th className="px-3 py-1.5 text-left font-semibold text-blue-900">Kód</th>
+                        <th className="px-3 py-1.5 text-left font-semibold text-blue-900">Název</th>
+                        <th className="px-3 py-1.5 text-left font-semibold text-blue-900">Popis</th>
+                        <th className="px-3 py-1.5 text-right font-semibold text-blue-900">Počet</th>
+                        <th className="px-3 py-1.5 text-right font-semibold text-blue-900">Cena</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {EXAMPLE_ROWS.map((r, i) => (
+                        <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-blue-50/50"}>
+                          <td className="px-3 py-1 font-mono text-blue-800">{r.kod}</td>
+                          <td className="px-3 py-1 font-semibold">{r.nazev}</td>
+                          <td className="px-3 py-1 text-muted-foreground">{r.popis}</td>
+                          <td className="px-3 py-1 text-right">{r.pocet}</td>
+                          <td className="px-3 py-1 text-right">{r.cena}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* ─── STEP 2: Column Mapping (inverted) ───────────── */}
+        {/* ─── STEP 2: Column Mapping (Excel → TPV) ────────── */}
         {step === 2 && currentSheet && (
           <div className="max-w-3xl mx-auto mt-4 space-y-4">
             {sheets.length > 1 && (
@@ -512,55 +559,108 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
               </div>
             )}
 
+            {/* Excel preview (top) */}
+            <Card>
+              <CardContent className="p-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Náhled importovaného souboru</p>
+                <div className="rounded border overflow-auto max-h-[140px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {currentSheet.headers.map((h, i) => (
+                          <TableHead key={i} className="text-xs whitespace-nowrap font-semibold bg-muted/50">
+                            <span className="text-muted-foreground/60 mr-1">{colLetter(i)}:</span>
+                            {h || `(sloupec ${i + 1})`}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {currentSheet.rows.slice(0, 3).map((row, ri) => (
+                        <TableRow key={ri}>
+                          {currentSheet.headers.map((_, ci) => (
+                            <TableCell key={ci} className="text-xs whitespace-nowrap max-w-[180px] truncate">
+                              {String(row[ci] ?? "")}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Mapping interface (Excel LEFT → TPV RIGHT) */}
             <Card>
               <CardContent className="p-4">
-                <div className="grid grid-cols-[1fr_auto_1fr] gap-x-4 gap-y-2 items-center">
-                  {/* Header row */}
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pb-2">TPV List pole</div>
+                {/* Header labels */}
+                <div className="grid grid-cols-[1fr_32px_1fr] gap-x-3 items-center mb-3 pb-2 border-b">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Excel sloupec (import)</div>
                   <div />
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pb-2">Excel sloupec</div>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">TPV List (cíl)</div>
+                </div>
 
+                <div className="space-y-2">
                   {TARGET_FIELDS.map(field => {
                     const colIdx = mapping[field.key];
                     const isMapped = colIdx !== null && colIdx !== undefined;
                     const isAuto = autoMatched.has(field.key);
 
                     return (
-                      <div key={field.key} className="contents">
-                        <div className="flex items-center gap-2">
-                          <span className={cn("text-sm font-medium", field.required && "font-semibold")}>
-                            {field.label}
-                          </span>
-                          {field.required && <span className="text-red-500 text-xs">*</span>}
-                        </div>
-                        <div className="flex items-center justify-center">
-                          {isMapped ? (
-                            <span className="text-green-600"><Check className="h-4 w-4" /></span>
-                          ) : (
-                            <span className="w-4 h-0.5 bg-gray-300 rounded" />
-                          )}
-                        </div>
+                      <div key={field.key} className="grid grid-cols-[1fr_32px_1fr] gap-x-3 items-center">
+                        {/* LEFT: Excel column dropdown */}
                         <div className="flex items-center gap-2">
                           <Select
                             value={colIdx !== null && colIdx !== undefined ? String(colIdx) : "__none__"}
                             onValueChange={v => setMappingForField(field.key, v === "__none__" ? null : Number(v))}
                           >
-                            <SelectTrigger className={cn("h-8 text-xs", !isMapped && field.required && "border-red-300")}>
+                            <SelectTrigger className={cn(
+                              "h-9 text-xs",
+                              !isMapped && field.required && "border-destructive/50 bg-destructive/5",
+                              isMapped && "border-green-300 bg-green-50/50",
+                            )}>
                               <SelectValue placeholder="Vyberte sloupec" />
                             </SelectTrigger>
                             <SelectContent className="z-[100001]">
                               <SelectItem value="__none__">— Vyberte sloupec —</SelectItem>
                               {currentSheet.headers.map((h, i) => (
                                 <SelectItem key={i} value={String(i)} disabled={usedColIndices.has(i) && mapping[field.key] !== i}>
+                                  <span className="text-muted-foreground mr-1">{colLetter(i)}:</span>
                                   {h || `(sloupec ${i + 1})`}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                           {isAuto && isMapped && (
-                            <span className="text-[10px] text-green-600 whitespace-nowrap flex items-center gap-0.5">
-                              <Check className="h-3 w-3" /> automaticky
+                            <span className="text-[10px] text-green-600 whitespace-nowrap flex items-center gap-0.5 shrink-0">
+                              <Check className="h-3 w-3" /> auto
                             </span>
+                          )}
+                        </div>
+
+                        {/* CENTER: Arrow */}
+                        <div className="flex items-center justify-center">
+                          {isMapped ? (
+                            <ArrowRight className="h-4 w-4 text-green-600" />
+                          ) : field.required ? (
+                            <ArrowRight className="h-4 w-4 text-destructive/50" />
+                          ) : (
+                            <ArrowRight className="h-4 w-4 text-muted-foreground/20" />
+                          )}
+                        </div>
+
+                        {/* RIGHT: TPV field name (fixed) */}
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "text-sm",
+                            field.required ? "font-semibold" : "font-medium text-muted-foreground",
+                          )}>
+                            {field.label}
+                          </span>
+                          {field.required && <span className="text-destructive text-xs font-bold">*</span>}
+                          {!field.required && !isMapped && (
+                            <span className="text-[10px] text-muted-foreground/50 italic">volitelné</span>
                           )}
                         </div>
                       </div>
@@ -571,7 +671,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
             </Card>
 
             {!requiredMapped && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-md text-xs text-red-700">
+              <div className="flex items-center gap-2 px-3 py-2 bg-destructive/5 border border-destructive/20 rounded-md text-xs text-destructive">
                 <AlertTriangle className="h-3.5 w-3.5" />
                 Povinná pole (Kód Prvku, Název Prvku) musí být namapována pro pokračování
               </div>
@@ -594,10 +694,10 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
         {/* ─── STEP 3: Preview & Validate ──────────────────── */}
         {step === 3 && (
           <>
-            <div className="sticky top-0 z-10 bg-[#f5f3ef] pb-2 space-y-2 shrink-0">
+            <div className="sticky top-0 z-10 bg-background pb-2 space-y-2 shrink-0 pt-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap gap-2">
-                  <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-foreground bg-card border-border">
+                  <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-foreground bg-card">
                     {stats.total} položek celkem
                   </div>
                   <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-green-700 bg-green-50 border-green-200">
@@ -634,7 +734,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                     {importing ? (
                       <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Importuji...</>
                     ) : (
-                      <>Importovat {stats.selected} položek <ChevronRight className="h-4 w-4 ml-1" /></>
+                      <>Importovat {stats.selected} položek</>
                     )}
                   </Button>
                 </div>
@@ -663,7 +763,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                         key={idx}
                         className={cn(
                           "text-xs",
-                          isExcluded && "bg-gray-50",
+                          isExcluded && "bg-muted/30",
                           !isExcluded && row.status === "warning" && "bg-amber-50",
                           !isExcluded && row.status === "error" && "bg-red-50/30",
                         )}
@@ -689,7 +789,10 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                           )}
                         </TableCell>
                         {TARGET_FIELDS.map(f => (
-                          <TableCell key={f.key} className={cn(f.key === "item_name" && "max-w-[300px] truncate")}>
+                          <TableCell key={f.key} className={cn(
+                            f.key === "nazev_prvku" && "font-semibold",
+                            f.key === "item_name" && "max-w-[300px] truncate",
+                          )}>
                             {row.values[f.key] ?? ""}
                           </TableCell>
                         ))}
@@ -709,7 +812,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
               {[
                 { label: "Importováno", value: importResult.imported, color: "border-green-300 bg-green-50 text-green-800" },
                 { label: "Varování", value: importResult.warnings, color: "border-orange-300 bg-orange-50 text-orange-800" },
-                { label: "Přeskočeno", value: importResult.skipped, color: "border-gray-300 bg-gray-50 text-gray-600" },
+                { label: "Přeskočeno", value: importResult.skipped, color: "border-muted bg-muted/30 text-muted-foreground" },
               ].map(c => (
                 <Card key={c.label} className={cn("border", c.color)}>
                   <CardContent className="p-4 text-center">
