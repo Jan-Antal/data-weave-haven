@@ -51,7 +51,6 @@ function endSessionSync() {
   const durationMs = Date.now() - new Date(sessionStartTime).getTime();
   const durationMin = Math.round(durationMs / 60_000);
 
-  // Use sendBeacon for reliability on page unload
   const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/data_log`;
   const body = JSON.stringify({
     project_id: "_system_",
@@ -66,10 +65,21 @@ function endSessionSync() {
     }),
   });
 
-  navigator.sendBeacon(
-    url,
-    new Blob([body], { type: "application/json" })
-  );
+  const headers = {
+    "Content-Type": "application/json",
+    apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+  };
+
+  // sendBeacon doesn't support custom headers, use fetch keepalive instead
+  try {
+    fetch(url, {
+      method: "POST",
+      headers,
+      body,
+      keepalive: true,
+    });
+  } catch {}
 
   cleanup();
 }
