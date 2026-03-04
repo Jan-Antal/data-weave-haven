@@ -138,19 +138,22 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
 
   // Auto-scroll silo container during drag when pointer near edges
   useEffect(() => {
-    if (!overDroppableId && overDroppableId !== null) return; // not dragging
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    let animFrame: number;
+    let animFrame = 0;
     const EDGE_ZONE = 80;
     const SCROLL_SPEED = 6;
 
     const handlePointerMove = (e: PointerEvent) => {
+      cancelAnimationFrame(animFrame);
+      animFrame = 0;
+
+      // Only auto-scroll when a button is pressed (dragging)
+      if (e.buttons === 0) return;
+
       const rect = container.getBoundingClientRect();
       const x = e.clientX;
-
-      cancelAnimationFrame(animFrame);
 
       if (x < rect.left + EDGE_ZONE && x >= rect.left) {
         const intensity = 1 - (x - rect.left) / EDGE_ZONE;
@@ -169,14 +172,20 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       }
     };
 
-    // Only attach during drag (overDroppableId is non-null when something is being dragged over)
+    const handlePointerUp = () => {
+      cancelAnimationFrame(animFrame);
+      animFrame = 0;
+    };
+
     document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("pointerup", handlePointerUp);
 
     return () => {
       document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("pointerup", handlePointerUp);
       cancelAnimationFrame(animFrame);
     };
-  }, [overDroppableId]);
+  }, []);
 
   const weeks = useMemo(() => {
     const monday = getMonday(new Date());
