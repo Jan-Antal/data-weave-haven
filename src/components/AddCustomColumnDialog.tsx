@@ -37,6 +37,19 @@ export function AddCustomColumnDialog({ open, onOpenChange, tableName, groupKey,
   const { columns: existingCustomColumns } = useAllCustomColumns(tableName);
   const qc = useQueryClient();
 
+  // Build list of ALL existing column names (built-in + custom) for duplicate detection
+  const allExistingNames = useMemo(() => {
+    const builtIn = tableName === "tpv_items"
+      ? ["Kód Prvku", "Název Prvku", "Popis", "Konstruktér", "Status", "Odesláno", "Přijato", "Poznámka", "Počet", "Cena"]
+      : ["Číslo zakázky", "Název projektu", "Klient", "Lokace", "PM", "Konstruktér", "Kalkulant", "Architekt", "DM", "Status", "Velikost zakázky", "Datum smluvní", "Datum objednávky", "Zaměření", "TPV datum", "Expedice", "Předání", "Montáž", "Náročnost", "Hodiny TPV", "% TPV", "Prodejní cena", "Marže", "Risk", "PM Poznámka", "Smluvní", "Fakturace"];
+    const custom = existingCustomColumns.map(c => c.label);
+    return [...builtIn, ...custom];
+  }, [tableName, existingCustomColumns]);
+
+  const isDuplicate = name.trim().length > 0 && allExistingNames.some(
+    n => n.toLowerCase() === name.trim().toLowerCase()
+  );
+
   const handleSubmit = async () => {
     if (!name.trim()) return;
     const columnKey = `custom_${Date.now()}_${name.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "")}`;
@@ -96,6 +109,9 @@ export function AddCustomColumnDialog({ open, onOpenChange, tableName, groupKey,
           <div>
             <Label>Název sloupce</Label>
             <Input value={name} onChange={e => setName(e.target.value)} placeholder="Např. Materiál" autoFocus />
+            {isDuplicate && (
+              <p className="text-xs text-destructive mt-1">Sloupec s tímto názvem již existuje</p>
+            )}
           </div>
           <div>
             <Label>Typ dat</Label>
@@ -130,7 +146,7 @@ export function AddCustomColumnDialog({ open, onOpenChange, tableName, groupKey,
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Zrušit</Button>
-          <Button onClick={handleSubmit} disabled={!name.trim()}>Přidat sloupec</Button>
+          <Button onClick={handleSubmit} disabled={!name.trim() || isDuplicate}>Přidat sloupec</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
