@@ -132,6 +132,11 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     setEditMode(!editMode);
   }, [editMode, localOrder, allVisibleNonLocked, updateDisplayOrder]);
 
+  const handleCancelEditMode = useCallback(() => {
+    setLocalOrder(allVisibleNonLocked);
+    setEditMode(false);
+  }, [allVisibleNonLocked]);
+
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 
   const renderKeys = editMode ? localOrder : allVisibleNonLocked;
