@@ -8,6 +8,7 @@ import { WeeklySilos } from "@/components/production/WeeklySilos";
 import { ExpedicePanel } from "@/components/production/ExpedicePanel";
 import { DragOverlayContent } from "@/components/production/DragOverlayContent";
 import { AutoSplitPopover } from "@/components/production/AutoSplitPopover";
+import { MergePopover } from "@/components/production/MergePopover";
 import {
   DndContext,
   DragOverlay,
@@ -33,6 +34,7 @@ interface ActiveDragData {
   stageId?: string | null;
   scheduledCzk?: number;
   inboxItemId?: string;
+  splitGroupId?: string | null;
 }
 
 interface AutoSplitState {
@@ -53,6 +55,14 @@ interface AutoSplitState {
   onInsertWhole: () => Promise<void>;
 }
 
+interface MergeState {
+  itemName: string;
+  splitGroupId: string;
+  draggedItemId: string;
+  targetWeekKey: string;
+  onKeepSeparate: () => Promise<void>;
+}
+
 export default function PlanVyroby() {
   const { isAdmin, loading } = useAuth();
   const navigate = useNavigate();
@@ -61,6 +71,7 @@ export default function PlanVyroby() {
   const [activeDrag, setActiveDrag] = useState<ActiveDragData | null>(null);
   const [overDroppableId, setOverDroppableId] = useState<string | null>(null);
   const [autoSplitState, setAutoSplitState] = useState<AutoSplitState | null>(null);
+  const [mergeState, setMergeState] = useState<MergeState | null>(null);
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const {
@@ -70,6 +81,7 @@ export default function PlanVyroby() {
     moveBundleToWeek,
     moveItemBackToInbox,
     returnBundleToInbox,
+    mergeSplitItems,
   } = useProductionDragDrop();
 
   const weeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
@@ -86,7 +98,6 @@ export default function PlanVyroby() {
     }
   }, [isAdmin, loading, navigate]);
 
-  // Helper to find first future week with capacity after a given week
   const findSpillWeek = useCallback((afterWeekKey: string): { key: string; weekNum: number } => {
     const monday = new Date();
     const day = monday.getDay();
@@ -103,11 +114,24 @@ export default function PlanVyroby() {
         return { key, weekNum: getISOWeekNumber(d) };
       }
     }
-    // Fallback: next week after target
     const target = new Date(afterWeekKey);
     target.setDate(target.getDate() + 7);
     return { key: target.toISOString().split("T")[0], weekNum: getISOWeekNumber(target) };
   }, [scheduleData, weeklyCapacity]);
+
+  // Check if dropping a split item onto a sibling in the target week
+  const findSiblingInWeek = useCallback((splitGroupId: string, targetWeekKey: string, draggedItemId: string) => {
+    const silo = scheduleData?.get(targetWeekKey);
+    if (!silo) return null;
+    for (const bundle of silo.bundles) {
+      for (const item of bundle.items) {
+        if (item.id !== draggedItemId && item.split_group_id === splitGroupId) {
+          return item;
+        }
+      }
+    }
+    return null;
+  }, [scheduleData]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current as ActiveDragData | undefined;
@@ -140,17 +164,33 @@ export default function PlanVyroby() {
     if (targetId.startsWith("silo-week-")) {
       const weekDate = targetId.replace("silo-week-", "");
 
-      // Check for auto-split on single items (inbox-item or silo-item)
+      // Check for merge: dragging split item onto sibling
+      if (dragData.type === "silo-item" && dragData.splitGroupId && dragData.itemId) {
+        const sibling = findSiblingInWeek(dragData.splitGroupId, weekDate, dragData.itemId);
+        if (sibling) {
+          // Show merge popover
+          const doNormalMove = async () => {
+            if (dragData.weekDate !== weekDate) {
+              await moveScheduleItemToWeek(dragData.itemId!, weekDate);
+            }
+          };
+          setMergeState({
+            itemName: dragData.itemName || "Položka",
+            splitGroupId: dragData.splitGroupId,
+            draggedItemId: dragData.itemId,
+            targetWeekKey: weekDate,
+            onKeepSeparate: doNormalMove,
+          });
+          return;
+        }
+      }
+
+      // Check for auto-split on single items
       if ((dragData.type === "inbox-item" || dragData.type === "silo-item") && dragData.hours) {
         const targetUsed = scheduleData?.get(weekDate)?.total_hours ?? 0;
-        // If dragging from same week, subtract the item's own hours from used
-        const effectiveUsed = (dragData.type === "silo-item" && dragData.weekDate === weekDate)
-          ? targetUsed
-          : targetUsed;
-        const available = weeklyCapacity - effectiveUsed;
+        const available = weeklyCapacity - targetUsed;
 
         if (dragData.hours > available && available > 0) {
-          // Show auto-split popover
           const targetDate = new Date(weekDate);
           const targetWeekNum = getISOWeekNumber(targetDate);
           const spillWeek = findSpillWeek(weekDate);
@@ -183,7 +223,7 @@ export default function PlanVyroby() {
             inboxItemId: dragData.type === "inbox-item" ? dragData.itemId : undefined,
             onInsertWhole: doInsertWhole,
           });
-          return; // Don't do normal drop
+          return;
         }
       }
 
@@ -202,7 +242,9 @@ export default function PlanVyroby() {
         }
       }
     }
-  }, [moveInboxItemToWeek, moveInboxProjectToWeek, moveScheduleItemToWeek, moveBundleToWeek, moveItemBackToInbox, returnBundleToInbox, scheduleData, weeklyCapacity, hourlyRate, findSpillWeek]);
+  }, [moveInboxItemToWeek, moveInboxProjectToWeek, moveScheduleItemToWeek, moveBundleToWeek,
+    moveItemBackToInbox, returnBundleToInbox, scheduleData, weeklyCapacity, hourlyRate,
+    findSpillWeek, findSiblingInWeek, mergeSplitItems]);
 
   if (loading) {
     return (
@@ -238,8 +280,19 @@ export default function PlanVyroby() {
       {autoSplitState && (
         <AutoSplitPopover
           open={!!autoSplitState}
-          onOpenChange={(open) => !open && setAutoSplitState(null)}
+          onOpenChange={open => !open && setAutoSplitState(null)}
           {...autoSplitState}
+        />
+      )}
+
+      {/* Merge popover */}
+      {mergeState && (
+        <MergePopover
+          open={!!mergeState}
+          onOpenChange={open => !open && setMergeState(null)}
+          itemName={mergeState.itemName}
+          onMerge={() => mergeSplitItems(mergeState.splitGroupId)}
+          onKeepSeparate={mergeState.onKeepSeparate}
         />
       )}
     </DndContext>
