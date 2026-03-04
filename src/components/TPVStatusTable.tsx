@@ -403,9 +403,10 @@ interface TPVStatusTableProps {
   riskHighlight?: import("@/hooks/useRiskHighlight").RiskHighlightType;
   onRequestTab?: () => void;
   closeDetailRef?: MutableRefObject<(() => void) | null>;
+  onActiveProjectChange?: (active: boolean) => void;
 }
 
-export function TPVStatusTable({ personFilter, statusFilter, search: externalSearch, riskHighlight, onRequestTab, closeDetailRef }: TPVStatusTableProps) {
+export function TPVStatusTable({ personFilter, statusFilter, search: externalSearch, riskHighlight, onRequestTab, closeDetailRef, onActiveProjectChange }: TPVStatusTableProps) {
   useDataLogRowHighlight();
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
@@ -444,6 +445,11 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
       return () => { closeDetailRef.current = null; };
     }
   }, [closeDetailRef]);
+
+  // Notify parent when TPV List is active/inactive
+  useEffect(() => {
+    onActiveProjectChange?.(!!activeProject);
+  }, [activeProject, onActiveProjectChange]);
 
   // ── Frozen filter results ───────────────────────────────────────
   const filterFingerprint = JSON.stringify([personFilter, statusFilter, externalSearch]);
