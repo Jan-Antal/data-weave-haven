@@ -533,6 +533,11 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
     setEditMode(!editMode);
   }, [editMode, localOrder, allVisibleKeys, updateDisplayOrder]);
 
+  const handleCancelEditMode = useCallback(() => {
+    setLocalOrder(allVisibleKeys);
+    setEditMode(false);
+  }, [allVisibleKeys]);
+
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 
   // Register export data getter with column metadata
@@ -655,7 +660,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
               {v("project_id") && renderColumnHeader(headerProps("project_id"))}
               {v("project_name") && renderColumnHeader(headerProps("project_name"))}
               {renderKeys.map((key) => renderColumnHeader(headerProps(key)))}
-              <ColumnVisibilityToggle tabKey="pmStatus" editMode={editMode} onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined} />
+              <ColumnVisibilityToggle tabKey="pmStatus" editMode={editMode} onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined} onCancelEditMode={canEditColumns ? handleCancelEditMode : undefined} />
             </TableRow>
           </TableHeader>
           <TableBody>

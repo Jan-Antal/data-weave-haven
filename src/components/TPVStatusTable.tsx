@@ -530,6 +530,11 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
     setEditMode(!editMode);
   }, [editMode, localOrder, allVisibleKeys, updateDisplayOrder]);
 
+  const handleCancelEditMode = useCallback(() => {
+    setLocalOrder(allVisibleKeys);
+    setEditMode(false);
+  }, [allVisibleKeys]);
+
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 
   // Register export
@@ -635,7 +640,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
               {v("project_id") && renderColumnHeader(headerProps("project_id"))}
               {v("project_name") && renderColumnHeader(headerProps("project_name"))}
               {renderKeys.map((key) => renderColumnHeader(headerProps(key)))}
-              <ColumnVisibilityToggle tabKey="tpvStatus" editMode={editMode} onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined} />
+              <ColumnVisibilityToggle tabKey="tpvStatus" editMode={editMode} onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined} onCancelEditMode={canEditColumns ? handleCancelEditMode : undefined} />
             </TableRow>
           </TableHeader>
           <TableBody>
