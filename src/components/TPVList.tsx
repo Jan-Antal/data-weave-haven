@@ -6,7 +6,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useTPVItems, useUpdateTPVItem, useAddTPVItem, useDeleteTPVItems, useBulkUpdateTPVStatus, useBulkInsertTPVItems } from "@/hooks/useTPVItems";
@@ -24,9 +23,12 @@ import { cn } from "@/lib/utils";
 import { ExcelImportWizard } from "./ExcelImportWizard";
 import { formatCurrency } from "@/lib/currency";
 import { useExportContext } from "./ExportContext";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
-  { key: "item_name", label: "Název", locked: true },
-  { key: "item_type", label: "Typ" },
+  { key: "item_type", label: "Kód Prvku", locked: true },
+  { key: "nazev_prvku", label: "Název Prvku" },
+  { key: "item_name", label: "Popis" },
   { key: "konstrukter", label: "Konstruktér" },
   { key: "status", label: "Status" },
   { key: "sent_date", label: "Odesláno" },
@@ -45,6 +47,10 @@ function getTPVListColumnStyle(key: string, customWidth?: number | null): React.
     case "sent_date":
     case "accepted_date":
       return { width: 100, minWidth: 100, maxWidth: 100 };
+    case "item_type":
+      return { minWidth: 100, maxWidth: 140 };
+    case "nazev_prvku":
+      return { minWidth: 180 };
     case "item_name":
       return { minWidth: 200 };
     case "notes":
@@ -87,7 +93,6 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const { columns: customColumns } = useAllCustomColumns("tpv_items");
   const updateCustomField = useUpdateCustomField();
 
-  // ── Column management via shared hooks ──────────────────────────
   const {
     getLabel, getWidth, updateLabel, updateWidth,
     getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder,
@@ -97,7 +102,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const visMap = useMemo(() => getVisibilityMap(), [getVisibilityMap]);
   const DEFAULT_HIDDEN_KEYS = useMemo(() => new Set(TPV_LIST_COLUMNS.filter(c => c.defaultHidden).map(c => c.key)), []);
   const isColVisible = useCallback((key: string) => {
-    if (key === "item_name") return true;
+    if (key === "item_type") return true; // locked
     if (visMap[key] === undefined) return !DEFAULT_HIDDEN_KEYS.has(key);
     return visMap[key] !== false;
   }, [visMap, DEFAULT_HIDDEN_KEYS]);
@@ -156,16 +161,13 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
 
   // ── Selection & CRUD state ──────────────────────────────────────
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [importOpen, setImportOpen] = useState(false);
-  const [importData, setImportData] = useState<any[]>([]);
   const [wizardOpen, setWizardOpen] = useState(!!autoOpenImport);
   const [deleteIds, setDeleteIds] = useState<string[] | null>(null);
   const [addingInline, setAddingInline] = useState(false);
   const [inlineName, setInlineName] = useState("");
   const inlineRef = useRef<HTMLInputElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
-  const visibleColCount = renderKeys.length + 3; // +checkbox +item_name +actions
+  const visibleColCount = renderKeys.length + 3; // +checkbox +item_type(locked) +actions
 
   const toggleSelect = (id: string) => {
     setSelected(prev => {
@@ -192,43 +194,11 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     if (addingInline && inlineRef.current) inlineRef.current.focus();
   }, [addingInline]);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const wb = XLSX.read(evt.target?.result, { type: "binary" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const data = XLSX.utils.sheet_to_json<any>(ws, { defval: "" });
-      setImportData(data.map(row => ({
-        item_name: row["item_name"] || row["Název"] || row["name"] || "",
-        item_type: row["item_type"] || row["Typ"] || row["type"] || "",
-        status: row["status"] || row["Status"] || "",
-        sent_date: row["sent_date"] || row["Odesláno"] || "",
-        accepted_date: row["accepted_date"] || row["Přijato"] || "",
-        notes: row["notes"] || row["Poznámka"] || "",
-      })));
-      setImportOpen(true);
-    };
-    reader.readAsBinaryString(file);
-    e.target.value = "";
-  };
-
-  const handleImportConfirm = () => {
-    const validItems = importData.filter(r => r.item_name).map(r => ({ ...r, project_id: projectId }));
-    if (validItems.length) bulkInsert.mutate({ items: validItems, projectId });
-    setImportOpen(false);
-    setImportData([]);
-  };
-
   // ── Bulk-aware field save ────────────────────────────────────────
-  // When multiple items are selected, editing a bulk-editable field on any
-  // selected row applies the change to ALL selected rows.
   const BULK_FIELDS = new Set(["status", "konstrukter", "sent_date", "accepted_date"]);
 
   const saveField = (itemId: string, field: string, value: string, oldValue: string) => {
     if (BULK_FIELDS.has(field) && selected.size > 1 && selected.has(itemId)) {
-      // Apply to all selected rows
       for (const id of selected) {
         updateItem.mutate({ id, field, value, projectId });
       }
@@ -259,7 +229,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
 
   const tpvExportMeta = useMemo(() => ({
     getter: (selectedKeys?: string[]) => {
-      const visKeys = selectedKeys ?? ["item_name", ...renderKeys];
+      const visKeys = selectedKeys ?? ["item_type", ...renderKeys];
       const headers = visKeys.map(k => getLabel(k, TPV_LIST_LABEL_MAP[k] || k));
       const rows = sortedItems.map(item => visKeys.map(k => {
         if (k.startsWith("custom_")) {
@@ -274,14 +244,12 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     groups: [
       { label: "TPV List", keys: TPV_LIST_COLUMNS.map(c => c.key), getLabel: (k: string) => getLabel(k, TPV_LIST_LABEL_MAP[k] || k) },
     ],
-    defaultVisibleKeys: ["item_name", ...renderKeys],
+    defaultVisibleKeys: ["item_type", ...renderKeys],
   }), [renderKeys, sortedItems, getLabel]);
 
-  // Register export meta for the main Export button
   useEffect(() => {
     registerExport("tpv-list", tpvExportMeta);
     return () => {
-      // Unregister on unmount by setting to null-like
       registerExport("tpv-list", null as any);
     };
   }, [registerExport, tpvExportMeta]);
@@ -335,9 +303,9 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
               <TableHead className="w-10">
                 <Checkbox checked={items.length > 0 && selected.size === items.length} onCheckedChange={toggleAll} />
               </TableHead>
-              {/* Locked: item_name */}
-              {isColVisible("item_name") && (
-                <SortableHeader {...headerProps("item_name")} />
+              {/* Locked: item_type (Kód Prvku) */}
+              {isColVisible("item_type") && (
+                <SortableHeader {...headerProps("item_type")} />
               )}
               {/* Dynamic columns */}
               {renderKeys.map(key => (
@@ -366,11 +334,32 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
               <TableRow key={item.id} className={`hover:bg-muted/50 transition-colors h-9 ${selected.has(item.id) ? "bg-primary/5" : ""}`}>
                 {canManageTPV && <TableCell><Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} /></TableCell>}
                 {!canManageTPV && <TableCell />}
-                {isColVisible("item_name") && (
-                  <TableCell><InlineEditableCell value={item.item_name} onSave={(v) => saveField(item.id, "item_name", v, item.item_name)} className="font-medium" readOnly={!canManageTPV} /></TableCell>
+                {/* Locked: Kód Prvku */}
+                {isColVisible("item_type") && (
+                  <TableCell>
+                    <InlineEditableCell value={item.item_type || ""} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} className="font-mono text-xs" readOnly={!canManageTPV} />
+                  </TableCell>
                 )}
                 {renderKeys.map(key => {
-                  if (key === "item_type") return <TableCell key={key}><InlineEditableCell value={item.item_type} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} readOnly={!canManageTPV} /></TableCell>;
+                  if (key === "nazev_prvku") return (
+                    <TableCell key={key}>
+                      <InlineEditableCell value={(item as any).nazev_prvku || ""} onSave={(v) => saveField(item.id, "nazev_prvku", v, (item as any).nazev_prvku || "")} className="font-semibold" readOnly={!canManageTPV} />
+                    </TableCell>
+                  );
+                  if (key === "item_name") return (
+                    <TableCell key={key}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="max-w-[300px] truncate">
+                            <InlineEditableCell value={item.item_name} onSave={(v) => saveField(item.id, "item_name", v, item.item_name)} readOnly={!canManageTPV} />
+                          </div>
+                        </TooltipTrigger>
+                        {item.item_name && item.item_name.length > 40 && (
+                          <TooltipContent className="max-w-[400px]">{item.item_name}</TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TableCell>
+                  );
                   if (key === "konstrukter") return (
                     <TableCell key={key}>
                       <InlineEditableCell value={item.konstrukter || ""} type="people" peopleRole="Konstruktér" onSave={(v) => saveField(item.id, "konstrukter", v, item.konstrukter || "")} readOnly={!canManageTPV} />
@@ -479,52 +468,6 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           </TableBody>
         </Table>
       </div>
-
-
-
-      {/* Import Dialog */}
-      <Dialog open={importOpen} onOpenChange={setImportOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-auto">
-          <DialogHeader><DialogTitle>Import z Excelu — náhled</DialogTitle></DialogHeader>
-          <div className="rounded border overflow-auto max-h-[50vh]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Název</TableHead>
-                  <TableHead>Typ</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Odesláno</TableHead>
-                  <TableHead>Přijato</TableHead>
-                  <TableHead>Poznámka</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {importData.map((row, i) => (
-                  <TableRow key={i}>
-                    {(["item_name", "item_type", "status", "sent_date", "accepted_date", "notes"] as const).map(field => (
-                      <TableCell key={field}>
-                        <Input
-                          className="h-7 text-xs"
-                          value={row[field]}
-                          onChange={(e) => {
-                            const copy = [...importData];
-                            copy[i] = { ...copy[i], [field]: e.target.value };
-                            setImportData(copy);
-                          }}
-                        />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setImportOpen(false); setImportData([]); }}>Zrušit</Button>
-            <Button onClick={handleImportConfirm}>Importovat ({importData.filter(r => r.item_name).length} položek)</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Confirmation */}
       <ConfirmDialog
