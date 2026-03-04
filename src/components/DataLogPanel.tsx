@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
 import { useActivityLog, type ActivityLogEntry } from "@/hooks/useActivityLog";
-import { useUserAnalytics, useUserRecentActions, type UserAnalytics } from "@/hooks/useUserAnalytics";
+import { useUserAnalytics, useUserRecentActions, formatSessionDuration, type UserAnalytics } from "@/hooks/useUserAnalytics";
 import { useProjects } from "@/hooks/useProjects";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Clock, Users, ChevronDown, ChevronRight } from "lucide-react";
+import { X, Clock, Users, ChevronDown, ChevronRight, ArrowUpDown } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
 import { cs } from "date-fns/locale";
 import { cn } from "@/lib/utils";
