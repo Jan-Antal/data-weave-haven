@@ -26,11 +26,11 @@ import {
 const TARGET_FIELDS = [
   { key: "item_type", label: "Kód Prvku", required: true },
   { key: "nazev_prvku", label: "Název Prvku", required: true },
-  { key: "item_name", label: "Popis" },
-  { key: "pocet", label: "Počet" },
-  { key: "cena", label: "Cena" },
-  { key: "konstrukter", label: "Konstruktér" },
-  { key: "notes", label: "Poznámka" },
+  { key: "item_name", label: "Popis", required: false },
+  { key: "pocet", label: "Počet", required: false },
+  { key: "cena", label: "Cena", required: false },
+  { key: "konstrukter", label: "Konstruktér", required: false },
+  { key: "notes", label: "Poznámka", required: false },
 ] as const;
 
 type TargetKey = (typeof TARGET_FIELDS)[number]["key"];
