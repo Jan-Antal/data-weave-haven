@@ -29,18 +29,18 @@ export function ProjectProgressBar({ progress, compact }: Props) {
           )}
           <div className="h-[4px] w-full rounded-full overflow-hidden flex" style={{ backgroundColor: "#e8e5e0" }}>
             {pctCompleted > 0 && <div className="h-full" style={{ width: `${pctCompleted}%`, backgroundColor: "#5a9a58" }} />}
-            {pctScheduled > 0 && <div className="h-full" style={{ width: `${pctScheduled}%`, backgroundColor: "#a3cfa2" }} />}
+            {pctScheduled > 0 && <div className="h-full" style={{ width: `${pctScheduled}%`, backgroundColor: "#7bafd4" }} />}
             {pctPaused > 0 && <div className="h-full" style={{ width: `${pctPaused}%`, backgroundColor: "#e0c97a" }} />}
-            {pctInbox > 0 && <div className="h-full" style={{ width: `${pctInbox}%`, backgroundColor: "#c4bfb8" }} />}
+            {pctInbox > 0 && <div className="h-full" style={{ width: `${pctInbox}%`, backgroundColor: "#d4a06a" }} />}
             {pctMissing > 0 && <div className="h-full" style={{ width: `${pctMissing}%`, backgroundColor: "#c9706e" }} />}
           </div>
         </div>
       </TooltipTrigger>
       <TooltipContent className="text-[10px] space-y-0.5">
         <div style={{ color: "#5a9a58" }}>✓ Dokončeno: {progress.completed}</div>
-        <div style={{ color: "#6aab68" }}>📅 Naplánováno: {progress.scheduled}</div>
+        <div style={{ color: "#7bafd4" }}>📅 Naplánováno: {progress.scheduled}</div>
         {(progress.paused || 0) > 0 && <div style={{ color: "#b8a44a" }}>⏸ Pozastaveno: {progress.paused}</div>}
-        <div style={{ color: "#8a8580" }}>📥 V Inboxu: {progress.in_inbox}</div>
+        <div style={{ color: "#d4a06a" }}>📥 V Inboxu: {progress.in_inbox}</div>
         {progress.missing > 0 && <div style={{ color: "#c9706e" }}>⚠ Chybí: {progress.missing}</div>}
         <div className="text-muted-foreground pt-0.5 border-t" style={{ borderColor: "#e2ddd6" }}>TPV celkem: {progress.total_tpv}</div>
       </TooltipContent>
