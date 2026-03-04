@@ -521,3 +521,67 @@ export function UserManagement({ open, onOpenChange }: Props) {
     </>
   );
 }
+
+function PasswordChangeDialog({
+  target,
+  onOpenChange,
+  password,
+  onPasswordChange,
+  showPassword,
+  onToggleShow,
+  onSubmit,
+  submitting,
+}: {
+  target: { id: string; name: string } | null;
+  onOpenChange: (open: boolean) => void;
+  password: string;
+  onPasswordChange: (v: string) => void;
+  showPassword: boolean;
+  onToggleShow: () => void;
+  onSubmit: () => void;
+  submitting: boolean;
+}) {
+  const validation = usePasswordValidation(password);
+
+  return (
+    <Dialog open={!!target} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Změnit heslo</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Nastavit nové heslo pro <strong>{target?.name}</strong>
+        </p>
+        <div className="space-y-2">
+          <Label htmlFor="admin-new-password">Nové heslo</Label>
+          <div className="relative">
+            <Input
+              id="admin-new-password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => onPasswordChange(e.target.value)}
+              placeholder="Alespoň 8 znaků"
+              autoFocus
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={onToggleShow}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          <PasswordChecklist password={password} />
+        </div>
+        <div className="flex justify-end gap-2 mt-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Zrušit</Button>
+          <Button onClick={onSubmit} disabled={submitting || !validation.isValid}>
+            {submitting ? "Ukládám..." : "Změnit heslo"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
