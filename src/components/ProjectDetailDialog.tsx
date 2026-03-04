@@ -495,6 +495,36 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       cost_is_custom: form.cost_is_custom,
     };
 
+    // If project ID changed, rename SharePoint folder first
+    const projectIdChanged = form.project_id !== project.project_id;
+    if (projectIdChanged) {
+      try {
+        const renameResult = await supabase.functions.invoke("sharepoint-documents", {
+          body: { action: "rename", oldProjectId: project.project_id, newProjectId: form.project_id },
+        });
+        if (renameResult.error) {
+          const errMsg = renameResult.error?.message ?? "";
+          if (errMsg.includes("TARGET_EXISTS") || (renameResult.data as any)?.error === "TARGET_EXISTS") {
+            toast({ title: "Chyba", description: "Složka s tímto ID už na SharePointu existuje.", variant: "destructive" });
+          } else {
+            toast({ title: "Chyba", description: "Nelze přejmenovat složku na SharePointu. ID projektu nebylo změněno.", variant: "destructive" });
+          }
+          setForm((f) => ({ ...f, project_id: project.project_id }));
+          return;
+        }
+        // Check for 409 conflict in response data
+        if ((renameResult.data as any)?.error === "TARGET_EXISTS") {
+          toast({ title: "Chyba", description: "Složka s tímto ID už na SharePointu existuje.", variant: "destructive" });
+          setForm((f) => ({ ...f, project_id: project.project_id }));
+          return;
+        }
+      } catch (err: any) {
+        toast({ title: "Chyba", description: "Nelze přejmenovat složku na SharePointu. ID projektu nebylo změněno.", variant: "destructive" });
+        setForm((f) => ({ ...f, project_id: project.project_id }));
+        return;
+      }
+    }
+
     const { error } = await supabase.from("projects").update(newValues).eq("id", project.id);
     if (error) {
       if (error.code === "23505") {

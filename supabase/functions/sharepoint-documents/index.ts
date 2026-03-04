@@ -333,6 +333,60 @@ async function getPreviewUrl(
   };
 }
 
+async function renameProjectFolder(
+  token: string,
+  driveId: string,
+  oldProjectId: string,
+  newProjectId: string
+): Promise<{ success: boolean; folderNotFound?: boolean }> {
+  // Check if old folder exists
+  const oldFolderUrl = `${GRAPH}/drives/${driveId}/root:/${LIB_ROOT}/${oldProjectId}`;
+  console.log("[rename] Checking old folder:", oldFolderUrl);
+  const oldRes = await fetch(oldFolderUrl, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (oldRes.status === 404) {
+    await oldRes.text();
+    console.log("[rename] Old folder not found, skip rename");
+    return { success: true, folderNotFound: true };
+  }
+  if (!oldRes.ok) {
+    const t = await oldRes.text();
+    throw new Error(`Rename resolve error ${oldRes.status}: ${t}`);
+  }
+  const oldFolder = await oldRes.json();
+  const folderId = oldFolder.id;
+
+  // Check if target folder already exists
+  const newFolderUrl = `${GRAPH}/drives/${driveId}/root:/${LIB_ROOT}/${newProjectId}`;
+  const newRes = await fetch(newFolderUrl, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (newRes.ok) {
+    await newRes.json();
+    throw new Error("TARGET_EXISTS");
+  }
+  await newRes.text().catch(() => {});
+
+  // Rename folder
+  console.log("[rename] Renaming folder", folderId, "from", oldProjectId, "to", newProjectId);
+  const patchRes = await fetch(`${GRAPH}/drives/${driveId}/items/${folderId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name: newProjectId }),
+  });
+  if (!patchRes.ok) {
+    const t = await patchRes.text();
+    throw new Error(`Rename error ${patchRes.status}: ${t}`);
+  }
+  await patchRes.json();
+  console.log("[rename] Successfully renamed to", newProjectId);
+  return { success: true };
+}
+
 const CATEGORIES = ["Cenova-nabidka", "Smlouva", "Vykresy", "Dokumentace", "Dodaci-list"];
 
 async function countFilesForProjects(
@@ -453,6 +507,33 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Rename project folder action
+    if (action === "rename") {
+      const { oldProjectId, newProjectId } = body;
+      if (!oldProjectId || !newProjectId) {
+        return new Response(
+          JSON.stringify({ error: "Missing oldProjectId or newProjectId for rename" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const accessToken = await getAccessToken();
+      const driveId = await getDriveId(accessToken);
+      try {
+        const result = await renameProjectFolder(accessToken, driveId, oldProjectId, newProjectId);
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (err: any) {
+        if (err.message === "TARGET_EXISTS") {
+          return new Response(
+            JSON.stringify({ error: "TARGET_EXISTS" }),
+            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        throw err;
+      }
     }
 
     // Count action — accepts projectIds array
