@@ -58,7 +58,7 @@ export function UserManagement({ open, onOpenChange }: Props) {
   const [transferTarget, setTransferTarget] = useState<string>("");
   const [transferSubmitting, setTransferSubmitting] = useState(false);
   const [copyingLinkId, setCopyingLinkId] = useState<string | null>(null);
-  const [sendingAuthEmailId, setSendingAuthEmailId] = useState<string | null>(null);
+  
   const [passwordTarget, setPasswordTarget] = useState<{ id: string; name: string } | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
