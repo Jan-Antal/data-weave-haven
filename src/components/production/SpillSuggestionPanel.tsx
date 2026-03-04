@@ -96,7 +96,7 @@ export function SpillSuggestionPanel({
   // All active item IDs for a bundle
   const bundleItemIds = useCallback((bd: BundleSpillData) => bd.items.map(i => i.id), []);
 
-  // Pre-select bundles to cover overflow
+  // Pre-select bundles to cover overflow (items mode)
   useEffect(() => {
     if (bundleData.length === 0) return;
     const preChecked = new Set<string>();
@@ -109,6 +109,45 @@ export function SpillSuggestionPanel({
       accumulated += bd.totalHours;
     }
     setCheckedIds(preChecked);
+  }, [bundleData, overloadHours]);
+
+  // Auto-suggest split percentages to cover overflow (split mode)
+  useEffect(() => {
+    if (bundleData.length === 0 || overloadHours <= 0) return;
+    const totalActiveHours = bundleData.reduce((s, bd) => s + bd.totalHours, 0);
+    if (totalActiveHours <= 0) return;
+
+    // Strategy: distribute proportionally across least-urgent bundles first,
+    // but cap so we only spill enough to cover the overload
+    let remainingToSpill = overloadHours;
+    const newPcts: Record<string, number> = {};
+
+    for (const bd of bundleData) {
+      if (remainingToSpill <= 0) {
+        // No more spill needed — set remaining to 0%
+        for (const item of bd.items) {
+          newPcts[item.id] = 0;
+        }
+        continue;
+      }
+
+      // Calculate what % of this bundle we need to spill
+      const bundleSpillNeeded = Math.min(remainingToSpill, bd.totalHours);
+      const bundlePct = Math.min(100, Math.ceil((bundleSpillNeeded / bd.totalHours) * 100));
+      // Round to nearest 5%
+      const roundedPct = Math.min(100, Math.ceil(bundlePct / 5) * 5);
+
+      for (const item of bd.items) {
+        newPcts[item.id] = roundedPct;
+      }
+
+      const actualSpill = bd.items.reduce(
+        (s, i) => s + Math.round(i.scheduled_hours * roundedPct / 100), 0
+      );
+      remainingToSpill -= actualSpill;
+    }
+
+    setSplitPcts(newPcts);
   }, [bundleData, overloadHours]);
 
   const toggleBundle = (bd: BundleSpillData) => {
