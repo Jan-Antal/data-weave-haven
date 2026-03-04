@@ -1,12 +1,15 @@
 import { useState, useMemo } from "react";
-import { ChevronRight, GripVertical } from "lucide-react";
+import { ChevronRight, GripVertical, Check } from "lucide-react";
 import { useProductionInbox, type InboxProject, type InboxItem } from "@/hooks/useProductionInbox";
+import { useProductionProgress, type ProjectProgress } from "@/hooks/useProductionProgress";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { getProjectColor } from "@/lib/projectColors";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { ProjectProgressBar } from "./ProjectProgressBar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -29,10 +32,12 @@ const SAMPLE_ITEMS = [
 interface InboxPanelProps {
   overDroppableId?: string | null;
   showCzk?: boolean;
+  onNavigateToTPV?: (projectId: string) => void;
 }
 
-export function InboxPanel({ overDroppableId, showCzk }: InboxPanelProps) {
+export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV }: InboxPanelProps) {
   const { data: projects = [], isLoading } = useProductionInbox();
+  const { data: progressData } = useProductionProgress();
   const { data: settings } = useProductionSettings();
   const qc = useQueryClient();
   const [loading, setLoading] = useState(false);
@@ -44,6 +49,15 @@ export function InboxPanel({ overDroppableId, showCzk }: InboxPanelProps) {
   const totalHours = useMemo(() => projects.reduce((s, p) => s + p.total_hours, 0), [projects]);
   const hourlyRate = settings?.hourly_rate ?? 550;
   const isHighlighted = isOver || overDroppableId === "inbox-drop-zone";
+
+  // Find completed projects (all items scheduled/completed, none pending in inbox, no missing)
+  const completedProjects = useMemo(() => {
+    if (!progressData) return [];
+    const activeProjectIds = new Set(projects.map(p => p.project_id));
+    return Array.from(progressData.values()).filter(
+      p => p.is_complete && !activeProjectIds.has(p.project_id)
+    );
+  }, [progressData, projects]);
 
   const handleExpandAll = () => { setAllExpanded(true); setExpandKey((k) => k + 1); };
   const handleCollapseAll = () => { setAllExpanded(false); setExpandKey((k) => k + 1); };
@@ -111,6 +125,7 @@ export function InboxPanel({ overDroppableId, showCzk }: InboxPanelProps) {
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["production-expedice"] });
+      qc.invalidateQueries({ queryKey: ["production-progress"] });
       toast({ title: "Testovací data vložena" });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
@@ -159,14 +174,41 @@ export function InboxPanel({ overDroppableId, showCzk }: InboxPanelProps) {
 
       {/* Items */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-        {projects.length === 0 && !isLoading && (
+        {projects.length === 0 && completedProjects.length === 0 && !isLoading && (
           <div className="text-center py-8">
             <p className="text-[10px] mb-3" style={{ color: "#99a5a3" }}>Inbox je prázdný</p>
           </div>
         )}
         {projects.map((project) => (
-          <InboxProjectGroup key={`${project.project_id}-${expandKey}`} project={project} hourlyRate={hourlyRate} defaultExpanded={allExpanded} showCzk={showCzk} />
+          <InboxProjectGroup
+            key={`${project.project_id}-${expandKey}`}
+            project={project}
+            hourlyRate={hourlyRate}
+            defaultExpanded={allExpanded}
+            showCzk={showCzk}
+            progress={progressData?.get(project.project_id)}
+            onNavigateToTPV={onNavigateToTPV}
+          />
         ))}
+
+        {/* Completed projects at bottom */}
+        {completedProjects.length > 0 && (
+          <div className="mt-2 space-y-[2px]">
+            {completedProjects.map(p => (
+              <div
+                key={p.project_id}
+                className="flex items-center gap-1.5 px-2 py-[4px] rounded-[5px]"
+                style={{ backgroundColor: "rgba(58,138,54,0.04)", border: "1px solid rgba(58,138,54,0.15)" }}
+              >
+                <Check className="h-3 w-3 shrink-0" style={{ color: "#3a8a36" }} />
+                <span className="text-[10px] font-medium truncate" style={{ color: "#3a8a36" }}>
+                  {p.project_id}
+                </span>
+                <span className="text-[9px] truncate" style={{ color: "#6b7a78" }}>— kompletní</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Subtle test data button at bottom */}
@@ -186,10 +228,12 @@ export function InboxPanel({ overDroppableId, showCzk }: InboxPanelProps) {
   );
 }
 
-function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk }: { project: InboxProject; hourlyRate: number; defaultExpanded: boolean; showCzk?: boolean }) {
+function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV }: {
+  project: InboxProject; hourlyRate: number; defaultExpanded: boolean; showCzk?: boolean;
+  progress?: ProjectProgress; onNavigateToTPV?: (projectId: string) => void;
+}) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const color = getProjectColor(project.project_id);
-  const totalCzkK = Math.round((project.total_hours * hourlyRate) / 1000);
 
   return (
     <div
@@ -213,6 +257,12 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk }: { 
           <div className="font-mono text-[9px]" style={{ color: "#99a5a3" }}>
             {project.project_id}
           </div>
+          {/* Progress bar */}
+          {progress && (
+            <div className="mt-1">
+              <ProjectProgressBar progress={progress} compact />
+            </div>
+          )}
         </div>
         <div className="text-right shrink-0">
           <span className="font-mono text-[12px] font-semibold" style={{ color: "#223937" }}>
@@ -228,10 +278,34 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk }: { 
 
       {expanded && (
         <div className="px-2 pb-2 space-y-[2px]">
+          {/* Scheduled items (muted) */}
+          {progress?.scheduled_items.map(si => (
+            <div key={si.id} className="flex items-center gap-1.5 px-2 py-[3px] rounded-[5px]" style={{ opacity: 0.5 }}>
+              <span className="text-[9px]" style={{ color: si.status === "completed" ? "#3a8a36" : "#3b82f6" }}>
+                {si.status === "completed" ? "✓" : "→"}
+              </span>
+              {si.item_code && (
+                <span className="font-mono text-[9px] shrink-0" style={{ color: "#99a5a3" }}>{si.item_code}</span>
+              )}
+              <span className="text-[10px] flex-1 truncate" style={{ color: "#99a5a3" }}>{si.item_name}</span>
+              <span className="font-mono text-[9px] shrink-0" style={{ color: "#99a5a3" }}>{si.week_label}</span>
+            </div>
+          ))}
+          {/* Active draggable items */}
           {project.items.map((item) => (
             <DraggableInboxItem key={item.id} item={item} projectName={project.project_name} />
           ))}
           <DraggableInboxProject project={project} />
+          {/* Navigate to TPV */}
+          {onNavigateToTPV && (
+            <button
+              onClick={() => onNavigateToTPV(project.project_id)}
+              className="w-full text-[9px] text-center py-1 hover:underline transition-colors"
+              style={{ color: "#6b7a78" }}
+            >
+              📋 Zobrazit TPV položky
+            </button>
+          )}
         </div>
       )}
     </div>
