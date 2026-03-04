@@ -242,7 +242,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
 
   const tpvExportMeta = useMemo(() => ({
     getter: (selectedKeys?: string[]) => {
-      const visKeys = selectedKeys ?? ["item_type", ...renderKeys];
+      const visKeys = selectedKeys ?? renderKeys;
       const headers = visKeys.map(k => getLabel(k, TPV_LIST_LABEL_MAP[k] || k));
       const rows = sortedItems.map(item => visKeys.map(k => {
         if (k.startsWith("custom_")) {
@@ -257,7 +257,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     groups: [
       { label: "TPV List", keys: TPV_LIST_COLUMNS.map(c => c.key), getLabel: (k: string) => getLabel(k, TPV_LIST_LABEL_MAP[k] || k) },
     ],
-    defaultVisibleKeys: ["item_type", ...renderKeys],
+    defaultVisibleKeys: renderKeys,
   }), [renderKeys, sortedItems, getLabel]);
 
   useEffect(() => {
