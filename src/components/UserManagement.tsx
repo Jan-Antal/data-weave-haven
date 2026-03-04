@@ -499,6 +499,17 @@ export function UserManagement({ open, onOpenChange }: Props) {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Change Password Dialog */}
+      <PasswordChangeDialog
+        target={passwordTarget}
+        onOpenChange={(open) => { if (!open) { setPasswordTarget(null); setNewPassword(""); setShowNewPassword(false); } }}
+        password={newPassword}
+        onPasswordChange={setNewPassword}
+        showPassword={showNewPassword}
+        onToggleShow={() => setShowNewPassword(!showNewPassword)}
+        onSubmit={handleChangePassword}
+        submitting={passwordSubmitting}
+      />
 
       <ConfirmDialog
         open={deleteTarget !== null}
