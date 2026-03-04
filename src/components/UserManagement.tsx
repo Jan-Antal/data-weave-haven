@@ -264,6 +264,28 @@ export function UserManagement({ open, onOpenChange }: Props) {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (!passwordTarget) return;
+    setPasswordSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("update-user", {
+        body: { user_id: passwordTarget.id, password: newPassword },
+      });
+      if (error || data?.error) {
+        toast({ title: "Chyba", description: data?.error || error?.message, variant: "destructive" });
+      } else {
+        toast({ title: "Heslo změněno" });
+        setPasswordTarget(null);
+        setNewPassword("");
+        setShowNewPassword(false);
+      }
+    } catch (e: any) {
+      toast({ title: "Chyba", description: e.message, variant: "destructive" });
+    } finally {
+      setPasswordSubmitting(false);
+    }
+  };
+
   const isOwner = (u: UserRow) => u.role === "owner";
   const nonOwnerUsers = users.filter((u) => u.role !== "owner");
 
