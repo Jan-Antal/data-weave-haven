@@ -540,6 +540,12 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
 
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 
+  const allCurrentLabels = useMemo(() => {
+    const rk = editMode ? localOrder : allVisibleKeys;
+    const keys = ["project_id", "project_name", ...rk];
+    return keys.map(k => getLabel(k, getColumnLabel(k, customColumns)));
+  }, [editMode, localOrder, allVisibleKeys, getLabel, customColumns]);
+
   // Register export data getter with column metadata
   useEffect(() => {
     const allExportKeys = ["project_id", "project_name", ...allVisibleKeys];
