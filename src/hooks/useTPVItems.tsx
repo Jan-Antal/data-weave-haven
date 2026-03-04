@@ -4,7 +4,7 @@ import { toast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import type { Tables } from "@/integrations/supabase/types";
 
-export type TPVItem = Tables<"tpv_items"> & { konstrukter?: string | null };
+export type TPVItem = Tables<"tpv_items"> & { konstrukter?: string | null; nazev_prvku?: string | null };
 
 export function useTPVItems(projectId: string) {
   return useQuery({
