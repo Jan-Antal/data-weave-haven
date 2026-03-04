@@ -214,15 +214,10 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   // ── Header helpers ──────────────────────────────────────────────
   // Build list of all current column labels for duplicate detection
   const allCurrentLabels = useMemo(() => {
-    const labels: string[] = [];
-    // locked column
-    labels.push(getLabel("item_type", TPV_LIST_LABEL_MAP["item_type"] || "item_type"));
-    // visible columns (including custom)
-    for (const key of renderKeys) {
+    return renderKeys.map(key => {
       const customCol = customColumns.find(c => c.column_key === key);
-      labels.push(customCol ? customCol.label : getLabel(key, TPV_LIST_LABEL_MAP[key] || key));
-    }
-    return labels;
+      return customCol ? customCol.label : getLabel(key, TPV_LIST_LABEL_MAP[key] || key);
+    });
   }, [renderKeys, getLabel, customColumns]);
 
   const headerProps = (key: string) => ({
