@@ -132,7 +132,7 @@ function SortableColumnRow({
 }
 
 export function ColumnVisibilityToggle(props: Props) {
-  const { editMode, onToggleEditMode } = props;
+  const { editMode, onToggleEditMode, onCancelEditMode } = props;
   const isStandalone = !!props.standalone;
 
   const allVis = useAllColumnVisibility();
