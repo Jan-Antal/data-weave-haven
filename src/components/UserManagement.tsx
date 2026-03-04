@@ -374,6 +374,13 @@ export function UserManagement({ open, onOpenChange }: Props) {
                           <Link2 className="h-4 w-4" />
                         </button>
                         <button
+                          onClick={() => { setPasswordTarget({ id: u.id, name: u.full_name || u.email }); setNewPassword(""); setShowNewPassword(false); }}
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                          title="Změnit heslo"
+                        >
+                          <Lock className="h-4 w-4" />
+                        </button>
+                        <button
                           onClick={() => handleSendAccessEmail(u.id)}
                           className="text-muted-foreground hover:text-foreground transition-colors"
                           title="Znovu odeslat přístupový email"
