@@ -509,6 +509,33 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Rename project folder action
+    if (action === "rename") {
+      const { oldProjectId, newProjectId } = body;
+      if (!oldProjectId || !newProjectId) {
+        return new Response(
+          JSON.stringify({ error: "Missing oldProjectId or newProjectId for rename" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const accessToken = await getAccessToken();
+      const driveId = await getDriveId(accessToken);
+      try {
+        const result = await renameProjectFolder(accessToken, driveId, oldProjectId, newProjectId);
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (err: any) {
+        if (err.message === "TARGET_EXISTS") {
+          return new Response(
+            JSON.stringify({ error: "TARGET_EXISTS" }),
+            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        throw err;
+      }
+    }
+
     // Count action — accepts projectIds array
     if (action === "count") {
       if (!projectIds || !Array.isArray(projectIds) || projectIds.length === 0) {
