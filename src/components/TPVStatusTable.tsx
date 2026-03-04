@@ -446,6 +446,11 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
     }
   }, [closeDetailRef]);
 
+  // Notify parent when TPV List is active/inactive
+  useEffect(() => {
+    onActiveProjectChange?.(!!activeProject);
+  }, [activeProject, onActiveProjectChange]);
+
   // ── Frozen filter results ───────────────────────────────────────
   const filterFingerprint = JSON.stringify([personFilter, statusFilter, externalSearch]);
   const computeKey = `${filterFingerprint}|${projects.length}|${stagesByProject.size}`;
