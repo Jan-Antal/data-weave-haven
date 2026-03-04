@@ -233,6 +233,26 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       if (hasUncompleted || pausedItems.length > 0) {
         actions.push({ label: "Vrátit do Inboxu", icon: "←", onClick: () => returnBundleToInbox(bundle.project_id, weekKey) });
       }
+      // Merge option for bundles containing split items
+      const splitGroupIds = new Set<string>();
+      for (const item of bundle.items) {
+        if (item.split_group_id && item.status !== "completed" && item.status !== "cancelled") {
+          splitGroupIds.add(item.split_group_id);
+        }
+      }
+      const mergeableSplitGroups = Array.from(splitGroupIds).filter(sgId => {
+        const siblingsInWeek = bundle.items.filter(i => i.split_group_id === sgId && i.status !== "completed" && i.status !== "cancelled");
+        return siblingsInWeek.length >= 2;
+      });
+      if (mergeableSplitGroups.length > 0) {
+        actions.push({
+          label: `Spojit části (${mergeableSplitGroups.length} skupin)`, icon: "🔗",
+          onClick: async () => {
+            for (const sgId of mergeableSplitGroups) await mergeSplitItems(sgId);
+          },
+        });
+      }
+
       actions.push({ label: "Rozbalit / Sbalit", icon: "⇅", onClick: toggleExpand });
       if (onNavigateToTPV) {
         actions.push({ label: "Zobrazit TPV položky", icon: "📋", onClick: () => onNavigateToTPV(bundle.project_id) });
