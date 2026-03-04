@@ -19,6 +19,10 @@ export interface ScheduleItem {
   split_group_id: string | null;
   split_part: number | null;
   split_total: number | null;
+  pause_reason: string | null;
+  pause_expected_date: string | null;
+  adhoc_reason: string | null;
+  cancel_reason: string | null;
 }
 
 export interface ScheduleBundle {
@@ -29,7 +33,7 @@ export interface ScheduleBundle {
 }
 
 export interface WeekSilo {
-  week_start: string; // ISO date string (Monday)
+  week_start: string;
   week_number: number;
   bundles: ScheduleBundle[];
   total_hours: number;
@@ -54,7 +58,7 @@ export function useProductionSchedule() {
       const { data, error } = await supabase
         .from("production_schedule")
         .select("*, projects!production_schedule_project_id_fkey(project_name)")
-        .in("status", ["scheduled", "in_progress", "completed"])
+        .in("status", ["scheduled", "in_progress", "completed", "paused"])
         .order("position", { ascending: true });
       if (error) throw error;
 
@@ -91,6 +95,10 @@ export function useProductionSchedule() {
           split_group_id: (row as any).split_group_id ?? null,
           split_part: (row as any).split_part ?? null,
           split_total: (row as any).split_total ?? null,
+          pause_reason: (row as any).pause_reason ?? null,
+          pause_expected_date: (row as any).pause_expected_date ?? null,
+          adhoc_reason: (row as any).adhoc_reason ?? null,
+          cancel_reason: (row as any).cancel_reason ?? null,
         });
         bundle.total_hours += row.scheduled_hours;
       }
@@ -137,31 +145,23 @@ export function useProductionExpedice() {
       for (const row of data || []) {
         const pid = row.project_id;
         if (!grouped.has(pid)) {
-          grouped.set(pid, {
-            project_id: pid,
-            project_name: (row as any).projects?.project_name || pid,
-            items: [],
-            count: 0,
-          });
+          grouped.set(pid, { project_id: pid, project_name: (row as any).projects?.project_name || pid, items: [], count: 0 });
         }
         const g = grouped.get(pid)!;
         g.items.push({
-          id: row.id,
-          project_id: row.project_id,
+          id: row.id, project_id: row.project_id,
           project_name: (row as any).projects?.project_name || pid,
-          stage_id: row.stage_id,
-          item_name: row.item_name,
-          item_code: row.item_code ?? null,
-          scheduled_week: row.scheduled_week,
-          scheduled_hours: row.scheduled_hours,
-          scheduled_czk: row.scheduled_czk,
-          position: row.position,
-          status: row.status,
-          completed_at: row.completed_at,
-          completed_by: row.completed_by,
+          stage_id: row.stage_id, item_name: row.item_name,
+          item_code: row.item_code ?? null, scheduled_week: row.scheduled_week,
+          scheduled_hours: row.scheduled_hours, scheduled_czk: row.scheduled_czk,
+          position: row.position, status: row.status,
+          completed_at: row.completed_at, completed_by: row.completed_by,
           split_group_id: (row as any).split_group_id ?? null,
           split_part: (row as any).split_part ?? null,
           split_total: (row as any).split_total ?? null,
+          pause_reason: null, pause_expected_date: null,
+          adhoc_reason: (row as any).adhoc_reason ?? null,
+          cancel_reason: null,
         });
         g.count++;
       }

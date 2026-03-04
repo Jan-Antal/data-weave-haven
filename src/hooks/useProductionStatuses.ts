@@ -17,7 +17,7 @@ export function useProductionStatuses(projectId: string) {
     queryFn: async () => {
       const [inboxRes, scheduleRes] = await Promise.all([
         supabase.from("production_inbox").select("item_name, item_code, status").eq("project_id", projectId),
-        supabase.from("production_schedule").select("item_name, item_code, status, scheduled_week, split_part, split_total").eq("project_id", projectId),
+        supabase.from("production_schedule").select("item_name, item_code, status, scheduled_week, split_part, split_total, pause_reason, pause_expected_date, cancel_reason").eq("project_id", projectId),
       ]);
       if (inboxRes.error) throw inboxRes.error;
       if (scheduleRes.error) throw scheduleRes.error;
@@ -37,7 +37,6 @@ export function useProductionStatuses(projectId: string) {
     monday.setHours(0, 0, 0, 0);
     const currentWeekKey = monday.toISOString().split("T")[0];
 
-    // Index inbox items by item_name (since TPV items don't have direct IDs in production)
     for (const row of query.data.inbox) {
       const key = row.item_code || row.item_name;
       if (!map.has(key)) map.set(key, []);
@@ -54,11 +53,19 @@ export function useProductionStatuses(projectId: string) {
       if (row.status === "completed") {
         status = { label: "K expedici", color: "#3a8a36" };
       } else if (row.status === "paused") {
-        status = { label: "⏸ Pozastaveno", color: "#d97706" };
+        const pauseReason = (row as any).pause_reason || "Pozastaveno";
+        const expDate = (row as any).pause_expected_date;
+        const isOverdue = expDate && new Date(expDate) < new Date();
+        if (isOverdue) {
+          status = { label: `⚠ ⏸ ${pauseReason} — po termínu`, color: "#dc3545" };
+        } else {
+          const expLabel = expDate ? ` · exp. ${new Date(expDate).toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric" })}` : "";
+          status = { label: `⏸ ${pauseReason}${expLabel}`, color: "#d97706" };
+        }
       } else if (row.status === "cancelled") {
-        status = { label: "✕ Zrušeno", color: "#6b7280" };
+        const cancelReason = (row as any).cancel_reason || "";
+        status = { label: `✕ Zrušeno${cancelReason ? ` · ${cancelReason}` : ""}`, color: "#6b7280" };
       } else {
-        // Check week relative to current
         const weekKey = row.scheduled_week;
         const weekDate = new Date(weekKey);
         const dayNum = weekDate.getUTCDay() || 7;
