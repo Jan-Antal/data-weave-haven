@@ -249,7 +249,7 @@ export function AmiAssistant() {
                     <button
                       key={chip.label}
                       onClick={() => handleChip(chip)}
-                      className="text-left text-xs px-3 py-2 rounded-lg border border-border hover:bg-muted transition-colors"
+                      className="text-left text-sm px-4 py-2.5 rounded-lg border border-border hover:bg-muted transition-colors"
                     >
                       {chip.emoji} {chip.label}
                     </button>
@@ -261,7 +261,7 @@ export function AmiAssistant() {
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
-                  className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${
+                  className={`max-w-[85%] px-3 py-2 rounded-xl text-sm leading-relaxed ${
                     msg.role === "user"
                       ? "text-white rounded-br-sm"
                       : "bg-muted text-foreground rounded-bl-sm"
@@ -275,7 +275,7 @@ export function AmiAssistant() {
 
             {loading && messages[messages.length - 1]?.role !== "assistant" && (
               <div className="flex justify-start">
-                <div className="bg-muted text-foreground px-3 py-2 rounded-xl rounded-bl-sm text-xs flex gap-1">
+                <div className="bg-muted text-foreground px-3 py-2 rounded-xl rounded-bl-sm text-sm flex gap-1">
                   <span className="animate-pulse">●</span>
                   <span className="animate-pulse" style={{ animationDelay: "150ms" }}>●</span>
                   <span className="animate-pulse" style={{ animationDelay: "300ms" }}>●</span>
@@ -297,7 +297,7 @@ export function AmiAssistant() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={feedbackMode ? "Napiš zprávu pro admina..." : "Napiš dotaz..."}
-                className="flex-1 text-xs px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary/30"
+                className="flex-1 text-sm px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary/30"
                 disabled={loading}
               />
               <button
@@ -306,7 +306,7 @@ export function AmiAssistant() {
                 className="p-2 rounded-lg transition-colors disabled:opacity-30"
                 style={{ background: "#223937", color: "white" }}
               >
-                <Send className="h-3.5 w-3.5" />
+                <Send className="h-4 w-4" />
               </button>
             </form>
           </div>
@@ -318,22 +318,22 @@ export function AmiAssistant() {
         onClick={() => { setOpen(o => !o); dismissTooltip(); }}
         onMouseEnter={() => setCollapsed(false)}
         onMouseLeave={() => setCollapsed(true)}
-        className="fixed z-[9998] flex items-center gap-1.5 transition-all duration-300 hover:scale-105 group"
+        className="fixed z-[9998] flex items-center gap-2 transition-all duration-300 hover:scale-105 group"
         style={{
           bottom: 16,
           right: 16,
-          height: collapsed ? 40 : 28,
-          width: collapsed ? 40 : "auto",
-          borderRadius: collapsed ? 20 : 8,
+          height: 44,
+          width: collapsed ? 44 : "auto",
+          borderRadius: collapsed ? 22 : 10,
           background: "#223937",
           color: "white",
-          fontSize: 10,
-          padding: collapsed ? 0 : "0 10px",
+          fontSize: 13,
+          padding: collapsed ? 0 : "0 14px",
           boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
           justifyContent: "center",
         }}
       >
-        <MessageCircle className="shrink-0" style={{ width: collapsed ? 20 : 14, height: collapsed ? 20 : 14 }} />
+        <MessageCircle className="shrink-0" style={{ width: collapsed ? 22 : 16, height: collapsed ? 22 : 16 }} />
         {!collapsed && (
           <span className="whitespace-nowrap animate-fade-in font-medium">Potřebuješ pomoc?</span>
         )}
