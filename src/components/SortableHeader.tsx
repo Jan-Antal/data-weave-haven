@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { TableHead } from "@/components/ui/table";
 import { ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 
 interface SortableHeaderProps {
   label: string;
@@ -15,6 +16,8 @@ interface SortableHeaderProps {
   customLabel?: string;
   onLabelChange?: (newLabel: string) => void;
   onWidthChange?: (newWidth: number) => void;
+  /** All current column labels (for duplicate detection on rename) */
+  existingLabels?: string[];
   // Drag reorder props
   dragProps?: {
     draggable?: boolean;
@@ -39,6 +42,7 @@ export function SortableHeader({
   customLabel,
   onLabelChange,
   onWidthChange,
+  existingLabels,
   dragProps,
   dropIndicator,
   isDragging,
@@ -57,8 +61,21 @@ export function SortableHeader({
   };
 
   const handleRenameSubmit = () => {
-    if (editValue.trim() && onLabelChange) {
-      onLabelChange(editValue.trim());
+    const trimmed = editValue.trim();
+    if (trimmed && onLabelChange) {
+      // Check for duplicate names (case-insensitive), excluding current column's own label
+      if (existingLabels) {
+        const currentLabel = (customLabel || label).toLowerCase();
+        const isDuplicate = existingLabels.some(
+          l => l.toLowerCase() === trimmed.toLowerCase() && l.toLowerCase() !== currentLabel
+        );
+        if (isDuplicate) {
+          toast({ title: "Duplicitní název", description: `Sloupec s názvem „${trimmed}" již existuje.`, variant: "destructive" });
+          setEditing(false);
+          return;
+        }
+      }
+      onLabelChange(trimmed);
     }
     setEditing(false);
   };

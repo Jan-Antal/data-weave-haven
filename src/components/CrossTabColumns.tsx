@@ -91,10 +91,11 @@ interface HeaderProps {
   dropIndicator?: "left" | "right" | null;
   isDragging?: boolean;
   customColumns?: CustomColumnDef[];
+  existingLabels?: string[];
 }
 
 export function renderColumnHeader(props: HeaderProps) {
-  const { colKey: key, sortCol, sortDir, onSort, getLabel, getWidth, editMode, updateLabel, updateWidth, dragProps, dropIndicator, isDragging, customColumns } = props;
+  const { colKey: key, sortCol, sortDir, onSort, getLabel, getWidth, editMode, updateLabel, updateWidth, dragProps, dropIndicator, isDragging, customColumns, existingLabels } = props;
   const defaultLabel = getColumnLabel(key, customColumns);
   const style = getColumnStyle(key, getWidth(key));
   const isRight = key === "prodejni_cena" || key === "marze";
@@ -115,6 +116,7 @@ export function renderColumnHeader(props: HeaderProps) {
       dragProps={dragProps}
       dropIndicator={dropIndicator}
       isDragging={isDragging}
+      existingLabels={existingLabels}
     />
   );
 }

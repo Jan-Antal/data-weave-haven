@@ -558,6 +558,11 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     setEditMode(!editMode);
   }, [editMode, localOrder, allVisibleKeys, updateDisplayOrder]);
 
+  const handleCancelEditMode = useCallback(() => {
+    setLocalOrder(allVisibleKeys);
+    setEditMode(false);
+  }, [allVisibleKeys]);
+
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 
   useEffect(() => {
@@ -672,6 +677,13 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
 
   const v = isVisible;
 
+  const renderKeys = editMode ? localOrder : allVisibleKeys;
+
+  const allCurrentLabels = useMemo(() => {
+    const keys = ["project_id", "project_name", ...renderKeys];
+    return keys.map(k => getLabel(k, getColumnLabel(k, customColumns)));
+  }, [renderKeys, getLabel, customColumns]);
+
   const headerProps = (key: string) => ({
     colKey: key,
     sortCol,
@@ -683,14 +695,13 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     updateLabel,
     updateWidth,
     customColumns,
+    existingLabels: allCurrentLabels,
     ...(editMode ? {
       dragProps: getDragProps(key),
       dropIndicator: dropTarget?.key === key ? dropTarget.side : null,
       isDragging: dragKey === key,
     } : {}),
   });
-
-  const renderKeys = editMode ? localOrder : allVisibleKeys;
 
   return (
     <div>
@@ -734,7 +745,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
               {v("project_id") && renderColumnHeader(headerProps("project_id"))}
               {v("project_name") && renderColumnHeader(headerProps("project_name"))}
               {renderKeys.map((key) => renderColumnHeader(headerProps(key)))}
-              <ColumnVisibilityToggle tabKey="projectInfo" editMode={editMode} onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined} />
+              <ColumnVisibilityToggle tabKey="projectInfo" editMode={editMode} onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined} onCancelEditMode={canEditColumns ? handleCancelEditMode : undefined} />
             </TableRow>
           </TableHeader>
           <TableBody>

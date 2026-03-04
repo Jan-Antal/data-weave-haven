@@ -132,6 +132,11 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     setEditMode(!editMode);
   }, [editMode, localOrder, allVisibleNonLocked, updateDisplayOrder]);
 
+  const handleCancelEditMode = useCallback(() => {
+    setLocalOrder(allVisibleNonLocked);
+    setEditMode(false);
+  }, [allVisibleNonLocked]);
+
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 
   const renderKeys = editMode ? localOrder : allVisibleNonLocked;
@@ -208,6 +213,18 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   };
 
   // ── Header helpers ──────────────────────────────────────────────
+  // Build list of all current column labels for duplicate detection
+  const allCurrentLabels = useMemo(() => {
+    const labels: string[] = [];
+    // locked column
+    labels.push(getLabel("item_type", TPV_LIST_LABEL_MAP["item_type"] || "item_type"));
+    // visible columns
+    for (const key of renderKeys) {
+      labels.push(getLabel(key, TPV_LIST_LABEL_MAP[key] || key));
+    }
+    return labels;
+  }, [renderKeys, getLabel]);
+
   const headerProps = (key: string) => ({
     label: TPV_LIST_LABEL_MAP[key] || key,
     column: key,
@@ -219,6 +236,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     customLabel: getLabel(key, TPV_LIST_LABEL_MAP[key] || key),
     onLabelChange: (v: string) => updateLabel(key, v),
     onWidthChange: (w: number) => updateWidth(key, w),
+    existingLabels: allCurrentLabels,
     ...(editMode ? {
       dragProps: getDragProps(key),
       dropIndicator: dropTarget?.key === key ? dropTarget.side : null,
@@ -322,6 +340,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                 toggleColumn={toggleColVis}
                 editMode={editMode}
                 onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined}
+                onCancelEditMode={canEditColumns ? handleCancelEditMode : undefined}
               />
             </TableRow>
           </TableHeader>

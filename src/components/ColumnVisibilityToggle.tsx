@@ -39,6 +39,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 type Props = {
   editMode?: boolean;
   onToggleEditMode?: () => void;
+  onCancelEditMode?: () => void;
 } & (
   | { tabKey: "projectInfo" | "pmStatus" | "tpvStatus"; standalone?: never }
   | {
@@ -131,7 +132,7 @@ function SortableColumnRow({
 }
 
 export function ColumnVisibilityToggle(props: Props) {
-  const { editMode, onToggleEditMode } = props;
+  const { editMode, onToggleEditMode, onCancelEditMode } = props;
   const isStandalone = !!props.standalone;
 
   const allVis = useAllColumnVisibility();
@@ -321,9 +322,14 @@ export function ColumnVisibilityToggle(props: Props) {
           >
             {onToggleEditMode && (
               <div className="p-2 pb-0 shrink-0">
-                <Button variant={editMode ? "default" : "outline"} size="sm" className="w-full mb-2 text-xs" onClick={onToggleEditMode}>
+                <Button variant={editMode ? "default" : "outline"} size="sm" className="w-full mb-1 text-xs" onClick={onToggleEditMode}>
                   {editMode ? "Dokončit úpravy" : "Upravit sloupce"}
                 </Button>
+                {editMode && onCancelEditMode && (
+                  <Button variant="ghost" size="sm" className="w-full mb-1 text-xs text-muted-foreground" onClick={onCancelEditMode}>
+                    Zrušit změny
+                  </Button>
+                )}
                 <Separator />
               </div>
             )}
