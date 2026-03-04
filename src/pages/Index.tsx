@@ -288,6 +288,12 @@ const Index = () => {
                   <TabsTrigger value="tpv-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" onClick={() => tpvCloseDetailRef.current?.()}>
                     TPV Status
                   </TabsTrigger>
+                  {tpvListActive && activeTab === "tpv-status" && (
+                    <>
+                      <span className="text-muted-foreground/50 text-xs mx-1 select-none">›</span>
+                      <span className="text-xs font-medium text-primary px-2 py-1 rounded-sm bg-primary/10">TPV List</span>
+                    </>
+                  )}
                 </TabsList>
                 <button
                   onClick={() => {
@@ -341,7 +347,7 @@ const Index = () => {
               <PMStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
             </TabsContent>
             <TabsContent value="tpv-status" forceMount className={cn("flex-1 min-h-0 overflow-y-auto", activeTab !== "tpv-status" ? "hidden" : "")}>
-              <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRequestTab={() => handleTabChange("tpv-status")} closeDetailRef={tpvCloseDetailRef} />
+              <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRequestTab={() => handleTabChange("tpv-status")} closeDetailRef={tpvCloseDetailRef} onActiveProjectChange={setTpvListActive} />
             </TabsContent>
             {activeTab === "plan" && (
               <TabsContent value="plan" className="flex-1 min-h-0 overflow-y-auto">
