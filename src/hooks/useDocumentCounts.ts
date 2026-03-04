@@ -23,6 +23,22 @@ export function dispatchDocCountUpdate(projectId: string, delta: number) {
   window.dispatchEvent(new CustomEvent(DOC_COUNT_EVENT, { detail: { projectId, delta } }));
 }
 
+/** Migrate doc count cache when project ID is renamed */
+export async function migrateDocCountCache(oldProjectId: string, newProjectId: string) {
+  const count = memoryCache[oldProjectId] ?? 0;
+  delete memoryCache[oldProjectId];
+  memoryCache[newProjectId] = count;
+  // Update DB cache: delete old, upsert new
+  try {
+    await supabase.from("sharepoint_document_cache").delete().eq("project_id", oldProjectId);
+    if (count > 0) {
+      await supabase.from("sharepoint_document_cache")
+        .upsert({ project_id: newProjectId, total_count: count, updated_at: new Date().toISOString() } as any, { onConflict: "project_id" });
+    }
+  } catch { /* ignore */ }
+  window.dispatchEvent(new CustomEvent(DOC_COUNT_EVENT, { detail: { projectId: newProjectId, delta: 0 } }));
+}
+
 async function updateSupabaseCacheForProject(projectId: string, delta: number) {
   try {
     const { data } = await supabase
