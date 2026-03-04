@@ -6,8 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 type Msg = { role: "user" | "assistant"; content: string };
 
 const QUICK_CHIPS = [
-  { emoji: "📋", label: "Jak plánovat výrobu?" },
   { emoji: "🔍", label: "Jak najít projekt?" },
+  { emoji: "📋", label: "Jak funguje TPV?" },
   { emoji: "💬", label: "Napsat zprávu adminovi" },
 ];
 
