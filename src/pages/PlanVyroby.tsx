@@ -365,7 +365,13 @@ export default function PlanVyroby() {
           open={!!mergeState}
           onOpenChange={open => !open && setMergeState(null)}
           itemName={mergeState.itemName}
-          onMerge={() => mergeSplitItems(mergeState.splitGroupId)}
+          onMerge={async () => {
+            // For bundle moves, first move to target week, then merge
+            if (mergeState.onKeepSeparate) {
+              await mergeState.onKeepSeparate();
+            }
+            await mergeSplitItems(mergeState.splitGroupId);
+          }}
           onKeepSeparate={mergeState.onKeepSeparate}
         />
       )}
