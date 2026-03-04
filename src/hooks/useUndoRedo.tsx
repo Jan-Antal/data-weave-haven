@@ -64,9 +64,11 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
       if (executingRef.current) return;
       const targetPage = page ?? currentPageRef.current;
       // Find last entry for this page
-      const idx = targetPage
-        ? undoStackRef.current.findLastIndex((e) => e.page === targetPage)
-        : undoStackRef.current.length - 1;
+      let idx = -1;
+      const stack = undoStackRef.current;
+      for (let i = stack.length - 1; i >= 0; i--) {
+        if (!targetPage || stack[i].page === targetPage) { idx = i; break; }
+      }
       if (idx === -1) return;
 
       const entry = undoStackRef.current[idx];
@@ -95,9 +97,11 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
     async (page?: UndoPage) => {
       if (executingRef.current) return;
       const targetPage = page ?? currentPageRef.current;
-      const idx = targetPage
-        ? redoStackRef.current.findLastIndex((e) => e.page === targetPage)
-        : redoStackRef.current.length - 1;
+      let idx = -1;
+      const stack = redoStackRef.current;
+      for (let i = stack.length - 1; i >= 0; i--) {
+        if (!targetPage || stack[i].page === targetPage) { idx = i; break; }
+      }
       if (idx === -1) return;
 
       const entry = redoStackRef.current[idx];
