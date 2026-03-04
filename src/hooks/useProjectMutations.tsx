@@ -4,6 +4,7 @@ import { toast } from "@/hooks/use-toast";
 import { logActivity } from "@/lib/activityLog";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
 import type { Project } from "@/hooks/useProjects";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
 
 const NUMERIC_FIELDS = ["prodejni_cena", "material", "subdodavky", "vyroba", "tpv_cost", "percent_tpv"];
 
@@ -14,6 +15,8 @@ function parseField(field: string, value: string): string | number | null {
 
 export function useUpdateProject() {
   const qc = useQueryClient();
+  const { pushUndo } = useUndoRedo();
+
   return useMutation({
     mutationFn: async ({ id, field, value, oldValue, projectId }: { id: string; field: string; value: string; oldValue: string; projectId?: string }) => {
       const parsed = parseField(field, value);
@@ -38,43 +41,57 @@ export function useUpdateProject() {
         logActivity({ projectId, actionType: "datum_smluvni_change", oldValue: fmtOld, newValue: fmtNew });
       }
 
-      return { id, field, oldValue, updatedProject: data as Project };
+      return { id, field, value, oldValue, updatedProject: data as Project };
     },
-    onSuccess: ({ id, field, oldValue, updatedProject }) => {
+    onSuccess: ({ id, field, value, oldValue, updatedProject }) => {
       // Patch single project in cache instead of full refetch
       qc.setQueryData<Project[]>(["projects"], (old) => {
         if (!old) return old;
         return old.map((p) => (p.id === id ? { ...p, ...updatedProject } : p));
       });
 
-      toast({
-        title: "Uloženo",
-        description: "Klikněte pro vrácení změny",
-        action: (
-          <button
-            className="text-xs underline px-2 py-1"
-            onClick={async () => {
-              const parsed = parseField(field, oldValue);
-              const { data } = await supabase
-                .from("projects")
-                .update({ [field]: parsed } as any)
-                .eq("id", id)
-                .select()
-                .single();
-              if (data) {
-                qc.setQueryData<Project[]>(["projects"], (old) => {
-                  if (!old) return old;
-                  return old.map((p) => (p.id === id ? { ...p, ...data } : p));
-                });
-              } else {
-                qc.invalidateQueries({ queryKey: ["projects"] });
-              }
-            }}
-          >
-            Undo
-          </button>
-        ) as any,
+      // Push to undo stack
+      pushUndo({
+        page: "project-table",
+        actionType: "inline_edit",
+        description: `Úprava ${field}: "${oldValue || "—"}" → "${value || "—"}"`,
+        undo: async () => {
+          const parsed = parseField(field, oldValue);
+          const { data } = await supabase
+            .from("projects")
+            .update({ [field]: parsed } as any)
+            .eq("id", id)
+            .select()
+            .single();
+          if (data) {
+            qc.setQueryData<Project[]>(["projects"], (old) => {
+              if (!old) return old;
+              return old.map((p) => (p.id === id ? { ...p, ...data } : p));
+            });
+          } else {
+            qc.invalidateQueries({ queryKey: ["projects"] });
+          }
+        },
+        redo: async () => {
+          const parsed = parseField(field, value);
+          const { data } = await supabase
+            .from("projects")
+            .update({ [field]: parsed } as any)
+            .eq("id", id)
+            .select()
+            .single();
+          if (data) {
+            qc.setQueryData<Project[]>(["projects"], (old) => {
+              if (!old) return old;
+              return old.map((p) => (p.id === id ? { ...p, ...data } : p));
+            });
+          } else {
+            qc.invalidateQueries({ queryKey: ["projects"] });
+          }
+        },
       });
+
+      toast({ title: "Uloženo", duration: 2000 });
     },
     onError: () => {
       toast({ title: "Chyba", description: "Nepodařilo se uložit změnu", variant: "destructive" });

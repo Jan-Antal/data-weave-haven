@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { ProductionHeader } from "@/components/production/ProductionHeader";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { InboxPanel } from "@/components/production/InboxPanel";
 import { WeeklySilos } from "@/components/production/WeeklySilos";
 import { ExpedicePanel } from "@/components/production/ExpedicePanel";
@@ -55,6 +56,7 @@ interface AutoSplitState {
 export default function PlanVyroby() {
   const { isAdmin, loading } = useAuth();
   const navigate = useNavigate();
+  const { setCurrentPage } = useUndoRedo();
   const [showCzk, setShowCzk] = useState(false);
   const [activeDrag, setActiveDrag] = useState<ActiveDragData | null>(null);
   const [overDroppableId, setOverDroppableId] = useState<string | null>(null);
@@ -72,6 +74,11 @@ export default function PlanVyroby() {
 
   const weeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
+
+  useEffect(() => {
+    setCurrentPage("plan-vyroby");
+    return () => setCurrentPage(null);
+  }, [setCurrentPage]);
 
   useEffect(() => {
     if (!loading && !isAdmin) {

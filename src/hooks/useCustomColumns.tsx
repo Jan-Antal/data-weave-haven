@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
 import React from "react";
 
 export interface CustomColumnDef {
@@ -61,7 +62,6 @@ export function useCustomColumns(tableName?: string, groupKey?: string) {
 
   const deleteColumn = useMutation({
     mutationFn: async (id: string) => {
-      // Get column_key before deleting
       const { data: colDef } = await (supabase.from("custom_column_definitions") as any)
         .select("column_key")
         .eq("id", id)
@@ -73,7 +73,6 @@ export function useCustomColumns(tableName?: string, groupKey?: string) {
         .eq("id", id);
       if (error) throw error;
 
-      // Clean up column_labels entries for this column
       if (columnKey) {
         await (supabase.from("column_labels") as any)
           .delete()
@@ -103,6 +102,8 @@ export function useAllCustomColumns(tableName: string) {
 /** Mutation to update a single custom field value on a row */
 export function useUpdateCustomField() {
   const qc = useQueryClient();
+  const { pushUndo } = useUndoRedo();
+
   return useMutation({
     mutationFn: async ({
       rowId,
@@ -128,34 +129,50 @@ export function useUpdateCustomField() {
         .update({ custom_fields: fields })
         .eq("id", rowId);
       if (error) throw error;
-      return { rowId, tableName, columnKey, oldValue };
+      return { rowId, tableName, columnKey, value, oldValue };
     },
-    onSuccess: ({ rowId, tableName, columnKey, oldValue }) => {
+    onSuccess: ({ rowId, tableName, columnKey, value, oldValue }) => {
       const queryKey = tableName === "tpv_items" ? "tpv-items" : "projects";
       qc.invalidateQueries({ queryKey: [queryKey] });
-      toast({
-        title: "Uloženo",
-        description: "Klikněte pro vrácení změny",
-        action: (
-          <button
-            className="text-xs underline px-2 py-1"
-            onClick={async () => {
-              const { data: current } = await (supabase.from(tableName) as any)
-                .select("custom_fields")
-                .eq("id", rowId)
-                .single();
-              const fields = { ...(current?.custom_fields || {}) };
-              fields[columnKey] = oldValue === "" ? null : oldValue;
-              await (supabase.from(tableName) as any)
-                .update({ custom_fields: fields })
-                .eq("id", rowId);
-              qc.invalidateQueries({ queryKey: [queryKey] });
-            }}
-          >
-            Undo
-          </button>
-        ) as any,
+      // Also invalidate the query key format used by tpv_items hook
+      if (tableName === "tpv_items") {
+        qc.invalidateQueries({ queryKey: ["tpv_items"] });
+      }
+
+      const page = tableName === "tpv_items" ? "tpv-list" : "project-table";
+      pushUndo({
+        page: page as any,
+        actionType: "custom_field_edit",
+        description: `Úprava vlastního pole`,
+        undo: async () => {
+          const { data: current } = await (supabase.from(tableName) as any)
+            .select("custom_fields")
+            .eq("id", rowId)
+            .single();
+          const fields = { ...(current?.custom_fields || {}) };
+          fields[columnKey] = oldValue === "" ? null : oldValue;
+          await (supabase.from(tableName) as any)
+            .update({ custom_fields: fields })
+            .eq("id", rowId);
+          qc.invalidateQueries({ queryKey: [queryKey] });
+          if (tableName === "tpv_items") qc.invalidateQueries({ queryKey: ["tpv_items"] });
+        },
+        redo: async () => {
+          const { data: current } = await (supabase.from(tableName) as any)
+            .select("custom_fields")
+            .eq("id", rowId)
+            .single();
+          const fields = { ...(current?.custom_fields || {}) };
+          fields[columnKey] = value === "" ? null : value;
+          await (supabase.from(tableName) as any)
+            .update({ custom_fields: fields })
+            .eq("id", rowId);
+          qc.invalidateQueries({ queryKey: [queryKey] });
+          if (tableName === "tpv_items") qc.invalidateQueries({ queryKey: ["tpv_items"] });
+        },
       });
+
+      toast({ title: "Uloženo", duration: 2000 });
     },
     onError: () => {
       toast({ title: "Chyba", description: "Nepodařilo se uložit", variant: "destructive" });

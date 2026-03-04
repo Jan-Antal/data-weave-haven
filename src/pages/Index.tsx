@@ -29,6 +29,7 @@ import { DataLogPanel } from "@/components/DataLogPanel";
 import { DataLogHighlightProvider } from "@/components/DataLogHighlightContext";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { AchievementCelebration } from "@/components/AchievementCelebration";
 import { useAchievementChecker } from "@/hooks/useAchievements";
@@ -63,6 +64,17 @@ const Index = () => {
   const tpvCloseDetailRef = useRef<(() => void) | null>(null);
   const [tpvListActive, setTpvListActive] = useState(false);
   const scrollPositions = useRef<Record<string, number>>({});
+  const { setCurrentPage } = useUndoRedo();
+
+  // Set undo page context based on active tab/view
+  useEffect(() => {
+    if (tpvListActive) {
+      setCurrentPage("tpv-list");
+    } else {
+      setCurrentPage("project-table");
+    }
+    return () => setCurrentPage(null);
+  }, [tpvListActive, setCurrentPage]);
 
   const TPV_ACTIVE_STATUSES = ["Příprava", "Engineering", "TPV"];
 

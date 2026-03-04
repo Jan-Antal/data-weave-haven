@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { PeopleManagementProvider } from "@/components/PeopleManagementContext";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { UndoRedoProvider } from "@/hooks/useUndoRedo";
 
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -91,18 +92,20 @@ function AppRoutes() {
   }
 
   return (
-    <PeopleManagementProvider>
-      <BrowserRouter>
-        
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/plan-vyroby" element={<PlanVyroby />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route path="/set-password" element={<SetPassword />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </PeopleManagementProvider>
+    <UndoRedoProvider>
+      <PeopleManagementProvider>
+        <BrowserRouter>
+          
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/plan-vyroby" element={<PlanVyroby />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/set-password" element={<SetPassword />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </PeopleManagementProvider>
+    </UndoRedoProvider>
   );
 }
 

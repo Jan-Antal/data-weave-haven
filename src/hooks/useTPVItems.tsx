@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { ToastAction } from "@/components/ui/toast";
 import type { Tables } from "@/integrations/supabase/types";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
 
 export type TPVItem = Tables<"tpv_items"> & { konstrukter?: string | null; nazev_prvku?: string | null };
 
@@ -25,35 +25,35 @@ export function useTPVItems(projectId: string) {
 
 export function useUpdateTPVItem() {
   const qc = useQueryClient();
+  const { pushUndo } = useUndoRedo();
+
   return useMutation({
     mutationFn: async ({ id, field, value, oldValue }: { id: string; field: string; value: any; projectId: string; oldValue?: string }) => {
       const { error } = await supabase.from("tpv_items").update({ [field]: value } as any).eq("id", id);
       if (error) throw error;
-      return { id, field, oldValue };
+      return { id, field, value, oldValue };
     },
     onSuccess: (result, { projectId }) => {
       qc.invalidateQueries({ queryKey: ["tpv_items", projectId] });
-      const { id, field, oldValue } = result;
+      const { id, field, value, oldValue } = result;
 
       if (oldValue !== undefined) {
-        const { dismiss } = toast({
-          title: "Uloženo",
-          action: (
-            <ToastAction altText="Zpět" onClick={() => {
-              supabase.from("tpv_items").update({ [field]: oldValue } as any).eq("id", id).then(() => {
-                qc.invalidateQueries({ queryKey: ["tpv_items", projectId] });
-                toast({ title: "Vráceno zpět" });
-              });
-              dismiss();
-            }}>
-              Zpět
-            </ToastAction>
-          ),
+        pushUndo({
+          page: "tpv-list",
+          actionType: "inline_edit",
+          description: `Úprava ${field}: "${oldValue || "—"}" → "${value || "—"}"`,
+          undo: async () => {
+            await supabase.from("tpv_items").update({ [field]: oldValue } as any).eq("id", id);
+            qc.invalidateQueries({ queryKey: ["tpv_items", projectId] });
+          },
+          redo: async () => {
+            await supabase.from("tpv_items").update({ [field]: value } as any).eq("id", id);
+            qc.invalidateQueries({ queryKey: ["tpv_items", projectId] });
+          },
         });
-        setTimeout(() => dismiss(), 5000);
-      } else {
-        toast({ title: "Uloženo" });
       }
+
+      toast({ title: "Uloženo", duration: 2000 });
     },
     onError: () => {
       toast({ title: "Chyba", variant: "destructive" });
@@ -65,8 +65,9 @@ export function useAddTPVItem() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (item: { project_id: string; item_name: string; item_type?: string; status?: string; sent_date?: string; accepted_date?: string; notes?: string }) => {
-      const { error } = await supabase.from("tpv_items").insert(item);
+      const { data, error } = await supabase.from("tpv_items").insert(item).select().single();
       if (error) throw error;
+      return data;
     },
     onSuccess: (_, { project_id }) => {
       qc.invalidateQueries({ queryKey: ["tpv_items", project_id] });
@@ -80,14 +81,34 @@ export function useAddTPVItem() {
 
 export function useDeleteTPVItems() {
   const qc = useQueryClient();
+  const { pushUndo } = useUndoRedo();
+
   return useMutation({
     mutationFn: async ({ ids, projectId }: { ids: string[]; projectId: string }) => {
+      // Fetch full row data before soft-delete for undo
+      const { data: rows } = await supabase.from("tpv_items").select("*").in("id", ids);
       const { error } = await supabase.from("tpv_items").update({ deleted_at: new Date().toISOString() } as any).in("id", ids);
       if (error) throw error;
-      return projectId;
+      return { projectId, rows: rows || [], ids };
     },
-    onSuccess: (projectId) => {
+    onSuccess: ({ projectId, rows, ids }) => {
       qc.invalidateQueries({ queryKey: ["tpv_items", projectId] });
+
+      pushUndo({
+        page: "tpv-list",
+        actionType: "delete_rows",
+        description: `Smazáno ${ids.length} položek`,
+        undo: async () => {
+          // Restore by clearing deleted_at
+          await supabase.from("tpv_items").update({ deleted_at: null } as any).in("id", ids);
+          qc.invalidateQueries({ queryKey: ["tpv_items", projectId] });
+        },
+        redo: async () => {
+          await supabase.from("tpv_items").update({ deleted_at: new Date().toISOString() } as any).in("id", ids);
+          qc.invalidateQueries({ queryKey: ["tpv_items", projectId] });
+        },
+      });
+
       toast({ title: "Smazáno" });
     },
   });

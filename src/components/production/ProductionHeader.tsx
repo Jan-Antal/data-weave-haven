@@ -5,7 +5,9 @@ import { useProductionSchedule } from "@/hooks/useProductionSchedule";
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
-import { LayoutDashboard, Settings, Check, User, UserCog, LogOut } from "lucide-react";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
+import { LayoutDashboard, Settings, Check, User, UserCog, LogOut, Undo2, Redo2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { UserManagement } from "@/components/UserManagement";
 import { AccountSettings } from "@/components/AccountSettings";
@@ -29,6 +31,7 @@ export function ProductionHeader() {
   const { data: inboxProjects = [] } = useProductionInbox();
   const { canAccessSettings, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, profile, signOut } = useAuth();
   const { openPeopleManagement } = usePeopleManagement();
+  const { undo, redo, canUndo, canRedo } = useUndoRedo();
 
   const [userMgmtOpen, setUserMgmtOpen] = useState(false);
   const [exchangeRateOpen, setExchangeRateOpen] = useState(false);
@@ -91,6 +94,35 @@ export function ProductionHeader() {
 
           {/* Right: Back icon + User menu + Settings gear */}
           <div className="flex items-center gap-1 shrink-0">
+            {/* Undo/Redo buttons */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => undo("plan-vyroby")}
+                  disabled={!canUndo("plan-vyroby")}
+                  className="p-2 rounded-md transition-colors disabled:opacity-30"
+                  style={{ color: canUndo("plan-vyroby") ? "#ffffff" : "rgba(255,255,255,0.3)" }}
+                >
+                  <Undo2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Zpět (Ctrl+Z)</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => redo("plan-vyroby")}
+                  disabled={!canRedo("plan-vyroby")}
+                  className="p-2 rounded-md transition-colors disabled:opacity-30"
+                  style={{ color: canRedo("plan-vyroby") ? "#ffffff" : "rgba(255,255,255,0.3)" }}
+                >
+                  <Redo2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Vpřed (Ctrl+Shift+Z)</TooltipContent>
+            </Tooltip>
+            <div className="w-px h-5 bg-primary-foreground/15 mx-1" />
+
             <button
               onClick={() => navigate("/")}
               className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"

@@ -2,9 +2,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useCallback } from "react";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
 
 export function useProductionDragDrop() {
   const qc = useQueryClient();
+  const { pushUndo } = useUndoRedo();
 
   const invalidateAll = useCallback(() => {
     qc.invalidateQueries({ queryKey: ["production-inbox"] });
@@ -17,7 +19,6 @@ export function useProductionDragDrop() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Fetch inbox item
       const { data: item, error: fetchErr } = await supabase
         .from("production_inbox")
         .select("*")
@@ -25,8 +26,7 @@ export function useProductionDragDrop() {
         .single();
       if (fetchErr || !item) throw fetchErr || new Error("Item not found");
 
-      // Insert into schedule
-      const { error: insertErr } = await supabase.from("production_schedule").insert({
+      const { data: inserted, error: insertErr } = await supabase.from("production_schedule").insert({
         project_id: item.project_id,
         stage_id: item.stage_id,
         item_name: item.item_name,
@@ -38,10 +38,9 @@ export function useProductionDragDrop() {
         status: "scheduled",
         created_by: user.id,
         inbox_item_id: item.id,
-      });
+      }).select().single();
       if (insertErr) throw insertErr;
 
-      // Mark inbox item as scheduled
       const { error: updateErr } = await supabase
         .from("production_inbox")
         .update({ status: "scheduled" })
@@ -49,11 +48,37 @@ export function useProductionDragDrop() {
       if (updateErr) throw updateErr;
 
       invalidateAll();
+
+      // Push undo
+      if (inserted) {
+        pushUndo({
+          page: "plan-vyroby",
+          actionType: "inbox_to_silo",
+          description: `Přesun ${item.item_name} → T${weekDate}`,
+          undo: async () => {
+            await supabase.from("production_schedule").delete().eq("id", inserted.id);
+            await supabase.from("production_inbox").update({ status: "pending" }).eq("id", inboxItemId);
+            invalidateAll();
+          },
+          redo: async () => {
+            const { data: { user: u } } = await supabase.auth.getUser();
+            await supabase.from("production_schedule").insert({
+              project_id: item.project_id, stage_id: item.stage_id,
+              item_name: item.item_name, item_code: item.item_code,
+              scheduled_week: weekDate, scheduled_hours: item.estimated_hours,
+              scheduled_czk: item.estimated_czk, position: 999, status: "scheduled",
+              created_by: u?.id || user.id, inbox_item_id: item.id,
+            });
+            await supabase.from("production_inbox").update({ status: "scheduled" }).eq("id", inboxItemId);
+            invalidateAll();
+          },
+        });
+      }
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
       throw err;
     }
-  }, [invalidateAll]);
+  }, [invalidateAll, pushUndo]);
 
   const moveInboxProjectToWeek = useCallback(async (projectId: string, weekDate: string) => {
     try {
@@ -82,7 +107,7 @@ export function useProductionDragDrop() {
         inbox_item_id: item.id,
       }));
 
-      const { error: insertErr } = await supabase.from("production_schedule").insert(scheduleRows);
+      const { data: inserted, error: insertErr } = await supabase.from("production_schedule").insert(scheduleRows).select();
       if (insertErr) throw insertErr;
 
       const ids = items.map((i) => i.id);
@@ -93,25 +118,68 @@ export function useProductionDragDrop() {
       if (updateErr) throw updateErr;
 
       invalidateAll();
+
+      const insertedIds = (inserted || []).map((r: any) => r.id);
+      pushUndo({
+        page: "plan-vyroby",
+        actionType: "inbox_project_to_silo",
+        description: `Přesun projektu ${projectId} → T${weekDate}`,
+        undo: async () => {
+          if (insertedIds.length) await supabase.from("production_schedule").delete().in("id", insertedIds);
+          await supabase.from("production_inbox").update({ status: "pending" }).in("id", ids);
+          invalidateAll();
+        },
+        redo: async () => {
+          const { data: { user: u } } = await supabase.auth.getUser();
+          const rows = items.map((item, i) => ({
+            project_id: item.project_id, stage_id: item.stage_id,
+            item_name: item.item_name, item_code: item.item_code,
+            scheduled_week: weekDate, scheduled_hours: item.estimated_hours,
+            scheduled_czk: item.estimated_czk, position: i, status: "scheduled" as const,
+            created_by: u?.id || user.id, inbox_item_id: item.id,
+          }));
+          await supabase.from("production_schedule").insert(rows);
+          await supabase.from("production_inbox").update({ status: "scheduled" }).in("id", ids);
+          invalidateAll();
+        },
+      });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
       throw err;
     }
-  }, [invalidateAll]);
+  }, [invalidateAll, pushUndo]);
 
   const moveScheduleItemToWeek = useCallback(async (scheduleItemId: string, newWeekDate: string) => {
     try {
+      // Capture old week for undo
+      const { data: oldItem } = await supabase.from("production_schedule").select("scheduled_week, item_name").eq("id", scheduleItemId).single();
+      const oldWeek = oldItem?.scheduled_week;
+
       const { error } = await supabase
         .from("production_schedule")
         .update({ scheduled_week: newWeekDate })
         .eq("id", scheduleItemId);
       if (error) throw error;
       invalidateAll();
+
+      pushUndo({
+        page: "plan-vyroby",
+        actionType: "move_silo_item",
+        description: `Přesun ${oldItem?.item_name || "položky"} → T${newWeekDate}`,
+        undo: async () => {
+          await supabase.from("production_schedule").update({ scheduled_week: oldWeek }).eq("id", scheduleItemId);
+          invalidateAll();
+        },
+        redo: async () => {
+          await supabase.from("production_schedule").update({ scheduled_week: newWeekDate }).eq("id", scheduleItemId);
+          invalidateAll();
+        },
+      });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
       throw err;
     }
-  }, [invalidateAll]);
+  }, [invalidateAll, pushUndo]);
 
   const moveBundleToWeek = useCallback(async (projectId: string, sourceWeekDate: string, targetWeekDate: string) => {
     try {
@@ -123,18 +191,39 @@ export function useProductionDragDrop() {
         .in("status", ["scheduled", "in_progress"]);
       if (error) throw error;
       invalidateAll();
+
+      pushUndo({
+        page: "plan-vyroby",
+        actionType: "move_bundle",
+        description: `Přesun balíku ${projectId} → T${targetWeekDate}`,
+        undo: async () => {
+          await supabase.from("production_schedule")
+            .update({ scheduled_week: sourceWeekDate })
+            .eq("project_id", projectId)
+            .eq("scheduled_week", targetWeekDate)
+            .in("status", ["scheduled", "in_progress"]);
+          invalidateAll();
+        },
+        redo: async () => {
+          await supabase.from("production_schedule")
+            .update({ scheduled_week: targetWeekDate })
+            .eq("project_id", projectId)
+            .eq("scheduled_week", sourceWeekDate)
+            .in("status", ["scheduled", "in_progress"]);
+          invalidateAll();
+        },
+      });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
       throw err;
     }
-  }, [invalidateAll]);
+  }, [invalidateAll, pushUndo]);
 
   const moveItemBackToInbox = useCallback(async (scheduleItemId: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Get the full schedule item
       const { data: schedItem, error: fetchErr } = await supabase
         .from("production_schedule")
         .select("*")
@@ -142,7 +231,6 @@ export function useProductionDragDrop() {
         .single();
       if (fetchErr) throw fetchErr;
 
-      // Delete schedule item
       const { error: delErr } = await supabase
         .from("production_schedule")
         .delete()
@@ -150,14 +238,12 @@ export function useProductionDragDrop() {
       if (delErr) throw delErr;
 
       if (schedItem?.inbox_item_id) {
-        // Restore existing inbox item
         const { error: updateErr } = await supabase
           .from("production_inbox")
           .update({ status: "pending" })
           .eq("id", schedItem.inbox_item_id);
         if (updateErr) throw updateErr;
       } else {
-        // Create a new inbox item from schedule data
         const { error: insertErr } = await supabase
           .from("production_inbox")
           .insert({
@@ -174,11 +260,51 @@ export function useProductionDragDrop() {
       }
 
       invalidateAll();
+
+      pushUndo({
+        page: "plan-vyroby",
+        actionType: "return_to_inbox",
+        description: `Vrácení ${schedItem.item_name} do Inboxu`,
+        undo: async () => {
+          // Re-schedule item
+          const { data: { user: u } } = await supabase.auth.getUser();
+          await supabase.from("production_schedule").insert({
+            project_id: schedItem.project_id, stage_id: schedItem.stage_id,
+            item_name: schedItem.item_name, item_code: schedItem.item_code,
+            scheduled_week: schedItem.scheduled_week, scheduled_hours: schedItem.scheduled_hours,
+            scheduled_czk: schedItem.scheduled_czk, position: schedItem.position,
+            status: "scheduled", created_by: u?.id || user.id,
+            inbox_item_id: schedItem.inbox_item_id,
+          });
+          if (schedItem.inbox_item_id) {
+            await supabase.from("production_inbox").update({ status: "scheduled" }).eq("id", schedItem.inbox_item_id);
+          }
+          invalidateAll();
+        },
+        redo: async () => {
+          // Re-do the return to inbox (simplified: just call the same logic)
+          const { data: { user: u } } = await supabase.auth.getUser();
+          // Find the re-created schedule item by matching
+          const { data: reItems } = await supabase.from("production_schedule")
+            .select("id, inbox_item_id")
+            .eq("project_id", schedItem.project_id)
+            .eq("item_name", schedItem.item_name)
+            .eq("scheduled_week", schedItem.scheduled_week)
+            .limit(1);
+          if (reItems && reItems[0]) {
+            await supabase.from("production_schedule").delete().eq("id", reItems[0].id);
+            if (reItems[0].inbox_item_id) {
+              await supabase.from("production_inbox").update({ status: "pending" }).eq("id", reItems[0].inbox_item_id);
+            }
+          }
+          invalidateAll();
+        },
+      });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
       throw err;
     }
-  }, [invalidateAll]);
+  }, [invalidateAll, pushUndo]);
 
   const reorderItemsInWeek = useCallback(async (weekDate: string, orderedItemIds: string[]) => {
     try {
@@ -196,37 +322,87 @@ export function useProductionDragDrop() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
+
+      // Capture old statuses for undo
+      const { data: oldItems } = await supabase.from("production_schedule")
+        .select("id, status, completed_at, completed_by, item_name")
+        .in("id", itemIds);
+
       const { error } = await supabase
         .from("production_schedule")
         .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user.id })
         .in("id", itemIds);
       if (error) throw error;
       invalidateAll();
+
+      pushUndo({
+        page: "plan-vyroby",
+        actionType: "complete_items",
+        description: `${itemIds.length} položek → Expedice`,
+        undo: async () => {
+          // Restore previous statuses
+          for (const old of (oldItems || [])) {
+            await supabase.from("production_schedule")
+              .update({ status: old.status, completed_at: old.completed_at, completed_by: old.completed_by })
+              .eq("id", old.id);
+          }
+          invalidateAll();
+        },
+        redo: async () => {
+          const { data: { user: u } } = await supabase.auth.getUser();
+          await supabase.from("production_schedule")
+            .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: u?.id })
+            .in("id", itemIds);
+          invalidateAll();
+        },
+      });
+
       toast({ title: `${itemIds.length} položek přesunuto do Expedice` });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
-  }, [invalidateAll]);
+  }, [invalidateAll, pushUndo]);
 
   const returnToProduction = useCallback(async (scheduleItemId: string) => {
     try {
+      const { data: oldItem } = await supabase.from("production_schedule")
+        .select("status, completed_at, completed_by, item_name")
+        .eq("id", scheduleItemId).single();
+
       const { error } = await supabase
         .from("production_schedule")
         .update({ status: "scheduled", completed_at: null, completed_by: null })
         .eq("id", scheduleItemId);
       if (error) throw error;
       invalidateAll();
+
+      pushUndo({
+        page: "plan-vyroby",
+        actionType: "return_to_production",
+        description: `Vrácení ${oldItem?.item_name || "položky"} do výroby`,
+        undo: async () => {
+          await supabase.from("production_schedule")
+            .update({ status: oldItem?.status || "completed", completed_at: oldItem?.completed_at, completed_by: oldItem?.completed_by })
+            .eq("id", scheduleItemId);
+          invalidateAll();
+        },
+        redo: async () => {
+          await supabase.from("production_schedule")
+            .update({ status: "scheduled", completed_at: null, completed_by: null })
+            .eq("id", scheduleItemId);
+          invalidateAll();
+        },
+      });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
-  }, [invalidateAll]);
+  }, [invalidateAll, pushUndo]);
 
   const returnBundleToInbox = useCallback(async (projectId: string, weekDate: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Get all schedule items for this bundle (full data for re-creation)
       const { data: items, error: fetchErr } = await supabase
         .from("production_schedule")
         .select("*")
@@ -240,11 +416,9 @@ export function useProductionDragDrop() {
       const withInbox = items.filter((i) => i.inbox_item_id);
       const withoutInbox = items.filter((i) => !i.inbox_item_id);
 
-      // Delete schedule rows
       const { error: delErr } = await supabase.from("production_schedule").delete().in("id", ids);
       if (delErr) throw delErr;
 
-      // Restore existing inbox items
       const inboxIds = withInbox.map((i) => i.inbox_item_id).filter(Boolean) as string[];
       if (inboxIds.length > 0) {
         const { error: updateErr } = await supabase
@@ -254,7 +428,6 @@ export function useProductionDragDrop() {
         if (updateErr) throw updateErr;
       }
 
-      // Create new inbox items for those without inbox_item_id
       if (withoutInbox.length > 0) {
         const newItems = withoutInbox.map((item) => ({
           project_id: item.project_id,
@@ -271,15 +444,48 @@ export function useProductionDragDrop() {
       }
 
       invalidateAll();
+
+      pushUndo({
+        page: "plan-vyroby",
+        actionType: "return_bundle_to_inbox",
+        description: `${items.length} položek vráceno do Inboxu`,
+        undo: async () => {
+          // Re-schedule all items
+          const { data: { user: u } } = await supabase.auth.getUser();
+          const rows = items.map((item) => ({
+            project_id: item.project_id, stage_id: item.stage_id,
+            item_name: item.item_name, item_code: item.item_code,
+            scheduled_week: item.scheduled_week, scheduled_hours: item.scheduled_hours,
+            scheduled_czk: item.scheduled_czk, position: item.position,
+            status: item.status, created_by: u?.id || user.id,
+            inbox_item_id: item.inbox_item_id,
+          }));
+          await supabase.from("production_schedule").insert(rows);
+          if (inboxIds.length) await supabase.from("production_inbox").update({ status: "scheduled" }).in("id", inboxIds);
+          invalidateAll();
+        },
+        redo: async () => {
+          // Simplified: just move them back
+          const { data: reItems } = await supabase.from("production_schedule")
+            .select("id").eq("project_id", projectId).eq("scheduled_week", weekDate)
+            .in("status", ["scheduled", "in_progress"]);
+          if (reItems && reItems.length) {
+            const reIds = reItems.map(i => i.id);
+            await supabase.from("production_schedule").delete().in("id", reIds);
+          }
+          if (inboxIds.length) await supabase.from("production_inbox").update({ status: "pending" }).in("id", inboxIds);
+          invalidateAll();
+        },
+      });
+
       toast({ title: `${items.length} položek vráceno do Inboxu` });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
-  }, [invalidateAll]);
+  }, [invalidateAll, pushUndo]);
 
   const mergeSplitItems = useCallback(async (splitGroupId: string) => {
     try {
-      // Find all parts with this split_group_id, plus the original
       const { data: parts, error: fetchErr } = await supabase
         .from("production_schedule")
         .select("*")
@@ -293,12 +499,9 @@ export function useProductionDragDrop() {
 
       const totalHours = parts.reduce((s, p) => s + p.scheduled_hours, 0);
       const totalCzk = parts.reduce((s, p) => s + p.scheduled_czk, 0);
-      const primary = parts[0]; // Part 1
-
-      // Clean name: remove (X/Y) suffix
+      const primary = parts[0];
       const cleanName = primary.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
 
-      // Update Part 1 with merged totals, clear split fields
       const { error: updateErr } = await supabase
         .from("production_schedule")
         .update({
@@ -312,7 +515,6 @@ export function useProductionDragDrop() {
         .eq("id", primary.id);
       if (updateErr) throw updateErr;
 
-      // Delete all other parts
       const otherIds = parts.filter(p => p.id !== primary.id).map(p => p.id);
       if (otherIds.length > 0) {
         const { error: delErr } = await supabase
@@ -323,11 +525,56 @@ export function useProductionDragDrop() {
       }
 
       invalidateAll();
+
+      // Store parts snapshot for undo
+      const partsSnapshot = parts.map(p => ({ ...p }));
+      pushUndo({
+        page: "plan-vyroby",
+        actionType: "merge_split",
+        description: `${parts.length} částí spojeno → "${cleanName}"`,
+        undo: async () => {
+          // Restore primary to its original state
+          const orig = partsSnapshot[0];
+          await supabase.from("production_schedule").update({
+            scheduled_hours: orig.scheduled_hours, scheduled_czk: orig.scheduled_czk,
+            item_name: orig.item_name, split_group_id: orig.split_group_id,
+            split_part: orig.split_part, split_total: orig.split_total,
+          }).eq("id", orig.id);
+          // Re-create other parts
+          const { data: { user } } = await supabase.auth.getUser();
+          const others = partsSnapshot.slice(1).map(p => ({
+            project_id: p.project_id, stage_id: p.stage_id,
+            item_name: p.item_name, item_code: p.item_code,
+            scheduled_week: p.scheduled_week, scheduled_hours: p.scheduled_hours,
+            scheduled_czk: p.scheduled_czk, position: p.position,
+            status: p.status, created_by: user?.id,
+            split_group_id: p.split_group_id, split_part: p.split_part, split_total: p.split_total,
+          }));
+          if (others.length) await supabase.from("production_schedule").insert(others);
+          invalidateAll();
+        },
+        redo: async () => {
+          // Re-merge
+          await supabase.from("production_schedule").update({
+            scheduled_hours: totalHours, scheduled_czk: totalCzk,
+            item_name: cleanName, split_group_id: null, split_part: null, split_total: null,
+          }).eq("id", primary.id);
+          // Find and delete other parts
+          const { data: reParts } = await supabase.from("production_schedule")
+            .select("id").or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`)
+            .neq("id", primary.id);
+          if (reParts && reParts.length) {
+            await supabase.from("production_schedule").delete().in("id", reParts.map(p => p.id));
+          }
+          invalidateAll();
+        },
+      });
+
       toast({ title: `${parts.length} částí spojeno zpět do "${cleanName}" (${totalHours}h)` });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
-  }, [invalidateAll]);
+  }, [invalidateAll, pushUndo]);
 
   return {
     moveInboxItemToWeek,
