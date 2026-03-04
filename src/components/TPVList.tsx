@@ -11,7 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useTPVItems, useUpdateTPVItem, useAddTPVItem, useDeleteTPVItems, useBulkUpdateTPVStatus, useBulkInsertTPVItems } from "@/hooks/useTPVItems";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
-import { ArrowLeft, Plus, Upload, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Upload, Trash2, FileText } from "lucide-react";
+import { ProjectDetailDialog } from "./ProjectDetailDialog";
+import { useProjects } from "@/hooks/useProjects";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/useAuth";
 import { useColumnLabels } from "@/hooks/useColumnLabels";
@@ -288,7 +290,20 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Zpět
         </Button>
-        <span className="text-sm font-serif font-bold">{projectId} — {projectName}</span>
+        <button
+          onClick={() => setDetailOpen(true)}
+          className="text-sm font-serif font-bold hover:underline cursor-pointer transition-colors"
+          style={{ color: "#223937" }}
+        >
+          {projectId} — {projectName}
+        </button>
+        <button
+          onClick={() => setDetailOpen(true)}
+          className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          title="Otevřít detail projektu"
+        >
+          <FileText className="h-3.5 w-3.5" />
+        </button>
         <span className="text-muted-foreground/40 text-sm">|</span>
         {canManageTPV && (
           <Button size="sm" variant="outline" onClick={() => setWizardOpen(true)}>
@@ -462,7 +477,9 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         </Table>
       </div>
 
-
+  const { data: allProjects = [] } = useProjects();
+  const [detailOpen, setDetailOpen] = useState(false);
+  const currentProject = useMemo(() => allProjects.find(p => p.project_id === projectId), [allProjects, projectId]);
       {/* Import Dialog */}
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-auto">
