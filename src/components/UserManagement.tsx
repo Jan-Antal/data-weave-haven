@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Trash2, KeyRound, ArrowRightLeft, Link2, Lock, Eye, EyeOff } from "lucide-react";
+import { Plus, Trash2, ArrowRightLeft, Link2, Lock, Eye, EyeOff } from "lucide-react";
 import type { AppRole } from "@/hooks/useAuth";
 import { PasswordChecklist } from "@/components/PasswordChecklist";
 import { usePasswordValidation } from "@/hooks/usePasswordValidation";
@@ -58,7 +58,7 @@ export function UserManagement({ open, onOpenChange }: Props) {
   const [transferTarget, setTransferTarget] = useState<string>("");
   const [transferSubmitting, setTransferSubmitting] = useState(false);
   const [copyingLinkId, setCopyingLinkId] = useState<string | null>(null);
-  const [sendingAuthEmailId, setSendingAuthEmailId] = useState<string | null>(null);
+  
   const [passwordTarget, setPasswordTarget] = useState<{ id: string; name: string } | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -212,35 +212,6 @@ export function UserManagement({ open, onOpenChange }: Props) {
     }
   };
 
-  const handleSendAccessEmail = async (userId: string) => {
-    setSendingAuthEmailId(userId);
-
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-invite-link", {
-        body: {
-          user_id: userId,
-          origin_url: window.location.origin,
-          mode: "send_email",
-        },
-      });
-
-      if (error || data?.error) {
-        toast({ title: "Chyba", description: data?.error || error?.message, variant: "destructive" });
-        return;
-      }
-
-      if (data?.link) {
-        await navigator.clipboard.writeText(data.link);
-        toast({ title: "Odkaz zkopírován do schránky", description: `Odešlete odkaz uživateli ${data.email}` });
-      } else {
-        toast({ title: "Odkaz vygenerován" });
-      }
-    } catch (e: any) {
-      toast({ title: "Chyba", description: e.message, variant: "destructive" });
-    } finally {
-      setSendingAuthEmailId(null);
-    }
-  };
 
   const handleTransferOwnership = async () => {
     if (!transferTarget) return;
@@ -379,14 +350,6 @@ export function UserManagement({ open, onOpenChange }: Props) {
                           title="Změnit heslo"
                         >
                           <Lock className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleSendAccessEmail(u.id)}
-                          className="text-muted-foreground hover:text-foreground transition-colors"
-                          title="Znovu odeslat přístupový email"
-                          disabled={sendingAuthEmailId === u.id}
-                        >
-                          <KeyRound className="h-4 w-4" />
                         </button>
                         {isOwner(u) ? (
                           <button
