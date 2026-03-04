@@ -380,14 +380,6 @@ export function UserManagement({ open, onOpenChange }: Props) {
                         >
                           <Lock className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => handleSendAccessEmail(u.id)}
-                          className="text-muted-foreground hover:text-foreground transition-colors"
-                          title="Znovu odeslat přístupový email"
-                          disabled={sendingAuthEmailId === u.id}
-                        >
-                          <KeyRound className="h-4 w-4" />
-                        </button>
                         {isOwner(u) ? (
                           <button
                             onClick={() => { setTransferOpen(true); setTransferTarget(""); }}
