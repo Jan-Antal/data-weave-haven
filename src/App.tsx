@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-ro
 import { useEffect } from "react";
 import { PeopleManagementProvider } from "@/components/PeopleManagementContext";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { usePageTracking } from "@/hooks/usePageTracking";
+
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 
@@ -93,7 +93,7 @@ function AppRoutes() {
   return (
     <PeopleManagementProvider>
       <BrowserRouter>
-        <PageTracker />
+        
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/plan-vyroby" element={<PlanVyroby />} />
@@ -106,11 +106,6 @@ function AppRoutes() {
   );
 }
 
-function PageTracker() {
-  const location = useLocation();
-  usePageTracking(location.pathname);
-  return null;
-}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
