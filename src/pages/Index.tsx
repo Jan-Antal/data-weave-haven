@@ -64,6 +64,17 @@ const Index = () => {
   const tpvCloseDetailRef = useRef<(() => void) | null>(null);
   const [tpvListActive, setTpvListActive] = useState(false);
   const scrollPositions = useRef<Record<string, number>>({});
+  const { setCurrentPage } = useUndoRedo();
+
+  // Set undo page context based on active tab/view
+  useEffect(() => {
+    if (tpvListActive) {
+      setCurrentPage("tpv-list");
+    } else {
+      setCurrentPage("project-table");
+    }
+    return () => setCurrentPage(null);
+  }, [tpvListActive, setCurrentPage]);
 
   const TPV_ACTIVE_STATUSES = ["Příprava", "Engineering", "TPV"];
 
