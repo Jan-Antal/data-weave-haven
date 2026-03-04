@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.sharepoint-documents]
 verify_jwt = false
+
+[functions.ami-assistant]
+verify_jwt = false
