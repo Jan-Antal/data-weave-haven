@@ -309,11 +309,11 @@ function UserAnalyticsRow({
             <span className="font-medium">{userName}</span>
           </div>
           <p className="text-[10px] text-muted-foreground ml-4">
-            {lastLogin} · {user.top_page || "—"}
+            {lastLogin}
           </p>
         </td>
         <td className="py-1.5 text-right font-mono">{user.login_count_30d}</td>
-        <td className="py-1.5 text-right font-mono">{user.page_view_count_30d}</td>
+        <td className="py-1.5 text-right font-mono">{user.avg_session_min} min</td>
       </tr>
       {expanded && (
         <tr>
