@@ -219,8 +219,11 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV }: InboxP
               <div key={p.project_id} className="flex items-center gap-1.5 px-2 py-[4px] rounded-[5px]"
                 style={{ backgroundColor: "rgba(58,138,54,0.04)", border: "1px solid rgba(58,138,54,0.15)" }}>
                 <Check className="h-3 w-3 shrink-0" style={{ color: "#3a8a36" }} />
-                <span className="text-[10px] font-medium truncate" style={{ color: "#3a8a36" }}>{p.project_id}</span>
-                <span className="text-[9px] truncate" style={{ color: "#6b7a78" }}>— kompletní</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] font-medium truncate" style={{ color: "#3a8a36" }}>{p.project_name}</div>
+                  <div className="font-mono text-[9px] truncate" style={{ color: "#6b7a78" }}>{p.project_id}</div>
+                </div>
+                <span className="text-[9px] shrink-0" style={{ color: "#6b7a78" }}>✓</span>
               </div>
             ))}
           </div>
