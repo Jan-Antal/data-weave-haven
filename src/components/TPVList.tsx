@@ -24,6 +24,7 @@ import { ExcelImportWizard } from "./ExcelImportWizard";
 import { formatCurrency } from "@/lib/currency";
 import { useExportContext } from "./ExportContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useProductionStatuses } from "@/hooks/useProductionStatuses";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
   { key: "item_type", label: "Kód Prvku" },
@@ -31,6 +32,7 @@ const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultH
   { key: "item_name", label: "Popis" },
   { key: "konstrukter", label: "Konstruktér" },
   { key: "status", label: "Status" },
+  { key: "vyroba_status", label: "Výroba" },
   { key: "sent_date", label: "Odesláno" },
   { key: "accepted_date", label: "Přijato" },
   { key: "notes", label: "Poznámka" },
@@ -57,6 +59,8 @@ function getTPVListColumnStyle(key: string, customWidth?: number | null): React.
       return { minWidth: 200 };
     case "status":
       return { minWidth: 140 };
+    case "vyroba_status":
+      return { minWidth: 140, maxWidth: 200 };
     case "konstrukter":
       return { minWidth: 124, maxWidth: 124, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } as React.CSSProperties;
     case "pocet":
@@ -82,6 +86,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const { data: statusOptions = [] } = useTPVStatusOptions();
   const TPV_STATUSES = statusOptions.map(o => o.label);
   const { data: allProjects = [] } = useProjects();
+  const { statusMap: productionStatusMap } = useProductionStatuses(projectId);
   const [detailOpen, setDetailOpen] = useState(false);
   const currentProject = useMemo(() => allProjects.find(p => p.project_id === projectId), [allProjects, projectId]);
 
@@ -383,6 +388,40 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                       </span>
                     ) : undefined;
                     return <TableCell key={key}><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} displayValue={statusDisplay} onSave={(v) => saveField(item.id, "status", v, item.status || "")} readOnly={!canManageTPV} /></TableCell>;
+                  }
+                  if (key === "vyroba_status") {
+                    const itemKey = item.item_type || item.item_name;
+                    const statuses = productionStatusMap.get(itemKey);
+                    if (!statuses || statuses.length === 0) {
+                      return (
+                        <TableCell key={key}>
+                          <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: "#f0eee9", color: "#99a5a3", borderColor: "#e2ddd6" }}>
+                            Neodesláno
+                          </span>
+                        </TableCell>
+                      );
+                    }
+                    return (
+                      <TableCell key={key}>
+                        <div className="flex flex-wrap gap-0.5">
+                          {statuses.map((s, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                              style={{
+                                backgroundColor: `${s.color}15`,
+                                color: s.color,
+                                borderColor: `${s.color}40`,
+                                textDecoration: s.label.startsWith("✕") ? "line-through" : undefined,
+                              }}
+                            >
+                              {s.splitPart && s.splitTotal ? `${s.splitPart}/${s.splitTotal} ` : ""}
+                              {s.label}
+                            </span>
+                          ))}
+                        </div>
+                      </TableCell>
+                    );
                   }
                   if (key === "sent_date") return <TableCell key={key}><InlineEditableCell value={item.sent_date} type="date" onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>;
                   if (key === "accepted_date") return <TableCell key={key}><InlineEditableCell value={item.accepted_date} type="date" onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>;

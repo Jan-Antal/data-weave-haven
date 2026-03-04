@@ -9,6 +9,8 @@ import { ExpedicePanel } from "@/components/production/ExpedicePanel";
 import { DragOverlayContent } from "@/components/production/DragOverlayContent";
 import { AutoSplitPopover } from "@/components/production/AutoSplitPopover";
 import { MergePopover } from "@/components/production/MergePopover";
+import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
+import { useProjects } from "@/hooks/useProjects";
 import {
   DndContext,
   DragOverlay,
@@ -72,6 +74,8 @@ export default function PlanVyroby() {
   const [overDroppableId, setOverDroppableId] = useState<string | null>(null);
   const [autoSplitState, setAutoSplitState] = useState<AutoSplitState | null>(null);
   const [mergeState, setMergeState] = useState<MergeState | null>(null);
+  const [tpvProjectId, setTpvProjectId] = useState<string | null>(null);
+  const { data: allProjects = [] } = useProjects();
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const {
@@ -97,6 +101,12 @@ export default function PlanVyroby() {
       navigate("/", { replace: true });
     }
   }, [isAdmin, loading, navigate]);
+
+  const tpvProject = tpvProjectId ? allProjects.find(p => p.project_id === tpvProjectId) : null;
+
+  const handleNavigateToTPV = useCallback((projectId: string, _itemCode?: string | null) => {
+    setTpvProjectId(projectId);
+  }, []);
 
   const findSpillWeek = useCallback((afterWeekKey: string): { key: string; weekNum: number } => {
     const monday = new Date();
@@ -266,9 +276,9 @@ export default function PlanVyroby() {
       <div className="h-screen flex flex-col overflow-hidden" style={{ backgroundColor: "#f4f2f0" }}>
         <ProductionHeader />
         <div className="flex-1 flex min-h-0">
-          <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} />
-          <WeeklySilos showCzk={showCzk} onToggleCzk={setShowCzk} overDroppableId={overDroppableId} />
-          <ExpedicePanel showCzk={showCzk} />
+          <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
+          <WeeklySilos showCzk={showCzk} onToggleCzk={setShowCzk} overDroppableId={overDroppableId} onNavigateToTPV={handleNavigateToTPV} />
+          <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
         </div>
       </div>
 
@@ -293,6 +303,15 @@ export default function PlanVyroby() {
           itemName={mergeState.itemName}
           onMerge={() => mergeSplitItems(mergeState.splitGroupId)}
           onKeepSeparate={mergeState.onKeepSeparate}
+        />
+      )}
+
+      {/* TPV Navigation Dialog */}
+      {tpvProject && (
+        <ProjectDetailDialog
+          project={tpvProject}
+          open={!!tpvProjectId}
+          onOpenChange={(open) => { if (!open) setTpvProjectId(null); }}
         />
       )}
     </DndContext>

@@ -18,7 +18,7 @@ interface ContextMenuState {
   actions: ContextMenuAction[];
 }
 
-export function ExpedicePanel({ showCzk }: { showCzk?: boolean }) {
+export function ExpedicePanel({ showCzk, onNavigateToTPV }: { showCzk?: boolean; onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void }) {
   const { data: projects = [] } = useProductionExpedice();
   const { returnToProduction, moveItemBackToInbox } = useProductionDragDrop();
   const { data: settings } = useProductionSettings();
@@ -38,24 +38,30 @@ export function ExpedicePanel({ showCzk }: { showCzk?: boolean }) {
         return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
       })();
 
-      setContextMenu({
-        x: e.clientX,
-        y: e.clientY,
-        actions: [
-          {
-            label: `Vrátit do výroby (T${weekNum})`,
-            icon: "↩",
-            onClick: () => returnToProduction(item.id),
-          },
-          {
-            label: "Vrátit do Inboxu",
-            icon: "↩",
-            onClick: () => moveItemBackToInbox(item.id),
-          },
-        ],
-      });
+      const actions: ContextMenuAction[] = [
+        {
+          label: `Vrátit do výroby (T${weekNum})`,
+          icon: "↩",
+          onClick: () => returnToProduction(item.id),
+        },
+        {
+          label: "Vrátit do Inboxu",
+          icon: "↩",
+          onClick: () => moveItemBackToInbox(item.id),
+        },
+      ];
+
+      if (onNavigateToTPV) {
+        actions.push({
+          label: "Zobrazit v TPV",
+          icon: "📋",
+          onClick: () => onNavigateToTPV(item.project_id, item.item_code),
+        });
+      }
+
+      setContextMenu({ x: e.clientX, y: e.clientY, actions });
     },
-    [returnToProduction, moveItemBackToInbox]
+    [returnToProduction, moveItemBackToInbox, onNavigateToTPV]
   );
 
   if (collapsed) {
