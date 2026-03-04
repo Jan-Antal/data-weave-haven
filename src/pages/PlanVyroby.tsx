@@ -9,6 +9,8 @@ import { ExpedicePanel } from "@/components/production/ExpedicePanel";
 import { DragOverlayContent } from "@/components/production/DragOverlayContent";
 import { AutoSplitPopover } from "@/components/production/AutoSplitPopover";
 import { MergePopover } from "@/components/production/MergePopover";
+import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
+import { useProjects } from "@/hooks/useProjects";
 import {
   DndContext,
   DragOverlay,
@@ -72,6 +74,8 @@ export default function PlanVyroby() {
   const [overDroppableId, setOverDroppableId] = useState<string | null>(null);
   const [autoSplitState, setAutoSplitState] = useState<AutoSplitState | null>(null);
   const [mergeState, setMergeState] = useState<MergeState | null>(null);
+  const [tpvProjectId, setTpvProjectId] = useState<string | null>(null);
+  const { data: allProjects = [] } = useProjects();
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const {
@@ -97,6 +101,12 @@ export default function PlanVyroby() {
       navigate("/", { replace: true });
     }
   }, [isAdmin, loading, navigate]);
+
+  const tpvProject = tpvProjectId ? allProjects.find(p => p.project_id === tpvProjectId) : null;
+
+  const handleNavigateToTPV = useCallback((projectId: string, _itemCode?: string | null) => {
+    setTpvProjectId(projectId);
+  }, []);
 
   const findSpillWeek = useCallback((afterWeekKey: string): { key: string; weekNum: number } => {
     const monday = new Date();
