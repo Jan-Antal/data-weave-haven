@@ -253,6 +253,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const [priceEditing, setPriceEditing] = useState(false);
   const [showLocation, setShowLocation] = useState(false);
   const [unsavedConfirmOpen, setUnsavedConfirmOpen] = useState(false);
+  const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
 
   const [locSuggestions, setLocSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
   const [showLocDropdown, setShowLocDropdown] = useState(false);
@@ -1130,19 +1131,22 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                 <>
                                   <div
                                     className={cn(
-                                      "relative rounded-md border border-dashed border-muted-foreground/30 bg-background flex flex-col items-center justify-center py-3 px-2 cursor-pointer hover:border-muted-foreground/50 transition-colors",
-                                      sp.uploading && "pointer-events-none opacity-60"
+                                      "relative rounded-md border-2 border-dashed border-muted-foreground/30 bg-background flex flex-col items-center justify-center py-3 px-2 cursor-pointer hover:border-muted-foreground/50 transition-colors",
+                                      sp.uploading && "pointer-events-none opacity-60",
+                                      dragOverCategory === cat.key && "border-primary bg-primary/5"
                                     )}
-                                    onDragOver={(e) => e.preventDefault()}
-                                    onDrop={(e) => handleFileDrop(e, cat.key)}
+                                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                    onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverCategory(cat.key); }}
+                                    onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverCategory(null); }}
+                                    onDrop={(e) => { setDragOverCategory(null); handleFileDrop(e, cat.key); }}
                                     onClick={() => fileInputRef.current?.click()}
                                   >
                                     {sp.uploading ? (
                                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                                     ) : (
                                       <>
-                                        <Upload className="h-4 w-4 text-muted-foreground mb-1" />
-                                        <p className="text-[10px] text-muted-foreground text-center">
+                                        <Upload className={cn("h-4 w-4 mb-1", dragOverCategory === cat.key ? "text-primary" : "text-muted-foreground")} />
+                                        <p className={cn("text-[10px] text-center", dragOverCategory === cat.key ? "text-primary" : "text-muted-foreground")}>
                                           Přetáhněte soubor nebo vyberte
                                         </p>
                                       </>
