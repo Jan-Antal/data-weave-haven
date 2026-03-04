@@ -359,8 +359,8 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                     </TableCell>
                   );
                   if (key === "status") return <TableCell key={key}><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} onSave={(v) => saveField(item.id, "status", v, item.status || "")} readOnly={!canManageTPV} /></TableCell>;
-                  if (key === "sent_date") return <TableCell key={key}><InlineEditableCell value={item.sent_date} onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>;
-                  if (key === "accepted_date") return <TableCell key={key}><InlineEditableCell value={item.accepted_date} onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>;
+                  if (key === "sent_date") return <TableCell key={key}><InlineEditableCell value={item.sent_date} type="date" onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>;
+                  if (key === "accepted_date") return <TableCell key={key}><InlineEditableCell value={item.accepted_date} type="date" onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>;
                   if (key === "notes") return <TableCell key={key}><InlineEditableCell value={item.notes} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} readOnly={!canManageTPV} /></TableCell>;
                   if (key === "pocet") return <TableCell key={key} className="text-right"><InlineEditableCell value={item.pocet != null ? String(item.pocet) : ""} type="number" onSave={(v) => saveField(item.id, "pocet", v, item.pocet != null ? String(item.pocet) : "")} readOnly={!canManageTPV} /></TableCell>;
                   if (key === "cena") {
