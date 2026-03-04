@@ -8,6 +8,7 @@ import { ProductionContextMenu, type ContextMenuAction } from "./ProductionConte
 import { CompletionDialog } from "./CompletionDialog";
 import { SpillSuggestionPanel } from "./SpillSuggestionPanel";
 import { SplitItemDialog } from "./SplitItemDialog";
+import { SplitBundleDialog } from "./SplitBundleDialog";
 import { PauseItemDialog } from "./PauseItemDialog";
 import { CancelItemDialog } from "./CancelItemDialog";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
