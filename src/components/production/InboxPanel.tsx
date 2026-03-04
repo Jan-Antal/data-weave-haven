@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { ChevronRight, GripVertical, Check } from "lucide-react";
+import { ChevronRight, GripVertical, Check, Plus } from "lucide-react";
 import { useProductionInbox, type InboxProject, type InboxItem } from "@/hooks/useProductionInbox";
 import { useProductionProgress, type ProjectProgress } from "@/hooks/useProductionProgress";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
@@ -9,6 +9,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ProjectProgressBar } from "./ProjectProgressBar";
+import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
+import { AddItemPopover, getAdhocBadge } from "./AddItemPopover";
+import { CancelItemDialog } from "./CancelItemDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 function formatCompactCzk(v: number): string {
@@ -35,6 +38,16 @@ interface InboxPanelProps {
   onNavigateToTPV?: (projectId: string) => void;
 }
 
+interface ContextMenuState {
+  x: number; y: number; actions: ContextMenuAction[];
+}
+
+interface CancelState {
+  itemId: string; itemName: string; itemCode: string | null;
+  hours: number; projectName: string; projectId: string;
+  source: "schedule" | "inbox"; splitGroupId: string | null;
+}
+
 export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV }: InboxPanelProps) {
   const { data: projects = [], isLoading } = useProductionInbox();
   const { data: progressData } = useProductionProgress();
@@ -43,6 +56,9 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV }: InboxP
   const [loading, setLoading] = useState(false);
   const [allExpanded, setAllExpanded] = useState(false);
   const [expandKey, setExpandKey] = useState(0);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [addItemState, setAddItemState] = useState<{ projectId?: string; projectName?: string } | null>(null);
+  const [cancelState, setCancelState] = useState<CancelState | null>(null);
 
   const { setNodeRef, isOver } = useDroppable({ id: "inbox-drop-zone" });
 
@@ -50,40 +66,67 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV }: InboxP
   const hourlyRate = settings?.hourly_rate ?? 550;
   const isHighlighted = isOver || overDroppableId === "inbox-drop-zone";
 
-  // Find completed projects (all items scheduled/completed, none pending in inbox, no missing)
   const completedProjects = useMemo(() => {
     if (!progressData) return [];
     const activeProjectIds = new Set(projects.map(p => p.project_id));
-    return Array.from(progressData.values()).filter(
-      p => p.is_complete && !activeProjectIds.has(p.project_id)
-    );
+    return Array.from(progressData.values()).filter(p => p.is_complete && !activeProjectIds.has(p.project_id));
   }, [progressData, projects]);
+
+  // All unique project IDs for the add item dropdown
+  const allProjectOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const result: { project_id: string; project_name: string }[] = [];
+    for (const p of projects) {
+      if (!seen.has(p.project_id)) { seen.add(p.project_id); result.push({ project_id: p.project_id, project_name: p.project_name }); }
+    }
+    return result;
+  }, [projects]);
 
   const handleExpandAll = () => { setAllExpanded(true); setExpandKey((k) => k + 1); };
   const handleCollapseAll = () => { setAllExpanded(false); setExpandKey((k) => k + 1); };
+
+  const handleProjectContextMenu = (e: React.MouseEvent, project: InboxProject) => {
+    e.preventDefault(); e.stopPropagation();
+    const actions: ContextMenuAction[] = [
+      {
+        label: "Přidat položku", icon: "➕",
+        onClick: () => setAddItemState({ projectId: project.project_id, projectName: project.project_name }),
+      },
+    ];
+    if (onNavigateToTPV) {
+      actions.push({ label: "Zobrazit TPV položky", icon: "📋", onClick: () => onNavigateToTPV(project.project_id) });
+    }
+    setContextMenu({ x: e.clientX, y: e.clientY, actions });
+  };
+
+  const handleItemContextMenu = (e: React.MouseEvent, item: InboxItem, project: InboxProject) => {
+    e.preventDefault(); e.stopPropagation();
+    const actions: ContextMenuAction[] = [];
+    if (onNavigateToTPV) {
+      actions.push({ label: "Zobrazit v TPV", icon: "📋", onClick: () => onNavigateToTPV(project.project_id) });
+    }
+    actions.push({
+      label: "Zrušit položku", icon: "✕", danger: true, dividerBefore: true,
+      onClick: () => setCancelState({
+        itemId: item.id, itemName: item.item_name, itemCode: item.item_code,
+        hours: item.estimated_hours, projectName: project.project_name,
+        projectId: project.project_id, source: "inbox", splitGroupId: null,
+      }),
+    });
+    setContextMenu({ x: e.clientX, y: e.clientY, actions });
+  };
 
   const handleSeedData = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
-
       const rows = SAMPLE_ITEMS.flatMap(({ pid, items }) =>
-        items.map((item) => ({
-          project_id: pid,
-          item_name: item.name,
-          item_code: item.code,
-          estimated_hours: item.h,
-          estimated_czk: item.h * hourlyRate,
-          sent_by: user.id,
-          status: "pending" as const,
-        }))
+        items.map((item) => ({ project_id: pid, item_name: item.name, item_code: item.code, estimated_hours: item.h, estimated_czk: item.h * hourlyRate, sent_by: user.id, status: "pending" as const }))
       );
-
       const now = new Date();
       const monday = new Date(now);
       monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-
       const scheduleRows: any[] = [];
       const weekOffsets = [
         { offset: -1, items: [{ pid: "Z-2601-001", name: "Kuchyňská linka B", code: "TK.04", h: 200, status: "completed", completed_at: new Date(monday.getTime() - 3 * 86400000).toISOString() }, { pid: "Z-2502-011", name: "Stoly meeting room", code: "ST.02", h: 150, status: "completed", completed_at: new Date(monday.getTime() - 2 * 86400000).toISOString() }, { pid: "Z-2508-003", name: "Barové židle", code: "BZ.01", h: 120, status: "completed", completed_at: new Date(monday.getTime() - 1 * 86400000).toISOString() }] },
@@ -94,7 +137,6 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV }: InboxP
         { offset: 4, items: [{ pid: "Z-2607-002", name: "Skříň série", code: "SK.04", h: 300 }, { pid: "Z-2603-002", name: "Police sada B", code: "PL.02", h: 220 }, { pid: "Z-2508-003", name: "Obklad baru final", code: "OB.04", h: 170 }] },
         { offset: 5, items: [{ pid: "Z-2610-001", name: "Ředitelský stůl", code: "RS.01", h: 140 }, { pid: "Z-2502-011", name: "Open-space příčky", code: "PR.02", h: 380 }] },
       ];
-
       for (const week of weekOffsets) {
         const weekDate = new Date(monday);
         weekDate.setDate(monday.getDate() + week.offset * 7);
@@ -102,26 +144,19 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV }: InboxP
         for (let i = 0; i < week.items.length; i++) {
           const item = week.items[i];
           scheduleRows.push({
-            project_id: item.pid,
-            item_name: item.name,
-            item_code: (item as any).code || null,
-            scheduled_week: weekStr,
-            scheduled_hours: item.h,
-            scheduled_czk: item.h * hourlyRate,
-            position: i,
-            status: (item as any).status || "scheduled",
+            project_id: item.pid, item_name: item.name, item_code: (item as any).code || null,
+            scheduled_week: weekStr, scheduled_hours: item.h, scheduled_czk: item.h * hourlyRate,
+            position: i, status: (item as any).status || "scheduled",
             completed_at: (item as any).completed_at || null,
             completed_by: (item as any).status === "completed" ? user.id : null,
             created_by: user.id,
           });
         }
       }
-
       const { error: inboxErr } = await supabase.from("production_inbox").insert(rows);
       if (inboxErr) throw inboxErr;
       const { error: schedErr } = await supabase.from("production_schedule").insert(scheduleRows);
       if (schedErr) throw schedErr;
-
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["production-expedice"] });
@@ -134,25 +169,15 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV }: InboxP
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      className="w-[270px] shrink-0 flex flex-col transition-colors"
-      style={{
-        borderRight: "1px solid #ece8e2",
-        backgroundColor: isHighlighted ? "rgba(59,130,246,0.04)" : "#ffffff",
-        boxShadow: isHighlighted ? "inset 0 0 0 2px #3b82f6" : undefined,
-      }}
-    >
+    <div ref={setNodeRef} className="w-[270px] shrink-0 flex flex-col transition-colors"
+      style={{ borderRight: "1px solid #ece8e2", backgroundColor: isHighlighted ? "rgba(59,130,246,0.04)" : "#ffffff", boxShadow: isHighlighted ? "inset 0 0 0 2px #3b82f6" : undefined }}>
       {/* Header */}
       <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "1px solid #ece8e2" }}>
         <div className="flex items-center gap-2">
           <span className="text-sm">📥</span>
           <span className="text-[13px] font-semibold" style={{ color: "#223937" }}>Inbox</span>
           {projects.length > 0 && (
-            <span
-              className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-              style={{ backgroundColor: "rgba(217,151,6,0.12)", color: "#d97706" }}
-            >
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(217,151,6,0.12)", color: "#d97706" }}>
               {projects.reduce((s, p) => s + p.items.length, 0)}
             </span>
           )}
@@ -180,30 +205,21 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV }: InboxP
           </div>
         )}
         {projects.map((project) => (
-          <InboxProjectGroup
-            key={`${project.project_id}-${expandKey}`}
-            project={project}
-            hourlyRate={hourlyRate}
-            defaultExpanded={allExpanded}
-            showCzk={showCzk}
-            progress={progressData?.get(project.project_id)}
+          <InboxProjectGroup key={`${project.project_id}-${expandKey}`} project={project} hourlyRate={hourlyRate}
+            defaultExpanded={allExpanded} showCzk={showCzk} progress={progressData?.get(project.project_id)}
             onNavigateToTPV={onNavigateToTPV}
+            onProjectContextMenu={handleProjectContextMenu}
+            onItemContextMenu={handleItemContextMenu}
           />
         ))}
 
-        {/* Completed projects at bottom */}
         {completedProjects.length > 0 && (
           <div className="mt-2 space-y-[2px]">
             {completedProjects.map(p => (
-              <div
-                key={p.project_id}
-                className="flex items-center gap-1.5 px-2 py-[4px] rounded-[5px]"
-                style={{ backgroundColor: "rgba(58,138,54,0.04)", border: "1px solid rgba(58,138,54,0.15)" }}
-              >
+              <div key={p.project_id} className="flex items-center gap-1.5 px-2 py-[4px] rounded-[5px]"
+                style={{ backgroundColor: "rgba(58,138,54,0.04)", border: "1px solid rgba(58,138,54,0.15)" }}>
                 <Check className="h-3 w-3 shrink-0" style={{ color: "#3a8a36" }} />
-                <span className="text-[10px] font-medium truncate" style={{ color: "#3a8a36" }}>
-                  {p.project_id}
-                </span>
+                <span className="text-[10px] font-medium truncate" style={{ color: "#3a8a36" }}>{p.project_id}</span>
                 <span className="text-[9px] truncate" style={{ color: "#6b7a78" }}>— kompletní</span>
               </div>
             ))}
@@ -211,98 +227,89 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV }: InboxP
         )}
       </div>
 
-      {/* Subtle test data button at bottom */}
-      {projects.length === 0 && !isLoading && (
-        <div className="px-3 py-2 text-center" style={{ borderTop: "1px solid #ece8e2" }}>
-          <button
-            onClick={handleSeedData}
-            disabled={loading}
-            className="text-[9px] hover:underline transition-colors"
-            style={{ color: "#99a5a3" }}
-          >
-            🧪 {loading ? "Vkládám..." : "Naplnit testovací data"}
+      {/* Bottom: Add item button + test data */}
+      <div className="px-3 py-2 flex items-center justify-between" style={{ borderTop: "1px solid #ece8e2" }}>
+        <button
+          onClick={() => setAddItemState({})}
+          className="flex items-center gap-1 text-[10px] font-medium transition-colors rounded px-2 py-1"
+          style={{ color: "#3a8a36", border: "1px solid rgba(58,138,54,0.3)" }}
+          onMouseEnter={e => (e.currentTarget.style.backgroundColor = "rgba(58,138,54,0.05)")}
+          onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+        >
+          <Plus className="h-3 w-3" /> Nová položka
+        </button>
+        {projects.length === 0 && !isLoading && (
+          <button onClick={handleSeedData} disabled={loading} className="text-[9px] hover:underline transition-colors" style={{ color: "#99a5a3" }}>
+            🧪 {loading ? "Vkládám..." : "Testovací data"}
           </button>
-        </div>
+        )}
+      </div>
+
+      {/* Context menu */}
+      {contextMenu && <ProductionContextMenu x={contextMenu.x} y={contextMenu.y} actions={contextMenu.actions} onClose={() => setContextMenu(null)} />}
+
+      {/* Add item popover */}
+      {addItemState && (
+        <AddItemPopover open={!!addItemState} onOpenChange={open => !open && setAddItemState(null)}
+          projectId={addItemState.projectId} projectName={addItemState.projectName}
+          allProjects={allProjectOptions} />
+      )}
+
+      {/* Cancel dialog */}
+      {cancelState && (
+        <CancelItemDialog open={!!cancelState} onOpenChange={open => !open && setCancelState(null)} {...cancelState} itemCode={cancelState.itemCode} />
       )}
     </div>
   );
 }
 
-function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV }: {
+function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV, onProjectContextMenu, onItemContextMenu }: {
   project: InboxProject; hourlyRate: number; defaultExpanded: boolean; showCzk?: boolean;
   progress?: ProjectProgress; onNavigateToTPV?: (projectId: string) => void;
+  onProjectContextMenu: (e: React.MouseEvent, project: InboxProject) => void;
+  onItemContextMenu: (e: React.MouseEvent, item: InboxItem, project: InboxProject) => void;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const color = getProjectColor(project.project_id);
 
   return (
-    <div
-      className="rounded-lg overflow-hidden"
-      style={{ backgroundColor: "#ffffff", border: "1px solid #ece8e2", borderLeft: `4px solid ${color}` }}
-    >
+    <div className="rounded-lg overflow-hidden" style={{ backgroundColor: "#ffffff", border: "1px solid #ece8e2", borderLeft: `4px solid ${color}` }}>
       <button
         onClick={() => setExpanded(!expanded)}
+        onContextMenu={e => onProjectContextMenu(e, project)}
         className="w-full flex items-center gap-1.5 px-2.5 py-2 text-left transition-colors"
         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
       >
-        <ChevronRight
-          className="h-3 w-3 shrink-0 transition-transform duration-150"
-          style={{ color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}
-        />
+        <ChevronRight className="h-3 w-3 shrink-0 transition-transform duration-150"
+          style={{ color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }} />
         <div className="flex-1 min-w-0">
-          <div className="text-[12px] font-semibold truncate" style={{ color: "#223937" }}>
-            {project.project_name}
-          </div>
-          <div className="font-mono text-[9px]" style={{ color: "#99a5a3" }}>
-            {project.project_id}
-          </div>
-          {/* Progress bar */}
-          {progress && (
-            <div className="mt-1">
-              <ProjectProgressBar progress={progress} compact />
-            </div>
-          )}
+          <div className="text-[12px] font-semibold truncate" style={{ color: "#223937" }}>{project.project_name}</div>
+          <div className="font-mono text-[9px]" style={{ color: "#99a5a3" }}>{project.project_id}</div>
+          {progress && <div className="mt-1"><ProjectProgressBar progress={progress} compact /></div>}
         </div>
         <div className="text-right shrink-0">
-          <span className="font-mono text-[12px] font-semibold" style={{ color: "#223937" }}>
-            {Math.round(project.total_hours)}h
-          </span>
-          {showCzk && (
-            <span className="font-mono text-[9px] ml-1" style={{ color: "#6b7a78" }}>
-              {formatCompactCzk(project.total_hours * hourlyRate)}
-            </span>
-          )}
+          <span className="font-mono text-[12px] font-semibold" style={{ color: "#223937" }}>{Math.round(project.total_hours)}h</span>
+          {showCzk && <span className="font-mono text-[9px] ml-1" style={{ color: "#6b7a78" }}>{formatCompactCzk(project.total_hours * hourlyRate)}</span>}
         </div>
       </button>
-
       {expanded && (
         <div className="px-2 pb-2 space-y-[2px]">
-          {/* Scheduled items (muted) */}
           {progress?.scheduled_items.map(si => (
             <div key={si.id} className="flex items-center gap-1.5 px-2 py-[3px] rounded-[5px]" style={{ opacity: 0.5 }}>
-              <span className="text-[9px]" style={{ color: si.status === "completed" ? "#3a8a36" : "#3b82f6" }}>
-                {si.status === "completed" ? "✓" : "→"}
-              </span>
-              {si.item_code && (
-                <span className="font-mono text-[9px] shrink-0" style={{ color: "#99a5a3" }}>{si.item_code}</span>
-              )}
+              <span className="text-[9px]" style={{ color: si.status === "completed" ? "#3a8a36" : "#3b82f6" }}>{si.status === "completed" ? "✓" : "→"}</span>
+              {si.item_code && <span className="font-mono text-[9px] shrink-0" style={{ color: "#99a5a3" }}>{si.item_code}</span>}
               <span className="text-[10px] flex-1 truncate" style={{ color: "#99a5a3" }}>{si.item_name}</span>
               <span className="font-mono text-[9px] shrink-0" style={{ color: "#99a5a3" }}>{si.week_label}</span>
             </div>
           ))}
-          {/* Active draggable items */}
           {project.items.map((item) => (
-            <DraggableInboxItem key={item.id} item={item} projectName={project.project_name} />
+            <DraggableInboxItem key={item.id} item={item} projectName={project.project_name}
+              onContextMenu={e => onItemContextMenu(e, item, project)} />
           ))}
           <DraggableInboxProject project={project} />
-          {/* Navigate to TPV */}
           {onNavigateToTPV && (
-            <button
-              onClick={() => onNavigateToTPV(project.project_id)}
-              className="w-full text-[9px] text-center py-1 hover:underline transition-colors"
-              style={{ color: "#6b7a78" }}
-            >
+            <button onClick={() => onNavigateToTPV(project.project_id)} className="w-full text-[9px] text-center py-1 hover:underline transition-colors" style={{ color: "#6b7a78" }}>
               📋 Zobrazit TPV položky
             </button>
           )}
@@ -312,56 +319,32 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
   );
 }
 
-function DraggableInboxItem({ item, projectName }: { item: InboxItem; projectName: string }) {
+function DraggableInboxItem({ item, projectName, onContextMenu }: { item: InboxItem; projectName: string; onContextMenu: (e: React.MouseEvent) => void }) {
+  const adhocBadge = getAdhocBadge((item as any).adhoc_reason);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `inbox-item-${item.id}`,
     data: {
-      type: "inbox-item",
-      itemId: item.id,
-      itemName: item.item_name,
-      itemCode: item.item_code,
-      projectId: item.project_id,
-      projectName,
-      hours: item.estimated_hours,
-      stageId: item.stage_id,
+      type: "inbox-item", itemId: item.id, itemName: item.item_name, itemCode: item.item_code,
+      projectId: item.project_id, projectName, hours: item.estimated_hours, stageId: item.stage_id,
       scheduledCzk: item.estimated_czk,
     },
   });
 
   return (
-    <div
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
+    <div ref={setNodeRef} {...attributes} {...listeners}
       className="flex items-center gap-1.5 px-2 py-[5px] rounded-[5px] cursor-grab transition-all"
-      style={{
-        backgroundColor: "#ffffff",
-        border: "1px solid #ece8e2",
-        opacity: isDragging ? 0.3 : 1,
-      }}
-      onMouseEnter={(e) => {
-        if (!isDragging) {
-          e.currentTarget.style.backgroundColor = "rgba(59,130,246,0.04)";
-          e.currentTarget.style.borderColor = "#3b82f6";
-        }
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = "#ffffff";
-        e.currentTarget.style.borderColor = "#ece8e2";
-      }}
+      style={{ backgroundColor: "#ffffff", border: "1px solid #ece8e2", opacity: isDragging ? 0.3 : 1 }}
+      onMouseEnter={(e) => { if (!isDragging) { e.currentTarget.style.backgroundColor = "rgba(59,130,246,0.04)"; e.currentTarget.style.borderColor = "#3b82f6"; } }}
+      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "#ffffff"; e.currentTarget.style.borderColor = "#ece8e2"; }}
+      onContextMenu={onContextMenu}
     >
       <GripVertical className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />
-      {item.item_code && (
-        <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>
-          {item.item_code}
-        </span>
+      {adhocBadge && (
+        <span className="text-[8px] shrink-0" title={adhocBadge.label}>{adhocBadge.emoji}</span>
       )}
-      <span className="text-[11px] font-medium flex-1 truncate" style={{ color: "#6b7a78" }}>
-        {item.item_name}
-      </span>
-      <span className="font-mono text-[10px] shrink-0" style={{ color: "#6b7a78" }}>
-        {item.estimated_hours}h
-      </span>
+      {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
+      <span className="text-[11px] font-medium flex-1 truncate" style={{ color: "#6b7a78" }}>{item.item_name}</span>
+      <span className="font-mono text-[10px] shrink-0" style={{ color: "#6b7a78" }}>{item.estimated_hours}h</span>
     </div>
   );
 }
@@ -369,34 +352,15 @@ function DraggableInboxItem({ item, projectName }: { item: InboxItem; projectNam
 function DraggableInboxProject({ project }: { project: InboxProject }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `inbox-project-${project.project_id}`,
-    data: {
-      type: "inbox-project",
-      projectId: project.project_id,
-      projectName: project.project_name,
-      hours: project.total_hours,
-    },
+    data: { type: "inbox-project", projectId: project.project_id, projectName: project.project_name, hours: project.total_hours },
   });
 
   return (
-    <div
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
+    <div ref={setNodeRef} {...attributes} {...listeners}
       className="flex items-center justify-center px-2 py-[5px] rounded-[5px] cursor-grab transition-all text-[9px] font-semibold"
-      style={{
-        border: "1.5px dashed #3a8a36",
-        backgroundColor: "rgba(58,138,54,0.05)",
-        color: "#3a8a36",
-        opacity: isDragging ? 0.3 : 1,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderStyle = "solid";
-        e.currentTarget.style.backgroundColor = "rgba(58,138,54,0.1)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderStyle = "dashed";
-        e.currentTarget.style.backgroundColor = "rgba(58,138,54,0.05)";
-      }}
+      style={{ border: "1.5px dashed #3a8a36", backgroundColor: "rgba(58,138,54,0.05)", color: "#3a8a36", opacity: isDragging ? 0.3 : 1 }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderStyle = "solid"; e.currentTarget.style.backgroundColor = "rgba(58,138,54,0.1)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderStyle = "dashed"; e.currentTarget.style.backgroundColor = "rgba(58,138,54,0.05)"; }}
     >
       Přetáhni celý projekt ({Math.round(project.total_hours)}h)
     </div>
