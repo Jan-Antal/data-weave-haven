@@ -606,11 +606,6 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
 
   const renderKeys = editMode ? localOrder : allVisibleKeys;
 
-  const allCurrentLabels = useMemo(() => {
-    const keys = ["project_id", "project_name", ...renderKeys];
-    return keys.map(k => getLabel(k, getColumnLabel(k, customColumns)));
-  }, [renderKeys, getLabel, customColumns]);
-
   const headerProps = (key: string) => ({
     colKey: key,
     sortCol,

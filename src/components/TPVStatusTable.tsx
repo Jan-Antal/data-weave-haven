@@ -608,11 +608,6 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
 
   const renderKeys = editMode ? localOrder : allVisibleKeys;
 
-  const allCurrentLabels = useMemo(() => {
-    const keys = ["project_id", "project_name", ...renderKeys];
-    return keys.map(k => getLabel(k, getColumnLabel(k, customColumns)));
-  }, [renderKeys, getLabel, customColumns]);
-
   const headerProps = (key: string) => ({
     colKey: key, sortCol, sortDir, onSort: toggleSort, getLabel, getWidth, editMode, updateLabel, updateWidth, customColumns,
     existingLabels: allCurrentLabels,
