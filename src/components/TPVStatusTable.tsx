@@ -537,6 +537,12 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
 
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 
+  const allCurrentLabels = useMemo(() => {
+    const rk = editMode ? localOrder : allVisibleKeys;
+    const keys = ["project_id", "project_name", ...rk];
+    return keys.map(k => getLabel(k, getColumnLabel(k, customColumns)));
+  }, [editMode, localOrder, allVisibleKeys, getLabel, customColumns]);
+
   // Register export
   useEffect(() => {
     const allExportKeys = ["project_id", "project_name", ...allVisibleKeys];
@@ -601,11 +607,6 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const v = isVisible;
 
   const renderKeys = editMode ? localOrder : allVisibleKeys;
-
-  const allCurrentLabels = useMemo(() => {
-    const keys = ["project_id", "project_name", ...renderKeys];
-    return keys.map(k => getLabel(k, getColumnLabel(k, customColumns)));
-  }, [renderKeys, getLabel, customColumns]);
 
   const headerProps = (key: string) => ({
     colKey: key, sortCol, sortDir, onSort: toggleSort, getLabel, getWidth, editMode, updateLabel, updateWidth, customColumns,
