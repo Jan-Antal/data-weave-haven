@@ -16,6 +16,15 @@ export interface AnalyticsSummary {
   users: UserAnalytics[];
 }
 
+export function formatSessionDuration(minutes: number): string {
+  if (!minutes || minutes <= 0) return "—";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}h ${mins}min`;
+}
+
 export function useUserAnalytics(enabled: boolean) {
   return useQuery({
     queryKey: ["user-analytics"],
@@ -25,28 +34,25 @@ export function useUserAnalytics(enabled: boolean) {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
-      // Fetch login entries (last 30 days)
-      const { data: logins } = await (supabase.from("data_log") as any)
-        .select("user_email, created_at")
-        .eq("action_type", "user_login")
-        .gte("created_at", thirtyDaysAgo)
-        .order("created_at", { ascending: false });
-
-      // Fetch session_end entries (last 30 days) for duration
-      const { data: sessions } = await (supabase.from("data_log") as any)
-        .select("user_email, detail")
-        .eq("action_type", "session_end")
-        .gte("created_at", thirtyDaysAgo);
+      const [{ data: logins }, { data: sessions }] = await Promise.all([
+        (supabase.from("data_log") as any)
+          .select("user_email, created_at")
+          .eq("action_type", "user_login")
+          .gte("created_at", thirtyDaysAgo)
+          .order("created_at", { ascending: false }),
+        (supabase.from("data_log") as any)
+          .select("user_email, detail")
+          .eq("action_type", "session_end")
+          .gte("created_at", thirtyDaysAgo),
+      ]);
 
       const loginArr = (logins ?? []) as { user_email: string; created_at: string }[];
       const sessionArr = (sessions ?? []) as { user_email: string; detail: string | null }[];
 
-      // Summary counts
       const loginsToday = loginArr.filter(l => new Date(l.created_at) >= todayStart).length;
       const uniqueUsers7d = new Set(loginArr.filter(l => l.created_at >= sevenDaysAgo).map(l => l.user_email));
       const uniqueUsers30d = new Set(loginArr.map(l => l.user_email));
 
-      // Per-user breakdown
       const userMap = new Map<string, UserAnalytics>();
 
       for (const l of loginArr) {
@@ -69,8 +75,10 @@ export function useUserAnalytics(enabled: boolean) {
         try {
           const parsed = JSON.parse(s.detail);
           const mins = parsed.duration_minutes ?? 0;
-          if (!userSessionMins.has(s.user_email)) userSessionMins.set(s.user_email, []);
-          userSessionMins.get(s.user_email)!.push(mins);
+          if (mins > 0) {
+            if (!userSessionMins.has(s.user_email)) userSessionMins.set(s.user_email, []);
+            userSessionMins.get(s.user_email)!.push(mins);
+          }
         } catch {}
       }
 
@@ -122,6 +130,7 @@ export function useUserRecentActions(userEmail: string | null, enabled: boolean)
         action_type: string;
         project_id: string;
         new_value: string | null;
+        old_value: string | null;
         detail: string | null;
         created_at: string;
       }>;
