@@ -340,6 +340,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                 toggleColumn={toggleColVis}
                 editMode={editMode}
                 onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined}
+                onCancelEditMode={canEditColumns ? handleCancelEditMode : undefined}
               />
             </TableRow>
           </TableHeader>
