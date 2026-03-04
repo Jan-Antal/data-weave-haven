@@ -116,29 +116,29 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   }, [orderedAll, isColVisible, getDisplayOrderedKeys]);
 
   const [editMode, setEditMode] = useState(false);
-  const [localOrder, setLocalOrder] = useState<string[]>(allVisibleNonLocked);
+  const [localOrder, setLocalOrder] = useState<string[]>(allVisibleKeys);
 
   useEffect(() => {
-    if (!editMode) setLocalOrder(allVisibleNonLocked);
-  }, [allVisibleNonLocked, editMode]);
+    if (!editMode) setLocalOrder(allVisibleKeys);
+  }, [allVisibleKeys, editMode]);
 
   const handleToggleEditMode = useCallback(async () => {
     if (editMode) {
       await updateDisplayOrder(localOrder);
     } else {
-      setLocalOrder(allVisibleNonLocked);
+      setLocalOrder(allVisibleKeys);
     }
     setEditMode(!editMode);
-  }, [editMode, localOrder, allVisibleNonLocked, updateDisplayOrder]);
+  }, [editMode, localOrder, allVisibleKeys, updateDisplayOrder]);
 
   const handleCancelEditMode = useCallback(() => {
-    setLocalOrder(allVisibleNonLocked);
+    setLocalOrder(allVisibleKeys);
     setEditMode(false);
-  }, [allVisibleNonLocked]);
+  }, [allVisibleKeys]);
 
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 
-  const renderKeys = editMode ? localOrder : allVisibleNonLocked;
+  const renderKeys = editMode ? localOrder : allVisibleKeys;
 
   // ── Sort state ──────────────────────────────────────────────────
   const [sortCol, setSortCol] = useState<string | null>(null);
