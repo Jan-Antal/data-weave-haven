@@ -1,0 +1,1 @@
+UPDATE projects SET deleted_at = NULL, project_name = 'Multisport', expedice = '2026-05-04', updated_at = now() WHERE project_id = 'X14'
