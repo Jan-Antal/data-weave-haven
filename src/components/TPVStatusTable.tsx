@@ -297,10 +297,6 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
               canEdit={canEdit}
               renderKeys={renderKeys}
 
-  // Notify parent when TPV List is active/inactive
-  useEffect(() => {
-    onActiveProjectChange?.(!!activeProject);
-  }, [activeProject, onActiveProjectChange]);
 
               cancelConfirm={cancelConfirmId === stage.id}
               onCancelConfirm={() => handleCancelStage(stage.id)}
