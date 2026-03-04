@@ -206,22 +206,51 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const handleBundleContextMenu = useCallback(
     (e: React.MouseEvent, bundle: ScheduleBundle, weekKey: string, weekNum: number, startDate: Date, endDate: Date, toggleExpand: () => void) => {
       e.preventDefault(); e.stopPropagation();
-      const hasUncompleted = bundle.items.some(i => i.status !== "completed");
+      const activeItems = bundle.items.filter(i => i.status !== "completed" && i.status !== "paused" && i.status !== "cancelled");
+      const hasUncompleted = activeItems.length > 0;
+      const pausedItems = bundle.items.filter(i => i.status === "paused");
       const actions: ContextMenuAction[] = [];
       if (hasUncompleted) {
         actions.push({
           label: "Dokončit položky → Expedice", icon: "✓",
           onClick: () => { setCompletionState({ projectName: bundle.project_name, projectId: bundle.project_id, weekLabel: `Výroba T${weekNum} · ${formatDateShort(startDate)} – ${formatDateShort(endDate)}`, weekKey, items: bundle.items }); },
         });
+      }
+      if (hasUncompleted) {
+        actions.push({
+          label: `Pozastavit vše (${activeItems.length})`, icon: "⏸",
+          onClick: () => setPauseState({ itemId: activeItems.map(i => i.id).join(","), itemName: `${bundle.project_name} — ${activeItems.length} položek`, itemCode: null, source: "schedule" }),
+        });
+      }
+      if (pausedItems.length > 0) {
+        actions.push({
+          label: `Uvolnit vše (${pausedItems.length})`, icon: "▶",
+          onClick: async () => {
+            for (const item of pausedItems) await handleReleaseItem(item.id);
+          },
+        });
+      }
+      if (hasUncompleted || pausedItems.length > 0) {
         actions.push({ label: "Vrátit do Inboxu", icon: "←", onClick: () => returnBundleToInbox(bundle.project_id, weekKey) });
       }
       actions.push({ label: "Rozbalit / Sbalit", icon: "⇅", onClick: toggleExpand });
       if (onNavigateToTPV) {
         actions.push({ label: "Zobrazit TPV položky", icon: "📋", onClick: () => onNavigateToTPV(bundle.project_id) });
       }
+      if (hasUncompleted) {
+        actions.push({
+          label: `Zrušit vše (${activeItems.length})`, icon: "✕", danger: true, dividerBefore: true,
+          onClick: () => setCancelState({
+            itemId: activeItems.map(i => i.id).join(","), itemName: `${bundle.project_name} — ${activeItems.length} položek`,
+            itemCode: null, hours: activeItems.reduce((s, i) => s + i.scheduled_hours, 0),
+            projectName: bundle.project_name, projectId: bundle.project_id,
+            source: "schedule", splitGroupId: null, cancelAll: true,
+          }),
+        });
+      }
       setContextMenu({ x: e.clientX, y: e.clientY, actions });
     },
-    [returnBundleToInbox, onNavigateToTPV]
+    [returnBundleToInbox, onNavigateToTPV, handleReleaseItem]
   );
 
   const handleItemContextMenu = useCallback(
