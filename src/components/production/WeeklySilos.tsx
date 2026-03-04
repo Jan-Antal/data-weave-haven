@@ -8,6 +8,7 @@ import { ProductionContextMenu, type ContextMenuAction } from "./ProductionConte
 import { CompletionDialog } from "./CompletionDialog";
 import { SpillSuggestionPanel } from "./SpillSuggestionPanel";
 import { SplitItemDialog } from "./SplitItemDialog";
+import { SplitBundleDialog } from "./SplitBundleDialog";
 import { PauseItemDialog } from "./PauseItemDialog";
 import { CancelItemDialog } from "./CancelItemDialog";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
@@ -79,6 +80,21 @@ interface PauseState {
   source: "schedule" | "inbox";
 }
 
+interface BundleSplitState {
+  bundleName: string;
+  currentWeekKey: string;
+  items: Array<{
+    id: string;
+    item_name: string;
+    item_code: string | null;
+    project_id: string;
+    stage_id: string | null;
+    scheduled_hours: number;
+    scheduled_czk: number;
+    split_group_id: string | null;
+  }>;
+}
+
 interface CancelState {
   itemId: string;
   itemName: string;
@@ -100,6 +116,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [completionState, setCompletionState] = useState<CompletionState | null>(null);
   const [splitState, setSplitState] = useState<SplitState | null>(null);
+  const [bundleSplitState, setBundleSplitState] = useState<BundleSplitState | null>(null);
   const [pauseState, setPauseState] = useState<PauseState | null>(null);
   const [cancelState, setCancelState] = useState<CancelState | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -215,8 +232,27 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
           label: "Dokončit položky → Expedice", icon: "✓",
           onClick: () => { setCompletionState({ projectName: bundle.project_name, projectId: bundle.project_id, weekLabel: `Výroba T${weekNum} · ${formatDateShort(startDate)} – ${formatDateShort(endDate)}`, weekKey, items: bundle.items }); },
         });
-      }
-      if (hasUncompleted) {
+
+        actions.push({
+          label: `Rozdělit bundle (${activeItems.length})`, icon: "✂",
+          onClick: () => {
+            setBundleSplitState({
+              bundleName: bundle.project_name,
+              currentWeekKey: weekKey,
+              items: activeItems.map(i => ({
+                id: i.id,
+                item_name: i.item_name,
+                item_code: i.item_code,
+                project_id: i.project_id,
+                stage_id: i.stage_id,
+                scheduled_hours: i.scheduled_hours,
+                scheduled_czk: i.scheduled_czk,
+                split_group_id: i.split_group_id,
+              })),
+            });
+          },
+        });
+
         actions.push({
           label: `Pozastavit vše (${activeItems.length})`, icon: "⏸",
           onClick: () => setPauseState({ itemId: activeItems.map(i => i.id).join(","), itemName: `${bundle.project_name} — ${activeItems.length} položek`, itemCode: null, source: "schedule" }),
@@ -270,7 +306,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       }
       setContextMenu({ x: e.clientX, y: e.clientY, actions });
     },
-    [returnBundleToInbox, onNavigateToTPV, handleReleaseItem]
+    [returnBundleToInbox, onNavigateToTPV, handleReleaseItem, mergeSplitItems]
   );
 
   const handleItemContextMenu = useCallback(
@@ -407,6 +443,17 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
 
       {splitState && (
         <SplitItemDialog open={!!splitState} onOpenChange={open => !open && setSplitState(null)} {...splitState} itemCode={splitState.itemCode} weeks={weekOptions} weeklyCapacity={weeklyCapacity} splitGroupId={splitState.splitGroupId} />
+      )}
+
+      {bundleSplitState && (
+        <SplitBundleDialog
+          open={!!bundleSplitState}
+          onOpenChange={open => !open && setBundleSplitState(null)}
+          bundleName={bundleSplitState.bundleName}
+          currentWeekKey={bundleSplitState.currentWeekKey}
+          items={bundleSplitState.items}
+          weeks={weekOptions}
+        />
       )}
 
       {pauseState && (
