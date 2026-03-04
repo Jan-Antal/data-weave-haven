@@ -29,6 +29,7 @@ import { DataLogPanel } from "@/components/DataLogPanel";
 import { DataLogHighlightProvider } from "@/components/DataLogHighlightContext";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { AchievementCelebration } from "@/components/AchievementCelebration";
 import { useAchievementChecker } from "@/hooks/useAchievements";
