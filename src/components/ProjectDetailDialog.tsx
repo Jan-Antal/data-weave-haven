@@ -549,6 +549,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     }
     if (form.project_id !== project.project_id) {
       logActivity({ projectId: logPid, actionType: "project_id_change", oldValue: project.project_id, newValue: form.project_id });
+      // Migrate document count cache to new project ID
+      migrateDocCountCache(project.project_id, form.project_id);
     }
     qc.invalidateQueries({ queryKey: ["projects"] });
     qc.invalidateQueries({ queryKey: ["project-stages"] });
