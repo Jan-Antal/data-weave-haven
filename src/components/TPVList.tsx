@@ -86,6 +86,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const { data: statusOptions = [] } = useTPVStatusOptions();
   const TPV_STATUSES = statusOptions.map(o => o.label);
   const { data: allProjects = [] } = useProjects();
+  const { statusMap: productionStatusMap } = useProductionStatuses(projectId);
   const [detailOpen, setDetailOpen] = useState(false);
   const currentProject = useMemo(() => allProjects.find(p => p.project_id === projectId), [allProjects, projectId]);
 
