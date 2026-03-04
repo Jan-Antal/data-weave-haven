@@ -321,11 +321,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
               <TableHead className="w-10">
                 <Checkbox checked={items.length > 0 && selected.size === items.length} onCheckedChange={toggleAll} />
               </TableHead>
-              {/* Locked: item_type (Kód Prvku) */}
-              {isColVisible("item_type") && (
-                <SortableHeader {...headerProps("item_type")} />
-              )}
-              {/* Dynamic columns */}
+              {/* Dynamic columns (all, including item_type) */}
               {renderKeys.map(key => (
                 <SortableHeader key={key} {...headerProps(key)} />
               ))}
@@ -353,13 +349,12 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
               <TableRow key={item.id} className={`hover:bg-muted/50 transition-colors h-9 ${selected.has(item.id) ? "bg-primary/5" : ""}`}>
                 {canManageTPV && <TableCell><Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} /></TableCell>}
                 {!canManageTPV && <TableCell />}
-                {/* Locked: Kód Prvku */}
-                {isColVisible("item_type") && (
-                  <TableCell>
-                    <InlineEditableCell value={item.item_type || ""} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} className="font-mono text-xs" readOnly={!canManageTPV} />
-                  </TableCell>
-                )}
                 {renderKeys.map(key => {
+                  if (key === "item_type") return (
+                    <TableCell key={key}>
+                      <InlineEditableCell value={item.item_type || ""} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} className="font-mono text-xs" readOnly={!canManageTPV} />
+                    </TableCell>
+                  );
                   if (key === "nazev_prvku") return (
                     <TableCell key={key}>
                       <InlineEditableCell value={(item as any).nazev_prvku || ""} onSave={(v) => saveField(item.id, "nazev_prvku", v, (item as any).nazev_prvku || "")} className="font-semibold" readOnly={!canManageTPV} />
