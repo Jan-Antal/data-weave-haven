@@ -358,7 +358,16 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                       <InlineEditableCell value={item.konstrukter || ""} type="people" peopleRole="Konstruktér" onSave={(v) => saveField(item.id, "konstrukter", v, item.konstrukter || "")} readOnly={!canManageTPV} />
                     </TableCell>
                   );
-                  if (key === "status") return <TableCell key={key}><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} onSave={(v) => saveField(item.id, "status", v, item.status || "")} readOnly={!canManageTPV} /></TableCell>;
+                  if (key === "status") {
+                    const statusOpt = statusOptions.find(o => o.label === item.status);
+                    const statusColor = statusOpt?.color;
+                    const statusDisplay = item.status && statusColor ? (
+                      <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: `${statusColor}20`, color: statusColor, borderColor: `${statusColor}50` }}>
+                        {item.status}
+                      </span>
+                    ) : undefined;
+                    return <TableCell key={key}><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} displayValue={statusDisplay} onSave={(v) => saveField(item.id, "status", v, item.status || "")} readOnly={!canManageTPV} /></TableCell>;
+                  }
                   if (key === "sent_date") return <TableCell key={key}><InlineEditableCell value={item.sent_date} type="date" onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>;
                   if (key === "accepted_date") return <TableCell key={key}><InlineEditableCell value={item.accepted_date} type="date" onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>;
                   if (key === "notes") return <TableCell key={key}><InlineEditableCell value={item.notes} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} readOnly={!canManageTPV} /></TableCell>;
