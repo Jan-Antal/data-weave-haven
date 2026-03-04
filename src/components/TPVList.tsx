@@ -26,7 +26,7 @@ import { useExportContext } from "./ExportContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
-  { key: "item_type", label: "Kód Prvku", locked: true },
+  { key: "item_type", label: "Kód Prvku" },
   { key: "nazev_prvku", label: "Název Prvku" },
   { key: "item_name", label: "Popis" },
   { key: "konstrukter", label: "Konstruktér" },
@@ -39,7 +39,7 @@ const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultH
 ];
 
 const TPV_LIST_LABEL_MAP = Object.fromEntries(TPV_LIST_COLUMNS.map(c => [c.key, c.label]));
-const TPV_LIST_NON_LOCKED = TPV_LIST_COLUMNS.filter(c => !c.locked).map(c => c.key);
+const TPV_LIST_ALL_KEYS = TPV_LIST_COLUMNS.map(c => c.key);
 
 function getTPVListColumnStyle(key: string, customWidth?: number | null): React.CSSProperties {
   if (customWidth) return { width: customWidth, minWidth: customWidth };
