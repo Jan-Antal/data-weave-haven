@@ -111,19 +111,19 @@ function SortableColumnRow({
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-1 px-1 py-1 rounded hover:bg-muted/50 cursor-pointer text-sm">
+    <div ref={setNodeRef} style={style} className="flex items-center gap-1 px-1 py-1 rounded hover:bg-muted/50 text-sm">
       {canDrag && (
         <div {...attributes} {...listeners} className="cursor-grab shrink-0 p-0.5">
           <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
         </div>
       )}
-      <label className="flex items-center gap-2 flex-1 cursor-pointer px-1">
+      <div className="flex items-center gap-2 flex-1 cursor-pointer px-1" onClick={(e) => { e.stopPropagation(); onToggle(); }}>
         <Checkbox checked={checked} onCheckedChange={onToggle} />
         <span>{label}</span>
         {isCustom && <span className="text-xs italic text-muted-foreground ml-1">custom</span>}
-      </label>
+      </div>
       {onDelete && (
-        <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(); }} className="shrink-0 p-0.5 hover:text-destructive">
+        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(); }} className="shrink-0 p-0.5 hover:text-destructive">
           <Trash2 className="h-3 w-3" />
         </button>
       )}
@@ -362,7 +362,7 @@ export function ColumnVisibilityToggle(props: Props) {
         onConfirm={() => { if (deleteConfirm) { deleteColumn.mutate(deleteConfirm); setDeleteConfirm(null); } }}
         onCancel={() => setDeleteConfirm(null)}
         title="Smazat sloupec"
-        description={`Opravdu chcete smazat sloupec „${deleteConfirm ? (customColumns.find(c => c.id === deleteConfirm)?.label ?? "") : ""}"? Tato akce smaže sloupec a všechna jeho data ze všech projektů. Tuto akci nelze vrátit.`}
+        description={`Opravdu smazat sloupec „${deleteConfirm ? (customColumns.find(c => c.id === deleteConfirm)?.label ?? "") : ""}"? Data v tomto sloupci budou ztracena.`}
       />
     </>
   );

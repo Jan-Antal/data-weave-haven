@@ -26,7 +26,7 @@ import { useExportContext } from "./ExportContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
-  { key: "item_type", label: "Kód Prvku", locked: true },
+  { key: "item_type", label: "Kód Prvku" },
   { key: "nazev_prvku", label: "Název Prvku" },
   { key: "item_name", label: "Popis" },
   { key: "konstrukter", label: "Konstruktér" },
@@ -39,7 +39,7 @@ const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultH
 ];
 
 const TPV_LIST_LABEL_MAP = Object.fromEntries(TPV_LIST_COLUMNS.map(c => [c.key, c.label]));
-const TPV_LIST_NON_LOCKED = TPV_LIST_COLUMNS.filter(c => !c.locked).map(c => c.key);
+const TPV_LIST_ALL_KEYS = TPV_LIST_COLUMNS.map(c => c.key);
 
 function getTPVListColumnStyle(key: string, customWidth?: number | null): React.CSSProperties {
   if (customWidth) return { width: customWidth, minWidth: customWidth };
@@ -102,7 +102,6 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const visMap = useMemo(() => getVisibilityMap(), [getVisibilityMap]);
   const DEFAULT_HIDDEN_KEYS = useMemo(() => new Set(TPV_LIST_COLUMNS.filter(c => c.defaultHidden).map(c => c.key)), []);
   const isColVisible = useCallback((key: string) => {
-    if (key === "item_type") return true; // locked
     if (visMap[key] === undefined) return !DEFAULT_HIDDEN_KEYS.has(key);
     return visMap[key] !== false;
   }, [visMap, DEFAULT_HIDDEN_KEYS]);
@@ -110,36 +109,36 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     updateVisibility(key, !isColVisible(key));
   }, [isColVisible, updateVisibility]);
 
-  const orderedNonLocked = useMemo(() => getOrderedKeys(TPV_LIST_NON_LOCKED), [getOrderedKeys]);
-  const allVisibleNonLocked = useMemo(() => {
-    const vis = orderedNonLocked.filter(k => isColVisible(k));
+  const orderedAll = useMemo(() => getOrderedKeys(TPV_LIST_ALL_KEYS), [getOrderedKeys]);
+  const allVisibleKeys = useMemo(() => {
+    const vis = orderedAll.filter(k => isColVisible(k));
     return getDisplayOrderedKeys(vis);
-  }, [orderedNonLocked, isColVisible, getDisplayOrderedKeys]);
+  }, [orderedAll, isColVisible, getDisplayOrderedKeys]);
 
   const [editMode, setEditMode] = useState(false);
-  const [localOrder, setLocalOrder] = useState<string[]>(allVisibleNonLocked);
+  const [localOrder, setLocalOrder] = useState<string[]>(allVisibleKeys);
 
   useEffect(() => {
-    if (!editMode) setLocalOrder(allVisibleNonLocked);
-  }, [allVisibleNonLocked, editMode]);
+    if (!editMode) setLocalOrder(allVisibleKeys);
+  }, [allVisibleKeys, editMode]);
 
   const handleToggleEditMode = useCallback(async () => {
     if (editMode) {
       await updateDisplayOrder(localOrder);
     } else {
-      setLocalOrder(allVisibleNonLocked);
+      setLocalOrder(allVisibleKeys);
     }
     setEditMode(!editMode);
-  }, [editMode, localOrder, allVisibleNonLocked, updateDisplayOrder]);
+  }, [editMode, localOrder, allVisibleKeys, updateDisplayOrder]);
 
   const handleCancelEditMode = useCallback(() => {
-    setLocalOrder(allVisibleNonLocked);
+    setLocalOrder(allVisibleKeys);
     setEditMode(false);
-  }, [allVisibleNonLocked]);
+  }, [allVisibleKeys]);
 
   const { dragKey, dropTarget, getDragProps } = useHeaderDrag(localOrder, setLocalOrder);
 
-  const renderKeys = editMode ? localOrder : allVisibleNonLocked;
+  const renderKeys = editMode ? localOrder : allVisibleKeys;
 
   // ── Sort state ──────────────────────────────────────────────────
   const [sortCol, setSortCol] = useState<string | null>(null);
@@ -172,7 +171,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const [inlineName, setInlineName] = useState("");
   const inlineRef = useRef<HTMLInputElement>(null);
 
-  const visibleColCount = renderKeys.length + 3; // +checkbox +item_type(locked) +actions
+  const visibleColCount = renderKeys.length + 2; // +checkbox +actions
 
   const toggleSelect = (id: string) => {
     setSelected(prev => {
@@ -215,15 +214,11 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   // ── Header helpers ──────────────────────────────────────────────
   // Build list of all current column labels for duplicate detection
   const allCurrentLabels = useMemo(() => {
-    const labels: string[] = [];
-    // locked column
-    labels.push(getLabel("item_type", TPV_LIST_LABEL_MAP["item_type"] || "item_type"));
-    // visible columns
-    for (const key of renderKeys) {
-      labels.push(getLabel(key, TPV_LIST_LABEL_MAP[key] || key));
-    }
-    return labels;
-  }, [renderKeys, getLabel]);
+    return renderKeys.map(key => {
+      const customCol = customColumns.find(c => c.column_key === key);
+      return customCol ? customCol.label : getLabel(key, TPV_LIST_LABEL_MAP[key] || key);
+    });
+  }, [renderKeys, getLabel, customColumns]);
 
   const headerProps = (key: string) => ({
     label: TPV_LIST_LABEL_MAP[key] || key,
@@ -247,7 +242,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
 
   const tpvExportMeta = useMemo(() => ({
     getter: (selectedKeys?: string[]) => {
-      const visKeys = selectedKeys ?? ["item_type", ...renderKeys];
+      const visKeys = selectedKeys ?? renderKeys;
       const headers = visKeys.map(k => getLabel(k, TPV_LIST_LABEL_MAP[k] || k));
       const rows = sortedItems.map(item => visKeys.map(k => {
         if (k.startsWith("custom_")) {
@@ -262,7 +257,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     groups: [
       { label: "TPV List", keys: TPV_LIST_COLUMNS.map(c => c.key), getLabel: (k: string) => getLabel(k, TPV_LIST_LABEL_MAP[k] || k) },
     ],
-    defaultVisibleKeys: ["item_type", ...renderKeys],
+    defaultVisibleKeys: renderKeys,
   }), [renderKeys, sortedItems, getLabel]);
 
   useEffect(() => {
@@ -321,11 +316,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
               <TableHead className="w-10">
                 <Checkbox checked={items.length > 0 && selected.size === items.length} onCheckedChange={toggleAll} />
               </TableHead>
-              {/* Locked: item_type (Kód Prvku) */}
-              {isColVisible("item_type") && (
-                <SortableHeader {...headerProps("item_type")} />
-              )}
-              {/* Dynamic columns */}
+              {/* Dynamic columns (all, including item_type) */}
               {renderKeys.map(key => (
                 <SortableHeader key={key} {...headerProps(key)} />
               ))}
@@ -353,13 +344,12 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
               <TableRow key={item.id} className={`hover:bg-muted/50 transition-colors h-9 ${selected.has(item.id) ? "bg-primary/5" : ""}`}>
                 {canManageTPV && <TableCell><Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} /></TableCell>}
                 {!canManageTPV && <TableCell />}
-                {/* Locked: Kód Prvku */}
-                {isColVisible("item_type") && (
-                  <TableCell>
-                    <InlineEditableCell value={item.item_type || ""} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} className="font-mono text-xs" readOnly={!canManageTPV} />
-                  </TableCell>
-                )}
                 {renderKeys.map(key => {
+                  if (key === "item_type") return (
+                    <TableCell key={key}>
+                      <InlineEditableCell value={item.item_type || ""} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} className="font-mono text-xs" readOnly={!canManageTPV} />
+                    </TableCell>
+                  );
                   if (key === "nazev_prvku") return (
                     <TableCell key={key}>
                       <InlineEditableCell value={(item as any).nazev_prvku || ""} onSave={(v) => saveField(item.id, "nazev_prvku", v, (item as any).nazev_prvku || "")} className="font-semibold" readOnly={!canManageTPV} />
