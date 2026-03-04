@@ -9,8 +9,9 @@ import { ExpedicePanel } from "@/components/production/ExpedicePanel";
 import { DragOverlayContent } from "@/components/production/DragOverlayContent";
 import { AutoSplitPopover } from "@/components/production/AutoSplitPopover";
 import { MergePopover } from "@/components/production/MergePopover";
-import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
+import { TPVList } from "@/components/TPVList";
 import { useProjects } from "@/hooks/useProjects";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   DndContext,
   DragOverlay,
@@ -308,11 +309,16 @@ export default function PlanVyroby() {
 
       {/* TPV Navigation Dialog */}
       {tpvProject && (
-        <ProjectDetailDialog
-          project={tpvProject}
-          open={!!tpvProjectId}
-          onOpenChange={(open) => { if (!open) setTpvProjectId(null); }}
-        />
+        <Dialog open={!!tpvProjectId} onOpenChange={(open) => { if (!open) setTpvProjectId(null); }}>
+          <DialogContent className="max-w-[95vw] w-[95vw] max-h-[90vh] overflow-auto p-0">
+            <TPVList
+              projectId={tpvProject.project_id}
+              projectName={tpvProject.project_name}
+              currency={tpvProject.currency || "CZK"}
+              onBack={() => setTpvProjectId(null)}
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </DndContext>
   );

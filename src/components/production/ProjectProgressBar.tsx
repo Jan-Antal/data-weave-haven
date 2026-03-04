@@ -27,21 +27,21 @@ export function ProjectProgressBar({ progress, compact }: Props) {
               <span className="text-[9px] font-mono" style={{ color: "#6b7a78" }}>{accountedFor}/{total}</span>
             </div>
           )}
-          <div className="h-[4px] w-full rounded-full overflow-hidden flex" style={{ backgroundColor: "#f0eee9" }}>
-            {pctCompleted > 0 && <div className="h-full" style={{ width: `${pctCompleted}%`, backgroundColor: "#3a8a36" }} />}
-            {pctScheduled > 0 && <div className="h-full" style={{ width: `${pctScheduled}%`, backgroundColor: "#3b82f6" }} />}
-            {pctPaused > 0 && <div className="h-full" style={{ width: `${pctPaused}%`, backgroundColor: "#eab308" }} />}
-            {pctInbox > 0 && <div className="h-full" style={{ width: `${pctInbox}%`, backgroundColor: "#d97706" }} />}
-            {pctMissing > 0 && <div className="h-full" style={{ width: `${pctMissing}%`, backgroundColor: "#dc3545" }} />}
+          <div className="h-[4px] w-full rounded-full overflow-hidden flex" style={{ backgroundColor: "#e8e5e0" }}>
+            {pctCompleted > 0 && <div className="h-full" style={{ width: `${pctCompleted}%`, backgroundColor: "#5a9a58" }} />}
+            {pctScheduled > 0 && <div className="h-full" style={{ width: `${pctScheduled}%`, backgroundColor: "#a3cfa2" }} />}
+            {pctPaused > 0 && <div className="h-full" style={{ width: `${pctPaused}%`, backgroundColor: "#e0c97a" }} />}
+            {pctInbox > 0 && <div className="h-full" style={{ width: `${pctInbox}%`, backgroundColor: "#c4bfb8" }} />}
+            {pctMissing > 0 && <div className="h-full" style={{ width: `${pctMissing}%`, backgroundColor: "#c9706e" }} />}
           </div>
         </div>
       </TooltipTrigger>
       <TooltipContent className="text-[10px] space-y-0.5">
-        <div style={{ color: "#3a8a36" }}>✓ Dokončeno: {progress.completed}</div>
-        <div style={{ color: "#3b82f6" }}>📅 Naplánováno: {progress.scheduled}</div>
-        {(progress.paused || 0) > 0 && <div style={{ color: "#eab308" }}>⏸ Pozastaveno: {progress.paused}</div>}
-        <div style={{ color: "#d97706" }}>📥 V Inboxu: {progress.in_inbox}</div>
-        {progress.missing > 0 && <div style={{ color: "#dc3545" }}>⚠ Chybí: {progress.missing}</div>}
+        <div style={{ color: "#5a9a58" }}>✓ Dokončeno: {progress.completed}</div>
+        <div style={{ color: "#6aab68" }}>📅 Naplánováno: {progress.scheduled}</div>
+        {(progress.paused || 0) > 0 && <div style={{ color: "#b8a44a" }}>⏸ Pozastaveno: {progress.paused}</div>}
+        <div style={{ color: "#8a8580" }}>📥 V Inboxu: {progress.in_inbox}</div>
+        {progress.missing > 0 && <div style={{ color: "#c9706e" }}>⚠ Chybí: {progress.missing}</div>}
         <div className="text-muted-foreground pt-0.5 border-t" style={{ borderColor: "#e2ddd6" }}>TPV celkem: {progress.total_tpv}</div>
       </TooltipContent>
     </Tooltip>
