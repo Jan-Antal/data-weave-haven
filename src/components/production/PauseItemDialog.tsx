@@ -36,18 +36,32 @@ export function PauseItemDialog({ open, onOpenChange, itemId, itemName, itemCode
     setSubmitting(true);
     try {
       const pauseReason = reason === "jine" ? (customReason || "Jiné") : REASON_OPTIONS.find(r => r.value === reason)?.short || reason;
+      const pauseData = {
+        status: "paused" as const,
+        pause_reason: pauseReason,
+        pause_expected_date: expectedDate ? expectedDate.toISOString().split("T")[0] : null,
+      };
 
       if (source === "schedule") {
-        const { error } = await supabase.from("production_schedule").update({
-          status: "paused",
-          pause_reason: pauseReason,
-          pause_expected_date: expectedDate ? expectedDate.toISOString().split("T")[0] : null,
-        }).eq("id", itemId);
+        // Support multiple IDs (comma-separated for bundle pause)
+        const ids = itemId.split(",").map(id => id.trim()).filter(Boolean);
+
+        // Collect all split siblings for each item
+        const allIds = new Set(ids);
+        for (const id of ids) {
+          const { data: item } = await supabase.from("production_schedule").select("split_group_id").eq("id", id).single();
+          if (item?.split_group_id) {
+            const { data: siblings } = await supabase.from("production_schedule")
+              .select("id")
+              .or(`split_group_id.eq.${item.split_group_id},id.eq.${item.split_group_id}`)
+              .in("status", ["scheduled", "in_progress"]);
+            if (siblings) siblings.forEach(s => allIds.add(s.id));
+          }
+        }
+
+        const { error } = await supabase.from("production_schedule").update(pauseData).in("id", Array.from(allIds));
         if (error) throw error;
       } else {
-        // For inbox items we store pause info but keep status as pending with a marker
-        // Actually inbox doesn't have pause fields — we need to handle this differently
-        // For now, only schedule items can be paused per spec
         throw new Error("Inbox items cannot be paused - schedule them first");
       }
 

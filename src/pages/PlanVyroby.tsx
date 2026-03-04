@@ -153,6 +153,32 @@ export default function PlanVyroby() {
     setOverDroppableId(event.over?.id?.toString() ?? null);
   }, []);
 
+  // Resolve the target week from any droppable ID
+  const resolveTargetWeek = useCallback((targetId: string, dragData: ActiveDragData): string | null => {
+    if (targetId.startsWith("silo-week-")) {
+      return targetId.replace("silo-week-", "");
+    }
+    // Dropped on a specific item or bundle inside a silo — find its week
+    if (targetId.startsWith("silo-item-") || targetId.startsWith("silo-bundle-")) {
+      // Search schedule data for the item/bundle's week
+      if (scheduleData) {
+        for (const [weekKey, silo] of scheduleData) {
+          for (const bundle of silo.bundles) {
+            if (targetId.startsWith("silo-bundle-") && targetId.includes(bundle.project_id) && targetId.includes(weekKey)) {
+              return weekKey;
+            }
+            for (const item of bundle.items) {
+              if (targetId === `silo-item-${item.id}`) {
+                return weekKey;
+              }
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }, [scheduleData]);
+
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveDrag(null);
@@ -172,8 +198,8 @@ export default function PlanVyroby() {
       return;
     }
 
-    if (targetId.startsWith("silo-week-")) {
-      const weekDate = targetId.replace("silo-week-", "");
+    const weekDate = resolveTargetWeek(targetId, dragData);
+    if (!weekDate) return;
 
       // Check for merge: dragging split item onto sibling
       if (dragData.type === "silo-item" && dragData.splitGroupId && dragData.itemId) {
@@ -252,10 +278,9 @@ export default function PlanVyroby() {
           await moveBundleToWeek(dragData.projectId, dragData.weekDate, weekDate);
         }
       }
-    }
   }, [moveInboxItemToWeek, moveInboxProjectToWeek, moveScheduleItemToWeek, moveBundleToWeek,
     moveItemBackToInbox, returnBundleToInbox, scheduleData, weeklyCapacity, hourlyRate,
-    findSpillWeek, findSiblingInWeek, mergeSplitItems]);
+    findSpillWeek, findSiblingInWeek, mergeSplitItems, resolveTargetWeek]);
 
   if (loading) {
     return (
