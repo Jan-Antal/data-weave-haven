@@ -36,6 +36,7 @@ interface Props {
   showCzk: boolean;
   onToggleCzk: (v: boolean) => void;
   overDroppableId?: string | null;
+  onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void;
 }
 
 interface ContextMenuState {
@@ -66,7 +67,7 @@ interface SplitState {
   splitGroupId?: string | null;
 }
 
-export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
+export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
@@ -217,9 +218,17 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
         onClick: toggleExpand,
       });
 
+      if (onNavigateToTPV) {
+        actions.push({
+          label: "Zobrazit TPV položky",
+          icon: "📋",
+          onClick: () => onNavigateToTPV(bundle.project_id),
+        });
+      }
+
       setContextMenu({ x: e.clientX, y: e.clientY, actions });
     },
-    [returnBundleToInbox]
+    [returnBundleToInbox, onNavigateToTPV]
   );
 
   const handleItemContextMenu = useCallback(
@@ -296,9 +305,17 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId }: Props) {
         });
       }
 
+      if (onNavigateToTPV) {
+        actions.push({
+          label: "Zobrazit v TPV",
+          icon: "📋",
+          onClick: () => onNavigateToTPV(item.project_id, item.item_code),
+        });
+      }
+
       setContextMenu({ x: e.clientX, y: e.clientY, actions });
     },
-    [moveItemBackToInbox, returnToProduction, mergeSplitItems, findSameWeekSiblings]
+    [moveItemBackToInbox, returnToProduction, mergeSplitItems, findSameWeekSiblings, onNavigateToTPV]
   );
 
   return (
