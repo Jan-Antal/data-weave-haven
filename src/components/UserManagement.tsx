@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Trash2, KeyRound, ArrowRightLeft, Link2, Lock, Eye, EyeOff } from "lucide-react";
+import { Plus, Trash2, ArrowRightLeft, Link2, Lock, Eye, EyeOff } from "lucide-react";
 import type { AppRole } from "@/hooks/useAuth";
 import { PasswordChecklist } from "@/components/PasswordChecklist";
 import { usePasswordValidation } from "@/hooks/usePasswordValidation";
