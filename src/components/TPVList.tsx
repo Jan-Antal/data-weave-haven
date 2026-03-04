@@ -102,7 +102,6 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const visMap = useMemo(() => getVisibilityMap(), [getVisibilityMap]);
   const DEFAULT_HIDDEN_KEYS = useMemo(() => new Set(TPV_LIST_COLUMNS.filter(c => c.defaultHidden).map(c => c.key)), []);
   const isColVisible = useCallback((key: string) => {
-    if (key === "item_type") return true; // locked
     if (visMap[key] === undefined) return !DEFAULT_HIDDEN_KEYS.has(key);
     return visMap[key] !== false;
   }, [visMap, DEFAULT_HIDDEN_KEYS]);
@@ -110,11 +109,11 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     updateVisibility(key, !isColVisible(key));
   }, [isColVisible, updateVisibility]);
 
-  const orderedNonLocked = useMemo(() => getOrderedKeys(TPV_LIST_NON_LOCKED), [getOrderedKeys]);
-  const allVisibleNonLocked = useMemo(() => {
-    const vis = orderedNonLocked.filter(k => isColVisible(k));
+  const orderedAll = useMemo(() => getOrderedKeys(TPV_LIST_ALL_KEYS), [getOrderedKeys]);
+  const allVisibleKeys = useMemo(() => {
+    const vis = orderedAll.filter(k => isColVisible(k));
     return getDisplayOrderedKeys(vis);
-  }, [orderedNonLocked, isColVisible, getDisplayOrderedKeys]);
+  }, [orderedAll, isColVisible, getDisplayOrderedKeys]);
 
   const [editMode, setEditMode] = useState(false);
   const [localOrder, setLocalOrder] = useState<string[]>(allVisibleNonLocked);
