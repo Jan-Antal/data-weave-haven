@@ -306,7 +306,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       }
       setContextMenu({ x: e.clientX, y: e.clientY, actions });
     },
-    [returnBundleToInbox, onNavigateToTPV, handleReleaseItem]
+    [returnBundleToInbox, onNavigateToTPV, handleReleaseItem, mergeSplitItems]
   );
 
   const handleItemContextMenu = useCallback(
