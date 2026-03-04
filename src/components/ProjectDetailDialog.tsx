@@ -253,6 +253,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const [priceEditing, setPriceEditing] = useState(false);
   const [showLocation, setShowLocation] = useState(false);
   const [unsavedConfirmOpen, setUnsavedConfirmOpen] = useState(false);
+  const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
 
   const [locSuggestions, setLocSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
   const [showLocDropdown, setShowLocDropdown] = useState(false);
