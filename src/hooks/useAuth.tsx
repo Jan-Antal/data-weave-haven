@@ -163,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    await endSession();
     await supabase.auth.signOut();
   };
 
