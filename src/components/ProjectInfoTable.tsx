@@ -677,6 +677,11 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
 
   const v = isVisible;
 
+  const allCurrentLabels = useMemo(() => {
+    const keys = ["project_id", "project_name", ...renderKeys];
+    return keys.map(k => getLabel(k, getColumnLabel(k, customColumns)));
+  }, [renderKeys, getLabel, customColumns]);
+
   const headerProps = (key: string) => ({
     colKey: key,
     sortCol,
@@ -688,6 +693,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     updateLabel,
     updateWidth,
     customColumns,
+    existingLabels: allCurrentLabels,
     ...(editMode ? {
       dragProps: getDragProps(key),
       dropIndicator: dropTarget?.key === key ? dropTarget.side : null,
