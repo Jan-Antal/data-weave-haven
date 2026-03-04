@@ -370,7 +370,7 @@ export function SpillSuggestionPanel({
               Rozdělit %
             </button>
             <button
-              onClick={() => setDismissed(true)}
+              onClick={() => { setExpanded(false); }}
               className="text-[9px] px-1 rounded ml-1"
               style={{ color: "#99a5a3" }}
             >
