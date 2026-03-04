@@ -14,27 +14,12 @@ Hlavní sekce aplikace:
 
 - **Detail projektu** — popup s informacemi o projektu, etapami, TPV položkami a dokumenty. Záložky: Info, PM Status, TPV Status.
 
-- **TPV Status** — seznam položek (Kód Prvku, Popis, hodiny). Položky lze importovat z Excelu nebo přidat ručně. Tlačítko "Odeslat do výroby" pošle položky do Plánu Výroby.
-
-- **Plán Výroby** (/plan-vyroby) — plánovací tabule výroby se třemi zónami:
-  - Inbox (vlevo): příchozí položky čekající na naplánování, seskupené podle projektu
-  - Týdenní sloty (uprostřed): přetahuj položky z Inboxu do týdnů. Každý týden ukazuje kapacitu (hodiny/875h).
-  - Expedice (vpravo): dokončené položky připravené k odeslání
+- **TPV Status** — seznam položek (Kód Prvku, Popis, hodiny). Položky lze importovat z Excelu nebo přidat ručně.
 
 - **Nastavení** (⚙ ikona): správa uživatelů, osob, kurzovního lístku, statusů, koše a data logu
 
-Jak pracovat s Plánem Výroby:
-- Přetáhni položku z Inboxu do týdne pro naplánování
-- Pravý klik na položku: Dokončit → Expedice, Rozdělit, Pozastavit, Vrátit do Inboxu
-- Pravý klik na skupinu (bundle): stejné možnosti pro celou skupinu
-- Přepínač "Hodiny / Hod + Kč" zobrazí finanční hodnotu
-- Červený týden = přetížení, klikni na banner "Přetížení" pro přelití do dalšího týdne
-- Minulé týdny (šedé) jsou jen pro čtení
-
 Obecné tipy:
-- Navigace zpět: ikona mřížky vpravo nahoře
 - Nastavení: ikona ozubeného kola ⚙ vpravo nahoře
-- Projekt v Inboxu zmizí až když jsou všechny položky naplánované nebo dokončené
 
 PRAVIDLA:
 - Odpovídej česky, přátelským tónem (tykání)
