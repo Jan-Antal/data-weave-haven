@@ -333,6 +333,60 @@ async function getPreviewUrl(
   };
 }
 
+async function renameProjectFolder(
+  token: string,
+  driveId: string,
+  oldProjectId: string,
+  newProjectId: string
+): Promise<{ success: boolean; folderNotFound?: boolean }> {
+  // Check if old folder exists
+  const oldFolderUrl = `${GRAPH}/drives/${driveId}/root:/${LIB_ROOT}/${oldProjectId}`;
+  console.log("[rename] Checking old folder:", oldFolderUrl);
+  const oldRes = await fetch(oldFolderUrl, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (oldRes.status === 404) {
+    await oldRes.text();
+    console.log("[rename] Old folder not found, skip rename");
+    return { success: true, folderNotFound: true };
+  }
+  if (!oldRes.ok) {
+    const t = await oldRes.text();
+    throw new Error(`Rename resolve error ${oldRes.status}: ${t}`);
+  }
+  const oldFolder = await oldRes.json();
+  const folderId = oldFolder.id;
+
+  // Check if target folder already exists
+  const newFolderUrl = `${GRAPH}/drives/${driveId}/root:/${LIB_ROOT}/${newProjectId}`;
+  const newRes = await fetch(newFolderUrl, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (newRes.ok) {
+    await newRes.json();
+    throw new Error("TARGET_EXISTS");
+  }
+  await newRes.text().catch(() => {});
+
+  // Rename folder
+  console.log("[rename] Renaming folder", folderId, "from", oldProjectId, "to", newProjectId);
+  const patchRes = await fetch(`${GRAPH}/drives/${driveId}/items/${folderId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name: newProjectId }),
+  });
+  if (!patchRes.ok) {
+    const t = await patchRes.text();
+    throw new Error(`Rename error ${patchRes.status}: ${t}`);
+  }
+  await patchRes.json();
+  console.log("[rename] Successfully renamed to", newProjectId);
+  return { success: true };
+}
+
 const CATEGORIES = ["Cenova-nabidka", "Smlouva", "Vykresy", "Dokumentace", "Dodaci-list"];
 
 async function countFilesForProjects(
