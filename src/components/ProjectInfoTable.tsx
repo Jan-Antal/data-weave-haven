@@ -677,6 +677,8 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
 
   const v = isVisible;
 
+  const renderKeys = editMode ? localOrder : allVisibleKeys;
+
   const allCurrentLabels = useMemo(() => {
     const keys = ["project_id", "project_name", ...renderKeys];
     return keys.map(k => getLabel(k, getColumnLabel(k, customColumns)));
@@ -700,8 +702,6 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
       isDragging: dragKey === key,
     } : {}),
   });
-
-  const renderKeys = editMode ? localOrder : allVisibleKeys;
 
   return (
     <div>

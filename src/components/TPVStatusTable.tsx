@@ -600,6 +600,8 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
 
   const v = isVisible;
 
+  const renderKeys = editMode ? localOrder : allVisibleKeys;
+
   const allCurrentLabels = useMemo(() => {
     const keys = ["project_id", "project_name", ...renderKeys];
     return keys.map(k => getLabel(k, getColumnLabel(k, customColumns)));
@@ -610,8 +612,6 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
     existingLabels: allCurrentLabels,
     ...(editMode ? { dragProps: getDragProps(key), dropIndicator: dropTarget?.key === key ? dropTarget.side : null, isDragging: dragKey === key } : {}),
   });
-
-  const renderKeys = editMode ? localOrder : allVisibleKeys;
 
   return (
     <div>
