@@ -61,6 +61,7 @@ const Index = () => {
     try { return sessionStorage.getItem("dashboard-collapsed") === "true"; } catch { return false; }
   });
   const tpvCloseDetailRef = useRef<(() => void) | null>(null);
+  const [tpvListActive, setTpvListActive] = useState(false);
   const scrollPositions = useRef<Record<string, number>>({});
 
   const TPV_ACTIVE_STATUSES = ["Příprava", "Engineering", "TPV"];
