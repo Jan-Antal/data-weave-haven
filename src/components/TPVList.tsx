@@ -477,9 +477,8 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         </Table>
       </div>
 
-  const { data: allProjects = [] } = useProjects();
-  const [detailOpen, setDetailOpen] = useState(false);
-  const currentProject = useMemo(() => allProjects.find(p => p.project_id === projectId), [allProjects, projectId]);
+
+
       {/* Import Dialog */}
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-auto">
