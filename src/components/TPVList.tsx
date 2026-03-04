@@ -171,7 +171,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const [inlineName, setInlineName] = useState("");
   const inlineRef = useRef<HTMLInputElement>(null);
 
-  const visibleColCount = renderKeys.length + 3; // +checkbox +item_type(locked) +actions
+  const visibleColCount = renderKeys.length + 2; // +checkbox +actions
 
   const toggleSelect = (id: string) => {
     setSelected(prev => {
