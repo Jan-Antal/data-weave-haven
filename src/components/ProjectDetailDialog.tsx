@@ -21,7 +21,7 @@ import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { useSharePointDocs, type SPFile } from "@/hooks/useSharePointDocs";
-import { dispatchDocCountUpdate } from "@/hooks/useDocumentCounts";
+import { dispatchDocCountUpdate, migrateDocCountCache } from "@/hooks/useDocumentCounts";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { RozpadCeny } from "./RozpadCeny";
