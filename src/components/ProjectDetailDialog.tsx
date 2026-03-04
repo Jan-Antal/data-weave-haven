@@ -302,6 +302,11 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       setShowLocDropdown(false);
       sp.resetCache();
       resetIdCheck();
+
+      // Track project detail view
+      import("@/hooks/usePageTracking").then(({ logProjectDetailView }) => {
+        logProjectDetailView(project.project_id);
+      });
     }
   }, [project, open, resetIdCheck]);
 

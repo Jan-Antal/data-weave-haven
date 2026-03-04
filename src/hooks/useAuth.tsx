@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
+import { logLoginEvent, resetLoginTracking } from "@/hooks/useLoginTracking";
 
 export type AppRole = "owner" | "admin" | "pm" | "konstrukter" | "viewer";
 
@@ -53,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [simulatedRole, setSimulatedRole] = useState<AppRole | null>(null);
   const [linkedPersonName, setLinkedPersonName] = useState<string | null>(null);
+  const prevUserRef = useRef<string | null>(null);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -61,6 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
+          // Track login when transitioning from no user to signed in
+          if (!prevUserRef.current && session.user.id) {
+            logLoginEvent(session.user.id, session.user.email ?? "");
+          }
+          prevUserRef.current = session.user.id;
+
           setTimeout(async () => {
             const [{ data: profileData }, { data: roleData }] = await Promise.all([
               supabase
@@ -106,6 +114,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setRealRole(null);
           setSimulatedRole(null);
           setLinkedPersonName(null);
+          prevUserRef.current = null;
+          resetLoginTracking();
           setLoading(false);
         }
       }

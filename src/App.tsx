@@ -2,10 +2,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { PeopleManagementProvider } from "@/components/PeopleManagementContext";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { usePageTracking } from "@/hooks/usePageTracking";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 
@@ -92,6 +93,7 @@ function AppRoutes() {
   return (
     <PeopleManagementProvider>
       <BrowserRouter>
+        <PageTracker />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/plan-vyroby" element={<PlanVyroby />} />
@@ -102,6 +104,12 @@ function AppRoutes() {
       </BrowserRouter>
     </PeopleManagementProvider>
   );
+}
+
+function PageTracker() {
+  const location = useLocation();
+  usePageTracking(location.pathname);
+  return null;
 }
 
 const App = () => (
