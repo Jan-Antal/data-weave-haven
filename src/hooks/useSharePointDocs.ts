@@ -24,6 +24,7 @@ const CATEGORY_FOLDER_MAP: Record<string, string> = {
   vykresy: "Vykresy",
   dokumentace: "Dokumentace",
   dodaci_list: "Dodaci-list",
+  fotky: "Fotky",
 };
 
 const ALL_CATEGORY_KEYS = Object.keys(CATEGORY_FOLDER_MAP);

@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, FileText, X, Trash2, RefreshCw, MapPin, List, FileSpreadsheet } from "lucide-react";
+import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, FileText, X, Trash2, RefreshCw, MapPin, List, FileSpreadsheet, Camera, Pencil } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { marzeStorageToInput, marzeInputToStorage, formatMarze } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
@@ -78,7 +79,18 @@ const DOC_CATEGORIES = [
   { key: "vykresy", icon: "📐", label: "Výkresy" },
   { key: "dokumentace", icon: "📁", label: "Dokumentace" },
   { key: "dodaci_list", icon: "📦", label: "Předávací protokol" },
+  { key: "fotky", icon: "📷", label: "Fotky" },
 ];
+
+// ── Mobile read-only field helper ─────────────────────────────
+function ReadOnlyRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between items-baseline py-2 border-b border-border/40">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-sm font-medium text-foreground text-right max-w-[60%] truncate">{value || "—"}</span>
+    </div>
+  );
+}
 
 function getFileIconColor(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
@@ -252,6 +264,7 @@ function defaultForm() {
 
 export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList, tpvItemCount }: ProjectDetailDialogProps) {
   const qc = useQueryClient();
+  const isMobile = useIsMobile();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const { canEdit, canDeleteProject, isViewer, isKonstrukter, isPM, isFieldReadOnly, canUploadDocuments, isAdmin } = useAuth();
   const statusLabels = statusOptions.map((s) => s.label);
@@ -262,6 +275,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const [showLocation, setShowLocation] = useState(false);
   const [unsavedConfirmOpen, setUnsavedConfirmOpen] = useState(false);
   const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
+  const [mobileEditing, setMobileEditing] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const mobileReadOnly = isMobile && !mobileEditing;
 
   const [locSuggestions, setLocSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
   const [showLocDropdown, setShowLocDropdown] = useState(false);
@@ -309,9 +325,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       setPriceEditing(false);
       setLocSuggestions([]);
       setShowLocDropdown(false);
+      setMobileEditing(false);
       sp.resetCache();
       resetIdCheck();
-
     }
   }, [project, open, resetIdCheck]);
 
