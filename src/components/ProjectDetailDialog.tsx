@@ -808,10 +808,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
             <div className="flex max-md:flex-col max-md:overflow-y-auto" style={{ maxHeight: '78vh' }}>
               {/* LEFT PANEL — Form fields */}
               <div
-                className={cn("flex-1 px-6 pb-4 overflow-y-auto max-md:overflow-visible", isMobile && "pd-mobile")}
-                onTouchStart={handleMobileTouchStart}
-                onTouchMove={handleMobileTouchMove}
-                onTouchEnd={handleMobileTouchEnd}
+                className="flex-1 px-6 pb-4 overflow-y-auto max-md:overflow-visible"
               >
                 {/* ── ZÁKLADNÍ INFORMACE ────────────────────── */}
                 <SectionHeader icon="📋" label="ZÁKLADNÍ INFORMACE" />
@@ -1139,22 +1136,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                   </div>
                 </div>
 
-                {/* Mobile: Smazat projekt at bottom of scrollable content */}
-                {isMobile && canDeleteProject && (
-                  <div className="pt-8 pb-4 text-center">
-                    <button
-                      type="button"
-                      className="text-xs text-destructive hover:underline"
-                      onClick={() => {
-                        if (window.confirm(`Opravdu smazat projekt ${project.project_name}?`)) {
-                          handleDelete();
-                        }
-                      }}
-                    >
-                      Smazat projekt
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* RIGHT PANEL — Documents (below form on mobile) */}
@@ -1308,46 +1289,38 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
 
             {/* Footer */}
             <div className="flex items-center justify-between px-6 py-3 border-t border-border shrink-0 max-md:sticky max-md:bottom-0 max-md:bg-background max-md:z-10 max-md:flex-wrap max-md:gap-2">
-              {/* Desktop: delete button */}
-              {!isMobile && (
-                <div className="flex items-center gap-2">
-                  {canDeleteProject && (
-                    <>
-                      {deleteStep === 0 && (
-                        <Button variant="outline" onClick={() => setDeleteStep(1)}>
-                          Smazat projekt
-                        </Button>
-                      )}
-                      {deleteStep === 1 && (
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-muted-foreground">Opravdu smazat?</span>
-                          <button type="button" className="text-sm text-destructive font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
-                          <button type="button" className="text-sm text-muted-foreground font-medium hover:underline" onClick={() => {
-                            const totalDocs = Object.values(sp.filesByCategory).reduce((sum, files) => sum + files.length, 0);
-                            if (totalDocs > 0) { setDeleteStep(2); } else { handleDelete(); }
-                          }}>Potvrdit</button>
-                        </div>
-                      )}
-                      {deleteStep === 2 && (
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-muted-foreground">
-                            Tento projekt obsahuje {Object.values(sp.filesByCategory).reduce((sum, files) => sum + files.length, 0)} dokumentů. Opravdu chcete smazat?
-                          </span>
-                          <button type="button" className="text-sm text-destructive font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
-                          <button type="button" className="text-sm text-muted-foreground font-medium hover:underline" onClick={handleDelete}>Potvrdit smazání</button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
+              {/* Delete button */}
+              <div className="flex items-center gap-2">
+                {canDeleteProject && (
+                  <>
+                    {deleteStep === 0 && (
+                      <Button variant="outline" onClick={() => setDeleteStep(1)}>
+                        Smazat projekt
+                      </Button>
+                    )}
+                    {deleteStep === 1 && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-muted-foreground">Opravdu smazat?</span>
+                        <button type="button" className="text-sm text-destructive font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
+                        <button type="button" className="text-sm text-muted-foreground font-medium hover:underline" onClick={() => {
+                          const totalDocs = Object.values(sp.filesByCategory).reduce((sum, files) => sum + files.length, 0);
+                          if (totalDocs > 0) { setDeleteStep(2); } else { handleDelete(); }
+                        }}>Potvrdit</button>
+                      </div>
+                    )}
+                    {deleteStep === 2 && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-muted-foreground">
+                          Tento projekt obsahuje {Object.values(sp.filesByCategory).reduce((sum, files) => sum + files.length, 0)} dokumentů. Opravdu chcete smazat?
+                        </span>
+                        <button type="button" className="text-sm text-destructive font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
+                        <button type="button" className="text-sm text-muted-foreground font-medium hover:underline" onClick={handleDelete}>Potvrdit smazání</button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
 
-              {/* Mobile: Fotky camera button */}
-              {isMobile && (
-                <Button size="sm" variant="outline" onClick={() => cameraInputRef.current?.click()}>
-                  <Camera className="h-3 w-3 mr-1" /> Fotky
-                </Button>
-              )}
 
               <div className="flex items-center gap-2">
                 {onOpenTPVList && (
@@ -1382,17 +1355,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
               </div>
             </div>
 
-            {/* Hidden camera input for mobile */}
-            {isMobile && (
-              <input
-                ref={cameraInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={handleCameraUpload}
-              />
-            )}
           </>
         )}
       </DialogContent>
