@@ -1,4 +1,4 @@
-import { Home, Factory, Plus, Settings } from "lucide-react";
+import { Home, Plus, Settings } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -13,7 +13,7 @@ export function MobileBottomNav({ onNewProject, onSettings, canCreateProject, ca
   const navigate = useNavigate();
   const location = useLocation();
   const isHome = location.pathname === "/";
-  const isPlan = location.pathname === "/plan-vyroby";
+  
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-background border-t border-border flex items-center justify-around z-50 safe-area-bottom">
@@ -23,13 +23,6 @@ export function MobileBottomNav({ onNewProject, onSettings, canCreateProject, ca
       >
         <Home className="h-5 w-5" />
         <span className="text-[10px]">Přehled</span>
-      </button>
-      <button
-        onClick={() => navigate("/plan-vyroby")}
-        className={cn("flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center", isPlan ? "text-primary" : "text-muted-foreground")}
-      >
-        <Factory className="h-5 w-5" />
-        <span className="text-[10px]">Plán</span>
       </button>
       {canCreateProject && (
         <button

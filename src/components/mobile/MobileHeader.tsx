@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Menu, X, LogOut, UserCog, Factory, Check } from "lucide-react";
+import { Menu, X, LogOut, UserCog, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -65,15 +65,6 @@ export function MobileHeader({
                   <UserCog className="h-4 w-4" />
                   Nastavení účtu
                 </button>
-                {isAdmin && (
-                  <button
-                    onClick={() => { navigate("/plan-vyroby"); setOpen(false); }}
-                    className="flex items-center gap-3 w-full px-3 py-3 rounded-md hover:bg-accent text-sm min-h-[44px]"
-                  >
-                    <Factory className="h-4 w-4" />
-                    Plán Výroby
-                  </button>
-                )}
                 {canAccessSettings && (
                   <button
                     onClick={() => { onSettings(); setOpen(false); }}
