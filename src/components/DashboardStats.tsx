@@ -300,12 +300,12 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
 
         {!mobileCollapsed && (
           <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+            <style>{`.mobile-carousel::-webkit-scrollbar { display: none; }`}</style>
             <div
               ref={scrollRef}
-              className="flex overflow-x-auto snap-x snap-mandatory"
+              className="mobile-carousel flex overflow-x-auto snap-x snap-mandatory"
               style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
             >
-              <style>{`.mobile-carousel::-webkit-scrollbar { display: none; }`}</style>
                 {/* Card 1: Aktivní zakázky */}
                 <div className="flex-shrink-0 w-full snap-start px-1">
                   <div className="rounded-lg border bg-card p-4 h-[160px] flex flex-col justify-center">
