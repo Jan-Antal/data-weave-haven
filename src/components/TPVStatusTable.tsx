@@ -453,7 +453,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
 
   // ── Frozen filter results ───────────────────────────────────────
   const filterFingerprint = JSON.stringify([personFilter, statusFilter, externalSearch]);
-  const computeKey = `${filterFingerprint}|${projects.length}|${stagesByProject.size}`;
+  const computeKey = `${filterFingerprint}|${projects.length}|${stagesByProject.size}|${tpvItemsByProject.size}`;
   const hasActiveFilters = !!(personFilter || (statusFilter && statusFilter.length > 0) || externalSearch);
 
   const frozenRef = useRef<{ key: string; ids: Set<string> }>({
@@ -463,13 +463,23 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   if (frozenRef.current.key !== computeKey) {
     const baseIds = new Set(baseSorted.map((p) => p.project_id));
 
-    if (hasActiveFilters && stagesByProject.size > 0) {
+    if (hasActiveFilters) {
       for (const p of projects) {
         if (baseIds.has(p.project_id)) continue;
-        const stages = stagesByProject.get(p.project_id);
-        if (!stages || stages.length === 0) continue;
-        if (stageMatchesFilters(stages, personFilter, statusFilterSet, searchLower)) {
-          baseIds.add(p.project_id);
+        // Check stages
+        if (stagesByProject.size > 0) {
+          const stages = stagesByProject.get(p.project_id);
+          if (stages && stages.length > 0 && stageMatchesFilters(stages, personFilter, statusFilterSet, searchLower)) {
+            baseIds.add(p.project_id);
+            continue;
+          }
+        }
+        // Check TPV items — include project if person is assigned as konstrukter on any item
+        if (personFilter && tpvItemsByProject.size > 0) {
+          const items = tpvItemsByProject.get(p.project_id);
+          if (items && items.some(item => item.konstrukter && String(item.konstrukter).includes(personFilter))) {
+            baseIds.add(p.project_id);
+          }
         }
       }
     }
