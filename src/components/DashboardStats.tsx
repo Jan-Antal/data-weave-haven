@@ -5,7 +5,6 @@ import { parseAppDate } from "@/lib/dateFormat";
 import { matchesStatusFilter } from "@/lib/statusFilter";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import {
   BarChart,
