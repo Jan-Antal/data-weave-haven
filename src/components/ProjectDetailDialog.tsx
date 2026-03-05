@@ -414,6 +414,24 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [sp]);
 
+  const handleCameraCapture = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    for (const file of files) {
+      const now = new Date();
+      const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
+      const renamedFile = new File([file], `foto_${ts}.jpg`, { type: file.type });
+      try {
+        await sp.uploadFile("fotky", renamedFile);
+        dispatchDocCountUpdate(project!.project_id, 1);
+        toast({ title: "Foto nahráno ✓", description: renamedFile.name });
+        logActivity({ projectId: project!.project_id, actionType: "document_uploaded", newValue: renamedFile.name, detail: "Fotky" });
+      } catch (err: any) {
+        toast({ title: "Chyba uploadu", description: err.message, variant: "destructive" });
+      }
+    }
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+  }, [sp, project]);
+
   const handleDownload = useCallback(async (categoryKey: string, fileName: string) => {
     try {
       const url = await sp.getDownloadUrl(categoryKey, fileName);
