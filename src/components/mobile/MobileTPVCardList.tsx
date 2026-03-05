@@ -148,7 +148,8 @@ export function MobileTPVCardList({
       <div className="flex-1 overflow-y-auto px-3 pt-2 pb-20">
         <div className="space-y-2">
           {filteredItems.map(item => {
-            const vyrobaStatus = productionStatusMap.get(item.id) || "";
+            const vyrobaStatuses = productionStatusMap.get(item.item_type || item.item_name) || [];
+            const vyrobaLabel = vyrobaStatuses[0]?.label || "";
             const statusOpt = statusOptions.find(o => o.label === item.status);
             const statusColor = statusOpt?.color;
 
@@ -195,9 +196,9 @@ export function MobileTPVCardList({
                       {item.status}
                     </Badge>
                   )}
-                  {vyrobaStatus && (
+                  {vyrobaLabel && (
                     <Badge variant="secondary" className="text-[10px] h-5">
-                      {vyrobaStatus}
+                      {vyrobaLabel}
                     </Badge>
                   )}
                 </div>
