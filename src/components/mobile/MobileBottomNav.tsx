@@ -1,11 +1,11 @@
-import { useState, useRef } from "react";
-import { Home, Plus, User, ClipboardList, FolderPlus, Camera, StickyNote, Users, UserCog, DollarSign, Tag, Trash2, BarChart3, Eye, ChevronLeft, Check } from "lucide-react";
+import { useState, useRef, useMemo } from "react";
+import { Home, Plus, User, FolderPlus, Camera, StickyNote, Users, UserCog, DollarSign, Tag, Trash2, BarChart3, Eye, ChevronLeft, Check, Search, X } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useProjects } from "@/hooks/useProjects";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -26,7 +26,6 @@ interface MobileBottomNavProps {
   canAccessSettings: boolean;
   activeTab?: string;
   onTabChange?: (tab: string) => void;
-  // Profile sheet props
   profileName?: string;
   profileEmail?: string;
   profileRole?: string | null;
@@ -34,7 +33,6 @@ interface MobileBottomNavProps {
   simulatedRole?: string | null;
   setSimulatedRole?: (r: string | null) => void;
   isOwner?: boolean;
-  // Settings callbacks
   canManageUsers?: boolean;
   canManagePeople?: boolean;
   canManageExchangeRates?: boolean;
@@ -85,12 +83,26 @@ export function MobileBottomNav({
   const [qaProjectId, setQaProjectId] = useState("");
   const [qaNote, setQaNote] = useState("");
   const [qaSaving, setQaSaving] = useState(false);
+  const [qaSearch, setQaSearch] = useState("");
   const cameraRef = useRef<HTMLInputElement>(null);
   const { data: projects = [] } = useProjects();
   const qc = useQueryClient();
 
-  const isTPVActive = activeTab === "tpv-status";
-  const isProjectsActive = (activeTab === "project-info" || activeTab === "pm-status") && isHome;
+  const isProjectsActive = (activeTab === "project-info" || activeTab === "pm-status" || activeTab === "tpv-status") && isHome;
+
+  const filteredProjects = useMemo(() => {
+    if (!qaSearch.trim()) return projects;
+    const q = qaSearch.toLowerCase();
+    return projects.filter(p =>
+      p.project_id.toLowerCase().includes(q) || p.project_name.toLowerCase().includes(q)
+    );
+  }, [projects, qaSearch]);
+
+  const selectedProjectName = useMemo(() => {
+    if (!qaProjectId) return "";
+    const p = projects.find(p => p.project_id === qaProjectId);
+    return p ? `${p.project_id} — ${p.project_name}` : qaProjectId;
+  }, [qaProjectId, projects]);
 
   const handleProjects = () => {
     if (isHome) {
@@ -100,18 +112,12 @@ export function MobileBottomNav({
     }
   };
 
-  const handleTPV = () => {
-    if (onTabChange) {
-      onTabChange("tpv-status");
-    }
-    if (!isHome) navigate("/");
-  };
-
   const resetQA = () => {
     setQaMode(null);
     setQaProjectId("");
     setQaNote("");
     setQaSaving(false);
+    setQaSearch("");
   };
 
   const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -119,8 +125,6 @@ export function MobileBottomNav({
     if (!file || !qaProjectId) return;
     setQaSaving(true);
     try {
-      const { useSharePointDocs } = await import("@/hooks/useSharePointDocs");
-      // Upload directly via edge function
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve((reader.result as string).split(",")[1]);
@@ -163,9 +167,54 @@ export function MobileBottomNav({
     }
   };
 
+  const handleSelectProjectForPhoto = (projectId: string) => {
+    setQaProjectId(projectId);
+    // Immediately open camera
+    setTimeout(() => cameraRef.current?.click(), 100);
+  };
+
+  // Project picker component used by both photo and note
+  const ProjectPicker = ({ onSelect }: { onSelect: (id: string) => void }) => (
+    <div className="space-y-3">
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={qaSearch}
+          onChange={(e) => setQaSearch(e.target.value)}
+          placeholder="Hledat projekt..."
+          className="pl-8 h-10 text-sm"
+          autoFocus
+        />
+        {qaSearch && (
+          <button onClick={() => setQaSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-1">
+            <X className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+        )}
+      </div>
+      <div className="overflow-y-auto max-h-[40vh] -mx-1">
+        {filteredProjects.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">Žádné výsledky</p>
+        ) : (
+          filteredProjects.map(p => (
+            <button
+              key={p.project_id}
+              onClick={() => onSelect(p.project_id)}
+              className="flex items-center w-full px-3 py-2.5 rounded-lg hover:bg-accent text-sm min-h-[40px] text-left"
+            >
+              <span className="font-mono text-xs text-muted-foreground mr-2 shrink-0">{p.project_id}</span>
+              <span className="truncate">· {p.project_name}</span>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <>
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-background border-t border-border flex items-center justify-around z-50 safe-area-bottom">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border flex items-center justify-around z-50"
+        style={{ height: "calc(70px + env(safe-area-inset-bottom, 0px))", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      >
         {/* Projekty */}
         <button
           onClick={handleProjects}
@@ -175,22 +224,15 @@ export function MobileBottomNav({
           <span className="text-[10px]">Projekty</span>
         </button>
 
-        {/* TPV */}
-        <button
-          onClick={handleTPV}
-          className={cn("flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center", isTPVActive ? "text-primary" : "text-muted-foreground")}
-        >
-          <ClipboardList className="h-5 w-5" />
-          <span className="text-[10px]">TPV</span>
-        </button>
-
         {/* Center + button */}
         <button
           onClick={() => { resetQA(); setQuickActionOpen(true); }}
-          className="flex items-center justify-center -mt-3"
+          className="flex items-center justify-center -mt-4"
         >
-          <div className="h-12 w-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
-            <Plus className="h-6 w-6 text-primary-foreground" />
+          <div className="h-[52px] w-[52px] rounded-full flex items-center justify-center"
+            style={{ backgroundColor: "#223937", boxShadow: "0 4px 16px rgba(34,57,55,0.35)" }}
+          >
+            <Plus className="h-7 w-7 text-white" />
           </div>
         </button>
 
@@ -206,9 +248,12 @@ export function MobileBottomNav({
 
       {/* Quick Action Sheet */}
       <Sheet open={quickActionOpen} onOpenChange={(v) => { if (!v) resetQA(); setQuickActionOpen(v); }}>
-        <SheetContent side="bottom" className="rounded-t-2xl px-4 pb-8 pt-3 max-h-[70vh]">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-4" />
+        <SheetContent side="bottom" className="rounded-t-2xl px-4 pb-8 pt-3 max-h-[80vh] flex flex-col"
+          style={{ paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))" }}
+        >
+          <div className="w-10 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-4 shrink-0" />
 
+          {/* Main menu */}
           {!qaMode && (
             <div className="space-y-2">
               {canCreateProject && (
@@ -237,57 +282,61 @@ export function MobileBottomNav({
             </div>
           )}
 
-          {qaMode === "photo" && (
-            <div className="space-y-4">
-              <button onClick={() => setQaMode(null)} className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
+          {/* Photo mode - project picker */}
+          {qaMode === "photo" && !qaProjectId && (
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <button onClick={() => setQaMode(null)} className="flex items-center gap-1 text-sm text-muted-foreground mb-3 shrink-0">
                 <ChevronLeft className="h-4 w-4" /> Zpět
               </button>
-              <p className="text-sm font-medium">Vyberte projekt:</p>
-              <Select value={qaProjectId} onValueChange={setQaProjectId}>
-                <SelectTrigger><SelectValue placeholder="Projekt..." /></SelectTrigger>
-                <SelectContent className="z-[99999] max-h-[200px]">
-                  {projects.map(p => (
-                    <SelectItem key={p.project_id} value={p.project_id}>{p.project_id} — {p.project_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {qaProjectId && (
-                <Button className="w-full" onClick={() => cameraRef.current?.click()} disabled={qaSaving}>
-                  <Camera className="h-4 w-4 mr-2" />
-                  {qaSaving ? "Nahrávám..." : "Otevřít fotoaparát"}
-                </Button>
-              )}
+              <p className="text-sm font-medium mb-2 shrink-0">Vyberte projekt pro foto:</p>
+              <ProjectPicker onSelect={handleSelectProjectForPhoto} />
               <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoCapture} />
             </div>
           )}
 
-          {qaMode === "note" && (
-            <div className="space-y-4">
-              <button onClick={() => setQaMode(null)} className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
+          {/* Photo mode - uploading state */}
+          {qaMode === "photo" && qaProjectId && (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <Camera className="h-8 w-8 text-primary animate-pulse" />
+              <p className="text-sm text-muted-foreground">
+                {qaSaving ? "Nahrávám foto..." : "Čekám na fotku..."}
+              </p>
+              <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoCapture} />
+            </div>
+          )}
+
+          {/* Note mode - project picker */}
+          {qaMode === "note" && !qaProjectId && (
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <button onClick={() => setQaMode(null)} className="flex items-center gap-1 text-sm text-muted-foreground mb-3 shrink-0">
                 <ChevronLeft className="h-4 w-4" /> Zpět
               </button>
-              <p className="text-sm font-medium">Vyberte projekt:</p>
-              <Select value={qaProjectId} onValueChange={setQaProjectId}>
-                <SelectTrigger><SelectValue placeholder="Projekt..." /></SelectTrigger>
-                <SelectContent className="z-[99999] max-h-[200px]">
-                  {projects.map(p => (
-                    <SelectItem key={p.project_id} value={p.project_id}>{p.project_id} — {p.project_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {qaProjectId && (
-                <>
-                  <Textarea
-                    value={qaNote}
-                    onChange={(e) => setQaNote(e.target.value)}
-                    placeholder="Vaše poznámka..."
-                    className="min-h-[80px]"
-                  />
-                  <Button className="w-full" onClick={handleSaveNote} disabled={qaSaving || !qaNote.trim()}>
-                    {qaSaving ? "Ukládám..." : "Uložit poznámku"}
-                  </Button>
-                </>
-              )}
+              <p className="text-sm font-medium mb-2 shrink-0">Vyberte projekt pro poznámku:</p>
+              <ProjectPicker onSelect={(id) => setQaProjectId(id)} />
+            </div>
+          )}
+
+          {/* Note mode - text entry */}
+          {qaMode === "note" && qaProjectId && (
+            <div className="flex-1 flex flex-col">
+              <button onClick={() => setQaProjectId("")} className="flex items-center gap-1 text-sm text-muted-foreground mb-3 shrink-0">
+                <ChevronLeft className="h-4 w-4" /> Zpět
+              </button>
+              <p className="text-sm font-medium mb-2 shrink-0">{selectedProjectName}</p>
+              <Textarea
+                value={qaNote}
+                onChange={(e) => setQaNote(e.target.value)}
+                placeholder="Vaše poznámka..."
+                className="min-h-[100px] flex-1"
+                autoFocus
+              />
+              <Button
+                className="w-full mt-3 shrink-0 min-h-[48px]"
+                onClick={handleSaveNote}
+                disabled={qaSaving || !qaNote.trim()}
+              >
+                {qaSaving ? "Ukládám..." : "Uložit"}
+              </Button>
             </div>
           )}
         </SheetContent>
@@ -295,7 +344,9 @@ export function MobileBottomNav({
 
       {/* Profile Sheet */}
       <Sheet open={profileOpen} onOpenChange={setProfileOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl px-0 pb-8 pt-3 max-h-[80vh]">
+        <SheetContent side="bottom" className="rounded-t-2xl px-0 pb-8 pt-3 max-h-[80vh]"
+          style={{ paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))" }}
+        >
           <div className="w-10 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-3" />
           
           {/* Header */}
