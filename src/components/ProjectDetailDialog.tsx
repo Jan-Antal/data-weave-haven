@@ -8,8 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, FileText, X, Trash2, RefreshCw, MapPin, List, FileSpreadsheet, Camera, Pencil } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, FileText, X, Trash2, RefreshCw, MapPin, List, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { marzeStorageToInput, marzeInputToStorage, formatMarze } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,18 +78,7 @@ const DOC_CATEGORIES = [
   { key: "vykresy", icon: "📐", label: "Výkresy" },
   { key: "dokumentace", icon: "📁", label: "Dokumentace" },
   { key: "dodaci_list", icon: "📦", label: "Předávací protokol" },
-  { key: "fotky", icon: "📷", label: "Fotky" },
 ];
-
-// ── Mobile read-only field helper ─────────────────────────────
-function ReadOnlyRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between items-baseline py-2 border-b border-border/40">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="text-sm font-medium text-foreground text-right max-w-[60%] truncate">{value || "—"}</span>
-    </div>
-  );
-}
 
 function getFileIconColor(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
@@ -264,7 +252,6 @@ function defaultForm() {
 
 export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList, tpvItemCount }: ProjectDetailDialogProps) {
   const qc = useQueryClient();
-  const isMobile = useIsMobile();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const { canEdit, canDeleteProject, isViewer, isKonstrukter, isPM, isFieldReadOnly, canUploadDocuments, isAdmin } = useAuth();
   const statusLabels = statusOptions.map((s) => s.label);
@@ -275,9 +262,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const [showLocation, setShowLocation] = useState(false);
   const [unsavedConfirmOpen, setUnsavedConfirmOpen] = useState(false);
   const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
-  const [mobileEditing, setMobileEditing] = useState(false);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const mobileReadOnly = isMobile && !mobileEditing;
 
   const [locSuggestions, setLocSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
   const [showLocDropdown, setShowLocDropdown] = useState(false);
@@ -325,9 +309,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       setPriceEditing(false);
       setLocSuggestions([]);
       setShowLocDropdown(false);
-      setMobileEditing(false);
       sp.resetCache();
       resetIdCheck();
+
     }
   }, [project, open, resetIdCheck]);
 
@@ -413,24 +397,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [sp]);
-
-  const handleCameraCapture = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    for (const file of files) {
-      const now = new Date();
-      const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
-      const renamedFile = new File([file], `foto_${ts}.jpg`, { type: file.type });
-      try {
-        await sp.uploadFile("fotky", renamedFile);
-        dispatchDocCountUpdate(project!.project_id, 1);
-        toast({ title: "Foto nahráno ✓", description: renamedFile.name });
-        logActivity({ projectId: project!.project_id, actionType: "document_uploaded", newValue: renamedFile.name, detail: "Fotky" });
-      } catch (err: any) {
-        toast({ title: "Chyba uploadu", description: err.message, variant: "destructive" });
-      }
-    }
-    if (cameraInputRef.current) cameraInputRef.current.value = "";
-  }, [sp, project]);
 
   const handleDownload = useCallback(async (categoryKey: string, fileName: string) => {
     try {
@@ -644,7 +610,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
         className={cn(
           "p-0 gap-0 overflow-hidden",
           previewFile ? "sm:max-w-[92vw] h-[88vh]" : "sm:max-w-[920px]",
-          "max-md:!max-w-full max-md:!w-full max-md:!h-[95vh] max-md:!max-h-[95vh] max-md:!rounded-t-2xl max-md:!rounded-b-none max-md:!top-auto max-md:!bottom-0 max-md:!left-0 max-md:!translate-x-0 max-md:!translate-y-0 max-md:data-[state=closed]:duration-200"
+          "max-md:!max-w-full max-md:!w-full max-md:!h-[95vh] max-md:!max-h-[95vh] max-md:!rounded-t-2xl max-md:!rounded-b-none max-md:!top-auto max-md:!bottom-0 max-md:!left-0 max-md:!translate-x-0 max-md:!translate-y-0"
         )}
         onEscapeKeyDown={(e) => {
           if (previewFile) {
@@ -768,77 +734,12 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
               <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
             </div>
             <DialogHeader className="px-6 pt-4 md:pt-6 pb-4">
-              <div className="flex items-center justify-between">
-                <DialogTitle className="text-base md:text-lg">{project.project_id} — {project.project_name}</DialogTitle>
-                {isMobile && !mobileEditing && canEdit && (
-                  <Button size="sm" variant="outline" className="gap-1.5 shrink-0" onClick={() => setMobileEditing(true)}>
-                    <Pencil className="h-3.5 w-3.5" /> Upravit
-                  </Button>
-                )}
-                {isMobile && mobileEditing && (
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button size="sm" variant="outline" onClick={() => { setForm(initialForm); setMobileEditing(false); }}>Zrušit</Button>
-                    <Button size="sm" className="bg-[hsl(var(--success))] hover:bg-[hsl(var(--success))]/90 text-[hsl(var(--success-foreground))]" onClick={async () => { await handleSave(); setMobileEditing(false); }} disabled={idExists || !form.project_id}>Uložit</Button>
-                  </div>
-                )}
-              </div>
+              <DialogTitle className="text-base md:text-lg">{project.project_id} — {project.project_name}</DialogTitle>
             </DialogHeader>
 
             <div className="flex max-md:flex-col max-md:overflow-y-auto" style={{ maxHeight: '78vh' }}>
               {/* LEFT PANEL — Form fields */}
               <div className="flex-1 px-6 pb-4 overflow-y-auto max-md:overflow-visible">
-
-                {/* ── MOBILE READ-ONLY VIEW ──────────────────── */}
-                {mobileReadOnly ? (
-                  <div className="space-y-0">
-                    <SectionHeader icon="📋" label="ZÁKLADNÍ INFORMACE" />
-                    <ReadOnlyRow label="Project ID" value={form.project_id} />
-                    <ReadOnlyRow label="Project Name" value={form.project_name} />
-                    <ReadOnlyRow label="Klient" value={form.klient} />
-                    <ReadOnlyRow label="Architekt" value={form.architekt} />
-                    {form.location && <ReadOnlyRow label="Lokace" value={form.location} />}
-                    <ReadOnlyRow label="Datum Objednávky" value={formatDisplayDate(form.datum_objednavky)} />
-                    <ReadOnlyRow label="Datum Smluvní" value={formatDisplayDate(form.datum_smluvni)} />
-
-                    <SectionHeader icon="💰" label="FINANCE" />
-                    <ReadOnlyRow label="Prodejní cena" value={form.prodejni_cena ? `${Number(form.prodejni_cena).toLocaleString("cs-CZ")} ${form.currency}` : ""} />
-                    <ReadOnlyRow label="Marže" value={form.marze ? `${form.marze} %` : ""} />
-                    <ReadOnlyRow label="Kalkulant" value={form.kalkulant} />
-
-                    <SectionHeader icon="📊" label="PM — ŘÍZENÍ PROJEKTU" />
-                    <ReadOnlyRow label="PM" value={form.pm} />
-                    <ReadOnlyRow label="Status" value={form.status} />
-                    <ReadOnlyRow label="Risk" value={form.risk} />
-                    <ReadOnlyRow label="Zaměření" value={formatDisplayDate(form.zamereni)} />
-                    <ReadOnlyRow label="TPV" value={formatDisplayDate(form.tpv_date)} />
-                    <ReadOnlyRow label="Expedice" value={formatDisplayDate(form.expedice)} />
-                    <ReadOnlyRow label="Montáž" value={formatDisplayDate(form.montaz)} />
-                    <ReadOnlyRow label="Předání" value={formatDisplayDate(form.predani)} />
-                    {form.pm_poznamka && <ReadOnlyRow label="Poznámka PM" value={form.pm_poznamka} />}
-
-                    <SectionHeader icon="🔧" label="TPV — TECHNICKÁ PŘÍPRAVA" />
-                    <ReadOnlyRow label="Konstruktér" value={form.konstrukter} />
-                    <ReadOnlyRow label="Náročnost" value={form.narocnost} />
-                    <ReadOnlyRow label="Hodiny TPV" value={form.hodiny_tpv} />
-                    <ReadOnlyRow label="Rozpracovanost" value={form.percent_tpv ? `${form.percent_tpv} %` : ""} />
-                    {form.tpv_poznamka && <ReadOnlyRow label="Poznámka TPV" value={form.tpv_poznamka} />}
-
-                    {/* Mobile-only delete at bottom of read-only content */}
-                    {canDeleteProject && (
-                      <div className="pt-8 pb-4 text-center">
-                        <button
-                          type="button"
-                          className="text-destructive text-xs hover:underline"
-                          onClick={() => setDeleteStep(1)}
-                        >
-                          Smazat projekt
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  /* ── DESKTOP / MOBILE EDIT MODE ────────────── */
-                  <>
                 {/* ── ZÁKLADNÍ INFORMACE ────────────────────── */}
                 <SectionHeader icon="📋" label="ZÁKLADNÍ INFORMACE" />
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
@@ -1164,21 +1065,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                     />
                   </div>
                 </div>
-
-                {/* Mobile-only delete at bottom of edit content */}
-                {isMobile && canDeleteProject && (
-                  <div className="pt-8 pb-4 text-center">
-                    <button
-                      type="button"
-                      className="text-destructive text-xs hover:underline"
-                      onClick={() => setDeleteStep(1)}
-                    >
-                      Smazat projekt
-                    </button>
-                  </div>
-                )}
-                  </>
-                )}
               </div>
 
               {/* RIGHT PANEL — Documents (below form on mobile) */}
@@ -1333,8 +1219,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
             {/* Footer */}
             <div className="flex items-center justify-between px-6 py-3 border-t border-border shrink-0 max-md:sticky max-md:bottom-0 max-md:bg-background max-md:z-10 max-md:flex-wrap max-md:gap-2">
               <div className="flex items-center gap-2">
-                {/* Desktop-only delete button */}
-                {canDeleteProject && !isMobile && (
+                {canDeleteProject && (
                   <>
                     {deleteStep === 0 && (
                       <Button
@@ -1367,16 +1252,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                         <button type="button" className="text-sm text-muted-foreground font-medium hover:underline" onClick={handleDelete}>Potvrdit smazání</button>
                       </div>
                     )}
-                  </>
-                )}
-
-                {/* Mobile-only camera button */}
-                {isMobile && canUploadDocuments && (
-                  <>
-                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => cameraInputRef.current?.click()}>
-                      <Camera className="h-3.5 w-3.5" /> Fotky
-                    </Button>
-                    <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCameraCapture} />
                   </>
                 )}
               </div>
@@ -1416,7 +1291,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                   </>
                 )}
                 <Button variant="outline" onClick={tryClose}>Zavřít</Button>
-                {canEdit && !mobileReadOnly && <Button onClick={handleSave} disabled={idExists || !form.project_id}>Uložit</Button>}
+                {canEdit && <Button onClick={handleSave} disabled={idExists || !form.project_id}>Uložit</Button>}
               </div>
             </div>
           </>
@@ -1434,27 +1309,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       onCancel={() => setUnsavedConfirmOpen(false)}
       description="Máte neuložené změny. Opravdu chcete zavřít?"
     />
-
-    {/* Mobile delete confirmation */}
-    {isMobile && (
-      <ConfirmDialog
-        open={deleteStep === 1 || deleteStep === 2}
-        onConfirm={() => {
-          const totalDocs = Object.values(sp.filesByCategory).reduce((sum, files) => sum + files.length, 0);
-          if (deleteStep === 1 && totalDocs > 0) {
-            setDeleteStep(2);
-          } else {
-            handleDelete();
-          }
-        }}
-        onCancel={() => setDeleteStep(0)}
-        description={
-          deleteStep === 2
-            ? `Tento projekt obsahuje ${Object.values(sp.filesByCategory).reduce((sum, files) => sum + files.length, 0)} dokumentů. Opravdu chcete smazat projekt "${project?.project_name}"?`
-            : `Opravdu smazat projekt "${project?.project_name}"?`
-        }
-      />
-    )}
     </>
   );
 }

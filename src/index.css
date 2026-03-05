@@ -229,10 +229,4 @@
   button, [role="button"], a {
     min-height: 36px;
   }
-
-  /* Suppress orange tap highlight on mobile form elements */
-  input, select, textarea, button, [role="button"], [role="combobox"] {
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-  }
 }
