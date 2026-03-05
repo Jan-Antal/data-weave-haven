@@ -131,7 +131,7 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
       <div className="flex items-center justify-between px-1">
         <span className="text-xs text-muted-foreground">{displayProjects.length} projektů</span>
         <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-[130px] h-8 text-xs">
+          <SelectTrigger className="w-[110px] h-8 text-xs">
             <SelectValue placeholder="Řadit dle" />
           </SelectTrigger>
           <SelectContent>
@@ -142,6 +142,14 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
             ))}
           </SelectContent>
         </Select>
+        <button
+          onClick={() => setSortAsc(v => !v)}
+          className="h-8 w-8 flex items-center justify-center rounded-md border border-border shrink-0"
+          style={{ color: "#223937" }}
+          title={sortAsc ? "Vzestupně" : "Sestupně"}
+        >
+          {sortAsc ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+        </button>
       </div>
 
       {/* Cards */}
