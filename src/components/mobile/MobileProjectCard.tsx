@@ -2,6 +2,7 @@ import { memo, useState } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatCurrency } from "@/lib/currency";
+import { parseAppDate, formatAppDate } from "@/lib/dateFormat";
 import { cn } from "@/lib/utils";
 
 interface Project {
@@ -67,7 +68,7 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
             </div>
           </div>
           {project.datum_smluvni && (
-            <p className="text-xs text-muted-foreground mt-1">Datum S.: {project.datum_smluvni}</p>
+            <p className="text-xs text-muted-foreground mt-1">Datum S.: {(() => { const d = parseAppDate(project.datum_smluvni); return d ? formatAppDate(d) : project.datum_smluvni; })()}</p>
           )}
         </button>
         {hasStages && (
