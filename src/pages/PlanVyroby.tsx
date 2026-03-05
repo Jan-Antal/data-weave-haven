@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { ProductionHeader } from "@/components/production/ProductionHeader";
@@ -98,11 +99,14 @@ export default function PlanVyroby() {
     return () => setCurrentPage(null);
   }, [setCurrentPage]);
 
+  const isMobile = useIsMobile();
+
   useEffect(() => {
     if (!loading && !isAdmin) {
       navigate("/", { replace: true });
     }
   }, [isAdmin, loading, navigate]);
+
 
   const tpvProject = tpvProjectId ? allProjects.find(p => p.project_id === tpvProjectId) : null;
 
@@ -334,6 +338,21 @@ export default function PlanVyroby() {
   }
 
   if (!isAdmin) return null;
+
+  // Mobile: show desktop-only message
+  if (isMobile) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-background px-6 text-center gap-4">
+        <p className="text-lg font-medium text-foreground">Plán Výroby je dostupný pouze na počítači</p>
+        <button
+          onClick={() => navigate("/")}
+          className="text-sm text-primary font-medium hover:underline"
+        >
+          ← Zpět na projekty
+        </button>
+      </div>
+    );
+  }
 
   return (
     <DndContext

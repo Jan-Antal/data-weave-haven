@@ -1,4 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileTPVCardList } from "./mobile/MobileTPVCardList";
 import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColumns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { InlineEditableCell } from "./InlineEditableCell";
@@ -271,6 +273,38 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       registerExport("tpv-list", null as any);
     };
   }, [registerExport, tpvExportMeta]);
+
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return (
+      <>
+        <MobileTPVCardList
+          items={sortedItems}
+          projectId={projectId}
+          projectName={projectName}
+          currency={currency}
+          productionStatusMap={productionStatusMap}
+          onBack={onBack}
+          onOpenDetail={() => setDetailOpen(true)}
+          onAddItem={(name) => addItem.mutate({ project_id: projectId, item_name: name })}
+          onOpenImport={() => setWizardOpen(true)}
+          canManageTPV={canManageTPV}
+        />
+        <ProjectDetailDialog
+          project={currentProject ?? null}
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+        />
+        <ExcelImportWizard
+          open={wizardOpen}
+          onClose={() => setWizardOpen(false)}
+          projectId={projectId}
+          projectName={projectName}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="w-full min-w-0">

@@ -78,6 +78,7 @@ const DOC_CATEGORIES = [
   { key: "vykresy", icon: "📐", label: "Výkresy" },
   { key: "dokumentace", icon: "📁", label: "Dokumentace" },
   { key: "dodaci_list", icon: "📦", label: "Předávací protokol" },
+  { key: "fotky", icon: "📷", label: "Fotky" },
 ];
 
 function getFileIconColor(name: string): string {

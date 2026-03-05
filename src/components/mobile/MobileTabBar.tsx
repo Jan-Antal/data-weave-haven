@@ -9,7 +9,6 @@ const TABS = [
   { value: "project-info", label: "Project Info" },
   { value: "pm-status", label: "PM Status" },
   { value: "tpv-status", label: "TPV Status" },
-  { value: "plan", label: "📅 Plán" },
 ];
 
 export function MobileTabBar({ activeTab, onTabChange }: MobileTabBarProps) {
@@ -20,7 +19,7 @@ export function MobileTabBar({ activeTab, onTabChange }: MobileTabBarProps) {
           key={tab.value}
           onClick={() => onTabChange(tab.value)}
           className={cn(
-            "shrink-0 px-4 py-2.5 text-sm font-medium whitespace-nowrap min-h-[44px] border-b-2 transition-colors",
+            "shrink-0 flex-1 px-4 py-2.5 text-sm font-medium whitespace-nowrap min-h-[44px] border-b-2 transition-colors",
             activeTab === tab.value
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
