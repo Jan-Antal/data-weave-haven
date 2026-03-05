@@ -107,20 +107,6 @@ export default function PlanVyroby() {
     }
   }, [isAdmin, loading, navigate]);
 
-  // Mobile: show desktop-only message
-  if (isMobile) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen bg-background px-6 text-center gap-4">
-        <p className="text-lg font-medium text-foreground">Plán Výroby je dostupný pouze na počítači</p>
-        <button
-          onClick={() => navigate("/")}
-          className="text-sm text-primary font-medium hover:underline"
-        >
-          ← Zpět na projekty
-        </button>
-      </div>
-    );
-  }
 
   const tpvProject = tpvProjectId ? allProjects.find(p => p.project_id === tpvProjectId) : null;
 
