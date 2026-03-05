@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef } from "react";
 import { ArrowLeft, Search, FileText, Plus, Upload, HardHat } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/currency";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
 import { getProjectColor } from "@/lib/projectColors";
+import type { ProductionStatus } from "@/hooks/useProductionStatuses";
 
 interface TPVItem {
   id: string;
@@ -29,7 +30,7 @@ interface MobileTPVCardListProps {
   projectId: string;
   projectName: string;
   currency: string;
-  productionStatusMap: Map<string, string>;
+  productionStatusMap: Map<string, ProductionStatus[]>;
   onBack: () => void;
   onOpenDetail: () => void;
   onAddItem: (name: string) => void;
