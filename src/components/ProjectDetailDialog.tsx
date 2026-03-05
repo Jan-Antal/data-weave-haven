@@ -602,7 +602,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
         className={cn(
           "p-0 gap-0 overflow-hidden",
           previewFile ? "sm:max-w-[92vw] h-[88vh]" : "sm:max-w-[920px]",
-          "max-md:!max-w-full max-md:!w-full max-md:!h-full max-md:!max-h-full max-md:!rounded-none max-md:!top-0 max-md:!left-0 max-md:!translate-x-0 max-md:!translate-y-0"
+          "max-md:!max-w-full max-md:!w-full max-md:!h-[95vh] max-md:!max-h-[95vh] max-md:!rounded-t-2xl max-md:!rounded-b-none max-md:!top-auto max-md:!bottom-0 max-md:!left-0 max-md:!translate-x-0 max-md:!translate-y-0"
         )}
         onEscapeKeyDown={(e) => {
           if (previewFile) {
@@ -721,13 +721,17 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
         ) : (
           /* ===== EDIT FORM MODE ===== */
           <>
-            <DialogHeader className="px-6 pt-6 pb-4">
-              <DialogTitle>{project.project_id} — {project.project_name}</DialogTitle>
+            {/* Mobile drag handle */}
+            <div className="md:hidden flex justify-center pt-2 pb-1">
+              <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+            </div>
+            <DialogHeader className="px-6 pt-4 md:pt-6 pb-4">
+              <DialogTitle className="text-base md:text-lg">{project.project_id} — {project.project_name}</DialogTitle>
             </DialogHeader>
 
-            <div className="flex" style={{ maxHeight: '78vh' }}>
+            <div className="flex max-md:flex-col max-md:overflow-y-auto" style={{ maxHeight: '78vh' }}>
               {/* LEFT PANEL — Form fields */}
-              <div className="flex-1 px-6 pb-4 overflow-y-auto">
+              <div className="flex-1 px-6 pb-4 overflow-y-auto max-md:overflow-visible">
                 {/* ── ZÁKLADNÍ INFORMACE ────────────────────── */}
                 <SectionHeader icon="📋" label="ZÁKLADNÍ INFORMACE" />
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
@@ -1055,8 +1059,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                 </div>
               </div>
 
-              {/* RIGHT PANEL — Documents */}
-              <div className="w-[340px] shrink-0 border-l border-border bg-muted/30 flex flex-col">
+              {/* RIGHT PANEL — Documents (below form on mobile) */}
+              <div className="w-[340px] max-md:w-full shrink-0 border-l max-md:border-l-0 max-md:border-t border-border bg-muted/30 flex flex-col">
                 <div className="px-4 pt-4 pb-2">
                   <div className="relative flex items-center">
                     <div className="absolute inset-0 flex items-center" aria-hidden="true">
@@ -1205,7 +1209,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between px-6 py-3 border-t border-border">
+            <div className="flex items-center justify-between px-6 py-3 border-t border-border shrink-0 max-md:sticky max-md:bottom-0 max-md:bg-background max-md:z-10 max-md:flex-wrap max-md:gap-2">
               <div className="flex items-center gap-2">
                 {canDeleteProject && (
                   <>
