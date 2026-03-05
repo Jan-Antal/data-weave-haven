@@ -51,12 +51,15 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
     return [...sorted].sort((a, b) => {
       const av = (a as any)[sortBy] ?? "";
       const bv = (b as any)[sortBy] ?? "";
+      let cmp: number;
       if (sortBy === "prodejni_cena") {
-        return (Number(bv) || 0) - (Number(av) || 0);
+        cmp = (Number(av) || 0) - (Number(bv) || 0);
+      } else {
+        cmp = String(av).localeCompare(String(bv), "cs");
       }
-      return String(av).localeCompare(String(bv), "cs");
+      return sortAsc ? cmp : -cmp;
     });
-  }, [sorted, sortBy]);
+  }, [sorted, sortBy, sortAsc]);
 
   // Pull-to-refresh touch handlers
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
