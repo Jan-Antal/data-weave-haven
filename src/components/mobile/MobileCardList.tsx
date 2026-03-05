@@ -128,8 +128,9 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
       )}
 
       {/* Sort control */}
-      <div className="flex items-center justify-between px-1">
-        <span className="text-xs text-muted-foreground">{displayProjects.length} projektů</span>
+      <div className="flex items-center justify-between px-1 gap-2">
+        <span className="text-xs text-muted-foreground shrink-0">{displayProjects.length} projektů</span>
+        <div className="flex items-center gap-1">
         <Select value={sortBy} onValueChange={setSortBy}>
           <SelectTrigger className="w-[110px] h-8 text-xs">
             <SelectValue placeholder="Řadit dle" />
