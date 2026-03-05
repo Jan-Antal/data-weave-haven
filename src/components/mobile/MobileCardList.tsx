@@ -151,6 +151,7 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
         >
           {sortAsc ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
         </button>
+        </div>
       </div>
 
       {/* Cards */}
