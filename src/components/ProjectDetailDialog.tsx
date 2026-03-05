@@ -1361,17 +1361,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
               </div>
             </div>
 
-            {/* Hidden camera input for mobile */}
-            {isMobile && (
-              <input
-                ref={cameraInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={handleCameraUpload}
-              />
-            )}
           </>
         )}
       </DialogContent>
