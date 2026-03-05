@@ -1321,12 +1321,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                 )}
               </div>
 
-              {/* Mobile: Fotky camera button */}
-              {isMobile && (
-                <Button size="sm" variant="outline" onClick={() => cameraInputRef.current?.click()}>
-                  <Camera className="h-3 w-3 mr-1" /> Fotky
-                </Button>
-              )}
 
               <div className="flex items-center gap-2">
                 {onOpenTPVList && (
