@@ -6,7 +6,7 @@ import { useStagesByProject } from "@/hooks/useAllProjectStages";
 import { useSortFilter } from "@/hooks/useSortFilter";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowUp, ArrowDown } from "lucide-react";
 
 interface MobileCardListProps {
   personFilter: string | null;
