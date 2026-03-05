@@ -1,11 +1,12 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { MobileProjectCard } from "./MobileProjectCard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProjects, type Project } from "@/hooks/useProjects";
 import { useStagesByProject } from "@/hooks/useAllProjectStages";
 import { useSortFilter } from "@/hooks/useSortFilter";
-import { matchesStatusFilter, normalizeSearch, normalizedIncludes } from "@/lib/statusFilter";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
+import { useQueryClient } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 
 interface MobileCardListProps {
   personFilter: string | null;
@@ -24,10 +25,20 @@ const SORT_OPTIONS = [
   { value: "prodejni_cena", label: "Cena" },
 ];
 
+const PULL_THRESHOLD = 60;
+const MIN_SPINNER_MS = 500;
+
 export function MobileCardList({ personFilter, statusFilter, search, riskHighlight, activeTab, onProjectTap }: MobileCardListProps) {
   const { data: projects = [], isLoading } = useProjects();
   const { stagesByProject } = useStagesByProject();
+  const queryClient = useQueryClient();
   const [sortBy, setSortBy] = useState("project_name");
+
+  // Pull-to-refresh state
+  const [pullDistance, setPullDistance] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const touchStartY = useRef(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const externalFilters = useMemo(() => ({
     personFilter,
@@ -36,7 +47,6 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
 
   const { sorted } = useSortFilter(projects, externalFilters, search);
 
-  // Apply sorting
   const displayProjects = useMemo(() => {
     return [...sorted].sort((a, b) => {
       const av = (a as any)[sortBy] ?? "";
@@ -48,6 +58,39 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
     });
   }, [sorted, sortBy]);
 
+  // Pull-to-refresh touch handlers
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (refreshing) return;
+    touchStartY.current = e.touches[0].clientY;
+  }, [refreshing]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (refreshing) return;
+    const container = containerRef.current?.closest("main");
+    if (!container || container.scrollTop > 5) return;
+    
+    const deltaY = e.touches[0].clientY - touchStartY.current;
+    if (deltaY > 0) {
+      setPullDistance(Math.min(deltaY * 0.5, 100));
+    }
+  }, [refreshing]);
+
+  const handleTouchEnd = useCallback(async () => {
+    if (refreshing) return;
+    if (pullDistance >= PULL_THRESHOLD) {
+      setRefreshing(true);
+      setPullDistance(PULL_THRESHOLD);
+      const start = Date.now();
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      const elapsed = Date.now() - start;
+      if (elapsed < MIN_SPINNER_MS) {
+        await new Promise(r => setTimeout(r, MIN_SPINNER_MS - elapsed));
+      }
+      setRefreshing(false);
+    }
+    setPullDistance(0);
+  }, [pullDistance, refreshing, queryClient]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -57,7 +100,30 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
   }
 
   return (
-    <div className="flex flex-col gap-2 pb-16">
+    <div
+      ref={containerRef}
+      className="flex flex-col gap-2 pb-16"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Pull-to-refresh indicator */}
+      {(pullDistance > 0 || refreshing) && (
+        <div
+          className="flex items-center justify-center overflow-hidden transition-all"
+          style={{ height: refreshing ? 40 : pullDistance * 0.6 }}
+        >
+          <Loader2
+            className="h-5 w-5 text-primary"
+            style={{
+              opacity: refreshing ? 1 : Math.min(pullDistance / PULL_THRESHOLD, 1),
+              animation: refreshing ? "spin 1s linear infinite" : "none",
+              transform: refreshing ? undefined : `rotate(${pullDistance * 3}deg)`,
+            }}
+          />
+        </div>
+      )}
+
       {/* Sort control */}
       <div className="flex items-center justify-between px-1">
         <span className="text-xs text-muted-foreground">{displayProjects.length} projektů</span>
