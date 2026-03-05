@@ -215,7 +215,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
 const MemoSortableStageRow = memo(SortableStageRow);
 
 // ── Stages section ──────────────────────────────────────────────────
-function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, renderKeys, personFilter, statusFilterSet, searchLower, showAddButton = true, saveCurrency }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[]; personFilter: string | null; statusFilterSet: Set<string> | null; searchLower: string | null; showAddButton?: boolean; saveCurrency?: (id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => void }) {
+function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, renderKeys, personFilter, statusFilterSet, searchLower, showAddButton = true, saveCurrency, parentMatchesSearch = false }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[]; personFilter: string | null; statusFilterSet: Set<string> | null; searchLower: string | null; showAddButton?: boolean; saveCurrency?: (id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => void; parentMatchesSearch?: boolean }) {
   const { data: stages = [] } = useProjectStages(projectId);
   const deleteStage = useDeleteStage();
   const reorderStages = useReorderStages();
@@ -329,7 +329,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
               cancelConfirm={cancelConfirmId === stage.id}
               onCancelConfirm={() => handleCancelStage(stage.id)}
               onCancelDismiss={() => setCancelConfirmId(null)}
-              dimmed={!singleStageMatches(stage, personFilter, statusFilterSet, searchLower)}
+              dimmed={parentMatchesSearch ? false : !singleStageMatches(stage, personFilter, statusFilterSet, searchLower)}
               saveCurrency={saveCurrency}
               freshInheritedFields={freshStages.get(stage.id)}
             />
@@ -784,6 +784,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                     searchLower={searchLower}
                     showAddButton={showAddButton.has(p.project_id)}
                     saveCurrency={saveCurrency}
+                    parentMatchesSearch={!!searchLower && [p.project_id, p.project_name, p.klient, p.pm].some(v => normalizedIncludes(v, searchLower))}
                   />
                 )}
               </Fragment>

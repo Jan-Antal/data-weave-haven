@@ -169,7 +169,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
 
 const MemoSortableStageRow = memo(SortableStageRow);
 
-function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, renderKeys, personFilter, statusFilterSet, searchLower, showAddButton = true }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[]; personFilter: string | null; statusFilterSet: Set<string> | null; searchLower: string | null; showAddButton?: boolean }) {
+function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, renderKeys, personFilter, statusFilterSet, searchLower, showAddButton = true, parentMatchesSearch = false }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[]; personFilter: string | null; statusFilterSet: Set<string> | null; searchLower: string | null; showAddButton?: boolean; parentMatchesSearch?: boolean }) {
   const { data: stages = [] } = useProjectStages(projectId);
   const deleteStage = useDeleteStage();
   const reorderStages = useReorderStages();
@@ -302,7 +302,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
               cancelConfirm={cancelConfirmId === stage.id}
               onCancelConfirm={() => handleCancelStage(stage.id)}
               onCancelDismiss={() => setCancelConfirmId(null)}
-              dimmed={!singleStageMatches(stage, personFilter, statusFilterSet, searchLower)}
+              dimmed={parentMatchesSearch ? false : !singleStageMatches(stage, personFilter, statusFilterSet, searchLower)}
               freshInheritedFields={freshStages.get(stage.id)}
             />
           ))}
@@ -702,6 +702,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                     statusFilterSet={statusFilterSet}
                     searchLower={searchLower}
                     showAddButton={showAddButton.has(p.project_id)}
+                    parentMatchesSearch={!!searchLower && [p.project_id, p.project_name, p.klient, p.pm].some(v => normalizedIncludes(v, searchLower))}
                   />
                 )}
               </Fragment>
