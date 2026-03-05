@@ -36,25 +36,40 @@ const TARGET_FIELDS = [
 type TargetKey = (typeof TARGET_FIELDS)[number]["key"];
 
 // ── Fuzzy matching ────────────────────────────────────────────────
-const FUZZY_MAP: { keywords: string[]; target: TargetKey }[] = [
-  { keywords: ["kod", "kód", "code", "kód prvku", "kod prvku", "item code"], target: "item_type" },
-  { keywords: ["název prvku", "nazev prvku", "název", "nazev", "name", "item name", "prvek", "item"], target: "nazev_prvku" },
-  { keywords: ["popis", "description", "detail", "specifikace", "spec"], target: "item_name" },
-  { keywords: ["pocet", "počet", "qty", "quantity", "ks", "mnozstvi", "množství", "pcs"], target: "pocet" },
-  { keywords: ["cena", "price", "cost", "castka", "částka"], target: "cena" },
-  { keywords: ["konstrukter", "konstruktér", "engineer", "designer"], target: "konstrukter" },
-  { keywords: ["poznamka", "poznámka", "note", "notes"], target: "notes" },
+// Each entry has exact phrases tried first, then loose keywords as fallback.
+// Order matters: more specific entries should come first.
+const FUZZY_MAP: { exact: string[]; contains: string[]; target: TargetKey }[] = [
+  { exact: ["kod prvku", "kod", "kod polozky", "item code", "element code", "id prvku"], contains: ["code"], target: "item_type" },
+  { exact: ["nazev prvku", "nazev polozky", "nazev", "element name", "item name"], contains: ["name"], target: "nazev_prvku" },
+  { exact: ["popis", "description", "detail", "specifikace", "spec"], contains: ["descript", "specif"], target: "item_name" },
+  { exact: ["pocet", "qty", "quantity", "ks", "mnozstvi", "pcs"], contains: ["quantit"], target: "pocet" },
+  { exact: ["cena", "price", "cost", "castka"], contains: ["price", "cost"], target: "cena" },
+  { exact: ["konstrukter", "engineer", "designer"], contains: ["konstrukt", "engineer"], target: "konstrukter" },
+  { exact: ["poznamka", "note", "notes"], contains: ["poznam", "note"], target: "notes" },
 ];
 
 function normalize(s: string): string {
-  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[_\s]+/g, " ").trim();
 }
 
 function fuzzyMatch(header: string): TargetKey | null {
   const n = normalize(header);
-  for (const { keywords, target } of FUZZY_MAP) {
-    if (keywords.some(k => n.includes(normalize(k)))) return target;
+
+  // Priority 1: Exact match on full normalized header
+  for (const { exact, target } of FUZZY_MAP) {
+    if (exact.some(k => n === normalize(k))) return target;
   }
+
+  // Priority 2: Header starts with an exact keyword
+  for (const { exact, target } of FUZZY_MAP) {
+    if (exact.some(k => n.startsWith(normalize(k)))) return target;
+  }
+
+  // Priority 3: Header contains a contains-keyword (less greedy)
+  for (const { contains, target } of FUZZY_MAP) {
+    if (contains.some(k => n.includes(normalize(k)))) return target;
+  }
+
   return null;
 }
 
