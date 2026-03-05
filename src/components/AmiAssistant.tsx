@@ -205,8 +205,8 @@ export function AmiAssistant() {
       {showTooltip && !open && (
         <button
           onClick={dismissTooltip}
-          className="fixed z-[9998] animate-fade-in"
-          style={{ bottom: 80, right: 16 }}
+          className="fixed z-[9998] animate-fade-in md:!bottom-20"
+          style={{ bottom: "calc(130px + env(safe-area-inset-bottom, 0px))", right: 16 }}
         >
           <div className="bg-white text-foreground text-xs px-3 py-2 rounded-lg shadow-lg border border-border max-w-[220px]">
             Ahoj! Jsem tu, když budeš potřebovat pomoc 👋
@@ -220,7 +220,7 @@ export function AmiAssistant() {
         <div
           className="fixed z-[9999] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden animate-scale-in"
           style={{
-          bottom: 84,
+          bottom: window.innerWidth < 768 ? "calc(130px + env(safe-area-inset-bottom, 0px))" : 84,
           right: 16,
             width: 340,
             height: 440,
@@ -318,9 +318,9 @@ export function AmiAssistant() {
         onClick={() => { setOpen(o => !o); dismissTooltip(); }}
         onMouseEnter={() => setCollapsed(false)}
         onMouseLeave={() => setCollapsed(true)}
-        className="fixed z-[9998] flex items-center gap-2 transition-all duration-300 hover:scale-105 group"
+        className="fixed z-[9998] flex items-center gap-2 transition-all duration-300 hover:scale-105 group md:bottom-10"
         style={{
-          bottom: 40,
+          bottom: window.innerWidth < 768 ? "calc(80px + env(safe-area-inset-bottom, 0px))" : undefined,
           right: 16,
           height: 44,
           width: collapsed ? 44 : "auto",
