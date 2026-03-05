@@ -1,9 +1,12 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useProjects } from "@/hooks/useProjects";
 import { useExchangeRates, getExchangeRate } from "@/hooks/useExchangeRates";
 import { parseAppDate } from "@/lib/dateFormat";
 import { matchesStatusFilter } from "@/lib/statusFilter";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel";
+import { ChevronUp, ChevronDown } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -70,6 +73,7 @@ export interface DashboardStatsProps {
 export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRiskHighlightChange, activeTab, onCollapsedChange }: DashboardStatsProps) {
   const { data: projects = [] } = useProjects();
   const { data: rates = [] } = useExchangeRates();
+  const isMobile = useIsMobile();
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
