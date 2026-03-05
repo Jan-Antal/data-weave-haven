@@ -115,6 +115,25 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
     return () => document.removeEventListener("toggle-dashboard", handler);
   }, []);
 
+  // Mobile carousel state
+  const [mobileCollapsed, setMobileCollapsed] = useState(() => {
+    try { return localStorage.getItem("mobile-dashboard-collapsed") === "true"; } catch { return false; }
+  });
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+  const [activeSlide, setActiveSlide] = useState(0);
+
+  useEffect(() => {
+    if (!carouselApi) return;
+    const onSelect = () => setActiveSlide(carouselApi.selectedScrollSnap());
+    carouselApi.on("select", onSelect);
+    onSelect();
+    return () => { carouselApi.off("select", onSelect); };
+  }, [carouselApi]);
+
+  useEffect(() => {
+    try { localStorage.setItem("mobile-dashboard-collapsed", String(mobileCollapsed)); } catch {}
+  }, [mobileCollapsed]);
+
   const filtered = useMemo(() => {
     let list = projects;
     if (personFilter) {
