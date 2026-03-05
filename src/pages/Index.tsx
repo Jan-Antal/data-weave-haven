@@ -145,6 +145,16 @@ const Index = () => {
   useEffect(() => {
     setActiveTab(defaultTab);
   }, [defaultTab]);
+  const handleOpenSettings = useCallback(() => {
+    // Open a settings sheet on mobile — reuse existing settings dialogs
+    setSettingsMenuOpen(true);
+  }, []);
+
+  const handleMobileProjectTap = useCallback((project: any) => {
+    // Dispatch custom event to open project detail
+    document.dispatchEvent(new CustomEvent("open-project-detail", { detail: project }));
+  }, []);
+
   return (
     <ColumnVisibilityProvider>
     <ExportProvider>
@@ -157,7 +167,25 @@ const Index = () => {
           <button onClick={() => setSimulatedRole(null)} className="text-amber-700 font-medium hover:text-amber-900 underline text-sm">Zpět na Admin</button>
         </div>
       )}
-      <header className="border-b bg-primary px-6 py-4 shrink-0 z-50">
+
+      {/* Mobile Header */}
+      {isMobile && (
+        <MobileHeader
+          profileName={profile?.full_name || profile?.email || "Uživatel"}
+          isAdmin={isAdmin}
+          isOwner={isOwner}
+          realRole={realRole}
+          simulatedRole={simulatedRole}
+          setSimulatedRole={setSimulatedRole}
+          canAccessSettings={canAccessSettings}
+          onSignOut={signOut}
+          onAccountSettings={() => setAccountSettingsOpen(true)}
+          onSettings={handleOpenSettings}
+        />
+      )}
+
+      {/* Desktop Header */}
+      <header className="hidden md:block border-b bg-primary px-6 py-4 shrink-0 z-50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-serif text-primary-foreground tracking-wide">
@@ -265,7 +293,24 @@ const Index = () => {
         </div>
       </header>
 
-      <div className="shrink-0 z-40 bg-background border-b px-6 py-3">
+      {/* Mobile: filter bar + tab bar */}
+      {isMobile && (
+        <>
+          <MobileFilterSheet
+            personFilter={filters.personFilter}
+            onPersonFilterChange={filters.setPersonFilter}
+            statusFilter={filters.statusFilter}
+            onStatusFilterChange={filters.setStatusFilter}
+            search={filters.search}
+            onSearchChange={filters.setSearch}
+            hasActiveFilters={filters.hasActiveFilters}
+          />
+          <MobileTabBar activeTab={activeTab} onTabChange={handleTabChange} />
+        </>
+      )}
+
+      {/* Desktop: filter bar */}
+      <div className="hidden md:block shrink-0 z-40 bg-background border-b px-6 py-3">
         <div>
           <TableFilters
             personFilter={filters.personFilter}
@@ -290,106 +335,133 @@ const Index = () => {
 
       {/* Split layout: main content + data log panel */}
       <div className="flex flex-1 overflow-hidden">
-        <main className="px-6 flex-1 min-w-0 flex flex-col overflow-hidden">
-          <div className={cn("shrink-0", dashboardCollapsed ? "py-2" : "py-4")}>
-            <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} riskHighlight={riskHighlight} onRiskHighlightChange={setRiskHighlight} activeTab={activeTab} onCollapsedChange={setDashboardCollapsed} />
-          </div>
-
-          <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-col flex-1 min-h-0">
-            <div className="flex items-center justify-between mb-3 shrink-0">
-              <div className="flex items-center">
-                <TabsList className="bg-card border">
-                  <TabsTrigger value="project-info" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    Project Info
-                  </TabsTrigger>
-                  <TabsTrigger value="pm-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    PM Status
-                  </TabsTrigger>
-                  <TabsTrigger value="tpv-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" onClick={() => tpvCloseDetailRef.current?.()}>
-                    TPV Status
-                  </TabsTrigger>
-                  {tpvListActive && activeTab === "tpv-status" && (
-                    <>
-                      <span className="text-muted-foreground/50 text-xs mx-1 select-none">›</span>
-                      <span className="text-xs font-medium text-primary px-2 py-1 rounded-sm bg-primary/10">TPV List</span>
-                    </>
-                  )}
-                </TabsList>
-                <button
-                  onClick={() => {
-                    document.dispatchEvent(new CustomEvent("toggle-dashboard"));
-                  }}
-                  className="ml-4 flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors cursor-pointer"
-                >
-                  {dashboardCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
-                  <span>{dashboardCollapsed ? "Zobrazit dashboard" : "Skrýt dashboard"}</span>
-                </button>
-              </div>
-
-              <div className="inline-flex h-10 items-center rounded-md bg-card border p-1">
-                {activeTab === "plan" && (
-                  <>
-                    {(["3M", "6M", "1R"] as ZoomLevel[]).map((z) => (
-                      <button
-                        key={z}
-                        onClick={() => setPlanZoom(z)}
-                        className={cn(
-                          "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
-                          planZoom === z
-                            ? "bg-primary text-primary-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        {z}
-                      </button>
-                    ))}
-                    <div className="w-px h-4 bg-border mx-1 shrink-0" />
-                  </>
-                )}
-                <button
-                  onClick={() => handleTabChange("plan")}
-                  className={cn(
-                    "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
-                    activeTab === "plan"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  📅 Plán
-                </button>
-              </div>
+        {/* Mobile: card list */}
+        {isMobile ? (
+          <main className="flex-1 min-w-0 flex flex-col overflow-y-auto px-3 pt-3 pb-16">
+            <MobileCardList
+              personFilter={filters.personFilter}
+              statusFilter={filters.statusFilter}
+              search={filters.search}
+              riskHighlight={riskHighlight}
+              activeTab={activeTab}
+              onProjectTap={handleMobileProjectTap}
+            />
+          </main>
+        ) : (
+          /* Desktop: table view */
+          <main className="px-6 flex-1 min-w-0 flex flex-col overflow-hidden">
+            <div className={cn("shrink-0", dashboardCollapsed ? "py-2" : "py-4")}>
+              <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} riskHighlight={riskHighlight} onRiskHighlightChange={setRiskHighlight} activeTab={activeTab} onCollapsedChange={setDashboardCollapsed} />
             </div>
 
-            <TabsContent value="project-info" forceMount className={cn("flex-1 min-h-0 overflow-y-auto", activeTab !== "project-info" ? "hidden" : "")}>
-              <ProjectInfoTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
-            </TabsContent>
-            <TabsContent value="pm-status" forceMount className={cn("flex-1 min-h-0 overflow-y-auto", activeTab !== "pm-status" ? "hidden" : "")}>
-              <PMStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
-            </TabsContent>
-            <TabsContent value="tpv-status" forceMount className={cn("flex-1 min-h-0 overflow-y-auto", activeTab !== "tpv-status" ? "hidden" : "")}>
-              <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRequestTab={() => handleTabChange("tpv-status")} closeDetailRef={tpvCloseDetailRef} onActiveProjectChange={setTpvListActive} />
-            </TabsContent>
-            {activeTab === "plan" && (
-              <TabsContent value="plan" className="flex-1 min-h-0 overflow-y-auto">
-                <PlanView personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} zoom={planZoom} />
-              </TabsContent>
-            )}
-          </Tabs>
-        </main>
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-col flex-1 min-h-0">
+              <div className="flex items-center justify-between mb-3 shrink-0">
+                <div className="flex items-center">
+                  <TabsList className="bg-card border">
+                    <TabsTrigger value="project-info" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                      Project Info
+                    </TabsTrigger>
+                    <TabsTrigger value="pm-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                      PM Status
+                    </TabsTrigger>
+                    <TabsTrigger value="tpv-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" onClick={() => tpvCloseDetailRef.current?.()}>
+                      TPV Status
+                    </TabsTrigger>
+                    {tpvListActive && activeTab === "tpv-status" && (
+                      <>
+                        <span className="text-muted-foreground/50 text-xs mx-1 select-none">›</span>
+                        <span className="text-xs font-medium text-primary px-2 py-1 rounded-sm bg-primary/10">TPV List</span>
+                      </>
+                    )}
+                  </TabsList>
+                  <button
+                    onClick={() => {
+                      document.dispatchEvent(new CustomEvent("toggle-dashboard"));
+                    }}
+                    className="ml-4 flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors cursor-pointer"
+                  >
+                    {dashboardCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+                    <span>{dashboardCollapsed ? "Zobrazit dashboard" : "Skrýt dashboard"}</span>
+                  </button>
+                </div>
 
-        {/* Data Log Side Panel */}
-        <div
-          className={cn(
-            "transition-all duration-250 ease-in-out overflow-hidden shrink-0",
-            dataLogOpen ? "w-[340px]" : "w-0"
-          )}
-        >
-          <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
-            setDataLogOpen(v);
-            try { sessionStorage.setItem("datalog-open", String(v)); } catch {}
-          }} />
-        </div>
+                <div className="inline-flex h-10 items-center rounded-md bg-card border p-1">
+                  {activeTab === "plan" && (
+                    <>
+                      {(["3M", "6M", "1R"] as ZoomLevel[]).map((z) => (
+                        <button
+                          key={z}
+                          onClick={() => setPlanZoom(z)}
+                          className={cn(
+                            "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
+                            planZoom === z
+                              ? "bg-primary text-primary-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          {z}
+                        </button>
+                      ))}
+                      <div className="w-px h-4 bg-border mx-1 shrink-0" />
+                    </>
+                  )}
+                  <button
+                    onClick={() => handleTabChange("plan")}
+                    className={cn(
+                      "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
+                      activeTab === "plan"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    📅 Plán
+                  </button>
+                </div>
+              </div>
+
+              <TabsContent value="project-info" forceMount className={cn("flex-1 min-h-0 overflow-y-auto", activeTab !== "project-info" ? "hidden" : "")}>
+                <ProjectInfoTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
+              </TabsContent>
+              <TabsContent value="pm-status" forceMount className={cn("flex-1 min-h-0 overflow-y-auto", activeTab !== "pm-status" ? "hidden" : "")}>
+                <PMStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
+              </TabsContent>
+              <TabsContent value="tpv-status" forceMount className={cn("flex-1 min-h-0 overflow-y-auto", activeTab !== "tpv-status" ? "hidden" : "")}>
+                <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRequestTab={() => handleTabChange("tpv-status")} closeDetailRef={tpvCloseDetailRef} onActiveProjectChange={setTpvListActive} />
+              </TabsContent>
+              {activeTab === "plan" && (
+                <TabsContent value="plan" className="flex-1 min-h-0 overflow-y-auto">
+                  <PlanView personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} zoom={planZoom} />
+                </TabsContent>
+              )}
+            </Tabs>
+          </main>
+        )}
+
+        {/* Data Log Side Panel — desktop only */}
+        {!isMobile && (
+          <div
+            className={cn(
+              "transition-all duration-250 ease-in-out overflow-hidden shrink-0",
+              dataLogOpen ? "w-[340px]" : "w-0"
+            )}
+          >
+            <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
+              setDataLogOpen(v);
+              try { sessionStorage.setItem("datalog-open", String(v)); } catch {}
+            }} />
+          </div>
+        )}
       </div>
+
+      {/* Mobile Bottom Nav */}
+      {isMobile && (
+        <MobileBottomNav
+          onNewProject={() => document.dispatchEvent(new CustomEvent("open-add-project"))}
+          onSettings={handleOpenSettings}
+          canCreateProject={canCreateProject}
+          canAccessSettings={canAccessSettings}
+        />
+      )}
 
       <ExchangeRateSettings open={exchangeRateOpen} onOpenChange={setExchangeRateOpen} />
       <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />
