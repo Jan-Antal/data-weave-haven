@@ -1434,6 +1434,27 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       onCancel={() => setUnsavedConfirmOpen(false)}
       description="Máte neuložené změny. Opravdu chcete zavřít?"
     />
+
+    {/* Mobile delete confirmation */}
+    {isMobile && (
+      <ConfirmDialog
+        open={deleteStep === 1 || deleteStep === 2}
+        onConfirm={() => {
+          const totalDocs = Object.values(sp.filesByCategory).reduce((sum, files) => sum + files.length, 0);
+          if (deleteStep === 1 && totalDocs > 0) {
+            setDeleteStep(2);
+          } else {
+            handleDelete();
+          }
+        }}
+        onCancel={() => setDeleteStep(0)}
+        description={
+          deleteStep === 2
+            ? `Tento projekt obsahuje ${Object.values(sp.filesByCategory).reduce((sum, files) => sum + files.length, 0)} dokumentů. Opravdu chcete smazat projekt "${project?.project_name}"?`
+            : `Opravdu smazat projekt "${project?.project_name}"?`
+        }
+      />
+    )}
     </>
   );
 }
