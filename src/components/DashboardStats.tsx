@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useProjects } from "@/hooks/useProjects";
 import { useExchangeRates, getExchangeRate } from "@/hooks/useExchangeRates";
 import { parseAppDate } from "@/lib/dateFormat";
@@ -121,6 +121,7 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
   });
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const [activeSlide, setActiveSlide] = useState(0);
+  const hasInteracted = useRef(false);
 
   useEffect(() => {
     if (!carouselApi) return;
@@ -129,6 +130,19 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
     onSelect();
     return () => { carouselApi.off("select", onSelect); };
   }, [carouselApi]);
+
+  // Auto-advance every 8s, stop permanently on first interaction
+  useEffect(() => {
+    if (!carouselApi || hasInteracted.current || mobileCollapsed) return;
+    const interval = setInterval(() => {
+      if (hasInteracted.current) return;
+      carouselApi.scrollNext();
+    }, 8000);
+    const stopAuto = () => { hasInteracted.current = true; clearInterval(interval); };
+    const root = carouselApi.rootNode();
+    root.addEventListener("pointerdown", stopAuto, { once: true });
+    return () => { clearInterval(interval); root.removeEventListener("pointerdown", stopAuto); };
+  }, [carouselApi, mobileCollapsed]);
 
   useEffect(() => {
     try { localStorage.setItem("mobile-dashboard-collapsed", String(mobileCollapsed)); } catch {}
@@ -272,10 +286,10 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
 
         {!mobileCollapsed && (
           <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-            <Carousel opts={{ align: "start", loop: false }} setApi={setCarouselApi} className="w-full">
-              <CarouselContent className="-ml-2">
+            <Carousel opts={{ align: "center", loop: true }} setApi={setCarouselApi} className="w-full">
+              <CarouselContent className="ml-0">
                 {/* Card 1: Aktivní zakázky */}
-                <CarouselItem className="pl-2 basis-[85%]">
+                <CarouselItem className="pl-0 basis-full">
                   <div className="rounded-lg border bg-card p-4 h-[160px] flex flex-col justify-center">
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Aktivní zakázky</p>
                     <span className="font-serif font-bold text-3xl mt-1">{activeCount}</span>
@@ -287,7 +301,7 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
                 </CarouselItem>
 
                 {/* Card 2: Pipeline */}
-                <CarouselItem className="pl-2 basis-[85%]">
+                <CarouselItem className="pl-0 basis-full">
                   <div className="rounded-lg border bg-card p-3 h-[160px] flex flex-col">
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Pipeline zakázek</p>
                     <div className="flex-1 min-h-0">
@@ -307,7 +321,7 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
                 </CarouselItem>
 
                 {/* Card 3: Riziko & Termíny */}
-                <CarouselItem className="pl-2 basis-[85%]">
+                <CarouselItem className="pl-0 basis-full">
                   <div className="rounded-lg border bg-card p-4 h-[160px] flex flex-col">
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Riziko & Termíny</p>
                     <div className="flex flex-col gap-1">
@@ -331,7 +345,7 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
                 </CarouselItem>
 
                 {/* Card 4: Vytížení PM */}
-                <CarouselItem className="pl-2 basis-[85%]">
+                <CarouselItem className="pl-0 basis-full">
                   <div className="rounded-lg border bg-card p-3 h-[160px] flex flex-col">
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{isTPV ? "Vytížení Konstruktér" : "Vytížení PM"}</p>
                     <div className="flex-1 flex items-center gap-2 min-h-0">
@@ -374,7 +388,7 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
                   style={{
                     width: activeSlide === i ? 8 : 6,
                     height: activeSlide === i ? 8 : 6,
-                    backgroundColor: activeSlide === i ? "hsl(var(--primary))" : "hsl(var(--muted-foreground) / 0.3)",
+                    backgroundColor: activeSlide === i ? "#223937" : "#d1cdc7",
                   }}
                 />
               ))}
