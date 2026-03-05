@@ -453,7 +453,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
 
   // ── Frozen filter results ───────────────────────────────────────
   const filterFingerprint = JSON.stringify([personFilter, statusFilter, externalSearch]);
-  const computeKey = `${filterFingerprint}|${projects.length}|${stagesByProject.size}`;
+  const computeKey = `${filterFingerprint}|${projects.length}|${stagesByProject.size}|${tpvItemsByProject.size}`;
   const hasActiveFilters = !!(personFilter || (statusFilter && statusFilter.length > 0) || externalSearch);
 
   const frozenRef = useRef<{ key: string; ids: Set<string> }>({
