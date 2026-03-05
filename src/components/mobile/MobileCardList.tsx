@@ -6,7 +6,7 @@ import { useStagesByProject } from "@/hooks/useAllProjectStages";
 import { useSortFilter } from "@/hooks/useSortFilter";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowUp, ArrowDown } from "lucide-react";
 
 interface MobileCardListProps {
   personFilter: string | null;
@@ -33,7 +33,7 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
   const { stagesByProject } = useStagesByProject();
   const queryClient = useQueryClient();
   const [sortBy, setSortBy] = useState("project_name");
-
+  const [sortAsc, setSortAsc] = useState(true);
   // Pull-to-refresh state
   const [pullDistance, setPullDistance] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -51,12 +51,15 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
     return [...sorted].sort((a, b) => {
       const av = (a as any)[sortBy] ?? "";
       const bv = (b as any)[sortBy] ?? "";
+      let cmp: number;
       if (sortBy === "prodejni_cena") {
-        return (Number(bv) || 0) - (Number(av) || 0);
+        cmp = (Number(av) || 0) - (Number(bv) || 0);
+      } else {
+        cmp = String(av).localeCompare(String(bv), "cs");
       }
-      return String(av).localeCompare(String(bv), "cs");
+      return sortAsc ? cmp : -cmp;
     });
-  }, [sorted, sortBy]);
+  }, [sorted, sortBy, sortAsc]);
 
   // Pull-to-refresh touch handlers
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -125,10 +128,11 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
       )}
 
       {/* Sort control */}
-      <div className="flex items-center justify-between px-1">
-        <span className="text-xs text-muted-foreground">{displayProjects.length} projektů</span>
+      <div className="flex items-center justify-between px-1 gap-2">
+        <span className="text-xs text-muted-foreground shrink-0">{displayProjects.length} projektů</span>
+        <div className="flex items-center gap-1">
         <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-[130px] h-8 text-xs">
+          <SelectTrigger className="w-[110px] h-8 text-xs">
             <SelectValue placeholder="Řadit dle" />
           </SelectTrigger>
           <SelectContent>
@@ -139,6 +143,15 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
             ))}
           </SelectContent>
         </Select>
+        <button
+          onClick={() => setSortAsc(v => !v)}
+          className="h-8 w-8 flex items-center justify-center rounded-md border border-border shrink-0"
+          style={{ color: "#223937" }}
+          title={sortAsc ? "Vzestupně" : "Sestupně"}
+        >
+          {sortAsc ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+        </button>
+        </div>
       </div>
 
       {/* Cards */}
