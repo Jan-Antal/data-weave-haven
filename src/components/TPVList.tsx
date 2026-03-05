@@ -298,10 +298,9 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         />
         <ExcelImportWizard
           open={wizardOpen}
-          onOpenChange={setWizardOpen}
+          onClose={() => setWizardOpen(false)}
           projectId={projectId}
-          onImport={(items) => bulkInsert.mutate({ projectId, items })}
-          existingItems={items}
+          projectName={projectName}
         />
       </>
     );
