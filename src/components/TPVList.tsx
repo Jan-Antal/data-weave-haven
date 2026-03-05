@@ -274,6 +274,39 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     };
   }, [registerExport, tpvExportMeta]);
 
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return (
+      <>
+        <MobileTPVCardList
+          items={sortedItems}
+          projectId={projectId}
+          projectName={projectName}
+          currency={currency}
+          productionStatusMap={productionStatusMap}
+          onBack={onBack}
+          onOpenDetail={() => setDetailOpen(true)}
+          onAddItem={(name) => addItem.mutate({ project_id: projectId, item_name: name })}
+          onOpenImport={() => setWizardOpen(true)}
+          canManageTPV={canManageTPV}
+        />
+        <ProjectDetailDialog
+          project={currentProject ?? null}
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+        />
+        <ExcelImportWizard
+          open={wizardOpen}
+          onOpenChange={setWizardOpen}
+          projectId={projectId}
+          onImport={(items) => bulkInsert.mutate({ projectId, items })}
+          existingItems={items}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="w-full min-w-0">
       {/* Toolbar */}
