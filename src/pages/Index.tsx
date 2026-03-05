@@ -96,6 +96,8 @@ const Index = () => {
 
   const { data: userPrefs } = useUserPreferences();
   const achievementChecker = useAchievementChecker();
+  const isMobile = useIsMobile();
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
 
   const handleTabChange = useCallback((tab: string) => {
     scrollPositions.current[activeTab] = window.scrollY;
