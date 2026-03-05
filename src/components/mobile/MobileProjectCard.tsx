@@ -47,9 +47,9 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
           className="flex-1 text-left p-3 min-h-[44px]"
           onClick={() => onTap(project)}
         >
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <p className="text-xs text-muted-foreground font-mono">{project.project_id}</p>
+          <div className="flex items-start justify-between gap-2 overflow-hidden">
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <p className="text-xs text-muted-foreground font-mono truncate">{project.project_id}</p>
               <p className="font-medium text-sm truncate">{project.project_name}</p>
               {project.klient && (
                 <p className="text-xs text-muted-foreground mt-0.5">Klient: {project.klient}</p>
