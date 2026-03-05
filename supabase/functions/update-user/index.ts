@@ -131,7 +131,10 @@ Deno.serve(async (req) => {
       const { error: pwError } = await adminClient.auth.admin.updateUserById(user_id, { password });
       if (pwError) {
         console.error("Password update failed:", pwError);
-        return new Response(JSON.stringify({ error: "Unable to update password" }), {
+        const pwMsg = pwError.message?.includes("easily guessed")
+          ? "Heslo je příliš jednoduché nebo snadno uhodnutelné. Zvolte silnější heslo."
+          : pwError.message || "Unable to update password";
+        return new Response(JSON.stringify({ error: pwMsg }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
