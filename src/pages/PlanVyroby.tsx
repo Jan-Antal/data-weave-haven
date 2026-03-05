@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { ProductionHeader } from "@/components/production/ProductionHeader";
