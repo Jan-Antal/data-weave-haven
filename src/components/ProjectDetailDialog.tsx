@@ -877,7 +877,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
 
                   {/* Collapsible location row */}
                   <div className={cn("col-span-2 overflow-hidden transition-all duration-300 ease-in-out", showLocation ? "max-h-[280px] opacity-100" : "max-h-0 opacity-0")}>
-                    <div className="grid grid-cols-2 gap-3 pb-1">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-1">
                       <div className="relative">
                         <Label className="text-xs">Lokace</Label>
                         <Input
@@ -900,9 +900,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                           </div>
                         )}
                       </div>
-                      <div className="flex flex-col">
-                        <Label className="text-xs opacity-0">Mapa</Label>
-                        <div className="mt-1 rounded-lg border border-input bg-muted/50 overflow-hidden relative" style={{ height: '200px' }}>
+                      <div className="flex flex-col md:-mx-0 -mx-4">
+                        <Label className="text-xs opacity-0 hidden md:block">Mapa</Label>
+                        <div className="md:mt-1 md:rounded-lg rounded-none border border-input bg-muted/50 overflow-hidden relative" style={{ height: '200px' }}>
                           {form.location ? (
                             <iframe
                               title="Map preview"
