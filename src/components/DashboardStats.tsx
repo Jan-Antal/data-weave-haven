@@ -118,7 +118,6 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
   const [mobileCollapsed, setMobileCollapsed] = useState(() => {
     try { return localStorage.getItem("mobile-dashboard-collapsed") === "true"; } catch { return false; }
   });
-  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const [activeSlide, setActiveSlide] = useState(0);
   const hasInteracted = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
