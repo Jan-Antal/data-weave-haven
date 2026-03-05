@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { logActivity } from "@/lib/activityLog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, FileText, X, Trash2, RefreshCw, MapPin, List, FileSpreadsheet } from "lucide-react";
+import { CalendarIcon, Upload, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Loader2, FileText, X, Trash2, RefreshCw, MapPin, List, FileSpreadsheet, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { marzeStorageToInput, marzeInputToStorage, formatMarze } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
@@ -276,6 +277,72 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const sp = useSharePointDocs(project?.project_id ?? "");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewFile, setPreviewFile] = useState<{ file: SPFile; categoryKey: string; loading: boolean; previewUrl: string | null; webUrl: string | null; downloadUrl: string | null } | null>(null);
+  const isMobile = useIsMobile();
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const touchTapRef = useRef<{ timer: number; x: number; y: number } | null>(null);
+
+  // ── Mobile: touch-to-edit with scroll delay ─────────────────
+  const handleMobileTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!isMobile) return;
+    const touch = e.touches[0];
+    touchTapRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      timer: window.setTimeout(() => {
+        const target = e.target as HTMLElement;
+        const container = target.closest('.grid > div, .col-span-2') as HTMLElement;
+        if (!container) return;
+        const input = container.querySelector('input:not([type="file"]):not([type="hidden"]):not(:disabled), textarea:not(:disabled)') as HTMLElement;
+        if (input) {
+          input.style.pointerEvents = 'auto';
+          input.focus();
+          input.addEventListener('blur', () => { input.style.pointerEvents = ''; }, { once: true });
+        }
+      }, 250),
+    };
+  }, [isMobile]);
+
+  const handleMobileTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchTapRef.current) return;
+    const touch = e.touches[0];
+    if (Math.abs(touch.clientX - touchTapRef.current.x) > 10 || Math.abs(touch.clientY - touchTapRef.current.y) > 10) {
+      clearTimeout(touchTapRef.current.timer);
+      touchTapRef.current = null;
+    }
+  }, []);
+
+  const handleMobileTouchEnd = useCallback(() => {
+    if (touchTapRef.current) {
+      clearTimeout(touchTapRef.current.timer);
+      touchTapRef.current = null;
+    }
+  }, []);
+
+  // ── Mobile: camera photo upload ─────────────────────────────
+  const handleCameraUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !project) return;
+    try {
+      const now = new Date();
+      const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
+      const fileName = `foto_${ts}.jpg`;
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      await supabase.functions.invoke('sharepoint-documents', {
+        body: { action: 'upload', projectId: project.project_id, category: 'Fotky', fileName, fileContent: base64 },
+      });
+      toast({ title: 'Foto nahráno ✓' });
+      sp.listFiles('fotky', true);
+      dispatchDocCountUpdate(project.project_id, 1);
+    } catch (err: any) {
+      toast({ title: 'Chyba', description: err.message, variant: 'destructive' });
+    }
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+  }, [project, sp]);
 
   // ── Dirty check ─────────────────────────────────────────────
   const isDirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initialForm), [form, initialForm]);
@@ -284,7 +351,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     if (isDirty) {
       setUnsavedConfirmOpen(true);
     } else {
-      onOpenChange(false);
+      requestAnimationFrame(() => onOpenChange(false));
     }
   }, [isDirty, onOpenChange]);
 
@@ -740,7 +807,12 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
 
             <div className="flex max-md:flex-col max-md:overflow-y-auto" style={{ maxHeight: '78vh' }}>
               {/* LEFT PANEL — Form fields */}
-              <div className="flex-1 px-6 pb-4 overflow-y-auto max-md:overflow-visible">
+              <div
+                className={cn("flex-1 px-6 pb-4 overflow-y-auto max-md:overflow-visible", isMobile && "pd-mobile")}
+                onTouchStart={handleMobileTouchStart}
+                onTouchMove={handleMobileTouchMove}
+                onTouchEnd={handleMobileTouchEnd}
+              >
                 {/* ── ZÁKLADNÍ INFORMACE ────────────────────── */}
                 <SectionHeader icon="📋" label="ZÁKLADNÍ INFORMACE" />
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
@@ -1066,6 +1138,23 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                     />
                   </div>
                 </div>
+
+                {/* Mobile: Smazat projekt at bottom of scrollable content */}
+                {isMobile && canDeleteProject && (
+                  <div className="pt-8 pb-4 text-center">
+                    <button
+                      type="button"
+                      className="text-xs text-destructive hover:underline"
+                      onClick={() => {
+                        if (window.confirm(`Opravdu smazat projekt ${project.project_name}?`)) {
+                          handleDelete();
+                        }
+                      }}
+                    >
+                      Smazat projekt
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* RIGHT PANEL — Documents (below form on mobile) */}
@@ -1219,43 +1308,46 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
 
             {/* Footer */}
             <div className="flex items-center justify-between px-6 py-3 border-t border-border shrink-0 max-md:sticky max-md:bottom-0 max-md:bg-background max-md:z-10 max-md:flex-wrap max-md:gap-2">
-              <div className="flex items-center gap-2">
-                {canDeleteProject && (
-                  <>
-                    {deleteStep === 0 && (
-                      <Button
-                        variant="outline"
-                        onClick={() => setDeleteStep(1)}
-                      >
-                        Smazat projekt
-                      </Button>
-                    )}
-                    {deleteStep === 1 && (
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-muted-foreground">Opravdu smazat?</span>
-                        <button type="button" className="text-sm text-destructive font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
-                        <button type="button" className="text-sm text-muted-foreground font-medium hover:underline" onClick={() => {
-                          const totalDocs = Object.values(sp.filesByCategory).reduce((sum, files) => sum + files.length, 0);
-                          if (totalDocs > 0) {
-                            setDeleteStep(2);
-                          } else {
-                            handleDelete();
-                          }
-                        }}>Potvrdit</button>
-                      </div>
-                    )}
-                    {deleteStep === 2 && (
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-muted-foreground">
-                          Tento projekt obsahuje {Object.values(sp.filesByCategory).reduce((sum, files) => sum + files.length, 0)} dokumentů. Opravdu chcete smazat?
-                        </span>
-                        <button type="button" className="text-sm text-destructive font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
-                        <button type="button" className="text-sm text-muted-foreground font-medium hover:underline" onClick={handleDelete}>Potvrdit smazání</button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
+              {/* Desktop: delete button */}
+              {!isMobile && (
+                <div className="flex items-center gap-2">
+                  {canDeleteProject && (
+                    <>
+                      {deleteStep === 0 && (
+                        <Button variant="outline" onClick={() => setDeleteStep(1)}>
+                          Smazat projekt
+                        </Button>
+                      )}
+                      {deleteStep === 1 && (
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-muted-foreground">Opravdu smazat?</span>
+                          <button type="button" className="text-sm text-destructive font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
+                          <button type="button" className="text-sm text-muted-foreground font-medium hover:underline" onClick={() => {
+                            const totalDocs = Object.values(sp.filesByCategory).reduce((sum, files) => sum + files.length, 0);
+                            if (totalDocs > 0) { setDeleteStep(2); } else { handleDelete(); }
+                          }}>Potvrdit</button>
+                        </div>
+                      )}
+                      {deleteStep === 2 && (
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-muted-foreground">
+                            Tento projekt obsahuje {Object.values(sp.filesByCategory).reduce((sum, files) => sum + files.length, 0)} dokumentů. Opravdu chcete smazat?
+                          </span>
+                          <button type="button" className="text-sm text-destructive font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
+                          <button type="button" className="text-sm text-muted-foreground font-medium hover:underline" onClick={handleDelete}>Potvrdit smazání</button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Mobile: Fotky camera button */}
+              {isMobile && (
+                <Button size="sm" variant="outline" onClick={() => cameraInputRef.current?.click()}>
+                  <Camera className="h-3 w-3 mr-1" /> Fotky
+                </Button>
+              )}
 
               <div className="flex items-center gap-2">
                 {onOpenTPVList && (
@@ -1264,10 +1356,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                       size="sm"
                       variant="outline"
                       onClick={() => {
-                        if (project) {
-                          onOpenChange(false);
-                          onOpenTPVList(project.project_id, project.project_name, true);
-                        }
+                        if (project) { onOpenChange(false); onOpenTPVList(project.project_id, project.project_name, true); }
                       }}
                     >
                       <Upload className="h-3 w-3 mr-1" /> Import z Excelu
@@ -1277,10 +1366,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                       variant="ghost"
                       className="gap-1.5"
                       onClick={() => {
-                        if (project) {
-                          onOpenChange(false);
-                          onOpenTPVList(project.project_id, project.project_name);
-                        }
+                        if (project) { onOpenChange(false); onOpenTPVList(project.project_id, project.project_name); }
                       }}
                     >
                       <List className="h-3.5 w-3.5" />
@@ -1295,6 +1381,18 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                 {canEdit && <Button onClick={handleSave} disabled={idExists || !form.project_id}>Uložit</Button>}
               </div>
             </div>
+
+            {/* Hidden camera input for mobile */}
+            {isMobile && (
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleCameraUpload}
+              />
+            )}
           </>
         )}
       </DialogContent>
