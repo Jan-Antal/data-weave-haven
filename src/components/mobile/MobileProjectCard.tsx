@@ -2,7 +2,6 @@ import { memo, useState } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatCurrency } from "@/lib/currency";
-import { getProjectRiskColor } from "@/lib/projectColors";
 import { cn } from "@/lib/utils";
 
 interface Project {
@@ -25,9 +24,15 @@ interface MobileProjectCardProps {
   dimmed?: boolean;
 }
 
+const RISK_COLORS: Record<string, string> = {
+  High: "hsl(0 70% 50%)",
+  Medium: "hsl(35 90% 55%)",
+  Low: "hsl(142 60% 45%)",
+};
+
 export const MobileProjectCard = memo(function MobileProjectCard({ project, onTap, stages = [], dimmed }: MobileProjectCardProps) {
   const [expanded, setExpanded] = useState(false);
-  const riskColor = getProjectRiskColor(project.risk);
+  const riskColor = project.risk ? RISK_COLORS[project.risk] : undefined;
   const hasStages = stages.length > 0;
 
   return (
