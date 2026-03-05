@@ -80,8 +80,8 @@ export function MobileTPVCardList({
     return [...filtered].sort((a, b) => {
       if (sortBy === "cena") return ((b.cena || 0) - (a.cena || 0));
       if (sortBy === "vyroba") {
-        const va = productionStatusMap.get(a.id) || "";
-        const vb = productionStatusMap.get(b.id) || "";
+        const va = (productionStatusMap.get(a.item_type || a.item_name)?.[0]?.label) || "";
+        const vb = (productionStatusMap.get(b.item_type || b.item_name)?.[0]?.label) || "";
         return va.localeCompare(vb, "cs");
       }
       const av = String((a as any)[sortBy] || "");
