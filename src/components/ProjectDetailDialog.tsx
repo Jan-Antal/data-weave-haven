@@ -113,14 +113,21 @@ function SectionHeader({ icon, label }: { icon: string; label: string }) {
 }
 
 // ── Helper: Date picker field ──────────────────────────────────
+function formatDisplayDate(value: string): string {
+  if (!value) return "";
+  const d = parseAppDate(value);
+  return d ? formatAppDate(d) : value;
+}
+
 function DateField({ label, value, onChange, disabled }: { label: string; value: string; onChange: (v: string) => void; disabled: boolean }) {
+  const displayVal = formatDisplayDate(value);
   if (disabled) {
     return (
       <div>
         <Label className="text-xs">{label}</Label>
         <Button variant="outline" disabled className="w-full justify-start text-left font-normal bg-muted text-muted-foreground cursor-not-allowed opacity-70">
           <CalendarIcon className="mr-2 h-4 w-4" />
-          {value || "—"}
+          {displayVal || "—"}
         </Button>
       </div>
     );
@@ -132,7 +139,7 @@ function DateField({ label, value, onChange, disabled }: { label: string; value:
         <PopoverTrigger asChild>
           <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !value && "text-muted-foreground")}>
             <CalendarIcon className="mr-2 h-4 w-4" />
-            {value || "Vyberte datum"}
+            {displayVal || "Vyberte datum"}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0 z-[99999]" align="start">
@@ -151,13 +158,14 @@ function DateField({ label, value, onChange, disabled }: { label: string; value:
 
 // ── Compact milestone date field ───────────────────────────────
 function CompactDateField({ label, value, onChange, disabled }: { label: string; value: string; onChange: (v: string) => void; disabled: boolean }) {
+  const displayVal = formatDisplayDate(value);
   if (disabled) {
     return (
       <div>
         <Label className="text-xs">{label}</Label>
         <Button variant="outline" disabled className="w-full justify-start text-left font-normal text-xs h-8 bg-muted text-muted-foreground cursor-not-allowed opacity-70">
           <CalendarIcon className="mr-1 h-3 w-3" />
-          {value || "—"}
+          {displayVal || "—"}
         </Button>
       </div>
     );
@@ -169,7 +177,7 @@ function CompactDateField({ label, value, onChange, disabled }: { label: string;
         <PopoverTrigger asChild>
           <Button variant="outline" className={cn("w-full justify-start text-left font-normal text-xs h-8", !value && "text-muted-foreground")}>
             <CalendarIcon className="mr-1 h-3 w-3" />
-            {value || "—"}
+            {displayVal || "—"}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0 z-[99999]" align="start">
