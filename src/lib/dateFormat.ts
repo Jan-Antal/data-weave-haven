@@ -1,7 +1,7 @@
 import { format, parse, isValid } from "date-fns";
 
-/** App-wide date display format: DD-Mon-YY (e.g. 02-Mar-26) */
-export const APP_DATE_FORMAT = "dd-MMM-yy";
+/** App-wide date display format: Czech D. M. YYYY (e.g. 5. 3. 2026) */
+export const APP_DATE_FORMAT = "d. M. yyyy";
 
 /**
  * All formats we accept when parsing stored dates.
@@ -10,7 +10,8 @@ export const APP_DATE_FORMAT = "dd-MMM-yy";
  * then other fallbacks.
  */
 export const PARSE_FORMATS = [
-  "dd-MMM-yy",     // new canonical: 15-Mar-26
+  "d. M. yyyy",    // Czech canonical: 5. 3. 2026
+  "dd-MMM-yy",     // legacy: 15-Mar-26
   "M/d/yyyy",      // legacy US full year: 3/15/2026
   "M/d/yy",        // legacy US short year: 3/15/26
   "yyyy-MM-dd",    // ISO

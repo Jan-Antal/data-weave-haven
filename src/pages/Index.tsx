@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectInfoTable } from "@/components/ProjectInfoTable";
+import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
 import { PMStatusTable } from "@/components/PMStatusTable";
 import { TPVStatusTable } from "@/components/TPVStatusTable";
 import { PlanView } from "@/components/PlanView";
@@ -69,6 +70,8 @@ const Index = () => {
   });
   const tpvCloseDetailRef = useRef<(() => void) | null>(null);
   const [tpvListActive, setTpvListActive] = useState(false);
+  const [mobileDetailProject, setMobileDetailProject] = useState<any>(null);
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const scrollPositions = useRef<Record<string, number>>({});
   const { setCurrentPage } = useUndoRedo();
 
@@ -151,8 +154,8 @@ const Index = () => {
   }, []);
 
   const handleMobileProjectTap = useCallback((project: any) => {
-    // Dispatch custom event to open project detail
-    document.dispatchEvent(new CustomEvent("open-project-detail", { detail: project }));
+    setMobileDetailProject(project);
+    setMobileDetailOpen(true);
   }, []);
 
   return (
@@ -338,6 +341,7 @@ const Index = () => {
         {/* Mobile: card list */}
         {isMobile ? (
           <main className="flex-1 min-w-0 flex flex-col overflow-y-auto px-3 pt-3 pb-16">
+            <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} riskHighlight={riskHighlight} onRiskHighlightChange={setRiskHighlight} activeTab={activeTab} />
             <MobileCardList
               personFilter={filters.personFilter}
               statusFilter={filters.statusFilter}
@@ -345,6 +349,11 @@ const Index = () => {
               riskHighlight={riskHighlight}
               activeTab={activeTab}
               onProjectTap={handleMobileProjectTap}
+            />
+            <ProjectDetailDialog
+              project={mobileDetailProject}
+              open={mobileDetailOpen}
+              onOpenChange={setMobileDetailOpen}
             />
           </main>
         ) : (

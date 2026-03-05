@@ -2,6 +2,7 @@ import { memo, useState } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatCurrency } from "@/lib/currency";
+import { parseAppDate, formatAppDate } from "@/lib/dateFormat";
 import { cn } from "@/lib/utils";
 
 interface Project {
@@ -36,7 +37,7 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
   const hasStages = stages.length > 0;
 
   return (
-    <div className={cn("bg-card rounded-lg border shadow-sm overflow-hidden", dimmed && "opacity-40")}>
+    <div className={cn("bg-card rounded-lg border shadow-sm overflow-hidden transition-all active:scale-[0.98] active:opacity-90", dimmed && "opacity-40")}>
       {/* Main card area */}
       <div
         className="flex items-stretch"
@@ -67,7 +68,7 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
             </div>
           </div>
           {project.datum_smluvni && (
-            <p className="text-xs text-muted-foreground mt-1">Datum S.: {project.datum_smluvni}</p>
+            <p className="text-xs text-muted-foreground mt-1">Datum S.: {(() => { const d = parseAppDate(project.datum_smluvni); return d ? formatAppDate(d) : project.datum_smluvni; })()}</p>
           )}
         </button>
         {hasStages && (

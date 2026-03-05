@@ -1,9 +1,12 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useProjects } from "@/hooks/useProjects";
 import { useExchangeRates, getExchangeRate } from "@/hooks/useExchangeRates";
 import { parseAppDate } from "@/lib/dateFormat";
 import { matchesStatusFilter } from "@/lib/statusFilter";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel";
+import { ChevronUp, ChevronDown } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -70,6 +73,7 @@ export interface DashboardStatsProps {
 export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRiskHighlightChange, activeTab, onCollapsedChange }: DashboardStatsProps) {
   const { data: projects = [] } = useProjects();
   const { data: rates = [] } = useExchangeRates();
+  const isMobile = useIsMobile();
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -110,6 +114,25 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
     document.addEventListener("toggle-dashboard", handler);
     return () => document.removeEventListener("toggle-dashboard", handler);
   }, []);
+
+  // Mobile carousel state
+  const [mobileCollapsed, setMobileCollapsed] = useState(() => {
+    try { return localStorage.getItem("mobile-dashboard-collapsed") === "true"; } catch { return false; }
+  });
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+  const [activeSlide, setActiveSlide] = useState(0);
+
+  useEffect(() => {
+    if (!carouselApi) return;
+    const onSelect = () => setActiveSlide(carouselApi.selectedScrollSnap());
+    carouselApi.on("select", onSelect);
+    onSelect();
+    return () => { carouselApi.off("select", onSelect); };
+  }, [carouselApi]);
+
+  useEffect(() => {
+    try { localStorage.setItem("mobile-dashboard-collapsed", String(mobileCollapsed)); } catch {}
+  }, [mobileCollapsed]);
 
   const filtered = useMemo(() => {
     let list = projects;
@@ -235,6 +258,134 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
     { key: "high-risk", color: "#EAB308", bgTint: "transparent", label: "Vysoké riziko", count: riskCounts.highRisk },
   ];
 
+  // ── Mobile carousel ─────────────────────────────────────────────
+  if (isMobile) {
+    return (
+      <div className="mb-3">
+        <button
+          onClick={() => setMobileCollapsed(prev => !prev)}
+          className="flex items-center gap-1 text-xs text-muted-foreground mb-2 px-1"
+        >
+          {mobileCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+          <span>{mobileCollapsed ? "Zobrazit dashboard" : "Skrýt dashboard"}</span>
+        </button>
+
+        {!mobileCollapsed && (
+          <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+            <Carousel opts={{ align: "start", loop: false }} setApi={setCarouselApi} className="w-full">
+              <CarouselContent className="-ml-2">
+                {/* Card 1: Aktivní zakázky */}
+                <CarouselItem className="pl-2 basis-[85%]">
+                  <div className="rounded-lg border bg-card p-4 h-[160px] flex flex-col justify-center">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Aktivní zakázky</p>
+                    <span className="font-serif font-bold text-3xl mt-1">{activeCount}</span>
+                    <p className="text-xs text-muted-foreground mt-0.5">ø {activeCount > 0 ? formatNumber(Math.round(totalValueCZK / activeCount)) : "—"} Kč</p>
+                    <div className="my-2 border-t border-border" />
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Celková hodnota</p>
+                    <p className="font-serif font-bold text-xl mt-0.5">{formatNumber(totalValueCZK)} Kč</p>
+                  </div>
+                </CarouselItem>
+
+                {/* Card 2: Pipeline */}
+                <CarouselItem className="pl-2 basis-[85%]">
+                  <div className="rounded-lg border bg-card p-3 h-[160px] flex flex-col">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Pipeline zakázek</p>
+                    <div className="flex-1 min-h-0">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={pipelineData} margin={{ top: 16, right: 2, left: 2, bottom: 0 }}>
+                          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#999" }} interval={0} />
+                          <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={28}>
+                            {pipelineData.map((entry, i) => (
+                              <Cell key={i} fill={entry.fill} />
+                            ))}
+                            <LabelList dataKey="count" position="top" style={{ fontSize: 10, fontWeight: 700, fill: "hsl(var(--foreground))" }} />
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </CarouselItem>
+
+                {/* Card 3: Riziko & Termíny */}
+                <CarouselItem className="pl-2 basis-[85%]">
+                  <div className="rounded-lg border bg-card p-4 h-[160px] flex flex-col">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Riziko & Termíny</p>
+                    <div className="flex flex-col gap-1">
+                      {riskRows.map(({ key, color, label, count }) => (
+                        <button
+                          key={key}
+                          onClick={() => toggleRisk(key)}
+                          className={`flex items-center justify-between px-2.5 rounded-md transition-colors min-h-[36px] ${
+                            riskHighlight === key ? "ring-1 ring-border bg-muted" : ""
+                          }`}
+                        >
+                          <span className="flex items-center gap-2">
+                            <span className="inline-block rounded-full" style={{ width: 8, height: 8, backgroundColor: color }} />
+                            <span className="text-sm text-foreground">{label}</span>
+                          </span>
+                          <span className="font-bold tabular-nums text-lg" style={{ color }}>{count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </CarouselItem>
+
+                {/* Card 4: Vytížení PM */}
+                <CarouselItem className="pl-2 basis-[85%]">
+                  <div className="rounded-lg border bg-card p-3 h-[160px] flex flex-col">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{isTPV ? "Vytížení Konstruktér" : "Vytížení PM"}</p>
+                    <div className="flex-1 flex items-center gap-2 min-h-0">
+                      <div className="relative" style={{ width: 90, height: 90, flexShrink: 0 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={workloadData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={24} outerRadius={40} paddingAngle={2} strokeWidth={0}>
+                              {workloadData.map((entry, i) => (
+                                <Cell key={i} fill={entry.fill} />
+                              ))}
+                            </Pie>
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <span className="font-serif font-bold text-lg">{workloadData.reduce((s, d) => s + d.value, 0)}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-0.5 overflow-hidden min-w-0">
+                        {workloadData.slice(0, 6).map((entry) => (
+                          <div key={entry.name} className="flex items-center gap-1.5 whitespace-nowrap text-[11px]">
+                            <span className="inline-block rounded-full shrink-0" style={{ width: 6, height: 6, backgroundColor: entry.fill }} />
+                            <span className="text-muted-foreground truncate" style={{ maxWidth: 80 }}>{entry.name}</span>
+                            <span className="font-bold text-foreground">{entry.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </CarouselItem>
+              </CarouselContent>
+            </Carousel>
+
+            {/* Dot indicators */}
+            <div className="flex justify-center gap-1.5 mt-2">
+              {[0, 1, 2, 3].map((i) => (
+                <button
+                  key={i}
+                  onClick={() => carouselApi?.scrollTo(i)}
+                  className="rounded-full transition-all"
+                  style={{
+                    width: activeSlide === i ? 8 : 6,
+                    height: activeSlide === i ? 8 : 6,
+                    backgroundColor: activeSlide === i ? "hsl(var(--primary))" : "hsl(var(--muted-foreground) / 0.3)",
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Desktop rendering ─────────────────────────────────────────────
   return (
     <div>
 
