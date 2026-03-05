@@ -5,7 +5,6 @@ import { parseAppDate } from "@/lib/dateFormat";
 import { matchesStatusFilter } from "@/lib/statusFilter";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import {
   BarChart,
@@ -119,30 +118,45 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
   const [mobileCollapsed, setMobileCollapsed] = useState(() => {
     try { return localStorage.getItem("mobile-dashboard-collapsed") === "true"; } catch { return false; }
   });
-  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const [activeSlide, setActiveSlide] = useState(0);
   const hasInteracted = useRef(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const TOTAL_SLIDES = 4;
 
+  // Native scroll-snap: track active slide
   useEffect(() => {
-    if (!carouselApi) return;
-    const onSelect = () => setActiveSlide(carouselApi.selectedScrollSnap());
-    carouselApi.on("select", onSelect);
-    onSelect();
-    return () => { carouselApi.off("select", onSelect); };
-  }, [carouselApi]);
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const idx = Math.round(el.scrollLeft / el.clientWidth);
+      setActiveSlide(((idx % TOTAL_SLIDES) + TOTAL_SLIDES) % TOTAL_SLIDES);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [mobileCollapsed]);
+
+  const scrollToSlide = useCallback((idx: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ left: idx * el.clientWidth, behavior: "smooth" });
+  }, []);
 
   // Auto-advance every 8s, stop permanently on first interaction
   useEffect(() => {
-    if (!carouselApi || hasInteracted.current || mobileCollapsed) return;
+    if (hasInteracted.current || mobileCollapsed) return;
     const interval = setInterval(() => {
       if (hasInteracted.current) return;
-      carouselApi.scrollNext();
+      const el = scrollRef.current;
+      if (!el) return;
+      const currentIdx = Math.round(el.scrollLeft / el.clientWidth);
+      const nextIdx = (currentIdx + 1) % TOTAL_SLIDES;
+      el.scrollTo({ left: nextIdx * el.clientWidth, behavior: "smooth" });
     }, 8000);
     const stopAuto = () => { hasInteracted.current = true; clearInterval(interval); };
-    const root = carouselApi.rootNode();
-    root.addEventListener("pointerdown", stopAuto, { once: true });
-    return () => { clearInterval(interval); root.removeEventListener("pointerdown", stopAuto); };
-  }, [carouselApi, mobileCollapsed]);
+    const el = scrollRef.current;
+    el?.addEventListener("pointerdown", stopAuto, { once: true });
+    return () => { clearInterval(interval); el?.removeEventListener("pointerdown", stopAuto); };
+  }, [mobileCollapsed]);
 
   useEffect(() => {
     try { localStorage.setItem("mobile-dashboard-collapsed", String(mobileCollapsed)); } catch {}
@@ -286,10 +300,14 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
 
         {!mobileCollapsed && (
           <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-            <Carousel opts={{ align: "center", loop: true }} setApi={setCarouselApi} className="w-full">
-              <CarouselContent className="ml-0">
+            <style>{`.mobile-carousel::-webkit-scrollbar { display: none; }`}</style>
+            <div
+              ref={scrollRef}
+              className="mobile-carousel flex overflow-x-auto snap-x snap-mandatory"
+              style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
+            >
                 {/* Card 1: Aktivní zakázky */}
-                <CarouselItem className="pl-0 basis-full">
+                <div className="flex-shrink-0 w-full snap-start px-1">
                   <div className="rounded-lg border bg-card p-4 h-[160px] flex flex-col justify-center">
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Aktivní zakázky</p>
                     <span className="font-serif font-bold text-3xl mt-1">{activeCount}</span>
@@ -298,10 +316,10 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Celková hodnota</p>
                     <p className="font-serif font-bold text-xl mt-0.5">{formatNumber(totalValueCZK)} Kč</p>
                   </div>
-                </CarouselItem>
+                </div>
 
                 {/* Card 2: Pipeline */}
-                <CarouselItem className="pl-0 basis-full">
+                <div className="flex-shrink-0 w-full snap-start px-1">
                   <div className="rounded-lg border bg-card p-3 h-[160px] flex flex-col">
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Pipeline zakázek</p>
                     <div className="flex-1 min-h-0">
@@ -318,10 +336,10 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
                       </ResponsiveContainer>
                     </div>
                   </div>
-                </CarouselItem>
+                </div>
 
                 {/* Card 3: Riziko & Termíny */}
-                <CarouselItem className="pl-0 basis-full">
+                <div className="flex-shrink-0 w-full snap-start px-1">
                   <div className="rounded-lg border bg-card p-4 h-[160px] flex flex-col">
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Riziko & Termíny</p>
                     <div className="flex flex-col gap-1">
@@ -342,10 +360,10 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
                       ))}
                     </div>
                   </div>
-                </CarouselItem>
+                </div>
 
                 {/* Card 4: Vytížení PM */}
-                <CarouselItem className="pl-0 basis-full">
+                <div className="flex-shrink-0 w-full snap-start px-1">
                   <div className="rounded-lg border bg-card p-3 h-[160px] flex flex-col">
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{isTPV ? "Vytížení Konstruktér" : "Vytížení PM"}</p>
                     <div className="flex-1 flex items-center gap-2 min-h-0">
@@ -374,21 +392,25 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
                       </div>
                     </div>
                   </div>
-                </CarouselItem>
-              </CarouselContent>
-            </Carousel>
+                </div>
+            </div>
 
             {/* Dot indicators */}
-            <div className="flex justify-center gap-1.5 mt-2">
+            <div className="flex justify-center items-center gap-2 py-3">
               {[0, 1, 2, 3].map((i) => (
                 <button
                   key={i}
-                  onClick={() => carouselApi?.scrollTo(i)}
-                  className="rounded-full transition-all"
+                  onClick={() => scrollToSlide(i)}
+                  aria-label={`Slide ${i + 1}`}
                   style={{
-                    width: activeSlide === i ? 8 : 6,
-                    height: activeSlide === i ? 8 : 6,
+                    width: activeSlide === i ? 10 : 8,
+                    height: activeSlide === i ? 10 : 8,
+                    borderRadius: "50%",
                     backgroundColor: activeSlide === i ? "#223937" : "#d1cdc7",
+                    transition: "all 0.3s ease",
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
                   }}
                 />
               ))}
