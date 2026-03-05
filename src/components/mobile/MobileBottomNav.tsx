@@ -153,7 +153,6 @@ export function MobileBottomNav({
       const newNote = existing ? `${existing}\n${qaNote.trim()}` : qaNote.trim();
       await supabase.from("projects").update({ pm_poznamka: newNote }).eq("project_id", qaProjectId);
       toast({ title: "Poznámka uložena ✓" });
-      logActivity({ projectId: qaProjectId, actionType: "field_change", detail: "pm_poznamka" });
       qc.invalidateQueries({ queryKey: ["projects"] });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
