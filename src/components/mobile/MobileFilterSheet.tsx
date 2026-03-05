@@ -35,8 +35,8 @@ export function MobileFilterSheet({
   const { data: projects = [] } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
 
-  const [personExpanded, setPersonExpanded] = useState(true);
-  const [statusExpanded, setStatusExpanded] = useState(true);
+  const [personExpanded, setPersonExpanded] = useState(false);
+  const [statusExpanded, setStatusExpanded] = useState(false);
 
   // Draft state so changes only apply on "Použít"
   const [draftPerson, setDraftPerson] = useState<string | null>(personFilter);
