@@ -33,7 +33,7 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
   const { stagesByProject } = useStagesByProject();
   const queryClient = useQueryClient();
   const [sortBy, setSortBy] = useState("project_name");
-
+  const [sortAsc, setSortAsc] = useState(true);
   // Pull-to-refresh state
   const [pullDistance, setPullDistance] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
