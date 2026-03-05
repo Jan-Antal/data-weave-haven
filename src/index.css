@@ -208,3 +208,25 @@
   animation-delay: 30s;
   animation-iteration-count: infinite;
 }
+
+/* Mobile safe area padding */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* Hide scrollbars for mobile tab bar */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mobile touch targets */
+@media (max-width: 767px) {
+  /* Ensure minimum tap targets */
+  button, [role="button"], a {
+    min-height: 36px;
+  }
+}

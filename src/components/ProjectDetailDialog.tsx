@@ -601,7 +601,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       <DialogContent
         className={cn(
           "p-0 gap-0 overflow-hidden",
-          previewFile ? "sm:max-w-[92vw] h-[88vh]" : "sm:max-w-[920px]"
+          previewFile ? "sm:max-w-[92vw] h-[88vh]" : "sm:max-w-[920px]",
+          "max-md:!max-w-full max-md:!w-full max-md:!h-full max-md:!max-h-full max-md:!rounded-none max-md:!top-0 max-md:!left-0 max-md:!translate-x-0 max-md:!translate-y-0"
         )}
         onEscapeKeyDown={(e) => {
           if (previewFile) {
