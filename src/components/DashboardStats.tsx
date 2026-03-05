@@ -395,26 +395,6 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
                 </div>
             </div>
 
-            {/* Dot indicators */}
-            <div className="flex justify-center items-center gap-2 py-3">
-              {[0, 1, 2, 3].map((i) => (
-                <button
-                  key={i}
-                  onClick={() => scrollToSlide(i)}
-                  aria-label={`Slide ${i + 1}`}
-                  style={{
-                    width: activeSlide === i ? 10 : 8,
-                    height: activeSlide === i ? 10 : 8,
-                    borderRadius: "50%",
-                    backgroundColor: activeSlide === i ? "#223937" : "#d1cdc7",
-                    transition: "all 0.3s ease",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
-                  }}
-                />
-              ))}
-            </div>
           </div>
         )}
       </div>
