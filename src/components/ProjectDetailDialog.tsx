@@ -638,41 +638,62 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   // ── Read-only style helper ──────────────────────────────────
   const roClass = "bg-[#f3f4f6] text-muted-foreground cursor-not-allowed opacity-70";
 
-    // ── Edit form body (shared between mobile sheet and desktop dialog) ──
-    const editFormBody = project && !previewFile ? (
-      <>
-        <DialogHeader className="px-6 pt-4 md:pt-6 pb-4 max-md:hidden">
-          <DialogTitle className="text-base md:text-lg">{project.project_id} — {project.project_name}</DialogTitle>
-        </DialogHeader>
+  // ── Mobile swipe-down-to-close ──────────────────────────────
+  const [mobileDragY, setMobileDragY] = useState(0);
+  const mobileDragRef = useRef({ startY: 0, startTime: 0, dragging: false });
+  const mobileSheetRef = useRef<HTMLDivElement>(null);
 
-        <div className="flex max-md:flex-col max-md:overflow-y-auto" style={isMobile ? undefined : { maxHeight: '78vh' }}>
-    ) : null;
+  const handleMobileTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!isMobile) return;
+    const rect = mobileSheetRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const touchY = e.touches[0].clientY - rect.top;
+    if (touchY > 80) return; // only from top 80px area
+    mobileDragRef.current = { startY: e.touches[0].clientY, startTime: Date.now(), dragging: true };
+  }, [isMobile]);
 
-    // Not used yet — will wire up below
-    void editFormBody;
+  const handleMobileTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!mobileDragRef.current.dragging) return;
+    const dy = e.touches[0].clientY - mobileDragRef.current.startY;
+    setMobileDragY(Math.max(0, dy));
+  }, []);
+
+  const handleMobileTouchEnd = useCallback(() => {
+    if (!mobileDragRef.current.dragging) return;
+    const elapsed = (Date.now() - mobileDragRef.current.startTime) / 1000;
+    const velocity = mobileDragY / elapsed;
+    if (mobileDragY > 100 || velocity > 500) {
+      tryClose();
+    }
+    setMobileDragY(0);
+    mobileDragRef.current.dragging = false;
+  }, [mobileDragY, tryClose]);
+
+  // Reset drag state when dialog closes
+  useEffect(() => {
+    if (!open) setMobileDragY(0);
+  }, [open]);
 
   return (
     <>
-    {/* Mobile: top-sliding sheet */}
-    {isMobile && (
-      <MobileProjectDetailSheet
-        open={open && !!project && !previewFile}
-        onClose={tryClose}
-        title={project ? `${project.project_id} — ${project.project_name}` : ""}
-      >
-        {/* Content is rendered inside the sheet */}
-      </MobileProjectDetailSheet>
-    )}
-
-    <Dialog open={isMobile ? false : open} onOpenChange={(v) => {
+    <Dialog open={open} onOpenChange={(v) => {
       if (!v && previewFile) { setPreviewFile(null); return; }
       if (!v) { tryClose(); return; }
     }}>
       <DialogContent
+        ref={mobileSheetRef}
         className={cn(
           "p-0 gap-0 overflow-hidden",
           previewFile ? "sm:max-w-[92vw] h-[88vh]" : "sm:max-w-[920px]",
+          // Mobile: full-screen card from top
+          "max-md:!max-w-full max-md:!w-full max-md:!top-0 max-md:!bottom-auto max-md:!left-0 max-md:!translate-x-0 max-md:!translate-y-0 max-md:!rounded-t-none max-md:!rounded-b-2xl max-md:!border-t-0",
+          "max-md:data-[state=open]:!slide-in-from-top max-md:data-[state=closed]:!slide-out-to-top",
         )}
+        style={isMobile ? {
+          height: "calc(100vh - 70px - env(safe-area-inset-bottom, 0px))",
+          paddingTop: "env(safe-area-inset-top, 0px)",
+          ...(mobileDragY > 0 ? { transform: `translateY(${mobileDragY}px)`, transition: 'none' } : {}),
+        } : undefined}
         onOpenAutoFocus={(e) => {
           if (isMobile) e.preventDefault();
         }}
@@ -682,6 +703,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
             setPreviewFile(null);
           }
         }}
+        onTouchStart={handleMobileTouchStart}
+        onTouchMove={handleMobileTouchMove}
+        onTouchEnd={handleMobileTouchEnd}
       >
         {previewFile ? (
           /* ===== PREVIEW MODE ===== */
