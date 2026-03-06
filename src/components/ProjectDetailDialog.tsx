@@ -473,6 +473,36 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const canGoPrev = previewTotal > 1 && previewCurrentIndex > 0;
   const canGoNext = previewTotal > 1 && previewCurrentIndex < previewTotal - 1;
 
+  const handleMobileTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!isMobile) return;
+    const rect = mobileSheetRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const touchY = e.touches[0].clientY - rect.top;
+    if (touchY > 80) return;
+    mobileDragRef.current = { startY: e.touches[0].clientY, startTime: Date.now(), dragging: true };
+  }, [isMobile]);
+
+  const handleMobileTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!mobileDragRef.current.dragging) return;
+    const dy = e.touches[0].clientY - mobileDragRef.current.startY;
+    setMobileDragY(Math.max(0, dy));
+  }, []);
+
+  const handleMobileTouchEnd = useCallback(() => {
+    if (!mobileDragRef.current.dragging) return;
+    const elapsed = (Date.now() - mobileDragRef.current.startTime) / 1000;
+    const velocity = mobileDragY / elapsed;
+    if (mobileDragY > 100 || velocity > 500) {
+      tryClose();
+    }
+    setMobileDragY(0);
+    mobileDragRef.current.dragging = false;
+  }, [mobileDragY, tryClose]);
+
+  useEffect(() => {
+    if (!open) setMobileDragY(0);
+  }, [open]);
+
   if (!project) return null;
 
   const handleSave = async () => {
