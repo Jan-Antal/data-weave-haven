@@ -27,6 +27,7 @@ import { dispatchDocCountUpdate, migrateDocCountCache } from "@/hooks/useDocumen
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { RozpadCeny } from "./RozpadCeny";
+import { MobileProjectDetailSheet } from "./mobile/MobileProjectDetailSheet";
 
 interface Project {
   id: string;
