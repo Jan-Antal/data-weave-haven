@@ -680,12 +680,12 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     }}>
       <DialogContent
         ref={mobileSheetRef}
+        data-mobile-top-sheet={isMobile ? "" : undefined}
         className={cn(
           "p-0 gap-0 overflow-hidden",
           previewFile ? "sm:max-w-[92vw] h-[88vh]" : "sm:max-w-[920px]",
           // Mobile: full-screen card from top
           "max-md:!max-w-full max-md:!w-full max-md:!top-0 max-md:!bottom-auto max-md:!left-0 max-md:!translate-x-0 max-md:!translate-y-0 max-md:!rounded-t-none max-md:!rounded-b-2xl max-md:!border-t-0",
-          "max-md:data-[state=open]:!slide-in-from-top max-md:data-[state=closed]:!slide-out-to-top",
         )}
         style={isMobile ? {
           height: "calc(100vh - 70px - env(safe-area-inset-bottom, 0px))",
