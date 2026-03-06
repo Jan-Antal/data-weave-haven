@@ -1054,40 +1054,46 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
                   <div>
                     <Label className="text-xs">PM</Label>
-                    {isSectionReadOnly("pm") || isFieldReadOnly("pm") ? (
-                      <Input value={form.pm || "—"} disabled className={roClass} />
-                    ) : (
-                      <PeopleSelectDropdown role="PM" value={form.pm} onValueChange={(v) => setForm(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
-                    )}
+                    <MobileTapField displayValue={form.pm || ""} disabled={isSectionReadOnly("pm") || isFieldReadOnly("pm")}>
+                      {() => isSectionReadOnly("pm") || isFieldReadOnly("pm") ? (
+                        <Input value={form.pm || "—"} disabled className={roClass} />
+                      ) : (
+                        <PeopleSelectDropdown role="PM" value={form.pm} onValueChange={(v) => setForm(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
+                      )}
+                    </MobileTapField>
                   </div>
                   <div>
                     <Label className="text-xs">Status</Label>
-                    {isSectionReadOnly("pm") ? (
-                      <Select value={form.status} disabled>
-                        <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                      </Select>
-                    ) : (
-                      <Select value={form.status} onValueChange={(v) => setForm(s => ({ ...s, status: v }))}>
-                        <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                      </Select>
-                    )}
+                    <MobileTapField displayValue={form.status || ""} disabled={isSectionReadOnly("pm")}>
+                      {() => isSectionReadOnly("pm") ? (
+                        <Select value={form.status} disabled>
+                          <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
+                          <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                        </Select>
+                      ) : (
+                        <Select value={form.status} onValueChange={(v) => setForm(s => ({ ...s, status: v }))}>
+                          <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
+                          <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                        </Select>
+                      )}
+                    </MobileTapField>
                   </div>
 
                   <div>
                     <Label className="text-xs">Risk</Label>
-                    {isSectionReadOnly("pm") || isFieldReadOnly("risk") ? (
-                      <Select value={form.risk} disabled>
-                        <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-                      </Select>
-                    ) : (
-                      <Select value={form.risk} onValueChange={(v) => setForm(s => ({ ...s, risk: v }))}>
-                        <SelectTrigger><SelectValue placeholder="Vyberte risk" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-                      </Select>
-                    )}
+                    <MobileTapField displayValue={form.risk || ""} disabled={isSectionReadOnly("pm") || isFieldReadOnly("risk")}>
+                      {() => isSectionReadOnly("pm") || isFieldReadOnly("risk") ? (
+                        <Select value={form.risk} disabled>
+                          <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
+                          <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                        </Select>
+                      ) : (
+                        <Select value={form.risk} onValueChange={(v) => setForm(s => ({ ...s, risk: v }))}>
+                          <SelectTrigger><SelectValue placeholder="Vyberte risk" /></SelectTrigger>
+                          <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                        </Select>
+                      )}
+                    </MobileTapField>
                   </div>
                   <div>{/* empty cell */}</div>
 
@@ -1108,13 +1114,18 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
 
                   <div className="col-span-2">
                     <Label className="text-xs">Poznámka PM</Label>
-                    <Textarea
-                      value={form.pm_poznamka}
-                      onChange={(e) => setForm(s => ({ ...s, pm_poznamka: e.target.value }))}
-                      disabled={isSectionReadOnly("pm")}
-                      className={cn("min-h-[50px] text-sm", isSectionReadOnly("pm") && roClass)}
-                      placeholder="Poznámka…"
-                    />
+                    <MobileTapField displayValue={form.pm_poznamka || ""} disabled={isSectionReadOnly("pm")}>
+                      {({ autoFocus }) => (
+                        <Textarea
+                          value={form.pm_poznamka}
+                          onChange={(e) => setForm(s => ({ ...s, pm_poznamka: e.target.value }))}
+                          disabled={isSectionReadOnly("pm")}
+                          className={cn("min-h-[50px] text-sm", isSectionReadOnly("pm") && roClass)}
+                          placeholder="Poznámka…"
+                          autoFocus={autoFocus}
+                        />
+                      )}
+                    </MobileTapField>
                   </div>
                 </div>
 
