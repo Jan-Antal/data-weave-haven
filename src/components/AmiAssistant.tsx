@@ -201,12 +201,12 @@ export function AmiAssistant() {
 
   return (
     <>
-      {/* Tooltip for first-time users */}
+      {/* Tooltip for first-time users — desktop only */}
       {showTooltip && !open && (
         <button
           onClick={dismissTooltip}
-          className="fixed z-[9998] animate-fade-in md:!bottom-20"
-          style={{ bottom: "calc(130px + env(safe-area-inset-bottom, 0px))", right: 16 }}
+          className="fixed z-[9998] animate-fade-in hidden md:block"
+          style={{ bottom: 80, right: 16 }}
         >
           <div className="bg-white text-foreground text-xs px-3 py-2 rounded-lg shadow-lg border border-border max-w-[220px]">
             Ahoj! Jsem tu, když budeš potřebovat pomoc 👋
