@@ -176,12 +176,12 @@ export function MobileBottomNav({
         >
           {activeTab === "prehled" ? (
             <>
-              <FolderPlus className="h-5 w-5" />
+              <FolderPlus className="h-5 w-5" strokeWidth={1.75} />
               <span className="text-[10px]">Projekty</span>
             </>
           ) : (
             <>
-              <Home className="h-5 w-5" />
+              <Home className="h-5 w-5" strokeWidth={1.75} />
               <span className="text-[10px]">Přehled</span>
             </>
           )}

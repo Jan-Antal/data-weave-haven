@@ -481,9 +481,9 @@ const Index = () => {
         >
           <button
             onClick={() => window.dispatchEvent(new Event("ami-toggle"))}
-            className="flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center text-muted-foreground"
+            className={cn("flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center text-muted-foreground")}
           >
-            <MessageCircle className="h-5 w-5" />
+            <MessageCircle className="h-5 w-5" strokeWidth={1.75} />
             <span className="text-[10px]">Asistent</span>
           </button>
         </MobileBottomNav>
