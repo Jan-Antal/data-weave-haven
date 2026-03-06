@@ -194,8 +194,8 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
               : stage.stage_name;
             const canEditSuffix = canEdit;
             return (
-              <div className="flex items-center gap-0">
-                <span className="text-muted-foreground/60">{project.project_id}-</span>
+              <div className="flex items-center gap-0 h-7 leading-7">
+                <span className="text-muted-foreground/60 shrink-0">{project.project_id}-</span>
                 <InlineEditableCell
                   value={suffix}
                   onSave={(val) => {
@@ -203,7 +203,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
                     saveStage("stage_name", newStageName);
                   }}
                   readOnly={!canEditSuffix}
-                  className="inline-block max-w-[60px]"
+                  className="!p-0 !h-7 !leading-7 inline-block max-w-[60px]"
                 />
               </div>
             );
