@@ -102,6 +102,8 @@ const Index = () => {
   const achievementChecker = useAchievementChecker();
   const isMobile = useIsMobile();
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState("prehled");
+  const { recent: recentProjects, trackOpen: trackRecentOpen } = useRecentlyOpened();
 
   const handleTabChange = useCallback((tab: string) => {
     scrollPositions.current[activeTab] = window.scrollY;
@@ -155,9 +157,10 @@ const Index = () => {
   }, []);
 
   const handleMobileProjectTap = useCallback((project: any) => {
+    trackRecentOpen(project);
     setMobileDetailProject(project);
     setMobileDetailOpen(true);
-  }, []);
+  }, [trackRecentOpen]);
 
   return (
     <ColumnVisibilityProvider>
