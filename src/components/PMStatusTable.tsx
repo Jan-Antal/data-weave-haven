@@ -147,9 +147,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
         </TableCell>
       )}
       {v("project_name") && (
-        <TableCell className="truncate text-muted-foreground text-xs" style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={stage.stage_name}>
-          <InlineEditableCell value={stage.stage_name} onSave={(val) => saveStage("stage_name", val)} readOnly={!canEdit} />
-        </TableCell>
+        <TableCell className="truncate text-muted-foreground text-xs" style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={project.project_name}>{project.project_name}</TableCell>
       )}
       {renderKeys.map((key) => renderStageCell(key))}
       <TableCell>
