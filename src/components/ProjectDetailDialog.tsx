@@ -639,11 +639,43 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const roClass = "bg-[#f3f4f6] text-muted-foreground cursor-not-allowed opacity-70";
 
   return (
-    // Build the form content shared between mobile and desktop
-    const formContent = project ? (
-      previewFile ? (
-        /* ===== PREVIEW MODE ===== */
-        <div className="flex flex-col h-full">
+    <>
+    {/* Mobile: custom top-sliding sheet */}
+    {isMobile && project && (
+      <MobileProjectDetailSheet
+        open={open && !previewFile}
+        onClose={tryClose}
+        title={`${project.project_id} — ${project.project_name}`}
+      >
+        {/* Reuse the same form content rendered below inside the hidden Dialog on mobile */}
+        <MobileFormContentPortal target="mobile-detail-content" />
+      </MobileProjectDetailSheet>
+    )}
+
+    <Dialog open={open} onOpenChange={(v) => {
+      if (!v && previewFile) { setPreviewFile(null); return; }
+      if (!v) { tryClose(); return; }
+    }}>
+      <DialogContent
+        className={cn(
+          "p-0 gap-0 overflow-hidden",
+          previewFile ? "sm:max-w-[92vw] h-[88vh]" : "sm:max-w-[920px]",
+          // Hide the dialog on mobile — we use MobileProjectDetailSheet instead
+          "max-md:!hidden"
+        )}
+        onOpenAutoFocus={(e) => {
+          if (isMobile) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (previewFile) {
+            e.preventDefault();
+            setPreviewFile(null);
+          }
+        }}
+      >
+        {previewFile ? (
+          /* ===== PREVIEW MODE ===== */
+          <div className="flex flex-col h-full">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setPreviewFile(null)}>
