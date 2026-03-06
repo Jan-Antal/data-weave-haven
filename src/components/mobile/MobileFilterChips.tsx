@@ -19,6 +19,7 @@ const STATUS_CHIPS = [
 ];
 
 export function MobileFilterChips({ activeChip, onChipChange }: MobileFilterChipsProps) {
+  const { data: projects = [] } = useProjects();
   const { profile, linkedPersonName } = useAuth();
   const pmName = profile?.full_name || null;
   const { urgencyMap } = useProjectAttention(linkedPersonName || pmName);
