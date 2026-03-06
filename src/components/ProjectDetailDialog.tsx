@@ -1305,9 +1305,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                     {deleteStep === 1 && (
                       <div className="flex items-center gap-2 text-xs">
                         <span className="text-muted-foreground">Opravdu smazat projekt?</span>
-                        {sp.totalCount > 0 ? (
+                        {(() => { const tc = Object.values(sp.filesByCategory).reduce((s, f) => s + f.length, 0); return tc > 0; })() ? (
                           <>
-                            <span className="text-destructive font-medium">⚠ Projekt obsahuje {sp.totalCount} souborů</span>
+                            <span className="text-destructive font-medium">⚠ Projekt obsahuje {Object.values(sp.filesByCategory).reduce((s, f) => s + f.length, 0)} souborů</span>
                             <button type="button" className="text-destructive font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
                             <button type="button" className="text-muted-foreground hover:underline" onClick={() => setDeleteStep(2)}>Pokračovat</button>
                           </>
