@@ -1334,9 +1334,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
               </div>
 
               {/* Right side — actions */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 max-md:ml-auto">
                 {onOpenTPVList && (
-                  <>
+                  <div className="hidden md:contents">
                     <Button
                       size="sm"
                       variant="outline"
@@ -1360,7 +1360,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                         {tpvItemCount ?? 0}
                       </Badge>
                     </Button>
-                  </>
+                  </div>
                 )}
                 <Button variant="outline" onClick={tryClose}>Zavřít</Button>
                 {canEdit && <Button onClick={handleSave} disabled={idExists || !form.project_id}>Uložit</Button>}
