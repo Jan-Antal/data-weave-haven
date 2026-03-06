@@ -282,44 +282,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const [previewFile, setPreviewFile] = useState<{ file: SPFile; categoryKey: string; loading: boolean; previewUrl: string | null; webUrl: string | null; downloadUrl: string | null } | null>(null);
   const isMobile = useIsMobile();
   const cameraInputRef = useRef<HTMLInputElement>(null);
-  const touchTapRef = useRef<{ timer: number; x: number; y: number } | null>(null);
 
-  // ── Mobile: touch-to-edit with scroll delay ─────────────────
-  const handleMobileTouchStart = useCallback((e: React.TouchEvent) => {
-    if (!isMobile) return;
-    const touch = e.touches[0];
-    touchTapRef.current = {
-      x: touch.clientX,
-      y: touch.clientY,
-      timer: window.setTimeout(() => {
-        const target = e.target as HTMLElement;
-        const container = target.closest('.grid > div, .col-span-2') as HTMLElement;
-        if (!container) return;
-        const input = container.querySelector('input:not([type="file"]):not([type="hidden"]):not(:disabled), textarea:not(:disabled)') as HTMLElement;
-        if (input) {
-          input.style.pointerEvents = 'auto';
-          input.focus();
-          input.addEventListener('blur', () => { input.style.pointerEvents = ''; }, { once: true });
-        }
-      }, 250),
-    };
-  }, [isMobile]);
 
-  const handleMobileTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!touchTapRef.current) return;
-    const touch = e.touches[0];
-    if (Math.abs(touch.clientX - touchTapRef.current.x) > 10 || Math.abs(touch.clientY - touchTapRef.current.y) > 10) {
-      clearTimeout(touchTapRef.current.timer);
-      touchTapRef.current = null;
-    }
-  }, []);
-
-  const handleMobileTouchEnd = useCallback(() => {
-    if (touchTapRef.current) {
-      clearTimeout(touchTapRef.current.timer);
-      touchTapRef.current = null;
-    }
-  }, []);
 
   // ── Mobile: camera photo upload ─────────────────────────────
   const handleCameraUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
