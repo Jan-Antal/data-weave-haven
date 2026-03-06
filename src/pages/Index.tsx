@@ -300,20 +300,9 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Mobile: filter bar + tab bar */}
+      {/* Mobile: tab bar only */}
       {isMobile && (
-        <>
-          <MobileFilterSheet
-            personFilter={filters.personFilter}
-            onPersonFilterChange={filters.setPersonFilter}
-            statusFilter={filters.statusFilter}
-            onStatusFilterChange={filters.setStatusFilter}
-            search={filters.search}
-            onSearchChange={filters.setSearch}
-            hasActiveFilters={filters.hasActiveFilters}
-          />
-          <MobileTabBar activeTab={activeTab} onTabChange={handleTabChange} />
-        </>
+        <MobileTabBar activeTab={mobileTab} onTabChange={setMobileTab} />
       )}
 
       {/* Desktop: filter bar */}
@@ -342,18 +331,24 @@ const Index = () => {
 
       {/* Split layout: main content + data log panel */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Mobile: card list */}
+        {/* Mobile: Přehled or Projekty */}
         {isMobile ? (
           <main className="flex-1 min-w-0 flex flex-col overflow-y-auto px-3 pt-3 pb-16">
-            <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} riskHighlight={riskHighlight} onRiskHighlightChange={setRiskHighlight} activeTab={activeTab} />
-            <MobileCardList
-              personFilter={filters.personFilter}
-              statusFilter={filters.statusFilter}
-              search={filters.search}
-              riskHighlight={riskHighlight}
-              activeTab={activeTab}
-              onProjectTap={handleMobileProjectTap}
-            />
+            {mobileTab === "prehled" ? (
+              <MobilePrehled
+                recentProjects={recentProjects}
+                onProjectTap={handleMobileProjectTap}
+              />
+            ) : (
+              <MobileCardList
+                personFilter={filters.personFilter}
+                statusFilter={filters.statusFilter}
+                search={filters.search}
+                riskHighlight={riskHighlight}
+                activeTab={activeTab}
+                onProjectTap={handleMobileProjectTap}
+              />
+            )}
             <ProjectDetailDialog
               project={mobileDetailProject}
               open={mobileDetailOpen}
