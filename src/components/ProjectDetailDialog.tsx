@@ -638,15 +638,51 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   // ── Read-only style helper ──────────────────────────────────
   const roClass = "bg-[#f3f4f6] text-muted-foreground cursor-not-allowed opacity-70";
 
-  return (
-    // ── Shared edit form content (used by both mobile sheet and desktop dialog) ──
-    const editFormContent = project ? (
+    // ── Edit form body (shared between mobile sheet and desktop dialog) ──
+    const editFormBody = project && !previewFile ? (
       <>
         <DialogHeader className="px-6 pt-4 md:pt-6 pb-4 max-md:hidden">
           <DialogTitle className="text-base md:text-lg">{project.project_id} — {project.project_name}</DialogTitle>
         </DialogHeader>
 
         <div className="flex max-md:flex-col max-md:overflow-y-auto" style={isMobile ? undefined : { maxHeight: '78vh' }}>
+    ) : null;
+
+    // Not used yet — will wire up below
+    void editFormBody;
+
+  return (
+    <>
+    {/* Mobile: top-sliding sheet */}
+    {isMobile && (
+      <MobileProjectDetailSheet
+        open={open && !!project && !previewFile}
+        onClose={tryClose}
+        title={project ? `${project.project_id} — ${project.project_name}` : ""}
+      >
+        {/* Content is rendered inside the sheet */}
+      </MobileProjectDetailSheet>
+    )}
+
+    <Dialog open={isMobile ? false : open} onOpenChange={(v) => {
+      if (!v && previewFile) { setPreviewFile(null); return; }
+      if (!v) { tryClose(); return; }
+    }}>
+      <DialogContent
+        className={cn(
+          "p-0 gap-0 overflow-hidden",
+          previewFile ? "sm:max-w-[92vw] h-[88vh]" : "sm:max-w-[920px]",
+        )}
+        onOpenAutoFocus={(e) => {
+          if (isMobile) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (previewFile) {
+            e.preventDefault();
+            setPreviewFile(null);
+          }
+        }}
+      >
         {previewFile ? (
           /* ===== PREVIEW MODE ===== */
           <div className="flex flex-col h-full">
