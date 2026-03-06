@@ -220,6 +220,7 @@ function buildFormState(p: Project | null) {
     expedice: p.expedice || "",
     montaz: p.montaz || "",
     predani: p.predani || "",
+    van_date: (p as any).van_date || "",
     pm_poznamka: p.pm_poznamka || "",
     narocnost: p.narocnost || "",
     hodiny_tpv: p.hodiny_tpv || "",
@@ -240,7 +241,7 @@ function defaultForm() {
   return {
     project_id: "", project_name: "", klient: "", location: "", pm: "", konstrukter: "", kalkulant: "", architekt: "",
     status: "", datum_smluvni: "", datum_objednavky: "", prodejni_cena: "", currency: "CZK", marze: "",
-    risk: "", zamereni: "", tpv_date: "", expedice: "", montaz: "", predani: "", pm_poznamka: "",
+    risk: "", zamereni: "", tpv_date: "", expedice: "", montaz: "", predani: "", van_date: "", pm_poznamka: "",
     narocnost: "", hodiny_tpv: "", percent_tpv: "", tpv_poznamka: "",
     cost_preset_id: null as string | null,
     cost_material_pct: null as number | null,
@@ -529,6 +530,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       expedice: project.expedice,
       montaz: project.montaz,
       predani: project.predani,
+      van_date: (project as any).van_date,
       pm_poznamka: project.pm_poznamka,
       narocnost: project.narocnost,
       hodiny_tpv: project.hodiny_tpv,
@@ -557,6 +559,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       expedice: form.expedice || null,
       montaz: form.montaz || null,
       predani: form.predani || null,
+      van_date: form.van_date || null,
       pm_poznamka: form.pm_poznamka || null,
       narocnost: form.narocnost || null,
       hodiny_tpv: form.hodiny_tpv || null,
@@ -1064,7 +1067,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                     <div className="grid grid-cols-3 gap-2 mt-1.5">
                       <CompactDateField label="Montáž" value={form.montaz} onChange={(v) => setForm(s => ({ ...s, montaz: v }))} disabled={isSectionReadOnly("pm")} />
                       <CompactDateField label="Předání" value={form.predani} onChange={(v) => setForm(s => ({ ...s, predani: v }))} disabled={isSectionReadOnly("pm")} />
-                      <div>{/* empty cell for alignment */}</div>
+                      <CompactDateField label="VaN" value={form.van_date} onChange={(v) => setForm(s => ({ ...s, van_date: v }))} disabled={isSectionReadOnly("pm")} />
                     </div>
                   </div>
 
