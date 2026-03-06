@@ -13,7 +13,7 @@ import { DashboardStats } from "@/components/DashboardStats";
 import { TableFilters, useTableFilters } from "@/components/TableFilters";
 import { ExportButton } from "@/components/ExportButton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Settings, Plus, LogOut, User, Check, ChevronUp, ChevronDown, UserCog, Factory } from "lucide-react";
+import { Settings, Plus, LogOut, User, Check, ChevronUp, ChevronDown, UserCog, Factory, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AmiAssistant } from "@/components/AmiAssistant";
 import { AdminInboxButton } from "@/components/AdminInbox";
@@ -478,7 +478,15 @@ const Index = () => {
           canCreateProject={canCreateProject}
           activeTab={mobileTab}
           onTabChange={setMobileTab}
-        />
+        >
+          <button
+            onClick={() => window.dispatchEvent(new Event("ami-toggle"))}
+            className="flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center text-muted-foreground"
+          >
+            <MessageCircle className="h-5 w-5" />
+            <span className="text-[10px]">Asistent</span>
+          </button>
+        </MobileBottomNav>
       )}
 
       <ExchangeRateSettings open={exchangeRateOpen} onOpenChange={setExchangeRateOpen} />

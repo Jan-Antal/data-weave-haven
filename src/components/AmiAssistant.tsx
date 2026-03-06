@@ -120,6 +120,13 @@ export function AmiAssistant() {
     if (open) setTimeout(() => inputRef.current?.focus(), 100);
   }, [open]);
 
+  // Listen for mobile bottom-nav toggle
+  useEffect(() => {
+    const handler = () => { setOpen(o => !o); dismissTooltip(); };
+    window.addEventListener("ami-toggle", handler);
+    return () => window.removeEventListener("ami-toggle", handler);
+  }, []);
+
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return;
     const userMsg: Msg = { role: "user", content: text.trim() };
@@ -201,12 +208,12 @@ export function AmiAssistant() {
 
   return (
     <>
-      {/* Tooltip for first-time users */}
+      {/* Tooltip for first-time users — desktop only */}
       {showTooltip && !open && (
         <button
           onClick={dismissTooltip}
-          className="fixed z-[9998] animate-fade-in md:!bottom-20"
-          style={{ bottom: "calc(130px + env(safe-area-inset-bottom, 0px))", right: 16 }}
+          className="fixed z-[9998] animate-fade-in hidden md:block"
+          style={{ bottom: 80, right: 16 }}
         >
           <div className="bg-white text-foreground text-xs px-3 py-2 rounded-lg shadow-lg border border-border max-w-[220px]">
             Ahoj! Jsem tu, když budeš potřebovat pomoc 👋
@@ -218,12 +225,13 @@ export function AmiAssistant() {
       {/* Chat Panel */}
       {open && (
         <div
-          className="fixed z-[9999] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden animate-scale-in"
+          className="fixed z-[9999] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden animate-scale-in max-md:left-2 max-md:right-2 max-md:rounded-2xl"
           style={{
-          bottom: window.innerWidth < 768 ? "calc(130px + env(safe-area-inset-bottom, 0px))" : 84,
-          right: 16,
-            width: 340,
+          bottom: window.innerWidth < 768 ? "calc(80px + env(safe-area-inset-bottom, 0px))" : 84,
+          right: window.innerWidth >= 768 ? 16 : undefined,
+            width: window.innerWidth >= 768 ? 340 : undefined,
             height: 440,
+            maxHeight: "70vh",
             border: "1px solid #e2ddd6",
           }}
         >
@@ -313,14 +321,13 @@ export function AmiAssistant() {
         </div>
       )}
 
-      {/* Bubble */}
+      {/* Bubble — hidden on mobile (shown in bottom nav instead) */}
       <button
         onClick={() => { setOpen(o => !o); dismissTooltip(); }}
         onMouseEnter={() => setCollapsed(false)}
         onMouseLeave={() => setCollapsed(true)}
-        className="fixed z-[9998] flex items-center gap-2 transition-all duration-300 hover:scale-105 group md:bottom-10"
+        className="hidden md:flex fixed z-[9998] items-center gap-2 transition-all duration-300 hover:scale-105 group bottom-10"
         style={{
-          bottom: window.innerWidth < 768 ? "calc(80px + env(safe-area-inset-bottom, 0px))" : undefined,
           right: 16,
           height: 44,
           width: collapsed ? 44 : "auto",
