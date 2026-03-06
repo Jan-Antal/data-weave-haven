@@ -15,7 +15,7 @@ export const READ_ONLY_INHERITED = new Set(["project_name", "klient"]);
 /** Editable inherited fields — copied from parent on creation, gray until manually edited */
 export const EDITABLE_INHERITED = new Set([
   "display_name", "kalkulant", "pm", "status", "start_date", "datum_smluvni",
-  "tpv_date", "expedice", "montaz", "predani",
+  "tpv_date", "expedice", "montaz", "predani", "van_date",
   "architekt", "konstrukter", "risk", "zamereni",
 ]);
 

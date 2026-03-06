@@ -530,6 +530,7 @@ export type Database = {
           status: string | null
           tpv_date: string | null
           updated_at: string
+          van_date: string | null
           zamereni: string | null
         }
         Insert: {
@@ -563,6 +564,7 @@ export type Database = {
           status?: string | null
           tpv_date?: string | null
           updated_at?: string
+          van_date?: string | null
           zamereni?: string | null
         }
         Update: {
@@ -596,6 +598,7 @@ export type Database = {
           status?: string | null
           tpv_date?: string | null
           updated_at?: string
+          van_date?: string | null
           zamereni?: string | null
         }
         Relationships: [
@@ -682,6 +685,7 @@ export type Database = {
           tpv_poznamka: string | null
           tpv_risk: string | null
           updated_at: string
+          van_date: string | null
           velikost_zakazky: string | null
           vyroba: number | null
           zamereni: string | null
@@ -735,6 +739,7 @@ export type Database = {
           tpv_poznamka?: string | null
           tpv_risk?: string | null
           updated_at?: string
+          van_date?: string | null
           velikost_zakazky?: string | null
           vyroba?: number | null
           zamereni?: string | null
@@ -788,6 +793,7 @@ export type Database = {
           tpv_poznamka?: string | null
           tpv_risk?: string | null
           updated_at?: string
+          van_date?: string | null
           velikost_zakazky?: string | null
           vyroba?: number | null
           zamereni?: string | null

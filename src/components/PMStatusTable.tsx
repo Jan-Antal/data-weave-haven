@@ -126,6 +126,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
       case "expedice": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "expedice")} type="date" onSave={(val) => saveStage("expedice", val)} readOnly={!canEdit} className={ihClass("expedice")} /></TableCell>;
       case "montaz": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "montaz")} type="date" onSave={(val) => saveStage("montaz", val)} readOnly={!canEdit} className={ihClass("montaz")} /></TableCell>;
       case "predani": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "predani")} type="date" onSave={(val) => saveStage("predani", val)} readOnly={!canEdit} className={ihClass("predani")} /></TableCell>;
+      case "van_date": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "van_date")} type="date" onSave={(val) => saveStage("van_date", val)} readOnly={!canEdit} className={ihClass("van_date")} /></TableCell>;
       case "pm_poznamka": return <TableCell key={key}><InlineEditableCell value={stage.pm_poznamka} type="textarea" onSave={(val) => saveStage("pm_poznamka", val)} readOnly={!canEdit} /></TableCell>;
       default: return <TableCell key={key} />;
     }
