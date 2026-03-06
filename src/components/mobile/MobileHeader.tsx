@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { Menu, X, LogOut, UserCog, Check } from "lucide-react";
+import { Menu, LogOut, UserCog, Check, Users, DollarSign, Tag, Trash2, BarChart3, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { cn } from "@/lib/utils";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
@@ -13,6 +12,8 @@ const ROLE_LABELS: Record<string, string> = {
 
 interface MobileHeaderProps {
   profileName: string;
+  profileEmail?: string;
+  profileRole?: string | null;
   isAdmin: boolean;
   isOwner: boolean;
   realRole: string | null;
@@ -22,10 +23,24 @@ interface MobileHeaderProps {
   onSignOut: () => void;
   onAccountSettings: () => void;
   onSettings: () => void;
+  // Admin menu callbacks
+  canManageUsers?: boolean;
+  canManagePeople?: boolean;
+  canManageExchangeRates?: boolean;
+  canManageStatuses?: boolean;
+  canAccessRecycleBin?: boolean;
+  onUserMgmt?: () => void;
+  onPeopleMgmt?: () => void;
+  onExchangeRates?: () => void;
+  onStatusMgmt?: () => void;
+  onRecycleBin?: () => void;
+  onDataLog?: () => void;
 }
 
 export function MobileHeader({
   profileName,
+  profileEmail,
+  profileRole,
   isAdmin,
   isOwner,
   realRole,
@@ -34,10 +49,19 @@ export function MobileHeader({
   canAccessSettings,
   onSignOut,
   onAccountSettings,
-  onSettings,
+  canManageUsers,
+  canManagePeople,
+  canManageExchangeRates,
+  canManageStatuses,
+  canAccessRecycleBin,
+  onUserMgmt,
+  onPeopleMgmt,
+  onExchangeRates,
+  onStatusMgmt,
+  onRecycleBin,
+  onDataLog,
 }: MobileHeaderProps) {
   const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
 
   return (
     <header className="md:hidden border-b bg-primary px-4 pb-3 shrink-0 z-50"
@@ -55,29 +79,73 @@ export function MobileHeader({
           </SheetTrigger>
           <SheetContent side="right" className="w-[280px] p-0">
             <div className="flex flex-col h-full">
+              {/* Header with user info */}
               <div className="p-4 border-b bg-primary">
                 <p className="text-primary-foreground font-medium">{profileName}</p>
-                <p className="text-primary-foreground/60 text-sm">AMI Interior</p>
+                {profileEmail && <p className="text-primary-foreground/60 text-sm">{profileEmail}</p>}
+                {profileRole && <p className="text-primary-foreground/40 text-xs mt-0.5">{ROLE_LABELS[profileRole] || profileRole}</p>}
               </div>
+
               <div className="flex-1 overflow-y-auto p-2">
+                {/* Account settings */}
                 <button
                   onClick={() => { onAccountSettings(); setOpen(false); }}
                   className="flex items-center gap-3 w-full px-3 py-3 rounded-md hover:bg-accent text-sm min-h-[44px]"
                 >
-                  <UserCog className="h-4 w-4" />
+                  <UserCog className="h-4 w-4 text-muted-foreground" />
                   Nastavení účtu
                 </button>
-                {canAccessSettings && (
-                  <button
-                    onClick={() => { onSettings(); setOpen(false); }}
-                    className="flex items-center gap-3 w-full px-3 py-3 rounded-md hover:bg-accent text-sm min-h-[44px]"
-                  >
-                    Nastavení systému
-                  </button>
+
+                {/* Admin/settings section */}
+                {(canManageUsers || canManagePeople || canManageExchangeRates || canManageStatuses || canAccessRecycleBin || isAdmin || profileRole === "pm" || isOwner) && (
+                  <div className="border-t mt-2 pt-2">
+                    <p className="px-3 py-1 text-xs font-medium text-muted-foreground">Správa</p>
+                    {canManageUsers && (
+                      <button onClick={() => { setOpen(false); onUserMgmt?.(); }} className="flex items-center gap-3 w-full px-3 py-3 rounded-md hover:bg-accent text-sm min-h-[44px]">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        Správa uživatelů
+                      </button>
+                    )}
+                    {canManagePeople && (
+                      <button onClick={() => { setOpen(false); onPeopleMgmt?.(); }} className="flex items-center gap-3 w-full px-3 py-3 rounded-md hover:bg-accent text-sm min-h-[44px]">
+                        <UserCog className="h-4 w-4 text-muted-foreground" />
+                        Správa osob
+                      </button>
+                    )}
+                    {canManageExchangeRates && (
+                      <button onClick={() => { setOpen(false); onExchangeRates?.(); }} className="flex items-center gap-3 w-full px-3 py-3 rounded-md hover:bg-accent text-sm min-h-[44px]">
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        Kurzovní lístek
+                      </button>
+                    )}
+                    {canManageStatuses && (
+                      <button onClick={() => { setOpen(false); onStatusMgmt?.(); }} className="flex items-center gap-3 w-full px-3 py-3 rounded-md hover:bg-accent text-sm min-h-[44px]">
+                        <Tag className="h-4 w-4 text-muted-foreground" />
+                        Správa statusů
+                      </button>
+                    )}
+                    {canAccessRecycleBin && (
+                      <button onClick={() => { setOpen(false); onRecycleBin?.(); }} className="flex items-center gap-3 w-full px-3 py-3 rounded-md hover:bg-accent text-sm min-h-[44px]">
+                        <Trash2 className="h-4 w-4 text-muted-foreground" />
+                        Koš
+                      </button>
+                    )}
+                    {(isAdmin || profileRole === "pm" || isOwner) && (
+                      <button onClick={() => { setOpen(false); onDataLog?.(); }} className="flex items-center gap-3 w-full px-3 py-3 rounded-md hover:bg-accent text-sm min-h-[44px]">
+                        <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                        Data Log
+                      </button>
+                    )}
+                  </div>
                 )}
+
+                {/* Role switcher */}
                 {realRole === "owner" && (
                   <div className="border-t mt-2 pt-2">
-                    <p className="px-3 py-1 text-xs font-medium text-muted-foreground">Zobrazit jako</p>
+                    <div className="flex items-center gap-2 px-3 py-1 text-xs font-medium text-muted-foreground">
+                      <Eye className="h-3.5 w-3.5" />
+                      Zobrazit jako
+                    </div>
                     {(["admin", "pm", "konstrukter", "viewer"] as const).map((r) => (
                       <button
                         key={r}
@@ -93,6 +161,8 @@ export function MobileHeader({
                   </div>
                 )}
               </div>
+
+              {/* Sign out at bottom */}
               <div className="border-t p-2">
                 <button
                   onClick={() => { onSignOut(); setOpen(false); }}

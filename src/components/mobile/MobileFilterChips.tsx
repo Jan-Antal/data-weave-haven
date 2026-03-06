@@ -22,7 +22,7 @@ export function MobileFilterChips({ activeChip, onChipChange }: MobileFilterChip
   const { data: projects = [] } = useProjects();
   const { profile } = useAuth();
   const pmName = profile?.full_name || null;
-  const { urgencyMap } = useProjectAttention();
+  const { urgencyMap } = useProjectAttention(pmName);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {

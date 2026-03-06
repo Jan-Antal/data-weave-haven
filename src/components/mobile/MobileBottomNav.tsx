@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo } from "react";
-import { Home, Plus, User, FolderPlus, Camera, StickyNote, Users, UserCog, DollarSign, Tag, Trash2, BarChart3, Eye, ChevronLeft, Check, Search, X } from "lucide-react";
+import { Home, Plus, FolderPlus, Camera, StickyNote, ChevronLeft, Search, X } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -12,71 +12,23 @@ import { toast } from "@/hooks/use-toast";
 import { logActivity } from "@/lib/activityLog";
 import { useQueryClient } from "@tanstack/react-query";
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Admin",
-  pm: "PM",
-  konstrukter: "Konstruktér",
-  viewer: "Viewer",
-};
-
 interface MobileBottomNavProps {
   onNewProject: () => void;
-  onSettings: () => void;
   canCreateProject: boolean;
-  canAccessSettings: boolean;
   activeTab?: string;
   onTabChange?: (tab: string) => void;
-  profileName?: string;
-  profileEmail?: string;
-  profileRole?: string | null;
-  realRole?: string | null;
-  simulatedRole?: string | null;
-  setSimulatedRole?: (r: string | null) => void;
-  isOwner?: boolean;
-  canManageUsers?: boolean;
-  canManagePeople?: boolean;
-  canManageExchangeRates?: boolean;
-  canManageStatuses?: boolean;
-  canAccessRecycleBin?: boolean;
-  isAdmin?: boolean;
-  onUserMgmt?: () => void;
-  onPeopleMgmt?: () => void;
-  onExchangeRates?: () => void;
-  onStatusMgmt?: () => void;
-  onRecycleBin?: () => void;
-  onDataLog?: () => void;
 }
 
 export function MobileBottomNav({
   onNewProject,
   canCreateProject,
-  activeTab = "project-info",
+  activeTab = "prehled",
   onTabChange,
-  profileName,
-  profileEmail,
-  profileRole,
-  realRole,
-  simulatedRole,
-  setSimulatedRole,
-  isOwner,
-  canManageUsers,
-  canManagePeople,
-  canManageExchangeRates,
-  canManageStatuses,
-  canAccessRecycleBin,
-  isAdmin,
-  onUserMgmt,
-  onPeopleMgmt,
-  onExchangeRates,
-  onStatusMgmt,
-  onRecycleBin,
-  onDataLog,
 }: MobileBottomNavProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const isHome = location.pathname === "/";
   const [quickActionOpen, setQuickActionOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
 
   // Quick action sub-states
   const [qaMode, setQaMode] = useState<null | "photo" | "note">(null);
@@ -106,7 +58,6 @@ export function MobileBottomNav({
 
   const handleHomeToggle = () => {
     if (isHome) {
-      // Toggle between prehled and projekty
       const next = activeTab === "prehled" ? "projekty" : "prehled";
       onTabChange?.(next);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -172,11 +123,9 @@ export function MobileBottomNav({
 
   const handleSelectProjectForPhoto = (projectId: string) => {
     setQaProjectId(projectId);
-    // Immediately open camera
     setTimeout(() => cameraRef.current?.click(), 100);
   };
 
-  // Project picker component used by both photo and note
   const ProjectPicker = ({ onSelect }: { onSelect: (id: string) => void }) => (
     <div className="space-y-3">
       <div className="relative">
@@ -242,20 +191,14 @@ export function MobileBottomNav({
           className="flex items-center justify-center -mt-4"
         >
           <div className="h-[52px] w-[52px] rounded-full flex items-center justify-center"
-            style={{ backgroundColor: "#223937", boxShadow: "0 4px 16px rgba(34,57,55,0.35)" }}
+            style={{ backgroundColor: "hsl(var(--primary))", boxShadow: "0 4px 16px hsl(var(--primary) / 0.35)" }}
           >
-            <Plus className="h-7 w-7 text-white" />
+            <Plus className="h-7 w-7 text-primary-foreground" />
           </div>
         </button>
 
-        {/* Profil */}
-        <button
-          onClick={() => setProfileOpen(true)}
-          className={cn("flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center", profileOpen ? "text-primary" : "text-muted-foreground")}
-        >
-          <User className="h-5 w-5" />
-          <span className="text-[10px]">Profil</span>
-        </button>
+        {/* Spacer for symmetry */}
+        <div className="min-w-[56px]" />
       </nav>
 
       {/* Quick Action Sheet */}
@@ -351,87 +294,6 @@ export function MobileBottomNav({
               </Button>
             </div>
           )}
-        </SheetContent>
-      </Sheet>
-
-      {/* Profile Sheet */}
-      <Sheet open={profileOpen} onOpenChange={setProfileOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl px-0 pb-8 pt-3 max-h-[80vh]"
-          style={{ paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))" }}
-        >
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-3" />
-          
-          {/* Header */}
-          <div className="px-4 pb-3 border-b border-border">
-            <button onClick={() => setProfileOpen(false)} className="flex items-center gap-1 text-sm text-muted-foreground mb-3">
-              <ChevronLeft className="h-4 w-4" /> Zpět
-            </button>
-            <p className="font-medium text-foreground">{profileName || "Uživatel"}</p>
-            {profileEmail && <p className="text-sm text-muted-foreground">{profileEmail}</p>}
-            {profileRole && <p className="text-xs text-muted-foreground/60 mt-0.5">{ROLE_LABELS[profileRole] || profileRole}</p>}
-          </div>
-
-          {/* Menu items */}
-          <div className="overflow-y-auto px-2 pt-2">
-            {canManageUsers && (
-              <button onClick={() => { setProfileOpen(false); onUserMgmt?.(); }} className="flex items-center gap-3 w-full px-4 py-3 rounded-lg hover:bg-accent text-sm min-h-[48px]">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                Správa uživatelů
-              </button>
-            )}
-            {canManagePeople && (
-              <button onClick={() => { setProfileOpen(false); onPeopleMgmt?.(); }} className="flex items-center gap-3 w-full px-4 py-3 rounded-lg hover:bg-accent text-sm min-h-[48px]">
-                <UserCog className="h-4 w-4 text-muted-foreground" />
-                Správa osob
-              </button>
-            )}
-            {canManageExchangeRates && (
-              <button onClick={() => { setProfileOpen(false); onExchangeRates?.(); }} className="flex items-center gap-3 w-full px-4 py-3 rounded-lg hover:bg-accent text-sm min-h-[48px]">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                Kurzovní lístek
-              </button>
-            )}
-            {canManageStatuses && (
-              <button onClick={() => { setProfileOpen(false); onStatusMgmt?.(); }} className="flex items-center gap-3 w-full px-4 py-3 rounded-lg hover:bg-accent text-sm min-h-[48px]">
-                <Tag className="h-4 w-4 text-muted-foreground" />
-                Správa statusů
-              </button>
-            )}
-            {canAccessRecycleBin && (
-              <button onClick={() => { setProfileOpen(false); onRecycleBin?.(); }} className="flex items-center gap-3 w-full px-4 py-3 rounded-lg hover:bg-accent text-sm min-h-[48px]">
-                <Trash2 className="h-4 w-4 text-muted-foreground" />
-                Koš
-              </button>
-            )}
-            {(isAdmin || profileRole === "pm" || isOwner) && (
-              <button onClick={() => { setProfileOpen(false); onDataLog?.(); }} className="flex items-center gap-3 w-full px-4 py-3 rounded-lg hover:bg-accent text-sm min-h-[48px]">
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                Data Log
-              </button>
-            )}
-
-            {/* Role switcher */}
-            {realRole === "owner" && setSimulatedRole && (
-              <div className="border-t mt-2 pt-2 px-2">
-                <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                  <Eye className="h-3.5 w-3.5" />
-                  Zobrazit jako
-                </div>
-                {(["admin", "pm", "konstrukter", "viewer"] as const).map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => { setSimulatedRole(r === "admin" ? null : r); setProfileOpen(false); }}
-                    className="flex items-center justify-between w-full px-4 py-2.5 rounded-lg hover:bg-accent text-sm min-h-[44px]"
-                  >
-                    <span>{ROLE_LABELS[r]}</span>
-                    {((r === "admin" && !simulatedRole) || simulatedRole === r) && (
-                      <Check className="h-4 w-4 text-green-600" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
         </SheetContent>
       </Sheet>
     </>
