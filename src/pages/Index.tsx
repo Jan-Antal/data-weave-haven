@@ -475,30 +475,9 @@ const Index = () => {
       {isMobile && (
         <MobileBottomNav
           onNewProject={() => document.dispatchEvent(new CustomEvent("open-add-project"))}
-          onSettings={handleOpenSettings}
           canCreateProject={canCreateProject}
-          canAccessSettings={canAccessSettings}
           activeTab={mobileTab}
           onTabChange={setMobileTab}
-          profileName={profile?.full_name || profile?.email || "Uživatel"}
-          profileEmail={profile?.email || ""}
-          profileRole={role}
-          realRole={realRole}
-          simulatedRole={simulatedRole}
-          setSimulatedRole={setSimulatedRole}
-          isOwner={isOwner}
-          canManageUsers={canManageUsers}
-          canManagePeople={canManagePeople}
-          canManageExchangeRates={canManageExchangeRates}
-          canManageStatuses={canManageStatuses}
-          canAccessRecycleBin={canAccessRecycleBin}
-          isAdmin={isAdmin}
-          onUserMgmt={() => setUserMgmtOpen(true)}
-          onPeopleMgmt={openPeopleManagement}
-          onExchangeRates={() => setExchangeRateOpen(true)}
-          onStatusMgmt={() => setStatusMgmtOpen(true)}
-          onRecycleBin={() => setRecycleBinOpen(true)}
-          onDataLog={toggleDataLog}
         />
       )}
 
