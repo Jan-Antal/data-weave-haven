@@ -192,7 +192,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
             const suffix = stage.stage_name.startsWith(project.project_id + "-")
               ? stage.stage_name.slice(project.project_id.length + 1)
               : stage.stage_name;
-            const canEditSuffix = canEdit && !isFieldReadOnly("project_id");
+            const canEditSuffix = canEdit;
             return (
               <div className="flex items-center gap-0">
                 <span className="text-muted-foreground/60">{project.project_id}-</span>
