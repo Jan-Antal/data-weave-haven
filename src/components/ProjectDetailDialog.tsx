@@ -1134,58 +1134,77 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 pb-2">
                   <div>
                     <Label className="text-xs">Konstruktér</Label>
-                    {isSectionReadOnly("tpv") ? (
-                      <Input value={form.konstrukter || "—"} disabled className={roClass} />
-                    ) : (
-                      <PeopleSelectDropdown role="Konstruktér" value={form.konstrukter} onValueChange={(v) => setForm(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
-                    )}
+                    <MobileTapField displayValue={form.konstrukter || ""} disabled={isSectionReadOnly("tpv")}>
+                      {() => isSectionReadOnly("tpv") ? (
+                        <Input value={form.konstrukter || "—"} disabled className={roClass} />
+                      ) : (
+                        <PeopleSelectDropdown role="Konstruktér" value={form.konstrukter} onValueChange={(v) => setForm(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
+                      )}
+                    </MobileTapField>
                   </div>
                   <div>
                     <Label className="text-xs">Náročnost</Label>
-                    {isSectionReadOnly("tpv") ? (
-                      <Select value={form.narocnost} disabled>
-                        <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">{["Low", "Medium", "High"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                      </Select>
-                    ) : (
-                      <Select value={form.narocnost} onValueChange={(v) => setForm(s => ({ ...s, narocnost: v }))}>
-                        <SelectTrigger><SelectValue placeholder="Vyberte náročnost" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">{["Low", "Medium", "High"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                      </Select>
-                    )}
+                    <MobileTapField displayValue={form.narocnost || ""} disabled={isSectionReadOnly("tpv")}>
+                      {() => isSectionReadOnly("tpv") ? (
+                        <Select value={form.narocnost} disabled>
+                          <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
+                          <SelectContent className="z-[99999]">{["Low", "Medium", "High"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                        </Select>
+                      ) : (
+                        <Select value={form.narocnost} onValueChange={(v) => setForm(s => ({ ...s, narocnost: v }))}>
+                          <SelectTrigger><SelectValue placeholder="Vyberte náročnost" /></SelectTrigger>
+                          <SelectContent className="z-[99999]">{["Low", "Medium", "High"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                        </Select>
+                      )}
+                    </MobileTapField>
                   </div>
                   <div>
                     <Label className="text-xs">Hodiny TPV</Label>
-                    <Input
-                      value={form.hodiny_tpv}
-                      onChange={(e) => setForm(s => ({ ...s, hodiny_tpv: e.target.value }))}
-                      disabled={isSectionReadOnly("tpv")}
-                      className={cn(isSectionReadOnly("tpv") && roClass)}
-                    />
+                    <MobileTapField displayValue={form.hodiny_tpv || ""} disabled={isSectionReadOnly("tpv")}>
+                      {({ autoFocus }) => (
+                        <Input
+                          value={form.hodiny_tpv}
+                          onChange={(e) => setForm(s => ({ ...s, hodiny_tpv: e.target.value }))}
+                          disabled={isSectionReadOnly("tpv")}
+                          className={cn(isSectionReadOnly("tpv") && roClass)}
+                          autoFocus={autoFocus}
+                        />
+                      )}
+                    </MobileTapField>
                   </div>
                   <div>
                     <Label className="text-xs">% Rozpracovanost</Label>
-                    <div className="relative">
-                      <Input
-                        type={isSectionReadOnly("tpv") ? "text" : "number"}
-                        className={cn("no-spinners pr-8", isSectionReadOnly("tpv") && roClass)}
-                        value={isSectionReadOnly("tpv") ? (form.percent_tpv ? `${form.percent_tpv}` : "—") : form.percent_tpv}
-                        onChange={(e) => setForm(s => ({ ...s, percent_tpv: e.target.value }))}
-                        placeholder="0"
-                        disabled={isSectionReadOnly("tpv")}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
-                    </div>
+                    <MobileTapField displayValue={form.percent_tpv ? `${form.percent_tpv} %` : ""} disabled={isSectionReadOnly("tpv")}>
+                      {({ autoFocus }) => (
+                        <div className="relative">
+                          <Input
+                            type={isSectionReadOnly("tpv") ? "text" : "number"}
+                            className={cn("no-spinners pr-8", isSectionReadOnly("tpv") && roClass)}
+                            value={isSectionReadOnly("tpv") ? (form.percent_tpv ? `${form.percent_tpv}` : "—") : form.percent_tpv}
+                            onChange={(e) => setForm(s => ({ ...s, percent_tpv: e.target.value }))}
+                            placeholder="0"
+                            disabled={isSectionReadOnly("tpv")}
+                            autoFocus={autoFocus}
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
+                        </div>
+                      )}
+                    </MobileTapField>
                   </div>
                   <div className="col-span-2">
                     <Label className="text-xs">Poznámka TPV</Label>
-                    <Textarea
-                      value={form.tpv_poznamka}
-                      onChange={(e) => setForm(s => ({ ...s, tpv_poznamka: e.target.value }))}
-                      disabled={isSectionReadOnly("tpv")}
-                      className={cn("min-h-[50px] text-sm", isSectionReadOnly("tpv") && roClass)}
-                      placeholder="Poznámka…"
-                    />
+                    <MobileTapField displayValue={form.tpv_poznamka || ""} disabled={isSectionReadOnly("tpv")}>
+                      {({ autoFocus }) => (
+                        <Textarea
+                          value={form.tpv_poznamka}
+                          onChange={(e) => setForm(s => ({ ...s, tpv_poznamka: e.target.value }))}
+                          disabled={isSectionReadOnly("tpv")}
+                          className={cn("min-h-[50px] text-sm", isSectionReadOnly("tpv") && roClass)}
+                          placeholder="Poznámka…"
+                          autoFocus={autoFocus}
+                        />
+                      )}
+                    </MobileTapField>
                   </div>
                 </div>
 
