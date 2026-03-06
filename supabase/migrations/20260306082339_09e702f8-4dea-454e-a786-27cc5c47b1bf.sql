@@ -1,0 +1,1 @@
+ALTER TABLE public.project_stages ADD COLUMN display_name text NULL;
