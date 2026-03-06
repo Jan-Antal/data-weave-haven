@@ -6,9 +6,8 @@ interface MobileTabBarProps {
 }
 
 const TABS = [
-  { value: "project-info", label: "Project Info" },
-  { value: "pm-status", label: "PM Status" },
-  { value: "tpv-status", label: "TPV Status" },
+  { value: "prehled", label: "🏠 Přehled" },
+  { value: "projekty", label: "📁 Projekty" },
 ];
 
 export function MobileTabBar({ activeTab, onTabChange }: MobileTabBarProps) {
