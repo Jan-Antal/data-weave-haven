@@ -827,9 +827,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                       }}
                       disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_id")}
                       className={cn((isSectionReadOnly("basic") || isFieldReadOnly("project_id")) && roClass)}
-                      readOnly
-                      tabIndex={-1}
-                      style={{ cursor: "default" }}
+                      readOnly={isSectionReadOnly("basic") || isFieldReadOnly("project_id")}
+                      tabIndex={isSectionReadOnly("basic") || isFieldReadOnly("project_id") ? -1 : undefined}
+                      style={(isSectionReadOnly("basic") || isFieldReadOnly("project_id")) ? { cursor: "default" } : undefined}
                     />
                     {idExists && <p className="text-xs text-destructive mt-1">Toto ID již existuje</p>}
                   </div>
