@@ -225,12 +225,13 @@ export function AmiAssistant() {
       {/* Chat Panel */}
       {open && (
         <div
-          className="fixed z-[9999] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden animate-scale-in"
+          className="fixed z-[9999] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden animate-scale-in max-md:left-2 max-md:right-2 max-md:rounded-2xl"
           style={{
-          bottom: window.innerWidth < 768 ? "calc(130px + env(safe-area-inset-bottom, 0px))" : 84,
-          right: 16,
-            width: 340,
+          bottom: window.innerWidth < 768 ? "calc(80px + env(safe-area-inset-bottom, 0px))" : 84,
+          right: window.innerWidth >= 768 ? 16 : undefined,
+            width: window.innerWidth >= 768 ? 340 : undefined,
             height: 440,
+            maxHeight: "70vh",
             border: "1px solid #e2ddd6",
           }}
         >
