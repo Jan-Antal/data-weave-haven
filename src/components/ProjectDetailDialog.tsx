@@ -284,7 +284,10 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const isMobile = useIsMobile();
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-
+  // ── Mobile swipe-down-to-close ──────────────────────────────
+  const [mobileDragY, setMobileDragY] = useState(0);
+  const mobileDragRef = useRef({ startY: 0, startTime: 0, dragging: false });
+  const mobileSheetRef = useRef<HTMLDivElement>(null);
 
   // ── Mobile: camera photo upload ─────────────────────────────
   const handleCameraUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
