@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { MobileTapField } from "./MobileTapToEdit";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logActivity } from "@/lib/activityLog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
