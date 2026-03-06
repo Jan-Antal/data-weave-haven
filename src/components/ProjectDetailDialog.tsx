@@ -684,11 +684,13 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
           "p-0 gap-0 overflow-hidden",
           previewFile ? "sm:max-w-[92vw] h-[88vh]" : "sm:max-w-[920px]",
           // Mobile: full-screen card from top
-          "max-md:!max-w-full max-md:!w-full max-md:!left-0 max-md:!translate-x-0 max-md:!translate-y-0 max-md:!rounded-t-none max-md:!rounded-b-2xl max-md:!border-t-0",
+          "max-md:!max-w-full max-md:!w-full max-md:!left-0 max-md:!translate-x-0 max-md:!translate-y-0 max-md:!rounded-none max-md:!border-0",
         )}
         style={isMobile ? {
-          top: "calc(max(env(safe-area-inset-top, 0px), 12px) + 48px)",
-          height: "calc(100vh - (max(env(safe-area-inset-top, 0px), 12px) + 48px) - 70px - env(safe-area-inset-bottom, 0px))",
+          top: 0,
+          bottom: 0,
+          height: "100vh",
+          paddingTop: "env(safe-area-inset-top, 0px)",
           ...(mobileDragY > 0 ? { transform: `translateY(${mobileDragY}px)`, transition: 'none' } : {}),
         } : undefined}
         onOpenAutoFocus={(e) => {
