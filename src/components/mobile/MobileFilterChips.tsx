@@ -12,7 +12,7 @@ interface MobileFilterChipsProps {
 const STATUS_CHIPS = [
   { value: "Příprava", label: "Příprava" },
   { value: "Engineering", label: "Engineering" },
-  { value: "Výroba", label: "Výroba" },
+  { value: "Výroba IN", label: "Výroba IN" },
   { value: "Expedice", label: "Expedice" },
   { value: "Montáž", label: "Montáž" },
   { value: "Fakturace", label: "Fakturace" },
@@ -22,7 +22,8 @@ export function MobileFilterChips({ activeChip, onChipChange }: MobileFilterChip
   const { data: projects = [] } = useProjects();
   const { profile } = useAuth();
   const pmName = profile?.full_name || null;
-  const { urgencyMap } = useProjectAttention(pmName);
+  const linkedPersonName = useAuth().linkedPersonName;
+  const { urgencyMap } = useProjectAttention(linkedPersonName || pmName);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {
