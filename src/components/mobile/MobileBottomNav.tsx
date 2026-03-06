@@ -25,6 +25,7 @@ export function MobileBottomNav({
   canCreateProject,
   activeTab = "prehled",
   onTabChange,
+  children,
 }: MobileBottomNavProps) {
   const navigate = useNavigate();
   const location = useLocation();
