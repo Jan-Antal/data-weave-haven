@@ -649,6 +649,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
           previewFile ? "sm:max-w-[92vw] h-[88vh]" : "sm:max-w-[920px]",
           "max-md:!max-w-full max-md:!w-full max-md:!h-[95vh] max-md:!max-h-[95vh] max-md:!rounded-t-2xl max-md:!rounded-b-none max-md:!top-auto max-md:!bottom-0 max-md:!left-0 max-md:!translate-x-0 max-md:!translate-y-0"
         )}
+        onOpenAutoFocus={(e) => {
+          if (isMobile) e.preventDefault();
+        }}
         onEscapeKeyDown={(e) => {
           if (previewFile) {
             e.preventDefault();
