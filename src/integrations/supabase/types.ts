@@ -505,6 +505,7 @@ export type Database = {
           currency: string | null
           datum_smluvni: string | null
           deleted_at: string | null
+          display_name: string | null
           end_date: string | null
           expedice: string | null
           hodiny_tpv: string | null
@@ -537,6 +538,7 @@ export type Database = {
           currency?: string | null
           datum_smluvni?: string | null
           deleted_at?: string | null
+          display_name?: string | null
           end_date?: string | null
           expedice?: string | null
           hodiny_tpv?: string | null
@@ -569,6 +571,7 @@ export type Database = {
           currency?: string | null
           datum_smluvni?: string | null
           deleted_at?: string | null
+          display_name?: string | null
           end_date?: string | null
           expedice?: string | null
           hodiny_tpv?: string | null

@@ -1161,7 +1161,7 @@ function SubstageLeftRows({ projectId, project, statusColorMap, onClickStage, ho
              </div>
              <div style={{ width: 36, minWidth: 36, maxWidth: 36 }} />
             <span className="text-xs font-mono text-muted-foreground truncate pl-4 px-2 cursor-pointer hover:underline" style={{ width: 110, minWidth: 110 }} onClick={() => onClickStage(stage)}>{stage.stage_name}</span>
-            <span className="text-xs text-muted-foreground truncate px-2" style={{ width: 180, minWidth: 180, maxWidth: 180 }} title={project.project_name}>{project.project_name}</span>
+            <span className="text-xs text-muted-foreground truncate px-2" style={{ width: 180, minWidth: 180, maxWidth: 180 }} title={(stage as any).display_name || ""}>{(stage as any).display_name || "—"}</span>
           </div>
         );
       })}

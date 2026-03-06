@@ -143,11 +143,36 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
       </TableCell>
       {v("project_id") && (
         <TableCell className="font-mono text-xs truncate pl-4 text-muted-foreground">
-          <InlineEditableCell value={stage.stage_name} onSave={(val) => saveStage("stage_name", val)} readOnly={!canEdit} />
+          {(() => {
+            const suffix = stage.stage_name.startsWith(project.project_id + "-")
+              ? stage.stage_name.slice(project.project_id.length + 1)
+              : stage.stage_name;
+            const canEditSuffix = canEdit;
+            return (
+              <div className="flex items-center gap-0">
+                <span className="text-muted-foreground/60">{project.project_id}-</span>
+                <InlineEditableCell
+                  value={suffix}
+                  onSave={(val) => {
+                    const newStageName = `${project.project_id}-${val.replace(/^-/, "")}`;
+                    saveStage("stage_name", newStageName);
+                  }}
+                  readOnly={!canEditSuffix}
+                  className="inline-block max-w-[60px]"
+                />
+              </div>
+            );
+          })()}
         </TableCell>
       )}
       {v("project_name") && (
-        <TableCell className="truncate text-muted-foreground text-xs" style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={project.project_name}>{project.project_name}</TableCell>
+        <TableCell className="truncate text-muted-foreground text-xs" style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <InlineEditableCell
+            value={(stage as any).display_name || ""}
+            onSave={(val) => saveStage("display_name", val)}
+            readOnly={!canEdit}
+          />
+        </TableCell>
       )}
       {renderKeys.map((key) => renderStageCell(key))}
       <TableCell>
