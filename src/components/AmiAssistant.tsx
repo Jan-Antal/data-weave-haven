@@ -120,6 +120,13 @@ export function AmiAssistant() {
     if (open) setTimeout(() => inputRef.current?.focus(), 100);
   }, [open]);
 
+  // Listen for mobile bottom-nav toggle
+  useEffect(() => {
+    const handler = () => { setOpen(o => !o); dismissTooltip(); };
+    window.addEventListener("ami-toggle", handler);
+    return () => window.removeEventListener("ami-toggle", handler);
+  }, []);
+
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return;
     const userMsg: Msg = { role: "user", content: text.trim() };
