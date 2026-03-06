@@ -197,8 +197,8 @@ export function MobileBottomNav({
           </div>
         </button>
 
-        {/* Spacer for symmetry */}
-        <div className="min-w-[56px]" />
+        {/* AMI Assistant slot — rendered by parent */}
+        {children}
       </nav>
 
       {/* Quick Action Sheet */}
