@@ -36,8 +36,8 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
   const { data: projects = [], isLoading } = useProjects();
   const { stagesByProject } = useStagesByProject();
   const { profile, linkedPersonName } = useAuth();
-  const pmName = profile?.full_name || null;
-  const { urgencyMap } = useProjectAttention(linkedPersonName || pmName);
+  const pmName = linkedPersonName || null;
+  const { urgencyMap } = useProjectAttention(pmName);
   const queryClient = useQueryClient();
   const [sortBy, setSortBy] = useState("project_name");
   const [sortAsc, setSortAsc] = useState(true);
