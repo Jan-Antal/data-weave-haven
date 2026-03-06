@@ -230,3 +230,13 @@
     min-height: 36px;
   }
 }
+
+/* Mobile project detail: slide from top instead of center */
+@media (max-width: 767px) {
+  [data-mobile-top-sheet] {
+    --tw-enter-translate-y: -100% !important;
+    --tw-exit-translate-y: -100% !important;
+    --tw-enter-translate-x: 0 !important;
+    --tw-exit-translate-x: 0 !important;
+  }
+}

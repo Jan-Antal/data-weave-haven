@@ -283,7 +283,10 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const isMobile = useIsMobile();
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-
+  // ── Mobile swipe-down-to-close ──────────────────────────────
+  const [mobileDragY, setMobileDragY] = useState(0);
+  const mobileDragRef = useRef({ startY: 0, startTime: 0, dragging: false });
+  const mobileSheetRef = useRef<HTMLDivElement>(null);
 
   // ── Mobile: camera photo upload ─────────────────────────────
   const handleCameraUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -469,6 +472,36 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const canGoPrev = previewTotal > 1 && previewCurrentIndex > 0;
   const canGoNext = previewTotal > 1 && previewCurrentIndex < previewTotal - 1;
 
+  const handleMobileTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!isMobile) return;
+    const rect = mobileSheetRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const touchY = e.touches[0].clientY - rect.top;
+    if (touchY > 80) return;
+    mobileDragRef.current = { startY: e.touches[0].clientY, startTime: Date.now(), dragging: true };
+  }, [isMobile]);
+
+  const handleMobileTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!mobileDragRef.current.dragging) return;
+    const dy = e.touches[0].clientY - mobileDragRef.current.startY;
+    setMobileDragY(Math.max(0, dy));
+  }, []);
+
+  const handleMobileTouchEnd = useCallback(() => {
+    if (!mobileDragRef.current.dragging) return;
+    const elapsed = (Date.now() - mobileDragRef.current.startTime) / 1000;
+    const velocity = mobileDragY / elapsed;
+    if (mobileDragY > 100 || velocity > 500) {
+      tryClose();
+    }
+    setMobileDragY(0);
+    mobileDragRef.current.dragging = false;
+  }, [mobileDragY, tryClose]);
+
+  useEffect(() => {
+    if (!open) setMobileDragY(0);
+  }, [open]);
+
   if (!project) return null;
 
   const handleSave = async () => {
@@ -637,6 +670,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   // ── Read-only style helper ──────────────────────────────────
   const roClass = "bg-[#f3f4f6] text-muted-foreground cursor-not-allowed opacity-70";
 
+
   return (
     <>
     <Dialog open={open} onOpenChange={(v) => {
@@ -644,11 +678,19 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       if (!v) { tryClose(); return; }
     }}>
       <DialogContent
+        ref={mobileSheetRef}
+        data-mobile-top-sheet={isMobile ? "" : undefined}
         className={cn(
           "p-0 gap-0 overflow-hidden",
           previewFile ? "sm:max-w-[92vw] h-[88vh]" : "sm:max-w-[920px]",
-          "max-md:!max-w-full max-md:!w-full max-md:!h-[95vh] max-md:!max-h-[95vh] max-md:!rounded-t-2xl max-md:!rounded-b-none max-md:!top-auto max-md:!bottom-0 max-md:!left-0 max-md:!translate-x-0 max-md:!translate-y-0"
+          // Mobile: full-screen card from top
+          "max-md:!max-w-full max-md:!w-full max-md:!top-0 max-md:!bottom-auto max-md:!left-0 max-md:!translate-x-0 max-md:!translate-y-0 max-md:!rounded-t-none max-md:!rounded-b-2xl max-md:!border-t-0",
         )}
+        style={isMobile ? {
+          height: "calc(100vh - 70px - env(safe-area-inset-bottom, 0px))",
+          paddingTop: "env(safe-area-inset-top, 0px)",
+          ...(mobileDragY > 0 ? { transform: `translateY(${mobileDragY}px)`, transition: 'none' } : {}),
+        } : undefined}
         onOpenAutoFocus={(e) => {
           if (isMobile) e.preventDefault();
         }}
@@ -658,6 +700,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
             setPreviewFile(null);
           }
         }}
+        onTouchStart={handleMobileTouchStart}
+        onTouchMove={handleMobileTouchMove}
+        onTouchEnd={handleMobileTouchEnd}
       >
         {previewFile ? (
           /* ===== PREVIEW MODE ===== */
