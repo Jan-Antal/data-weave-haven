@@ -179,6 +179,8 @@ const Index = () => {
       {isMobile && (
         <MobileHeader
           profileName={profile?.full_name || profile?.email || "Uživatel"}
+          profileEmail={profile?.email || ""}
+          profileRole={role}
           isAdmin={isAdmin}
           isOwner={isOwner}
           realRole={realRole}
@@ -188,6 +190,17 @@ const Index = () => {
           onSignOut={signOut}
           onAccountSettings={() => setAccountSettingsOpen(true)}
           onSettings={handleOpenSettings}
+          canManageUsers={canManageUsers}
+          canManagePeople={canManagePeople}
+          canManageExchangeRates={canManageExchangeRates}
+          canManageStatuses={canManageStatuses}
+          canAccessRecycleBin={canAccessRecycleBin}
+          onUserMgmt={() => setUserMgmtOpen(true)}
+          onPeopleMgmt={openPeopleManagement}
+          onExchangeRates={() => setExchangeRateOpen(true)}
+          onStatusMgmt={() => setStatusMgmtOpen(true)}
+          onRecycleBin={() => setRecycleBinOpen(true)}
+          onDataLog={toggleDataLog}
         />
       )}
 
