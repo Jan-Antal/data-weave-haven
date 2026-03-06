@@ -37,9 +37,10 @@ import { useAchievementChecker } from "@/hooks/useAchievements";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
-import { MobileFilterSheet } from "@/components/mobile/MobileFilterSheet";
 import { MobileCardList } from "@/components/mobile/MobileCardList";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
+import { MobilePrehled } from "@/components/mobile/MobilePrehled";
+import { useRecentlyOpened } from "@/hooks/useRecentlyOpened";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
@@ -101,6 +102,8 @@ const Index = () => {
   const achievementChecker = useAchievementChecker();
   const isMobile = useIsMobile();
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState("prehled");
+  const { recent: recentProjects, trackOpen: trackRecentOpen } = useRecentlyOpened();
 
   const handleTabChange = useCallback((tab: string) => {
     scrollPositions.current[activeTab] = window.scrollY;
@@ -154,9 +157,10 @@ const Index = () => {
   }, []);
 
   const handleMobileProjectTap = useCallback((project: any) => {
+    trackRecentOpen(project);
     setMobileDetailProject(project);
     setMobileDetailOpen(true);
-  }, []);
+  }, [trackRecentOpen]);
 
   return (
     <ColumnVisibilityProvider>
@@ -296,20 +300,9 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Mobile: filter bar + tab bar */}
+      {/* Mobile: tab bar only */}
       {isMobile && (
-        <>
-          <MobileFilterSheet
-            personFilter={filters.personFilter}
-            onPersonFilterChange={filters.setPersonFilter}
-            statusFilter={filters.statusFilter}
-            onStatusFilterChange={filters.setStatusFilter}
-            search={filters.search}
-            onSearchChange={filters.setSearch}
-            hasActiveFilters={filters.hasActiveFilters}
-          />
-          <MobileTabBar activeTab={activeTab} onTabChange={handleTabChange} />
-        </>
+        <MobileTabBar activeTab={mobileTab} onTabChange={setMobileTab} />
       )}
 
       {/* Desktop: filter bar */}
@@ -338,18 +331,24 @@ const Index = () => {
 
       {/* Split layout: main content + data log panel */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Mobile: card list */}
+        {/* Mobile: Přehled or Projekty */}
         {isMobile ? (
           <main className="flex-1 min-w-0 flex flex-col overflow-y-auto px-3 pt-3 pb-16">
-            <DashboardStats personFilter={filters.personFilter} statusFilter={filters.statusFilter} riskHighlight={riskHighlight} onRiskHighlightChange={setRiskHighlight} activeTab={activeTab} />
-            <MobileCardList
-              personFilter={filters.personFilter}
-              statusFilter={filters.statusFilter}
-              search={filters.search}
-              riskHighlight={riskHighlight}
-              activeTab={activeTab}
-              onProjectTap={handleMobileProjectTap}
-            />
+            {mobileTab === "prehled" ? (
+              <MobilePrehled
+                recentProjects={recentProjects}
+                onProjectTap={handleMobileProjectTap}
+              />
+            ) : (
+              <MobileCardList
+                personFilter={filters.personFilter}
+                statusFilter={filters.statusFilter}
+                search={filters.search}
+                riskHighlight={riskHighlight}
+                activeTab={activeTab}
+                onProjectTap={handleMobileProjectTap}
+              />
+            )}
             <ProjectDetailDialog
               project={mobileDetailProject}
               open={mobileDetailOpen}
@@ -469,8 +468,8 @@ const Index = () => {
           onSettings={handleOpenSettings}
           canCreateProject={canCreateProject}
           canAccessSettings={canAccessSettings}
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
+          activeTab={mobileTab}
+          onTabChange={setMobileTab}
           profileName={profile?.full_name || profile?.email || "Uživatel"}
           profileEmail={profile?.email || ""}
           profileRole={role}

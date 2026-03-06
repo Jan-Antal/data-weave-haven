@@ -88,7 +88,7 @@ export function MobileBottomNav({
   const { data: projects = [] } = useProjects();
   const qc = useQueryClient();
 
-  const isProjectsActive = (activeTab === "project-info" || activeTab === "pm-status" || activeTab === "tpv-status") && isHome;
+  const isProjectsActive = (activeTab === "prehled" || activeTab === "projekty") && isHome;
 
   const filteredProjects = useMemo(() => {
     if (!qaSearch.trim()) return projects;
@@ -106,6 +106,7 @@ export function MobileBottomNav({
 
   const handleProjects = () => {
     if (isHome) {
+      onTabChange?.("prehled");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
       navigate("/");

@@ -4,6 +4,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { formatCurrency } from "@/lib/currency";
 import { parseAppDate, formatAppDate } from "@/lib/dateFormat";
 import { cn } from "@/lib/utils";
+import type { ProjectUrgency } from "@/hooks/useProjectAttention";
 
 interface Project {
   id: string;
@@ -23,6 +24,7 @@ interface MobileProjectCardProps {
   onTap: (project: Project) => void;
   stages?: any[];
   dimmed?: boolean;
+  urgency?: ProjectUrgency | null;
 }
 
 const RISK_COLORS: Record<string, string> = {
@@ -31,7 +33,7 @@ const RISK_COLORS: Record<string, string> = {
   Low: "hsl(142 60% 45%)",
 };
 
-export const MobileProjectCard = memo(function MobileProjectCard({ project, onTap, stages = [], dimmed }: MobileProjectCardProps) {
+export const MobileProjectCard = memo(function MobileProjectCard({ project, onTap, stages = [], dimmed, urgency }: MobileProjectCardProps) {
   const [expanded, setExpanded] = useState(false);
   const riskColor = project.risk ? RISK_COLORS[project.risk] : undefined;
   const hasStages = stages.length > 0;
@@ -60,6 +62,18 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0">
               {project.status && <StatusBadge status={project.status} />}
+              {urgency && (
+                <span
+                  className={cn(
+                    "text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap",
+                    urgency.severity === "critical"
+                      ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                      : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                  )}
+                >
+                  {urgency.label}{urgency.count > 1 ? ` (+${urgency.count - 1})` : ""}
+                </span>
+              )}
               {project.prodejni_cena != null && (
                 <span className="text-xs font-mono text-muted-foreground">
                   {formatCurrency(project.prodejni_cena, project.currency || "CZK")}
