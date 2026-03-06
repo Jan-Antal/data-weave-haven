@@ -313,14 +313,13 @@ export function AmiAssistant() {
         </div>
       )}
 
-      {/* Bubble */}
+      {/* Bubble — hidden on mobile (shown in bottom nav instead) */}
       <button
         onClick={() => { setOpen(o => !o); dismissTooltip(); }}
         onMouseEnter={() => setCollapsed(false)}
         onMouseLeave={() => setCollapsed(true)}
-        className="fixed z-[9998] flex items-center gap-2 transition-all duration-300 hover:scale-105 group md:bottom-10"
+        className="hidden md:flex fixed z-[9998] items-center gap-2 transition-all duration-300 hover:scale-105 group bottom-10"
         style={{
-          bottom: window.innerWidth < 768 ? "calc(80px + env(safe-area-inset-bottom, 0px))" : undefined,
           right: 16,
           height: 44,
           width: collapsed ? 44 : "auto",
