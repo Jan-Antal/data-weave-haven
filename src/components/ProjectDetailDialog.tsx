@@ -639,40 +639,14 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const roClass = "bg-[#f3f4f6] text-muted-foreground cursor-not-allowed opacity-70";
 
   return (
-    <>
-    {/* Mobile: custom top-sliding sheet */}
-    {isMobile && project && (
-      <MobileProjectDetailSheet
-        open={open && !previewFile}
-        onClose={tryClose}
-        title={`${project.project_id} — ${project.project_name}`}
-      >
-        {/* Reuse the same form content rendered below inside the hidden Dialog on mobile */}
-        <MobileFormContentPortal target="mobile-detail-content" />
-      </MobileProjectDetailSheet>
-    )}
+    // ── Shared edit form content (used by both mobile sheet and desktop dialog) ──
+    const editFormContent = project ? (
+      <>
+        <DialogHeader className="px-6 pt-4 md:pt-6 pb-4 max-md:hidden">
+          <DialogTitle className="text-base md:text-lg">{project.project_id} — {project.project_name}</DialogTitle>
+        </DialogHeader>
 
-    <Dialog open={open} onOpenChange={(v) => {
-      if (!v && previewFile) { setPreviewFile(null); return; }
-      if (!v) { tryClose(); return; }
-    }}>
-      <DialogContent
-        className={cn(
-          "p-0 gap-0 overflow-hidden",
-          previewFile ? "sm:max-w-[92vw] h-[88vh]" : "sm:max-w-[920px]",
-          // Hide the dialog on mobile — we use MobileProjectDetailSheet instead
-          "max-md:!hidden"
-        )}
-        onOpenAutoFocus={(e) => {
-          if (isMobile) e.preventDefault();
-        }}
-        onEscapeKeyDown={(e) => {
-          if (previewFile) {
-            e.preventDefault();
-            setPreviewFile(null);
-          }
-        }}
-      >
+        <div className="flex max-md:flex-col max-md:overflow-y-auto" style={isMobile ? undefined : { maxHeight: '78vh' }}>
         {previewFile ? (
           /* ===== PREVIEW MODE ===== */
           <div className="flex flex-col h-full">
