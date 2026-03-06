@@ -300,10 +300,7 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Mobile: tab bar only */}
-      {isMobile && (
-        <MobileTabBar activeTab={mobileTab} onTabChange={setMobileTab} />
-      )}
+      {/* Mobile: no top tab bar — switching handled by bottom nav */}
 
       {/* Desktop: filter bar */}
       <div className="hidden md:block shrink-0 z-40 bg-background border-b px-6 py-3">

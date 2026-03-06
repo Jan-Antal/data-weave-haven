@@ -73,7 +73,11 @@ export function useProjectAttention(pmName?: string | null) {
       ? projects.filter(p => p.pm === pmName)
       : projects;
 
+    const DONE_STATUSES = new Set(["Fakturace", "Dokončeno"]);
+
     for (const project of filteredProjects) {
+      // Skip finished projects — they are not "po termínu"
+      if (project.status && DONE_STATUSES.has(project.status)) continue;
       const issues: { severity: "critical" | "warning"; message: string; icon: string }[] = [];
 
       // Check production delays
