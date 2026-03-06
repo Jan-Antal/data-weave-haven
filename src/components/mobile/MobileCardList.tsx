@@ -35,8 +35,7 @@ const MIN_SPINNER_MS = 500;
 export function MobileCardList({ personFilter, statusFilter, search, riskHighlight, activeTab, onProjectTap }: MobileCardListProps) {
   const { data: projects = [], isLoading } = useProjects();
   const { stagesByProject } = useStagesByProject();
-  const { urgencyMap } = useProjectAttention();
-  const { profile } = useAuth();
+  const { urgencyMap } = useProjectAttention(pmName);
   const pmName = profile?.full_name || null;
   const queryClient = useQueryClient();
   const [sortBy, setSortBy] = useState("project_name");
