@@ -211,11 +211,12 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
         </TableCell>
       )}
       {v("project_name") && (
-        <TableCell className="truncate text-muted-foreground text-xs" style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <TableCell className="truncate text-xs" style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           <InlineEditableCell
-            value={(stage as any).display_name || ""}
+            value={getStageDisplayValue(stage, project, "display_name") || ""}
             onSave={(val) => saveStage("display_name", val)}
             readOnly={!canEdit}
+            className={ihClass("display_name")}
           />
         </TableCell>
       )}
