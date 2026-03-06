@@ -889,11 +889,13 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                   </div>
                   <div>
                     <Label className="text-xs">Architekt</Label>
-                    {isSectionReadOnly("basic") ? (
-                      <Input value={form.architekt || "—"} disabled className={roClass} />
-                    ) : (
-                      <Input value={form.architekt} onChange={(e) => setForm(s => ({ ...s, architekt: e.target.value }))} placeholder="Architekt" />
-                    )}
+                    <MobileTapField displayValue={form.architekt || ""} disabled={isSectionReadOnly("basic")}>
+                      {({ autoFocus }) => isSectionReadOnly("basic") ? (
+                        <Input value={form.architekt || "—"} disabled className={roClass} />
+                      ) : (
+                        <Input value={form.architekt} onChange={(e) => setForm(s => ({ ...s, architekt: e.target.value }))} placeholder="Architekt" autoFocus={autoFocus} />
+                      )}
+                    </MobileTapField>
                   </div>
 
                   {/* Collapsible location row */}
