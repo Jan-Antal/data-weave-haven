@@ -468,8 +468,8 @@ const Index = () => {
           onSettings={handleOpenSettings}
           canCreateProject={canCreateProject}
           canAccessSettings={canAccessSettings}
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
+          activeTab={mobileTab}
+          onTabChange={setMobileTab}
           profileName={profile?.full_name || profile?.email || "Uživatel"}
           profileEmail={profile?.email || ""}
           profileRole={role}
