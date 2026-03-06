@@ -104,9 +104,11 @@ export function MobileBottomNav({
     return p ? `${p.project_id} — ${p.project_name}` : qaProjectId;
   }, [qaProjectId, projects]);
 
-  const handleProjects = () => {
+  const handleHomeToggle = () => {
     if (isHome) {
-      onTabChange?.("prehled");
+      // Toggle between prehled and projekty
+      const next = activeTab === "prehled" ? "projekty" : "prehled";
+      onTabChange?.(next);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
       navigate("/");
@@ -216,13 +218,22 @@ export function MobileBottomNav({
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border flex items-center justify-around z-50"
         style={{ height: "calc(70px + env(safe-area-inset-bottom, 0px))", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
-        {/* Projekty */}
+        {/* Home / Projekty toggle */}
         <button
-          onClick={handleProjects}
+          onClick={handleHomeToggle}
           className={cn("flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center", isProjectsActive ? "text-primary" : "text-muted-foreground")}
         >
-          <Home className="h-5 w-5" />
-          <span className="text-[10px]">Projekty</span>
+          {activeTab === "prehled" ? (
+            <>
+              <FolderPlus className="h-5 w-5" />
+              <span className="text-[10px]">Projekty</span>
+            </>
+          ) : (
+            <>
+              <Home className="h-5 w-5" />
+              <span className="text-[10px]">Přehled</span>
+            </>
+          )}
         </button>
 
         {/* Center + button */}
