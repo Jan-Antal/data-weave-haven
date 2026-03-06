@@ -820,32 +820,48 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
                   <div>
                     <Label className="text-xs">Project ID</Label>
-                    <Input
-                      value={form.project_id}
-                      onChange={(e) => setForm(s => ({ ...s, project_id: e.target.value }))}
-                      onBlur={() => {
-                        if (form.project_id !== project.project_id) {
-                          checkProjectId(form.project_id);
-                        } else {
-                          resetIdCheck();
-                        }
-                      }}
+                    <MobileTapField
+                      displayValue={form.project_id}
                       disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_id")}
-                      className={cn((isSectionReadOnly("basic") || isFieldReadOnly("project_id")) && roClass)}
-                      readOnly={isSectionReadOnly("basic") || isFieldReadOnly("project_id")}
-                      tabIndex={isSectionReadOnly("basic") || isFieldReadOnly("project_id") ? -1 : undefined}
-                      style={(isSectionReadOnly("basic") || isFieldReadOnly("project_id")) ? { cursor: "default" } : undefined}
-                    />
+                    >
+                      {({ autoFocus }) => (
+                        <Input
+                          value={form.project_id}
+                          onChange={(e) => setForm(s => ({ ...s, project_id: e.target.value }))}
+                          onBlur={() => {
+                            if (form.project_id !== project.project_id) {
+                              checkProjectId(form.project_id);
+                            } else {
+                              resetIdCheck();
+                            }
+                          }}
+                          disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_id")}
+                          className={cn((isSectionReadOnly("basic") || isFieldReadOnly("project_id")) && roClass)}
+                          readOnly={isSectionReadOnly("basic") || isFieldReadOnly("project_id")}
+                          tabIndex={isSectionReadOnly("basic") || isFieldReadOnly("project_id") ? -1 : undefined}
+                          style={(isSectionReadOnly("basic") || isFieldReadOnly("project_id")) ? { cursor: "default" } : undefined}
+                          autoFocus={autoFocus}
+                        />
+                      )}
+                    </MobileTapField>
                     {idExists && <p className="text-xs text-destructive mt-1">Toto ID již existuje</p>}
                   </div>
                   <div>
                     <Label className="text-xs">Project Name</Label>
-                    <Input
-                      value={form.project_name}
-                      onChange={(e) => setForm(s => ({ ...s, project_name: e.target.value }))}
+                    <MobileTapField
+                      displayValue={form.project_name}
                       disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_name")}
-                      className={cn((isSectionReadOnly("basic") || isFieldReadOnly("project_name")) && roClass)}
-                    />
+                    >
+                      {({ autoFocus }) => (
+                        <Input
+                          value={form.project_name}
+                          onChange={(e) => setForm(s => ({ ...s, project_name: e.target.value }))}
+                          disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_name")}
+                          className={cn((isSectionReadOnly("basic") || isFieldReadOnly("project_name")) && roClass)}
+                          autoFocus={autoFocus}
+                        />
+                      )}
+                    </MobileTapField>
                   </div>
 
                   <div>
