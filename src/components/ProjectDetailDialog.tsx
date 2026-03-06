@@ -1300,6 +1300,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
               {/* Delete button — left side */}
               <div className="flex items-center gap-2">
                 {canDeleteProject && !isViewer && (
+                  <div className="hidden md:contents">
                   <>
                     {deleteStep === 0 && (
                       <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setDeleteStep(1)}>
