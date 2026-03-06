@@ -639,30 +639,11 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const roClass = "bg-[#f3f4f6] text-muted-foreground cursor-not-allowed opacity-70";
 
   return (
-    <>
-    <Dialog open={open} onOpenChange={(v) => {
-      if (!v && previewFile) { setPreviewFile(null); return; }
-      if (!v) { tryClose(); return; }
-    }}>
-      <DialogContent
-        className={cn(
-          "p-0 gap-0 overflow-hidden",
-          previewFile ? "sm:max-w-[92vw] h-[88vh]" : "sm:max-w-[920px]",
-          "max-md:!max-w-full max-md:!w-full max-md:!h-[95vh] max-md:!max-h-[95vh] max-md:!rounded-t-2xl max-md:!rounded-b-none max-md:!top-auto max-md:!bottom-0 max-md:!left-0 max-md:!translate-x-0 max-md:!translate-y-0"
-        )}
-        onOpenAutoFocus={(e) => {
-          if (isMobile) e.preventDefault();
-        }}
-        onEscapeKeyDown={(e) => {
-          if (previewFile) {
-            e.preventDefault();
-            setPreviewFile(null);
-          }
-        }}
-      >
-        {previewFile ? (
-          /* ===== PREVIEW MODE ===== */
-          <div className="flex flex-col h-full">
+    // Build the form content shared between mobile and desktop
+    const formContent = project ? (
+      previewFile ? (
+        /* ===== PREVIEW MODE ===== */
+        <div className="flex flex-col h-full">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setPreviewFile(null)}>
