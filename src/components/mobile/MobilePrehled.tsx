@@ -28,8 +28,8 @@ function formatCZK(v: number): string {
 }
 
 export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onProjectTap }: MobilePrehledProps) {
-  const { profile } = useAuth();
-  const pmName = profile?.full_name || null;
+  const { profile, linkedPersonName } = useAuth();
+  const pmName = linkedPersonName || profile?.full_name || null;
   const { attentionItems, upcomingDates, projects } = useProjectAttention(pmName);
   const { data: allProjects = [] } = useProjects();
   const { data: rates = [] } = useExchangeRates();
