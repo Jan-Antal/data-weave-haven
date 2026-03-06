@@ -37,9 +37,11 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
   const today = new Date();
   const firstName = profile?.full_name?.split(" ")[0] || profile?.email?.split("@")[0] || "Uživatel";
 
-  // My projects stats
+  const DONE_STATUSES = new Set(["Fakturace", "Dokončeno"]);
+
+  // My projects stats — if no person assigned, show all active (exclude done statuses)
   const myProjects = useMemo(() => {
-    if (!pmName) return allProjects;
+    if (!pmName) return allProjects.filter(p => !p.status || !DONE_STATUSES.has(p.status));
     return allProjects.filter(p => p.pm === pmName);
   }, [allProjects, pmName]);
 
