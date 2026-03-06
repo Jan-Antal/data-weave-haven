@@ -22,6 +22,7 @@ export const ALL_COLUMNS: ColumnDef[] = [
   { key: "expedice", label: "Expedice" },
   { key: "montaz", label: "Montáž" },
   { key: "predani", label: "Předání" },
+  { key: "van_date", label: "VaN" },
   { key: "pm_poznamka", label: "Poznámka PM" },
   { key: "konstrukter", label: "Konstruktér" },
   { key: "narocnost", label: "Náročnost" },
@@ -42,7 +43,7 @@ export const PROJECT_INFO_NATIVE = [
 ];
 export const PM_NATIVE = [
   "pm", "status", "risk", "zamereni", "tpv_date",
-  "expedice", "montaz", "predani", "pm_poznamka",
+  "expedice", "montaz", "predani", "van_date", "pm_poznamka",
 ];
 export const TPV_NATIVE = [
   "konstrukter", "narocnost", "hodiny_tpv", "percent_tpv", "tpv_poznamka",

@@ -49,6 +49,7 @@ interface Project {
   expedice: string | null;
   montaz: string | null;
   predani: string | null;
+  van_date: string | null;
   pm_poznamka: string | null;
   narocnost: string | null;
   hodiny_tpv: string | null;

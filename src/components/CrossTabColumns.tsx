@@ -16,7 +16,7 @@ export const COL_CHEVRON_STYLE: React.CSSProperties = { width: 36, minWidth: 36,
 // ── Centralised column-width system ─────────────────────────────────
 const DATE_KEYS = new Set([
   "datum_smluvni", "datum_objednavky", "zamereni",
-  "tpv_date", "expedice", "montaz", "predani",
+  "tpv_date", "expedice", "montaz", "predani", "van_date",
 ]);
 const SHORT_KEYS = new Set(["marze", "risk", "percent_tpv", "narocnost"]);
 
@@ -188,6 +188,8 @@ function renderCell(
       return <TableCell key={key}><InlineEditableCell value={(p as any).montaz} type="date" onSave={(x) => s("montaz", x, (p as any).montaz || "")} readOnly={ro("montaz")} /></TableCell>;
     case "predani":
       return <TableCell key={key}><InlineEditableCell value={p.predani} type="date" onSave={(x) => s("predani", x, v("predani"))} readOnly={ro("predani")} /></TableCell>;
+    case "van_date":
+      return <TableCell key={key}><InlineEditableCell value={(p as any).van_date} type="date" onSave={(x) => s("van_date", x, (p as any).van_date || "")} readOnly={ro("van_date")} /></TableCell>;
     case "pm_poznamka":
       return <TableCell key={key} style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.pm_poznamka || ""}><InlineEditableCell value={p.pm_poznamka} type="textarea" onSave={(x) => s("pm_poznamka", x, v("pm_poznamka"))} readOnly={ro("pm_poznamka")} /></TableCell>;
     case "konstrukter":
