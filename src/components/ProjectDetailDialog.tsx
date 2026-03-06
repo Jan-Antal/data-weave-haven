@@ -641,10 +641,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   // ── Read-only style helper ──────────────────────────────────
   const roClass = "bg-[#f3f4f6] text-muted-foreground cursor-not-allowed opacity-70";
 
-  // ── Mobile swipe-down-to-close ──────────────────────────────
-  const [mobileDragY, setMobileDragY] = useState(0);
-  const mobileDragRef = useRef({ startY: 0, startTime: 0, dragging: false });
-  const mobileSheetRef = useRef<HTMLDivElement>(null);
+  // (hooks moved above early return)
 
   const handleMobileTouchStart = useCallback((e: React.TouchEvent) => {
     if (!isMobile) return;
