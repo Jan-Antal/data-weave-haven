@@ -20,9 +20,9 @@ const STATUS_CHIPS = [
 
 export function MobileFilterChips({ activeChip, onChipChange }: MobileFilterChipsProps) {
   const { data: projects = [] } = useProjects();
-  const { profile, linkedPersonName } = useAuth();
-  const pmName = profile?.full_name || null;
-  const { urgencyMap } = useProjectAttention(linkedPersonName || pmName);
+  const { linkedPersonName } = useAuth();
+  const pmName = linkedPersonName || null;
+  const { urgencyMap } = useProjectAttention(pmName);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {
