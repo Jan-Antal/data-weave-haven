@@ -1297,8 +1297,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
             {/* Footer */}
             <div className="flex items-center justify-between px-6 py-3 border-t border-border shrink-0 max-md:sticky max-md:bottom-0 max-md:bg-background max-md:z-10 max-md:flex-wrap max-md:gap-2">
 
-              {/* Delete button — left side */}
-              <div className="flex items-center gap-2">
+              <div className="hidden md:flex items-center gap-2">
                 {canDeleteProject && !isViewer && (
                   <>
                     {deleteStep === 0 && (
