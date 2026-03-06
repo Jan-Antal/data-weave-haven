@@ -14,7 +14,7 @@ export const READ_ONLY_INHERITED = new Set(["project_name", "klient"]);
 
 /** Editable inherited fields — copied from parent on creation, gray until manually edited */
 export const EDITABLE_INHERITED = new Set([
-  "kalkulant", "pm", "status", "start_date", "datum_smluvni",
+  "display_name", "kalkulant", "pm", "status", "start_date", "datum_smluvni",
   "tpv_date", "expedice", "montaz", "predani",
   "architekt", "konstrukter", "risk", "zamereni",
 ]);
@@ -31,11 +31,13 @@ export const NOT_INHERITED = new Set([
  */
 export const STAGE_TO_PROJECT_FIELD: Record<string, string> = {
   start_date: "datum_objednavky",
+  display_name: "project_name",
 };
 
 /** Reverse: project field → stage field */
 export const PROJECT_TO_STAGE_FIELD: Record<string, string> = {
   datum_objednavky: "start_date",
+  project_name: "display_name",
 };
 
 // ── manually_edited_fields helpers ───────────────────────────────────
