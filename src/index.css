@@ -181,13 +181,13 @@
     color: hsl(15 82% 54%);
   }
   100% {
-    color: hsl(var(--muted-foreground) / 0.6);
+    color: hsl(var(--muted-foreground));
   }
 }
 
 .stage-inherit-highlight {
   animation: stage-inherit-flash 2s ease-out forwards;
-  color: hsl(var(--muted-foreground) / 0.6);
+  color: hsl(var(--muted-foreground));
 }
 
 /* AMI Assistant pulse ring */

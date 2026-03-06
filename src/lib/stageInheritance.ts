@@ -93,7 +93,7 @@ export function stageFieldClass(
 ): string {
   if (READ_ONLY_INHERITED.has(field)) return "";
   if (!EDITABLE_INHERITED.has(field)) return "";
-  return isFieldManuallyEdited(stage, field) ? "" : "text-muted-foreground/60";
+  return isFieldManuallyEdited(stage, field) ? "" : "text-muted-foreground";
 }
 
 // ── Values to copy on stage creation ─────────────────────────────────
