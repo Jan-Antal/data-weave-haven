@@ -69,15 +69,18 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
     return filtered;
   }, [projects, activeChip, urgencyMap, pmName]);
 
-  // Apply search
+  // Apply search — match across all project detail fields
   const searchFiltered = useMemo(() => {
     const q = localSearch.trim().toLowerCase();
     if (!q) return chipFiltered;
-    return chipFiltered.filter(p =>
-      p.project_id.toLowerCase().includes(q) ||
-      p.project_name.toLowerCase().includes(q) ||
-      (p.klient || "").toLowerCase().includes(q)
-    );
+    return chipFiltered.filter(p => {
+      const fields = [
+        p.project_id, p.project_name, p.klient, p.pm, p.konstrukter,
+        p.kalkulant, p.architekt, p.status, p.risk, p.location,
+        p.narocnost, p.pm_poznamka, p.tpv_poznamka,
+      ];
+      return fields.some(f => f && f.toLowerCase().includes(q));
+    });
   }, [chipFiltered, localSearch]);
 
   const displayProjects = useMemo(() => {
