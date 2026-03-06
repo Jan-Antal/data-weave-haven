@@ -671,38 +671,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   // ── Read-only style helper ──────────────────────────────────
   const roClass = "bg-[#f3f4f6] text-muted-foreground cursor-not-allowed opacity-70";
 
-  // (hooks moved above early return)
-
-  const handleMobileTouchStart = useCallback((e: React.TouchEvent) => {
-    if (!isMobile) return;
-    const rect = mobileSheetRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const touchY = e.touches[0].clientY - rect.top;
-    if (touchY > 80) return; // only from top 80px area
-    mobileDragRef.current = { startY: e.touches[0].clientY, startTime: Date.now(), dragging: true };
-  }, [isMobile]);
-
-  const handleMobileTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!mobileDragRef.current.dragging) return;
-    const dy = e.touches[0].clientY - mobileDragRef.current.startY;
-    setMobileDragY(Math.max(0, dy));
-  }, []);
-
-  const handleMobileTouchEnd = useCallback(() => {
-    if (!mobileDragRef.current.dragging) return;
-    const elapsed = (Date.now() - mobileDragRef.current.startTime) / 1000;
-    const velocity = mobileDragY / elapsed;
-    if (mobileDragY > 100 || velocity > 500) {
-      tryClose();
-    }
-    setMobileDragY(0);
-    mobileDragRef.current.dragging = false;
-  }, [mobileDragY, tryClose]);
-
-  // Reset drag state when dialog closes
-  useEffect(() => {
-    if (!open) setMobileDragY(0);
-  }, [open]);
 
   return (
     <>
