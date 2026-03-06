@@ -952,44 +952,60 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
                   <div>
                     <Label className="text-xs">Prodejní cena</Label>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type={!isSectionReadOnly("finance") && priceEditing ? "number" : "text"}
-                        className={cn("no-spinners", (isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")) && roClass)}
-                        value={isSectionReadOnly("finance")
-                          ? (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : "—")
-                          : (priceEditing ? form.prodejni_cena : (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : ""))
-                        }
-                        onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))}
-                        onFocus={() => setPriceEditing(true)}
-                        onBlur={() => setPriceEditing(false)}
-                        disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className={cn("h-10 px-3 font-mono shrink-0", isSectionReadOnly("finance") && "opacity-70 cursor-not-allowed")}
-                        onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
-                        disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
-                      >
-                        {form.currency}
-                      </Button>
-                    </div>
+                    <MobileTapField
+                      displayValue={form.prodejni_cena ? `${Number(form.prodejni_cena).toLocaleString("cs-CZ")} ${form.currency}` : ""}
+                      disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
+                    >
+                      {({ autoFocus }) => (
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type={!isSectionReadOnly("finance") && priceEditing ? "number" : "text"}
+                            className={cn("no-spinners", (isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")) && roClass)}
+                            value={isSectionReadOnly("finance")
+                              ? (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : "—")
+                              : (priceEditing ? form.prodejni_cena : (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : ""))
+                            }
+                            onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))}
+                            onFocus={() => setPriceEditing(true)}
+                            onBlur={() => setPriceEditing(false)}
+                            disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
+                            autoFocus={autoFocus}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className={cn("h-10 px-3 font-mono shrink-0", isSectionReadOnly("finance") && "opacity-70 cursor-not-allowed")}
+                            onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
+                            disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
+                          >
+                            {form.currency}
+                          </Button>
+                        </div>
+                      )}
+                    </MobileTapField>
                   </div>
                   <div>
                     <Label className="text-xs">Marže</Label>
-                    <div className="relative">
-                      <Input
-                        type={isSectionReadOnly("finance") ? "text" : "number"}
-                        className={cn("no-spinners pr-8", (isSectionReadOnly("finance") || isFieldReadOnly("marze")) && roClass)}
-                        value={isSectionReadOnly("finance") ? (form.marze ? `${form.marze}` : "—") : form.marze}
-                        onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
-                        placeholder="0"
-                        disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
-                    </div>
+                    <MobileTapField
+                      displayValue={form.marze ? `${form.marze} %` : ""}
+                      disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
+                    >
+                      {({ autoFocus }) => (
+                        <div className="relative">
+                          <Input
+                            type={isSectionReadOnly("finance") ? "text" : "number"}
+                            className={cn("no-spinners pr-8", (isSectionReadOnly("finance") || isFieldReadOnly("marze")) && roClass)}
+                            value={isSectionReadOnly("finance") ? (form.marze ? `${form.marze}` : "—") : form.marze}
+                            onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
+                            placeholder="0"
+                            disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
+                            autoFocus={autoFocus}
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
+                        </div>
+                      )}
+                    </MobileTapField>
                   </div>
 
                   {/* Rozpad ceny — admin only */}
