@@ -37,9 +37,10 @@ import { useAchievementChecker } from "@/hooks/useAchievements";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
-import { MobileFilterSheet } from "@/components/mobile/MobileFilterSheet";
 import { MobileCardList } from "@/components/mobile/MobileCardList";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
+import { MobilePrehled } from "@/components/mobile/MobilePrehled";
+import { useRecentlyOpened } from "@/hooks/useRecentlyOpened";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
