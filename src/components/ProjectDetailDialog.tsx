@@ -1291,8 +1291,46 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end px-6 py-3 border-t border-border shrink-0 max-md:sticky max-md:bottom-0 max-md:bg-background max-md:z-10 max-md:flex-wrap max-md:gap-2">
+            <div className="flex items-center justify-between px-6 py-3 border-t border-border shrink-0 max-md:sticky max-md:bottom-0 max-md:bg-background max-md:z-10 max-md:flex-wrap max-md:gap-2">
 
+              {/* Delete button — left side */}
+              <div className="flex items-center gap-2">
+                {canDeleteProject && !isViewer && (
+                  <>
+                    {deleteStep === 0 && (
+                      <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setDeleteStep(1)}>
+                        <Trash2 className="h-3.5 w-3.5 mr-1" /> Smazat projekt
+                      </Button>
+                    )}
+                    {deleteStep === 1 && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">Opravdu smazat projekt?</span>
+                        {(() => { const tc = Object.values(sp.filesByCategory).reduce((s, f) => s + f.length, 0); return tc > 0; })() ? (
+                          <>
+                            <span className="text-destructive font-medium">⚠ Projekt obsahuje {Object.values(sp.filesByCategory).reduce((s, f) => s + f.length, 0)} souborů</span>
+                            <button type="button" className="text-destructive font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
+                            <button type="button" className="text-muted-foreground hover:underline" onClick={() => setDeleteStep(2)}>Pokračovat</button>
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" className="text-destructive font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
+                            <button type="button" className="text-muted-foreground hover:underline" onClick={handleDelete}>Smazat</button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    {deleteStep === 2 && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-destructive font-medium">Soubory budou archivovány. Potvrdit smazání?</span>
+                        <button type="button" className="text-destructive font-medium hover:underline" onClick={() => setDeleteStep(0)}>Zrušit</button>
+                        <button type="button" className="text-muted-foreground hover:underline" onClick={handleDelete}>Smazat</button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Right side — actions */}
               <div className="flex items-center gap-2">
                 {onOpenTPVList && (
                   <>
