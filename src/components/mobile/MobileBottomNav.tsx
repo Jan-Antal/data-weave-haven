@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, type ReactNode } from "react";
 import { Home, Plus, FolderPlus, Camera, StickyNote, ChevronLeft, Search, X } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,7 @@ interface MobileBottomNavProps {
   canCreateProject: boolean;
   activeTab?: string;
   onTabChange?: (tab: string) => void;
+  children?: ReactNode;
 }
 
 export function MobileBottomNav({
