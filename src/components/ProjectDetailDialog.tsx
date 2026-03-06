@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { MobileTapField } from "./MobileTapToEdit";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logActivity } from "@/lib/activityLog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -281,44 +282,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const [previewFile, setPreviewFile] = useState<{ file: SPFile; categoryKey: string; loading: boolean; previewUrl: string | null; webUrl: string | null; downloadUrl: string | null } | null>(null);
   const isMobile = useIsMobile();
   const cameraInputRef = useRef<HTMLInputElement>(null);
-  const touchTapRef = useRef<{ timer: number; x: number; y: number } | null>(null);
 
-  // ── Mobile: touch-to-edit with scroll delay ─────────────────
-  const handleMobileTouchStart = useCallback((e: React.TouchEvent) => {
-    if (!isMobile) return;
-    const touch = e.touches[0];
-    touchTapRef.current = {
-      x: touch.clientX,
-      y: touch.clientY,
-      timer: window.setTimeout(() => {
-        const target = e.target as HTMLElement;
-        const container = target.closest('.grid > div, .col-span-2') as HTMLElement;
-        if (!container) return;
-        const input = container.querySelector('input:not([type="file"]):not([type="hidden"]):not(:disabled), textarea:not(:disabled)') as HTMLElement;
-        if (input) {
-          input.style.pointerEvents = 'auto';
-          input.focus();
-          input.addEventListener('blur', () => { input.style.pointerEvents = ''; }, { once: true });
-        }
-      }, 250),
-    };
-  }, [isMobile]);
 
-  const handleMobileTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!touchTapRef.current) return;
-    const touch = e.touches[0];
-    if (Math.abs(touch.clientX - touchTapRef.current.x) > 10 || Math.abs(touch.clientY - touchTapRef.current.y) > 10) {
-      clearTimeout(touchTapRef.current.timer);
-      touchTapRef.current = null;
-    }
-  }, []);
-
-  const handleMobileTouchEnd = useCallback(() => {
-    if (touchTapRef.current) {
-      clearTimeout(touchTapRef.current.timer);
-      touchTapRef.current = null;
-    }
-  }, []);
 
   // ── Mobile: camera photo upload ─────────────────────────────
   const handleCameraUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -684,6 +649,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
           previewFile ? "sm:max-w-[92vw] h-[88vh]" : "sm:max-w-[920px]",
           "max-md:!max-w-full max-md:!w-full max-md:!h-[95vh] max-md:!max-h-[95vh] max-md:!rounded-t-2xl max-md:!rounded-b-none max-md:!top-auto max-md:!bottom-0 max-md:!left-0 max-md:!translate-x-0 max-md:!translate-y-0"
         )}
+        onOpenAutoFocus={(e) => {
+          if (isMobile) e.preventDefault();
+        }}
         onEscapeKeyDown={(e) => {
           if (previewFile) {
             e.preventDefault();
@@ -819,32 +787,48 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
                   <div>
                     <Label className="text-xs">Project ID</Label>
-                    <Input
-                      value={form.project_id}
-                      onChange={(e) => setForm(s => ({ ...s, project_id: e.target.value }))}
-                      onBlur={() => {
-                        if (form.project_id !== project.project_id) {
-                          checkProjectId(form.project_id);
-                        } else {
-                          resetIdCheck();
-                        }
-                      }}
+                    <MobileTapField
+                      displayValue={form.project_id}
                       disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_id")}
-                      className={cn((isSectionReadOnly("basic") || isFieldReadOnly("project_id")) && roClass)}
-                      readOnly={isSectionReadOnly("basic") || isFieldReadOnly("project_id")}
-                      tabIndex={isSectionReadOnly("basic") || isFieldReadOnly("project_id") ? -1 : undefined}
-                      style={(isSectionReadOnly("basic") || isFieldReadOnly("project_id")) ? { cursor: "default" } : undefined}
-                    />
+                    >
+                      {({ autoFocus }) => (
+                        <Input
+                          value={form.project_id}
+                          onChange={(e) => setForm(s => ({ ...s, project_id: e.target.value }))}
+                          onBlur={() => {
+                            if (form.project_id !== project.project_id) {
+                              checkProjectId(form.project_id);
+                            } else {
+                              resetIdCheck();
+                            }
+                          }}
+                          disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_id")}
+                          className={cn((isSectionReadOnly("basic") || isFieldReadOnly("project_id")) && roClass)}
+                          readOnly={isSectionReadOnly("basic") || isFieldReadOnly("project_id")}
+                          tabIndex={isSectionReadOnly("basic") || isFieldReadOnly("project_id") ? -1 : undefined}
+                          style={(isSectionReadOnly("basic") || isFieldReadOnly("project_id")) ? { cursor: "default" } : undefined}
+                          autoFocus={autoFocus}
+                        />
+                      )}
+                    </MobileTapField>
                     {idExists && <p className="text-xs text-destructive mt-1">Toto ID již existuje</p>}
                   </div>
                   <div>
                     <Label className="text-xs">Project Name</Label>
-                    <Input
-                      value={form.project_name}
-                      onChange={(e) => setForm(s => ({ ...s, project_name: e.target.value }))}
+                    <MobileTapField
+                      displayValue={form.project_name}
                       disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_name")}
-                      className={cn((isSectionReadOnly("basic") || isFieldReadOnly("project_name")) && roClass)}
-                    />
+                    >
+                      {({ autoFocus }) => (
+                        <Input
+                          value={form.project_name}
+                          onChange={(e) => setForm(s => ({ ...s, project_name: e.target.value }))}
+                          disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_name")}
+                          className={cn((isSectionReadOnly("basic") || isFieldReadOnly("project_name")) && roClass)}
+                          autoFocus={autoFocus}
+                        />
+                      )}
+                    </MobileTapField>
                   </div>
 
                   <div>
@@ -872,11 +856,13 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                   </div>
                   <div>
                     <Label className="text-xs">Architekt</Label>
-                    {isSectionReadOnly("basic") ? (
-                      <Input value={form.architekt || "—"} disabled className={roClass} />
-                    ) : (
-                      <Input value={form.architekt} onChange={(e) => setForm(s => ({ ...s, architekt: e.target.value }))} placeholder="Architekt" />
-                    )}
+                    <MobileTapField displayValue={form.architekt || ""} disabled={isSectionReadOnly("basic")}>
+                      {({ autoFocus }) => isSectionReadOnly("basic") ? (
+                        <Input value={form.architekt || "—"} disabled className={roClass} />
+                      ) : (
+                        <Input value={form.architekt} onChange={(e) => setForm(s => ({ ...s, architekt: e.target.value }))} placeholder="Architekt" autoFocus={autoFocus} />
+                      )}
+                    </MobileTapField>
                   </div>
 
                   {/* Collapsible location row */}
@@ -933,44 +919,60 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
                   <div>
                     <Label className="text-xs">Prodejní cena</Label>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type={!isSectionReadOnly("finance") && priceEditing ? "number" : "text"}
-                        className={cn("no-spinners", (isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")) && roClass)}
-                        value={isSectionReadOnly("finance")
-                          ? (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : "—")
-                          : (priceEditing ? form.prodejni_cena : (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : ""))
-                        }
-                        onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))}
-                        onFocus={() => setPriceEditing(true)}
-                        onBlur={() => setPriceEditing(false)}
-                        disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className={cn("h-10 px-3 font-mono shrink-0", isSectionReadOnly("finance") && "opacity-70 cursor-not-allowed")}
-                        onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
-                        disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
-                      >
-                        {form.currency}
-                      </Button>
-                    </div>
+                    <MobileTapField
+                      displayValue={form.prodejni_cena ? `${Number(form.prodejni_cena).toLocaleString("cs-CZ")} ${form.currency}` : ""}
+                      disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
+                    >
+                      {({ autoFocus }) => (
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type={!isSectionReadOnly("finance") && priceEditing ? "number" : "text"}
+                            className={cn("no-spinners", (isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")) && roClass)}
+                            value={isSectionReadOnly("finance")
+                              ? (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : "—")
+                              : (priceEditing ? form.prodejni_cena : (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : ""))
+                            }
+                            onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))}
+                            onFocus={() => setPriceEditing(true)}
+                            onBlur={() => setPriceEditing(false)}
+                            disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
+                            autoFocus={autoFocus}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className={cn("h-10 px-3 font-mono shrink-0", isSectionReadOnly("finance") && "opacity-70 cursor-not-allowed")}
+                            onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
+                            disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
+                          >
+                            {form.currency}
+                          </Button>
+                        </div>
+                      )}
+                    </MobileTapField>
                   </div>
                   <div>
                     <Label className="text-xs">Marže</Label>
-                    <div className="relative">
-                      <Input
-                        type={isSectionReadOnly("finance") ? "text" : "number"}
-                        className={cn("no-spinners pr-8", (isSectionReadOnly("finance") || isFieldReadOnly("marze")) && roClass)}
-                        value={isSectionReadOnly("finance") ? (form.marze ? `${form.marze}` : "—") : form.marze}
-                        onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
-                        placeholder="0"
-                        disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
-                    </div>
+                    <MobileTapField
+                      displayValue={form.marze ? `${form.marze} %` : ""}
+                      disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
+                    >
+                      {({ autoFocus }) => (
+                        <div className="relative">
+                          <Input
+                            type={isSectionReadOnly("finance") ? "text" : "number"}
+                            className={cn("no-spinners pr-8", (isSectionReadOnly("finance") || isFieldReadOnly("marze")) && roClass)}
+                            value={isSectionReadOnly("finance") ? (form.marze ? `${form.marze}` : "—") : form.marze}
+                            onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
+                            placeholder="0"
+                            disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
+                            autoFocus={autoFocus}
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
+                        </div>
+                      )}
+                    </MobileTapField>
                   </div>
 
                   {/* Rozpad ceny — admin only */}
@@ -1019,40 +1021,46 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
                   <div>
                     <Label className="text-xs">PM</Label>
-                    {isSectionReadOnly("pm") || isFieldReadOnly("pm") ? (
-                      <Input value={form.pm || "—"} disabled className={roClass} />
-                    ) : (
-                      <PeopleSelectDropdown role="PM" value={form.pm} onValueChange={(v) => setForm(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
-                    )}
+                    <MobileTapField displayValue={form.pm || ""} disabled={isSectionReadOnly("pm") || isFieldReadOnly("pm")}>
+                      {() => isSectionReadOnly("pm") || isFieldReadOnly("pm") ? (
+                        <Input value={form.pm || "—"} disabled className={roClass} />
+                      ) : (
+                        <PeopleSelectDropdown role="PM" value={form.pm} onValueChange={(v) => setForm(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
+                      )}
+                    </MobileTapField>
                   </div>
                   <div>
                     <Label className="text-xs">Status</Label>
-                    {isSectionReadOnly("pm") ? (
-                      <Select value={form.status} disabled>
-                        <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                      </Select>
-                    ) : (
-                      <Select value={form.status} onValueChange={(v) => setForm(s => ({ ...s, status: v }))}>
-                        <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                      </Select>
-                    )}
+                    <MobileTapField displayValue={form.status || ""} disabled={isSectionReadOnly("pm")}>
+                      {() => isSectionReadOnly("pm") ? (
+                        <Select value={form.status} disabled>
+                          <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
+                          <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                        </Select>
+                      ) : (
+                        <Select value={form.status} onValueChange={(v) => setForm(s => ({ ...s, status: v }))}>
+                          <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
+                          <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                        </Select>
+                      )}
+                    </MobileTapField>
                   </div>
 
                   <div>
                     <Label className="text-xs">Risk</Label>
-                    {isSectionReadOnly("pm") || isFieldReadOnly("risk") ? (
-                      <Select value={form.risk} disabled>
-                        <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-                      </Select>
-                    ) : (
-                      <Select value={form.risk} onValueChange={(v) => setForm(s => ({ ...s, risk: v }))}>
-                        <SelectTrigger><SelectValue placeholder="Vyberte risk" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-                      </Select>
-                    )}
+                    <MobileTapField displayValue={form.risk || ""} disabled={isSectionReadOnly("pm") || isFieldReadOnly("risk")}>
+                      {() => isSectionReadOnly("pm") || isFieldReadOnly("risk") ? (
+                        <Select value={form.risk} disabled>
+                          <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
+                          <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                        </Select>
+                      ) : (
+                        <Select value={form.risk} onValueChange={(v) => setForm(s => ({ ...s, risk: v }))}>
+                          <SelectTrigger><SelectValue placeholder="Vyberte risk" /></SelectTrigger>
+                          <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                        </Select>
+                      )}
+                    </MobileTapField>
                   </div>
                   <div>{/* empty cell */}</div>
 
@@ -1073,13 +1081,18 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
 
                   <div className="col-span-2">
                     <Label className="text-xs">Poznámka PM</Label>
-                    <Textarea
-                      value={form.pm_poznamka}
-                      onChange={(e) => setForm(s => ({ ...s, pm_poznamka: e.target.value }))}
-                      disabled={isSectionReadOnly("pm")}
-                      className={cn("min-h-[50px] text-sm", isSectionReadOnly("pm") && roClass)}
-                      placeholder="Poznámka…"
-                    />
+                    <MobileTapField displayValue={form.pm_poznamka || ""} disabled={isSectionReadOnly("pm")}>
+                      {({ autoFocus }) => (
+                        <Textarea
+                          value={form.pm_poznamka}
+                          onChange={(e) => setForm(s => ({ ...s, pm_poznamka: e.target.value }))}
+                          disabled={isSectionReadOnly("pm")}
+                          className={cn("min-h-[50px] text-sm", isSectionReadOnly("pm") && roClass)}
+                          placeholder="Poznámka…"
+                          autoFocus={autoFocus}
+                        />
+                      )}
+                    </MobileTapField>
                   </div>
                 </div>
 
@@ -1088,58 +1101,77 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 pb-2">
                   <div>
                     <Label className="text-xs">Konstruktér</Label>
-                    {isSectionReadOnly("tpv") ? (
-                      <Input value={form.konstrukter || "—"} disabled className={roClass} />
-                    ) : (
-                      <PeopleSelectDropdown role="Konstruktér" value={form.konstrukter} onValueChange={(v) => setForm(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
-                    )}
+                    <MobileTapField displayValue={form.konstrukter || ""} disabled={isSectionReadOnly("tpv")}>
+                      {() => isSectionReadOnly("tpv") ? (
+                        <Input value={form.konstrukter || "—"} disabled className={roClass} />
+                      ) : (
+                        <PeopleSelectDropdown role="Konstruktér" value={form.konstrukter} onValueChange={(v) => setForm(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
+                      )}
+                    </MobileTapField>
                   </div>
                   <div>
                     <Label className="text-xs">Náročnost</Label>
-                    {isSectionReadOnly("tpv") ? (
-                      <Select value={form.narocnost} disabled>
-                        <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">{["Low", "Medium", "High"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                      </Select>
-                    ) : (
-                      <Select value={form.narocnost} onValueChange={(v) => setForm(s => ({ ...s, narocnost: v }))}>
-                        <SelectTrigger><SelectValue placeholder="Vyberte náročnost" /></SelectTrigger>
-                        <SelectContent className="z-[99999]">{["Low", "Medium", "High"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                      </Select>
-                    )}
+                    <MobileTapField displayValue={form.narocnost || ""} disabled={isSectionReadOnly("tpv")}>
+                      {() => isSectionReadOnly("tpv") ? (
+                        <Select value={form.narocnost} disabled>
+                          <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
+                          <SelectContent className="z-[99999]">{["Low", "Medium", "High"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                        </Select>
+                      ) : (
+                        <Select value={form.narocnost} onValueChange={(v) => setForm(s => ({ ...s, narocnost: v }))}>
+                          <SelectTrigger><SelectValue placeholder="Vyberte náročnost" /></SelectTrigger>
+                          <SelectContent className="z-[99999]">{["Low", "Medium", "High"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                        </Select>
+                      )}
+                    </MobileTapField>
                   </div>
                   <div>
                     <Label className="text-xs">Hodiny TPV</Label>
-                    <Input
-                      value={form.hodiny_tpv}
-                      onChange={(e) => setForm(s => ({ ...s, hodiny_tpv: e.target.value }))}
-                      disabled={isSectionReadOnly("tpv")}
-                      className={cn(isSectionReadOnly("tpv") && roClass)}
-                    />
+                    <MobileTapField displayValue={form.hodiny_tpv || ""} disabled={isSectionReadOnly("tpv")}>
+                      {({ autoFocus }) => (
+                        <Input
+                          value={form.hodiny_tpv}
+                          onChange={(e) => setForm(s => ({ ...s, hodiny_tpv: e.target.value }))}
+                          disabled={isSectionReadOnly("tpv")}
+                          className={cn(isSectionReadOnly("tpv") && roClass)}
+                          autoFocus={autoFocus}
+                        />
+                      )}
+                    </MobileTapField>
                   </div>
                   <div>
                     <Label className="text-xs">% Rozpracovanost</Label>
-                    <div className="relative">
-                      <Input
-                        type={isSectionReadOnly("tpv") ? "text" : "number"}
-                        className={cn("no-spinners pr-8", isSectionReadOnly("tpv") && roClass)}
-                        value={isSectionReadOnly("tpv") ? (form.percent_tpv ? `${form.percent_tpv}` : "—") : form.percent_tpv}
-                        onChange={(e) => setForm(s => ({ ...s, percent_tpv: e.target.value }))}
-                        placeholder="0"
-                        disabled={isSectionReadOnly("tpv")}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
-                    </div>
+                    <MobileTapField displayValue={form.percent_tpv ? `${form.percent_tpv} %` : ""} disabled={isSectionReadOnly("tpv")}>
+                      {({ autoFocus }) => (
+                        <div className="relative">
+                          <Input
+                            type={isSectionReadOnly("tpv") ? "text" : "number"}
+                            className={cn("no-spinners pr-8", isSectionReadOnly("tpv") && roClass)}
+                            value={isSectionReadOnly("tpv") ? (form.percent_tpv ? `${form.percent_tpv}` : "—") : form.percent_tpv}
+                            onChange={(e) => setForm(s => ({ ...s, percent_tpv: e.target.value }))}
+                            placeholder="0"
+                            disabled={isSectionReadOnly("tpv")}
+                            autoFocus={autoFocus}
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
+                        </div>
+                      )}
+                    </MobileTapField>
                   </div>
                   <div className="col-span-2">
                     <Label className="text-xs">Poznámka TPV</Label>
-                    <Textarea
-                      value={form.tpv_poznamka}
-                      onChange={(e) => setForm(s => ({ ...s, tpv_poznamka: e.target.value }))}
-                      disabled={isSectionReadOnly("tpv")}
-                      className={cn("min-h-[50px] text-sm", isSectionReadOnly("tpv") && roClass)}
-                      placeholder="Poznámka…"
-                    />
+                    <MobileTapField displayValue={form.tpv_poznamka || ""} disabled={isSectionReadOnly("tpv")}>
+                      {({ autoFocus }) => (
+                        <Textarea
+                          value={form.tpv_poznamka}
+                          onChange={(e) => setForm(s => ({ ...s, tpv_poznamka: e.target.value }))}
+                          disabled={isSectionReadOnly("tpv")}
+                          className={cn("min-h-[50px] text-sm", isSectionReadOnly("tpv") && roClass)}
+                          placeholder="Poznámka…"
+                          autoFocus={autoFocus}
+                        />
+                      )}
+                    </MobileTapField>
                   </div>
                 </div>
 
@@ -1334,9 +1366,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
               </div>
 
               {/* Right side — actions */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 max-md:ml-auto">
                 {onOpenTPVList && (
-                  <>
+                  <div className="hidden md:contents">
                     <Button
                       size="sm"
                       variant="outline"
@@ -1360,7 +1392,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                         {tpvItemCount ?? 0}
                       </Badge>
                     </Button>
-                  </>
+                  </div>
                 )}
                 <Button variant="outline" onClick={tryClose}>Zavřít</Button>
                 {canEdit && <Button onClick={handleSave} disabled={idExists || !form.project_id}>Uložit</Button>}
