@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { RotateCcw, Trash2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { TestModeBanner } from "./TestModeBanner";
 
 interface RecycleBinProps {
   open: boolean;
