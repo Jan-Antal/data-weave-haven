@@ -25,6 +25,8 @@ import {
 } from "@/hooks/useTPVStatusOptions";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { TestModeBanner } from "./TestModeBanner";
 
 interface StatusManagementProps {
   open: boolean;
@@ -207,6 +209,8 @@ export function StatusManagement({ open, onOpenChange }: StatusManagementProps) 
   const deleteTPV = useDeleteTPVStatusOption();
   const qc = useQueryClient();
 
+  const { isTestUser } = useAuth();
+
   const handleReorderTPV = async (items: StatusItem[]) => {
     for (const item of items) {
       await supabase.from("tpv_status_options" as any).update({ sort_order: item.sort_order } as any).eq("id", item.id);
@@ -226,30 +230,33 @@ export function StatusManagement({ open, onOpenChange }: StatusManagementProps) 
     sort_order: s.sort_order,
   }));
 
+  const noop = () => {};
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[750px]">
         <DialogHeader>
           <DialogTitle>Správa statusů</DialogTitle>
         </DialogHeader>
-        <div className="flex gap-6">
+        {isTestUser && <TestModeBanner />}
+        <div className={`flex gap-6 ${isTestUser ? "pointer-events-none opacity-80" : ""}`}>
           <StatusColumn
             title="Projektové statusy"
             items={projectStatuses}
-            onUpdateLabel={(id, label) => updateProject.mutate({ id, label })}
-            onUpdateColor={(id, color) => updateProject.mutate({ id, color })}
-            onDelete={(id) => deleteProject.mutate(id)}
-            onReorder={(items) => reorderProject.mutate(items.map((i) => ({ id: i.id, sort_order: i.sort_order })))}
-            onAdd={() => addProject.mutate({ label: "Nový status", color: "#6b7280", sort_order: projectStatuses.length })}
+            onUpdateLabel={isTestUser ? noop : (id, label) => updateProject.mutate({ id, label })}
+            onUpdateColor={isTestUser ? noop : (id, color) => updateProject.mutate({ id, color })}
+            onDelete={isTestUser ? noop : (id) => deleteProject.mutate(id)}
+            onReorder={isTestUser ? noop : (items) => reorderProject.mutate(items.map((i) => ({ id: i.id, sort_order: i.sort_order })))}
+            onAdd={isTestUser ? noop : () => addProject.mutate({ label: "Nový status", color: "#6b7280", sort_order: projectStatuses.length })}
           />
           <StatusColumn
             title="TPV statusy"
             items={tpvItems}
-            onUpdateLabel={(id, label) => updateTPV.mutate({ id, label })}
-            onUpdateColor={handleUpdateTPVColor}
-            onDelete={(id) => deleteTPV.mutate(id)}
-            onReorder={handleReorderTPV}
-            onAdd={() => addTPV.mutate({ label: "Nový status", sort_order: tpvStatuses.length })}
+            onUpdateLabel={isTestUser ? noop : (id, label) => updateTPV.mutate({ id, label })}
+            onUpdateColor={isTestUser ? noop : handleUpdateTPVColor}
+            onDelete={isTestUser ? noop : (id) => deleteTPV.mutate(id)}
+            onReorder={isTestUser ? noop : handleReorderTPV}
+            onAdd={isTestUser ? noop : () => addTPV.mutate({ label: "Nový status", sort_order: tpvStatuses.length })}
           />
         </div>
       </DialogContent>

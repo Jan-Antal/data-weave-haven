@@ -16,6 +16,7 @@ import { usePasswordValidation } from "@/hooks/usePasswordValidation";
 import { Eye, EyeOff } from "lucide-react";
 import { useUserAchievements } from "@/hooks/useAchievements";
 import { AchievementShowcase } from "@/components/AchievementShowcase";
+import { TestModeBanner } from "./TestModeBanner";
 import { Switch } from "@/components/ui/switch";
 
 
@@ -54,7 +55,7 @@ interface AccountSettingsProps {
 }
 
 export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
-  const { user, profile, role, isAdmin } = useAuth();
+  const { user, profile, role, isAdmin, isTestUser } = useAuth();
   const { data: allPeople = [] } = useAllPeople();
   const { data: prefs } = useUserPreferences();
   const upsertPrefs = useUpsertPreferences();
@@ -172,6 +173,7 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
       >
         <div className="px-5 pt-5 pb-3 border-b">
           <h2 className="text-lg font-semibold">Nastavení účtu</h2>
+          {isTestUser && <div className="mt-2"><TestModeBanner /></div>}
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 pb-5">
@@ -313,7 +315,7 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Zrušit
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={handleSave} disabled={saving || isTestUser}>
             {saving ? "Ukládám..." : "Uložit"}
           </Button>
         </div>

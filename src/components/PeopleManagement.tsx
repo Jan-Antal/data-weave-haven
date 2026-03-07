@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { TestModeBanner } from "./TestModeBanner";
 import { toast } from "@/hooks/use-toast";
 
 const roles = ["PM", "Konstruktér", "Kalkulant"] as const;
@@ -43,10 +44,10 @@ interface PeopleManagementProps {
 export function PeopleManagement({ open, onOpenChange }: PeopleManagementProps) {
   const { data: allPeople = [] } = useAllPeopleIncludingInactive();
   const addPerson = useAddPerson();
-  const { isAdmin, isPM, isKonstrukter } = useAuth();
-  const canDelete = isAdmin || isPM;
-  const canRename = isAdmin || isPM;
-  const canToggleAllRoles = isAdmin || isPM;
+  const { isAdmin, isPM, isKonstrukter, isTestUser } = useAuth();
+  const canDelete = !isTestUser && (isAdmin || isPM);
+  const canRename = !isTestUser && (isAdmin || isPM);
+  const canToggleAllRoles = !isTestUser && (isAdmin || isPM);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -139,6 +140,7 @@ export function PeopleManagement({ open, onOpenChange }: PeopleManagementProps) 
             <DialogHeader>
               <DialogTitle>Správa osob</DialogTitle>
             </DialogHeader>
+            {isTestUser && <TestModeBanner />}
             <Input
               ref={searchRef}
               value={search}
@@ -243,7 +245,7 @@ export function PeopleManagement({ open, onOpenChange }: PeopleManagementProps) 
           </div>
 
           <div className="px-5 py-3 border-t">
-            {!addingNew && (
+            {!addingNew && !isTestUser && (
               <Button variant="outline" size="sm" className="text-sm" onClick={() => setAddingNew(true)}>
                 <Plus className="h-3.5 w-3.5 mr-1.5" /> Přidat osobu
               </Button>
