@@ -24,9 +24,9 @@ import {
 
 // ── Target fields (TPV List columns — fixed) ─────────────────────
 const TARGET_FIELDS = [
-  { key: "item_type", label: "Kód Prvku", required: true },
-  { key: "nazev_prvku", label: "Název Prvku", required: true },
-  { key: "item_name", label: "Popis", required: false },
+  { key: "item_name", label: "Kód Prvku", required: true },
+  { key: "item_type", label: "Název Prvku", required: true },
+  { key: "nazev_prvku", label: "Popis", required: false },
   { key: "pocet", label: "Počet", required: false },
   { key: "cena", label: "Cena", required: false },
   { key: "konstrukter", label: "Konstruktér", required: false },
@@ -39,9 +39,9 @@ type TargetKey = (typeof TARGET_FIELDS)[number]["key"];
 // Each entry has exact phrases tried first, then loose keywords as fallback.
 // Order matters: more specific entries should come first.
 const FUZZY_MAP: { exact: string[]; contains: string[]; target: TargetKey }[] = [
-  { exact: ["kod prvku", "kod", "kod polozky", "item code", "element code", "id prvku"], contains: ["code"], target: "item_type" },
-  { exact: ["nazev prvku", "nazev polozky", "nazev", "element name", "item name"], contains: ["name"], target: "nazev_prvku" },
-  { exact: ["popis", "description", "detail", "specifikace", "spec"], contains: ["descript", "specif"], target: "item_name" },
+  { exact: ["kod prvku", "kod", "kod polozky", "item code", "element code", "id prvku"], contains: ["code"], target: "item_name" },
+  { exact: ["nazev prvku", "nazev polozky", "nazev", "element name", "item name"], contains: ["name"], target: "item_type" },
+  { exact: ["popis", "description", "detail", "specifikace", "spec"], contains: ["descript", "specif"], target: "nazev_prvku" },
   { exact: ["pocet", "qty", "quantity", "ks", "mnozstvi", "pcs"], contains: ["quantit"], target: "pocet" },
   { exact: ["cena", "price", "cost", "castka"], contains: ["price", "cost"], target: "cena" },
   { exact: ["konstrukter", "engineer", "designer"], contains: ["konstrukt", "engineer"], target: "konstrukter" },

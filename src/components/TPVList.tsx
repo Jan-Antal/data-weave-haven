@@ -29,9 +29,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useProductionStatuses } from "@/hooks/useProductionStatuses";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
-  { key: "item_type", label: "Kód Prvku" },
-  { key: "nazev_prvku", label: "Název Prvku" },
-  { key: "item_name", label: "Popis" },
+  { key: "item_name", label: "Kód Prvku" },
+  { key: "item_type", label: "Název Prvku" },
+  { key: "nazev_prvku", label: "Popis" },
   { key: "konstrukter", label: "Konstruktér" },
   { key: "status", label: "Status" },
   { key: "vyroba_status", label: "Výroba" },
@@ -51,11 +51,11 @@ function getTPVListColumnStyle(key: string, customWidth?: number | null): React.
     case "sent_date":
     case "accepted_date":
       return { width: 100, minWidth: 100, maxWidth: 100 };
-    case "item_type":
-      return { minWidth: 100, maxWidth: 140 };
-    case "nazev_prvku":
-      return { minWidth: 180 };
     case "item_name":
+      return { minWidth: 100, maxWidth: 140 };
+    case "item_type":
+      return { minWidth: 180 };
+    case "nazev_prvku":
       return { minWidth: 200 };
     case "notes":
       return { minWidth: 200 };
@@ -384,26 +384,26 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                 {canManageTPV && <TableCell><Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} /></TableCell>}
                 {!canManageTPV && <TableCell />}
                 {renderKeys.map(key => {
+                  if (key === "item_name") return (
+                    <TableCell key={key}>
+                      <InlineEditableCell value={item.item_name || ""} onSave={(v) => saveField(item.id, "item_name", v, item.item_name || "")} className="font-mono text-xs" readOnly={!canManageTPV} />
+                    </TableCell>
+                  );
                   if (key === "item_type") return (
                     <TableCell key={key}>
-                      <InlineEditableCell value={item.item_type || ""} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} className="font-mono text-xs" readOnly={!canManageTPV} />
+                      <InlineEditableCell value={item.item_type || ""} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} className="font-semibold" readOnly={!canManageTPV} />
                     </TableCell>
                   );
                   if (key === "nazev_prvku") return (
                     <TableCell key={key}>
-                      <InlineEditableCell value={(item as any).nazev_prvku || ""} onSave={(v) => saveField(item.id, "nazev_prvku", v, (item as any).nazev_prvku || "")} className="font-semibold" readOnly={!canManageTPV} />
-                    </TableCell>
-                  );
-                  if (key === "item_name") return (
-                    <TableCell key={key}>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="max-w-[300px] truncate">
-                            <InlineEditableCell value={item.item_name} onSave={(v) => saveField(item.id, "item_name", v, item.item_name)} readOnly={!canManageTPV} />
+                            <InlineEditableCell value={(item as any).nazev_prvku || ""} onSave={(v) => saveField(item.id, "nazev_prvku", v, (item as any).nazev_prvku || "")} readOnly={!canManageTPV} />
                           </div>
                         </TooltipTrigger>
-                        {item.item_name && item.item_name.length > 40 && (
-                          <TooltipContent className="max-w-[400px]">{item.item_name}</TooltipContent>
+                        {(item as any).nazev_prvku && (item as any).nazev_prvku.length > 40 && (
+                          <TooltipContent className="max-w-[400px]">{(item as any).nazev_prvku}</TooltipContent>
                         )}
                       </Tooltip>
                     </TableCell>
@@ -424,7 +424,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                     return <TableCell key={key}><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} displayValue={statusDisplay} onSave={(v) => saveField(item.id, "status", v, item.status || "")} readOnly={!canManageTPV} /></TableCell>;
                   }
                   if (key === "vyroba_status") {
-                    const itemKey = item.item_type || item.item_name;
+                    const itemKey = item.item_name || item.item_type;
                     const statuses = productionStatusMap.get(itemKey);
                     if (!statuses || statuses.length === 0) {
                       return (
