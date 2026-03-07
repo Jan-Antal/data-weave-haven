@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { useExchangeRates, useUpdateExchangeRate, useAddExchangeRate, useDeleteExchangeRate } from "@/hooks/useExchangeRates";
 import { Plus, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { useAuth } from "@/hooks/useAuth";
+import { TestModeBanner } from "./TestModeBanner";
 
 interface Props {
   open: boolean;
@@ -17,6 +19,7 @@ export function ExchangeRateSettings({ open, onOpenChange }: Props) {
   const updateRate = useUpdateExchangeRate();
   const addRate = useAddExchangeRate();
   const deleteRate = useDeleteExchangeRate();
+  const { isTestUser } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [addOpen, setAddOpen] = useState(false);
@@ -25,6 +28,7 @@ export function ExchangeRateSettings({ open, onOpenChange }: Props) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const handleStartEdit = (id: string, currentValue: number) => {
+    if (isTestUser) return;
     setEditingId(id);
     setEditValue(String(currentValue));
   };
@@ -55,13 +59,14 @@ export function ExchangeRateSettings({ open, onOpenChange }: Props) {
           <DialogHeader>
             <DialogTitle>Kurzovní lístek — EUR / CZK</DialogTitle>
           </DialogHeader>
+          {isTestUser && <TestModeBanner />}
           <div className="rounded-lg border bg-card">
             <Table>
               <TableHeader>
                 <TableRow className="bg-primary/5">
                   <TableHead className="font-semibold">Rok</TableHead>
                   <TableHead className="font-semibold">Kurz EUR/CZK</TableHead>
-                  <TableHead className="w-10"></TableHead>
+                  {!isTestUser && <TableHead className="w-10"></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -73,7 +78,7 @@ export function ExchangeRateSettings({ open, onOpenChange }: Props) {
                   <TableRow key={rate.id}>
                     <TableCell className="font-mono text-sm">{rate.year}</TableCell>
                     <TableCell>
-                      {editingId === rate.id ? (
+                      {editingId === rate.id && !isTestUser ? (
                         <Input
                           type="number"
                           step="0.01"
@@ -89,30 +94,34 @@ export function ExchangeRateSettings({ open, onOpenChange }: Props) {
                         />
                       ) : (
                         <span
-                          className="cursor-pointer hover:bg-muted/80 rounded px-1 py-0.5 text-sm"
+                          className={`${isTestUser ? "" : "cursor-pointer hover:bg-muted/80"} rounded px-1 py-0.5 text-sm`}
                           onClick={() => handleStartEdit(rate.id, rate.eur_czk)}
                         >
                           {Number(rate.eur_czk).toFixed(2)}
                         </span>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDeleteId(rate.id)}>
-                        <Trash2 className="h-3 w-3 text-destructive" />
-                      </Button>
-                    </TableCell>
+                    {!isTestUser && (
+                      <TableCell>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDeleteId(rate.id)}>
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
-          <Button variant="outline" size="sm" className="mt-2" onClick={() => {
-            setNewYear(String(new Date().getFullYear() + 1));
-            setNewRate("25.00");
-            setAddOpen(true);
-          }}>
-            <Plus className="h-3 w-3 mr-1" /> Přidat rok
-          </Button>
+          {!isTestUser && (
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => {
+              setNewYear(String(new Date().getFullYear() + 1));
+              setNewRate("25.00");
+              setAddOpen(true);
+            }}>
+              <Plus className="h-3 w-3 mr-1" /> Přidat rok
+            </Button>
+          )}
         </DialogContent>
       </Dialog>
 
