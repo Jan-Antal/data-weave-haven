@@ -26,7 +26,8 @@ export function MobileFilterChips({ activeChip, onChipChange }: MobileFilterChip
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {
-      all: projects.length,
+      everything: projects.length,
+      active: 0,
       attention: 0,
       mine: 0,
     };
@@ -35,6 +36,7 @@ export function MobileFilterChips({ activeChip, onChipChange }: MobileFilterChip
       if (pmName && p.pm === pmName) c.mine++;
       const s = p.status;
       if (s) c[s] = (c[s] || 0) + 1;
+      if (s !== "Dokončeno") c.active++;
     }
     return c;
   }, [projects, urgencyMap, pmName]);
@@ -42,11 +44,12 @@ export function MobileFilterChips({ activeChip, onChipChange }: MobileFilterChip
   const chips = [
     { value: "attention", label: `⚠ Pozornost (${counts.attention})` },
     { value: "mine", label: `Moje (${counts.mine})` },
-    { value: "all", label: "Všechny" },
+    { value: "active", label: `Aktivní (${counts.active})` },
     ...STATUS_CHIPS.map(sc => ({
       value: sc.value,
       label: `${sc.label}${counts[sc.value] ? ` (${counts[sc.value]})` : ""}`,
     })),
+    { value: "everything", label: `Vše (${counts.everything})` },
   ];
 
   return (
