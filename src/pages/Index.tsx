@@ -179,7 +179,7 @@ const Index = () => {
   const mobileTPVProjectId = mobileTPVProject?.project_id || "";
   const { data: mobileTPVItems = [] } = useTPVItems(mobileTPVProjectId);
   const { statusMap: mobileProductionStatusMap } = useProductionStatuses(mobileTPVProjectId);
-  const { data: allProjects = [] } = useProjects();
+  const addTPVItem = useAddTPVItem();
   const mobileTPVCurrency = mobileTPVProject?.currency || "CZK";
   const canManageTPVMobile = !!(role && ["owner", "admin", "pm", "konstrukter"].includes(role));
 
