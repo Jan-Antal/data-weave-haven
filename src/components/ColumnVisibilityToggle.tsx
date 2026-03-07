@@ -1,4 +1,4 @@
-import { Columns3, GripVertical, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Columns3, GripVertical, Plus, Trash2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -136,7 +136,7 @@ export function ColumnVisibilityToggle(props: Props) {
   const isStandalone = !!props.standalone;
 
   const allVis = useAllColumnVisibility();
-  const { canEditColumns } = useAuth();
+  const { canEditColumns, isTestUser } = useAuth();
 
   const labelKey = isStandalone ? props.labelTab : TAB_TO_LABEL_KEY[props.tabKey!];
   const { getLabel: dbGetLabel, getOrderedKeys, updateOrder } = useColumnLabels(labelKey);
@@ -334,6 +334,12 @@ export function ColumnVisibilityToggle(props: Props) {
               </div>
             )}
             <div className="overflow-y-auto p-2 pt-1">
+              {isTestUser && (
+                <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-medium mb-2">
+                  <AlertTriangle className="h-3 w-3 shrink-0" />
+                  Column settings are read-only in TEST MODE
+                </div>
+              )}
               {canEditColumns ? (
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext items={orderedKeys} strategy={verticalListSortingStrategy}>

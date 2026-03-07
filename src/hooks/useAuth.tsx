@@ -190,7 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const canDeleteProject = isAdmin || isPM;
   const canManageTPV = isAdmin || isPM || isKonstrukter;
   const canAccessSettings = isAdmin || isPM || isKonstrukter; // at least Koš
-  const canEditColumns = isAdmin || isPM;
+  const canEditColumns = (isAdmin || isPM) && !isTestUser;
   const canUploadDocuments = !isViewer;
   const canPermanentDelete = isAdmin || isPM;
 
