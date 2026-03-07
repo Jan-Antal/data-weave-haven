@@ -165,17 +165,62 @@ const TPV_ITEMS = [
   { project_id: "Z-2201-005", item_name: "SH-007", nazev_prvku: "Recepce showroom", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 165000 },
 ];
 
-// Production inbox items — only "Schváleno" TPV items get sent to production
+// Total target: ~2500h across all projects
 const PRODUCTION_INBOX = [
-  { project_id: "Z-2201-001", item_name: "Kuchyňská linka — dub", item_code: "KU-001", estimated_hours: 48, estimated_czk: 185000 },
-  { project_id: "Z-2201-002", item_name: "Recepční pult — mosaz/mramor", item_code: "LO-001", estimated_hours: 72, estimated_czk: 320000 },
-  { project_id: "Z-2201-002", item_name: "Obkladový panel lobby", item_code: "LO-002", estimated_hours: 36, estimated_czk: 336000 },
-  { project_id: "Z-2201-003", item_name: "Recepční pult — dýha dub", item_code: "KA-001", estimated_hours: 32, estimated_czk: 145000 },
-  { project_id: "Z-2201-003", item_name: "Open-space přepážky", item_code: "KA-002", estimated_hours: 64, estimated_czk: 256000 },
-  { project_id: "Z-2201-004", item_name: "Vestavěná skříň hala", item_code: "PR-001", estimated_hours: 40, estimated_czk: 196000 },
-  { project_id: "Z-2201-004", item_name: "Knihovna obývák", item_code: "PR-002", estimated_hours: 28, estimated_czk: 165000 },
-  { project_id: "Z-2201-005", item_name: "Výstavní stěna A", item_code: "SH-001", estimated_hours: 24, estimated_czk: 165000 },
-  { project_id: "Z-2201-005", item_name: "Pódium showroom", item_code: "SH-002", estimated_hours: 18, estimated_czk: 78000 },
+  // Z-2201-001 — Rezidence Vinohrady (~480h)
+  { project_id: "Z-2201-001", item_name: "Kuchyňská linka — dub", item_code: "KU-001", estimated_hours: 96, estimated_czk: 185000 },
+  { project_id: "Z-2201-001", item_name: "Ostrůvek s deskou Dekton", item_code: "KU-002", estimated_hours: 64, estimated_czk: 95000 },
+  { project_id: "Z-2201-001", item_name: "TV stěna — ořech", item_code: "OB-001", estimated_hours: 48, estimated_czk: 72000 },
+  { project_id: "Z-2201-001", item_name: "Komoda pod TV", item_code: "OB-002", estimated_hours: 32, estimated_czk: 48000 },
+  { project_id: "Z-2201-001", item_name: "Šatní skříň ložnice", item_code: "LO-001", estimated_hours: 80, estimated_czk: 184000 },
+  { project_id: "Z-2201-001", item_name: "Noční stolky — pár", item_code: "LO-002", estimated_hours: 24, estimated_czk: 56000 },
+  { project_id: "Z-2201-001", item_name: "Koupelnový nábytek", item_code: "KP-001", estimated_hours: 72, estimated_czk: 115000 },
+  { project_id: "Z-2201-001", item_name: "Předsíňová stěna", item_code: "PR-001", estimated_hours: 64, estimated_czk: 68000 },
+
+  // Z-2201-002 — Hotel Mánes (~680h)
+  { project_id: "Z-2201-002", item_name: "Recepční pult — mosaz/mramor", item_code: "LO-001", estimated_hours: 120, estimated_czk: 320000 },
+  { project_id: "Z-2201-002", item_name: "Obkladový panel lobby", item_code: "LO-002", estimated_hours: 96, estimated_czk: 336000 },
+  { project_id: "Z-2201-002", item_name: "Lobby sedací boxy", item_code: "LO-003", estimated_hours: 72, estimated_czk: 270000 },
+  { project_id: "Z-2201-002", item_name: "Lobby konferenční stoly", item_code: "LO-004", estimated_hours: 48, estimated_czk: 140000 },
+  { project_id: "Z-2201-002", item_name: "Barový pult", item_code: "BA-001", estimated_hours: 88, estimated_czk: 210000 },
+  { project_id: "Z-2201-002", item_name: "Policový systém bar", item_code: "BA-002", estimated_hours: 56, estimated_czk: 145000 },
+  { project_id: "Z-2201-002", item_name: "Barové židle — kůže", item_code: "BA-003", estimated_hours: 48, estimated_czk: 216000 },
+  { project_id: "Z-2201-002", item_name: "Restaurace — jídelní stoly", item_code: "RE-001", estimated_hours: 80, estimated_czk: 440000 },
+  { project_id: "Z-2201-002", item_name: "Restaurace — sedací boxy", item_code: "RE-002", estimated_hours: 40, estimated_czk: 304000 },
+  { project_id: "Z-2201-002", item_name: "Wine display vitrína", item_code: "RE-003", estimated_hours: 32, estimated_czk: 170000 },
+
+  // Z-2201-003 — Kanceláře Karlín Hub (~520h)
+  { project_id: "Z-2201-003", item_name: "Recepční pult — dýha dub", item_code: "KA-001", estimated_hours: 64, estimated_czk: 145000 },
+  { project_id: "Z-2201-003", item_name: "Open-space přepážky", item_code: "KA-002", estimated_hours: 96, estimated_czk: 256000 },
+  { project_id: "Z-2201-003", item_name: "Jednací stůl — konferenční", item_code: "KA-003", estimated_hours: 48, estimated_czk: 136000 },
+  { project_id: "Z-2201-003", item_name: "Kancelářské stoly — výšk. nastav.", item_code: "KA-004", estimated_hours: 96, estimated_czk: 432000 },
+  { project_id: "Z-2201-003", item_name: "Akustické panely stěna", item_code: "KA-005", estimated_hours: 64, estimated_czk: 192000 },
+  { project_id: "Z-2201-003", item_name: "Meetingroom skříňky", item_code: "KA-006", estimated_hours: 40, estimated_czk: 168000 },
+  { project_id: "Z-2201-003", item_name: "Kuchyňka kancelář", item_code: "KA-007", estimated_hours: 72, estimated_czk: 165000 },
+  { project_id: "Z-2201-003", item_name: "Phone booth kabiny", item_code: "KA-008", estimated_hours: 40, estimated_czk: 330000 },
+
+  // Z-2201-004 — Vila Bubeneč (~580h)
+  { project_id: "Z-2201-004", item_name: "Vestavěná skříň hala", item_code: "PR-001", estimated_hours: 56, estimated_czk: 196000 },
+  { project_id: "Z-2201-004", item_name: "Knihovna obývák", item_code: "PR-002", estimated_hours: 48, estimated_czk: 165000 },
+  { project_id: "Z-2201-004", item_name: "Šatní systém ložnice", item_code: "PA-001", estimated_hours: 40, estimated_czk: 112000 },
+  { project_id: "Z-2201-004", item_name: "Dětský pokoj — sestava", item_code: "PA-002", estimated_hours: 56, estimated_czk: 156000 },
+  { project_id: "Z-2201-004", item_name: "Kuchyně vila — masiv", item_code: "KU-001", estimated_hours: 120, estimated_czk: 420000 },
+  { project_id: "Z-2201-004", item_name: "Spižní skříň", item_code: "KU-002", estimated_hours: 24, estimated_czk: 65000 },
+  { project_id: "Z-2201-004", item_name: "Obývák — mediální stěna", item_code: "OB-001", estimated_hours: 56, estimated_czk: 195000 },
+  { project_id: "Z-2201-004", item_name: "Krbová stěna — obklad", item_code: "OB-002", estimated_hours: 40, estimated_czk: 145000 },
+  { project_id: "Z-2201-004", item_name: "Terasa — pergola dřevo", item_code: "TE-001", estimated_hours: 64, estimated_czk: 280000 },
+  { project_id: "Z-2201-004", item_name: "Koupelna master — nábytek", item_code: "KP-001", estimated_hours: 48, estimated_czk: 185000 },
+  { project_id: "Z-2201-004", item_name: "Koupelna host — nábytek", item_code: "KP-002", estimated_hours: 32, estimated_czk: 95000 },
+  { project_id: "Z-2201-004", item_name: "Schodiště — dub/ocel", item_code: "SC-001", estimated_hours: 96, estimated_czk: 350000 },
+
+  // Z-2201-005 — Showroom Smíchov (~280h)
+  { project_id: "Z-2201-005", item_name: "Výstavní stěna A", item_code: "SH-001", estimated_hours: 48, estimated_czk: 165000 },
+  { project_id: "Z-2201-005", item_name: "Pódium showroom", item_code: "SH-002", estimated_hours: 32, estimated_czk: 78000 },
+  { project_id: "Z-2201-005", item_name: "Výstavní stěna B — otočná", item_code: "SH-003", estimated_hours: 40, estimated_czk: 144000 },
+  { project_id: "Z-2201-005", item_name: "Prezentační vitríny", item_code: "SH-004", estimated_hours: 56, estimated_czk: 280000 },
+  { project_id: "Z-2201-005", item_name: "Material library regál", item_code: "SH-005", estimated_hours: 32, estimated_czk: 125000 },
+  { project_id: "Z-2201-005", item_name: "Zákaznický lounge", item_code: "SH-006", estimated_hours: 40, estimated_czk: 195000 },
+  { project_id: "Z-2201-005", item_name: "Recepce showroom", item_code: "SH-007", estimated_hours: 32, estimated_czk: 165000 },
 ];
 
 Deno.serve(async (req) => {
