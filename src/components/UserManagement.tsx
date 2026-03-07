@@ -274,7 +274,7 @@ export function UserManagement({ open, onOpenChange }: Props) {
             {isTestUser && <TestModeBanner />}
           </div>
 
-          <div className="flex-1 overflow-y-auto">
+          <div className={`flex-1 overflow-y-auto ${isTestUser ? "pointer-events-none opacity-80" : ""}`}>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -380,9 +380,10 @@ export function UserManagement({ open, onOpenChange }: Props) {
           </div>
 
           <div className="px-5 py-3 border-t">
-            <Button variant="outline" size="sm" className="text-sm" onClick={() => setAddOpen(true)}>
-              <Plus className="h-3.5 w-3.5 mr-1.5" /> Přidat uživatele
-            </Button>
+            {!isTestUser && (
+              <Button variant="outline" size="sm" className="text-sm" onClick={() => setAddOpen(true)}>
+                <Plus className="h-3.5 w-3.5 mr-1.5" /> Přidat uživatele
+              </Button>
           </div>
         </DialogContent>
       </Dialog>
