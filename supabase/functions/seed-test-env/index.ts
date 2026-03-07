@@ -263,6 +263,27 @@ Deno.serve(async (req) => {
       }
     }
 
+    // 7. Seed production inbox
+    for (const pi of PRODUCTION_INBOX) {
+      const { data: exists } = await adminClient
+        .from("production_inbox")
+        .select("id")
+        .eq("project_id", pi.project_id)
+        .eq("item_code", pi.item_code)
+        .single();
+
+      if (!exists) {
+        await adminClient.from("production_inbox").insert({
+          ...pi,
+          sent_by: testUserId,
+          status: "pending",
+        });
+        steps.push(`Inbox ${pi.item_code} created`);
+      } else {
+        steps.push(`Inbox ${pi.item_code} exists, skipped`);
+      }
+    }
+
     return new Response(JSON.stringify({ success: true, steps }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
