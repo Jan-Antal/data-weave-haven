@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
         .single();
 
       if (!exists) {
-        await adminClient.from("projects").insert({ ...p, is_test: true });
+        await adminClient.from("projects").insert(p);
         steps.push(`Project ${p.project_id} created`);
       } else {
         steps.push(`Project ${p.project_id} already exists, skipped`);
