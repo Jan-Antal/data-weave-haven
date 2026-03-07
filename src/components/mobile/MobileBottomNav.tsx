@@ -27,6 +27,8 @@ export function MobileBottomNav({
   canCreateProject,
   activeTab = "prehled",
   onTabChange,
+  isInTPVList = false,
+  onExitTPVList,
   children,
 }: MobileBottomNavProps) {
   const navigate = useNavigate();
