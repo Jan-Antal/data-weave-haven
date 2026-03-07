@@ -26,10 +26,15 @@ interface LogParams {
   detail?: string | null;
 }
 
+const TEST_EMAILS = ["alfred@ami-test.cz"];
+
 export async function logActivity(params: LogParams) {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+
+    const isTestUser = TEST_EMAILS.includes(user.email ?? "");
+    const detailPrefix = isTestUser ? "[TEST] " : "";
 
     await (supabase.from("data_log") as any).insert({
       project_id: params.projectId,
@@ -38,7 +43,7 @@ export async function logActivity(params: LogParams) {
       action_type: params.actionType,
       old_value: params.oldValue ?? null,
       new_value: params.newValue ?? null,
-      detail: params.detail ?? null,
+      detail: `${detailPrefix}${params.detail ?? ""}` || null,
     });
   } catch (e) {
     console.error("Activity log error:", e);
