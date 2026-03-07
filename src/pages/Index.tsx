@@ -188,6 +188,12 @@ const Index = () => {
     <ExportProvider>
     <DataLogHighlightProvider>
     <div className="h-screen bg-background flex flex-col overflow-hidden">
+      {/* TEST MODE banner */}
+      {profile?.email === "alfred@ami-test.cz" && (
+        <div className="bg-orange-500 text-white px-6 flex items-center justify-center gap-2 font-bold tracking-wide shrink-0" style={{ height: 32 }}>
+          <span>⚠ TEST MODE — Testovací prostředí — data nejsou produkční</span>
+        </div>
+      )}
       {/* Role simulation banner */}
       {simulatedRole && (
         <div className="bg-amber-50 border-b border-amber-200 px-6 flex items-center justify-between" style={{ height: 32 }}>
