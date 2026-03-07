@@ -109,21 +109,60 @@ const STAGES = [
 ];
 
 const TPV_ITEMS = [
+  // Z-2201-001 — Rezidence Vinohrady
   { project_id: "Z-2201-001", item_name: "KU-001", nazev_prvku: "Kuchyňská linka — dub", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 185000 },
-  { project_id: "Z-2201-001", item_name: "KU-002", nazev_prvku: "Ostrůvek s deskou Dekton", status: "Připomínky k zapracování", konstrukter: "Svoboda Petr", pocet: 1, cena: 95000 },
-  { project_id: "Z-2201-001", item_name: "OB-001", nazev_prvku: "TV stěna — ořech", status: "Nový", konstrukter: "Svoboda Petr", pocet: 1, cena: 72000 },
+  { project_id: "Z-2201-001", item_name: "KU-002", nazev_prvku: "Ostrůvek s deskou Dekton", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 95000 },
+  { project_id: "Z-2201-001", item_name: "OB-001", nazev_prvku: "TV stěna — ořech", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 72000 },
+  { project_id: "Z-2201-001", item_name: "OB-002", nazev_prvku: "Komoda pod TV", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 48000 },
+  { project_id: "Z-2201-001", item_name: "LO-001", nazev_prvku: "Šatní skříň ložnice", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 2, cena: 92000 },
+  { project_id: "Z-2201-001", item_name: "LO-002", nazev_prvku: "Noční stolky — pár", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 2, cena: 28000 },
+  { project_id: "Z-2201-001", item_name: "KP-001", nazev_prvku: "Koupelnový nábytek", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 115000 },
+  { project_id: "Z-2201-001", item_name: "PR-001", nazev_prvku: "Předsíňová stěna", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 68000 },
+
+  // Z-2201-002 — Hotel Mánes
   { project_id: "Z-2201-002", item_name: "LO-001", nazev_prvku: "Recepční pult — mosaz/mramor", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 320000 },
   { project_id: "Z-2201-002", item_name: "LO-002", nazev_prvku: "Obkladový panel lobby", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 12, cena: 28000 },
-  { project_id: "Z-2201-002", item_name: "BA-001", nazev_prvku: "Barový pult", status: "V řešení", konstrukter: "Horák Tomáš", pocet: 1, cena: 210000 },
-  { project_id: "Z-2201-002", item_name: "BA-002", nazev_prvku: "Policový systém bar", status: "Nový", konstrukter: "Horák Tomáš", pocet: 1, cena: 145000 },
+  { project_id: "Z-2201-002", item_name: "LO-003", nazev_prvku: "Lobby sedací boxy", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 6, cena: 45000 },
+  { project_id: "Z-2201-002", item_name: "LO-004", nazev_prvku: "Lobby konferenční stoly", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 4, cena: 35000 },
+  { project_id: "Z-2201-002", item_name: "BA-001", nazev_prvku: "Barový pult", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 210000 },
+  { project_id: "Z-2201-002", item_name: "BA-002", nazev_prvku: "Policový systém bar", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 145000 },
+  { project_id: "Z-2201-002", item_name: "BA-003", nazev_prvku: "Barové židle — kůže", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 12, cena: 18000 },
+  { project_id: "Z-2201-002", item_name: "RE-001", nazev_prvku: "Restaurace — jídelní stoly", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 20, cena: 22000 },
+  { project_id: "Z-2201-002", item_name: "RE-002", nazev_prvku: "Restaurace — sedací boxy", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 8, cena: 38000 },
+  { project_id: "Z-2201-002", item_name: "RE-003", nazev_prvku: "Wine display vitrína", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 2, cena: 85000 },
+
+  // Z-2201-003 — Kanceláře Karlín Hub
   { project_id: "Z-2201-003", item_name: "KA-001", nazev_prvku: "Recepční pult — dýha dub", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 145000 },
   { project_id: "Z-2201-003", item_name: "KA-002", nazev_prvku: "Open-space přepážky", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 8, cena: 32000 },
-  { project_id: "Z-2201-003", item_name: "KA-003", nazev_prvku: "Jednací stůl — konferenční", status: "Nový", konstrukter: "Svoboda Petr", pocet: 2, cena: 68000 },
+  { project_id: "Z-2201-003", item_name: "KA-003", nazev_prvku: "Jednací stůl — konferenční", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 2, cena: 68000 },
+  { project_id: "Z-2201-003", item_name: "KA-004", nazev_prvku: "Kancelářské stoly — výšk. nastav.", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 24, cena: 18000 },
+  { project_id: "Z-2201-003", item_name: "KA-005", nazev_prvku: "Akustické panely stěna", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 16, cena: 12000 },
+  { project_id: "Z-2201-003", item_name: "KA-006", nazev_prvku: "Meetingroom skříňky", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 4, cena: 42000 },
+  { project_id: "Z-2201-003", item_name: "KA-007", nazev_prvku: "Kuchyňka kancelář", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 165000 },
+  { project_id: "Z-2201-003", item_name: "KA-008", nazev_prvku: "Phone booth kabiny", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 6, cena: 55000 },
+
+  // Z-2201-004 — Vila Bubeneč
   { project_id: "Z-2201-004", item_name: "PR-001", nazev_prvku: "Vestavěná skříň hala", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 2, cena: 98000 },
   { project_id: "Z-2201-004", item_name: "PR-002", nazev_prvku: "Knihovna obývák", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 165000 },
-  { project_id: "Z-2201-004", item_name: "PA-001", nazev_prvku: "Šatní systém ložnice", status: "Připomínky k zapracování", konstrukter: "Horák Tomáš", pocet: 1, cena: 112000 },
+  { project_id: "Z-2201-004", item_name: "PA-001", nazev_prvku: "Šatní systém ložnice", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 112000 },
+  { project_id: "Z-2201-004", item_name: "PA-002", nazev_prvku: "Dětský pokoj — sestava", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 2, cena: 78000 },
+  { project_id: "Z-2201-004", item_name: "KU-001", nazev_prvku: "Kuchyně vila — masiv", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 420000 },
+  { project_id: "Z-2201-004", item_name: "KU-002", nazev_prvku: "Spižní skříň", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 65000 },
+  { project_id: "Z-2201-004", item_name: "OB-001", nazev_prvku: "Obývák — mediální stěna", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 195000 },
+  { project_id: "Z-2201-004", item_name: "OB-002", nazev_prvku: "Krbová stěna — obklad", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 145000 },
+  { project_id: "Z-2201-004", item_name: "TE-001", nazev_prvku: "Terasa — pergola dřevo", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 280000 },
+  { project_id: "Z-2201-004", item_name: "KP-001", nazev_prvku: "Koupelna master — nábytek", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 185000 },
+  { project_id: "Z-2201-004", item_name: "KP-002", nazev_prvku: "Koupelna host — nábytek", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 95000 },
+  { project_id: "Z-2201-004", item_name: "SC-001", nazev_prvku: "Schodiště — dub/ocel", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 350000 },
+
+  // Z-2201-005 — Showroom Smíchov City
   { project_id: "Z-2201-005", item_name: "SH-001", nazev_prvku: "Výstavní stěna A", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 3, cena: 55000 },
   { project_id: "Z-2201-005", item_name: "SH-002", nazev_prvku: "Pódium showroom", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 78000 },
+  { project_id: "Z-2201-005", item_name: "SH-003", nazev_prvku: "Výstavní stěna B — otočná", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 2, cena: 72000 },
+  { project_id: "Z-2201-005", item_name: "SH-004", nazev_prvku: "Prezentační vitríny", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 8, cena: 35000 },
+  { project_id: "Z-2201-005", item_name: "SH-005", nazev_prvku: "Material library regál", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 125000 },
+  { project_id: "Z-2201-005", item_name: "SH-006", nazev_prvku: "Zákaznický lounge", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 195000 },
+  { project_id: "Z-2201-005", item_name: "SH-007", nazev_prvku: "Recepce showroom", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 165000 },
 ];
 
 // Production inbox items — only "Schváleno" TPV items get sent to production
