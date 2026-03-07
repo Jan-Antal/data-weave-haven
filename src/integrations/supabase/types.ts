@@ -661,6 +661,7 @@ export type Database = {
           hodiny_tpv: string | null
           id: string
           is_active: boolean | null
+          is_test: boolean
           kalkulant: string | null
           klient: string | null
           konstrukter: string | null
@@ -715,6 +716,7 @@ export type Database = {
           hodiny_tpv?: string | null
           id?: string
           is_active?: boolean | null
+          is_test?: boolean
           kalkulant?: string | null
           klient?: string | null
           konstrukter?: string | null
@@ -769,6 +771,7 @@ export type Database = {
           hodiny_tpv?: string | null
           id?: string
           is_active?: boolean | null
+          is_test?: boolean
           kalkulant?: string | null
           klient?: string | null
           konstrukter?: string | null
@@ -1013,6 +1016,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_test_project: { Args: { _project_id: string }; Returns: boolean }
+      is_test_user: { Args: never; Returns: boolean }
       mark_password_set: { Args: never; Returns: boolean }
       purge_soft_deleted_records: { Args: never; Returns: undefined }
     }
