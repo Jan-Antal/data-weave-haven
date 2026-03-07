@@ -365,7 +365,24 @@ const Index = () => {
         {/* Mobile: Přehled or Projekty */}
         {isMobile ? (
           <main className="flex-1 min-w-0 flex flex-col overflow-y-auto px-3 pt-3 pb-16">
-            {mobileTab === "prehled" ? (
+            {mobileTPVProject ? (
+              <MobileTPVCardList
+                items={mobileTPVItems}
+                projectId={mobileTPVProjectId}
+                projectName={mobileTPVProject.project_name}
+                currency={mobileTPVCurrency}
+                productionStatusMap={mobileProductionStatusMap}
+                onBack={handleMobileTPVBack}
+                onOpenDetail={() => {
+                  handleMobileProjectTap(mobileTPVProject);
+                }}
+                onAddItem={(name) => {
+                  // Add item handled by TPVList hook — for mobile we just show toast
+                }}
+                onOpenImport={() => {}}
+                canManageTPV={canManageTPVMobile}
+              />
+            ) : mobileTab === "prehled" ? (
               <MobilePrehled
                 recentProjects={recentProjects}
                 onProjectTap={handleMobileProjectTap}
@@ -378,6 +395,7 @@ const Index = () => {
                 riskHighlight={riskHighlight}
                 activeTab={activeTab}
                 onProjectTap={handleMobileProjectTap}
+                onOpenTPV={handleMobileOpenTPV}
               />
             )}
             <ProjectDetailDialog
