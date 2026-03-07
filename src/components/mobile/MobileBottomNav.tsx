@@ -63,6 +63,10 @@ export function MobileBottomNav({
   }, [qaProjectId, projects]);
 
   const handleHomeToggle = () => {
+    if (isInTPVList) {
+      onExitTPVList?.();
+      return;
+    }
     if (isHome) {
       const next = activeTab === "prehled" ? "projekty" : "prehled";
       onTabChange?.(next);
