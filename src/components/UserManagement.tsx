@@ -384,6 +384,7 @@ export function UserManagement({ open, onOpenChange }: Props) {
               <Button variant="outline" size="sm" className="text-sm" onClick={() => setAddOpen(true)}>
                 <Plus className="h-3.5 w-3.5 mr-1.5" /> Přidat uživatele
               </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
