@@ -69,7 +69,7 @@ interface MergeState {
 }
 
 export default function PlanVyroby() {
-  const { isAdmin, loading } = useAuth();
+  const { isAdmin, loading, profile } = useAuth();
   const navigate = useNavigate();
   const { setCurrentPage } = useUndoRedo();
   const [showCzk, setShowCzk] = useState(false);
