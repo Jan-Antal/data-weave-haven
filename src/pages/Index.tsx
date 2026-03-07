@@ -167,6 +167,22 @@ const Index = () => {
     setMobileDetailOpen(true);
   }, [trackRecentOpen]);
 
+  const handleMobileOpenTPV = useCallback((project: any) => {
+    setMobileTPVProject(project);
+  }, []);
+
+  const handleMobileTPVBack = useCallback(() => {
+    setMobileTPVProject(null);
+  }, []);
+
+  // TPV data for the mobile TPV list
+  const mobileTPVProjectId = mobileTPVProject?.project_id || "";
+  const { data: mobileTPVItems = [] } = useTPVItems(mobileTPVProjectId);
+  const { statusMap: mobileProductionStatusMap } = useProductionStatuses(mobileTPVProjectId);
+  const { data: allProjects = [] } = useProjects();
+  const mobileTPVCurrency = mobileTPVProject?.currency || "CZK";
+  const canManageTPVMobile = !!(role && ["owner", "admin", "pm", "konstrukter"].includes(role));
+
   return (
     <ColumnVisibilityProvider>
     <ExportProvider>
