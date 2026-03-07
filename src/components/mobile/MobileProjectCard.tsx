@@ -82,10 +82,10 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
               <p className="text-xs text-muted-foreground font-mono truncate">{project.project_id}</p>
               <p className="font-medium text-sm truncate">{project.project_name}</p>
               {project.klient && (
-                <p className="text-xs text-muted-foreground mt-0.5">Klient: {project.klient}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">Klient: {project.klient}</p>
               )}
               {project.pm && (
-                <p className="text-xs text-muted-foreground">PM: {project.pm}</p>
+                <p className="text-xs text-muted-foreground truncate">PM: {project.pm}</p>
               )}
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0 ml-auto">
