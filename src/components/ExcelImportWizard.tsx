@@ -24,9 +24,9 @@ import {
 
 // ── Target fields (TPV List columns — fixed) ─────────────────────
 const TARGET_FIELDS = [
-  { key: "item_type", label: "Kód Prvku", required: true },
-  { key: "nazev_prvku", label: "Název Prvku", required: true },
-  { key: "item_name", label: "Popis", required: false },
+  { key: "item_name", label: "Kód Prvku", required: true },
+  { key: "item_type", label: "Název Prvku", required: true },
+  { key: "nazev_prvku", label: "Popis", required: false },
   { key: "pocet", label: "Počet", required: false },
   { key: "cena", label: "Cena", required: false },
   { key: "konstrukter", label: "Konstruktér", required: false },
@@ -39,9 +39,9 @@ type TargetKey = (typeof TARGET_FIELDS)[number]["key"];
 // Each entry has exact phrases tried first, then loose keywords as fallback.
 // Order matters: more specific entries should come first.
 const FUZZY_MAP: { exact: string[]; contains: string[]; target: TargetKey }[] = [
-  { exact: ["kod prvku", "kod", "kod polozky", "item code", "element code", "id prvku"], contains: ["code"], target: "item_type" },
-  { exact: ["nazev prvku", "nazev polozky", "nazev", "element name", "item name"], contains: ["name"], target: "nazev_prvku" },
-  { exact: ["popis", "description", "detail", "specifikace", "spec"], contains: ["descript", "specif"], target: "item_name" },
+  { exact: ["kod prvku", "kod", "kod polozky", "item code", "element code", "id prvku"], contains: ["code"], target: "item_name" },
+  { exact: ["nazev prvku", "nazev polozky", "nazev", "element name", "item name"], contains: ["name"], target: "item_type" },
+  { exact: ["popis", "description", "detail", "specifikace", "spec"], contains: ["descript", "specif"], target: "nazev_prvku" },
   { exact: ["pocet", "qty", "quantity", "ks", "mnozstvi", "pcs"], contains: ["quantit"], target: "pocet" },
   { exact: ["cena", "price", "cost", "castka"], contains: ["price", "cost"], target: "cena" },
   { exact: ["konstrukter", "engineer", "designer"], contains: ["konstrukt", "engineer"], target: "konstrukter" },
@@ -263,10 +263,10 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
 
     const { data: existingItems } = await supabase
       .from("tpv_items")
-      .select("item_type")
+      .select("item_name")
       .eq("project_id", projectId)
       .is("deleted_at", null);
-    const codes = new Set((existingItems || []).map(i => i.item_type).filter(Boolean) as string[]);
+    const codes = new Set((existingItems || []).map(i => i.item_name).filter(Boolean) as string[]);
     setExistingCodes(codes);
 
     const built: RowData[] = [];
@@ -287,9 +287,9 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
       }
       if (!hasAnyData) continue;
 
-      const hasCode = !!values.item_type;
-      const hasName = !!values.nazev_prvku;
-      const isDuplicate = hasCode && codes.has(values.item_type);
+      const hasCode = !!values.item_name;
+      const hasName = !!values.item_type;
+      const isDuplicate = hasCode && codes.has(values.item_name);
       const status: "valid" | "warning" | "error" =
         (!hasCode || !hasName) ? "error" : isDuplicate ? "warning" : "valid";
 
@@ -334,9 +334,9 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
       if (newItems.length > 0) {
         const items = newItems.map(r => ({
           project_id: projectId,
+          item_name: r.values.item_name || "Bez kódu",
           item_type: r.values.item_type || null,
           nazev_prvku: r.values.nazev_prvku || null,
-          item_name: r.values.item_name || r.values.nazev_prvku || "Bez názvu",
           konstrukter: r.values.konstrukter || null,
           notes: r.values.notes || null,
           pocet: r.values.pocet ? parseNumericValue(r.values.pocet) : null,
@@ -352,15 +352,15 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
         for (const r of duplicates) {
           await supabase.from("tpv_items")
             .update({
+              item_type: r.values.item_type || null,
               nazev_prvku: r.values.nazev_prvku || null,
-              item_name: r.values.item_name || r.values.nazev_prvku || "Bez názvu",
               konstrukter: r.values.konstrukter || null,
               notes: r.values.notes || null,
               pocet: r.values.pocet ? parseNumericValue(r.values.pocet) : null,
               cena: r.values.cena ? parseNumericValue(r.values.cena) : null,
             } as any)
             .eq("project_id", projectId)
-            .eq("item_type", r.values.item_type)
+            .eq("item_name", r.values.item_name)
             .is("deleted_at", null);
         }
       }

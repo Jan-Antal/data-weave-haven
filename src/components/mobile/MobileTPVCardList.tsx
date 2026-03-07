@@ -62,8 +62,8 @@ export function MobileTPVCardList({
     const q = search.toLowerCase();
     if (!q) return items;
     return items.filter(item => {
-      const code = (item.item_type || "").toLowerCase();
-      const name = (item.nazev_prvku || item.item_name || "").toLowerCase();
+      const code = (item.item_name || "").toLowerCase();
+      const name = (item.item_type || "").toLowerCase();
       return code.includes(q) || name.includes(q);
     });
   }, [items, search]);
@@ -119,7 +119,7 @@ export function MobileTPVCardList({
             const statusOpt = statusOptions.find(o => o.label === item.status);
             const statusColor = statusOpt?.color;
             const isExpanded = expandedId === item.id;
-            const vyrobaStatuses = productionStatusMap.get(item.item_type || item.item_name) || [];
+            const vyrobaStatuses = productionStatusMap.get(item.item_name || item.item_type || "") || [];
             const vyrobaLabel = vyrobaStatuses[0]?.label || "";
 
             return (
@@ -132,14 +132,14 @@ export function MobileTPVCardList({
                 {/* Compact view: 3 fields */}
                 <div className="p-3 space-y-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold font-mono text-primary">{item.item_type || "—"}</span>
+                    <span className="text-[11px] font-bold font-mono text-primary">{item.item_name || "—"}</span>
                     {isExpanded
                       ? <ChevronUp className="h-3 w-3 text-muted-foreground shrink-0" />
                       : <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
                     }
                   </div>
-                  {item.nazev_prvku && (
-                    <p className="text-sm font-semibold text-foreground leading-tight">{item.nazev_prvku}</p>
+                  {item.item_type && (
+                    <p className="text-sm font-semibold text-foreground leading-tight">{item.item_type}</p>
                   )}
                   {item.status && (
                     <Badge
@@ -155,10 +155,10 @@ export function MobileTPVCardList({
                 {/* Expanded details */}
                 {isExpanded && (
                   <div className="border-t border-border bg-muted/20 px-3 py-2 space-y-1.5">
-                    {item.item_name && (
+                    {item.nazev_prvku && (
                       <div>
                         <span className="text-[10px] text-muted-foreground uppercase">Popis</span>
-                        <p className="text-xs text-foreground">{item.item_name}</p>
+                        <p className="text-xs text-foreground">{item.nazev_prvku}</p>
                       </div>
                     )}
                     {item.konstrukter && (
