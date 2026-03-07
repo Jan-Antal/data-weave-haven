@@ -176,6 +176,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Effective role: use simulated if set (only owner can simulate)
   const effectiveRole = (simulatedRole && (realRole === "owner")) ? simulatedRole : realRole;
 
+  const isTestUser = user?.email === "alfred@ami-test.cz";
+
   const isOwner = effectiveRole === "owner";
   const isAdmin = effectiveRole === "admin" || isOwner;
   const isPM = effectiveRole === "pm";
@@ -227,6 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     realRole,
     loading,
     linkedPersonName,
+    isTestUser,
     signIn,
     signOut,
     isOwner,
