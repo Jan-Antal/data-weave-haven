@@ -180,9 +180,14 @@ export function MobileBottomNav({
         {/* Home / Projekty toggle */}
         <button
           onClick={handleHomeToggle}
-          className={cn("flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center", isProjectsActive ? "text-primary" : "text-muted-foreground")}
+          className={cn("flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center", isInTPVList || isProjectsActive ? "text-primary" : "text-muted-foreground")}
         >
-          {activeTab === "prehled" ? (
+          {isInTPVList ? (
+            <>
+              <FolderPlus className="h-5 w-5" strokeWidth={1.75} />
+              <span className="text-[10px]">Projekty</span>
+            </>
+          ) : activeTab === "prehled" ? (
             <>
               <FolderPlus className="h-5 w-5" strokeWidth={1.75} />
               <span className="text-[10px]">Projekty</span>
