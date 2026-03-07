@@ -88,7 +88,7 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
                 <p className="text-xs text-muted-foreground">PM: {project.pm}</p>
               )}
             </div>
-            <div className="flex flex-col items-end gap-1 shrink-0">
+            <div className="flex flex-col items-end gap-1 shrink-0 ml-auto">
               {project.status && (
                 <div className="flex items-center gap-1">
                   <StatusBadge status={project.status} />
