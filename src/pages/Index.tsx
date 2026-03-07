@@ -517,6 +517,8 @@ const Index = () => {
           canCreateProject={canCreateProject}
           activeTab={mobileTab}
           onTabChange={setMobileTab}
+          isInTPVList={!!mobileTPVProject}
+          onExitTPVList={handleMobileTPVBack}
         >
           <button
             onClick={() => window.dispatchEvent(new Event("ami-toggle"))}

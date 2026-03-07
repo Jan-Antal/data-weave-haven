@@ -17,6 +17,8 @@ interface MobileBottomNavProps {
   canCreateProject: boolean;
   activeTab?: string;
   onTabChange?: (tab: string) => void;
+  isInTPVList?: boolean;
+  onExitTPVList?: () => void;
   children?: ReactNode;
 }
 
