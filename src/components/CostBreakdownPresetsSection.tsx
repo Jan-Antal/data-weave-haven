@@ -154,7 +154,7 @@ function PresetCard({
   );
 }
 
-export function CostBreakdownPresetsSection() {
+export function CostBreakdownPresetsSection({ readOnly = false }: { readOnly?: boolean }) {
   const { data: presets = [], isLoading } = useCostBreakdownPresets();
   const upsertPreset = useUpsertPreset();
   const deletePreset = useDeletePreset();
@@ -201,7 +201,7 @@ export function CostBreakdownPresetsSection() {
   if (isLoading) return <p className="text-xs text-muted-foreground">Načítání...</p>;
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${readOnly ? "pointer-events-none opacity-80" : ""}`}>
       {/* Production capacity settings */}
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -213,6 +213,7 @@ export function CostBreakdownPresetsSection() {
               value={rateVal}
               onChange={(e) => setHourlyRate(e.target.value)}
               onBlur={() => handleSaveSettings("hourly_rate", rateVal)}
+              disabled={readOnly}
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">Kč/h</span>
           </div>
@@ -226,6 +227,7 @@ export function CostBreakdownPresetsSection() {
               value={capVal}
               onChange={(e) => setMonthlyCapacity(e.target.value)}
               onBlur={() => handleSaveSettings("monthly_capacity_hours", capVal)}
+              disabled={readOnly}
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">h</span>
           </div>
@@ -238,17 +240,19 @@ export function CostBreakdownPresetsSection() {
           <PresetCard
             key={preset.id}
             preset={preset}
-            onUpdate={handleUpdate}
-            onDelete={handleDelete}
-            onSetDefault={handleSetDefault}
+            onUpdate={readOnly ? () => {} : handleUpdate}
+            onDelete={readOnly ? () => {} : handleDelete}
+            onSetDefault={readOnly ? () => {} : handleSetDefault}
           />
         ))}
       </div>
 
-      <Button variant="outline" size="sm" className="w-full" onClick={handleAddPreset}>
-        <Plus className="h-3.5 w-3.5 mr-1" />
-        Nová šablona
-      </Button>
+      {!readOnly && (
+        <Button variant="outline" size="sm" className="w-full" onClick={handleAddPreset}>
+          <Plus className="h-3.5 w-3.5 mr-1" />
+          Nová šablona
+        </Button>
+      )}
     </div>
   );
 }

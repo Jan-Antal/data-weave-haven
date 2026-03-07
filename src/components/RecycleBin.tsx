@@ -107,13 +107,13 @@ function RecordList({ table, nameField, idField, emptyText, canPermanentDelete }
 }
 
 export function RecycleBin({ open, onOpenChange }: RecycleBinProps) {
-  const { canPermanentDelete, isKonstrukter, isPM, isAdmin } = useAuth();
+  const { canPermanentDelete, isKonstrukter, isPM, isAdmin, isTestUser } = useAuth();
 
   // Konstruktér only sees TPV items
   const defaultTab = isKonstrukter ? "tpv" : "projects";
 
   // PM can see projects/stages but cannot permanently delete them — only Admin/Owner can
-  const canPermDeleteProjectsStages = isAdmin;
+  const canPermDeleteProjectsStages = isAdmin && !isTestUser;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -121,26 +121,29 @@ export function RecycleBin({ open, onOpenChange }: RecycleBinProps) {
         <DialogHeader>
           <DialogTitle>Koš</DialogTitle>
         </DialogHeader>
-        <Tabs defaultValue={defaultTab} className="space-y-3">
-          <TabsList className="w-full">
-            {!isKonstrukter && <TabsTrigger value="projects" className="flex-1">Projekty</TabsTrigger>}
-            {!isKonstrukter && <TabsTrigger value="stages" className="flex-1">Etapy</TabsTrigger>}
-            <TabsTrigger value="tpv" className="flex-1">TPV položky</TabsTrigger>
-          </TabsList>
-          {!isKonstrukter && (
-            <TabsContent value="projects">
-              <RecordList table="projects" nameField="project_name" idField="project_id" emptyText="Žádné smazané projekty" canPermanentDelete={canPermDeleteProjectsStages} />
+        {isTestUser && <TestModeBanner />}
+        <div className={isTestUser ? "pointer-events-none opacity-80" : ""}>
+          <Tabs defaultValue={defaultTab} className="space-y-3">
+            <TabsList className="w-full">
+              {!isKonstrukter && <TabsTrigger value="projects" className="flex-1">Projekty</TabsTrigger>}
+              {!isKonstrukter && <TabsTrigger value="stages" className="flex-1">Etapy</TabsTrigger>}
+              <TabsTrigger value="tpv" className="flex-1">TPV položky</TabsTrigger>
+            </TabsList>
+            {!isKonstrukter && (
+              <TabsContent value="projects">
+                <RecordList table="projects" nameField="project_name" idField="project_id" emptyText="Žádné smazané projekty" canPermanentDelete={canPermDeleteProjectsStages} />
+              </TabsContent>
+            )}
+            {!isKonstrukter && (
+              <TabsContent value="stages">
+                <RecordList table="project_stages" nameField="stage_name" emptyText="Žádné smazané etapy" canPermanentDelete={canPermDeleteProjectsStages} />
+              </TabsContent>
+            )}
+            <TabsContent value="tpv">
+              <RecordList table="tpv_items" nameField="item_name" emptyText="Žádné smazané TPV položky" canPermanentDelete={canPermanentDelete && !isTestUser} />
             </TabsContent>
-          )}
-          {!isKonstrukter && (
-            <TabsContent value="stages">
-              <RecordList table="project_stages" nameField="stage_name" emptyText="Žádné smazané etapy" canPermanentDelete={canPermDeleteProjectsStages} />
-            </TabsContent>
-          )}
-          <TabsContent value="tpv">
-            <RecordList table="tpv_items" nameField="item_name" emptyText="Žádné smazané TPV položky" canPermanentDelete={canPermanentDelete} />
-          </TabsContent>
-        </Tabs>
+          </Tabs>
+        </div>
       </DialogContent>
     </Dialog>
   );
