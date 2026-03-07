@@ -77,6 +77,7 @@ const Index = () => {
   const [tpvListActive, setTpvListActive] = useState(false);
   const [mobileDetailProject, setMobileDetailProject] = useState<any>(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [mobileTPVProject, setMobileTPVProject] = useState<any>(null);
   const scrollPositions = useRef<Record<string, number>>({});
   const { setCurrentPage } = useUndoRedo();
 
