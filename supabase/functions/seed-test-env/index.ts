@@ -9,9 +9,10 @@ const TEST_EMAIL = "alfred@ami-test.cz";
 const TEST_PASSWORD = "Alfred2026!";
 const TEST_FULL_NAME = "Alfred Test (AMI)";
 
+// Using Z-2201-XXX prefix to avoid any collision with production Z-26XX projects
 const PROJECTS = [
   {
-    project_id: "Z-2601-001",
+    project_id: "Z-2201-001",
     project_name: "Rezidence Vinohrady — Byt 4A",
     klient: "Ing. Martin Dvořák",
     pm: "Novák Jan",
@@ -25,9 +26,10 @@ const PROJECTS = [
     risk: "Střední",
     location: "Praha 2",
     narocnost: "Vysoká",
+    is_test: true,
   },
   {
-    project_id: "Z-2601-002",
+    project_id: "Z-2201-002",
     project_name: "Hotel Mánes — Lobby & Bar",
     klient: "Mánes Hotels s.r.o.",
     pm: "Černá Kateřina",
@@ -41,9 +43,10 @@ const PROJECTS = [
     risk: "Nízké",
     location: "Praha 1",
     narocnost: "Střední",
+    is_test: true,
   },
   {
-    project_id: "Z-2601-003",
+    project_id: "Z-2201-003",
     project_name: "Kanceláře Karlín Hub",
     klient: "Karlín Development a.s.",
     pm: "Novák Jan",
@@ -57,9 +60,10 @@ const PROJECTS = [
     risk: "Nízké",
     location: "Praha 8",
     narocnost: "Nízká",
+    is_test: true,
   },
   {
-    project_id: "Z-2601-004",
+    project_id: "Z-2201-004",
     project_name: "Vila Bubeneč — Komplet interiér",
     klient: "Rodina Vávra",
     pm: "Černá Kateřina",
@@ -73,9 +77,10 @@ const PROJECTS = [
     risk: "Vysoké",
     location: "Praha 6",
     narocnost: "Velmi vysoká",
+    is_test: true,
   },
   {
-    project_id: "Z-2601-005",
+    project_id: "Z-2201-005",
     project_name: "Showroom Smíchov City",
     klient: "AMI Interior s.r.o.",
     pm: "Novák Jan",
@@ -89,39 +94,33 @@ const PROJECTS = [
     risk: "Nízké",
     location: "Praha 5",
     narocnost: "Nízká",
+    is_test: true,
   },
 ];
 
 const STAGES = [
-  // Project 001 - 3 stages
-  { project_id: "Z-2601-001", stage_name: "-A", display_name: "Kuchyně", status: "Projekce", datum_smluvni: "2026-05-01", stage_order: 1 },
-  { project_id: "Z-2601-001", stage_name: "-B", display_name: "Obývací pokoj", status: "Kalkulace", datum_smluvni: "2026-06-01", stage_order: 2 },
-  { project_id: "Z-2601-001", stage_name: "-C", display_name: "Ložnice", status: "Projekce", datum_smluvni: "2026-06-15", stage_order: 3 },
-  // Project 002 - 2 stages
-  { project_id: "Z-2601-002", stage_name: "-A", display_name: "Lobby", status: "Výroba", datum_smluvni: "2026-03-30", stage_order: 1 },
-  { project_id: "Z-2601-002", stage_name: "-B", display_name: "Bar", status: "Projekce", datum_smluvni: "2026-04-30", stage_order: 2 },
-  // Project 004 - 2 stages
-  { project_id: "Z-2601-004", stage_name: "-A", display_name: "Přízemí", status: "Montáž", datum_smluvni: "2026-03-10", stage_order: 1 },
-  { project_id: "Z-2601-004", stage_name: "-B", display_name: "Patro", status: "Výroba", datum_smluvni: "2026-03-20", stage_order: 2 },
+  { project_id: "Z-2201-001", stage_name: "-A", display_name: "Kuchyně", status: "Projekce", datum_smluvni: "2026-05-01", stage_order: 1 },
+  { project_id: "Z-2201-001", stage_name: "-B", display_name: "Obývací pokoj", status: "Kalkulace", datum_smluvni: "2026-06-01", stage_order: 2 },
+  { project_id: "Z-2201-001", stage_name: "-C", display_name: "Ložnice", status: "Projekce", datum_smluvni: "2026-06-15", stage_order: 3 },
+  { project_id: "Z-2201-002", stage_name: "-A", display_name: "Lobby", status: "Výroba", datum_smluvni: "2026-03-30", stage_order: 1 },
+  { project_id: "Z-2201-002", stage_name: "-B", display_name: "Bar", status: "Projekce", datum_smluvni: "2026-04-30", stage_order: 2 },
+  { project_id: "Z-2201-004", stage_name: "-A", display_name: "Přízemí", status: "Montáž", datum_smluvni: "2026-03-10", stage_order: 1 },
+  { project_id: "Z-2201-004", stage_name: "-B", display_name: "Patro", status: "Výroba", datum_smluvni: "2026-03-20", stage_order: 2 },
 ];
 
 const TPV_ITEMS = [
-  // Project 001
-  { project_id: "Z-2601-001", item_name: "KU-001", nazev_prvku: "Kuchyňská linka — dub", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 185000 },
-  { project_id: "Z-2601-001", item_name: "KU-002", nazev_prvku: "Ostrůvek s deskou Dekton", status: "Připomínky k zapracování", konstrukter: "Svoboda Petr", pocet: 1, cena: 95000 },
-  { project_id: "Z-2601-001", item_name: "OB-001", nazev_prvku: "TV stěna — ořech", status: "Nový", konstrukter: "Svoboda Petr", pocet: 1, cena: 72000 },
-  // Project 002
-  { project_id: "Z-2601-002", item_name: "LO-001", nazev_prvku: "Recepční pult — mosaz/mramor", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 320000 },
-  { project_id: "Z-2601-002", item_name: "LO-002", nazev_prvku: "Obkladový panel lobby", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 12, cena: 28000 },
-  { project_id: "Z-2601-002", item_name: "BA-001", nazev_prvku: "Barový pult", status: "V řešení", konstrukter: "Horák Tomáš", pocet: 1, cena: 210000 },
-  { project_id: "Z-2601-002", item_name: "BA-002", nazev_prvku: "Policový systém bar", status: "Nový", konstrukter: "Horák Tomáš", pocet: 1, cena: 145000 },
-  // Project 004
-  { project_id: "Z-2601-004", item_name: "PR-001", nazev_prvku: "Vestavěná skříň hala", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 2, cena: 98000 },
-  { project_id: "Z-2601-004", item_name: "PR-002", nazev_prvku: "Knihovna obývák", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 165000 },
-  { project_id: "Z-2601-004", item_name: "PA-001", nazev_prvku: "Šatní systém ložnice", status: "Připomínky k zapracování", konstrukter: "Horák Tomáš", pocet: 1, cena: 112000 },
-  // Project 005
-  { project_id: "Z-2601-005", item_name: "SH-001", nazev_prvku: "Výstavní stěna A", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 3, cena: 55000 },
-  { project_id: "Z-2601-005", item_name: "SH-002", nazev_prvku: "Pódium showroom", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 78000 },
+  { project_id: "Z-2201-001", item_name: "KU-001", nazev_prvku: "Kuchyňská linka — dub", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 185000 },
+  { project_id: "Z-2201-001", item_name: "KU-002", nazev_prvku: "Ostrůvek s deskou Dekton", status: "Připomínky k zapracování", konstrukter: "Svoboda Petr", pocet: 1, cena: 95000 },
+  { project_id: "Z-2201-001", item_name: "OB-001", nazev_prvku: "TV stěna — ořech", status: "Nový", konstrukter: "Svoboda Petr", pocet: 1, cena: 72000 },
+  { project_id: "Z-2201-002", item_name: "LO-001", nazev_prvku: "Recepční pult — mosaz/mramor", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 320000 },
+  { project_id: "Z-2201-002", item_name: "LO-002", nazev_prvku: "Obkladový panel lobby", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 12, cena: 28000 },
+  { project_id: "Z-2201-002", item_name: "BA-001", nazev_prvku: "Barový pult", status: "V řešení", konstrukter: "Horák Tomáš", pocet: 1, cena: 210000 },
+  { project_id: "Z-2201-002", item_name: "BA-002", nazev_prvku: "Policový systém bar", status: "Nový", konstrukter: "Horák Tomáš", pocet: 1, cena: 145000 },
+  { project_id: "Z-2201-004", item_name: "PR-001", nazev_prvku: "Vestavěná skříň hala", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 2, cena: 98000 },
+  { project_id: "Z-2201-004", item_name: "PR-002", nazev_prvku: "Knihovna obývák", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 165000 },
+  { project_id: "Z-2201-004", item_name: "PA-001", nazev_prvku: "Šatní systém ložnice", status: "Připomínky k zapracování", konstrukter: "Horák Tomáš", pocet: 1, cena: 112000 },
+  { project_id: "Z-2201-005", item_name: "SH-001", nazev_prvku: "Výstavní stěna A", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 3, cena: 55000 },
+  { project_id: "Z-2201-005", item_name: "SH-002", nazev_prvku: "Pódium showroom", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 78000 },
 ];
 
 Deno.serve(async (req) => {
@@ -136,7 +135,24 @@ Deno.serve(async (req) => {
 
     const steps: string[] = [];
 
-    // 1. Create test user
+    // Safety check: verify no production projects use Z-2201-XXX prefix
+    const { data: conflictCheck } = await adminClient
+      .from("projects")
+      .select("project_id")
+      .like("project_id", "Z-2201-%")
+      .eq("is_test", false);
+
+    if (conflictCheck && conflictCheck.length > 0) {
+      return new Response(JSON.stringify({
+        error: "SAFETY ABORT: Production projects found with Z-2201- prefix. Aborting to protect data.",
+        conflicting_ids: conflictCheck.map((p: any) => p.project_id),
+      }), {
+        status: 409,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 1. Create or find test user
     let testUserId: string;
     const { data: existingUsers } = await adminClient.auth.admin.listUsers();
     const existing = existingUsers?.users?.find((u: any) => u.email === TEST_EMAIL);
