@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.ami-assistant]
 verify_jwt = false
+
+[functions.seed-test-env]
+verify_jwt = false
