@@ -1,9 +1,8 @@
 import { useState, useMemo, useRef } from "react";
-import { ArrowLeft, Search, FileText, Plus, Upload, HardHat } from "lucide-react";
+import { ArrowLeft, Search, FileText, Plus, Upload, ChevronDown, ChevronUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/currency";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
@@ -38,14 +37,6 @@ interface MobileTPVCardListProps {
   canManageTPV: boolean;
 }
 
-const SORT_OPTIONS = [
-  { value: "item_type", label: "Kód" },
-  { value: "nazev_prvku", label: "Název" },
-  { value: "status", label: "Status" },
-  { value: "vyroba", label: "Výroba" },
-  { value: "cena", label: "Cena" },
-];
-
 export function MobileTPVCardList({
   items,
   projectId,
@@ -59,7 +50,7 @@ export function MobileTPVCardList({
   canManageTPV,
 }: MobileTPVCardListProps) {
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState("item_type");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [addingItem, setAddingItem] = useState(false);
   const [newItemName, setNewItemName] = useState("");
   const addInputRef = useRef<HTMLInputElement>(null);
@@ -69,26 +60,13 @@ export function MobileTPVCardList({
 
   const filteredItems = useMemo(() => {
     const q = search.toLowerCase();
-    let filtered = items;
-    if (q) {
-      filtered = items.filter(item => {
-        const code = (item.item_type || "").toLowerCase();
-        const name = (item.nazev_prvku || item.item_name || "").toLowerCase();
-        return code.includes(q) || name.includes(q);
-      });
-    }
-    return [...filtered].sort((a, b) => {
-      if (sortBy === "cena") return ((b.cena || 0) - (a.cena || 0));
-      if (sortBy === "vyroba") {
-        const va = (productionStatusMap.get(a.item_type || a.item_name)?.[0]?.label) || "";
-        const vb = (productionStatusMap.get(b.item_type || b.item_name)?.[0]?.label) || "";
-        return va.localeCompare(vb, "cs");
-      }
-      const av = String((a as any)[sortBy] || "");
-      const bv = String((b as any)[sortBy] || "");
-      return av.localeCompare(bv, "cs");
+    if (!q) return items;
+    return items.filter(item => {
+      const code = (item.item_type || "").toLowerCase();
+      const name = (item.nazev_prvku || item.item_name || "").toLowerCase();
+      return code.includes(q) || name.includes(q);
     });
-  }, [items, search, sortBy, productionStatusMap]);
+  }, [items, search]);
 
   const handleAddItem = () => {
     const name = newItemName.trim();
@@ -115,7 +93,7 @@ export function MobileTPVCardList({
             <FileText className="h-4 w-4 text-muted-foreground" />
           </button>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <div className="flex-1 relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -126,16 +104,6 @@ export function MobileTPVCardList({
               className="pl-8 h-8 text-sm"
             />
           </div>
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[100px] h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="z-[99999]">
-              {SORT_OPTIONS.map(o => (
-                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           {canManageTPV && (
             <button onClick={onOpenImport} className="h-8 px-2 rounded-md border border-input bg-background hover:bg-accent text-xs flex items-center gap-1">
               <Upload className="h-3 w-3" /> Import
@@ -148,45 +116,31 @@ export function MobileTPVCardList({
       <div className="flex-1 overflow-y-auto px-3 pt-2 pb-20">
         <div className="space-y-2">
           {filteredItems.map(item => {
-            const vyrobaStatuses = productionStatusMap.get(item.item_type || item.item_name) || [];
-            const vyrobaLabel = vyrobaStatuses[0]?.label || "";
             const statusOpt = statusOptions.find(o => o.label === item.status);
             const statusColor = statusOpt?.color;
+            const isExpanded = expandedId === item.id;
+            const vyrobaStatuses = productionStatusMap.get(item.item_type || item.item_name) || [];
+            const vyrobaLabel = vyrobaStatuses[0]?.label || "";
 
             return (
-              <div
+              <button
                 key={item.id}
-                className="rounded-lg border border-border bg-card p-3 space-y-1.5"
+                className="w-full text-left rounded-lg border border-border bg-card overflow-hidden transition-colors active:bg-muted/40"
                 style={{ borderLeftWidth: 4, borderLeftColor: borderColor }}
+                onClick={() => setExpandedId(isExpanded ? null : item.id)}
               >
-                {/* Top row: code + count */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold font-mono text-primary">{item.item_type || "—"}</span>
-                  {item.pocet != null && item.pocet > 0 && (
-                    <span className="text-xs text-muted-foreground">{item.pocet} ks</span>
-                  )}
-                </div>
-
-                {/* Název prvku */}
-                {item.nazev_prvku && (
-                  <p className="text-[15px] font-semibold text-foreground leading-tight">{item.nazev_prvku}</p>
-                )}
-
-                {/* Popis */}
-                {item.item_name && (
-                  <p className="text-xs text-muted-foreground line-clamp-2">{item.item_name}</p>
-                )}
-
-                {/* Konstruktér */}
-                {item.konstrukter && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <HardHat className="h-3 w-3" />
-                    <span>{item.konstrukter}</span>
+                {/* Compact view: 3 fields */}
+                <div className="p-3 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold font-mono text-primary">{item.item_type || "—"}</span>
+                    {isExpanded
+                      ? <ChevronUp className="h-3 w-3 text-muted-foreground shrink-0" />
+                      : <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+                    }
                   </div>
-                )}
-
-                {/* Status + Výroba badges */}
-                <div className="flex items-center gap-1.5 flex-wrap">
+                  {item.nazev_prvku && (
+                    <p className="text-sm font-semibold text-foreground leading-tight">{item.nazev_prvku}</p>
+                  )}
                   {item.status && (
                     <Badge
                       variant="outline"
@@ -196,22 +150,44 @@ export function MobileTPVCardList({
                       {item.status}
                     </Badge>
                   )}
-                  {vyrobaLabel && (
-                    <Badge variant="secondary" className="text-[10px] h-5">
-                      {vyrobaLabel}
-                    </Badge>
-                  )}
                 </div>
 
-                {/* Cena */}
-                {item.cena != null && item.cena > 0 && (
-                  <div className="text-right">
-                    <span className="text-sm font-semibold text-foreground">
-                      {formatCurrency(item.cena, currency)}
-                    </span>
+                {/* Expanded details */}
+                {isExpanded && (
+                  <div className="border-t border-border bg-muted/20 px-3 py-2 space-y-1.5">
+                    {item.item_name && (
+                      <div>
+                        <span className="text-[10px] text-muted-foreground uppercase">Popis</span>
+                        <p className="text-xs text-foreground">{item.item_name}</p>
+                      </div>
+                    )}
+                    {item.konstrukter && (
+                      <div>
+                        <span className="text-[10px] text-muted-foreground uppercase">Konstruktér</span>
+                        <p className="text-xs text-foreground">{item.konstrukter}</p>
+                      </div>
+                    )}
+                    {item.pocet != null && item.pocet > 0 && (
+                      <div>
+                        <span className="text-[10px] text-muted-foreground uppercase">Počet</span>
+                        <p className="text-xs text-foreground">{item.pocet} ks</p>
+                      </div>
+                    )}
+                    {item.cena != null && item.cena > 0 && (
+                      <div>
+                        <span className="text-[10px] text-muted-foreground uppercase">Cena</span>
+                        <p className="text-xs font-semibold text-foreground">{formatCurrency(item.cena, currency)}</p>
+                      </div>
+                    )}
+                    {vyrobaLabel && (
+                      <div>
+                        <span className="text-[10px] text-muted-foreground uppercase">Výroba</span>
+                        <Badge variant="secondary" className="text-[10px] h-5 ml-1">{vyrobaLabel}</Badge>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>
