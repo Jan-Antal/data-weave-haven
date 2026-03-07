@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { ChevronRight, ChevronDown } from "lucide-react";
+import { ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatCurrency } from "@/lib/currency";
 import { parseAppDate, formatAppDate } from "@/lib/dateFormat";
@@ -19,10 +19,20 @@ interface Project {
   risk?: string | null;
 }
 
+interface Stage {
+  id: string;
+  stage_name: string;
+  status?: string | null;
+  konstrukter?: string | null;
+  datum_smluvni?: string | null;
+  [key: string]: any;
+}
+
 interface MobileProjectCardProps {
   project: Project;
   onTap: (project: Project) => void;
-  stages?: any[];
+  onOpenTPV?: (project: Project) => void;
+  stages?: Stage[];
   dimmed?: boolean;
   urgency?: ProjectUrgency | null;
 }
@@ -33,10 +43,28 @@ const RISK_COLORS: Record<string, string> = {
   Low: "hsl(142 60% 45%)",
 };
 
-export const MobileProjectCard = memo(function MobileProjectCard({ project, onTap, stages = [], dimmed, urgency }: MobileProjectCardProps) {
-  const [expanded, setExpanded] = useState(false);
+/** Count stages whose status differs from the project status */
+function countDifferentStatuses(stages: Stage[], projectStatus: string | null | undefined): number {
+  if (!stages.length || !projectStatus) return 0;
+  return stages.filter(s => s.status && s.status !== projectStatus).length;
+}
+
+/** Check if a date is past or within N days */
+function daysUntil(dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null;
+  const d = parseAppDate(dateStr);
+  if (!d) return null;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
+  return Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+export const MobileProjectCard = memo(function MobileProjectCard({ project, onTap, onOpenTPV, stages = [], dimmed, urgency }: MobileProjectCardProps) {
+  const [stagesExpanded, setStagesExpanded] = useState(false);
   const riskColor = project.risk ? RISK_COLORS[project.risk] : undefined;
   const hasStages = stages.length > 0;
+  const diffCount = countDifferentStatuses(stages, project.status);
 
   return (
     <div className={cn("bg-card rounded-lg border shadow-sm overflow-hidden transition-all active:scale-[0.98] active:opacity-90", dimmed && "opacity-40")}>
@@ -61,7 +89,14 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
               )}
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0">
-              {project.status && <StatusBadge status={project.status} />}
+              {project.status && (
+                <div className="flex items-center gap-1">
+                  <StatusBadge status={project.status} />
+                  {diffCount > 0 && (
+                    <span className="text-[10px] text-muted-foreground font-medium">+{diffCount}</span>
+                  )}
+                </div>
+              )}
               {urgency && (
                 <span
                   className={cn(
@@ -85,33 +120,67 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
             <p className="text-xs text-muted-foreground mt-1">Datum S.: {(() => { const d = parseAppDate(project.datum_smluvni); return d ? formatAppDate(d) : project.datum_smluvni; })()}</p>
           )}
         </button>
-        {hasStages && (
+
+        {/* Arrow → opens TPV list */}
+        {onOpenTPV && (
           <button
-            onClick={() => setExpanded(!expanded)}
+            onClick={() => onOpenTPV(project)}
             className="px-3 flex items-center border-l border-border min-w-[44px] justify-center"
           >
-            {expanded ? (
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            )}
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>
         )}
       </div>
+
+      {/* Stages toggle link */}
+      {hasStages && (
+        <button
+          onClick={() => setStagesExpanded(v => !v)}
+          className="w-full flex items-center gap-1 px-3 py-1.5 border-t border-border text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {stagesExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          <span>{stages.length} {stages.length === 1 ? "etapa" : stages.length < 5 ? "etapy" : "etap"}</span>
+        </button>
+      )}
+
       {/* Expanded stages */}
-      {expanded && hasStages && (
+      {stagesExpanded && hasStages && (
         <div className="border-t bg-muted/30">
-          {stages.map((stage) => (
-            <div key={stage.id} className="px-4 py-2 border-b last:border-b-0 flex items-center justify-between min-h-[44px]">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium">{stage.stage_name}</p>
-                {stage.konstrukter && <p className="text-[11px] text-muted-foreground">K: {stage.konstrukter}</p>}
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {stage.status && <StatusBadge status={stage.status} />}
-              </div>
-            </div>
-          ))}
+          {stages.map((stage) => {
+            const days = daysUntil(stage.datum_smluvni);
+            const isUrgent = days !== null && days <= 7;
+            const isPast = days !== null && days < 0;
+
+            return (
+              <button
+                key={stage.id}
+                className="w-full px-4 py-2 border-b last:border-b-0 flex items-center justify-between min-h-[44px] text-left hover:bg-muted/50 transition-colors"
+                onClick={() => onTap({ ...project, id: stage.id } as any)}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium">{stage.stage_name}</p>
+                  {stage.datum_smluvni && (
+                    <p className="text-[11px] text-muted-foreground">
+                      {(() => { const d = parseAppDate(stage.datum_smluvni); return d ? formatAppDate(d) : stage.datum_smluvni; })()}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {stage.status && <StatusBadge status={stage.status} />}
+                  {isUrgent && (
+                    <span className={cn(
+                      "text-[10px] font-medium px-1 py-0.5 rounded-full whitespace-nowrap",
+                      isPast
+                        ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                    )}>
+                      ⚠ {isPast ? `${Math.abs(days!)}d` : `${days}d`}
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

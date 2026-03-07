@@ -19,6 +19,7 @@ interface MobileCardListProps {
   riskHighlight: RiskHighlightType;
   activeTab: string;
   onProjectTap: (project: Project) => void;
+  onOpenTPV?: (project: Project) => void;
 }
 
 const SORT_OPTIONS = [
@@ -32,7 +33,7 @@ const SORT_OPTIONS = [
 const PULL_THRESHOLD = 60;
 const MIN_SPINNER_MS = 500;
 
-export function MobileCardList({ personFilter, statusFilter, search, riskHighlight, activeTab, onProjectTap }: MobileCardListProps) {
+export function MobileCardList({ personFilter, statusFilter, search, riskHighlight, activeTab, onProjectTap, onOpenTPV }: MobileCardListProps) {
   const { data: projects = [], isLoading } = useProjects();
   const { stagesByProject } = useStagesByProject();
   const { profile, linkedPersonName } = useAuth();
@@ -215,6 +216,7 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
           key={project.id}
           project={project}
           onTap={onProjectTap}
+          onOpenTPV={onOpenTPV}
           stages={stagesByProject.get(project.project_id) || []}
           urgency={urgencyMap.get(project.project_id) || null}
         />

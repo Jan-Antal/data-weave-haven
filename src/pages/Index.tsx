@@ -40,7 +40,11 @@ import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 import { MobileCardList } from "@/components/mobile/MobileCardList";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { MobilePrehled } from "@/components/mobile/MobilePrehled";
+import { MobileTPVCardList } from "@/components/mobile/MobileTPVCardList";
 import { useRecentlyOpened } from "@/hooks/useRecentlyOpened";
+import { useTPVItems, useAddTPVItem } from "@/hooks/useTPVItems";
+import { useProductionStatuses } from "@/hooks/useProductionStatuses";
+import { useProjects } from "@/hooks/useProjects";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
@@ -73,6 +77,7 @@ const Index = () => {
   const [tpvListActive, setTpvListActive] = useState(false);
   const [mobileDetailProject, setMobileDetailProject] = useState<any>(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [mobileTPVProject, setMobileTPVProject] = useState<any>(null);
   const scrollPositions = useRef<Record<string, number>>({});
   const { setCurrentPage } = useUndoRedo();
 
@@ -161,6 +166,22 @@ const Index = () => {
     setMobileDetailProject(project);
     setMobileDetailOpen(true);
   }, [trackRecentOpen]);
+
+  const handleMobileOpenTPV = useCallback((project: any) => {
+    setMobileTPVProject(project);
+  }, []);
+
+  const handleMobileTPVBack = useCallback(() => {
+    setMobileTPVProject(null);
+  }, []);
+
+  // TPV data for the mobile TPV list
+  const mobileTPVProjectId = mobileTPVProject?.project_id || "";
+  const { data: mobileTPVItems = [] } = useTPVItems(mobileTPVProjectId);
+  const { statusMap: mobileProductionStatusMap } = useProductionStatuses(mobileTPVProjectId);
+  const addTPVItem = useAddTPVItem();
+  const mobileTPVCurrency = mobileTPVProject?.currency || "CZK";
+  const canManageTPVMobile = !!(role && ["owner", "admin", "pm", "konstrukter"].includes(role));
 
   return (
     <ColumnVisibilityProvider>
@@ -344,7 +365,24 @@ const Index = () => {
         {/* Mobile: Přehled or Projekty */}
         {isMobile ? (
           <main className="flex-1 min-w-0 flex flex-col overflow-y-auto px-3 pt-3 pb-16">
-            {mobileTab === "prehled" ? (
+            {mobileTPVProject ? (
+              <MobileTPVCardList
+                items={mobileTPVItems}
+                projectId={mobileTPVProjectId}
+                projectName={mobileTPVProject.project_name}
+                currency={mobileTPVCurrency}
+                productionStatusMap={mobileProductionStatusMap}
+                onBack={handleMobileTPVBack}
+                onOpenDetail={() => {
+                  handleMobileProjectTap(mobileTPVProject);
+                }}
+                onAddItem={(name) => {
+                  addTPVItem.mutate({ project_id: mobileTPVProjectId, item_name: name });
+                }}
+                onOpenImport={() => {}}
+                canManageTPV={canManageTPVMobile}
+              />
+            ) : mobileTab === "prehled" ? (
               <MobilePrehled
                 recentProjects={recentProjects}
                 onProjectTap={handleMobileProjectTap}
@@ -357,6 +395,7 @@ const Index = () => {
                 riskHighlight={riskHighlight}
                 activeTab={activeTab}
                 onProjectTap={handleMobileProjectTap}
+                onOpenTPV={handleMobileOpenTPV}
               />
             )}
             <ProjectDetailDialog
