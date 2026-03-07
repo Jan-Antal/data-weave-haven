@@ -42,7 +42,7 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
   const queryClient = useQueryClient();
   const [sortBy, setSortBy] = useState("project_name");
   const [sortAsc, setSortAsc] = useState(true);
-  const [activeChip, setActiveChip] = useState("all");
+  const [activeChip, setActiveChip] = useState("active");
   const [localSearch, setLocalSearch] = useState("");
   // Pull-to-refresh state
   const [pullDistance, setPullDistance] = useState(0);
@@ -60,7 +60,10 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
       case "mine":
         if (pmName) filtered = projects.filter(p => p.pm === pmName);
         break;
-      case "all":
+      case "active":
+        filtered = projects.filter(p => p.status !== "Dokončeno");
+        break;
+      case "everything":
         break;
       default:
         // Status filter
