@@ -362,6 +362,11 @@ export default function PlanVyroby() {
       onDragEnd={handleDragEnd}
     >
       <div className="h-screen flex flex-col overflow-hidden" style={{ backgroundColor: "#f4f2f0" }}>
+        {profile?.email === "alfred@ami-test.cz" && (
+          <div className="bg-orange-500 text-white px-6 flex items-center justify-center gap-2 font-bold tracking-wide shrink-0" style={{ height: 32 }}>
+            <span>⚠ TEST MODE — Testovací prostředí — data nejsou produkční</span>
+          </div>
+        )}
         <ProductionHeader />
         <div className="flex-1 flex min-h-0">
           <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
