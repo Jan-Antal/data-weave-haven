@@ -74,11 +74,11 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
         style={{ borderLeft: `4px solid ${riskColor || 'hsl(var(--border))'}` }}
       >
         <button
-          className="flex-1 text-left p-3 min-h-[44px]"
+          className="flex-1 text-left p-3 min-h-[44px] overflow-hidden min-w-0"
           onClick={() => onTap(project)}
         >
-          <div className="flex items-start gap-2 overflow-hidden">
-            <div className="min-w-0 flex-1 overflow-hidden">
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground font-mono truncate">{project.project_id}</p>
               <p className="font-medium text-sm truncate">{project.project_name}</p>
               {project.klient && (
@@ -88,7 +88,7 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
                 <p className="text-xs text-muted-foreground truncate">PM: {project.pm}</p>
               )}
             </div>
-            <div className="flex flex-col items-end gap-1 shrink-0 ml-auto">
+            <div className="flex flex-col items-end gap-1 shrink-0 w-[110px]">
               {project.status && (
                 <div className="flex items-center gap-1">
                   <StatusBadge status={project.status} />
