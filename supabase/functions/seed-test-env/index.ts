@@ -116,11 +116,27 @@ const TPV_ITEMS = [
   { project_id: "Z-2201-002", item_name: "LO-002", nazev_prvku: "Obkladový panel lobby", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 12, cena: 28000 },
   { project_id: "Z-2201-002", item_name: "BA-001", nazev_prvku: "Barový pult", status: "V řešení", konstrukter: "Horák Tomáš", pocet: 1, cena: 210000 },
   { project_id: "Z-2201-002", item_name: "BA-002", nazev_prvku: "Policový systém bar", status: "Nový", konstrukter: "Horák Tomáš", pocet: 1, cena: 145000 },
+  { project_id: "Z-2201-003", item_name: "KA-001", nazev_prvku: "Recepční pult — dýha dub", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 145000 },
+  { project_id: "Z-2201-003", item_name: "KA-002", nazev_prvku: "Open-space přepážky", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 8, cena: 32000 },
+  { project_id: "Z-2201-003", item_name: "KA-003", nazev_prvku: "Jednací stůl — konferenční", status: "Nový", konstrukter: "Svoboda Petr", pocet: 2, cena: 68000 },
   { project_id: "Z-2201-004", item_name: "PR-001", nazev_prvku: "Vestavěná skříň hala", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 2, cena: 98000 },
   { project_id: "Z-2201-004", item_name: "PR-002", nazev_prvku: "Knihovna obývák", status: "Schváleno", konstrukter: "Horák Tomáš", pocet: 1, cena: 165000 },
   { project_id: "Z-2201-004", item_name: "PA-001", nazev_prvku: "Šatní systém ložnice", status: "Připomínky k zapracování", konstrukter: "Horák Tomáš", pocet: 1, cena: 112000 },
   { project_id: "Z-2201-005", item_name: "SH-001", nazev_prvku: "Výstavní stěna A", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 3, cena: 55000 },
   { project_id: "Z-2201-005", item_name: "SH-002", nazev_prvku: "Pódium showroom", status: "Schváleno", konstrukter: "Svoboda Petr", pocet: 1, cena: 78000 },
+];
+
+// Production inbox items — only "Schváleno" TPV items get sent to production
+const PRODUCTION_INBOX = [
+  { project_id: "Z-2201-001", item_name: "Kuchyňská linka — dub", item_code: "KU-001", estimated_hours: 48, estimated_czk: 185000 },
+  { project_id: "Z-2201-002", item_name: "Recepční pult — mosaz/mramor", item_code: "LO-001", estimated_hours: 72, estimated_czk: 320000 },
+  { project_id: "Z-2201-002", item_name: "Obkladový panel lobby", item_code: "LO-002", estimated_hours: 36, estimated_czk: 336000 },
+  { project_id: "Z-2201-003", item_name: "Recepční pult — dýha dub", item_code: "KA-001", estimated_hours: 32, estimated_czk: 145000 },
+  { project_id: "Z-2201-003", item_name: "Open-space přepážky", item_code: "KA-002", estimated_hours: 64, estimated_czk: 256000 },
+  { project_id: "Z-2201-004", item_name: "Vestavěná skříň hala", item_code: "PR-001", estimated_hours: 40, estimated_czk: 196000 },
+  { project_id: "Z-2201-004", item_name: "Knihovna obývák", item_code: "PR-002", estimated_hours: 28, estimated_czk: 165000 },
+  { project_id: "Z-2201-005", item_name: "Výstavní stěna A", item_code: "SH-001", estimated_hours: 24, estimated_czk: 165000 },
+  { project_id: "Z-2201-005", item_name: "Pódium showroom", item_code: "SH-002", estimated_hours: 18, estimated_czk: 78000 },
 ];
 
 Deno.serve(async (req) => {
@@ -244,6 +260,27 @@ Deno.serve(async (req) => {
         steps.push(`TPV ${t.item_name} created`);
       } else {
         steps.push(`TPV ${t.item_name} exists, skipped`);
+      }
+    }
+
+    // 7. Seed production inbox
+    for (const pi of PRODUCTION_INBOX) {
+      const { data: exists } = await adminClient
+        .from("production_inbox")
+        .select("id")
+        .eq("project_id", pi.project_id)
+        .eq("item_code", pi.item_code)
+        .single();
+
+      if (!exists) {
+        await adminClient.from("production_inbox").insert({
+          ...pi,
+          sent_by: testUserId,
+          status: "pending",
+        });
+        steps.push(`Inbox ${pi.item_code} created`);
+      } else {
+        steps.push(`Inbox ${pi.item_code} exists, skipped`);
       }
     }
 
