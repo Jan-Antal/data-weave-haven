@@ -11,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Trash2, ArrowRightLeft, Link2, Lock, Eye, EyeOff } from "lucide-react";
 import type { AppRole } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
+import { TestModeBanner } from "./TestModeBanner";
 import { PasswordChecklist } from "@/components/PasswordChecklist";
 import { usePasswordValidation } from "@/hooks/usePasswordValidation";
 
@@ -45,6 +47,7 @@ interface Props {
 }
 
 export function UserManagement({ open, onOpenChange }: Props) {
+  const { isTestUser } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -268,6 +271,7 @@ export function UserManagement({ open, onOpenChange }: Props) {
             <DialogHeader>
               <DialogTitle>Správa uživatelů</DialogTitle>
             </DialogHeader>
+            {isTestUser && <TestModeBanner />}
           </div>
 
           <div className="flex-1 overflow-y-auto">
