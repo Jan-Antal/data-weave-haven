@@ -15,6 +15,7 @@ interface AuthContextType {
   realRole: AppRole | null;
   loading: boolean;
   linkedPersonName: string | null;
+  isTestUser: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   isOwner: boolean;
