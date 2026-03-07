@@ -377,7 +377,7 @@ const Index = () => {
                   handleMobileProjectTap(mobileTPVProject);
                 }}
                 onAddItem={(name) => {
-                  // Add item handled by TPVList hook — for mobile we just show toast
+                  addTPVItem.mutate({ project_id: mobileTPVProjectId, item_name: name });
                 }}
                 onOpenImport={() => {}}
                 canManageTPV={canManageTPVMobile}
