@@ -61,7 +61,7 @@ function daysUntil(dateStr: string | null | undefined): number | null {
   return Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export const MobileProjectCard = memo(function MobileProjectCard({ project, onTap, onOpenTPV, stages = [], dimmed, urgency }: MobileProjectCardProps) {
+export const MobileProjectCard = memo(function MobileProjectCard({ project, onTap, onOpenTPV, onStageTap, stages = [], dimmed, urgency }: MobileProjectCardProps) {
   const [stagesExpanded, setStagesExpanded] = useState(false);
   const riskColor = project.risk ? RISK_COLORS[project.risk] : undefined;
   const hasStages = stages.length > 0;
