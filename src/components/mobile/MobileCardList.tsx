@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useProjects, type Project } from "@/hooks/useProjects";
 import { useStagesByProject } from "@/hooks/useAllProjectStages";
 import { useProjectAttention } from "@/hooks/useProjectAttention";
+import type { ProjectStage } from "@/hooks/useProjectStages";
 import { useAuth } from "@/hooks/useAuth";
 import { useSortFilter } from "@/hooks/useSortFilter";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
