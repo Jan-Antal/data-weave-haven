@@ -1,4 +1,5 @@
 import React, { useState, Fragment, useMemo, useEffect, useCallback, memo, useRef } from "react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { logActivity } from "@/lib/activityLog";
 import { useDataLogRowHighlight } from "@/hooks/useDataLogRowHighlight";
@@ -15,7 +16,7 @@ import { useProjectStages, useUpdateStage, useDeleteStage, useReorderStages } fr
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, ChevronDown, Plus, Trash2, GripVertical, ChevronsDown, ChevronsUp, Paperclip } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Trash2, GripVertical, ChevronsDown, ChevronsUp, ClipboardList } from "lucide-react";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -362,6 +363,7 @@ function ExpandArrow({ projectId, isExpanded, stageCount }: { projectId: string;
 interface PMProjectRowProps {
   project: Project;
   docCount: number;
+  tpvItemCount: number;
   isExpanded: boolean;
   stageCount: number;
   onToggleExpand: (pid: string) => void;
@@ -375,11 +377,13 @@ interface PMProjectRowProps {
   riskHighlight: any;
   isFieldReadOnly: (field: string) => boolean;
   onEditProject: (p: Project) => void;
+  onOpenTPVList: (projectId: string, projectName: string) => void;
 }
 
 const PMProjectRow = memo(function PMProjectRow({
   project: p,
   docCount,
+  tpvItemCount,
   isExpanded,
   stageCount,
   onToggleExpand,
@@ -393,6 +397,7 @@ const PMProjectRow = memo(function PMProjectRow({
   riskHighlight,
   isFieldReadOnly,
   onEditProject,
+  onOpenTPVList,
 }: PMProjectRowProps) {
   const bgStyle = useMemo(() => {
     const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
@@ -401,13 +406,17 @@ const PMProjectRow = memo(function PMProjectRow({
 
   return (
     <TableRow className="hover:bg-muted/50 transition-colors h-9" style={bgStyle} data-project-id={p.project_id}>
-      {/* Col 1 — Icon slot (📎 clip) */}
+      {/* Col 1 — TPV list icon */}
       <TableCell style={COL_ICON_STYLE} className="text-center px-0">
-        {(docCount ?? 0) > 0 && (
-          <span className="inline-flex items-center gap-0.5 text-muted-foreground text-[10px] cursor-pointer" onClick={() => onEditProject(p)}>
-            <Paperclip className="h-3 w-3" />
-            {docCount}
-          </span>
+        {tpvItemCount > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex items-center cursor-pointer" onClick={() => onOpenTPVList(p.project_id, p.project_name)}>
+                <ClipboardList className="h-4 w-4" style={{ color: '#223937' }} />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="text-xs">Zobrazit TPV položky ({tpvItemCount})</TooltipContent>
+          </Tooltip>
         )}
       </TableCell>
       {/* Col 2 — Chevron slot */}
@@ -663,9 +672,9 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
-              {/* Col 1 — Icon slot (📎 clip) */}
+              {/* Col 1 — TPV list icon */}
               <TableHead style={COL_ICON_STYLE} className="text-center px-0">
-                <Paperclip className="h-3.5 w-3.5 text-muted-foreground/50 mx-auto" />
+                <ClipboardList className="h-3.5 w-3.5 text-muted-foreground/50 mx-auto" />
               </TableHead>
               {/* Col 2 — Chevron slot */}
               <TableHead style={COL_CHEVRON_STYLE} className="shrink-0 px-0">
@@ -703,6 +712,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                 <PMProjectRow
                   project={p}
                   docCount={docCounts[p.project_id] ?? 0}
+                  tpvItemCount={tpvItemsByProject.get(p.project_id)?.length ?? 0}
                   isExpanded={expanded.has(p.project_id)}
                   stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
                   onToggleExpand={toggleExpand}
@@ -716,6 +726,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   riskHighlight={riskHighlight}
                   isFieldReadOnly={isFieldReadOnly}
                   onEditProject={(p) => setEditProject(p)}
+                  onOpenTPVList={handleOpenTPVList}
                 />
                 {expanded.has(p.project_id) && (
                   <StagesSection
