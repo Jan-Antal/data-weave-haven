@@ -722,6 +722,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   riskHighlight={riskHighlight}
                   isFieldReadOnly={isFieldReadOnly}
                   onEditProject={(p) => setEditProject(p)}
+                  onOpenTPVList={handleOpenTPVList}
                 />
                 {expanded.has(p.project_id) && (
                   <StagesSection
