@@ -23,6 +23,8 @@ import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { useSharePointDocs, type SPFile } from "@/hooks/useSharePointDocs";
+import { useChunkedUpload, formatFileSize as formatFileSizeUtil } from "@/hooks/useChunkedUpload";
+import { UploadProgressBar } from "./UploadProgressBar";
 import { dispatchDocCountUpdate, migrateDocCountCache } from "@/hooks/useDocumentCounts";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Textarea } from "@/components/ui/textarea";
