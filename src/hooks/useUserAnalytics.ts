@@ -36,7 +36,7 @@ export function useUserAnalytics(enabled: boolean) {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
-      // Fetch ALL data_log entries from last 30 days (not just logins)
+      // Fetch ALL data_log entries from last 30 days
       const { data: allEntries } = await (supabase.from("data_log") as any)
         .select("user_email, created_at, action_type, detail")
         .gte("created_at", thirtyDaysAgo)
@@ -64,11 +64,14 @@ export function useUserAnalytics(enabled: boolean) {
       for (const entry of entryArr) {
         if (!entry.user_email) continue;
 
+        // Skip user_session entries from action counts (they're internal tracking)
+        const isSessionEntry = entry.action_type === "user_session";
+
         if (!userMap.has(entry.user_email)) {
           userMap.set(entry.user_email, {
             user_email: entry.user_email,
             last_login: null,
-            last_activity: entry.created_at, // first entry is most recent (desc order)
+            last_activity: null,
             login_count_30d: 0,
             total_actions_30d: 0,
             avg_session_min: 0,
@@ -77,27 +80,49 @@ export function useUserAnalytics(enabled: boolean) {
         }
 
         const u = userMap.get(entry.user_email)!;
-        u.total_actions_30d += 1;
+
+        if (!isSessionEntry) {
+          u.total_actions_30d += 1;
+          // Track last real activity (not heartbeats)
+          if (!u.last_activity) u.last_activity = entry.created_at;
+        }
 
         if (entry.action_type === "user_login") {
           u.login_count_30d += 1;
           if (!u.last_login) u.last_login = entry.created_at;
+        }
 
-          // Extract session duration from login detail
-          if (entry.detail) {
-            try {
-              const parsed = JSON.parse(entry.detail) as { session_duration_minutes?: unknown };
-              const minutesRaw = parsed.session_duration_minutes;
-              const minutes = typeof minutesRaw === "number" ? minutesRaw : Number(minutesRaw);
-              if (Number.isFinite(minutes) && minutes >= 0) {
-                if (!sessionMinsByUser.has(entry.user_email)) {
-                  sessionMinsByUser.set(entry.user_email, []);
-                }
-                sessionMinsByUser.get(entry.user_email)!.push(Math.round(minutes));
+        // Extract session duration from user_session entries (heartbeat-based)
+        if (isSessionEntry && entry.detail) {
+          try {
+            const parsed = JSON.parse(entry.detail) as { duration_minutes?: unknown };
+            const minutesRaw = parsed.duration_minutes;
+            const minutes = typeof minutesRaw === "number" ? minutesRaw : Number(minutesRaw);
+            if (Number.isFinite(minutes) && minutes > 0) {
+              if (!sessionMinsByUser.has(entry.user_email)) {
+                sessionMinsByUser.set(entry.user_email, []);
               }
-            } catch {
-              // ignore
+              sessionMinsByUser.get(entry.user_email)!.push(Math.round(minutes));
             }
+          } catch {
+            // ignore
+          }
+        }
+
+        // Fallback: also read from old user_login session_duration_minutes
+        if (entry.action_type === "user_login" && entry.detail) {
+          try {
+            const parsed = JSON.parse(entry.detail) as { session_duration_minutes?: unknown };
+            const minutesRaw = parsed.session_duration_minutes;
+            const minutes = typeof minutesRaw === "number" ? minutesRaw : Number(minutesRaw);
+            if (Number.isFinite(minutes) && minutes > 0) {
+              if (!sessionMinsByUser.has(entry.user_email)) {
+                sessionMinsByUser.set(entry.user_email, []);
+              }
+              sessionMinsByUser.get(entry.user_email)!.push(Math.round(minutes));
+            }
+          } catch {
+            // ignore
           }
         }
       }
@@ -135,6 +160,7 @@ export function useUserRecentActions(userEmail: string | null, enabled: boolean)
         .select("*")
         .eq("user_email", userEmail)
         .neq("action_type", "page_view")
+        .neq("action_type", "user_session")
         .order("created_at", { ascending: false })
         .limit(20);
       return (data ?? []) as Array<{
