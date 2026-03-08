@@ -4,7 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 export interface UserAnalytics {
   user_email: string;
   last_login: string | null;
+  last_activity: string | null;
   login_count_30d: number;
+  total_actions_30d: number;
   avg_session_min: number;
   total_session_min: number;
 }
@@ -34,70 +36,78 @@ export function useUserAnalytics(enabled: boolean) {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
-      const { data: logins } = await (supabase.from("data_log") as any)
-        .select("user_email, created_at, detail")
-        .eq("action_type", "user_login")
+      // Fetch ALL data_log entries from last 30 days (not just logins)
+      const { data: allEntries } = await (supabase.from("data_log") as any)
+        .select("user_email, created_at, action_type, detail")
         .gte("created_at", thirtyDaysAgo)
         .order("created_at", { ascending: false });
 
-      const loginArr = (logins ?? []) as Array<{
+      const entryArr = (allEntries ?? []) as Array<{
         user_email: string;
         created_at: string;
+        action_type: string;
         detail: string | null;
       }>;
 
-      const loginsToday = loginArr.filter((l) => new Date(l.created_at) >= todayStart).length;
-      const uniqueUsers7d = new Set(loginArr.filter((l) => l.created_at >= sevenDaysAgo).map((l) => l.user_email));
-      const uniqueUsers30d = new Set(loginArr.map((l) => l.user_email));
+      const loginsToday = entryArr.filter(
+        (e) => e.action_type === "user_login" && new Date(e.created_at) >= todayStart
+      ).length;
+
+      const uniqueUsers7d = new Set(
+        entryArr.filter((e) => e.created_at >= sevenDaysAgo).map((e) => e.user_email)
+      );
+      const uniqueUsers30d = new Set(entryArr.map((e) => e.user_email));
 
       const userMap = new Map<string, UserAnalytics>();
       const sessionMinsByUser = new Map<string, number[]>();
 
-      for (const login of loginArr) {
-        if (!userMap.has(login.user_email)) {
-          userMap.set(login.user_email, {
-            user_email: login.user_email,
-            last_login: login.created_at,
+      for (const entry of entryArr) {
+        if (!entry.user_email) continue;
+
+        if (!userMap.has(entry.user_email)) {
+          userMap.set(entry.user_email, {
+            user_email: entry.user_email,
+            last_login: null,
+            last_activity: entry.created_at, // first entry is most recent (desc order)
             login_count_30d: 0,
+            total_actions_30d: 0,
             avg_session_min: 0,
             total_session_min: 0,
           });
         }
 
-        userMap.get(login.user_email)!.login_count_30d += 1;
+        const u = userMap.get(entry.user_email)!;
+        u.total_actions_30d += 1;
 
-        if (!login.detail) continue;
-        try {
-          const parsed = JSON.parse(login.detail) as { session_duration_minutes?: unknown };
-          const minutesRaw = parsed.session_duration_minutes;
-          const minutes = typeof minutesRaw === "number" ? minutesRaw : Number(minutesRaw);
+        if (entry.action_type === "user_login") {
+          u.login_count_30d += 1;
+          if (!u.last_login) u.last_login = entry.created_at;
 
-          if (Number.isFinite(minutes) && minutes >= 0) {
-            if (!sessionMinsByUser.has(login.user_email)) {
-              sessionMinsByUser.set(login.user_email, []);
+          // Extract session duration from login detail
+          if (entry.detail) {
+            try {
+              const parsed = JSON.parse(entry.detail) as { session_duration_minutes?: unknown };
+              const minutesRaw = parsed.session_duration_minutes;
+              const minutes = typeof minutesRaw === "number" ? minutesRaw : Number(minutesRaw);
+              if (Number.isFinite(minutes) && minutes >= 0) {
+                if (!sessionMinsByUser.has(entry.user_email)) {
+                  sessionMinsByUser.set(entry.user_email, []);
+                }
+                sessionMinsByUser.get(entry.user_email)!.push(Math.round(minutes));
+              }
+            } catch {
+              // ignore
             }
-            sessionMinsByUser.get(login.user_email)!.push(Math.round(minutes));
           }
-        } catch {
-          // ignore malformed detail rows
         }
       }
 
       for (const [email, mins] of sessionMinsByUser) {
-        if (!userMap.has(email)) {
-          userMap.set(email, {
-            user_email: email,
-            last_login: null,
-            login_count_30d: 0,
-            avg_session_min: 0,
-            total_session_min: 0,
-          });
-        }
-
-        const total = mins.reduce((acc, value) => acc + value, 0);
-        const avg = mins.length > 0 ? Math.round(total / mins.length) : 0;
-        userMap.get(email)!.total_session_min = total;
-        userMap.get(email)!.avg_session_min = avg;
+        const u = userMap.get(email);
+        if (!u) continue;
+        const total = mins.reduce((acc, v) => acc + v, 0);
+        u.total_session_min = total;
+        u.avg_session_min = mins.length > 0 ? Math.round(total / mins.length) : 0;
       }
 
       return {
@@ -105,8 +115,8 @@ export function useUserAnalytics(enabled: boolean) {
         active_7d: uniqueUsers7d.size,
         active_30d: uniqueUsers30d.size,
         users: Array.from(userMap.values()).sort((a, b) => {
-          const aTime = a.last_login ?? "";
-          const bTime = b.last_login ?? "";
+          const aTime = a.last_activity ?? "";
+          const bTime = b.last_activity ?? "";
           return bTime.localeCompare(aTime);
         }),
       };
