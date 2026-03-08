@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from "react";
 import { MobileProjectCard } from "./MobileProjectCard";
 import { MobileFilterChips } from "./MobileFilterChips";
+import { MobileStageDetailSheet } from "./MobileStageDetailSheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { useProjects, type Project } from "@/hooks/useProjects";
