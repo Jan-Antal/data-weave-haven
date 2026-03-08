@@ -230,6 +230,7 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
           project={project}
           onTap={onProjectTap}
           onOpenTPV={onOpenTPV}
+          onStageTap={handleStageTap}
           stages={stagesByProject.get(project.project_id) || []}
           urgency={urgencyMap.get(project.project_id) || null}
         />
