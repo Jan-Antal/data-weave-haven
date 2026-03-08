@@ -361,7 +361,7 @@ function ExpandArrow({ projectId, isExpanded, stageCount }: { projectId: string;
 // ── Memoized parent project row ──────────────────────────────────────
 interface PMProjectRowProps {
   project: Project;
-  docCount: number;
+  tpvCount: number;
   isExpanded: boolean;
   stageCount: number;
   onToggleExpand: (pid: string) => void;
@@ -375,6 +375,7 @@ interface PMProjectRowProps {
   riskHighlight: any;
   isFieldReadOnly: (field: string) => boolean;
   onEditProject: (p: Project) => void;
+  onOpenTPVList: (projectId: string, projectName: string) => void;
 }
 
 const PMProjectRow = memo(function PMProjectRow({
