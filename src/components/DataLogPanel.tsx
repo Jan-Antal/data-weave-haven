@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useActivityLog, type ActivityLogEntry } from "@/hooks/useActivityLog";
+import { useState, useMemo, useCallback } from "react";
+import { useActivityLog, useActivityLogUsers, type ActivityLogEntry, type DateRange } from "@/hooks/useActivityLog";
 import { useUserAnalytics, useUserRecentActions, formatSessionDuration, type UserAnalytics } from "@/hooks/useUserAnalytics";
 import { useProjects } from "@/hooks/useProjects";
 import { Button } from "@/components/ui/button";
@@ -249,7 +249,7 @@ function ActivityItem({
 
 /* ──────── Analytics tab ──────── */
 
-function UserAnalyticsTab() {
+function UserAnalyticsTab({ onShowUserActivity }: { onShowUserActivity: (email: string) => void }) {
   const { data: analytics, isLoading } = useUserAnalytics(true);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   type SortKey = "user" | "last_activity" | "actions" | "session";
@@ -326,6 +326,7 @@ function UserAnalyticsTab() {
                 user={u}
                 expanded={expandedUser === u.user_email}
                 onToggle={() => setExpandedUser(expandedUser === u.user_email ? null : u.user_email)}
+                onShowAll={() => onShowUserActivity(u.user_email)}
               />
             ))}
           </tbody>
@@ -342,10 +343,12 @@ function UserAnalyticsRow({
   user,
   expanded,
   onToggle,
+  onShowAll,
 }: {
   user: UserAnalytics;
   expanded: boolean;
   onToggle: () => void;
+  onShowAll: () => void;
 }) {
   const { data: recentActions, isLoading } = useUserRecentActions(
     expanded ? user.user_email : null,
@@ -399,6 +402,12 @@ function UserAnalyticsRow({
             ) : (
               <p className="text-[10px] text-muted-foreground">Žádné akce</p>
             )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onShowAll(); }}
+              className="text-[10px] text-primary hover:underline mt-1.5 font-medium"
+            >
+              Zobrazit vše →
+            </button>
           </td>
         </tr>
       )}
@@ -442,11 +451,13 @@ export function DataLogPanel({ open, onOpenChange }: DataLogPanelProps) {
   const [category, setCategory] = useState<Category>("all");
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   const [userFilter, setUserFilter] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<DateRange>("7d");
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const { highlightProject } = useDataLogHighlight();
 
   const { data: projects = [] } = useProjects();
   const activeProjects = useMemo(() => projects.filter(p => !p.deleted_at), [projects]);
+  const { data: allUsers = [] } = useActivityLogUsers();
 
   const {
     data,
@@ -454,7 +465,7 @@ export function DataLogPanel({ open, onOpenChange }: DataLogPanelProps) {
     hasNextPage,
     isFetchingNextPage,
     isLoading,
-  } = useActivityLog({ category, projectId: projectFilter, userEmail: userFilter, enabled: open && tab === "activity" });
+  } = useActivityLog({ category, projectId: projectFilter, userEmail: userFilter, dateRange, enabled: open && tab === "activity" });
 
   const entries = useMemo(() => data?.pages.flat() ?? [], [data]);
 
@@ -472,12 +483,6 @@ export function DataLogPanel({ open, onOpenChange }: DataLogPanelProps) {
     return groups;
   }, [entries]);
 
-  const uniqueUsers = useMemo(() => {
-    const set = new Set<string>();
-    entries.forEach(e => { if (e.user_email) set.add(e.user_email); });
-    return Array.from(set).sort();
-  }, [entries]);
-
   const handleEntrySelect = (entry: ActivityLogEntry) => {
     setSelectedEntryId(entry.id);
     if (entry.project_id !== "_system_") {
@@ -485,7 +490,20 @@ export function DataLogPanel({ open, onOpenChange }: DataLogPanelProps) {
     }
   };
 
+  const handleShowUserActivity = useCallback((email: string) => {
+    setUserFilter(email);
+    setTab("activity");
+  }, []);
+
   if (!open) return null;
+
+  const DATE_RANGE_OPTIONS: { value: DateRange; label: string }[] = [
+    { value: "today", label: "Dnes" },
+    { value: "yesterday", label: "Včera" },
+    { value: "7d", label: "7 dní" },
+    { value: "30d", label: "30 dní" },
+    { value: "all", label: "Vše" },
+  ];
 
   return (
     <div className="w-[340px] shrink-0 border-l border-border bg-card flex flex-col datalog-panel overflow-hidden h-full">
@@ -548,6 +566,31 @@ export function DataLogPanel({ open, onOpenChange }: DataLogPanelProps) {
               ))}
             </div>
 
+            <div className="flex gap-1.5">
+              <Select value={userFilter ?? "__all__"} onValueChange={v => setUserFilter(v === "__all__" ? null : v)}>
+                <SelectTrigger className="h-7 text-xs flex-1">
+                  <SelectValue placeholder="Všichni uživatelé" />
+                </SelectTrigger>
+                <SelectContent className="z-[99999]">
+                  <SelectItem value="__all__">Všichni uživatelé</SelectItem>
+                  {allUsers.map(u => (
+                    <SelectItem key={u} value={u}>{u.split("@")[0]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={dateRange} onValueChange={v => setDateRange(v as DateRange)}>
+                <SelectTrigger className="h-7 text-xs w-[90px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-[99999]">
+                  {DATE_RANGE_OPTIONS.map(o => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <Select value={projectFilter ?? "__all__"} onValueChange={v => setProjectFilter(v === "__all__" ? null : v)}>
               <SelectTrigger className="h-7 text-xs">
                 <SelectValue placeholder="Všechny projekty" />
@@ -556,18 +599,6 @@ export function DataLogPanel({ open, onOpenChange }: DataLogPanelProps) {
                 <SelectItem value="__all__">Všechny projekty</SelectItem>
                 {activeProjects.map(p => (
                   <SelectItem key={p.project_id} value={p.project_id}>{p.project_id}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={userFilter ?? "__all__"} onValueChange={v => setUserFilter(v === "__all__" ? null : v)}>
-              <SelectTrigger className="h-7 text-xs">
-                <SelectValue placeholder="Všichni uživatelé" />
-              </SelectTrigger>
-              <SelectContent className="z-[99999]">
-                <SelectItem value="__all__">Všichni uživatelé</SelectItem>
-                {uniqueUsers.map(u => (
-                  <SelectItem key={u} value={u}>{u.split("@")[0]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -627,7 +658,7 @@ export function DataLogPanel({ open, onOpenChange }: DataLogPanelProps) {
           </div>
         </>
       ) : (
-        <UserAnalyticsTab />
+        <UserAnalyticsTab onShowUserActivity={handleShowUserActivity} />
       )}
     </div>
   );
