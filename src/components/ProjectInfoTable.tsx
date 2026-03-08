@@ -752,7 +752,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
             <TableRow className="bg-primary/5">
               {/* Col 1 — Icon slot */}
               <TableHead style={COL_ICON_STYLE} className="text-center px-0">
-                <Paperclip className="h-3.5 w-3.5 text-gray-400 mx-auto" />
+                <ClipboardList className="h-3.5 w-3.5 text-muted-foreground/50 mx-auto" />
               </TableHead>
               {/* Col 2 — Chevron slot */}
               <TableHead style={COL_CHEVRON_STYLE} className="shrink-0 px-0">
