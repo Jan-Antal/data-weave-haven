@@ -791,6 +791,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                   key={p.id}
                   project={p}
                   docCount={docCounts[p.project_id] ?? 0}
+                  tpvItemCount={tpvItemsByProject.get(p.project_id)?.length ?? 0}
                   isExpanded={expanded.has(p.project_id)}
                   stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
                   onToggleExpand={toggleExpand}
@@ -805,6 +806,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                   riskHighlight={riskHighlight}
                   onEditProject={handleEditProject}
                   isFieldReadOnly={isFieldReadOnly}
+                  onOpenTPVList={handleOpenTPVList}
                 />
                 {expanded.has(p.project_id) && (
                   <StagesSection
