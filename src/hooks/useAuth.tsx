@@ -66,14 +66,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (session?.user) {
           if (event === "SIGNED_IN" && session.user.id && !hasLoginLoggedInCurrentTab()) {
-            void logLoginEvent(session.user.id, session.user.email ?? "").then((result) => {
-              if (result.logId && result.sessionStartMs) {
-                startSession(session.user.id, session.user.email ?? "", session.access_token);
-              }
-            });
-          } else if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
-            startSession(session.user.id, session.user.email ?? "", session.access_token);
+            void logLoginEvent(session.user.id, session.user.email ?? "");
           }
+          // Always start/resume session tracking (heartbeat-based, independent of login log)
+          startSession(session.user.id, session.user.email ?? "", session.access_token);
 
           prevUserRef.current = session.user.id;
 
