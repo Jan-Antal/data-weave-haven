@@ -536,6 +536,44 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Create upload session for chunked upload (large files)
+    if (action === "create_upload_session") {
+      const { fileName: sessionFileName, fileSize } = body;
+      if (!projectId || !category || !sessionFileName) {
+        return new Response(
+          JSON.stringify({ error: "Missing projectId, category, or fileName for create_upload_session" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const accessToken = await getAccessToken();
+      const driveId = await getDriveId(accessToken);
+      const path = folderPath(projectId, category);
+      await ensureFolder(accessToken, driveId, path);
+      
+      const sessionUrl = `${GRAPH}/drives/${driveId}/root:/${path}/${sessionFileName}:/createUploadSession`;
+      const sessionRes = await fetch(sessionUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          item: {
+            "@microsoft.graph.conflictBehavior": "rename",
+            name: sessionFileName,
+          },
+        }),
+      });
+      if (!sessionRes.ok) {
+        const t = await sessionRes.text();
+        throw new Error(`Upload session error ${sessionRes.status}: ${t}`);
+      }
+      const sessionData = await sessionRes.json();
+      return new Response(JSON.stringify({ uploadUrl: sessionData.uploadUrl }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Count action — accepts projectIds array
     if (action === "count") {
       if (!projectIds || !Array.isArray(projectIds) || projectIds.length === 0) {
