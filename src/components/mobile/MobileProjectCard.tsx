@@ -32,6 +32,7 @@ interface MobileProjectCardProps {
   project: Project;
   onTap: (project: Project) => void;
   onOpenTPV?: (project: Project) => void;
+  onStageTap?: (stage: Stage) => void;
   stages?: Stage[];
   dimmed?: boolean;
   urgency?: ProjectUrgency | null;
