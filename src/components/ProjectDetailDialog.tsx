@@ -407,7 +407,17 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const handleFileDrop = useCallback(async (e: React.DragEvent, categoryKey: string) => {
     e.preventDefault();
     const files = Array.from(e.dataTransfer.files);
+    const MAX_FILE_SIZE = 4.5 * 1024 * 1024; // ~4.5 MB (base64 limit for edge function)
     for (const file of files) {
+      if (file.size > MAX_FILE_SIZE) {
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+        toast({
+          title: "Soubor je příliš velký",
+          description: `${file.name} (${sizeMB} MB) — maximální velikost je 4 MB.`,
+          variant: "destructive",
+        });
+        continue;
+      }
       try {
         await sp.uploadFile(categoryKey, file);
         dispatchDocCountUpdate(project!.project_id, 1);
@@ -415,7 +425,12 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
         const catLabel = DOC_CATEGORIES.find(c => c.key === categoryKey)?.label ?? categoryKey;
         logActivity({ projectId: project!.project_id, actionType: "document_uploaded", newValue: file.name, detail: catLabel });
       } catch (err: any) {
-        toast({ title: "Chyba uploadu", description: err.message, variant: "destructive" });
+        const msg = err.message?.includes("AbortError") || err.message?.includes("timeout")
+          ? "Nahrávání trvalo příliš dlouho. Zkuste menší soubor."
+          : err.message?.includes("Edge function")
+            ? "Spojení se serverem selhalo. Zkuste to znovu."
+            : `Nepodařilo se nahrát ${file.name}. Zkuste to znovu.`;
+        toast({ title: "Chyba nahrávání", description: msg, variant: "destructive" });
       }
     }
   }, [sp]);
