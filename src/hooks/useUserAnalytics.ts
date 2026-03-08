@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 export interface UserAnalytics {
   user_email: string;
+  full_name: string | null;
+  role: string | null;
   last_login: string | null;
   last_activity: string | null;
   login_count_30d: number;
@@ -29,13 +31,11 @@ export function formatSessionDuration(minutes: number): string {
 
 /**
  * Fallback: estimate session durations from action timestamps when no heartbeat data exists.
- * Groups actions by user+date, session = last_action - first_action per day.
  */
 function estimateSessionsFromActions(
   entries: Array<{ user_email: string; created_at: string; action_type: string }>,
 ): Map<string, number[]> {
-  // Group by user_email + date
-  const dayMap = new Map<string, number[]>(); // key = "email|YYYY-MM-DD", value = timestamps
+  const dayMap = new Map<string, number[]>();
 
   for (const e of entries) {
     if (!e.user_email || e.action_type === "user_session") continue;
@@ -48,7 +48,7 @@ function estimateSessionsFromActions(
   const result = new Map<string, number[]>();
   for (const [key, timestamps] of dayMap) {
     const email = key.split("|")[0];
-    if (timestamps.length < 2) continue; // Need at least 2 actions to estimate
+    if (timestamps.length < 2) continue;
     const min = Math.min(...timestamps);
     const max = Math.max(...timestamps);
     const durationMin = Math.round((max - min) / 60_000);
@@ -69,10 +69,38 @@ export function useUserAnalytics(enabled: boolean) {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
-      const { data: allEntries } = await (supabase.from("data_log") as any)
-        .select("user_email, created_at, action_type, detail")
-        .gte("created_at", thirtyDaysAgo)
-        .order("created_at", { ascending: false });
+      // Fetch all profiles + roles first (source of truth for user list)
+      const [{ data: profilesData }, { data: rolesData }, { data: allEntries }] = await Promise.all([
+        supabase.from("profiles").select("id, email, full_name, is_active"),
+        supabase.from("user_roles").select("user_id, role"),
+        (supabase.from("data_log") as any)
+          .select("user_email, created_at, action_type, detail")
+          .gte("created_at", thirtyDaysAgo)
+          .order("created_at", { ascending: false }),
+      ]);
+
+      // Build role lookup
+      const roleMap = new Map<string, string>();
+      for (const r of (rolesData ?? []) as Array<{ user_id: string; role: string }>) {
+        roleMap.set(r.user_id, r.role);
+      }
+
+      // Build initial userMap from profiles — every registered user appears
+      const userMap = new Map<string, UserAnalytics>();
+      for (const p of (profilesData ?? []) as Array<{ id: string; email: string; full_name: string; is_active: boolean }>) {
+        if (!p.is_active) continue;
+        userMap.set(p.email, {
+          user_email: p.email,
+          full_name: p.full_name || null,
+          role: roleMap.get(p.id) ?? null,
+          last_login: null,
+          last_activity: null,
+          login_count_30d: 0,
+          total_actions_30d: 0,
+          avg_session_min: 0,
+          total_session_min: 0,
+        });
+      }
 
       const entryArr = (allEntries ?? []) as Array<{
         user_email: string;
@@ -90,16 +118,18 @@ export function useUserAnalytics(enabled: boolean) {
       );
       const uniqueUsers30d = new Set(entryArr.map((e) => e.user_email));
 
-      const userMap = new Map<string, UserAnalytics>();
       const heartbeatMinsByUser = new Map<string, number[]>();
 
       for (const entry of entryArr) {
         if (!entry.user_email) continue;
         const isSessionEntry = entry.action_type === "user_session";
 
+        // Ensure user exists in map (handles data_log entries for users not in profiles)
         if (!userMap.has(entry.user_email)) {
           userMap.set(entry.user_email, {
             user_email: entry.user_email,
+            full_name: null,
+            role: null,
             last_login: null,
             last_activity: null,
             login_count_30d: 0,
@@ -136,7 +166,7 @@ export function useUserAnalytics(enabled: boolean) {
           } catch {}
         }
 
-        // Also read from old user_login session_duration_minutes (legacy)
+        // Legacy: session_duration_minutes in user_login detail
         if (entry.action_type === "user_login" && entry.detail) {
           try {
             const parsed = JSON.parse(entry.detail) as { session_duration_minutes?: unknown };
@@ -152,18 +182,16 @@ export function useUserAnalytics(enabled: boolean) {
         }
       }
 
-      // Fallback: estimate sessions from action timestamps for users without heartbeat data
+      // Fallback: estimate sessions from action timestamps
       const estimatedSessions = estimateSessionsFromActions(entryArr);
 
       for (const [email, u] of userMap) {
         const heartbeatMins = heartbeatMinsByUser.get(email);
         if (heartbeatMins && heartbeatMins.length > 0) {
-          // Use real heartbeat data
           const total = heartbeatMins.reduce((acc, v) => acc + v, 0);
           u.total_session_min = total;
           u.avg_session_min = Math.round(total / heartbeatMins.length);
         } else {
-          // Fallback: use estimated sessions from action timestamps
           const estimated = estimatedSessions.get(email);
           if (estimated && estimated.length > 0) {
             const total = estimated.reduce((acc, v) => acc + v, 0);
@@ -178,9 +206,13 @@ export function useUserAnalytics(enabled: boolean) {
         active_7d: uniqueUsers7d.size,
         active_30d: uniqueUsers30d.size,
         users: Array.from(userMap.values()).sort((a, b) => {
+          // Users with recent activity first, then alphabetically
           const aTime = a.last_activity ?? "";
           const bTime = b.last_activity ?? "";
-          return bTime.localeCompare(aTime);
+          if (aTime && !bTime) return -1;
+          if (!aTime && bTime) return 1;
+          if (aTime && bTime) return bTime.localeCompare(aTime);
+          return (a.full_name ?? a.user_email).localeCompare(b.full_name ?? b.user_email);
         }),
       };
     },

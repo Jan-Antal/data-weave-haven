@@ -266,7 +266,7 @@ function UserAnalyticsTab({ onShowUserActivity }: { onShowUserActivity: (email: 
     return [...analytics.users].sort((a, b) => {
       let cmp = 0;
       switch (sortKey) {
-        case "user": cmp = a.user_email.localeCompare(b.user_email); break;
+        case "user": cmp = (a.full_name ?? a.user_email).localeCompare(b.full_name ?? b.user_email); break;
         case "last_activity": cmp = (a.last_activity ?? "").localeCompare(b.last_activity ?? ""); break;
         case "actions": cmp = a.total_actions_30d - b.total_actions_30d; break;
         case "session": cmp = a.avg_session_min - b.avg_session_min; break;
@@ -355,10 +355,25 @@ function UserAnalyticsRow({
     expanded
   );
 
-  const userName = user.user_email.split("@")[0];
+  const displayName = user.full_name || user.user_email.split("@")[0];
   const lastActivity = user.last_activity
     ? formatSmartTimestamp(user.last_activity)
-    : "—";
+    : "Nikdy";
+
+  const ROLE_LABELS: Record<string, string> = {
+    owner: "Owner",
+    admin: "Admin",
+    pm: "PM",
+    konstrukter: "Konstruktér",
+    viewer: "Viewer",
+  };
+  const ROLE_COLORS: Record<string, string> = {
+    owner: "bg-amber-100 text-amber-800",
+    admin: "bg-red-100 text-red-800",
+    pm: "bg-blue-100 text-blue-800",
+    konstrukter: "bg-purple-100 text-purple-800",
+    viewer: "bg-gray-100 text-gray-600",
+  };
 
   return (
     <>
@@ -369,7 +384,12 @@ function UserAnalyticsRow({
         <td className="py-1.5">
           <div className="flex items-center gap-1">
             {expanded ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
-            <span className="font-medium">{userName}</span>
+            <span className="font-medium">{displayName}</span>
+            {user.role && (
+              <span className={cn("text-[8px] px-1 py-0.5 rounded font-medium leading-none", ROLE_COLORS[user.role] || "bg-gray-100 text-gray-600")}>
+                {ROLE_LABELS[user.role] || user.role}
+              </span>
+            )}
           </div>
         </td>
         <td className="py-1.5 text-right text-muted-foreground text-[10px]">{lastActivity}</td>

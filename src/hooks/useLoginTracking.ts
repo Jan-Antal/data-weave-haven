@@ -42,12 +42,22 @@ function parseDetail(detail: string | null | undefined): LoginDetail | null {
   }
 }
 
+/** Generate a UUID client-side so we don't need .select() after insert */
+function uuidv4(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 export function hasLoginLoggedInCurrentTab() {
   return Boolean(getSessionValue(LAST_LOGIN_LOGGED_AT_KEY));
 }
 
 /**
  * Log a login event only once per browser tab session and deduplicate within 30 minutes.
+ * Works for ALL roles — no .select() calls that would fail for viewers/konstrukters.
  */
 export async function logLoginEvent(userId: string, email: string): Promise<LoginTrackingResult> {
   const now = Date.now();
@@ -72,7 +82,8 @@ export async function logLoginEvent(userId: string, email: string): Promise<Logi
     };
   }
 
-  // DB dedup for reload/race safety.
+  // DB dedup — wrapped in try/catch because Viewers can't SELECT from data_log.
+  // If SELECT fails, we skip dedup and rely on tab-level + in-memory guards.
   try {
     const thirtyMinAgo = new Date(now - LOGIN_DEDUP_WINDOW_MS).toISOString();
     const { data: recent } = await (supabase.from("data_log") as any)
@@ -106,9 +117,11 @@ export async function logLoginEvent(userId: string, email: string): Promise<Logi
       };
     }
   } catch {
-    // ignore dedup read failures and try insert
+    // SELECT not allowed for this role — skip dedup, proceed to insert
   }
 
+  // Generate ID client-side so we don't need .select() after insert
+  const logId = uuidv4();
   const baseDetail: LoginDetail = {
     email,
     login_method: "password",
@@ -117,8 +130,9 @@ export async function logLoginEvent(userId: string, email: string): Promise<Logi
   };
 
   try {
-    const { data: inserted, error } = await (supabase.from("data_log") as any)
+    const { error } = await (supabase.from("data_log") as any)
       .insert({
+        id: logId,
         project_id: "_system_",
         user_id: userId,
         user_email: email,
@@ -126,26 +140,21 @@ export async function logLoginEvent(userId: string, email: string): Promise<Logi
         old_value: null,
         new_value: null,
         detail: JSON.stringify(baseDetail),
-      })
-      .select("id, created_at")
-      .single();
+      });
 
     if (error) throw error;
 
-    const logId = inserted?.id ?? null;
-    const sessionStartMs = inserted?.created_at
-      ? new Date(inserted.created_at).getTime()
-      : now;
+    const sessionStartMs = now;
 
-    if (logId) {
-      setSessionValue(LAST_LOGIN_LOGGED_AT_KEY, String(now));
-      setSessionValue(ACTIVE_LOGIN_LOG_ID_KEY, logId);
-      setSessionValue(ACTIVE_SESSION_START_KEY, String(sessionStartMs));
-      setSessionValue(ACTIVE_LOGIN_DETAIL_KEY, JSON.stringify(baseDetail));
-    }
+    setSessionValue(LAST_LOGIN_LOGGED_AT_KEY, String(now));
+    setSessionValue(ACTIVE_LOGIN_LOG_ID_KEY, logId);
+    setSessionValue(ACTIVE_SESSION_START_KEY, String(sessionStartMs));
+    setSessionValue(ACTIVE_LOGIN_DETAIL_KEY, JSON.stringify(baseDetail));
 
     lastTrackedUserId = userId;
     lastLoginTime = now;
+
+    console.log(`[LoginTracking] Logged login for ${email}`);
 
     return {
       logged: true,
