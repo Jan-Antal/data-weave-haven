@@ -384,7 +384,12 @@ function UserAnalyticsRow({
         <td className="py-1.5">
           <div className="flex items-center gap-1">
             {expanded ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
-            <span className="font-medium">{userName}</span>
+            <span className="font-medium">{displayName}</span>
+            {user.role && (
+              <span className={cn("text-[8px] px-1 py-0.5 rounded font-medium leading-none", ROLE_COLORS[user.role] || "bg-gray-100 text-gray-600")}>
+                {ROLE_LABELS[user.role] || user.role}
+              </span>
+            )}
           </div>
         </td>
         <td className="py-1.5 text-right text-muted-foreground text-[10px]">{lastActivity}</td>
