@@ -241,6 +241,12 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
           Žádné výsledky
         </div>
       )}
+
+      <MobileStageDetailSheet
+        stage={selectedStage}
+        open={stageSheetOpen}
+        onOpenChange={setStageSheetOpen}
+      />
     </div>
   );
 }
