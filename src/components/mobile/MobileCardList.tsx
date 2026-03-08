@@ -1,11 +1,13 @@
 import { useState, useMemo, useCallback, useRef } from "react";
 import { MobileProjectCard } from "./MobileProjectCard";
 import { MobileFilterChips } from "./MobileFilterChips";
+import { MobileStageDetailSheet } from "./MobileStageDetailSheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { useProjects, type Project } from "@/hooks/useProjects";
 import { useStagesByProject } from "@/hooks/useAllProjectStages";
 import { useProjectAttention } from "@/hooks/useProjectAttention";
+import type { ProjectStage } from "@/hooks/useProjectStages";
 import { useAuth } from "@/hooks/useAuth";
 import { useSortFilter } from "@/hooks/useSortFilter";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
@@ -49,6 +51,14 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
   const [refreshing, setRefreshing] = useState(false);
   const touchStartY = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Stage detail sheet state
+  const [selectedStage, setSelectedStage] = useState<ProjectStage | null>(null);
+  const [stageSheetOpen, setStageSheetOpen] = useState(false);
+
+  const handleStageTap = useCallback((stage: any) => {
+    setSelectedStage(stage as ProjectStage);
+    setStageSheetOpen(true);
+  }, []);
 
   // Apply chip filter
   const chipFiltered = useMemo(() => {
@@ -220,6 +230,7 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
           project={project}
           onTap={onProjectTap}
           onOpenTPV={onOpenTPV}
+          onStageTap={handleStageTap}
           stages={stagesByProject.get(project.project_id) || []}
           urgency={urgencyMap.get(project.project_id) || null}
         />
@@ -230,6 +241,12 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
           Žádné výsledky
         </div>
       )}
+
+      <MobileStageDetailSheet
+        stage={selectedStage}
+        open={stageSheetOpen}
+        onOpenChange={setStageSheetOpen}
+      />
     </div>
   );
 }

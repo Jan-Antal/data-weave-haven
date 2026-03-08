@@ -32,6 +32,7 @@ interface MobileProjectCardProps {
   project: Project;
   onTap: (project: Project) => void;
   onOpenTPV?: (project: Project) => void;
+  onStageTap?: (stage: Stage) => void;
   stages?: Stage[];
   dimmed?: boolean;
   urgency?: ProjectUrgency | null;
@@ -60,7 +61,7 @@ function daysUntil(dateStr: string | null | undefined): number | null {
   return Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export const MobileProjectCard = memo(function MobileProjectCard({ project, onTap, onOpenTPV, stages = [], dimmed, urgency }: MobileProjectCardProps) {
+export const MobileProjectCard = memo(function MobileProjectCard({ project, onTap, onOpenTPV, onStageTap, stages = [], dimmed, urgency }: MobileProjectCardProps) {
   const [stagesExpanded, setStagesExpanded] = useState(false);
   const riskColor = project.risk ? RISK_COLORS[project.risk] : undefined;
   const hasStages = stages.length > 0;
@@ -155,28 +156,29 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
               <button
                 key={stage.id}
                 className="w-full px-4 py-2 border-b last:border-b-0 flex items-center justify-between min-h-[44px] text-left hover:bg-muted/50 transition-colors"
-                onClick={() => onTap({ ...project, id: stage.id } as any)}
+                onClick={() => onStageTap?.(stage)}
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium">{stage.stage_name}</p>
-                  {stage.datum_smluvni && (
-                    <p className="text-[11px] text-muted-foreground">
-                      {(() => { const d = parseAppDate(stage.datum_smluvni); return d ? formatAppDate(d) : stage.datum_smluvni; })()}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {stage.status && <StatusBadge status={stage.status} />}
-                  {isUrgent && (
-                    <span className={cn(
-                      "text-[10px] font-medium px-1 py-0.5 rounded-full whitespace-nowrap",
-                      isPast
-                        ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                    )}>
-                      ⚠ {isPast ? `${Math.abs(days!)}d` : `${days}d`}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-semibold truncate">{stage.display_name || stage.stage_name}</p>
+                    {stage.status && <StatusBadge status={stage.status} />}
+                    {isUrgent && (
+                      <span className={cn(
+                        "text-[10px] font-medium px-1 py-0.5 rounded-full whitespace-nowrap shrink-0",
+                        isPast
+                          ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                          : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                      )}>
+                        ⚠ {isPast ? `${Math.abs(days!)}d` : `${days}d`}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                    {stage.project_id}
+                    {stage.datum_smluvni && (
+                      <> · Datum S.: {(() => { const d = parseAppDate(stage.datum_smluvni); return d ? formatAppDate(d) : stage.datum_smluvni; })()}</>
+                    )}
+                  </p>
                 </div>
               </button>
             );
