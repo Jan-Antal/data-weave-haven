@@ -4,8 +4,8 @@ import { useUserAnalytics, useUserRecentActions, formatSessionDuration, type Use
 import { useProjects } from "@/hooks/useProjects";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Clock, Users, ChevronDown, ChevronRight, ArrowUpDown } from "lucide-react";
-import { format, isToday, isYesterday } from "date-fns";
+import { X, Clock, Users, ChevronDown, ChevronRight } from "lucide-react";
+import { format, isToday, isYesterday, differenceInDays } from "date-fns";
 import { cs } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useDataLogHighlight } from "@/components/DataLogHighlightContext";
@@ -45,7 +45,20 @@ const DOT_COLORS: Record<string, string> = {
   stage_document_deleted: "bg-orange-500",
   user_login: "bg-emerald-500",
   session_end: "bg-teal-400",
+  project_id_change: "bg-indigo-500",
 };
+
+const CZECH_DAY_SHORT = ["Ne", "Po", "Út", "St", "Čt", "Pá", "So"];
+
+/** Smart timestamp: dnes 14:30 / včera 09:15 / Po 14:30 / 5. 3. 2026 14:30 */
+function formatSmartTimestamp(dateStr: string): string {
+  const d = new Date(dateStr);
+  const time = format(d, "HH:mm");
+  if (isToday(d)) return `dnes ${time}`;
+  if (isYesterday(d)) return `včera ${time}`;
+  if (differenceInDays(new Date(), d) < 7) return `${CZECH_DAY_SHORT[d.getDay()]} ${time}`;
+  return `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()} ${time}`;
+}
 
 function formatDayHeader(dateStr: string): string {
   const d = new Date(dateStr);
@@ -64,7 +77,7 @@ function ActivityItem({
   onSelect: (entry: ActivityLogEntry) => void;
 }) {
   const userName = entry.user_email?.split("@")[0] || "Uživatel";
-  const time = format(new Date(entry.created_at), "HH:mm");
+  const timestamp = formatSmartTimestamp(entry.created_at);
   const pid = entry.project_id;
   const isSystemEntry = pid === "_system_";
 
@@ -75,10 +88,10 @@ function ActivityItem({
 
   switch (entry.action_type) {
     case "user_login":
-      mainText = <>👤 {userName} se přihlásil/a</>;
+      mainText = <>👤 <span className="font-medium">{userName}</span> se přihlásil/a</>;
       break;
     case "page_view":
-      mainText = <>📄 {userName} zobrazil/a {entry.new_value || "stránku"}</>;
+      mainText = <>📄 <span className="font-medium">{userName}</span> zobrazil/a {entry.new_value || "stránku"}</>;
       break;
     case "session_end": {
       let durText = "";
@@ -86,11 +99,11 @@ function ActivityItem({
         const d = JSON.parse(entry.detail || "{}");
         durText = ` (${d.duration_minutes ?? 0} min)`;
       } catch {}
-      mainText = <>🕐 {userName} – session{durText}</>;
+      mainText = <>🕐 <span className="font-medium">{userName}</span> – session{durText}</>;
       break;
     }
     case "status_change":
-      mainText = <>{userName} změnil/a status {projectLabel}</>;
+      mainText = <>✏️ <span className="font-medium">{userName}</span> změnil/a status {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] line-through px-1.5 py-0.5 rounded" style={{ background: '#fee2e2', color: '#991b1b' }}>{entry.old_value || "—"}</span>
@@ -101,8 +114,8 @@ function ActivityItem({
       break;
     case "konstrukter_change":
       mainText = entry.detail
-        ? <>{userName} změnil/a konstruktéra {entry.detail} v {projectLabel}</>
-        : <>{userName} změnil/a konstruktéra {projectLabel}</>;
+        ? <>✏️ <span className="font-medium">{userName}</span> změnil/a konstruktéra {entry.detail} v {projectLabel}</>
+        : <>✏️ <span className="font-medium">{userName}</span> změnil/a konstruktéra {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] line-through px-1.5 py-0.5 rounded" style={{ background: '#fee2e2', color: '#991b1b' }}>{entry.old_value || "—"}</span>
@@ -112,7 +125,7 @@ function ActivityItem({
       );
       break;
     case "datum_smluvni_change":
-      mainText = <>{userName} změnil/a datum smluvní {projectLabel}</>;
+      mainText = <>📅 <span className="font-medium">{userName}</span> změnil/a datum smluvní {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] line-through px-1.5 py-0.5 rounded" style={{ background: '#fee2e2', color: '#991b1b' }}>{entry.old_value || "—"}</span>
@@ -122,16 +135,16 @@ function ActivityItem({
       );
       break;
     case "project_created":
-      mainText = <>{userName} vytvořil/a {projectLabel}{entry.detail ? ` — ${entry.detail}` : ""}</>;
+      mainText = <>➕ <span className="font-medium">{userName}</span> vytvořil/a {projectLabel}{entry.detail ? ` — ${entry.detail}` : ""}</>;
       break;
     case "project_deleted":
-      mainText = <>{userName} smazal/a {projectLabel}{entry.detail ? ` — ${entry.detail}` : ""}</>;
+      mainText = <>🗑 <span className="font-medium">{userName}</span> smazal/a {projectLabel}{entry.detail ? ` — ${entry.detail}` : ""}</>;
       break;
     case "project_restored":
-      mainText = <>{userName} obnovil/a {projectLabel}{entry.detail ? ` — ${entry.detail}` : ""}</>;
+      mainText = <>♻️ <span className="font-medium">{userName}</span> obnovil/a {projectLabel}{entry.detail ? ` — ${entry.detail}` : ""}</>;
       break;
     case "document_uploaded":
-      mainText = <>{userName} nahrál/a dokument do {projectLabel}</>;
+      mainText = <>📁 <span className="font-medium">{userName}</span> nahrál/a dokument do {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] bg-muted px-1.5 py-0.5 rounded truncate max-w-[220px]">📄 {entry.new_value}</span>
@@ -140,7 +153,7 @@ function ActivityItem({
       );
       break;
     case "document_deleted":
-      mainText = <>{userName} smazal/a dokument z {projectLabel}</>;
+      mainText = <>🗑 <span className="font-medium">{userName}</span> smazal/a dokument z {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded truncate max-w-[220px]">🗑 {entry.old_value}</span>
@@ -149,13 +162,13 @@ function ActivityItem({
       );
       break;
     case "stage_created":
-      mainText = <>{userName} vytvořil/a etapu {entry.detail} v {projectLabel}</>;
+      mainText = <>➕ <span className="font-medium">{userName}</span> vytvořil/a etapu {entry.detail} v {projectLabel}</>;
       break;
     case "stage_deleted":
-      mainText = <>{userName} smazal/a etapu {entry.detail} z {projectLabel}</>;
+      mainText = <>🗑 <span className="font-medium">{userName}</span> smazal/a etapu {entry.detail} z {projectLabel}</>;
       break;
     case "stage_status_change":
-      mainText = <>{userName} změnil/a status {entry.detail} v {projectLabel}</>;
+      mainText = <>✏️ <span className="font-medium">{userName}</span> změnil/a status {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] line-through px-1.5 py-0.5 rounded" style={{ background: '#fee2e2', color: '#991b1b' }}>{entry.old_value || "—"}</span>
@@ -165,7 +178,7 @@ function ActivityItem({
       );
       break;
     case "stage_konstrukter_change":
-      mainText = <>{userName} změnil/a konstruktéra {entry.detail} v {projectLabel}</>;
+      mainText = <>✏️ <span className="font-medium">{userName}</span> změnil/a konstruktéra {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] line-through px-1.5 py-0.5 rounded" style={{ background: '#fee2e2', color: '#991b1b' }}>{entry.old_value || "—"}</span>
@@ -175,7 +188,7 @@ function ActivityItem({
       );
       break;
     case "stage_datum_smluvni_change":
-      mainText = <>{userName} změnil/a datum smluvní {entry.detail} v {projectLabel}</>;
+      mainText = <>📅 <span className="font-medium">{userName}</span> změnil/a datum smluvní {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] line-through px-1.5 py-0.5 rounded" style={{ background: '#fee2e2', color: '#991b1b' }}>{entry.old_value || "—"}</span>
@@ -185,7 +198,7 @@ function ActivityItem({
       );
       break;
     case "stage_document_uploaded":
-      mainText = <>{userName} nahrál/a dokument do {entry.detail} v {projectLabel}</>;
+      mainText = <>📁 <span className="font-medium">{userName}</span> nahrál/a dokument do {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] bg-muted px-1.5 py-0.5 rounded truncate max-w-[220px]">📄 {entry.new_value}</span>
@@ -193,13 +206,25 @@ function ActivityItem({
       );
       break;
     case "stage_document_deleted":
-      mainText = <>{userName} smazal/a dokument z {entry.detail} v {projectLabel}</>;
+      mainText = <>🗑 <span className="font-medium">{userName}</span> smazal/a dokument z {entry.detail} v {projectLabel}</>;
       subContent = (
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded truncate max-w-[220px]">🗑 {entry.old_value}</span>
         </div>
       );
       break;
+    case "project_id_change":
+      mainText = <>🔄 <span className="font-medium">{userName}</span> změnil/a ID projektu</>;
+      subContent = (
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <span className="text-[11px] line-through px-1.5 py-0.5 rounded" style={{ background: '#fee2e2', color: '#991b1b' }}>{entry.old_value || "—"}</span>
+          <span className="text-[10px]" style={{ color: '#9ca3af' }}>→</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: '#d1fae5', color: '#065f46' }}>{entry.new_value || "—"}</span>
+        </div>
+      );
+      break;
+    default:
+      mainText = <><span className="font-medium">{userName}</span> — {entry.action_type} {projectLabel}</>;
   }
 
   return (
@@ -216,7 +241,7 @@ function ActivityItem({
       <div className="min-w-0 flex-1">
         <p className="text-[12px] leading-[1.4] text-foreground">{mainText}</p>
         {subContent}
-        <p className="text-[10px] text-muted-foreground mt-0.5">{time}</p>
+        <p className="text-[10px] text-muted-foreground mt-0.5">{timestamp}</p>
       </div>
     </button>
   );
@@ -227,8 +252,8 @@ function ActivityItem({
 function UserAnalyticsTab() {
   const { data: analytics, isLoading } = useUserAnalytics(true);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
-  type SortKey = "user" | "last_login" | "logins" | "session";
-  const [sortKey, setSortKey] = useState<SortKey>("last_login");
+  type SortKey = "user" | "last_activity" | "actions" | "session";
+  const [sortKey, setSortKey] = useState<SortKey>("last_activity");
   const [sortAsc, setSortAsc] = useState(false);
 
   const toggleSort = (key: SortKey) => {
@@ -242,8 +267,8 @@ function UserAnalyticsTab() {
       let cmp = 0;
       switch (sortKey) {
         case "user": cmp = a.user_email.localeCompare(b.user_email); break;
-        case "last_login": cmp = (a.last_login ?? "").localeCompare(b.last_login ?? ""); break;
-        case "logins": cmp = a.login_count_30d - b.login_count_30d; break;
+        case "last_activity": cmp = (a.last_activity ?? "").localeCompare(b.last_activity ?? ""); break;
+        case "actions": cmp = a.total_actions_30d - b.total_actions_30d; break;
         case "session": cmp = a.avg_session_min - b.avg_session_min; break;
       }
       return sortAsc ? cmp : -cmp;
@@ -289,8 +314,8 @@ function UserAnalyticsTab() {
           <thead>
             <tr className="text-left text-muted-foreground border-b">
               <SortHeader label="Uživatel" k="user" />
-              <SortHeader label="Poslední" k="last_login" align="text-right" />
-              <SortHeader label="30d" k="logins" align="text-right" />
+              <SortHeader label="Aktivita" k="last_activity" align="text-right" />
+              <SortHeader label="Akce" k="actions" align="text-right" />
               <SortHeader label="Ø Session" k="session" align="text-right" />
             </tr>
           </thead>
@@ -328,8 +353,8 @@ function UserAnalyticsRow({
   );
 
   const userName = user.user_email.split("@")[0];
-  const lastLogin = user.last_login
-    ? format(new Date(user.last_login), "d.M. HH:mm")
+  const lastActivity = user.last_activity
+    ? formatSmartTimestamp(user.last_activity)
     : "—";
 
   return (
@@ -344,24 +369,29 @@ function UserAnalyticsRow({
             <span className="font-medium">{userName}</span>
           </div>
         </td>
-        <td className="py-1.5 text-right text-muted-foreground">{lastLogin}</td>
-        <td className="py-1.5 text-right font-mono">{user.login_count_30d}</td>
+        <td className="py-1.5 text-right text-muted-foreground text-[10px]">{lastActivity}</td>
+        <td className="py-1.5 text-right font-mono">{user.total_actions_30d}</td>
         <td className="py-1.5 text-right font-mono">{formatSessionDuration(user.avg_session_min)}</td>
       </tr>
       {expanded && (
         <tr>
           <td colSpan={4} className="bg-muted/20 px-2 py-1.5">
+            {/* Summary row */}
+            <div className="flex gap-3 text-[10px] text-muted-foreground mb-1.5 pb-1.5 border-b border-border/30">
+              <span>Přihlášení: <strong className="text-foreground">{user.login_count_30d}</strong></span>
+              <span>Posl. login: <strong className="text-foreground">{user.last_login ? formatSmartTimestamp(user.last_login) : "—"}</strong></span>
+            </div>
             {isLoading ? (
               <p className="text-[10px] text-muted-foreground">Načítání…</p>
             ) : recentActions && recentActions.length > 0 ? (
               <div className="space-y-0.5 max-h-[200px] overflow-y-auto">
                 {recentActions.map((a) => {
                   const actionLabel = getActionLabel(a.action_type, a.new_value, a.project_id, a.detail);
-                  const time = format(new Date(a.created_at), "HH:mm");
+                  const ts = formatSmartTimestamp(a.created_at);
                   return (
                     <div key={a.id} className="flex justify-between text-[10px]">
                       <span className="truncate mr-2">{actionLabel}</span>
-                      <span className="text-muted-foreground shrink-0">{time}</span>
+                      <span className="text-muted-foreground shrink-0">{ts}</span>
                     </div>
                   );
                 })}
@@ -390,16 +420,17 @@ function getActionLabel(actionType: string, newValue: string | null, projectId: 
     }
     case "status_change": return `✏️ Upravil ${projectId} · status`;
     case "konstrukter_change": return `✏️ Upravil ${projectId} · konstruktér`;
-    case "datum_smluvni_change": return `✏️ Upravil ${projectId} · datum`;
+    case "datum_smluvni_change": return `📅 Upravil ${projectId} · datum`;
     case "project_created": return `➕ Vytvořen ${projectId}`;
     case "project_deleted": return `🗑 Smazán ${projectId}`;
     case "project_restored": return `♻️ Obnoven ${projectId}`;
-    case "document_uploaded": return `📄 Nahrán dokument (${projectId})`;
+    case "document_uploaded": return `📁 Nahrán dokument (${projectId})`;
     case "document_deleted": return `🗑 Smazán dokument (${projectId})`;
     case "stage_created": return `➕ Etapa ${detail || ""} (${projectId})`;
     case "stage_deleted": return `🗑 Etapa ${detail || ""} (${projectId})`;
     case "stage_status_change": return `✏️ Status etapy ${detail || ""} (${projectId})`;
     case "stage_konstrukter_change": return `✏️ Konstruktér etapy (${projectId})`;
+    case "project_id_change": return `🔄 Změna ID (${projectId})`;
     default: return `${actionType} (${projectId})`;
   }
 }
