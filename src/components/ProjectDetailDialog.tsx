@@ -280,10 +280,12 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck(project?.id);
 
   const sp = useSharePointDocs(project?.project_id ?? "");
+  const chunked = useChunkedUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewFile, setPreviewFile] = useState<{ file: SPFile; categoryKey: string; loading: boolean; previewUrl: string | null; webUrl: string | null; downloadUrl: string | null } | null>(null);
   const isMobile = useIsMobile();
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const activeUploadCatRef = useRef<string | null>(null);
 
   // ── Mobile swipe-down-to-close ──────────────────────────────
   const [mobileDragY, setMobileDragY] = useState(0);

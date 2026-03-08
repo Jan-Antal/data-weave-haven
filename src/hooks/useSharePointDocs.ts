@@ -17,7 +17,7 @@ export interface SPPreview {
   name: string;
 }
 
-const CATEGORY_FOLDER_MAP: Record<string, string> = {
+export const CATEGORY_FOLDER_MAP: Record<string, string> = {
   cenova_nabidka: "Cenova-nabidka",
   smlouva: "Smlouva",
   zadani: "Zadani",
