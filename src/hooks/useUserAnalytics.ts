@@ -27,6 +27,39 @@ export function formatSessionDuration(minutes: number): string {
   return `${hours}h ${mins}min`;
 }
 
+/**
+ * Fallback: estimate session durations from action timestamps when no heartbeat data exists.
+ * Groups actions by user+date, session = last_action - first_action per day.
+ */
+function estimateSessionsFromActions(
+  entries: Array<{ user_email: string; created_at: string; action_type: string }>,
+): Map<string, number[]> {
+  // Group by user_email + date
+  const dayMap = new Map<string, number[]>(); // key = "email|YYYY-MM-DD", value = timestamps
+
+  for (const e of entries) {
+    if (!e.user_email || e.action_type === "user_session") continue;
+    const day = e.created_at.slice(0, 10);
+    const key = `${e.user_email}|${day}`;
+    if (!dayMap.has(key)) dayMap.set(key, []);
+    dayMap.get(key)!.push(new Date(e.created_at).getTime());
+  }
+
+  const result = new Map<string, number[]>();
+  for (const [key, timestamps] of dayMap) {
+    const email = key.split("|")[0];
+    if (timestamps.length < 2) continue; // Need at least 2 actions to estimate
+    const min = Math.min(...timestamps);
+    const max = Math.max(...timestamps);
+    const durationMin = Math.round((max - min) / 60_000);
+    if (durationMin < 1) continue;
+    if (!result.has(email)) result.set(email, []);
+    result.get(email)!.push(durationMin);
+  }
+
+  return result;
+}
+
 export function useUserAnalytics(enabled: boolean) {
   return useQuery({
     queryKey: ["user-analytics"],
@@ -36,7 +69,6 @@ export function useUserAnalytics(enabled: boolean) {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
-      // Fetch ALL data_log entries from last 30 days
       const { data: allEntries } = await (supabase.from("data_log") as any)
         .select("user_email, created_at, action_type, detail")
         .gte("created_at", thirtyDaysAgo)
@@ -59,12 +91,10 @@ export function useUserAnalytics(enabled: boolean) {
       const uniqueUsers30d = new Set(entryArr.map((e) => e.user_email));
 
       const userMap = new Map<string, UserAnalytics>();
-      const sessionMinsByUser = new Map<string, number[]>();
+      const heartbeatMinsByUser = new Map<string, number[]>();
 
       for (const entry of entryArr) {
         if (!entry.user_email) continue;
-
-        // Skip user_session entries from action counts (they're internal tracking)
         const isSessionEntry = entry.action_type === "user_session";
 
         if (!userMap.has(entry.user_email)) {
@@ -83,7 +113,6 @@ export function useUserAnalytics(enabled: boolean) {
 
         if (!isSessionEntry) {
           u.total_actions_30d += 1;
-          // Track last real activity (not heartbeats)
           if (!u.last_activity) u.last_activity = entry.created_at;
         }
 
@@ -92,47 +121,56 @@ export function useUserAnalytics(enabled: boolean) {
           if (!u.last_login) u.last_login = entry.created_at;
         }
 
-        // Extract session duration from user_session entries (heartbeat-based)
+        // Extract duration from heartbeat user_session records
         if (isSessionEntry && entry.detail) {
           try {
             const parsed = JSON.parse(entry.detail) as { duration_minutes?: unknown };
             const minutesRaw = parsed.duration_minutes;
             const minutes = typeof minutesRaw === "number" ? minutesRaw : Number(minutesRaw);
             if (Number.isFinite(minutes) && minutes > 0) {
-              if (!sessionMinsByUser.has(entry.user_email)) {
-                sessionMinsByUser.set(entry.user_email, []);
+              if (!heartbeatMinsByUser.has(entry.user_email)) {
+                heartbeatMinsByUser.set(entry.user_email, []);
               }
-              sessionMinsByUser.get(entry.user_email)!.push(Math.round(minutes));
+              heartbeatMinsByUser.get(entry.user_email)!.push(Math.round(minutes));
             }
-          } catch {
-            // ignore
-          }
+          } catch {}
         }
 
-        // Fallback: also read from old user_login session_duration_minutes
+        // Also read from old user_login session_duration_minutes (legacy)
         if (entry.action_type === "user_login" && entry.detail) {
           try {
             const parsed = JSON.parse(entry.detail) as { session_duration_minutes?: unknown };
             const minutesRaw = parsed.session_duration_minutes;
             const minutes = typeof minutesRaw === "number" ? minutesRaw : Number(minutesRaw);
             if (Number.isFinite(minutes) && minutes > 0) {
-              if (!sessionMinsByUser.has(entry.user_email)) {
-                sessionMinsByUser.set(entry.user_email, []);
+              if (!heartbeatMinsByUser.has(entry.user_email)) {
+                heartbeatMinsByUser.set(entry.user_email, []);
               }
-              sessionMinsByUser.get(entry.user_email)!.push(Math.round(minutes));
+              heartbeatMinsByUser.get(entry.user_email)!.push(Math.round(minutes));
             }
-          } catch {
-            // ignore
-          }
+          } catch {}
         }
       }
 
-      for (const [email, mins] of sessionMinsByUser) {
-        const u = userMap.get(email);
-        if (!u) continue;
-        const total = mins.reduce((acc, v) => acc + v, 0);
-        u.total_session_min = total;
-        u.avg_session_min = mins.length > 0 ? Math.round(total / mins.length) : 0;
+      // Fallback: estimate sessions from action timestamps for users without heartbeat data
+      const estimatedSessions = estimateSessionsFromActions(entryArr);
+
+      for (const [email, u] of userMap) {
+        const heartbeatMins = heartbeatMinsByUser.get(email);
+        if (heartbeatMins && heartbeatMins.length > 0) {
+          // Use real heartbeat data
+          const total = heartbeatMins.reduce((acc, v) => acc + v, 0);
+          u.total_session_min = total;
+          u.avg_session_min = Math.round(total / heartbeatMins.length);
+        } else {
+          // Fallback: use estimated sessions from action timestamps
+          const estimated = estimatedSessions.get(email);
+          if (estimated && estimated.length > 0) {
+            const total = estimated.reduce((acc, v) => acc + v, 0);
+            u.total_session_min = total;
+            u.avg_session_min = Math.round(total / estimated.length);
+          }
+        }
       }
 
       return {

@@ -35,23 +35,31 @@ function ssRemove(key: string) {
   try { sessionStorage.removeItem(key); } catch {}
 }
 
+/** Generate a UUID v4 client-side so we don't need SELECT after INSERT */
+function uuidv4(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 function onActivity() {
   lastActivityMs = Date.now();
   if (isIdle) {
     isIdle = false;
-    // Resuming from idle — check if gap is too large
     const now = Date.now();
     if (lastHeartbeatMs && now - lastHeartbeatMs > SESSION_GAP_TIMEOUT_MS) {
-      // Gap too large — end old session, start new one
       void endAndStartNew();
     } else {
-      // Small gap — just resume heartbeats
       startHeartbeat();
     }
   }
 }
 
-// Debounce activity listeners — we only care about recency
 let activityDebounce: ReturnType<typeof setTimeout> | null = null;
 function onActivityDebounced() {
   if (activityDebounce) return;
@@ -63,14 +71,17 @@ function onActivityDebounced() {
 async function createSessionRow(): Promise<string | null> {
   if (!userId || !userEmail) return null;
   const now = new Date();
+  const id = uuidv4();
   const detail = JSON.stringify({
     session_start: now.toISOString(),
     last_heartbeat: now.toISOString(),
     duration_minutes: 0,
   });
   try {
-    const { data, error } = await (supabase.from("data_log") as any)
+    // Use client-generated ID — don't need .select() which requires SELECT permission
+    const { error } = await (supabase.from("data_log") as any)
       .insert({
+        id,
         project_id: "_system_",
         user_id: userId,
         user_email: userEmail,
@@ -78,23 +89,19 @@ async function createSessionRow(): Promise<string | null> {
         old_value: null,
         new_value: null,
         detail,
-      })
-      .select("id, created_at")
-      .single();
+      });
     if (error) throw error;
-    const id = data?.id ?? null;
-    const startMs = data?.created_at ? new Date(data.created_at).getTime() : now.getTime();
-    if (id) {
-      sessionLogId = id;
-      sessionStartMs = startMs;
-      lastHeartbeatMs = now.getTime();
-      ssSet(SESSION_LOG_ID_KEY, id);
-      ssSet(SESSION_START_KEY, String(startMs));
-      ssSet(SESSION_LAST_HB_KEY, String(now.getTime()));
-    }
+
+    sessionLogId = id;
+    sessionStartMs = now.getTime();
+    lastHeartbeatMs = now.getTime();
+    ssSet(SESSION_LOG_ID_KEY, id);
+    ssSet(SESSION_START_KEY, String(now.getTime()));
+    ssSet(SESSION_LAST_HB_KEY, String(now.getTime()));
+    console.log(`[Session] Created session ${id.slice(0, 8)} for ${userEmail}`);
     return id;
   } catch (e) {
-    console.error("Session create error:", e);
+    console.error("[Session] Create error:", e);
     return null;
   }
 }
@@ -112,20 +119,23 @@ async function sendHeartbeat() {
   lastHeartbeatMs = now;
   ssSet(SESSION_LAST_HB_KEY, String(now));
   try {
-    await (supabase.from("data_log") as any)
+    // Update by id + user_id + action_type (matches RLS policy)
+    const { error } = await (supabase.from("data_log") as any)
       .update({ detail })
       .eq("id", sessionLogId)
       .eq("user_id", userId)
       .eq("action_type", "user_session");
+    if (error) {
+      console.warn("[Session] Heartbeat update failed:", error.message);
+    }
   } catch (e) {
-    console.error("Heartbeat error:", e);
+    console.error("[Session] Heartbeat error:", e);
   }
 }
 
 // ── Timers ─────────────────────────────────────────────────
 function startHeartbeat() {
   stopHeartbeat();
-  // Immediate heartbeat on resume
   void sendHeartbeat();
   heartbeatTimer = setInterval(() => {
     if (!isIdle) void sendHeartbeat();
@@ -142,7 +152,6 @@ function startIdleCheck() {
     if (lastActivityMs && Date.now() - lastActivityMs > IDLE_TIMEOUT_MS && !isIdle) {
       isIdle = true;
       stopHeartbeat();
-      // Send one final heartbeat to mark last active time
       void sendHeartbeat();
     }
   }, ACTIVITY_CHECK_MS);
@@ -155,16 +164,14 @@ function stopIdleCheck() {
 // ── Visibility change ──────────────────────────────────────
 function onVisibilityChange() {
   if (document.hidden) {
-    // Tab hidden — pause heartbeats but don't end session
     stopHeartbeat();
-    void sendHeartbeat(); // one last heartbeat
+    void sendHeartbeat();
   } else {
-    // Tab visible again
-    onActivity(); // triggers resume logic with gap check
+    onActivity();
   }
 }
 
-// ── beforeunload — best-effort final heartbeat via sendBeacon
+// ── beforeunload — best-effort final heartbeat ─────────────
 function onBeforeUnload() {
   if (!sessionLogId || !userId || !sessionStartMs) return;
   const now = Date.now();
@@ -183,54 +190,38 @@ function onBeforeUnload() {
     `&user_id=eq.${encodeURIComponent(userId)}` +
     `&action_type=eq.user_session`;
   const url = `${baseUrl}/rest/v1/data_log?${query}`;
-
-  // Try sendBeacon first (more reliable on unload), fallback to keepalive fetch
-  const body = JSON.stringify({ detail });
   const headers = {
     "Content-Type": "application/json",
     apikey: key,
     Authorization: `Bearer ${accessToken}`,
     Prefer: "return=minimal",
   };
-
-  if (navigator.sendBeacon) {
-    const blob = new Blob([body], { type: "application/json" });
-    // sendBeacon doesn't support custom headers, so use fetch with keepalive
-    try {
-      fetch(url, { method: "PATCH", headers, body, keepalive: true });
-    } catch {}
-  } else {
-    try {
-      fetch(url, { method: "PATCH", headers, body, keepalive: true });
-    } catch {}
-  }
+  const body = JSON.stringify({ detail });
+  try {
+    fetch(url, { method: "PATCH", headers, body, keepalive: true });
+  } catch {}
 }
 
-// ── End current & start new session (after long idle gap) ──
+// ── End current & start new session ────────────────────────
 async function endAndStartNew() {
-  // Final heartbeat on old session
   await sendHeartbeat();
-  // Reset session pointers
   sessionLogId = null;
   sessionStartMs = null;
   lastHeartbeatMs = null;
   ssRemove(SESSION_LOG_ID_KEY);
   ssRemove(SESSION_START_KEY);
   ssRemove(SESSION_LAST_HB_KEY);
-  // Create new session
   await createSessionRow();
   startHeartbeat();
 }
 
 // ── Public API ─────────────────────────────────────────────
 
-/**
- * Start tracking session. Called after login or on app load with existing session.
- */
 export function startSession(uid: string, email: string, token?: string) {
+  // Always update the access token (it refreshes)
+  accessToken = token ?? null;
   userId = uid;
   userEmail = email;
-  accessToken = token ?? null;
 
   if (isRunning) return;
 
@@ -243,12 +234,11 @@ export function startSession(uid: string, email: string, token?: string) {
     const lastHb = storedHb ? Number(storedHb) : Number(storedStart);
     const gap = Date.now() - lastHb;
     if (gap < SESSION_GAP_TIMEOUT_MS) {
-      // Resume existing session
       sessionLogId = storedId;
       sessionStartMs = Number(storedStart);
       lastHeartbeatMs = lastHb;
+      console.log(`[Session] Resumed session ${storedId.slice(0, 8)} for ${email} (gap ${Math.round(gap / 1000)}s)`);
     } else {
-      // Too old — will create new
       ssRemove(SESSION_LOG_ID_KEY);
       ssRemove(SESSION_START_KEY);
       ssRemove(SESSION_LAST_HB_KEY);
@@ -258,7 +248,6 @@ export function startSession(uid: string, email: string, token?: string) {
   isRunning = true;
   lastActivityMs = Date.now();
 
-  // Attach activity listeners
   window.addEventListener("mousemove", onActivityDebounced, { passive: true });
   window.addEventListener("keydown", onActivityDebounced, { passive: true });
   window.addEventListener("click", onActivityDebounced, { passive: true });
@@ -268,8 +257,9 @@ export function startSession(uid: string, email: string, token?: string) {
   window.addEventListener("beforeunload", onBeforeUnload);
 
   if (!sessionLogId) {
-    // Create new session, then start heartbeat
-    void createSessionRow().then(() => startHeartbeat());
+    void createSessionRow().then(() => {
+      if (sessionLogId) startHeartbeat();
+    });
   } else {
     startHeartbeat();
   }
@@ -277,9 +267,6 @@ export function startSession(uid: string, email: string, token?: string) {
   startIdleCheck();
 }
 
-/**
- * End session explicitly (sign-out).
- */
 export async function endSession() {
   if (sessionLogId && sessionStartMs) {
     await sendHeartbeat();
