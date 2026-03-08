@@ -343,10 +343,12 @@ function UserAnalyticsRow({
   user,
   expanded,
   onToggle,
+  onShowAll,
 }: {
   user: UserAnalytics;
   expanded: boolean;
   onToggle: () => void;
+  onShowAll: () => void;
 }) {
   const { data: recentActions, isLoading } = useUserRecentActions(
     expanded ? user.user_email : null,
@@ -400,6 +402,12 @@ function UserAnalyticsRow({
             ) : (
               <p className="text-[10px] text-muted-foreground">Žádné akce</p>
             )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onShowAll(); }}
+              className="text-[10px] text-primary hover:underline mt-1.5 font-medium"
+            >
+              Zobrazit vše →
+            </button>
           </td>
         </tr>
       )}
