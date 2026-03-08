@@ -460,7 +460,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [uploadSingleFile]);
-  }, [sp]);
 
   const handleDownload = useCallback(async (categoryKey: string, fileName: string) => {
     try {
