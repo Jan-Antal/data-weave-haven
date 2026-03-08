@@ -401,6 +401,7 @@ interface ProjectRowProps {
 const ProjectRow = memo(function ProjectRow({
   project: p,
   docCount,
+  tpvItemCount,
   isExpanded,
   stageCount,
   onToggleExpand,
@@ -415,6 +416,7 @@ const ProjectRow = memo(function ProjectRow({
   riskHighlight,
   onEditProject,
   isFieldReadOnly,
+  onOpenTPVList,
 }: ProjectRowProps) {
   const bgStyle = useMemo(() => {
     const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
@@ -423,13 +425,17 @@ const ProjectRow = memo(function ProjectRow({
 
   return (
     <TableRow className="hover:bg-muted/50 transition-colors h-9" style={bgStyle} data-project-id={p.project_id}>
-      {/* Col 1 — Icon slot */}
+      {/* Col 1 — TPV list icon */}
       <TableCell style={COL_ICON_STYLE} className="text-center px-0">
-        {(docCount ?? 0) > 0 && (
-          <span className="inline-flex items-center gap-0.5 text-muted-foreground text-[10px] cursor-pointer" onClick={() => onEditProject(p)}>
-            <Paperclip className="h-3 w-3" />
-            {docCount}
-          </span>
+        {tpvItemCount > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex items-center cursor-pointer" onClick={() => onOpenTPVList(p.project_id, p.project_name)}>
+                <ClipboardList className="h-4 w-4" style={{ color: '#223937' }} />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="text-xs">Zobrazit TPV položky ({tpvItemCount})</TooltipContent>
+          </Tooltip>
         )}
       </TableCell>
       {/* Col 2 — Chevron slot */}
