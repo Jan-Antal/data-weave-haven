@@ -407,13 +407,14 @@ const PMProjectRow = memo(function PMProjectRow({
       <TableCell style={COL_ICON_STYLE} className="text-center px-0">
         <button
           className={cn(
-            "transition-colors cursor-pointer hover:text-[#e87c3e]",
-            tpvCount > 0 ? "text-gray-700" : "text-gray-300"
+            "inline-flex items-center gap-0.5 transition-colors cursor-pointer hover:text-accent",
+            tpvCount > 0 ? "text-primary" : "text-muted-foreground/40"
           )}
           title={`TPV seznam (${tpvCount})`}
           onClick={(e) => { e.stopPropagation(); onOpenTPVList(p.project_id, p.project_name); }}
         >
-          <List className="h-4 w-4" />
+          <List className="h-3.5 w-3.5" />
+          {tpvCount > 0 && <span className="text-[9px] font-medium leading-none">{tpvCount}</span>}
         </button>
       </TableCell>
       {/* Col 2 — Chevron slot */}
