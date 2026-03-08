@@ -51,6 +51,14 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
   const [refreshing, setRefreshing] = useState(false);
   const touchStartY = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Stage detail sheet state
+  const [selectedStage, setSelectedStage] = useState<ProjectStage | null>(null);
+  const [stageSheetOpen, setStageSheetOpen] = useState(false);
+
+  const handleStageTap = useCallback((stage: any) => {
+    setSelectedStage(stage as ProjectStage);
+    setStageSheetOpen(true);
+  }, []);
 
   // Apply chip filter
   const chipFiltered = useMemo(() => {
