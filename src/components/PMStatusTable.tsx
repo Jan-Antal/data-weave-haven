@@ -380,7 +380,7 @@ interface PMProjectRowProps {
 
 const PMProjectRow = memo(function PMProjectRow({
   project: p,
-  docCount,
+  tpvCount,
   isExpanded,
   stageCount,
   onToggleExpand,
@@ -394,6 +394,7 @@ const PMProjectRow = memo(function PMProjectRow({
   riskHighlight,
   isFieldReadOnly,
   onEditProject,
+  onOpenTPVList,
 }: PMProjectRowProps) {
   const bgStyle = useMemo(() => {
     const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
@@ -402,14 +403,18 @@ const PMProjectRow = memo(function PMProjectRow({
 
   return (
     <TableRow className="hover:bg-muted/50 transition-colors h-9" style={bgStyle} data-project-id={p.project_id}>
-      {/* Col 1 — Icon slot (📎 clip) */}
+      {/* Col 1 — TPV List icon */}
       <TableCell style={COL_ICON_STYLE} className="text-center px-0">
-        {(docCount ?? 0) > 0 && (
-          <span className="inline-flex items-center gap-0.5 text-muted-foreground text-[10px] cursor-pointer" onClick={() => onEditProject(p)}>
-            <Paperclip className="h-3 w-3" />
-            {docCount}
-          </span>
-        )}
+        <button
+          className={cn(
+            "transition-colors cursor-pointer hover:text-[#e87c3e]",
+            tpvCount > 0 ? "text-gray-700" : "text-gray-300"
+          )}
+          title={`TPV seznam (${tpvCount})`}
+          onClick={(e) => { e.stopPropagation(); onOpenTPVList(p.project_id, p.project_name); }}
+        >
+          <List className="h-4 w-4" />
+        </button>
       </TableCell>
       {/* Col 2 — Chevron slot */}
       <TableCell style={COL_CHEVRON_STYLE} className="px-0 cursor-pointer" onClick={() => onToggleExpand(p.project_id)}>
