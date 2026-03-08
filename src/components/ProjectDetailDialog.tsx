@@ -845,17 +845,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
               <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
             </div>
             <DialogHeader className="px-6 pt-4 md:pt-6 pb-4">
-              <DialogTitle className="text-base md:text-lg flex items-center gap-2">
-                {project.project_id} — {project.project_name}
-                {(() => {
-                  const totalDocs = Object.values(sp.filesByCategory).reduce((s, f) => s + f.length, 0);
-                  return totalDocs > 0 ? (
-                    <span className="inline-flex items-center gap-1 text-xs font-normal text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
-                      📄 {totalDocs}
-                    </span>
-                  ) : null;
-                })()}
-              </DialogTitle>
+              <DialogTitle className="text-base md:text-lg">{project.project_id} — {project.project_name}</DialogTitle>
             </DialogHeader>
 
             <div className="flex max-md:flex-col max-md:overflow-y-auto" style={{ maxHeight: '78vh' }}>
