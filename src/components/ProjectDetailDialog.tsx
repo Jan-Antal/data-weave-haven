@@ -1356,6 +1356,19 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
 
                               {canUploadDocuments && (
                                 <>
+                                  {/* Active upload progress bars */}
+                                  {Object.entries(chunked.uploads).map(([id, upload]) => (
+                                    <UploadProgressBar
+                                      key={id}
+                                      upload={upload}
+                                      onCancel={() => chunked.cancelUpload(id)}
+                                      onDismiss={() => chunked.removeUpload(id)}
+                                      onRetry={upload.status === "error" ? () => {
+                                        chunked.removeUpload(id);
+                                        // User should re-drop or re-select to retry
+                                      } : undefined}
+                                    />
+                                  ))}
                                   <div
                                     className={cn(
                                       "relative rounded-md border-2 border-dashed border-muted-foreground/30 bg-background flex flex-col items-center justify-center py-3 px-2 cursor-pointer hover:border-muted-foreground/50 transition-colors",
@@ -1366,7 +1379,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                     onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverCategory(cat.key); }}
                                     onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverCategory(null); }}
                                     onDrop={(e) => { setDragOverCategory(null); handleFileDrop(e, cat.key); }}
-                                    onClick={() => fileInputRef.current?.click()}
+                                    onClick={() => { activeUploadCatRef.current = cat.key; fileInputRef.current?.click(); }}
                                   >
                                     {sp.uploading ? (
                                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -1374,7 +1387,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                       <>
                                         <Upload className={cn("h-4 w-4 mb-1", dragOverCategory === cat.key ? "text-primary" : "text-muted-foreground")} />
                                         <p className={cn("text-[10px] text-center", dragOverCategory === cat.key ? "text-primary" : "text-muted-foreground")}>
-                                          Přetáhněte soubor nebo vyberte
+                                          Přetáhněte soubor nebo vyberte (max 100 MB)
                                         </p>
                                       </>
                                     )}
