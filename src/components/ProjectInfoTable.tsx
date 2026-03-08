@@ -379,7 +379,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
 // ── Memoized project row ────────────────────────────────────────────
 interface ProjectRowProps {
   project: Project;
-  docCount: number;
+  tpvCount: number;
   isExpanded: boolean;
   stageCount: number;
   onToggleExpand: (pid: string) => void;
@@ -394,6 +394,7 @@ interface ProjectRowProps {
   riskHighlight: any;
   onEditProject: (p: Project) => void;
   isFieldReadOnly: (field: string) => boolean;
+  onOpenTPVList: (projectId: string, projectName: string) => void;
 }
 
 const ProjectRow = memo(function ProjectRow({
