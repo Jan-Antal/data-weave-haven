@@ -15,7 +15,7 @@ import { useProjectStages, useUpdateStage, useDeleteStage, useReorderStages } fr
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, ChevronDown, Plus, Trash2, GripVertical, ChevronsDown, ChevronsUp, Paperclip } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Trash2, GripVertical, ChevronsDown, ChevronsUp, ClipboardList } from "lucide-react";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
