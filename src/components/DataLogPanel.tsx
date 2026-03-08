@@ -266,7 +266,7 @@ function UserAnalyticsTab({ onShowUserActivity }: { onShowUserActivity: (email: 
     return [...analytics.users].sort((a, b) => {
       let cmp = 0;
       switch (sortKey) {
-        case "user": cmp = a.user_email.localeCompare(b.user_email); break;
+        case "user": cmp = (a.full_name ?? a.user_email).localeCompare(b.full_name ?? b.user_email); break;
         case "last_activity": cmp = (a.last_activity ?? "").localeCompare(b.last_activity ?? ""); break;
         case "actions": cmp = a.total_actions_30d - b.total_actions_30d; break;
         case "session": cmp = a.avg_session_min - b.avg_session_min; break;
