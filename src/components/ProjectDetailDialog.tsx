@@ -409,66 +409,57 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     }
   }, [project?.project_id, open]);
 
+  const uploadSingleFile = useCallback(async (categoryKey: string, file: File) => {
+    const folder = CATEGORY_FOLDER_MAP[categoryKey];
+    if (!folder || !project) return;
+
+    if (chunked.isLargeFile(file)) {
+      // Large file — use chunked upload directly to SharePoint
+      try {
+        const result = await chunked.uploadLargeFile(project.project_id, folder, file);
+        // Update the file list in SP cache
+        sp.listFiles(categoryKey, true);
+        dispatchDocCountUpdate(project.project_id, 1);
+        const catLabel = DOC_CATEGORIES.find(c => c.key === categoryKey)?.label ?? categoryKey;
+        logActivity({ projectId: project.project_id, actionType: "document_uploaded", newValue: file.name, detail: catLabel });
+      } catch (err: any) {
+        if (err.message === "CANCELLED") return;
+        toast({ title: "Chyba nahrávání", description: `Nepodařilo se nahrát ${file.name}. Zkuste to znovu.`, variant: "destructive" });
+      }
+    } else {
+      // Small file — use existing edge function upload
+      try {
+        await sp.uploadFile(categoryKey, file);
+        dispatchDocCountUpdate(project.project_id, 1);
+        toast({ title: "Soubor nahrán", description: file.name });
+        const catLabel = DOC_CATEGORIES.find(c => c.key === categoryKey)?.label ?? categoryKey;
+        logActivity({ projectId: project.project_id, actionType: "document_uploaded", newValue: file.name, detail: catLabel });
+      } catch (err: any) {
+        const msg = err.message?.includes("AbortError") || err.message?.includes("timeout")
+          ? "Nahrávání trvalo příliš dlouho. Zkuste menší soubor."
+          : err.message?.includes("Edge function")
+            ? "Spojení se serverem selhalo. Zkuste to znovu."
+            : `Nepodařilo se nahrát ${file.name}. Zkuste to znovu.`;
+        toast({ title: "Chyba nahrávání", description: msg, variant: "destructive" });
+      }
+    }
+  }, [sp, chunked, project]);
+
   const handleFileDrop = useCallback(async (e: React.DragEvent, categoryKey: string) => {
     e.preventDefault();
     const files = Array.from(e.dataTransfer.files);
-    const MAX_FILE_SIZE = 4.5 * 1024 * 1024; // ~4.5 MB (base64 limit for edge function)
     for (const file of files) {
-      if (file.size > MAX_FILE_SIZE) {
-        const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
-        toast({
-          title: "Soubor je příliš velký",
-          description: `${file.name} (${sizeMB} MB) — maximální velikost je 4 MB.`,
-          variant: "destructive",
-        });
-        continue;
-      }
-      try {
-        await sp.uploadFile(categoryKey, file);
-        dispatchDocCountUpdate(project!.project_id, 1);
-        toast({ title: "Soubor nahrán", description: file.name });
-        const catLabel = DOC_CATEGORIES.find(c => c.key === categoryKey)?.label ?? categoryKey;
-        logActivity({ projectId: project!.project_id, actionType: "document_uploaded", newValue: file.name, detail: catLabel });
-      } catch (err: any) {
-        const msg = err.message?.includes("AbortError") || err.message?.includes("timeout")
-          ? "Nahrávání trvalo příliš dlouho. Zkuste menší soubor."
-          : err.message?.includes("Edge function")
-            ? "Spojení se serverem selhalo. Zkuste to znovu."
-            : `Nepodařilo se nahrát ${file.name}. Zkuste to znovu.`;
-        toast({ title: "Chyba nahrávání", description: msg, variant: "destructive" });
-      }
+      uploadSingleFile(categoryKey, file);
     }
-  }, [sp]);
+  }, [uploadSingleFile]);
 
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>, categoryKey: string) => {
     const files = Array.from(e.target.files ?? []);
-    const MAX_FILE_SIZE = 4.5 * 1024 * 1024;
     for (const file of files) {
-      if (file.size > MAX_FILE_SIZE) {
-        const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
-        toast({
-          title: "Soubor je příliš velký",
-          description: `${file.name} (${sizeMB} MB) — maximální velikost je 4 MB.`,
-          variant: "destructive",
-        });
-        continue;
-      }
-      try {
-        await sp.uploadFile(categoryKey, file);
-        dispatchDocCountUpdate(project!.project_id, 1);
-        toast({ title: "Soubor nahrán", description: file.name });
-        const catLabel = DOC_CATEGORIES.find(c => c.key === categoryKey)?.label ?? categoryKey;
-        logActivity({ projectId: project!.project_id, actionType: "document_uploaded", newValue: file.name, detail: catLabel });
-      } catch (err: any) {
-        const msg = err.message?.includes("AbortError") || err.message?.includes("timeout")
-          ? "Nahrávání trvalo příliš dlouho. Zkuste menší soubor."
-          : err.message?.includes("Edge function")
-            ? "Spojení se serverem selhalo. Zkuste to znovu."
-            : `Nepodařilo se nahrát ${file.name}. Zkuste to znovu.`;
-        toast({ title: "Chyba nahrávání", description: msg, variant: "destructive" });
-      }
+      uploadSingleFile(categoryKey, file);
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [uploadSingleFile]);
   }, [sp]);
 
   const handleDownload = useCallback(async (categoryKey: string, fileName: string) => {
