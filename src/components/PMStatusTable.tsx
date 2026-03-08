@@ -362,6 +362,7 @@ function ExpandArrow({ projectId, isExpanded, stageCount }: { projectId: string;
 interface PMProjectRowProps {
   project: Project;
   docCount: number;
+  tpvItemCount: number;
   isExpanded: boolean;
   stageCount: number;
   onToggleExpand: (pid: string) => void;
@@ -375,6 +376,7 @@ interface PMProjectRowProps {
   riskHighlight: any;
   isFieldReadOnly: (field: string) => boolean;
   onEditProject: (p: Project) => void;
+  onOpenTPVList: (projectId: string, projectName: string) => void;
 }
 
 const PMProjectRow = memo(function PMProjectRow({
