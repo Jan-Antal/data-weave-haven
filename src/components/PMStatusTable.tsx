@@ -711,6 +711,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                 <PMProjectRow
                   project={p}
                   docCount={docCounts[p.project_id] ?? 0}
+                  tpvItemCount={tpvItemsByProject.get(p.project_id)?.length ?? 0}
                   isExpanded={expanded.has(p.project_id)}
                   stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
                   onToggleExpand={toggleExpand}
@@ -724,6 +725,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                   riskHighlight={riskHighlight}
                   isFieldReadOnly={isFieldReadOnly}
                   onEditProject={(p) => setEditProject(p)}
+                  onOpenTPVList={handleOpenTPVList}
                 />
                 {expanded.has(p.project_id) && (
                   <StagesSection
