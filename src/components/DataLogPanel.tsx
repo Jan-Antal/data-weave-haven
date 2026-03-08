@@ -249,7 +249,7 @@ function ActivityItem({
 
 /* ──────── Analytics tab ──────── */
 
-function UserAnalyticsTab() {
+function UserAnalyticsTab({ onShowUserActivity }: { onShowUserActivity: (email: string) => void }) {
   const { data: analytics, isLoading } = useUserAnalytics(true);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   type SortKey = "user" | "last_activity" | "actions" | "session";
@@ -326,6 +326,7 @@ function UserAnalyticsTab() {
                 user={u}
                 expanded={expandedUser === u.user_email}
                 onToggle={() => setExpandedUser(expandedUser === u.user_email ? null : u.user_email)}
+                onShowAll={() => onShowUserActivity(u.user_email)}
               />
             ))}
           </tbody>
