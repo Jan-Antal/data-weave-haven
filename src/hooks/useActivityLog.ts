@@ -44,6 +44,7 @@ export function useActivityLog(filters: Filters) {
 
       const types = getActionTypes(filters.category);
       if (types) q = q.in("action_type", types);
+      else q = q.neq("action_type", "user_session"); // Hide heartbeat rows from feed
       if (filters.projectId) q = q.eq("project_id", filters.projectId);
       if (filters.userEmail) q = q.eq("user_email", filters.userEmail);
 
