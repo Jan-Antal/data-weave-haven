@@ -24,7 +24,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { useSharePointDocs, type SPFile, CATEGORY_FOLDER_MAP } from "@/hooks/useSharePointDocs";
 import { useChunkedUpload } from "@/hooks/useChunkedUpload";
-import { formatFileSize as formatFileSizeChunked } from "@/hooks/useChunkedUpload";
 import { UploadProgressBar } from "./UploadProgressBar";
 import { dispatchDocCountUpdate, migrateDocCountCache } from "@/hooks/useDocumentCounts";
 import { ConfirmDialog } from "./ConfirmDialog";
