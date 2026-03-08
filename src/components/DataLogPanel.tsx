@@ -355,10 +355,25 @@ function UserAnalyticsRow({
     expanded
   );
 
-  const userName = user.user_email.split("@")[0];
+  const displayName = user.full_name || user.user_email.split("@")[0];
   const lastActivity = user.last_activity
     ? formatSmartTimestamp(user.last_activity)
-    : "—";
+    : "Nikdy";
+
+  const ROLE_LABELS: Record<string, string> = {
+    owner: "Owner",
+    admin: "Admin",
+    pm: "PM",
+    konstrukter: "Konstruktér",
+    viewer: "Viewer",
+  };
+  const ROLE_COLORS: Record<string, string> = {
+    owner: "bg-amber-100 text-amber-800",
+    admin: "bg-red-100 text-red-800",
+    pm: "bg-blue-100 text-blue-800",
+    konstrukter: "bg-purple-100 text-purple-800",
+    viewer: "bg-gray-100 text-gray-600",
+  };
 
   return (
     <>
