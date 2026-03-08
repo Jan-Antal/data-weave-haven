@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ActivityLogEntry {
@@ -15,10 +15,13 @@ export interface ActivityLogEntry {
 
 const PAGE_SIZE = 30;
 
+export type DateRange = "today" | "yesterday" | "7d" | "30d" | "all";
+
 interface Filters {
   category: "all" | "status" | "terminy" | "documents" | "projects" | "users";
   projectId: string | null;
   userEmail: string | null;
+  dateRange?: DateRange;
   enabled?: boolean;
 }
 
@@ -33,9 +36,33 @@ function getActionTypes(category: Filters["category"]): string[] | null {
   }
 }
 
+function getDateCutoff(range: DateRange | undefined): string | null {
+  if (!range || range === "all") return null;
+  const now = new Date();
+  switch (range) {
+    case "today": {
+      const d = new Date(now); d.setHours(0, 0, 0, 0);
+      return d.toISOString();
+    }
+    case "yesterday": {
+      const d = new Date(now); d.setDate(d.getDate() - 1); d.setHours(0, 0, 0, 0);
+      return d.toISOString();
+    }
+    case "7d": {
+      const d = new Date(now); d.setDate(d.getDate() - 7);
+      return d.toISOString();
+    }
+    case "30d": {
+      const d = new Date(now); d.setDate(d.getDate() - 30);
+      return d.toISOString();
+    }
+    default: return null;
+  }
+}
+
 export function useActivityLog(filters: Filters) {
   return useInfiniteQuery({
-    queryKey: ["activity-log", filters.category, filters.projectId, filters.userEmail],
+    queryKey: ["activity-log", filters.category, filters.projectId, filters.userEmail, filters.dateRange],
     queryFn: async ({ pageParam = 0 }) => {
       let q = (supabase.from("data_log") as any)
         .select("*")
@@ -44,9 +71,12 @@ export function useActivityLog(filters: Filters) {
 
       const types = getActionTypes(filters.category);
       if (types) q = q.in("action_type", types);
-      else q = q.neq("action_type", "user_session"); // Hide heartbeat rows from feed
+      else q = q.neq("action_type", "user_session");
       if (filters.projectId) q = q.eq("project_id", filters.projectId);
       if (filters.userEmail) q = q.eq("user_email", filters.userEmail);
+
+      const cutoff = getDateCutoff(filters.dateRange);
+      if (cutoff) q = q.gte("created_at", cutoff);
 
       const { data, error } = await q;
       if (error) throw error;
@@ -58,5 +88,23 @@ export function useActivityLog(filters: Filters) {
     },
     initialPageParam: 0,
     enabled: filters.enabled !== false,
+  });
+}
+
+/** Fetch distinct user emails from data_log for filter dropdown */
+export function useActivityLogUsers() {
+  return useQuery({
+    queryKey: ["activity-log-users"],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("data_log") as any)
+        .select("user_email")
+        .neq("action_type", "user_session")
+        .neq("user_email", "")
+        .order("user_email");
+      if (error) throw error;
+      const unique = [...new Set((data as { user_email: string }[]).map(r => r.user_email))].sort();
+      return unique;
+    },
+    staleTime: 5 * 60 * 1000,
   });
 }
