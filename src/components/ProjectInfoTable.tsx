@@ -27,7 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon, List, ChevronRight, ChevronDown, Plus, Trash2, GripVertical, ChevronsDown, ChevronsUp } from "lucide-react";
+import { CalendarIcon, Paperclip, ChevronRight, ChevronDown, Plus, Trash2, GripVertical, ChevronsDown, ChevronsUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 import { ProjectDetailDialog } from "./ProjectDetailDialog";
@@ -379,7 +379,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
 // ── Memoized project row ────────────────────────────────────────────
 interface ProjectRowProps {
   project: Project;
-  tpvCount: number;
+  docCount: number;
   isExpanded: boolean;
   stageCount: number;
   onToggleExpand: (pid: string) => void;
@@ -394,12 +394,11 @@ interface ProjectRowProps {
   riskHighlight: any;
   onEditProject: (p: Project) => void;
   isFieldReadOnly: (field: string) => boolean;
-  onOpenTPVList: (projectId: string, projectName: string) => void;
 }
 
 const ProjectRow = memo(function ProjectRow({
   project: p,
-  tpvCount,
+  docCount,
   isExpanded,
   stageCount,
   onToggleExpand,
@@ -414,7 +413,6 @@ const ProjectRow = memo(function ProjectRow({
   riskHighlight,
   onEditProject,
   isFieldReadOnly,
-  onOpenTPVList,
 }: ProjectRowProps) {
   const bgStyle = useMemo(() => {
     const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
@@ -423,19 +421,14 @@ const ProjectRow = memo(function ProjectRow({
 
   return (
     <TableRow className="hover:bg-muted/50 transition-colors h-9" style={bgStyle} data-project-id={p.project_id}>
-      {/* Col 1 — TPV List icon */}
+      {/* Col 1 — Icon slot */}
       <TableCell style={COL_ICON_STYLE} className="text-center px-0">
-        <button
-          className={cn(
-            "inline-flex items-center gap-0.5 transition-colors cursor-pointer hover:text-accent",
-            tpvCount > 0 ? "text-primary" : "text-muted-foreground/40"
-          )}
-          title={`TPV seznam (${tpvCount})`}
-          onClick={(e) => { e.stopPropagation(); onOpenTPVList(p.project_id, p.project_name); }}
-        >
-          <List className="h-3.5 w-3.5" />
-          {tpvCount > 0 && <span className="text-[9px] font-medium leading-none">{tpvCount}</span>}
-        </button>
+        {(docCount ?? 0) > 0 && (
+          <span className="inline-flex items-center gap-0.5 text-muted-foreground text-[10px] cursor-pointer" onClick={() => onEditProject(p)}>
+            <Paperclip className="h-3 w-3" />
+            {docCount}
+          </span>
+        )}
       </TableCell>
       {/* Col 2 — Chevron slot */}
       <TableCell style={COL_CHEVRON_STYLE} className="px-0 cursor-pointer" onClick={() => onToggleExpand(p.project_id)}>
@@ -748,9 +741,9 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
         <Table>
           <TableHeader>
             <TableRow className="bg-primary/5">
-              {/* Col 1 — TPV List icon */}
+              {/* Col 1 — Icon slot */}
               <TableHead style={COL_ICON_STYLE} className="text-center px-0">
-                <List className="h-3.5 w-3.5 text-muted-foreground/50 mx-auto" />
+                <Paperclip className="h-3.5 w-3.5 text-gray-400 mx-auto" />
               </TableHead>
               {/* Col 2 — Chevron slot */}
               <TableHead style={COL_CHEVRON_STYLE} className="shrink-0 px-0">
@@ -788,7 +781,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                 <ProjectRow
                   key={p.id}
                   project={p}
-                  tpvCount={(tpvItemsByProject.get(p.project_id) ?? []).length}
+                  docCount={docCounts[p.project_id] ?? 0}
                   isExpanded={expanded.has(p.project_id)}
                   stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
                   onToggleExpand={toggleExpand}
@@ -803,7 +796,6 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                   riskHighlight={riskHighlight}
                   onEditProject={handleEditProject}
                   isFieldReadOnly={isFieldReadOnly}
-                  onOpenTPVList={handleOpenTPVList}
                 />
                 {expanded.has(p.project_id) && (
                   <StagesSection

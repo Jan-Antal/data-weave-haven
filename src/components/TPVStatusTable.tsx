@@ -82,14 +82,13 @@ const TPVListIcon = memo(function TPVListIcon({ projectId, itemCount, onClick }:
   return (
     <button
       className={cn(
-        "inline-flex items-center gap-0.5 transition-colors cursor-pointer hover:text-accent",
-        hasItems ? "text-primary" : "text-muted-foreground/40"
+        "transition-colors cursor-pointer hover:text-[#e87c3e]",
+        hasItems ? "text-gray-700" : "text-gray-300"
       )}
       title={`TPV seznam (${itemCount})`}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
     >
-      <List className="h-3.5 w-3.5" />
-      {hasItems && <span className="text-[9px] font-medium leading-none">{itemCount}</span>}
+      <List className="h-4 w-4" />
     </button>
   );
 });
