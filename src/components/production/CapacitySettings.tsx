@@ -256,8 +256,10 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                           week={week}
                           weekNum={wn}
                           isPast={past}
+                          standardCapacity={standardCapacity}
                           onSave={(cap, days) => handleWeekCapacityUpdate(wn, cap, days)}
                           onReset={() => handleResetWeek(wn)}
+                          onClose={() => setEditingWeek(null)}
                         />
                       </PopoverContent>
                     </Popover>
