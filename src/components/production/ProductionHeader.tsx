@@ -26,7 +26,7 @@ export function ProductionHeader() {
   const { data: settings } = useProductionSettings();
   const { canAccessSettings, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, profile, signOut } = useAuth();
   const { openPeopleManagement } = usePeopleManagement();
-  const { undo, redo, canUndo, canRedo } = useUndoRedo();
+  
 
   const [userMgmtOpen, setUserMgmtOpen] = useState(false);
   const [exchangeRateOpen, setExchangeRateOpen] = useState(false);
