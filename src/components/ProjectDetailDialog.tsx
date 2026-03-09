@@ -655,9 +655,10 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       logActivity({ projectId: logPid, actionType: "project_id_change", oldValue: project.project_id, newValue: form.project_id });
       // Migrate document count cache to new project ID
       migrateDocCountCache(project.project_id, form.project_id);
-      // If saved without SharePoint rename, log warning
-      if (skipSharePoint) {
+      // If SharePoint rename failed, log warning and show toast
+      if (spRenameFailed) {
         logActivity({ projectId: logPid, actionType: "project_id_change", detail: "⚠️ SharePoint složka nebyla přejmenována — vyžaduje ruční přejmenování" });
+        toast({ title: "ID projektu změněno", description: "⚠ Složka na SharePointu nebyla přejmenována — přejmenujte ručně." });
       }
     }
     qc.invalidateQueries({ queryKey: ["projects"] });
