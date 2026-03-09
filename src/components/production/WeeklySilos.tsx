@@ -563,8 +563,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
 
   const totalHours = activeHours;
   const pct = weeklyCapacity > 0 ? (totalHours / weeklyCapacity) * 100 : 0;
-  const isOverloaded = pct > 100;
-  const isWarning = pct > 85 && pct <= 100;
+  const isOverloaded = pct > 120;
+  const isWarning = pct > 100 && pct <= 120;
   const overloadHours = totalHours - weeklyCapacity;
 
   const barColor = isPast ? "#b0bab8" : isOverloaded ? "#dc3545" : isWarning ? "#d97706" : "#3a8a36";
