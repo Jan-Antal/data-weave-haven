@@ -618,23 +618,24 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
 
                   {/* Item rows — only when expanded */}
                   {isExpanded && (
-                    <div style={{ marginLeft: 24 }}>
+                    <div>
                       {proj.items.map((item, idx) => (
                         <div
                           key={item.id}
                           className="flex"
                           style={{
                             height: 32,
-                            borderLeft: "2px dashed #e5e2dd",
                             borderBottom: idx < proj.items.length - 1 ? "1px solid #f5f3f0" : undefined,
                           }}
                         >
                           <div
-                            className="shrink-0 flex items-center gap-2 pl-3 pr-2 sticky left-0 z-20"
+                            className="shrink-0 flex items-center gap-2 pr-2 sticky left-0 z-20"
                             style={{
-                              width: LEFT_COL_W - 24,
+                              width: LEFT_COL_W,
                               backgroundColor: "#fff",
                               borderRight: "1px solid #e5e2dd",
+                              paddingLeft: 28,
+                              borderLeft: "2px dashed #e5e2dd",
                             }}
                           >
                             {item.itemCode && (
