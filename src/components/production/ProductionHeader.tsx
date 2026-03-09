@@ -4,7 +4,7 @@ import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
-import { LayoutDashboard, Settings, Check, User, UserCog, LogOut, Undo2, Redo2, Search, X } from "lucide-react";
+import { LayoutDashboard, Settings, Check, User, UserCog, LogOut, Undo2, Redo2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { UserManagement } from "@/components/UserManagement";
@@ -23,16 +23,7 @@ const ROLE_LABELS: Record<string, string> = {
   viewer: "Viewer",
 };
 
-type DisplayMode = "hours" | "czk" | "percent";
-
-interface ProductionHeaderProps {
-  displayMode: DisplayMode;
-  onDisplayModeChange: (mode: DisplayMode) => void;
-  searchQuery: string;
-  onSearchChange: (query: string) => void;
-}
-
-export function ProductionHeader({ displayMode, onDisplayModeChange, searchQuery, onSearchChange }: ProductionHeaderProps) {
+export function ProductionHeader() {
   const navigate = useNavigate();
   const { data: settings } = useProductionSettings();
   const { canAccessSettings, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, profile, signOut } = useAuth();
@@ -63,51 +54,8 @@ export function ProductionHeader({ displayMode, onDisplayModeChange, searchQuery
             <span className="text-primary-foreground/70 text-sm font-sans font-medium">Plán Výroby</span>
           </div>
 
-          {/* Center: Search bar */}
-          <div className="flex-1 max-w-[280px] mx-4 relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary-foreground/40" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => onSearchChange(e.target.value)}
-              placeholder="Hledat projekt..."
-              className="w-full h-8 pl-8 pr-8 rounded-md text-sm bg-primary-foreground/10 text-primary-foreground placeholder:text-primary-foreground/40 border border-primary-foreground/15 focus:outline-none focus:border-primary-foreground/30 focus:bg-primary-foreground/15 transition-colors"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => onSearchChange("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-primary-foreground/50 hover:text-primary-foreground transition-colors"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Right: Display mode toggle + undo/redo + user/settings */}
+          {/* Right: undo/redo + user/settings */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Display mode toggle */}
-            <div className="inline-flex h-8 items-center rounded-md bg-primary-foreground/10 border border-primary-foreground/15 p-0.5">
-              {([
-                { key: "hours" as DisplayMode, label: "Hodiny" },
-                { key: "czk" as DisplayMode, label: "Hod + Kč" },
-                { key: "percent" as DisplayMode, label: "%" },
-              ]).map(m => (
-                <button
-                  key={m.key}
-                  onClick={() => onDisplayModeChange(m.key)}
-                  className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-xs font-medium transition-all ${
-                    displayMode === m.key
-                      ? "bg-primary-foreground text-primary shadow-sm"
-                      : "text-primary-foreground/60 hover:text-primary-foreground"
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="w-px h-5 bg-primary-foreground/15" />
-
             {/* Undo/Redo */}
             <Tooltip>
               <TooltipTrigger asChild>
