@@ -151,7 +151,7 @@ export function useWeeklyCapacity(year: number) {
         .eq("week_year", year)
         .order("week_number", { ascending: true });
       if (error) throw error;
-      return (data || []) as WeekCapacity[];
+      return (data || []) as unknown as WeekCapacity[];
     },
   });
 
