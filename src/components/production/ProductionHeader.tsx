@@ -121,13 +121,6 @@ export function ProductionHeader({ viewTab, onViewTabChange, displayMode, onDisp
               ))}
             </div>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <h1 className="text-xl font-serif text-primary-foreground tracking-wide">
-              A→M <span className="font-sans font-normal text-base opacity-80">Interior</span>
-            </h1>
-            <span className="text-primary-foreground/30 text-sm">|</span>
-            <span className="text-primary-foreground/70 text-sm font-sans font-medium">Plán Výroby</span>
-          </div>
 
           {/* Center: Stats */}
           <div className="flex items-center gap-0">
