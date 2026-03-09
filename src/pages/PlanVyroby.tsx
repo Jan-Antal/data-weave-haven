@@ -542,7 +542,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
         <div className="inline-flex h-8 items-center rounded-md bg-card border border-border p-0.5">
           {([
             { key: "hours" as DisplayMode, label: "Hodiny" },
-            { key: "czk" as DisplayMode, label: "Hod + Kč" },
+            { key: "czk" as DisplayMode, label: "Hodnota" },
             { key: "percent" as DisplayMode, label: "%" },
           ]).map(m => (
             <button
