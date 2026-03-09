@@ -432,7 +432,6 @@ export default function PlanVyroby() {
   );
 }
 
-type DisplayMode = "hours" | "czk" | "percent";
 
 function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange }: {
   viewTab: "kanban" | "table";
