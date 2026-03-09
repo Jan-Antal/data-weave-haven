@@ -32,7 +32,7 @@ interface ProductionHeaderProps {
   onDisplayModeChange: (mode: DisplayMode) => void;
 }
 
-export function ProductionHeader({ viewTab, onViewTabChange, displayMode, onDisplayModeChange }: ProductionHeaderProps) {
+export function ProductionHeader({ displayMode, onDisplayModeChange }: ProductionHeaderProps) {
   const navigate = useNavigate();
   const { data: settings } = useProductionSettings();
   const { data: scheduleData } = useProductionSchedule();
