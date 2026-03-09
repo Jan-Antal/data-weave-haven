@@ -373,12 +373,21 @@ export default function PlanVyroby() {
             <span>⚠ TEST MODE — Testovací prostředí — data nejsou produkční</span>
           </div>
         )}
-        <ProductionHeader />
-        <div className="flex-1 flex min-h-0">
-          <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
-          <WeeklySilos showCzk={showCzk} onToggleCzk={setShowCzk} overDroppableId={overDroppableId} onNavigateToTPV={handleNavigateToTPV} />
-          <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
-        </div>
+        <ProductionHeader
+          viewTab={viewTab}
+          onViewTabChange={setViewTab}
+          displayMode={displayMode}
+          onDisplayModeChange={setDisplayMode}
+        />
+        {viewTab === "kanban" ? (
+          <div className="flex-1 flex min-h-0">
+            <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
+            <WeeklySilos showCzk={showCzk} onToggleCzk={(v) => setDisplayMode(v ? "czk" : "hours")} overDroppableId={overDroppableId} onNavigateToTPV={handleNavigateToTPV} displayMode={displayMode} onDisplayModeChange={setDisplayMode} />
+            <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
+          </div>
+        ) : (
+          <PlanVyrobyTableView displayMode={displayMode} />
+        )}
       </div>
 
       <DragOverlay dropAnimation={null}>
