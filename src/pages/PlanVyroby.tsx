@@ -367,55 +367,15 @@ export default function PlanVyroby() {
         <ProductionHeader
           displayMode={displayMode}
           onDisplayModeChange={setDisplayMode}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
         />
 
-        {/* Tab bar below header — same style as main page tabs */}
-        <div className="shrink-0 border-b border-border px-6 flex items-center justify-between bg-card" style={{ minHeight: 44 }}>
-          <div className="flex items-center">
-            <div className="inline-flex h-10 items-center rounded-md bg-card border border-border p-1">
-              <button
-                onClick={() => setViewTab("kanban")}
-                className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
-                  viewTab === "kanban"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Kanban
-              </button>
-              <button
-                onClick={() => setViewTab("table")}
-                className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
-                  viewTab === "table"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Tabulka
-              </button>
-            </div>
-          </div>
-
-          <div className="inline-flex h-10 items-center rounded-md bg-card border border-border p-1">
-            {([
-              { key: "hours" as DisplayMode, label: "Hodiny" },
-              { key: "czk" as DisplayMode, label: "Hod + Kč" },
-              { key: "percent" as DisplayMode, label: "%" },
-            ]).map(m => (
-              <button
-                key={m.key}
-                onClick={() => setDisplayMode(m.key)}
-                className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
-                  displayMode === m.key
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Row 2: Tabs + Stats + Period */}
+        <ToolbarRow2
+          viewTab={viewTab}
+          setViewTab={setViewTab}
+        />
 
         {viewTab === "kanban" ? (
           <div className="flex-1 flex min-h-0">
@@ -424,7 +384,7 @@ export default function PlanVyroby() {
             <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
           </div>
         ) : (
-          <PlanVyrobyTableView displayMode={displayMode} />
+          <PlanVyrobyTableView displayMode={displayMode} searchQuery={searchQuery} />
         )}
       </div>
 
