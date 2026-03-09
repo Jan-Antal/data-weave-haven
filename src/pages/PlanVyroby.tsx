@@ -141,7 +141,6 @@ export default function PlanVyroby() {
     return { key: target.toISOString().split("T")[0], weekNum: getISOWeekNumber(target) };
   }, [scheduleData, weeklyCapacity]);
 
-  // Check if dropping a split item onto a sibling in the target week
   const findSiblingInWeek = useCallback((splitGroupId: string, targetWeekKey: string, draggedItemId: string) => {
     const silo = scheduleData?.get(targetWeekKey);
     if (!silo) return null;
@@ -164,14 +163,11 @@ export default function PlanVyroby() {
     setOverDroppableId(event.over?.id?.toString() ?? null);
   }, []);
 
-  // Resolve the target week from any droppable ID
   const resolveTargetWeek = useCallback((targetId: string, dragData: ActiveDragData): string | null => {
     if (targetId.startsWith("silo-week-")) {
       return targetId.replace("silo-week-", "");
     }
-    // Dropped on a specific item or bundle inside a silo — find its week
     if (targetId.startsWith("silo-item-") || targetId.startsWith("silo-bundle-")) {
-      // Search schedule data for the item/bundle's week
       if (scheduleData) {
         for (const [weekKey, silo] of scheduleData) {
           for (const bundle of silo.bundles) {
@@ -199,7 +195,6 @@ export default function PlanVyroby() {
 
     const dragData = active.data.current as ActiveDragData;
 
-    // If dropped with no target (same position), check for same-week merge opportunity
     if (!over) {
       if (dragData.type === "silo-item" && dragData.splitGroupId && dragData.itemId && dragData.weekDate) {
         const sibling = findSiblingInWeek(dragData.splitGroupId, dragData.weekDate, dragData.itemId);
@@ -210,7 +205,7 @@ export default function PlanVyroby() {
             mergeItemCount: 1,
             draggedItemId: dragData.itemId,
             targetWeekKey: dragData.weekDate,
-            onKeepSeparate: async () => { /* no-op, already in same week */ },
+            onKeepSeparate: async () => {},
           });
         }
       }
@@ -231,11 +226,9 @@ export default function PlanVyroby() {
     const weekDate = resolveTargetWeek(targetId, dragData);
     if (!weekDate) return;
 
-      // Check for merge: dragging split item onto sibling
       if (dragData.type === "silo-item" && dragData.splitGroupId && dragData.itemId) {
         const sibling = findSiblingInWeek(dragData.splitGroupId, weekDate, dragData.itemId);
         if (sibling) {
-          // Show merge popover
           const doNormalMove = async () => {
             if (dragData.weekDate !== weekDate) {
               await moveScheduleItemToWeek(dragData.itemId!, weekDate);
@@ -253,7 +246,6 @@ export default function PlanVyroby() {
         }
       }
 
-      // Check for auto-split on single items
       if ((dragData.type === "inbox-item" || dragData.type === "silo-item") && dragData.hours) {
         const targetUsed = scheduleData?.get(weekDate)?.total_hours ?? 0;
         const available = weeklyCapacity - targetUsed;
@@ -295,7 +287,6 @@ export default function PlanVyroby() {
         }
       }
 
-      // Normal drop logic
       if (dragData.type === "inbox-item" && dragData.itemId) {
         await moveInboxItemToWeek(dragData.itemId, weekDate);
       } else if (dragData.type === "inbox-project" && dragData.projectId) {
@@ -306,7 +297,6 @@ export default function PlanVyroby() {
         }
     } else if (dragData.type === "silo-bundle" && dragData.projectId && dragData.weekDate) {
         if (dragData.weekDate !== weekDate) {
-          // Check if any items in the bundle have split siblings in the target week
           const sourceSilo = scheduleData?.get(dragData.weekDate);
           const sourceBundle = sourceSilo?.bundles.find(b => b.project_id === dragData.projectId);
           if (sourceBundle) {
@@ -345,7 +335,6 @@ export default function PlanVyroby() {
 
   if (!isAdmin) return null;
 
-  // Mobile: show desktop-only message
   if (isMobile) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-background px-6 text-center gap-4">
@@ -374,11 +363,56 @@ export default function PlanVyroby() {
           </div>
         )}
         <ProductionHeader
-          viewTab={viewTab}
-          onViewTabChange={setViewTab}
           displayMode={displayMode}
           onDisplayModeChange={setDisplayMode}
         />
+
+        {/* Tab bar below header — same style as main page tabs */}
+        <div className="shrink-0 border-b border-border px-6 py-2 flex items-center justify-between bg-card">
+          <div className="inline-flex h-10 items-center rounded-md bg-card border border-border p-1">
+            <button
+              onClick={() => setViewTab("kanban")}
+              className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
+                viewTab === "kanban"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Kanban
+            </button>
+            <button
+              onClick={() => setViewTab("table")}
+              className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
+                viewTab === "table"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Tabulka
+            </button>
+          </div>
+
+          <div className="inline-flex h-10 items-center rounded-md bg-card border border-border p-1">
+            {([
+              { key: "hours" as DisplayMode, label: "Hodiny" },
+              { key: "czk" as DisplayMode, label: "Hod + Kč" },
+              { key: "percent" as DisplayMode, label: "%" },
+            ]).map(m => (
+              <button
+                key={m.key}
+                onClick={() => setDisplayMode(m.key)}
+                className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
+                  displayMode === m.key
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {viewTab === "kanban" ? (
           <div className="flex-1 flex min-h-0">
             <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
@@ -394,7 +428,6 @@ export default function PlanVyroby() {
         {activeDrag ? <DragOverlayContent data={activeDrag} /> : null}
       </DragOverlay>
 
-      {/* Auto-split popover */}
       {autoSplitState && (
         <AutoSplitPopover
           open={!!autoSplitState}
@@ -403,7 +436,6 @@ export default function PlanVyroby() {
         />
       )}
 
-      {/* Merge popover */}
       {mergeState && (
         <MergePopover
           open={!!mergeState}
@@ -411,7 +443,6 @@ export default function PlanVyroby() {
           itemName={mergeState.itemName}
           mergeItemCount={mergeState.mergeItemCount}
           onMerge={async () => {
-            // First move (bundle or item), then merge all groups
             await mergeState.onKeepSeparate();
             for (const gid of mergeState.splitGroupIds) {
               await mergeSplitItems(gid);
@@ -421,7 +452,6 @@ export default function PlanVyroby() {
         />
       )}
 
-      {/* TPV Navigation Dialog */}
       {tpvProject && (
         <Dialog open={!!tpvProjectId} onOpenChange={(open) => { if (!open) setTpvProjectId(null); }}>
           <DialogContent className="max-w-[95vw] w-[95vw] max-h-[90vh] overflow-auto p-0">
