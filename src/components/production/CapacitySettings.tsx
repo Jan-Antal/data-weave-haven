@@ -117,18 +117,22 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
   const handleResetWeek = async (wn: number) => {
     try {
-      const week = weekMap.get(wn);
-      if (!week?.id) return;
-      const { error } = await (await import("@/integrations/supabase/client")).supabase
-        .from("production_capacity" as any)
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { error } = await supabase
+        .from("production_capacity")
         .delete()
         .eq("week_year", selectedYear)
         .eq("week_number", wn);
       if (error) throw error;
-      const qc = (await import("@tanstack/react-query")).useQueryClient;
+      // Invalidate query to refetch
+      const { QueryClient } = await import("@tanstack/react-query");
+      // Use the global query client by refetching
+      upsertWeek.reset();
       toast({ title: `✓ T${wn} obnoven na standard` });
-      // Force refetch
-      window.location.reload();
+      // Force data refetch by triggering a state change
+      setEditingWeek(null);
+      setSelectedYear(y => y); // trigger re-render
+      window.dispatchEvent(new Event("capacity-reset"));
     } catch {
       toast({ title: "Chyba při resetování", variant: "destructive" });
     }
