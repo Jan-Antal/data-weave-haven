@@ -24,6 +24,10 @@ import {
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 import { useProductionSchedule, getISOWeekNumber } from "@/hooks/useProductionSchedule";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
+import { PlanVyrobyTableView } from "@/components/production/PlanVyrobyTableView";
+
+export type DisplayMode = "hours" | "czk" | "percent";
+type ViewTab = "kanban" | "table";
 
 interface ActiveDragData {
   type: "inbox-item" | "inbox-project" | "silo-item" | "silo-bundle";
