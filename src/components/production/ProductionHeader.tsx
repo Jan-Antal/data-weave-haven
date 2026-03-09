@@ -25,7 +25,6 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 type DisplayMode = "hours" | "czk" | "percent";
-type ViewTab = "kanban" | "table";
 
 interface ProductionHeaderProps {
   displayMode: DisplayMode;
