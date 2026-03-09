@@ -468,10 +468,6 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
           Tento týden
         </button>
         <span className="text-[9px] font-medium" style={{ color: "#99a5a3" }}>{visiblePeriodLabel}</span>
-        <div className="flex items-center gap-[2px]">
-          <ToolbarButton active={!showCzk} label="Hodiny" onClick={() => onToggleCzk(false)} />
-          <ToolbarButton active={showCzk} label="Hod + Kč" onClick={() => onToggleCzk(true)} />
-        </div>
       </div>
 
       {/* Silos */}
