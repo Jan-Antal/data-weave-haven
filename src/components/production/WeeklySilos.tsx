@@ -247,9 +247,10 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     return weeks.map(w => {
       const siloData = scheduleData?.get(w.key);
       const usedHours = siloData?.total_hours ?? 0;
-      return { key: w.key, weekNum: w.weekNum, label: `${formatDateShort(w.start)}–${formatDateShort(w.end)}`, remainingCapacity: weeklyCapacity - usedHours };
+      const cap = getWeekCapacity(w.key);
+      return { key: w.key, weekNum: w.weekNum, label: `${formatDateShort(w.start)}–${formatDateShort(w.end)}`, remainingCapacity: cap - usedHours };
     });
-  }, [weeks, scheduleData, weeklyCapacity]);
+  }, [weeks, scheduleData, getWeekCapacity]);
 
   const weeksCapacityMap = useMemo(() => {
     const map = new Map<string, { total_hours: number }>();
