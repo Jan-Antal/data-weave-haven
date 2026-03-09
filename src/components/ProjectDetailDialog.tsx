@@ -276,7 +276,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const locInputRef = useRef<HTMLInputElement>(null);
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
-  const [spRenameWarning, setSpRenameWarning] = useState(false);
+  
   const [deletingFile, setDeletingFile] = useState<string | null>(null);
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck(project?.id);
 
