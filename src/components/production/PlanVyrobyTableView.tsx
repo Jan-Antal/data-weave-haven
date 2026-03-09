@@ -680,7 +680,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
             );
           })}
 
-          {projectRows.length === 0 && (
+          {filteredRows.length === 0 && (
             <div className="px-6 py-12 text-center text-[12px] text-muted-foreground">
               Žádné položky v plánu výroby
             </div>
