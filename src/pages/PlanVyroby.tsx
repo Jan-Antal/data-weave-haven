@@ -501,51 +501,10 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
         </button>
       </div>
 
-      {/* Search */}
-      <div className="relative w-[220px] shrink-0">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={e => onSearchChange(e.target.value)}
-          placeholder="Hledat projekt..."
-          className="w-full h-8 pl-8 pr-8 rounded-md text-sm bg-background border border-input placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 transition-colors"
-        />
-        {searchQuery && (
-          <button
-            onClick={() => onSearchChange("")}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
-
-      {/* Display mode toggle */}
-      <div className="inline-flex h-8 items-center rounded-md bg-card border border-border p-0.5 shrink-0">
-        {([
-          { key: "hours" as DisplayMode, label: "Hodiny" },
-          { key: "czk" as DisplayMode, label: "Hod + Kč" },
-          { key: "percent" as DisplayMode, label: "%" },
-        ]).map(m => (
-          <button
-            key={m.key}
-            onClick={() => onDisplayModeChange(m.key)}
-            className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-xs font-medium transition-all ${
-              displayMode === m.key
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
-
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Center-right: Stats */}
+      {/* Center: Stats */}
       <div className="flex items-center gap-1 text-xs text-muted-foreground font-mono shrink-0">
         <span>Kapacita <span className="font-semibold text-foreground">{monthlyHours.toLocaleString("cs-CZ")}h</span></span>
         <span className="text-border">·</span>
@@ -556,13 +515,50 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
         <span>V Inboxu <span className="font-semibold" style={{ color: "#d97706" }}>{Math.round(inboxHours).toLocaleString("cs-CZ")}h</span></span>
       </div>
 
-      {/* Period */}
-      {periodLabel && (
-        <>
-          <span className="text-border">·</span>
-          <span className="text-xs text-muted-foreground font-medium shrink-0">{periodLabel}</span>
-        </>
-      )}
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Right: Search + Display mode */}
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="relative w-[200px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => onSearchChange(e.target.value)}
+            placeholder="Hledat projekt..."
+            className="w-full h-8 pl-8 pr-8 rounded-md text-sm bg-background border border-input placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 transition-colors"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => onSearchChange("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="inline-flex h-8 items-center rounded-md bg-card border border-border p-0.5">
+          {([
+            { key: "hours" as DisplayMode, label: "Hodiny" },
+            { key: "czk" as DisplayMode, label: "Hod + Kč" },
+            { key: "percent" as DisplayMode, label: "%" },
+          ]).map(m => (
+            <button
+              key={m.key}
+              onClick={() => onDisplayModeChange(m.key)}
+              className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-xs font-medium transition-all ${
+                displayMode === m.key
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
