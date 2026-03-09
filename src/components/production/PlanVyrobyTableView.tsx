@@ -451,19 +451,22 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
       <div className="flex-1 overflow-auto" ref={scrollRef}>
         <div className="min-w-max">
           {/* Header row */}
-          <div className="flex sticky top-0 z-10 bg-muted" style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
-            <div className="shrink-0 sticky left-0 z-20 border-r border-b border-border bg-muted" style={{ width: LEFT_COL_W }}>
+          <div className="flex sticky top-0 z-30 bg-muted" style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+            <div className="shrink-0 sticky left-0 z-40 border-r border-b border-border bg-muted" style={{ width: LEFT_COL_W }}>
               <div className="px-3 py-2 text-[10px] font-semibold text-muted-foreground">
                 Projekt / Položka
               </div>
             </div>
-            {/* Inbox header */}
+            {/* Inbox header — sticky left after project col */}
             {hasAnyInbox && (
-              <div className="shrink-0 text-center px-1 py-1.5 border-b border-r border-border/50 bg-amber-50" style={{ width: INBOX_W }}>
-                <div className="text-[10px] font-bold text-amber-800">📥 Inbox</div>
+              <div
+                className="shrink-0 text-center px-1 py-1.5 border-b border-r border-border/50 sticky z-40"
+                style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "hsl(45 93% 95%)" }}
+              >
+                <div className="text-[10px] font-bold" style={{ color: "hsl(26 90% 37%)" }}>📥 Inbox</div>
               </div>
             )}
-            {/* Week headers */}
+            {/* Week headers — scroll freely */}
             {weeks.map(week => {
               const used = weekCapacities.get(week.key) ?? 0;
               const cap = getWeekCapacity(week.key);
@@ -492,9 +495,12 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
                 </div>
               );
             })}
-            {/* Expedice header */}
+            {/* Expedice header — sticky right */}
             {hasAnyExpedice && (
-              <div className="shrink-0 text-center px-1 py-1.5 border-b border-r border-border/50" style={{ width: EXPEDICE_W, backgroundColor: "hsl(142 76% 95%)" }}>
+              <div
+                className="shrink-0 text-center px-1 py-1.5 border-b border-l border-border/50 sticky right-0 z-40"
+                style={{ width: EXPEDICE_W, backgroundColor: "hsl(142 76% 95%)" }}
+              >
                 <div className="text-[10px] font-bold" style={{ color: "hsl(143 64% 24%)" }}>✓ Expedice</div>
               </div>
             )}
@@ -511,7 +517,7 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
                   onClick={() => toggleProject(proj.projectId)}
                 >
                   <div
-                    className="shrink-0 flex items-center gap-2 px-2 py-1.5 sticky left-0 z-10 border-r border-b border-border/60 bg-card"
+                    className="shrink-0 flex items-center gap-2 px-2 py-1.5 sticky left-0 z-20 border-r border-b border-border/60 bg-card"
                     style={{ width: LEFT_COL_W }}
                   >
                     {isExpanded
@@ -527,20 +533,20 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
                       </div>
                     </div>
                   </div>
-                  {/* Inbox cell */}
+                  {/* Inbox cell — sticky left */}
                   {hasAnyInbox && (
                     <div
-                      className="shrink-0 flex items-center justify-center px-1 py-1 border-b border-r border-border/30"
-                      style={{ width: INBOX_W }}
+                      className="shrink-0 flex items-center justify-center px-1 py-1 border-b border-r border-border/30 sticky z-20 bg-card"
+                      style={{ width: INBOX_W, left: LEFT_COL_W }}
                     >
                       {proj.inboxTotalHours > 0 && (
-                        <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-semibold bg-amber-100 text-amber-800">
+                        <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-semibold" style={{ backgroundColor: "hsl(45 93% 90%)", color: "hsl(26 90% 37%)" }}>
                           {formatSimple(proj.inboxTotalHours, proj.inboxTotalCzk)}
                         </div>
                       )}
                     </div>
                   )}
-                  {/* Week cells — show totals when collapsed */}
+                  {/* Week cells */}
                   {weeks.map(week => {
                     const wt = proj.weekTotals.get(week.key);
                     return (
@@ -563,10 +569,10 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
                       </div>
                     );
                   })}
-                  {/* Expedice cell */}
+                  {/* Expedice cell — sticky right */}
                   {hasAnyExpedice && (
                     <div
-                      className="shrink-0 flex items-center justify-center px-1 py-1 border-b border-r border-border/30"
+                      className="shrink-0 flex items-center justify-center px-1 py-1 border-b border-l border-border/30 sticky right-0 z-20 bg-card"
                       style={{ width: EXPEDICE_W }}
                     >
                       {proj.expediceTotalHours > 0 && (
@@ -582,7 +588,7 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
                 {isExpanded && proj.items.map(item => (
                   <div key={item.id} className="flex border-b border-border/20">
                     <div
-                      className="shrink-0 flex items-center pl-9 pr-2 py-1 sticky left-0 z-10 border-r border-border bg-background"
+                      className="shrink-0 flex items-center pl-9 pr-2 py-1 sticky left-0 z-20 border-r border-border bg-background"
                       style={{ width: LEFT_COL_W }}
                     >
                       <div className="min-w-0">
@@ -592,14 +598,14 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
                         </div>
                       </div>
                     </div>
-                    {/* Inbox cell */}
+                    {/* Inbox cell — sticky left */}
                     {hasAnyInbox && (
                       <div
-                        className="shrink-0 flex items-center justify-center px-1 py-1 border-r border-border/30"
-                        style={{ width: INBOX_W }}
+                        className="shrink-0 flex items-center justify-center px-1 py-1 border-r border-border/30 sticky z-20 bg-background"
+                        style={{ width: INBOX_W, left: LEFT_COL_W }}
                       >
                         {item.inboxHours > 0 && (
-                          <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-semibold bg-amber-100 text-amber-800">
+                          <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-semibold" style={{ backgroundColor: "hsl(45 93% 90%)", color: "hsl(26 90% 37%)" }}>
                             {Math.round(item.inboxHours)}h
                           </div>
                         )}
@@ -638,10 +644,10 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
                         </div>
                       );
                     })}
-                    {/* Expedice cell */}
+                    {/* Expedice cell — sticky right */}
                     {hasAnyExpedice && (
                       <div
-                        className="shrink-0 flex items-center justify-center px-1 py-1 border-r border-border/30"
+                        className="shrink-0 flex items-center justify-center px-1 py-1 border-l border-border/30 sticky right-0 z-20 bg-background"
                         style={{ width: EXPEDICE_W }}
                       >
                         {item.expediceHours > 0 && (
