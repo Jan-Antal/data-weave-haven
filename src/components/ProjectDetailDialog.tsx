@@ -600,33 +600,45 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
 
     // If project ID changed, rename SharePoint folder first
     const projectIdChanged = form.project_id !== project.project_id;
-    if (projectIdChanged) {
+    const skipSharePoint = spRenameWarning; // user already confirmed to skip
+    if (projectIdChanged && !skipSharePoint) {
       try {
         const renameResult = await supabase.functions.invoke("sharepoint-documents", {
           body: { action: "rename", oldProjectId: project.project_id, newProjectId: form.project_id },
         });
+
+        // supabase.functions.invoke sets error for non-2xx responses
         if (renameResult.error) {
+          // Try to parse the response data for TARGET_EXISTS
+          const errorCode = (renameResult.data as any)?.error;
           const errMsg = renameResult.error?.message ?? "";
-          if (errMsg.includes("TARGET_EXISTS") || (renameResult.data as any)?.error === "TARGET_EXISTS") {
-            toast({ title: "Chyba", description: "Složka s tímto ID už na SharePointu existuje.", variant: "destructive" });
-          } else {
-            toast({ title: "Chyba", description: "Nelze přejmenovat složku na SharePointu. ID projektu nebylo změněno.", variant: "destructive" });
+          if (errorCode === "TARGET_EXISTS" || errMsg.includes("TARGET_EXISTS")) {
+            toast({ title: "Chyba", description: `Složka s ID "${form.project_id}" již na SharePointu existuje.`, variant: "destructive" });
+            setForm((f) => ({ ...f, project_id: project.project_id }));
+            return;
           }
-          setForm((f) => ({ ...f, project_id: project.project_id }));
+          // SharePoint unreachable or other error — offer to save without SP
+          setSpRenameWarning(true);
           return;
         }
-        // Check for 409 conflict in response data
+
+        // Success response — check for TARGET_EXISTS in data (shouldn't happen with 200, but safety)
         if ((renameResult.data as any)?.error === "TARGET_EXISTS") {
-          toast({ title: "Chyba", description: "Složka s tímto ID už na SharePointu existuje.", variant: "destructive" });
+          toast({ title: "Chyba", description: `Složka s ID "${form.project_id}" již na SharePointu existuje.`, variant: "destructive" });
           setForm((f) => ({ ...f, project_id: project.project_id }));
           return;
         }
+
+        // folderNotFound means no folder on SP — that's fine, skip rename
+        // success: true means renamed OK — proceed to save
       } catch (err: any) {
-        toast({ title: "Chyba", description: "Nelze přejmenovat složku na SharePointu. ID projektu nebylo změněno.", variant: "destructive" });
-        setForm((f) => ({ ...f, project_id: project.project_id }));
+        // Network error or timeout — offer to save without SP
+        setSpRenameWarning(true);
         return;
       }
     }
+    // Reset the warning state after save
+    if (spRenameWarning) setSpRenameWarning(false);
 
     const { error } = await supabase.from("projects").update(newValues).eq("id", project.id);
     if (error) {
