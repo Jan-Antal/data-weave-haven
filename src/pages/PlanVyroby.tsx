@@ -76,7 +76,9 @@ export default function PlanVyroby() {
   const { isAdmin, loading, profile } = useAuth();
   const navigate = useNavigate();
   const { setCurrentPage } = useUndoRedo();
-  const [showCzk, setShowCzk] = useState(false);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>("hours");
+  const [viewTab, setViewTab] = useState<ViewTab>("kanban");
+  const showCzk = displayMode === "czk";
   const [activeDrag, setActiveDrag] = useState<ActiveDragData | null>(null);
   const [overDroppableId, setOverDroppableId] = useState<string | null>(null);
   const [autoSplitState, setAutoSplitState] = useState<AutoSplitState | null>(null);
