@@ -42,55 +42,25 @@ export function ProductionHeader() {
 
   return (
     <>
-      <header className="border-b bg-primary px-6 py-3 shrink-0">
-        <div className="flex items-center justify-between gap-4">
+      <header className="border-b bg-primary px-6 py-4 shrink-0 z-50">
+        <div className="flex items-center justify-between">
           {/* Left: Logo */}
           <div className="flex items-center gap-3 shrink-0">
             <h1 className="text-xl font-serif text-primary-foreground tracking-wide">
               A→M <span className="font-sans font-normal text-base opacity-80">Interior</span>
             </h1>
-            <span className="text-primary-foreground/30 text-sm">|</span>
-            <span className="text-primary-foreground/70 text-sm font-sans font-medium">Plán Výroby</span>
+            <span className="text-primary-foreground/40 text-sm">|</span>
+            <span className="text-primary-foreground/70 text-sm font-sans">Plán Výroby</span>
           </div>
 
-          {/* Right: undo/redo + user/settings */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Undo/Redo */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => undo("plan-vyroby")}
-                  disabled={!canUndo("plan-vyroby")}
-                  className="p-1.5 rounded-md transition-colors disabled:opacity-30"
-                  style={{ color: canUndo("plan-vyroby") ? "#ffffff" : "rgba(255,255,255,0.3)" }}
-                >
-                  <Undo2 className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Zpět (Ctrl+Z)</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => redo("plan-vyroby")}
-                  disabled={!canRedo("plan-vyroby")}
-                  className="p-1.5 rounded-md transition-colors disabled:opacity-30"
-                  style={{ color: canRedo("plan-vyroby") ? "#ffffff" : "rgba(255,255,255,0.3)" }}
-                >
-                  <Redo2 className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Vpřed (Ctrl+Shift+Z)</TooltipContent>
-            </Tooltip>
-
-            <div className="w-px h-5 bg-primary-foreground/15" />
-
+          {/* Right: user/settings */}
+          <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => navigate("/")}
-              className="p-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+              className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
               title="Přehled projektů"
             >
-              <LayoutDashboard className="h-4.5 w-4.5" />
+              <LayoutDashboard className="h-5 w-5" />
             </button>
 
             <DropdownMenu>
