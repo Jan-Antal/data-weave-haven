@@ -1494,23 +1494,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       </DialogContent>
     </Dialog>
 
-    {/* SharePoint rename warning — save without SP */}
-    <ConfirmDialog
-      open={spRenameWarning}
-      onConfirm={() => {
-        // User chose to save without SharePoint — handleSave will see spRenameWarning=true and skip SP
-        handleSave();
-      }}
-      onCancel={() => {
-        setSpRenameWarning(false);
-        setForm((f) => ({ ...f, project_id: project.project_id }));
-      }}
-      title="SharePoint není dostupný"
-      description="Nelze přejmenovat složku na SharePointu. Chcete uložit změnu ID pouze v databázi? Složku na SharePointu bude nutné přejmenovat ručně."
-      confirmLabel="Uložit bez SharePointu"
-      cancelLabel="Zrušit"
-      variant="default"
-    />
+
+
     {/* Unsaved changes confirmation */}
     <ConfirmDialog
       open={unsavedConfirmOpen}
