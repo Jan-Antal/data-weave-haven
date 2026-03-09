@@ -429,8 +429,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
     exportToExcel({ sheetName: "Plán Výroby", fileName: `AMI-Plan-Vyroby-${today}.xlsx`, headers, rows });
   };
 
-  const hasAnyInbox = filteredRows.some(p => p.inboxTotalHours > 0);
-  const hasAnyExpedice = filteredRows.some(p => p.expediceTotalHours > 0);
+  // Always show Inbox and Expedice columns as fixed/sticky
+  const hasAnyInbox = true;
+  const hasAnyExpedice = true;
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
