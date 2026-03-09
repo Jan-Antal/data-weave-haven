@@ -271,14 +271,15 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
     return `${Math.round(hours)}h${style.icon ? " " + style.icon : ""}`;
   };
 
-  const formatCapacity = (used: number) => {
+  const formatCapacity = (used: number, weekKey: string) => {
+    const cap = getWeekCapacity(weekKey);
     if (displayMode === "percent") {
-      return `${weeklyCapacity > 0 ? Math.round((used / weeklyCapacity) * 100) : 0}%`;
+      return `${cap > 0 ? Math.round((used / cap) * 100) : 0}%`;
     }
     if (displayMode === "czk") {
-      return `${Math.round(used)}h / ${weeklyCapacity}h · ${formatCompactCzk(used * hourlyRate)}`;
+      return `${Math.round(used)}h / ${cap}h · ${formatCompactCzk(used * hourlyRate)}`;
     }
-    return `${Math.round(used)}h / ${weeklyCapacity}h`;
+    return `${Math.round(used)}h / ${cap}h`;
   };
 
   const formatProjectTotal = (row: ProjectRow) => {
