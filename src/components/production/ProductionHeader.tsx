@@ -79,45 +79,6 @@ export function ProductionHeader({ displayMode, onDisplayModeChange }: Productio
             </h1>
             <span className="text-primary-foreground/30 text-sm">|</span>
             <span className="text-primary-foreground/70 text-sm font-sans font-medium">Plán Výroby</span>
-            <div className="flex items-center gap-[2px] ml-2">
-              {([
-                { key: "kanban" as ViewTab, label: "📋 Kanban" },
-                { key: "table" as ViewTab, label: "📊 Tabulka" },
-              ]).map(t => (
-                <button
-                  key={t.key}
-                  onClick={() => onViewTabChange(t.key)}
-                  className="px-2.5 py-[3px] text-[10px] font-medium rounded transition-colors"
-                  style={{
-                    backgroundColor: viewTab === t.key ? "#223937" : "rgba(255,255,255,0.15)",
-                    color: viewTab === t.key ? "#ffffff" : "rgba(255,255,255,0.7)",
-                    border: viewTab === t.key ? "none" : "1px solid rgba(255,255,255,0.2)",
-                  }}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-[2px] ml-1">
-              {([
-                { key: "hours" as DisplayMode, label: "Hodiny" },
-                { key: "czk" as DisplayMode, label: "Hod + Kč" },
-                { key: "percent" as DisplayMode, label: "%" },
-              ]).map(m => (
-                <button
-                  key={m.key}
-                  onClick={() => onDisplayModeChange(m.key)}
-                  className="px-2 py-[3px] text-[10px] font-medium rounded transition-colors"
-                  style={{
-                    backgroundColor: displayMode === m.key ? "#223937" : "rgba(255,255,255,0.15)",
-                    color: displayMode === m.key ? "#ffffff" : "rgba(255,255,255,0.7)",
-                    border: displayMode === m.key ? "none" : "1px solid rgba(255,255,255,0.2)",
-                  }}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Center: Stats */}
