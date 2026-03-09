@@ -12,6 +12,7 @@ type SortMode = "project" | "deadline" | "hours";
 
 interface Props {
   displayMode: DisplayMode;
+  searchQuery?: string;
 }
 
 function formatCompactCzk(v: number): string {
