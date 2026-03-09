@@ -188,6 +188,11 @@ export function ProductionHeader({ displayMode, onDisplayModeChange }: Productio
                       Rozpad ceny
                     </DropdownMenuItem>
                   )}
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => setCapacitySettingsOpen(true)}>
+                      📊 Kapacita výroby
+                    </DropdownMenuItem>
+                  )}
                   {canManageStatuses && (
                     <DropdownMenuItem onClick={() => setStatusMgmtOpen(true)}>
                       Správa statusů
