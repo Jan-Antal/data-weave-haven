@@ -363,8 +363,9 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
             </div>
             {weeks.map(week => {
               const used = weekCapacities.get(week.key) ?? 0;
-              const pct = weeklyCapacity > 0 ? (used / weeklyCapacity) * 100 : 0;
-              const barColor = pct > 100 ? "hsl(var(--destructive))" : pct > 85 ? "#d97706" : "hsl(var(--primary))";
+              const cap = getWeekCapacity(week.key);
+              const pct = cap > 0 ? (used / cap) * 100 : 0;
+              const barColor = pct > 120 ? "hsl(var(--destructive))" : pct > 100 ? "#d97706" : "hsl(var(--primary))";
               return (
                 <div
                   key={week.key}
