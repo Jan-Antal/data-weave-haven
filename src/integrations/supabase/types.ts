@@ -53,6 +53,36 @@ export type Database = {
         }
         Relationships: []
       }
+      company_holidays: {
+        Row: {
+          capacity_override: number
+          created_at: string
+          end_date: string
+          id: string
+          name: string
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          capacity_override?: number
+          created_at?: string
+          end_date: string
+          id?: string
+          name: string
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          capacity_override?: number
+          created_at?: string
+          end_date?: string
+          id?: string
+          name?: string
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cost_breakdown_presets: {
         Row: {
           created_at: string
@@ -257,6 +287,48 @@ export type Database = {
           is_active?: boolean
           name?: string
           role?: string
+        }
+        Relationships: []
+      }
+      production_capacity: {
+        Row: {
+          capacity_hours: number
+          company_holiday_name: string | null
+          created_at: string
+          holiday_name: string | null
+          id: string
+          is_manual_override: boolean
+          updated_at: string
+          week_number: number
+          week_start: string
+          week_year: number
+          working_days: number
+        }
+        Insert: {
+          capacity_hours?: number
+          company_holiday_name?: string | null
+          created_at?: string
+          holiday_name?: string | null
+          id?: string
+          is_manual_override?: boolean
+          updated_at?: string
+          week_number: number
+          week_start: string
+          week_year: number
+          working_days?: number
+        }
+        Update: {
+          capacity_hours?: number
+          company_holiday_name?: string | null
+          created_at?: string
+          holiday_name?: string | null
+          id?: string
+          is_manual_override?: boolean
+          updated_at?: string
+          week_number?: number
+          week_start?: string
+          week_year?: number
+          working_days?: number
         }
         Relationships: []
       }

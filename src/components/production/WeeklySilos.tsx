@@ -2,6 +2,7 @@ import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { GripVertical, ChevronRight } from "lucide-react";
 import { useProductionSchedule, getISOWeekNumber, type WeekSilo, type ScheduleBundle, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
+import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
 import { getProjectColor } from "@/lib/projectColors";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
@@ -116,6 +117,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
   const qc = useQueryClient();
+  const getWeekCapacity = useWeekCapacityLookup();
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [completionState, setCompletionState] = useState<CompletionState | null>(null);
@@ -128,7 +130,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const [visiblePeriodLabel, setVisiblePeriodLabel] = useState("");
   const initialScrollDone = useRef(false);
 
-  const weeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
+  const defaultWeeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
 
   // Initial scroll — run exactly once
@@ -245,9 +247,10 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     return weeks.map(w => {
       const siloData = scheduleData?.get(w.key);
       const usedHours = siloData?.total_hours ?? 0;
-      return { key: w.key, weekNum: w.weekNum, label: `${formatDateShort(w.start)}–${formatDateShort(w.end)}`, remainingCapacity: weeklyCapacity - usedHours };
+      const cap = getWeekCapacity(w.key);
+      return { key: w.key, weekNum: w.weekNum, label: `${formatDateShort(w.start)}–${formatDateShort(w.end)}`, remainingCapacity: cap - usedHours };
     });
-  }, [weeks, scheduleData, weeklyCapacity]);
+  }, [weeks, scheduleData, getWeekCapacity]);
 
   const weeksCapacityMap = useMemo(() => {
     const map = new Map<string, { total_hours: number }>();
@@ -479,7 +482,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               startDate={week.start} endDate={week.end}
               isCurrent={week.key === currentWeekKey} isPast={week.isPast}
               silo={scheduleData?.get(week.key) || null}
-              weeklyCapacity={weeklyCapacity} showCzk={showCzk} hourlyRate={hourlyRate}
+              weeklyCapacity={getWeekCapacity(week.key)} showCzk={showCzk} hourlyRate={hourlyRate}
               isOverTarget={overDroppableId === `silo-week-${week.key}`}
               onBundleContextMenu={(e, bundle, toggleExpand) => handleBundleContextMenu(e, bundle, week.key, week.weekNum, week.start, week.end, toggleExpand)}
               onItemContextMenu={(e, item, bundle) => handleItemContextMenu(e, item, week.key, week.weekNum, week.start, week.end, bundle)}
@@ -496,7 +499,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       )}
 
       {splitState && (
-        <SplitItemDialog open={!!splitState} onOpenChange={open => !open && setSplitState(null)} {...splitState} itemCode={splitState.itemCode} weeks={weekOptions} weeklyCapacity={weeklyCapacity} splitGroupId={splitState.splitGroupId} />
+        <SplitItemDialog open={!!splitState} onOpenChange={open => !open && setSplitState(null)} {...splitState} itemCode={splitState.itemCode} weeks={weekOptions} weeklyCapacity={defaultWeeklyCapacity} splitGroupId={splitState.splitGroupId} />
       )}
 
       {bundleSplitState && (
@@ -560,8 +563,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
 
   const totalHours = activeHours;
   const pct = weeklyCapacity > 0 ? (totalHours / weeklyCapacity) * 100 : 0;
-  const isOverloaded = pct > 100;
-  const isWarning = pct > 85 && pct <= 100;
+  const isOverloaded = pct > 120;
+  const isWarning = pct > 100 && pct <= 120;
   const overloadHours = totalHours - weeklyCapacity;
 
   const barColor = isPast ? "#b0bab8" : isOverloaded ? "#dc3545" : isWarning ? "#d97706" : "#3a8a36";

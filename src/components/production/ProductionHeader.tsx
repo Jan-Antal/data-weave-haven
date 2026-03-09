@@ -16,6 +16,7 @@ import { StatusManagement } from "@/components/StatusManagement";
 import { RecycleBin } from "@/components/RecycleBin";
 import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDialog";
 import { DataLogPanel } from "@/components/DataLogPanel";
+import { CapacitySettings } from "@/components/production/CapacitySettings";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
@@ -47,6 +48,7 @@ export function ProductionHeader({ displayMode, onDisplayModeChange }: Productio
   const [costPresetsOpen, setCostPresetsOpen] = useState(false);
   const [dataLogOpen, setDataLogOpen] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
 
   const toggleDataLog = useCallback(() => setDataLogOpen((p) => !p), []);
 
@@ -186,6 +188,11 @@ export function ProductionHeader({ displayMode, onDisplayModeChange }: Productio
                       Rozpad ceny
                     </DropdownMenuItem>
                   )}
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => setCapacitySettingsOpen(true)}>
+                      📊 Kapacita výroby
+                    </DropdownMenuItem>
+                  )}
                   {canManageStatuses && (
                     <DropdownMenuItem onClick={() => setStatusMgmtOpen(true)}>
                       Správa statusů
@@ -233,6 +240,7 @@ export function ProductionHeader({ displayMode, onDisplayModeChange }: Productio
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
       <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} />
       <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
+      <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
     </>
   );
 }

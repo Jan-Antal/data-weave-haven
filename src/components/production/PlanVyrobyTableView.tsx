@@ -2,6 +2,7 @@ import { useMemo, useState, useRef } from "react";
 import { useProductionSchedule, getISOWeekNumber, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
+import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
 import { getProjectColor } from "@/lib/projectColors";
 import { exportToExcel } from "@/lib/exportExcel";
 import { Download, ChevronRight, ChevronDown } from "lucide-react";
@@ -74,11 +75,12 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: inboxProjects = [] } = useProductionInbox();
   const { data: settings } = useProductionSettings();
+  const getWeekCapacity = useWeekCapacityLookup();
   const [sortMode, setSortMode] = useState<SortMode>("project");
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const weeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
+  const defaultWeeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
 
   const toggleProject = (pid: string) => {
@@ -269,14 +271,15 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
     return `${Math.round(hours)}h${style.icon ? " " + style.icon : ""}`;
   };
 
-  const formatCapacity = (used: number) => {
+  const formatCapacity = (used: number, weekKey: string) => {
+    const cap = getWeekCapacity(weekKey);
     if (displayMode === "percent") {
-      return `${weeklyCapacity > 0 ? Math.round((used / weeklyCapacity) * 100) : 0}%`;
+      return `${cap > 0 ? Math.round((used / cap) * 100) : 0}%`;
     }
     if (displayMode === "czk") {
-      return `${Math.round(used)}h / ${weeklyCapacity}h · ${formatCompactCzk(used * hourlyRate)}`;
+      return `${Math.round(used)}h / ${cap}h · ${formatCompactCzk(used * hourlyRate)}`;
     }
-    return `${Math.round(used)}h / ${weeklyCapacity}h`;
+    return `${Math.round(used)}h / ${cap}h`;
   };
 
   const formatProjectTotal = (row: ProjectRow) => {
@@ -360,8 +363,9 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
             </div>
             {weeks.map(week => {
               const used = weekCapacities.get(week.key) ?? 0;
-              const pct = weeklyCapacity > 0 ? (used / weeklyCapacity) * 100 : 0;
-              const barColor = pct > 100 ? "hsl(var(--destructive))" : pct > 85 ? "#d97706" : "hsl(var(--primary))";
+              const cap = getWeekCapacity(week.key);
+              const pct = cap > 0 ? (used / cap) * 100 : 0;
+              const barColor = pct > 120 ? "hsl(var(--destructive))" : pct > 100 ? "#d97706" : "hsl(var(--primary))";
               return (
                 <div
                   key={week.key}
