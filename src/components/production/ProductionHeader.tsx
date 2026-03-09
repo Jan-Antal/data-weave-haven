@@ -48,6 +48,7 @@ export function ProductionHeader({ displayMode, onDisplayModeChange }: Productio
   const [costPresetsOpen, setCostPresetsOpen] = useState(false);
   const [dataLogOpen, setDataLogOpen] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
 
   const toggleDataLog = useCallback(() => setDataLogOpen((p) => !p), []);
 
