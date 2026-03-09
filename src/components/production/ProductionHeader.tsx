@@ -1,12 +1,10 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
-import { useProductionSchedule } from "@/hooks/useProductionSchedule";
-import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
-import { LayoutDashboard, Settings, Check, User, UserCog, LogOut, Undo2, Redo2 } from "lucide-react";
+import { LayoutDashboard, Settings, Check, User, UserCog, LogOut, Undo2, Redo2, Search, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { UserManagement } from "@/components/UserManagement";
@@ -30,13 +28,13 @@ type DisplayMode = "hours" | "czk" | "percent";
 interface ProductionHeaderProps {
   displayMode: DisplayMode;
   onDisplayModeChange: (mode: DisplayMode) => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
 }
 
-export function ProductionHeader({ displayMode, onDisplayModeChange }: ProductionHeaderProps) {
+export function ProductionHeader({ displayMode, onDisplayModeChange, searchQuery, onSearchChange }: ProductionHeaderProps) {
   const navigate = useNavigate();
   const { data: settings } = useProductionSettings();
-  const { data: scheduleData } = useProductionSchedule();
-  const { data: inboxProjects = [] } = useProductionInbox();
   const { canAccessSettings, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, profile, signOut } = useAuth();
   const { openPeopleManagement } = usePeopleManagement();
   const { undo, redo, canUndo, canRedo } = useUndoRedo();
@@ -52,28 +50,11 @@ export function ProductionHeader({ displayMode, onDisplayModeChange }: Productio
 
   const toggleDataLog = useCallback(() => setDataLogOpen((p) => !p), []);
 
-  const monthlyHours = settings?.monthly_capacity_hours ?? 3500;
-  const hourlyRate = settings?.hourly_rate ?? 550;
-  const monthlyCzk = monthlyHours * hourlyRate;
-
-  const scheduledHours = scheduleData
-    ? Array.from(scheduleData.values()).reduce((s, w) => s + w.total_hours, 0)
-    : 0;
-
-  const inboxHours = inboxProjects.reduce((s, p) => s + p.total_hours, 0);
-  const isOverCapacity = scheduledHours > monthlyHours;
-
-  const formatCzk = (v: number) => {
-    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M Kč`;
-    if (v >= 1_000) return `${Math.round(v / 1_000)}K Kč`;
-    return `${v.toLocaleString("cs-CZ")} Kč`;
-  };
-
   return (
     <>
-      <header className="border-b bg-primary px-6 py-4 shrink-0">
-        <div className="flex items-center justify-between">
-          {/* Left: Logo + View Tabs */}
+      <header className="border-b bg-primary px-6 py-3 shrink-0">
+        <div className="flex items-center justify-between gap-4">
+          {/* Left: Logo */}
           <div className="flex items-center gap-3 shrink-0">
             <h1 className="text-xl font-serif text-primary-foreground tracking-wide">
               A→M <span className="font-sans font-normal text-base opacity-80">Interior</span>
@@ -82,34 +63,58 @@ export function ProductionHeader({ displayMode, onDisplayModeChange }: Productio
             <span className="text-primary-foreground/70 text-sm font-sans font-medium">Plán Výroby</span>
           </div>
 
-          {/* Center: Stats */}
-          <div className="flex items-center gap-0">
-            <StatBox label="Kapacita / měsíc" value={`${monthlyHours.toLocaleString("cs-CZ")} h`} />
-            <Divider />
-            <StatBox label="CZK ekvivalent" value={formatCzk(monthlyCzk)} />
-            <Divider />
-            <StatBox
-              label="Naplánováno"
-              value={`${Math.round(scheduledHours).toLocaleString("cs-CZ")} h`}
-              valueColor={isOverCapacity ? "#fca5a5" : "#a7d9a2"}
+          {/* Center: Search bar */}
+          <div className="flex-1 max-w-[280px] mx-4 relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary-foreground/40" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => onSearchChange(e.target.value)}
+              placeholder="Hledat projekt..."
+              className="w-full h-8 pl-8 pr-8 rounded-md text-sm bg-primary-foreground/10 text-primary-foreground placeholder:text-primary-foreground/40 border border-primary-foreground/15 focus:outline-none focus:border-primary-foreground/30 focus:bg-primary-foreground/15 transition-colors"
             />
-            <Divider />
-            <StatBox
-              label="V Inboxu"
-              value={`${Math.round(inboxHours).toLocaleString("cs-CZ")} h`}
-              valueColor="#fcd34d"
-            />
+            {searchQuery && (
+              <button
+                onClick={() => onSearchChange("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-primary-foreground/50 hover:text-primary-foreground transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
-          {/* Right: Back icon + User menu + Settings gear */}
-          <div className="flex items-center gap-1 shrink-0">
-            {/* Undo/Redo buttons */}
+          {/* Right: Display mode toggle + undo/redo + user/settings */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Display mode toggle */}
+            <div className="inline-flex h-8 items-center rounded-md bg-primary-foreground/10 border border-primary-foreground/15 p-0.5">
+              {([
+                { key: "hours" as DisplayMode, label: "Hodiny" },
+                { key: "czk" as DisplayMode, label: "Hod + Kč" },
+                { key: "percent" as DisplayMode, label: "%" },
+              ]).map(m => (
+                <button
+                  key={m.key}
+                  onClick={() => onDisplayModeChange(m.key)}
+                  className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-xs font-medium transition-all ${
+                    displayMode === m.key
+                      ? "bg-primary-foreground text-primary shadow-sm"
+                      : "text-primary-foreground/60 hover:text-primary-foreground"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="w-px h-5 bg-primary-foreground/15" />
+
+            {/* Undo/Redo */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   onClick={() => undo("plan-vyroby")}
                   disabled={!canUndo("plan-vyroby")}
-                  className="p-2 rounded-md transition-colors disabled:opacity-30"
+                  className="p-1.5 rounded-md transition-colors disabled:opacity-30"
                   style={{ color: canUndo("plan-vyroby") ? "#ffffff" : "rgba(255,255,255,0.3)" }}
                 >
                   <Undo2 className="h-4 w-4" />
@@ -122,7 +127,7 @@ export function ProductionHeader({ displayMode, onDisplayModeChange }: Productio
                 <button
                   onClick={() => redo("plan-vyroby")}
                   disabled={!canRedo("plan-vyroby")}
-                  className="p-2 rounded-md transition-colors disabled:opacity-30"
+                  className="p-1.5 rounded-md transition-colors disabled:opacity-30"
                   style={{ color: canRedo("plan-vyroby") ? "#ffffff" : "rgba(255,255,255,0.3)" }}
                 >
                   <Redo2 className="h-4 w-4" />
@@ -130,21 +135,22 @@ export function ProductionHeader({ displayMode, onDisplayModeChange }: Productio
               </TooltipTrigger>
               <TooltipContent>Vpřed (Ctrl+Shift+Z)</TooltipContent>
             </Tooltip>
-            <div className="w-px h-5 bg-primary-foreground/15 mx-1" />
+
+            <div className="w-px h-5 bg-primary-foreground/15" />
 
             <button
               onClick={() => navigate("/")}
-              className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+              className="p-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
               title="Přehled projektů"
             >
-              <LayoutDashboard className="h-5 w-5" />
+              <LayoutDashboard className="h-4.5 w-4.5" />
             </button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors text-sm">
                   <User className="h-4 w-4" />
-                  <span className="font-sans">{profile?.full_name || profile?.email || "Uživatel"}</span>
+                  <span className="font-sans text-xs">{profile?.full_name || profile?.email || "Uživatel"}</span>
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -163,8 +169,8 @@ export function ProductionHeader({ displayMode, onDisplayModeChange }: Productio
             {(canAccessSettings || realRole === "owner") && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
-                    <Settings className="h-5 w-5" />
+                  <button className="p-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+                    <Settings className="h-4.5 w-4.5" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -243,24 +249,4 @@ export function ProductionHeader({ displayMode, onDisplayModeChange }: Productio
       <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
     </>
   );
-}
-
-function StatBox({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
-  return (
-    <div className="px-3.5 text-center">
-      <div className="text-[8px] uppercase tracking-[0.08em] font-medium text-primary-foreground/40">
-        {label}
-      </div>
-      <div
-        className="font-mono font-semibold text-[13px] leading-tight"
-        style={{ color: valueColor || "rgba(255,255,255,0.9)" }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function Divider() {
-  return <div className="w-px h-6 bg-primary-foreground/15" />;
 }
