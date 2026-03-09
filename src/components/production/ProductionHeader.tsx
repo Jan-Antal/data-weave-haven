@@ -74,7 +74,53 @@ export function ProductionHeader({ viewTab, onViewTabChange, displayMode, onDisp
     <>
       <header className="border-b bg-primary px-6 py-4 shrink-0">
         <div className="flex items-center justify-between">
-          {/* Left: Logo */}
+          {/* Left: Logo + View Tabs */}
+          <div className="flex items-center gap-3 shrink-0">
+            <h1 className="text-xl font-serif text-primary-foreground tracking-wide">
+              A→M <span className="font-sans font-normal text-base opacity-80">Interior</span>
+            </h1>
+            <span className="text-primary-foreground/30 text-sm">|</span>
+            <span className="text-primary-foreground/70 text-sm font-sans font-medium">Plán Výroby</span>
+            <div className="flex items-center gap-[2px] ml-2">
+              {([
+                { key: "kanban" as ViewTab, label: "📋 Kanban" },
+                { key: "table" as ViewTab, label: "📊 Tabulka" },
+              ]).map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => onViewTabChange(t.key)}
+                  className="px-2.5 py-[3px] text-[10px] font-medium rounded transition-colors"
+                  style={{
+                    backgroundColor: viewTab === t.key ? "#223937" : "rgba(255,255,255,0.15)",
+                    color: viewTab === t.key ? "#ffffff" : "rgba(255,255,255,0.7)",
+                    border: viewTab === t.key ? "none" : "1px solid rgba(255,255,255,0.2)",
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-[2px] ml-1">
+              {([
+                { key: "hours" as DisplayMode, label: "Hodiny" },
+                { key: "czk" as DisplayMode, label: "Hod + Kč" },
+                { key: "percent" as DisplayMode, label: "%" },
+              ]).map(m => (
+                <button
+                  key={m.key}
+                  onClick={() => onDisplayModeChange(m.key)}
+                  className="px-2 py-[3px] text-[10px] font-medium rounded transition-colors"
+                  style={{
+                    backgroundColor: displayMode === m.key ? "#223937" : "rgba(255,255,255,0.15)",
+                    color: displayMode === m.key ? "#ffffff" : "rgba(255,255,255,0.7)",
+                    border: displayMode === m.key ? "none" : "1px solid rgba(255,255,255,0.2)",
+                  }}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex items-center gap-3 shrink-0">
             <h1 className="text-xl font-serif text-primary-foreground tracking-wide">
               A→M <span className="font-sans font-normal text-base opacity-80">Interior</span>
