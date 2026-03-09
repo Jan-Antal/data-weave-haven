@@ -117,6 +117,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
   const qc = useQueryClient();
+  const getWeekCapacity = useWeekCapacityLookup();
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [completionState, setCompletionState] = useState<CompletionState | null>(null);
@@ -129,7 +130,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const [visiblePeriodLabel, setVisiblePeriodLabel] = useState("");
   const initialScrollDone = useRef(false);
 
-  const weeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
+  const defaultWeeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
 
   // Initial scroll — run exactly once
