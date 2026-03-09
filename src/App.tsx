@@ -16,6 +16,8 @@ import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 import PlanVyroby from "./pages/PlanVyroby";
 
+const queryClient = new QueryClient();
+
 const BUILD_HASH = typeof __BUILD_HASH__ !== "undefined" ? __BUILD_HASH__ : "dev";
 const STORED_HASH_KEY = "ami_build_hash";
 
