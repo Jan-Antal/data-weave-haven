@@ -73,7 +73,7 @@ const INBOX_W = 80;
 const EXPEDICE_W = 80;
 const LEFT_COL_W = 260;
 
-export function PlanVyrobyTableView({ displayMode }: Props) {
+export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: expediceData } = useProductionExpedice();
   const { data: inboxProjects = [] } = useProductionInbox();
