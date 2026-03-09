@@ -12,6 +12,7 @@ type SortMode = "project" | "deadline" | "hours";
 
 interface Props {
   displayMode: DisplayMode;
+  searchQuery?: string;
 }
 
 function formatCompactCzk(v: number): string {
@@ -72,7 +73,7 @@ const INBOX_W = 80;
 const EXPEDICE_W = 80;
 const LEFT_COL_W = 260;
 
-export function PlanVyrobyTableView({ displayMode }: Props) {
+export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: expediceData } = useProductionExpedice();
   const { data: inboxProjects = [] } = useProductionInbox();
@@ -327,8 +328,24 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
     return rows;
   }, [scheduleData, expediceData, inboxByProject, expediceByProject, inboxProjects, sortMode, weeks]);
 
-  const totalProjects = projectRows.length;
-  const totalItems = projectRows.reduce((s, p) => s + p.items.length, 0);
+  // Filter by search
+  const filteredRows = useMemo(() => {
+    if (!searchQuery.trim()) return projectRows;
+    const q = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return projectRows.filter(p => {
+      const pName = p.projectName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const pId = p.projectId.toLowerCase();
+      if (pName.includes(q) || pId.includes(q)) return true;
+      return p.items.some(i => {
+        const iName = i.itemName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const iCode = (i.itemCode || "").toLowerCase();
+        return iName.includes(q) || iCode.includes(q);
+      });
+    });
+  }, [projectRows, searchQuery]);
+
+  const totalProjects = filteredRows.length;
+  const totalItems = filteredRows.reduce((s, p) => s + p.items.length, 0);
 
   // Week capacity data
   const weekCapacities = useMemo(() => {
@@ -395,7 +412,7 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
   const handleExport = () => {
     const headers = ["Projekt", "ID", "Položka", "Kód", "Inbox h", ...weeks.map(w => `T${w.weekNum}`), "Expedice h"];
     const rows: (string | number)[][] = [];
-    for (const proj of projectRows) {
+    for (const proj of filteredRows) {
       for (const item of proj.items) {
         const row: (string | number)[] = [proj.projectName, proj.projectId, item.itemName, item.itemCode || "", item.inboxHours || ""];
         for (const week of weeks) {
@@ -410,8 +427,8 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
     exportToExcel({ sheetName: "Plán Výroby", fileName: `AMI-Plan-Vyroby-${today}.xlsx`, headers, rows });
   };
 
-  const hasAnyInbox = projectRows.some(p => p.inboxTotalHours > 0);
-  const hasAnyExpedice = projectRows.some(p => p.expediceTotalHours > 0);
+  const hasAnyInbox = filteredRows.some(p => p.inboxTotalHours > 0);
+  const hasAnyExpedice = filteredRows.some(p => p.expediceTotalHours > 0);
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
@@ -507,7 +524,7 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
           </div>
 
           {/* Project rows */}
-          {projectRows.map(proj => {
+          {filteredRows.map(proj => {
             const isExpanded = expandedProjects.has(proj.projectId);
             return (
               <div key={proj.projectId}>
@@ -663,7 +680,7 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
             );
           })}
 
-          {projectRows.length === 0 && (
+          {filteredRows.length === 0 && (
             <div className="px-6 py-12 text-center text-[12px] text-muted-foreground">
               Žádné položky v plánu výroby
             </div>

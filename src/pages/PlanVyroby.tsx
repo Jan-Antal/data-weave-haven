@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,6 +23,7 @@ import {
 } from "@dnd-kit/core";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 import { useProductionSchedule, getISOWeekNumber } from "@/hooks/useProductionSchedule";
+import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { PlanVyrobyTableView } from "@/components/production/PlanVyrobyTableView";
 
@@ -78,6 +79,7 @@ export default function PlanVyroby() {
   const { setCurrentPage } = useUndoRedo();
   const [displayMode, setDisplayMode] = useState<DisplayMode>("hours");
   const [viewTab, setViewTab] = useState<ViewTab>("kanban");
+  const [searchQuery, setSearchQuery] = useState("");
   const showCzk = displayMode === "czk";
   const [activeDrag, setActiveDrag] = useState<ActiveDragData | null>(null);
   const [overDroppableId, setOverDroppableId] = useState<string | null>(null);
@@ -365,55 +367,15 @@ export default function PlanVyroby() {
         <ProductionHeader
           displayMode={displayMode}
           onDisplayModeChange={setDisplayMode}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
         />
 
-        {/* Tab bar below header — same style as main page tabs */}
-        <div className="shrink-0 border-b border-border px-6 flex items-center justify-between bg-card" style={{ minHeight: 44 }}>
-          <div className="flex items-center">
-            <div className="inline-flex h-10 items-center rounded-md bg-card border border-border p-1">
-              <button
-                onClick={() => setViewTab("kanban")}
-                className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
-                  viewTab === "kanban"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Kanban
-              </button>
-              <button
-                onClick={() => setViewTab("table")}
-                className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
-                  viewTab === "table"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Tabulka
-              </button>
-            </div>
-          </div>
-
-          <div className="inline-flex h-10 items-center rounded-md bg-card border border-border p-1">
-            {([
-              { key: "hours" as DisplayMode, label: "Hodiny" },
-              { key: "czk" as DisplayMode, label: "Hod + Kč" },
-              { key: "percent" as DisplayMode, label: "%" },
-            ]).map(m => (
-              <button
-                key={m.key}
-                onClick={() => setDisplayMode(m.key)}
-                className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
-                  displayMode === m.key
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Row 2: Tabs + Stats + Period */}
+        <ToolbarRow2
+          viewTab={viewTab}
+          setViewTab={setViewTab}
+        />
 
         {viewTab === "kanban" ? (
           <div className="flex-1 flex min-h-0">
@@ -422,7 +384,7 @@ export default function PlanVyroby() {
             <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
           </div>
         ) : (
-          <PlanVyrobyTableView displayMode={displayMode} />
+          <PlanVyrobyTableView displayMode={displayMode} searchQuery={searchQuery} />
         )}
       </div>
 
@@ -467,5 +429,86 @@ export default function PlanVyroby() {
         </Dialog>
       )}
     </DndContext>
+  );
+}
+
+function ToolbarRow2({ viewTab, setViewTab }: { viewTab: "kanban" | "table"; setViewTab: (v: "kanban" | "table") => void }) {
+  const { data: settings } = useProductionSettings();
+  const { data: scheduleData } = useProductionSchedule();
+  const { data: inboxProjects = [] } = useProductionInbox();
+
+  const monthlyHours = settings?.monthly_capacity_hours ?? 3500;
+  const hourlyRate = settings?.hourly_rate ?? 550;
+  const monthlyCzk = monthlyHours * hourlyRate;
+  const scheduledHours = scheduleData
+    ? Array.from(scheduleData.values()).reduce((s, w) => s + w.total_hours, 0)
+    : 0;
+  const inboxHours = inboxProjects.reduce((s, p) => s + p.total_hours, 0);
+  const isOverCapacity = scheduledHours > monthlyHours;
+
+  const formatCzk = (v: number) => {
+    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M Kč`;
+    if (v >= 1_000) return `${Math.round(v / 1_000)}K Kč`;
+    return `${v.toLocaleString("cs-CZ")} Kč`;
+  };
+
+  // Period label from schedule data
+  const periodLabel = useMemo(() => {
+    if (!scheduleData || scheduleData.size === 0) return "";
+    const weeks = Array.from(scheduleData.keys()).sort();
+    const first = new Date(weeks[0] + "T00:00:00");
+    const last = new Date(weeks[weeks.length - 1] + "T00:00:00");
+    const months = ["Leden", "Únor", "Březen", "Duben", "Květen", "Červen", "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec"];
+    if (first.getMonth() === last.getMonth() && first.getFullYear() === last.getFullYear()) {
+      return `${months[first.getMonth()]} ${first.getFullYear()}`;
+    }
+    if (first.getFullYear() === last.getFullYear()) {
+      return `${months[first.getMonth()]} – ${months[last.getMonth()]} ${first.getFullYear()}`;
+    }
+    return `${months[first.getMonth()]} ${first.getFullYear()} – ${months[last.getMonth()]} ${last.getFullYear()}`;
+  }, [scheduleData]);
+
+  return (
+    <div className="shrink-0 border-b border-border px-6 flex items-center justify-between bg-card" style={{ minHeight: 40 }}>
+      {/* Left: Tabs */}
+      <div className="inline-flex h-9 items-center rounded-md bg-card border border-border p-1">
+        <button
+          onClick={() => setViewTab("kanban")}
+          className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-sm font-medium transition-all ${
+            viewTab === "kanban"
+              ? "bg-primary text-primary-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Kanban
+        </button>
+        <button
+          onClick={() => setViewTab("table")}
+          className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-sm font-medium transition-all ${
+            viewTab === "table"
+              ? "bg-primary text-primary-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Tabulka
+        </button>
+      </div>
+
+      {/* Center: Stats */}
+      <div className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
+        <span>Kapacita <span className="font-semibold text-foreground">{monthlyHours.toLocaleString("cs-CZ")}h</span></span>
+        <span className="text-border">·</span>
+        <span>CZK <span className="font-semibold text-foreground">{formatCzk(monthlyCzk)}</span></span>
+        <span className="text-border">·</span>
+        <span>Naplánováno <span className="font-semibold" style={{ color: isOverCapacity ? "hsl(var(--destructive))" : "hsl(142 76% 36%)" }}>{Math.round(scheduledHours).toLocaleString("cs-CZ")}h</span></span>
+        <span className="text-border">·</span>
+        <span>V Inboxu <span className="font-semibold" style={{ color: "#d97706" }}>{Math.round(inboxHours).toLocaleString("cs-CZ")}h</span></span>
+      </div>
+
+      {/* Right: Period */}
+      {periodLabel && (
+        <span className="text-xs text-muted-foreground font-medium">{periodLabel}</span>
+      )}
+    </div>
   );
 }
