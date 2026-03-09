@@ -535,10 +535,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                     onClick={() => toggleProject(proj.projectId)}
                     style={{
                       height: 48,
-                      borderRadius: 6,
-                      overflow: "hidden",
                       boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                      border: "1px solid #e5e2dd",
                     }}
                   >
                     <div
@@ -548,6 +545,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                         backgroundColor: "#fff",
                         borderLeft: `4px solid ${proj.color}`,
                         borderRight: "1px solid #e5e2dd",
+                        borderTop: "1px solid #e5e2dd",
+                        borderBottom: "1px solid #e5e2dd",
+                        borderRadius: "6px 0 0 6px",
                       }}
                     >
                       {isExpanded
@@ -569,7 +569,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                     {hasAnyInbox && (
                       <div
                         className="shrink-0 flex items-center justify-center px-1.5 sticky z-20"
-                        style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff" }}
+                        style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff", borderTop: "1px solid #e5e2dd", borderBottom: "1px solid #e5e2dd" }}
                       >
                         {proj.inboxTotalHours > 0 && (
                           <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-bold" style={{ backgroundColor: "#fff7ed", color: "#ea580c" }}>
@@ -588,6 +588,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                           style={{
                             width: CELL_W,
                             backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : "#fff",
+                            borderTop: "1px solid #e5e2dd",
+                            borderBottom: "1px solid #e5e2dd",
                           }}
                         >
                           {!isExpanded && wt && wt.hours > 0 && (
@@ -605,7 +607,14 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                     {hasAnyExpedice && (
                       <div
                         className="shrink-0 flex items-center justify-center px-1.5 sticky right-0 z-20"
-                        style={{ width: EXPEDICE_W, backgroundColor: "#fff" }}
+                        style={{
+                          width: EXPEDICE_W,
+                          backgroundColor: "#fff",
+                          borderTop: "1px solid #e5e2dd",
+                          borderBottom: "1px solid #e5e2dd",
+                          borderRight: "1px solid #e5e2dd",
+                          borderRadius: "0 6px 6px 0",
+                        }}
                       >
                         {proj.expediceTotalHours > 0 && (
                           <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-bold" style={{ backgroundColor: "#ecfdf5", color: "#059669" }}>
