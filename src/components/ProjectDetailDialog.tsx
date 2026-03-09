@@ -276,7 +276,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const locInputRef = useRef<HTMLInputElement>(null);
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
-  const [spRenameWarning, setSpRenameWarning] = useState(false);
   const [deletingFile, setDeletingFile] = useState<string | null>(null);
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck(project?.id);
 
@@ -354,7 +353,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       setShowLocDropdown(false);
       sp.resetCache();
       resetIdCheck();
-      setSpRenameWarning(false);
+      
     }
   }, [project, open, resetIdCheck]);
 
@@ -598,47 +597,36 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       cost_is_custom: form.cost_is_custom,
     };
 
-    // If project ID changed, rename SharePoint folder first
+    // If project ID changed, try to rename SharePoint folder (never blocks DB save)
     const projectIdChanged = form.project_id !== project.project_id;
-    const skipSharePoint = spRenameWarning; // user already confirmed to skip
-    if (projectIdChanged && !skipSharePoint) {
+    let spRenameFailed = false;
+    if (projectIdChanged) {
       try {
         const renameResult = await supabase.functions.invoke("sharepoint-documents", {
           body: { action: "rename", oldProjectId: project.project_id, newProjectId: form.project_id },
         });
 
-        // supabase.functions.invoke sets error for non-2xx responses
-        if (renameResult.error) {
-          // Try to parse the response data for TARGET_EXISTS
-          const errorCode = (renameResult.data as any)?.error;
-          const errMsg = renameResult.error?.message ?? "";
-          if (errorCode === "TARGET_EXISTS" || errMsg.includes("TARGET_EXISTS")) {
-            toast({ title: "Chyba", description: `Složka s ID "${form.project_id}" již na SharePointu existuje.`, variant: "destructive" });
-            setForm((f) => ({ ...f, project_id: project.project_id }));
-            return;
-          }
-          // SharePoint unreachable or other error — offer to save without SP
-          setSpRenameWarning(true);
-          return;
-        }
+        const errorCode = (renameResult.data as any)?.error;
+        const errMsg = renameResult.error?.message ?? "";
 
-        // Success response — check for TARGET_EXISTS in data (shouldn't happen with 200, but safety)
-        if ((renameResult.data as any)?.error === "TARGET_EXISTS") {
+        // Only block save if target folder already exists on SharePoint
+        if (errorCode === "TARGET_EXISTS" || errMsg.includes("TARGET_EXISTS")) {
           toast({ title: "Chyba", description: `Složka s ID "${form.project_id}" již na SharePointu existuje.`, variant: "destructive" });
           setForm((f) => ({ ...f, project_id: project.project_id }));
           return;
         }
 
-        // folderNotFound means no folder on SP — that's fine, skip rename
-        // success: true means renamed OK — proceed to save
+        // Any other error — proceed with save, show warning later
+        if (renameResult.error) {
+          console.warn("SharePoint rename failed (non-blocking):", errMsg);
+          spRenameFailed = true;
+        }
+        // folderNotFound or success: true — all fine, proceed
       } catch (err: any) {
-        // Network error or timeout — offer to save without SP
-        setSpRenameWarning(true);
-        return;
+        console.warn("SharePoint rename error (non-blocking):", err);
+        spRenameFailed = true;
       }
     }
-    // Reset the warning state after save
-    if (spRenameWarning) setSpRenameWarning(false);
 
     const { error } = await supabase.from("projects").update(newValues).eq("id", project.id);
     if (error) {
@@ -666,9 +654,10 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       logActivity({ projectId: logPid, actionType: "project_id_change", oldValue: project.project_id, newValue: form.project_id });
       // Migrate document count cache to new project ID
       migrateDocCountCache(project.project_id, form.project_id);
-      // If saved without SharePoint rename, log warning
-      if (skipSharePoint) {
+      // If SharePoint rename failed, log warning and show toast
+      if (spRenameFailed) {
         logActivity({ projectId: logPid, actionType: "project_id_change", detail: "⚠️ SharePoint složka nebyla přejmenována — vyžaduje ruční přejmenování" });
+        toast({ title: "ID projektu změněno", description: "⚠ Složka na SharePointu nebyla přejmenována — přejmenujte ručně." });
       }
     }
     qc.invalidateQueries({ queryKey: ["projects"] });
@@ -1505,23 +1494,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       </DialogContent>
     </Dialog>
 
-    {/* SharePoint rename warning — save without SP */}
-    <ConfirmDialog
-      open={spRenameWarning}
-      onConfirm={() => {
-        // User chose to save without SharePoint — handleSave will see spRenameWarning=true and skip SP
-        handleSave();
-      }}
-      onCancel={() => {
-        setSpRenameWarning(false);
-        setForm((f) => ({ ...f, project_id: project.project_id }));
-      }}
-      title="SharePoint není dostupný"
-      description="Nelze přejmenovat složku na SharePointu. Chcete uložit změnu ID pouze v databázi? Složku na SharePointu bude nutné přejmenovat ručně."
-      confirmLabel="Uložit bez SharePointu"
-      cancelLabel="Zrušit"
-      variant="default"
-    />
+
+
     {/* Unsaved changes confirmation */}
     <ConfirmDialog
       open={unsavedConfirmOpen}
