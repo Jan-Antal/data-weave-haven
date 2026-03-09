@@ -240,6 +240,7 @@ export function ProductionHeader({ displayMode, onDisplayModeChange }: Productio
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
       <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} />
       <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
+      <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
     </>
   );
 }
