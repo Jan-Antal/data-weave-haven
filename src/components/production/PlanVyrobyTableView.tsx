@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef } from "react";
-import { useProductionSchedule, getISOWeekNumber, type ScheduleItem } from "@/hooks/useProductionSchedule";
+import { useProductionSchedule, useProductionExpedice, getISOWeekNumber, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
@@ -46,7 +46,11 @@ interface ItemRow {
   itemCode: string | null;
   totalHours: number;
   totalCzk: number;
-  weekAllocations: Map<string, { hours: number; czk: number; status: string }>;
+  weekAllocations: Map<string, { hours: number; czk: number; status: string; splitPart?: number; splitTotal?: number }>;
+  inboxHours: number;
+  inboxCzk: number;
+  expediceHours: number;
+  expediceCzk: number;
 }
 
 interface ProjectRow {
@@ -57,22 +61,20 @@ interface ProjectRow {
   totalCzk: number;
   items: ItemRow[];
   weekTotals: Map<string, { hours: number; czk: number }>;
-}
-
-interface InboxProjectRow {
-  projectId: string;
-  projectName: string;
-  color: string;
-  totalHours: number;
-  totalCzk: number;
-  itemCount: number;
+  inboxTotalHours: number;
+  inboxTotalCzk: number;
+  expediceTotalHours: number;
+  expediceTotalCzk: number;
 }
 
 const CELL_W = 110;
+const INBOX_W = 80;
+const EXPEDICE_W = 80;
 const LEFT_COL_W = 260;
 
 export function PlanVyrobyTableView({ displayMode }: Props) {
   const { data: scheduleData } = useProductionSchedule();
+  const { data: expediceData } = useProductionExpedice();
   const { data: inboxProjects = [] } = useProductionInbox();
   const { data: settings } = useProductionSettings();
   const getWeekCapacity = useWeekCapacityLookup();
@@ -80,7 +82,6 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const defaultWeeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
 
   const toggleProject = (pid: string) => {
@@ -92,12 +93,11 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
     });
   };
 
-  // Build weeks — only from first week with data, skip past empty weeks
+  // Build weeks — from first week with data, skip past empty weeks
   const weeks = useMemo<WeekColumn[]>(() => {
     const monday = getMonday(new Date());
     const currentWeekKey = monday.toISOString().split("T")[0];
 
-    // Find earliest week with data
     let earliestDataWeek = currentWeekKey;
     if (scheduleData) {
       for (const weekKey of scheduleData.keys()) {
@@ -105,7 +105,6 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
       }
     }
 
-    // Start from 1 week before earliest data or 1 week before current, whichever is earlier
     const startMonday = new Date(earliestDataWeek < currentWeekKey ? earliestDataWeek : currentWeekKey);
     startMonday.setDate(startMonday.getDate() - 7);
 
@@ -127,63 +126,157 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
     return result;
   }, [scheduleData]);
 
-  // Build project rows from schedule data — deduplicate split items
-  const projectRows = useMemo<ProjectRow[]>(() => {
-    if (!scheduleData) return [];
+  // Build inbox lookup: projectId -> items
+  const inboxByProject = useMemo(() => {
+    const map = new Map<string, { items: { name: string; code: string | null; hours: number; czk: number }[]; totalHours: number; totalCzk: number }>();
+    for (const p of inboxProjects) {
+      if (p.total_hours <= 0) continue;
+      map.set(p.project_id, {
+        items: p.items.map(i => ({ name: i.item_name, code: i.item_code, hours: i.estimated_hours, czk: i.estimated_czk })),
+        totalHours: p.total_hours,
+        totalCzk: p.items.reduce((s, i) => s + i.estimated_czk, 0),
+      });
+    }
+    return map;
+  }, [inboxProjects]);
 
+  // Build expedice lookup: projectId -> items
+  const expediceByProject = useMemo(() => {
+    const map = new Map<string, { items: { name: string; code: string | null; hours: number; czk: number }[]; totalHours: number; totalCzk: number }>();
+    if (!expediceData) return map;
+    for (const g of expediceData) {
+      const totalHours = g.items.reduce((s, i) => s + i.scheduled_hours, 0);
+      const totalCzk = g.items.reduce((s, i) => s + i.scheduled_czk, 0);
+      if (totalHours <= 0) continue;
+      map.set(g.project_id, {
+        items: g.items.map(i => ({ name: i.item_name, code: i.item_code, hours: i.scheduled_hours, czk: i.scheduled_czk })),
+        totalHours,
+        totalCzk,
+      });
+    }
+    return map;
+  }, [expediceData]);
+
+  // Build project rows combining schedule + inbox + expedice
+  const projectRows = useMemo<ProjectRow[]>(() => {
     const projectMap = new Map<string, {
       projectName: string;
       items: Map<string, {
-        item: ScheduleItem;
-        weekAllocations: Map<string, { hours: number; czk: number; status: string }>;
+        itemName: string;
+        itemCode: string | null;
+        weekAllocations: Map<string, { hours: number; czk: number; status: string; splitPart?: number; splitTotal?: number }>;
         totalHours: number;
         totalCzk: number;
       }>;
     }>();
 
-    for (const [weekKey, silo] of scheduleData) {
-      for (const bundle of silo.bundles) {
-        if (!projectMap.has(bundle.project_id)) {
-          projectMap.set(bundle.project_id, { projectName: bundle.project_name, items: new Map() });
-        }
-        const proj = projectMap.get(bundle.project_id)!;
-        for (const item of bundle.items) {
-          // Deduplicate splits: group by split_group_id or item id
-          const itemKey = item.split_group_id || item.id;
-          if (!proj.items.has(itemKey)) {
-            proj.items.set(itemKey, { item, weekAllocations: new Map(), totalHours: 0, totalCzk: 0 });
+    // From schedule data
+    if (scheduleData) {
+      for (const [weekKey, silo] of scheduleData) {
+        for (const bundle of silo.bundles) {
+          if (!projectMap.has(bundle.project_id)) {
+            projectMap.set(bundle.project_id, { projectName: bundle.project_name, items: new Map() });
           }
-          const entry = proj.items.get(itemKey)!;
-          const existing = entry.weekAllocations.get(weekKey);
-          entry.weekAllocations.set(weekKey, {
-            hours: (existing?.hours ?? 0) + item.scheduled_hours,
-            czk: (existing?.czk ?? 0) + item.scheduled_czk,
-            status: item.status,
-          });
-          entry.totalHours += item.scheduled_hours;
-          entry.totalCzk += item.scheduled_czk;
+          const proj = projectMap.get(bundle.project_id)!;
+          for (const item of bundle.items) {
+            // Skip completed items (they go to expedice)
+            if (item.status === "completed") continue;
+            const itemKey = item.split_group_id || item.id;
+            if (!proj.items.has(itemKey)) {
+              proj.items.set(itemKey, { itemName: item.item_name, itemCode: item.item_code, weekAllocations: new Map(), totalHours: 0, totalCzk: 0 });
+            }
+            const entry = proj.items.get(itemKey)!;
+            const existing = entry.weekAllocations.get(weekKey);
+            entry.weekAllocations.set(weekKey, {
+              hours: (existing?.hours ?? 0) + item.scheduled_hours,
+              czk: (existing?.czk ?? 0) + item.scheduled_czk,
+              status: item.status,
+              splitPart: item.split_part ?? undefined,
+              splitTotal: item.split_total ?? undefined,
+            });
+            entry.totalHours += item.scheduled_hours;
+            entry.totalCzk += item.scheduled_czk;
+          }
         }
       }
     }
 
+    // Collect all project IDs that have inbox or expedice data too
+    const allProjectIds = new Set<string>([...projectMap.keys(), ...inboxByProject.keys(), ...expediceByProject.keys()]);
+
     const rows: ProjectRow[] = [];
-    for (const [pid, proj] of projectMap) {
+    for (const pid of allProjectIds) {
+      const proj = projectMap.get(pid);
+      const inbox = inboxByProject.get(pid);
+      const expedice = expediceByProject.get(pid);
+
+      // Get project name from any source
+      const projectName = proj?.projectName || inbox?.items[0]?.name?.split(" ")[0] || 
+        inboxProjects.find(p => p.project_id === pid)?.project_name ||
+        expediceData?.find(g => g.project_id === pid)?.project_name || pid;
+
       const items: ItemRow[] = [];
-      for (const [, entry] of proj.items) {
-        // Skip items with 0 scheduled hours
-        if (entry.totalHours <= 0) continue;
-        items.push({
-          id: entry.item.id,
-          itemName: entry.item.item_name,
-          itemCode: entry.item.item_code,
-          totalHours: entry.totalHours,
-          totalCzk: entry.totalCzk,
-          weekAllocations: entry.weekAllocations,
-        });
+
+      // Build item rows from schedule
+      if (proj) {
+        for (const [, entry] of proj.items) {
+          if (entry.totalHours <= 0) continue;
+          items.push({
+            id: Math.random().toString(36),
+            itemName: entry.itemName,
+            itemCode: entry.itemCode,
+            totalHours: entry.totalHours,
+            totalCzk: entry.totalCzk,
+            weekAllocations: entry.weekAllocations,
+            inboxHours: 0,
+            inboxCzk: 0,
+            expediceHours: 0,
+            expediceCzk: 0,
+          });
+        }
       }
+
+      // Add inbox items as separate rows
+      if (inbox) {
+        for (const inItem of inbox.items) {
+          if (inItem.hours <= 0) continue;
+          items.push({
+            id: Math.random().toString(36),
+            itemName: inItem.name,
+            itemCode: inItem.code,
+            totalHours: inItem.hours,
+            totalCzk: inItem.czk,
+            weekAllocations: new Map(),
+            inboxHours: inItem.hours,
+            inboxCzk: inItem.czk,
+            expediceHours: 0,
+            expediceCzk: 0,
+          });
+        }
+      }
+
+      // Add expedice items as separate rows
+      if (expedice) {
+        for (const exItem of expedice.items) {
+          if (exItem.hours <= 0) continue;
+          items.push({
+            id: Math.random().toString(36),
+            itemName: exItem.name,
+            itemCode: exItem.code,
+            totalHours: exItem.hours,
+            totalCzk: exItem.czk,
+            weekAllocations: new Map(),
+            inboxHours: 0,
+            inboxCzk: 0,
+            expediceHours: exItem.hours,
+            expediceCzk: exItem.czk,
+          });
+        }
+      }
+
       if (items.length === 0) continue;
 
-      // Compute per-week totals for collapsed view
+      // Compute per-week totals
       const weekTotals = new Map<string, { hours: number; czk: number }>();
       for (const item of items) {
         for (const [wk, alloc] of item.weekAllocations) {
@@ -195,22 +288,36 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
         }
       }
 
+      const inboxTotalHours = inbox?.totalHours ?? 0;
+      const inboxTotalCzk = inbox?.totalCzk ?? 0;
+      const expediceTotalHours = expedice?.totalHours ?? 0;
+      const expediceTotalCzk = expedice?.totalCzk ?? 0;
+
+      // Get proper project name
+      const realName = inboxProjects.find(p => p.project_id === pid)?.project_name ||
+        expediceData?.find(g => g.project_id === pid)?.project_name ||
+        proj?.projectName || pid;
+
       rows.push({
         projectId: pid,
-        projectName: proj.projectName,
+        projectName: realName,
         color: getProjectColor(pid),
         totalHours: items.reduce((s, i) => s + i.totalHours, 0),
         totalCzk: items.reduce((s, i) => s + i.totalCzk, 0),
         items,
         weekTotals,
+        inboxTotalHours,
+        inboxTotalCzk,
+        expediceTotalHours,
+        expediceTotalCzk,
       });
     }
 
     if (sortMode === "hours") rows.sort((a, b) => b.totalHours - a.totalHours);
     else if (sortMode === "deadline") {
       rows.sort((a, b) => {
-        const aMin = Math.min(...a.items.flatMap(i => [...i.weekAllocations.keys()].map(k => weeks.findIndex(w => w.key === k))).filter(x => x >= 0));
-        const bMin = Math.min(...b.items.flatMap(i => [...i.weekAllocations.keys()].map(k => weeks.findIndex(w => w.key === k))).filter(x => x >= 0));
+        const aMin = Math.min(...a.items.flatMap(i => [...i.weekAllocations.keys()].map(k => weeks.findIndex(w => w.key === k))).filter(x => x >= 0), 999);
+        const bMin = Math.min(...b.items.flatMap(i => [...i.weekAllocations.keys()].map(k => weeks.findIndex(w => w.key === k))).filter(x => x >= 0), 999);
         return aMin - bMin;
       });
     } else {
@@ -218,21 +325,7 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
     }
 
     return rows;
-  }, [scheduleData, sortMode, weeks]);
-
-  // Inbox section
-  const inboxRows = useMemo<InboxProjectRow[]>(() => {
-    return inboxProjects
-      .filter(p => p.total_hours > 0)
-      .map(p => ({
-        projectId: p.project_id,
-        projectName: p.project_name,
-        color: getProjectColor(p.project_id),
-        totalHours: p.total_hours,
-        totalCzk: p.total_hours * hourlyRate,
-        itemCount: p.items.length,
-      }));
-  }, [inboxProjects, hourlyRate]);
+  }, [scheduleData, expediceData, inboxByProject, expediceByProject, inboxProjects, sortMode, weeks]);
 
   const totalProjects = projectRows.length;
   const totalItems = projectRows.reduce((s, p) => s + p.items.length, 0);
@@ -252,23 +345,24 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
 
   const getCellStyle = (status: string) => {
     switch (status) {
-      case "completed": return { bg: "#dcfce7", text: "#166534", icon: "✓" };
-      case "in_progress": return { bg: "#fef3c7", text: "#92400e", icon: "●" };
-      case "paused": return { bg: "#fef9c3", text: "#854d0e", icon: "⏸" };
-      default: return { bg: "#dbeafe", text: "#1e40af", icon: "" };
+      case "completed": return { bg: "hsl(142 76% 92%)", text: "hsl(143 64% 24%)", icon: "✓" };
+      case "in_progress": return { bg: "hsl(45 93% 90%)", text: "hsl(26 90% 37%)", icon: "●" };
+      case "paused": return { bg: "hsl(48 96% 89%)", text: "hsl(35 92% 33%)", icon: "⏸" };
+      default: return { bg: "hsl(214 95% 93%)", text: "hsl(221 83% 53%)", icon: "" };
     }
   };
 
-  const formatCellValue = (hours: number, czk: number, status: string, totalItemHours: number) => {
+  const formatCellValue = (hours: number, czk: number, status: string, totalItemHours: number, splitPart?: number, splitTotal?: number) => {
     const style = getCellStyle(status);
+    const splitLabel = splitPart && splitTotal ? ` ${splitPart}/${splitTotal}` : "";
     if (displayMode === "percent") {
       const pct = totalItemHours > 0 ? Math.round((hours / totalItemHours) * 100) : 0;
-      return `${pct}%${style.icon ? " " + style.icon : ""}`;
+      return `${pct}%${splitLabel}${style.icon ? " " + style.icon : ""}`;
     }
     if (displayMode === "czk") {
-      return `${Math.round(hours)}h · ${formatCompactCzk(czk)}${style.icon ? " " + style.icon : ""}`;
+      return `${Math.round(hours)}h · ${formatCompactCzk(czk)}${splitLabel}`;
     }
-    return `${Math.round(hours)}h${style.icon ? " " + style.icon : ""}`;
+    return `${Math.round(hours)}h${splitLabel}${style.icon ? " " + style.icon : ""}`;
   };
 
   const formatCapacity = (used: number, weekKey: string) => {
@@ -283,38 +377,41 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
   };
 
   const formatProjectTotal = (row: ProjectRow) => {
-    if (displayMode === "percent") {
-      const completed = row.items.filter(i =>
-        [...i.weekAllocations.values()].every(a => a.status === "completed")
-      ).length;
-      return `${completed}/${row.items.length} hotovo · ${row.items.length > 0 ? Math.round((completed / row.items.length) * 100) : 0}%`;
-    }
     if (displayMode === "czk") return `${Math.round(row.totalHours)}h · ${formatCompactCzk(row.totalCzk)}`;
     return `${Math.round(row.totalHours)}h`;
   };
 
   const formatWeekTotal = (hours: number, czk: number) => {
-    if (displayMode === "percent") return "";
     if (displayMode === "czk") return `${Math.round(hours)}h · ${formatCompactCzk(czk)}`;
     return `${Math.round(hours)}h`;
   };
 
+  const formatSimple = (hours: number, czk: number) => {
+    if (displayMode === "czk") return `${Math.round(hours)}h · ${formatCompactCzk(czk)}`;
+    if (displayMode === "percent") return `${Math.round(hours)}h`;
+    return `${Math.round(hours)}h`;
+  };
+
   const handleExport = () => {
-    const headers = ["Projekt", "ID", "Položka", "Kód", "Celkem h", ...weeks.map(w => `T${w.weekNum}`)];
+    const headers = ["Projekt", "ID", "Položka", "Kód", "Inbox h", ...weeks.map(w => `T${w.weekNum}`), "Expedice h"];
     const rows: (string | number)[][] = [];
     for (const proj of projectRows) {
       for (const item of proj.items) {
-        const row: (string | number)[] = [proj.projectName, proj.projectId, item.itemName, item.itemCode || "", Math.round(item.totalHours)];
+        const row: (string | number)[] = [proj.projectName, proj.projectId, item.itemName, item.itemCode || "", item.inboxHours || ""];
         for (const week of weeks) {
           const alloc = item.weekAllocations.get(week.key);
           row.push(alloc ? Math.round(alloc.hours) : "");
         }
+        row.push(item.expediceHours || "");
         rows.push(row);
       }
     }
     const today = new Date().toISOString().split("T")[0];
     exportToExcel({ sheetName: "Plán Výroby", fileName: `AMI-Plan-Vyroby-${today}.xlsx`, headers, rows });
   };
+
+  const hasAnyInbox = projectRows.some(p => p.inboxTotalHours > 0);
+  const hasAnyExpedice = projectRows.some(p => p.expediceTotalHours > 0);
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
@@ -323,7 +420,6 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
         <div className="flex items-center gap-3">
           <span className="text-[10px] font-medium text-muted-foreground">
             {totalProjects} projektů · {totalItems} položek
-            {inboxRows.length > 0 && ` · ${inboxRows.length} v inboxu`}
           </span>
           <div className="flex items-center gap-1">
             <span className="text-[9px] font-medium text-muted-foreground">Řadit:</span>
@@ -354,13 +450,20 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
       {/* Table */}
       <div className="flex-1 overflow-auto" ref={scrollRef}>
         <div className="min-w-max">
-          {/* Header row: capacity per week */}
-          <div className="flex sticky top-0 z-10" style={{ backgroundColor: "#f4f2f0" }}>
-            <div className="shrink-0 sticky left-0 z-20 border-r border-b border-border" style={{ width: LEFT_COL_W, backgroundColor: "#f4f2f0" }}>
+          {/* Header row */}
+          <div className="flex sticky top-0 z-10 bg-muted" style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+            <div className="shrink-0 sticky left-0 z-20 border-r border-b border-border bg-muted" style={{ width: LEFT_COL_W }}>
               <div className="px-3 py-2 text-[10px] font-semibold text-muted-foreground">
                 Projekt / Položka
               </div>
             </div>
+            {/* Inbox header */}
+            {hasAnyInbox && (
+              <div className="shrink-0 text-center px-1 py-1.5 border-b border-r border-border/50 bg-amber-50" style={{ width: INBOX_W }}>
+                <div className="text-[10px] font-bold text-amber-800">📥 Inbox</div>
+              </div>
+            )}
+            {/* Week headers */}
             {weeks.map(week => {
               const used = weekCapacities.get(week.key) ?? 0;
               const cap = getWeekCapacity(week.key);
@@ -372,7 +475,8 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
                   className="shrink-0 text-center px-1 py-1.5 border-b border-r border-border/50"
                   style={{
                     width: CELL_W,
-                    backgroundColor: week.isCurrent ? "hsl(var(--primary) / 0.08)" : "#f4f2f0",
+                    backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : undefined,
+                    borderTop: week.isCurrent ? "2px solid hsl(var(--primary))" : undefined,
                   }}
                 >
                   <div className="font-mono text-[11px] font-bold text-foreground">T{week.weekNum}</div>
@@ -388,22 +492,27 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
                 </div>
               );
             })}
+            {/* Expedice header */}
+            {hasAnyExpedice && (
+              <div className="shrink-0 text-center px-1 py-1.5 border-b border-r border-border/50" style={{ width: EXPEDICE_W, backgroundColor: "hsl(142 76% 95%)" }}>
+                <div className="text-[10px] font-bold" style={{ color: "hsl(143 64% 24%)" }}>✓ Expedice</div>
+              </div>
+            )}
           </div>
 
-          {/* Scheduled project rows */}
+          {/* Project rows */}
           {projectRows.map(proj => {
             const isExpanded = expandedProjects.has(proj.projectId);
             return (
               <div key={proj.projectId}>
-                {/* Project header — clickable to expand */}
+                {/* Project header row */}
                 <div
                   className="flex cursor-pointer hover:bg-accent/30 transition-colors"
-                  style={{ backgroundColor: "#fafaf8" }}
                   onClick={() => toggleProject(proj.projectId)}
                 >
                   <div
-                    className="shrink-0 flex items-center gap-2 px-2 py-1.5 sticky left-0 z-10 border-r border-b border-border/60"
-                    style={{ width: LEFT_COL_W, backgroundColor: "#fafaf8" }}
+                    className="shrink-0 flex items-center gap-2 px-2 py-1.5 sticky left-0 z-10 border-r border-b border-border/60 bg-card"
+                    style={{ width: LEFT_COL_W }}
                   >
                     {isExpanded
                       ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -418,7 +527,20 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
                       </div>
                     </div>
                   </div>
-                  {/* When collapsed, show per-week totals */}
+                  {/* Inbox cell */}
+                  {hasAnyInbox && (
+                    <div
+                      className="shrink-0 flex items-center justify-center px-1 py-1 border-b border-r border-border/30"
+                      style={{ width: INBOX_W }}
+                    >
+                      {proj.inboxTotalHours > 0 && (
+                        <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-semibold bg-amber-100 text-amber-800">
+                          {formatSimple(proj.inboxTotalHours, proj.inboxTotalCzk)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {/* Week cells — show totals when collapsed */}
                   {weeks.map(week => {
                     const wt = proj.weekTotals.get(week.key);
                     return (
@@ -427,7 +549,7 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
                         className="shrink-0 flex items-center justify-center px-1 py-1 border-b border-r border-border/30"
                         style={{
                           width: CELL_W,
-                          backgroundColor: week.isCurrent ? "hsl(var(--primary) / 0.04)" : undefined,
+                          backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : undefined,
                         }}
                       >
                         {!isExpanded && wt && wt.hours > 0 && (
@@ -441,11 +563,24 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
                       </div>
                     );
                   })}
+                  {/* Expedice cell */}
+                  {hasAnyExpedice && (
+                    <div
+                      className="shrink-0 flex items-center justify-center px-1 py-1 border-b border-r border-border/30"
+                      style={{ width: EXPEDICE_W }}
+                    >
+                      {proj.expediceTotalHours > 0 && (
+                        <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-semibold" style={{ backgroundColor: "hsl(142 76% 92%)", color: "hsl(143 64% 24%)" }}>
+                          {formatSimple(proj.expediceTotalHours, proj.expediceTotalCzk)} ✓
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Item rows — only when expanded */}
                 {isExpanded && proj.items.map(item => (
-                  <div key={item.id} className="flex" style={{ borderBottom: "1px solid hsl(var(--border) / 0.3)" }}>
+                  <div key={item.id} className="flex border-b border-border/20">
                     <div
                       className="shrink-0 flex items-center pl-9 pr-2 py-1 sticky left-0 z-10 border-r border-border bg-background"
                       style={{ width: LEFT_COL_W }}
@@ -457,13 +592,27 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
                         </div>
                       </div>
                     </div>
+                    {/* Inbox cell */}
+                    {hasAnyInbox && (
+                      <div
+                        className="shrink-0 flex items-center justify-center px-1 py-1 border-r border-border/30"
+                        style={{ width: INBOX_W }}
+                      >
+                        {item.inboxHours > 0 && (
+                          <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-semibold bg-amber-100 text-amber-800">
+                            {Math.round(item.inboxHours)}h
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {/* Week cells */}
                     {weeks.map(week => {
                       const alloc = item.weekAllocations.get(week.key);
                       if (!alloc) {
                         return (
                           <div key={week.key} className="shrink-0 border-r border-border/30" style={{
                             width: CELL_W,
-                            backgroundColor: week.isCurrent ? "hsl(var(--primary) / 0.04)" : undefined,
+                            backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : undefined,
                           }} />
                         );
                       }
@@ -477,67 +626,38 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
                           className="shrink-0 flex items-center justify-center px-1 py-1 border-r border-border/30"
                           style={{
                             width: CELL_W,
-                            backgroundColor: week.isCurrent ? "hsl(var(--primary) / 0.04)" : undefined,
+                            backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : undefined,
                           }}
                         >
                           <div
                             className="w-full rounded px-1.5 py-0.5 text-center text-[9px] font-mono font-semibold"
                             style={{ backgroundColor: style.bg, color: style.text, opacity: cellOpacity }}
                           >
-                            {formatCellValue(alloc.hours, alloc.czk, alloc.status, item.totalHours)}
+                            {formatCellValue(alloc.hours, alloc.czk, alloc.status, item.totalHours, alloc.splitPart, alloc.splitTotal)}
                           </div>
                         </div>
                       );
                     })}
+                    {/* Expedice cell */}
+                    {hasAnyExpedice && (
+                      <div
+                        className="shrink-0 flex items-center justify-center px-1 py-1 border-r border-border/30"
+                        style={{ width: EXPEDICE_W }}
+                      >
+                        {item.expediceHours > 0 && (
+                          <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-semibold" style={{ backgroundColor: "hsl(142 76% 92%)", color: "hsl(143 64% 24%)" }}>
+                            {Math.round(item.expediceHours)}h ✓
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             );
           })}
 
-          {/* Inbox section */}
-          {inboxRows.length > 0 && (
-            <>
-              <div className="flex" style={{ backgroundColor: "#fef9c3" }}>
-                <div
-                  className="shrink-0 px-3 py-2 sticky left-0 z-10 border-r border-b border-border/60"
-                  style={{ width: LEFT_COL_W, backgroundColor: "#fef9c3" }}
-                >
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-amber-800">
-                    📥 Inbox — Čeká na naplánování
-                  </div>
-                </div>
-                {weeks.map(week => (
-                  <div key={week.key} className="shrink-0 border-b border-border/30" style={{ width: CELL_W, backgroundColor: "#fef9c3" }} />
-                ))}
-              </div>
-              {inboxRows.map(inbox => (
-                <div key={inbox.projectId} className="flex" style={{ backgroundColor: "#fffef5" }}>
-                  <div
-                    className="shrink-0 flex items-center gap-2 px-2 py-1.5 sticky left-0 z-10 border-r border-b border-border/40"
-                    style={{ width: LEFT_COL_W, backgroundColor: "#fffef5" }}
-                  >
-                    <div className="w-[3px] h-5 rounded-full shrink-0" style={{ backgroundColor: inbox.color }} />
-                    <div className="min-w-0">
-                      <div className="text-[11px] font-medium truncate text-foreground">{inbox.projectName}</div>
-                      <div className="text-[9px] text-muted-foreground">
-                        {inbox.projectId} · {inbox.itemCount} položek ·{" "}
-                        {displayMode === "czk"
-                          ? `${Math.round(inbox.totalHours)}h · ${formatCompactCzk(inbox.totalCzk)}`
-                          : `${Math.round(inbox.totalHours)}h`
-                        }
-                      </div>
-                    </div>
-                  </div>
-                  {weeks.map(week => (
-                    <div key={week.key} className="shrink-0 border-b border-r border-border/30" style={{ width: CELL_W, backgroundColor: "#fffef5" }} />
-                  ))}
-                </div>
-              ))}
-            </>
-          )}
-
-          {projectRows.length === 0 && inboxRows.length === 0 && (
+          {projectRows.length === 0 && (
             <div className="px-6 py-12 text-center text-[12px] text-muted-foreground">
               Žádné položky v plánu výroby
             </div>
@@ -549,10 +669,11 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
       <div className="px-3 py-2 flex items-center justify-between shrink-0 border-t border-border bg-card">
         <div className="flex items-center gap-3">
           {[
-            { label: "Dokončeno", bg: "#dcfce7", text: "#166534" },
-            { label: "Ve výrobě", bg: "#fef3c7", text: "#92400e" },
-            { label: "Naplánováno", bg: "#dbeafe", text: "#1e40af" },
-            { label: "Pozastaveno", bg: "#fef9c3", text: "#854d0e" },
+            { label: "Inbox", bg: "hsl(45 93% 90%)", text: "hsl(26 90% 37%)" },
+            { label: "Naplánováno", bg: "hsl(214 95% 93%)", text: "hsl(221 83% 53%)" },
+            { label: "Ve výrobě", bg: "hsl(45 93% 90%)", text: "hsl(26 90% 37%)" },
+            { label: "Dokončeno", bg: "hsl(142 76% 92%)", text: "hsl(143 64% 24%)" },
+            { label: "Pozastaveno", bg: "hsl(48 96% 89%)", text: "hsl(35 92% 33%)" },
           ].map(l => (
             <div key={l.label} className="flex items-center gap-1">
               <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: l.bg, border: `1px solid ${l.text}30` }} />

@@ -368,28 +368,30 @@ export default function PlanVyroby() {
         />
 
         {/* Tab bar below header — same style as main page tabs */}
-        <div className="shrink-0 border-b border-border px-6 py-2 flex items-center justify-between bg-card">
-          <div className="inline-flex h-10 items-center rounded-md bg-card border border-border p-1">
-            <button
-              onClick={() => setViewTab("kanban")}
-              className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
-                viewTab === "kanban"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Kanban
-            </button>
-            <button
-              onClick={() => setViewTab("table")}
-              className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
-                viewTab === "table"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Tabulka
-            </button>
+        <div className="shrink-0 border-b border-border px-6 flex items-center justify-between bg-card" style={{ minHeight: 44 }}>
+          <div className="flex items-center">
+            <div className="inline-flex h-10 items-center rounded-md bg-card border border-border p-1">
+              <button
+                onClick={() => setViewTab("kanban")}
+                className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
+                  viewTab === "kanban"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Kanban
+              </button>
+              <button
+                onClick={() => setViewTab("table")}
+                className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all ${
+                  viewTab === "table"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Tabulka
+              </button>
+            </div>
           </div>
 
           <div className="inline-flex h-10 items-center rounded-md bg-card border border-border p-1">
