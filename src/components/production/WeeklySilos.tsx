@@ -482,7 +482,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               startDate={week.start} endDate={week.end}
               isCurrent={week.key === currentWeekKey} isPast={week.isPast}
               silo={scheduleData?.get(week.key) || null}
-              weeklyCapacity={weeklyCapacity} showCzk={showCzk} hourlyRate={hourlyRate}
+              weeklyCapacity={getWeekCapacity(week.key)} showCzk={showCzk} hourlyRate={hourlyRate}
               isOverTarget={overDroppableId === `silo-week-${week.key}`}
               onBundleContextMenu={(e, bundle, toggleExpand) => handleBundleContextMenu(e, bundle, week.key, week.weekNum, week.start, week.end, toggleExpand)}
               onItemContextMenu={(e, item, bundle) => handleItemContextMenu(e, item, week.key, week.weekNum, week.start, week.end, bundle)}
