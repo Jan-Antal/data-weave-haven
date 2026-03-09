@@ -328,8 +328,24 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
     return rows;
   }, [scheduleData, expediceData, inboxByProject, expediceByProject, inboxProjects, sortMode, weeks]);
 
-  const totalProjects = projectRows.length;
-  const totalItems = projectRows.reduce((s, p) => s + p.items.length, 0);
+  // Filter by search
+  const filteredRows = useMemo(() => {
+    if (!searchQuery.trim()) return projectRows;
+    const q = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return projectRows.filter(p => {
+      const pName = p.projectName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const pId = p.projectId.toLowerCase();
+      if (pName.includes(q) || pId.includes(q)) return true;
+      return p.items.some(i => {
+        const iName = i.itemName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const iCode = (i.itemCode || "").toLowerCase();
+        return iName.includes(q) || iCode.includes(q);
+      });
+    });
+  }, [projectRows, searchQuery]);
+
+  const totalProjects = filteredRows.length;
+  const totalItems = filteredRows.reduce((s, p) => s + p.items.length, 0);
 
   // Week capacity data
   const weekCapacities = useMemo(() => {
