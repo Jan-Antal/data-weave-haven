@@ -38,11 +38,15 @@ function formatDateShort(d: Date): string {
 
 const MONTH_NAMES = ["Leden", "Únor", "Březen", "Duben", "Květen", "Červen", "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec"];
 
+type DisplayMode = "hours" | "czk" | "percent";
+
 interface Props {
   showCzk: boolean;
   onToggleCzk: (v: boolean) => void;
   overDroppableId?: string | null;
   onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void;
+  displayMode?: DisplayMode;
+  onDisplayModeChange?: (mode: DisplayMode) => void;
 }
 
 interface ContextMenuState {
