@@ -15,10 +15,16 @@ interface Props {
   searchQuery?: string;
 }
 
-function formatCompactCzk(v: number): string {
+function formatCzk(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M Kč`;
+  if (v >= 1_000) return `${Math.round(v / 1_000)}K Kč`;
+  return `${v.toLocaleString("cs-CZ")} Kč`;
+}
+
+function formatCzkShort(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `${Math.round(v / 1_000)}K`;
-  return `${Math.round(v)}`;
+  return v.toLocaleString("cs-CZ");
 }
 
 function getMonday(date: Date): Date {
