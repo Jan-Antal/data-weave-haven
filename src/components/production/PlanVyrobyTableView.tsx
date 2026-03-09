@@ -158,6 +158,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
     return map;
   }, [expediceData]);
 
+  // Clean split suffixes like "(1/2)", "(2/2)" from item names
+  const cleanSplitName = (name: string) => name.replace(/\s*\(\d+\/\d+\)\s*$/, "").trim();
+
   // Build project rows combining schedule + inbox + expedice
   const projectRows = useMemo<ProjectRow[]>(() => {
     const projectMap = new Map<string, {
@@ -184,7 +187,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
             if (item.status === "completed") continue;
             const itemKey = item.split_group_id || item.id;
             if (!proj.items.has(itemKey)) {
-              proj.items.set(itemKey, { itemName: item.item_name, itemCode: item.item_code, weekAllocations: new Map(), totalHours: 0, totalCzk: 0 });
+              // Use cleaned name (without split suffix)
+              proj.items.set(itemKey, { itemName: cleanSplitName(item.item_name), itemCode: item.item_code, weekAllocations: new Map(), totalHours: 0, totalCzk: 0 });
             }
             const entry = proj.items.get(itemKey)!;
             const existing = entry.weekAllocations.get(weekKey);
@@ -211,20 +215,22 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
       const inbox = inboxByProject.get(pid);
       const expedice = expediceByProject.get(pid);
 
-      // Get project name from any source
-      const projectName = proj?.projectName || inbox?.items[0]?.name?.split(" ")[0] || 
-        inboxProjects.find(p => p.project_id === pid)?.project_name ||
-        expediceData?.find(g => g.project_id === pid)?.project_name || pid;
-
       const items: ItemRow[] = [];
 
       // Build item rows from schedule
+      // Track which item codes/names are already in schedule to avoid duplicates
+      const knownItemKeys = new Set<string>();
+
       if (proj) {
         for (const [, entry] of proj.items) {
           if (entry.totalHours <= 0) continue;
+          const cleanName = cleanSplitName(entry.itemName);
+          // Track by code or cleaned name for dedup
+          if (entry.itemCode) knownItemKeys.add(entry.itemCode.toLowerCase());
+          knownItemKeys.add(cleanName.toLowerCase());
           items.push({
             id: Math.random().toString(36),
-            itemName: entry.itemName,
+            itemName: cleanName,
             itemCode: entry.itemCode,
             totalHours: entry.totalHours,
             totalCzk: entry.totalCzk,
@@ -237,41 +243,72 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
         }
       }
 
-      // Add inbox items as separate rows
+      // Add inbox items — merge into existing rows or create new ones
       if (inbox) {
         for (const inItem of inbox.items) {
           if (inItem.hours <= 0) continue;
-          items.push({
-            id: Math.random().toString(36),
-            itemName: inItem.name,
-            itemCode: inItem.code,
-            totalHours: inItem.hours,
-            totalCzk: inItem.czk,
-            weekAllocations: new Map(),
-            inboxHours: inItem.hours,
-            inboxCzk: inItem.czk,
-            expediceHours: 0,
-            expediceCzk: 0,
-          });
+          const cleanName = cleanSplitName(inItem.name);
+          const codeKey = inItem.code?.toLowerCase();
+          const nameKey = cleanName.toLowerCase();
+          // Find existing row to merge into
+          const existing = items.find(i =>
+            (codeKey && i.itemCode?.toLowerCase() === codeKey) ||
+            cleanSplitName(i.itemName).toLowerCase() === nameKey
+          );
+          if (existing) {
+            existing.inboxHours += inItem.hours;
+            existing.inboxCzk += inItem.czk;
+            existing.totalHours += inItem.hours;
+            existing.totalCzk += inItem.czk;
+          } else {
+            if (codeKey) knownItemKeys.add(codeKey);
+            knownItemKeys.add(nameKey);
+            items.push({
+              id: Math.random().toString(36),
+              itemName: cleanName,
+              itemCode: inItem.code,
+              totalHours: inItem.hours,
+              totalCzk: inItem.czk,
+              weekAllocations: new Map(),
+              inboxHours: inItem.hours,
+              inboxCzk: inItem.czk,
+              expediceHours: 0,
+              expediceCzk: 0,
+            });
+          }
         }
       }
 
-      // Add expedice items as separate rows
+      // Add expedice items — merge into existing rows or create new ones
       if (expedice) {
         for (const exItem of expedice.items) {
           if (exItem.hours <= 0) continue;
-          items.push({
-            id: Math.random().toString(36),
-            itemName: exItem.name,
-            itemCode: exItem.code,
-            totalHours: exItem.hours,
-            totalCzk: exItem.czk,
-            weekAllocations: new Map(),
-            inboxHours: 0,
-            inboxCzk: 0,
-            expediceHours: exItem.hours,
-            expediceCzk: exItem.czk,
-          });
+          const cleanName = cleanSplitName(exItem.name);
+          const codeKey = exItem.code?.toLowerCase();
+          const nameKey = cleanName.toLowerCase();
+          const existing = items.find(i =>
+            (codeKey && i.itemCode?.toLowerCase() === codeKey) ||
+            cleanSplitName(i.itemName).toLowerCase() === nameKey
+          );
+          if (existing) {
+            existing.expediceHours += exItem.hours;
+            existing.expediceCzk += exItem.czk;
+            existing.totalHours += exItem.hours;
+            existing.totalCzk += exItem.czk;
+          } else {
+            items.push({
+              id: Math.random().toString(36),
+              itemName: cleanName,
+              itemCode: exItem.code,
+              totalHours: exItem.hours,
+              totalCzk: exItem.czk,
+              weekAllocations: new Map(),
+              inboxHours: 0,
+              inboxCzk: 0,
+              expediceHours: exItem.hours,
+              expediceCzk: exItem.czk,
+            });
+          }
         }
       }
 
