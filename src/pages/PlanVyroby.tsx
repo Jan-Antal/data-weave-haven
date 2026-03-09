@@ -364,17 +364,16 @@ export default function PlanVyroby() {
             <span>⚠ TEST MODE — Testovací prostředí — data nejsou produkční</span>
           </div>
         )}
-        <ProductionHeader
+        <ProductionHeader />
+
+        {/* Row 2: Tabs + Search + Display mode + Stats + Period */}
+        <ToolbarRow2
+          viewTab={viewTab}
+          setViewTab={setViewTab}
           displayMode={displayMode}
           onDisplayModeChange={setDisplayMode}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-        />
-
-        {/* Row 2: Tabs + Stats + Period */}
-        <ToolbarRow2
-          viewTab={viewTab}
-          setViewTab={setViewTab}
         />
 
         {viewTab === "kanban" ? (
