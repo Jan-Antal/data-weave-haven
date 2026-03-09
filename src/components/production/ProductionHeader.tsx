@@ -16,6 +16,7 @@ import { StatusManagement } from "@/components/StatusManagement";
 import { RecycleBin } from "@/components/RecycleBin";
 import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDialog";
 import { DataLogPanel } from "@/components/DataLogPanel";
+import { CapacitySettings } from "@/components/production/CapacitySettings";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
