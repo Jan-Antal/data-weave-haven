@@ -28,8 +28,6 @@ type DisplayMode = "hours" | "czk" | "percent";
 type ViewTab = "kanban" | "table";
 
 interface ProductionHeaderProps {
-  viewTab: ViewTab;
-  onViewTabChange: (tab: ViewTab) => void;
   displayMode: DisplayMode;
   onDisplayModeChange: (mode: DisplayMode) => void;
 }
