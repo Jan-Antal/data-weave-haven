@@ -524,7 +524,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
           </div>
 
           {/* Project rows */}
-          {projectRows.map(proj => {
+          {filteredRows.map(proj => {
             const isExpanded = expandedProjects.has(proj.projectId);
             return (
               <div key={proj.projectId}>
