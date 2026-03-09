@@ -535,10 +535,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                     onClick={() => toggleProject(proj.projectId)}
                     style={{
                       height: 48,
-                      borderRadius: 6,
-                      overflow: "hidden",
                       boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                      border: "1px solid #e5e2dd",
                     }}
                   >
                     <div
@@ -548,6 +545,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                         backgroundColor: "#fff",
                         borderLeft: `4px solid ${proj.color}`,
                         borderRight: "1px solid #e5e2dd",
+                        borderTop: "1px solid #e5e2dd",
+                        borderBottom: "1px solid #e5e2dd",
+                        borderRadius: "6px 0 0 6px",
                       }}
                     >
                       {isExpanded
