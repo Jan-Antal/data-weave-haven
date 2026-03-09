@@ -38,11 +38,15 @@ function formatDateShort(d: Date): string {
 
 const MONTH_NAMES = ["Leden", "Únor", "Březen", "Duben", "Květen", "Červen", "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec"];
 
+type DisplayMode = "hours" | "czk" | "percent";
+
 interface Props {
   showCzk: boolean;
   onToggleCzk: (v: boolean) => void;
   overDroppableId?: string | null;
   onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void;
+  displayMode?: DisplayMode;
+  onDisplayModeChange?: (mode: DisplayMode) => void;
 }
 
 interface ContextMenuState {
@@ -107,7 +111,7 @@ interface CancelState {
   cancelAll?: boolean;
 }
 
-export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV }: Props) {
+export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, displayMode, onDisplayModeChange }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
@@ -464,10 +468,6 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
           Tento týden
         </button>
         <span className="text-[9px] font-medium" style={{ color: "#99a5a3" }}>{visiblePeriodLabel}</span>
-        <div className="flex items-center gap-[2px]">
-          <ToolbarButton active={!showCzk} label="Hodiny" onClick={() => onToggleCzk(false)} />
-          <ToolbarButton active={showCzk} label="Hod + Kč" onClick={() => onToggleCzk(true)} />
-        </div>
       </div>
 
       {/* Silos */}

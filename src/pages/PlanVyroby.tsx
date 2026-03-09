@@ -24,6 +24,10 @@ import {
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 import { useProductionSchedule, getISOWeekNumber } from "@/hooks/useProductionSchedule";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
+import { PlanVyrobyTableView } from "@/components/production/PlanVyrobyTableView";
+
+export type DisplayMode = "hours" | "czk" | "percent";
+type ViewTab = "kanban" | "table";
 
 interface ActiveDragData {
   type: "inbox-item" | "inbox-project" | "silo-item" | "silo-bundle";
@@ -72,7 +76,9 @@ export default function PlanVyroby() {
   const { isAdmin, loading, profile } = useAuth();
   const navigate = useNavigate();
   const { setCurrentPage } = useUndoRedo();
-  const [showCzk, setShowCzk] = useState(false);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>("hours");
+  const [viewTab, setViewTab] = useState<ViewTab>("kanban");
+  const showCzk = displayMode === "czk";
   const [activeDrag, setActiveDrag] = useState<ActiveDragData | null>(null);
   const [overDroppableId, setOverDroppableId] = useState<string | null>(null);
   const [autoSplitState, setAutoSplitState] = useState<AutoSplitState | null>(null);
@@ -367,12 +373,21 @@ export default function PlanVyroby() {
             <span>⚠ TEST MODE — Testovací prostředí — data nejsou produkční</span>
           </div>
         )}
-        <ProductionHeader />
-        <div className="flex-1 flex min-h-0">
-          <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
-          <WeeklySilos showCzk={showCzk} onToggleCzk={setShowCzk} overDroppableId={overDroppableId} onNavigateToTPV={handleNavigateToTPV} />
-          <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
-        </div>
+        <ProductionHeader
+          viewTab={viewTab}
+          onViewTabChange={setViewTab}
+          displayMode={displayMode}
+          onDisplayModeChange={setDisplayMode}
+        />
+        {viewTab === "kanban" ? (
+          <div className="flex-1 flex min-h-0">
+            <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
+            <WeeklySilos showCzk={showCzk} onToggleCzk={(v) => setDisplayMode(v ? "czk" : "hours")} overDroppableId={overDroppableId} onNavigateToTPV={handleNavigateToTPV} displayMode={displayMode} onDisplayModeChange={setDisplayMode} />
+            <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
+          </div>
+        ) : (
+          <PlanVyrobyTableView displayMode={displayMode} />
+        )}
       </div>
 
       <DragOverlay dropAnimation={null}>
