@@ -353,7 +353,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       setShowLocDropdown(false);
       sp.resetCache();
       resetIdCheck();
-      setSpRenameWarning(false);
+      
     }
   }, [project, open, resetIdCheck]);
 
