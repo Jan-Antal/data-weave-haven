@@ -378,12 +378,14 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   );
 }
 
-function WeekEditor({ week, weekNum, isPast, onSave, onReset }: {
+function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, onClose }: {
   week: WeekCapacity;
   weekNum: number;
   isPast: boolean;
+  standardCapacity: number;
   onSave: (cap: number, days: number) => void;
   onReset: () => void;
+  onClose: () => void;
 }) {
   const [cap, setCap] = useState(String(Math.round(week.capacity_hours)));
   const [days, setDays] = useState(String(week.working_days));
@@ -392,11 +394,26 @@ function WeekEditor({ week, weekNum, isPast, onSave, onReset }: {
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
 
+  const save = () => {
+    const v = parseInt(cap);
+    const d = parseInt(days);
+    if (v >= 0 && d >= 0) onSave(v, d);
+    onClose();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") save();
+    if (e.key === "Escape") onClose();
+  };
+
   return (
     <div className="space-y-2">
       <div className="text-xs font-bold text-foreground">
         T{weekNum}: {weekStart.getDate()}.{weekStart.getMonth() + 1} – {weekEnd.getDate()}.{weekEnd.getMonth() + 1}
       </div>
+      {isPast && (
+        <div className="text-[10px] text-amber-600 font-medium">⚠ Minulý týden</div>
+      )}
       {week.holiday_name && (
         <div className="text-[10px] text-amber-600">🇨🇿 {week.holiday_name}</div>
       )}
@@ -410,9 +427,10 @@ function WeekEditor({ week, weekNum, isPast, onSave, onReset }: {
             type="number"
             value={cap}
             onChange={e => setCap(e.target.value)}
-            onBlur={() => { const v = parseInt(cap); if (v >= 0) onSave(v, parseInt(days) || 5); }}
+            onBlur={save}
+            onKeyDown={handleKeyDown}
             className="h-7 text-xs font-mono"
-            disabled={isPast}
+            autoFocus
           />
         </div>
         <div>
@@ -421,15 +439,15 @@ function WeekEditor({ week, weekNum, isPast, onSave, onReset }: {
             type="number"
             value={days}
             onChange={e => setDays(e.target.value)}
-            onBlur={() => { const v = parseInt(days); if (v >= 0) onSave(parseInt(cap) || 0, v); }}
+            onBlur={save}
+            onKeyDown={handleKeyDown}
             className="h-7 text-xs font-mono"
-            disabled={isPast}
           />
         </div>
       </div>
-      {week.is_manual_override && !isPast && (
-        <Button variant="outline" size="sm" className="h-6 text-[10px] w-full" onClick={onReset}>
-          <RotateCcw className="h-3 w-3 mr-1" /> Obnovit standard
+      {week.is_manual_override && (
+        <Button variant="outline" size="sm" className="h-6 text-[10px] w-full" onClick={() => { onReset(); onClose(); }}>
+          <RotateCcw className="h-3 w-3 mr-1" /> Obnovit standard ({standardCapacity}h)
         </Button>
       )}
     </div>
