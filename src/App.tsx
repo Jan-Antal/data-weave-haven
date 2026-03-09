@@ -18,6 +18,18 @@ import PlanVyroby from "./pages/PlanVyroby";
 
 const queryClient = new QueryClient();
 
+const BUILD_HASH = typeof __BUILD_HASH__ !== "undefined" ? __BUILD_HASH__ : "dev";
+const STORED_HASH_KEY = "ami_build_hash";
+
+// Check if build changed — clear RQ cache if so
+const prevHash = localStorage.getItem(STORED_HASH_KEY);
+if (prevHash && prevHash !== BUILD_HASH) {
+  console.info(`[CacheBust] Build changed ${prevHash} → ${BUILD_HASH}, clearing query cache`);
+  queryClient.clear();
+}
+localStorage.setItem(STORED_HASH_KEY, BUILD_HASH);
+
+
 function RootAuthRoute() {
   const navigate = useNavigate();
 
