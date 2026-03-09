@@ -1520,6 +1520,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       description="Nelze přejmenovat složku na SharePointu. Chcete uložit změnu ID pouze v databázi? Složku na SharePointu bude nutné přejmenovat ručně."
       confirmLabel="Uložit bez SharePointu"
       cancelLabel="Zrušit"
+      variant="default"
     />
     {/* Unsaved changes confirmation */}
     <ConfirmDialog
