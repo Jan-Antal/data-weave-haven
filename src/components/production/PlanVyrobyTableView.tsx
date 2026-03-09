@@ -412,7 +412,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
   const handleExport = () => {
     const headers = ["Projekt", "ID", "Položka", "Kód", "Inbox h", ...weeks.map(w => `T${w.weekNum}`), "Expedice h"];
     const rows: (string | number)[][] = [];
-    for (const proj of projectRows) {
+    for (const proj of filteredRows) {
       for (const item of proj.items) {
         const row: (string | number)[] = [proj.projectName, proj.projectId, item.itemName, item.itemCode || "", item.inboxHours || ""];
         for (const week of weeks) {
