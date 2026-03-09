@@ -383,7 +383,7 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
                     <div className="h-full rounded" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: barColor }} />
                   </div>
                   <div className="font-mono text-[9px] mt-0.5 font-semibold" style={{ color: barColor }}>
-                    {formatCapacity(used)}
+                    {formatCapacity(used, week.key)}
                   </div>
                 </div>
               );
