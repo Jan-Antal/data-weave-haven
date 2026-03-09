@@ -75,11 +75,12 @@ export function PlanVyrobyTableView({ displayMode }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: inboxProjects = [] } = useProductionInbox();
   const { data: settings } = useProductionSettings();
+  const getWeekCapacity = useWeekCapacityLookup();
   const [sortMode, setSortMode] = useState<SortMode>("project");
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const weeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
+  const defaultWeeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
 
   const toggleProject = (pid: string) => {
