@@ -789,6 +789,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                   key={p.id}
                   project={p}
                   docCount={docCounts[p.project_id]}
+                  docFailed={docFailed.has(p.project_id)}
                   isExpanded={expanded.has(p.project_id)}
                   stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
                   onToggleExpand={toggleExpand}
