@@ -431,9 +431,10 @@ const ProjectRow = memo(function ProjectRow({
             docCount !== undefined && docCount > 0 ? "text-[#223937]" : "text-[#99a5a3]"
           )}
           onClick={() => onEditProject(p)}
+          title={docFailed ? "Nepodařilo se načíst – klikněte pro ruční obnovení" : undefined}
         >
           <Paperclip className="h-3 w-3" />
-          {docCount !== undefined ? docCount : "—"}
+          {docFailed ? "?" : docCount !== undefined ? docCount : "—"}
         </span>
       </TableCell>
       {/* Col 2 — Chevron slot */}
