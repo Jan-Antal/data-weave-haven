@@ -380,6 +380,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
 interface ProjectRowProps {
   project: Project;
   docCount: number | undefined;
+  docFailed?: boolean;
   isExpanded: boolean;
   stageCount: number;
   onToggleExpand: (pid: string) => void;
