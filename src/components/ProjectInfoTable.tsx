@@ -379,7 +379,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
 // ── Memoized project row ────────────────────────────────────────────
 interface ProjectRowProps {
   project: Project;
-  docCount: number;
+  docCount: number | undefined;
   isExpanded: boolean;
   stageCount: number;
   onToggleExpand: (pid: string) => void;
@@ -423,12 +423,16 @@ const ProjectRow = memo(function ProjectRow({
     <TableRow className="hover:bg-muted/50 transition-colors h-9" style={bgStyle} data-project-id={p.project_id}>
       {/* Col 1 — Icon slot */}
       <TableCell style={COL_ICON_STYLE} className="text-center px-0">
-        {(docCount ?? 0) > 0 && (
-          <span className="inline-flex items-center gap-0.5 text-muted-foreground text-[10px] cursor-pointer" onClick={() => onEditProject(p)}>
-            <Paperclip className="h-3 w-3" />
-            {docCount}
-          </span>
-        )}
+        <span
+          className={cn(
+            "inline-flex items-center gap-0.5 text-[10px] cursor-pointer",
+            docCount !== undefined && docCount > 0 ? "text-[#223937]" : "text-[#99a5a3]"
+          )}
+          onClick={() => onEditProject(p)}
+        >
+          <Paperclip className="h-3 w-3" />
+          {docCount !== undefined ? docCount : "—"}
+        </span>
       </TableCell>
       {/* Col 2 — Chevron slot */}
       <TableCell style={COL_CHEVRON_STYLE} className="px-0 cursor-pointer" onClick={() => onToggleExpand(p.project_id)}>
@@ -781,7 +785,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                 <ProjectRow
                   key={p.id}
                   project={p}
-                  docCount={docCounts[p.project_id] ?? 0}
+                  docCount={docCounts[p.project_id]}
                   isExpanded={expanded.has(p.project_id)}
                   stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
                   onToggleExpand={toggleExpand}

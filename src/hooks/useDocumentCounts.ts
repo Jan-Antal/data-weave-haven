@@ -23,6 +23,22 @@ export function dispatchDocCountUpdate(projectId: string, delta: number) {
   window.dispatchEvent(new CustomEvent(DOC_COUNT_EVENT, { detail: { projectId, delta } }));
 }
 
+/** Set an absolute count (e.g. after loading all categories from SharePoint) */
+export function setDocCountAbsolute(projectId: string, count: number) {
+  memoryCache[projectId] = count;
+  // Persist to DB cache
+  setSupabaseCacheAbsolute(projectId, count);
+  window.dispatchEvent(new CustomEvent(DOC_COUNT_EVENT, { detail: { projectId, delta: 0, absolute: count } }));
+}
+
+async function setSupabaseCacheAbsolute(projectId: string, count: number) {
+  try {
+    await supabase
+      .from("sharepoint_document_cache")
+      .upsert({ project_id: projectId, total_count: count, updated_at: new Date().toISOString() } as any, { onConflict: "project_id" });
+  } catch { /* ignore */ }
+}
+
 /** Migrate doc count cache when project ID is renamed */
 export async function migrateDocCountCache(oldProjectId: string, newProjectId: string) {
   const count = memoryCache[oldProjectId] ?? 0;
@@ -185,10 +201,12 @@ export function useDocumentCounts(projectIds: string[], projectStatuses?: Record
   // Listen for upload/delete events from the edit dialog
   useEffect(() => {
     const handler = (e: Event) => {
-      const { projectId, delta } = (e as CustomEvent).detail;
+      const { projectId, delta, absolute } = (e as CustomEvent).detail;
       setCounts(prev => ({
         ...prev,
-        [projectId]: Math.max(0, (prev[projectId] ?? 0) + delta),
+        [projectId]: absolute !== undefined
+          ? absolute
+          : Math.max(0, (prev[projectId] ?? 0) + delta),
       }));
     };
     window.addEventListener(DOC_COUNT_EVENT, handler);

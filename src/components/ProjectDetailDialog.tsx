@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { useSharePointDocs, type SPFile, CATEGORY_FOLDER_MAP } from "@/hooks/useSharePointDocs";
 import { useChunkedUpload } from "@/hooks/useChunkedUpload";
 import { UploadProgressBar } from "./UploadProgressBar";
-import { dispatchDocCountUpdate, migrateDocCountCache } from "@/hooks/useDocumentCounts";
+import { dispatchDocCountUpdate, migrateDocCountCache, setDocCountAbsolute } from "@/hooks/useDocumentCounts";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { RozpadCeny } from "./RozpadCeny";
@@ -407,6 +407,14 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       sp.fetchAllCategories();
     }
   }, [project?.project_id, open]);
+
+  // Sync absolute document count after files are loaded
+  useEffect(() => {
+    if (project && open && Object.keys(sp.filesByCategory).length > 0) {
+      const total = Object.values(sp.filesByCategory).reduce((s, f) => s + f.length, 0);
+      setDocCountAbsolute(project.project_id, total);
+    }
+  }, [project?.project_id, open, sp.filesByCategory]);
 
   const uploadSingleFile = useCallback(async (categoryKey: string, file: File) => {
     const folder = CATEGORY_FOLDER_MAP[categoryKey];
