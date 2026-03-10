@@ -316,7 +316,33 @@ export function UserManagement({ open, onOpenChange }: Props) {
                 ) : (
                   users.map((u) => (
                     <TableRow key={u.id}>
-                      <TableCell className="text-sm">{u.full_name || "—"}</TableCell>
+                      <TableCell className="text-sm">
+                        {editingNameId === u.id ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              value={editingNameValue}
+                              onChange={(e) => setEditingNameValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleUpdateName(u.id);
+                                if (e.key === "Escape") setEditingNameId(null);
+                              }}
+                              className="h-7 text-sm"
+                              autoFocus
+                            />
+                            <button onClick={() => handleUpdateName(u.id)} className="text-green-600 hover:text-green-700"><Check className="h-4 w-4" /></button>
+                            <button onClick={() => setEditingNameId(null)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+                          </div>
+                        ) : (
+                          <button
+                            className="flex items-center gap-1 group hover:text-primary transition-colors text-left"
+                            onClick={() => { setEditingNameId(u.id); setEditingNameValue(u.full_name || ""); }}
+                            title="Upravit jméno"
+                          >
+                            <span>{u.full_name || "—"}</span>
+                            <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity" />
+                          </button>
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
                       <TableCell>
                         {isOwner(u) ? (
