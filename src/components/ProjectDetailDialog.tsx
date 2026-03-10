@@ -421,37 +421,43 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     const folder = CATEGORY_FOLDER_MAP[categoryKey];
     if (!folder || !project) return;
 
-    if (chunked.isLargeFile(file)) {
-      // Large file — use chunked upload directly to SharePoint
+    // For fotky category, rename to timestamp-based filename
+    let uploadFile = file;
+    if (categoryKey === "fotky" && isImageFile(file.name)) {
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+      const baseName = generatePhotoFilename(reklamaceToggle);
+      const newName = baseName.replace(/\.jpg$/, `.${ext}`);
+      uploadFile = new File([file], newName, { type: file.type });
+    }
+
+    if (chunked.isLargeFile(uploadFile)) {
       try {
-        const result = await chunked.uploadLargeFile(project.project_id, folder, file);
-        // Update the file list in SP cache
+        const result = await chunked.uploadLargeFile(project.project_id, folder, uploadFile);
         sp.listFiles(categoryKey, true);
         dispatchDocCountUpdate(project.project_id, 1);
         const catLabel = DOC_CATEGORIES.find(c => c.key === categoryKey)?.label ?? categoryKey;
-        logActivity({ projectId: project.project_id, actionType: "document_uploaded", newValue: file.name, detail: catLabel });
+        logActivity({ projectId: project.project_id, actionType: "document_uploaded", newValue: uploadFile.name, detail: catLabel });
       } catch (err: any) {
         if (err.message === "CANCELLED") return;
-        toast({ title: "Chyba nahrávání", description: `Nepodařilo se nahrát ${file.name}. Zkuste to znovu.`, variant: "destructive" });
+        toast({ title: "Chyba nahrávání", description: `Nepodařilo se nahrát ${uploadFile.name}. Zkuste to znovu.`, variant: "destructive" });
       }
     } else {
-      // Small file — use existing edge function upload
       try {
-        await sp.uploadFile(categoryKey, file);
+        await sp.uploadFile(categoryKey, uploadFile);
         dispatchDocCountUpdate(project.project_id, 1);
-        toast({ title: "Soubor nahrán", description: file.name });
+        toast({ title: "Soubor nahrán", description: uploadFile.name });
         const catLabel = DOC_CATEGORIES.find(c => c.key === categoryKey)?.label ?? categoryKey;
-        logActivity({ projectId: project.project_id, actionType: "document_uploaded", newValue: file.name, detail: catLabel });
+        logActivity({ projectId: project.project_id, actionType: "document_uploaded", newValue: uploadFile.name, detail: catLabel });
       } catch (err: any) {
         const msg = err.message?.includes("AbortError") || err.message?.includes("timeout")
           ? "Nahrávání trvalo příliš dlouho. Zkuste menší soubor."
           : err.message?.includes("Edge function")
             ? "Spojení se serverem selhalo. Zkuste to znovu."
-            : `Nepodařilo se nahrát ${file.name}. Zkuste to znovu.`;
+            : `Nepodařilo se nahrát ${uploadFile.name}. Zkuste to znovu.`;
         toast({ title: "Chyba nahrávání", description: msg, variant: "destructive" });
       }
     }
-  }, [sp, chunked, project]);
+  }, [sp, chunked, project, reklamaceToggle]);
 
   const handleFileDrop = useCallback(async (e: React.DragEvent, categoryKey: string) => {
     e.preventDefault();
