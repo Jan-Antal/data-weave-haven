@@ -400,6 +400,7 @@ interface ProjectRowProps {
 const ProjectRow = memo(function ProjectRow({
   project: p,
   docCount,
+  docFailed,
   isExpanded,
   stageCount,
   onToggleExpand,
