@@ -288,6 +288,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const activeUploadCatRef = useRef<string | null>(null);
   const [photoLightbox, setPhotoLightbox] = useState<{ files: SPFile[]; index: number } | null>(null);
+  const [reklamaceToggle, setReklamaceToggle] = useState(false);
 
   // ── Mobile swipe-down-to-close ──────────────────────────────
   const [mobileDragY, setMobileDragY] = useState(0);
