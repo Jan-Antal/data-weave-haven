@@ -472,7 +472,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     for (const p of projects) map[p.project_id] = p.status;
     return map;
   }, [projects]);
-  const { counts: docCounts } = useDocumentCounts(allProjectIds, projectStatuses);
+  const { counts: docCounts, failed: docFailed } = useDocumentCounts(allProjectIds, projectStatuses);
   const [addOpen, setAddOpen] = useState(false);
   const [newProj, setNewProj] = useState({ ...emptyProject });
   const [datumWarning, setDatumWarning] = useState(false);
