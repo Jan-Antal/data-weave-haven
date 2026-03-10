@@ -29,6 +29,7 @@ import { dispatchDocCountUpdate, migrateDocCountCache, setDocCountAbsolute } fro
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { RozpadCeny } from "./RozpadCeny";
+import { PhotoLightbox, PhotoThumbnailGrid, isImageFile } from "./PhotoLightbox";
 
 interface Project {
   id: string;
@@ -286,6 +287,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const isMobile = useIsMobile();
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const activeUploadCatRef = useRef<string | null>(null);
+  const [photoLightbox, setPhotoLightbox] = useState<{ files: SPFile[]; index: number } | null>(null);
 
   // ── Mobile swipe-down-to-close ──────────────────────────────
   const [mobileDragY, setMobileDragY] = useState(0);
@@ -1329,7 +1331,21 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                     </p>
                                   )}
                                 </div>
-                              ) : (
+                              ) : cat.key === "fotky" ? (
+                                  /* Photo thumbnail grid for Fotky category */
+                                  <PhotoThumbnailGrid
+                                    files={files}
+                                    maxHeight="200px"
+                                    onOpenLightbox={(index) => {
+                                      const f = files[index];
+                                      if (f && isImageFile(f.name)) {
+                                        setPhotoLightbox({ files, index });
+                                      } else {
+                                        handlePreview(f, cat.key);
+                                      }
+                                    }}
+                                  />
+                                ) : (
                                 <div className="space-y-0.5 max-h-[140px] overflow-y-auto">
                                   {files.map((f) => {
                                     const fileKey = `${cat.key}:${f.name}`;
@@ -1513,6 +1529,13 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       }}
       onCancel={() => setUnsavedConfirmOpen(false)}
       description="Máte neuložené změny. Opravdu chcete zavřít?"
+    />
+    <PhotoLightbox
+      open={!!photoLightbox}
+      onClose={() => setPhotoLightbox(null)}
+      files={photoLightbox?.files ?? []}
+      initialIndex={photoLightbox?.index ?? 0}
+      onDownload={(f) => { if (f.downloadUrl) window.open(f.downloadUrl, "_blank"); }}
     />
     </>
   );
