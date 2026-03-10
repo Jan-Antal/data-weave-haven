@@ -201,10 +201,12 @@ export function useDocumentCounts(projectIds: string[], projectStatuses?: Record
   // Listen for upload/delete events from the edit dialog
   useEffect(() => {
     const handler = (e: Event) => {
-      const { projectId, delta } = (e as CustomEvent).detail;
+      const { projectId, delta, absolute } = (e as CustomEvent).detail;
       setCounts(prev => ({
         ...prev,
-        [projectId]: Math.max(0, (prev[projectId] ?? 0) + delta),
+        [projectId]: absolute !== undefined
+          ? absolute
+          : Math.max(0, (prev[projectId] ?? 0) + delta),
       }));
     };
     window.addEventListener(DOC_COUNT_EVENT, handler);
