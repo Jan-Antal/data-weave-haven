@@ -1381,7 +1381,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                     );
                                   })}
                                 </div>
-                                )}
                               )}
 
                               {canUploadDocuments && (
