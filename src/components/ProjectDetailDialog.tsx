@@ -1536,7 +1536,18 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       onClose={() => setPhotoLightbox(null)}
       files={photoLightbox?.files ?? []}
       initialIndex={photoLightbox?.index ?? 0}
-      onDownload={(f) => { if (f.downloadUrl) window.open(f.downloadUrl, "_blank"); }}
+      projectName={project?.project_name}
+      canDelete={canUploadDocuments}
+      onDelete={(f) => {
+        handleDeleteFile("fotky", f.name);
+        // Update lightbox files
+        setPhotoLightbox((prev) => {
+          if (!prev) return null;
+          const updated = prev.files.filter((pf) => pf.itemId !== f.itemId);
+          if (updated.length === 0) return null;
+          return { files: updated, index: Math.min(prev.index, updated.length - 1) };
+        });
+      }}
     />
     </>
   );
