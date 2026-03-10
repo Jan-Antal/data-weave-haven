@@ -67,6 +67,9 @@ export function UserManagement({ open, onOpenChange }: Props) {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
 
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [editingNameValue, setEditingNameValue] = useState("");
+
   const handleCopyInviteLink = async (userId: string) => {
     setCopyingLinkId(userId);
     try {
