@@ -433,7 +433,6 @@ const ProjectRow = memo(function ProjectRow({
           <Paperclip className="h-3 w-3" />
           {docCount !== undefined ? docCount : "—"}
         </span>
-        )}
       </TableCell>
       {/* Col 2 — Chevron slot */}
       <TableCell style={COL_CHEVRON_STYLE} className="px-0 cursor-pointer" onClick={() => onToggleExpand(p.project_id)}>
