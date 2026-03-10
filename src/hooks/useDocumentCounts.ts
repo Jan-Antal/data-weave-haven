@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 // Global event bus so ProjectDetailDialog can notify the table
 const DOC_COUNT_EVENT = "doc-count-updated";
@@ -36,7 +36,6 @@ async function processQueue() {
         activeCount--;
       });
     }
-    // Wait for a slot to free up or batch delay
     await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
   }
 
@@ -45,13 +44,9 @@ async function processQueue() {
 
 async function fetchOneProject(projectId: string) {
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
     const { data, error } = await supabase.functions.invoke("sharepoint-documents", {
       body: { action: "count", projectIds: [projectId] },
     });
-    clearTimeout(timeoutId);
 
     if (error || !data?.counts) {
       throw new Error(error?.message ?? "No counts returned");
@@ -61,15 +56,22 @@ async function fetchOneProject(projectId: string) {
     const count = counts[projectId] ?? 0;
     fetchedThisSession.add(projectId);
 
-    // Persist to projects.document_count
-    await supabase.from("projects").update({ document_count: count } as any).eq("project_id", projectId);
+    // Persist to sharepoint_document_cache
+    await supabase
+      .from("sharepoint_document_cache")
+      .upsert({
+        project_id: projectId,
+        total_count: count,
+        category_counts: {},
+        file_list: {},
+        updated_at: new Date().toISOString(),
+      } as any, { onConflict: "project_id" });
 
     // Dispatch event for UI update
     window.dispatchEvent(
       new CustomEvent(DOC_COUNT_EVENT, { detail: { projectId, absolute: count } })
     );
   } catch {
-    // Retry once after delay
     const tries = (retryCount[projectId] ?? 0) + 1;
     retryCount[projectId] = tries;
     if (tries < 2) {
@@ -78,7 +80,6 @@ async function fetchOneProject(projectId: string) {
         processQueue();
       }, RETRY_DELAY_MS);
     } else {
-      // Give up — dispatch "failed" state
       window.dispatchEvent(
         new CustomEvent(DOC_COUNT_EVENT, { detail: { projectId, failed: true } })
       );
@@ -86,7 +87,7 @@ async function fetchOneProject(projectId: string) {
   }
 }
 
-/** Enqueue projects that have NULL document_count for background fetching */
+/** Enqueue projects for background fetching */
 export function enqueueDocCountFetch(projectIds: string[]) {
   const toFetch = projectIds.filter(
     (id) => !isStage(id) && !fetchedThisSession.has(id) && !fetchQueue.includes(id)
@@ -98,16 +99,21 @@ export function enqueueDocCountFetch(projectIds: string[]) {
 
 /** Optimistic delta update (+1 or -1) for upload/delete */
 export function dispatchDocCountUpdate(projectId: string, delta: number) {
-  // Update Supabase in background
+  // Update sharepoint_document_cache in background
   supabase
-    .from("projects")
-    .select("document_count")
+    .from("sharepoint_document_cache")
+    .select("total_count")
     .eq("project_id", projectId)
     .maybeSingle()
     .then(({ data }) => {
-      const current = data?.document_count ?? 0;
-      const newCount = Math.max(0, current + delta);
-      supabase.from("projects").update({ document_count: newCount } as any).eq("project_id", projectId).then(() => {});
+      if (data) {
+        const newCount = Math.max(0, (data.total_count ?? 0) + delta);
+        supabase
+          .from("sharepoint_document_cache")
+          .update({ total_count: newCount, updated_at: new Date().toISOString() } as any)
+          .eq("project_id", projectId)
+          .then(() => {});
+      }
     });
 
   window.dispatchEvent(
@@ -117,8 +123,16 @@ export function dispatchDocCountUpdate(projectId: string, delta: number) {
 
 /** Set an absolute count (e.g. after loading all categories from SharePoint) */
 export function setDocCountAbsolute(projectId: string, count: number) {
-  // Persist to Supabase
-  supabase.from("projects").update({ document_count: count } as any).eq("project_id", projectId).then(() => {});
+  supabase
+    .from("sharepoint_document_cache")
+    .upsert({
+      project_id: projectId,
+      total_count: count,
+      category_counts: {},
+      file_list: {},
+      updated_at: new Date().toISOString(),
+    } as any, { onConflict: "project_id" })
+    .then(() => {});
 
   window.dispatchEvent(
     new CustomEvent(DOC_COUNT_EVENT, { detail: { projectId, absolute: count } })
@@ -127,14 +141,32 @@ export function setDocCountAbsolute(projectId: string, count: number) {
 
 /** Migrate doc count cache when project ID is renamed */
 export async function migrateDocCountCache(oldProjectId: string, newProjectId: string) {
-  // The projects table cascade handles this since document_count is on the projects row.
-  // Just dispatch UI event for the new ID.
   window.dispatchEvent(
     new CustomEvent(DOC_COUNT_EVENT, { detail: { projectId: newProjectId, delta: 0 } })
   );
 }
 
 // ── Hook ────────────────────────────────────────────────────────────
+
+/** Fetch all cached doc counts from sharepoint_document_cache */
+function useDocCountCache() {
+  return useQuery({
+    queryKey: ["doc-count-cache"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sharepoint_document_cache")
+        .select("project_id, total_count");
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      for (const row of data ?? []) {
+        map[row.project_id] = row.total_count;
+      }
+      return map;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useDocumentCounts(
   projectIds: string[],
   projectStatuses?: Record<string, string | null>
@@ -142,47 +174,40 @@ export function useDocumentCounts(
   const mainProjectIds = projectIds.filter((id) => !isStage(id));
   const queryClient = useQueryClient();
 
-  // Read document_count from already-loaded projects data (react-query cache)
-  const projectsData = queryClient.getQueryData<any[]>(["projects"]);
+  const { data: cacheMap } = useDocCountCache();
 
   const [overrides, setOverrides] = useState<Record<string, number | "failed">>({});
   const mountedRef = useRef(true);
   const enqueuedRef = useRef(false);
 
-  // Build counts from projects data + overrides
+  // Build counts from cache + overrides
   const counts: Record<string, number | undefined> = {};
   for (const id of mainProjectIds) {
     if (id in overrides) {
       const v = overrides[id];
       counts[id] = v === "failed" ? undefined : v;
     } else {
-      const proj = projectsData?.find((p: any) => p.project_id === id);
-      counts[id] = proj?.document_count ?? undefined;
+      counts[id] = cacheMap?.[id] ?? undefined;
     }
   }
 
-  // Enqueue NULL projects for background fetch (once per mount)
+  // Enqueue projects with no cache entry for background fetch (once per mount)
   useEffect(() => {
-    if (enqueuedRef.current || !projectsData || mainProjectIds.length === 0) return;
+    if (enqueuedRef.current || !cacheMap || mainProjectIds.length === 0) return;
     enqueuedRef.current = true;
 
-    const nullProjects = mainProjectIds.filter((id) => {
-      const proj = projectsData?.find((p: any) => p.project_id === id);
-      return proj?.document_count == null;
-    });
+    const nullProjects = mainProjectIds.filter((id) => cacheMap[id] == null);
 
-    // Skip Dokončeno projects from initial background fetch
     let toFetch = nullProjects;
     if (projectStatuses) {
       toFetch = nullProjects.filter((id) => projectStatuses[id] !== "Dokončeno");
     }
 
     if (toFetch.length > 0) {
-      // Delay initial fetch by 3s to let UI settle
       const timer = setTimeout(() => enqueueDocCountFetch(toFetch), 3000);
       return () => clearTimeout(timer);
     }
-  }, [mainProjectIds.join(","), projectsData, projectStatuses]);
+  }, [mainProjectIds.join(","), cacheMap, projectStatuses]);
 
   // Listen for update events
   useEffect(() => {
@@ -198,12 +223,10 @@ export function useDocumentCounts(
 
       if (absolute !== undefined) {
         setOverrides((prev) => ({ ...prev, [projectId]: absolute }));
-        // Also update react-query cache so next render reads it
-        queryClient.setQueryData<any[]>(["projects"], (old) => {
-          if (!old) return old;
-          return old.map((p: any) =>
-            p.project_id === projectId ? { ...p, document_count: absolute } : p
-          );
+        // Update react-query cache for doc-count-cache
+        queryClient.setQueryData<Record<string, number>>(["doc-count-cache"], (old) => {
+          if (!old) return { [projectId]: absolute };
+          return { ...old, [projectId]: absolute };
         });
         return;
       }
@@ -211,21 +234,14 @@ export function useDocumentCounts(
       if (delta !== undefined && delta !== 0) {
         setOverrides((prev) => {
           const current = prev[projectId];
-          const base = typeof current === "number" ? current : (() => {
-            const proj = projectsData?.find((p: any) => p.project_id === projectId);
-            return proj?.document_count ?? 0;
-          })();
+          const base = typeof current === "number" ? current : (cacheMap?.[projectId] ?? 0);
           const newVal = Math.max(0, base + delta);
           return { ...prev, [projectId]: newVal };
         });
-        // Also update react-query cache
-        queryClient.setQueryData<any[]>(["projects"], (old) => {
+        queryClient.setQueryData<Record<string, number>>(["doc-count-cache"], (old) => {
           if (!old) return old;
-          return old.map((p: any) =>
-            p.project_id === projectId
-              ? { ...p, document_count: Math.max(0, (p.document_count ?? 0) + delta) }
-              : p
-          );
+          const current = old[projectId] ?? 0;
+          return { ...old, [projectId]: Math.max(0, current + delta) };
         });
       }
     };
@@ -235,9 +251,8 @@ export function useDocumentCounts(
       mountedRef.current = false;
       window.removeEventListener(DOC_COUNT_EVENT, handler);
     };
-  }, [projectsData, queryClient]);
+  }, [cacheMap, queryClient]);
 
-  // Compute failed set for badge display
   const failed = new Set<string>();
   for (const [id, v] of Object.entries(overrides)) {
     if (v === "failed") failed.add(id);
