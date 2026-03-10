@@ -29,7 +29,7 @@ import { dispatchDocCountUpdate, migrateDocCountCache, setDocCountAbsolute } fro
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { RozpadCeny } from "./RozpadCeny";
-import { PhotoLightbox, PhotoThumbnailGrid, isImageFile } from "./PhotoLightbox";
+import { PhotoLightbox, PhotoTimelineGrid, isImageFile, generatePhotoFilename } from "./PhotoLightbox";
 
 interface Project {
   id: string;
@@ -288,6 +288,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const activeUploadCatRef = useRef<string | null>(null);
   const [photoLightbox, setPhotoLightbox] = useState<{ files: SPFile[]; index: number } | null>(null);
+  const [reklamaceToggle, setReklamaceToggle] = useState(false);
 
   // ── Mobile swipe-down-to-close ──────────────────────────────
   const [mobileDragY, setMobileDragY] = useState(0);
@@ -299,9 +300,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     const file = e.target.files?.[0];
     if (!file || !project) return;
     try {
-      const now = new Date();
-      const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
-      const fileName = `foto_${ts}.jpg`;
+      const fileName = generatePhotoFilename(false);
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve((reader.result as string).split(',')[1]);
@@ -422,37 +421,43 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     const folder = CATEGORY_FOLDER_MAP[categoryKey];
     if (!folder || !project) return;
 
-    if (chunked.isLargeFile(file)) {
-      // Large file — use chunked upload directly to SharePoint
+    // For fotky category, rename to timestamp-based filename
+    let uploadFile = file;
+    if (categoryKey === "fotky" && isImageFile(file.name)) {
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+      const baseName = generatePhotoFilename(reklamaceToggle);
+      const newName = baseName.replace(/\.jpg$/, `.${ext}`);
+      uploadFile = new File([file], newName, { type: file.type });
+    }
+
+    if (chunked.isLargeFile(uploadFile)) {
       try {
-        const result = await chunked.uploadLargeFile(project.project_id, folder, file);
-        // Update the file list in SP cache
+        const result = await chunked.uploadLargeFile(project.project_id, folder, uploadFile);
         sp.listFiles(categoryKey, true);
         dispatchDocCountUpdate(project.project_id, 1);
         const catLabel = DOC_CATEGORIES.find(c => c.key === categoryKey)?.label ?? categoryKey;
-        logActivity({ projectId: project.project_id, actionType: "document_uploaded", newValue: file.name, detail: catLabel });
+        logActivity({ projectId: project.project_id, actionType: "document_uploaded", newValue: uploadFile.name, detail: catLabel });
       } catch (err: any) {
         if (err.message === "CANCELLED") return;
-        toast({ title: "Chyba nahrávání", description: `Nepodařilo se nahrát ${file.name}. Zkuste to znovu.`, variant: "destructive" });
+        toast({ title: "Chyba nahrávání", description: `Nepodařilo se nahrát ${uploadFile.name}. Zkuste to znovu.`, variant: "destructive" });
       }
     } else {
-      // Small file — use existing edge function upload
       try {
-        await sp.uploadFile(categoryKey, file);
+        await sp.uploadFile(categoryKey, uploadFile);
         dispatchDocCountUpdate(project.project_id, 1);
-        toast({ title: "Soubor nahrán", description: file.name });
+        toast({ title: "Soubor nahrán", description: uploadFile.name });
         const catLabel = DOC_CATEGORIES.find(c => c.key === categoryKey)?.label ?? categoryKey;
-        logActivity({ projectId: project.project_id, actionType: "document_uploaded", newValue: file.name, detail: catLabel });
+        logActivity({ projectId: project.project_id, actionType: "document_uploaded", newValue: uploadFile.name, detail: catLabel });
       } catch (err: any) {
         const msg = err.message?.includes("AbortError") || err.message?.includes("timeout")
           ? "Nahrávání trvalo příliš dlouho. Zkuste menší soubor."
           : err.message?.includes("Edge function")
             ? "Spojení se serverem selhalo. Zkuste to znovu."
-            : `Nepodařilo se nahrát ${file.name}. Zkuste to znovu.`;
+            : `Nepodařilo se nahrát ${uploadFile.name}. Zkuste to znovu.`;
         toast({ title: "Chyba nahrávání", description: msg, variant: "destructive" });
       }
     }
-  }, [sp, chunked, project]);
+  }, [sp, chunked, project, reklamaceToggle]);
 
   const handleFileDrop = useCallback(async (e: React.DragEvent, categoryKey: string) => {
     e.preventDefault();
@@ -1332,16 +1337,17 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                   )}
                                 </div>
                               ) : cat.key === "fotky" ? (
-                                  /* Photo thumbnail grid for Fotky category */
-                                  <PhotoThumbnailGrid
+                                  /* Photo timeline grid for Fotky category */
+                                  <PhotoTimelineGrid
                                     files={files}
-                                    maxHeight="200px"
+                                    maxHeight="260px"
+                                    canDelete={canUploadDocuments}
+                                    onDelete={(f) => { handleDeleteFile("fotky", f.name); }}
                                     onOpenLightbox={(index) => {
-                                      const f = files[index];
-                                      if (f && isImageFile(f.name)) {
-                                        setPhotoLightbox({ files, index });
-                                      } else {
-                                        handlePreview(f, cat.key);
+                                      // flatFiles from the grid — get the actual file list
+                                      const imageFiles = files.filter((f) => isImageFile(f.name));
+                                      if (imageFiles[index]) {
+                                        setPhotoLightbox({ files: imageFiles, index });
                                       }
                                     }}
                                   />
@@ -1398,6 +1404,19 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                       } : undefined}
                                     />
                                   ))}
+                                  {cat.key === "fotky" && (
+                                    <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-muted-foreground hover:text-foreground transition-colors">
+                                      <input
+                                        type="checkbox"
+                                        checked={reklamaceToggle}
+                                        onChange={(e) => setReklamaceToggle(e.target.checked)}
+                                        className="h-3 w-3 rounded border-border accent-red-500"
+                                      />
+                                      <span className={reklamaceToggle ? "text-red-500 font-medium" : ""}>
+                                        Označit jako reklamaci / škodu
+                                      </span>
+                                    </label>
+                                  )}
                                   <div
                                     className={cn(
                                       "relative rounded-md border-2 border-dashed border-muted-foreground/30 bg-background flex flex-col items-center justify-center py-3 px-2 cursor-pointer hover:border-muted-foreground/50 transition-colors",
@@ -1416,7 +1435,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                       <>
                                         <Upload className={cn("h-4 w-4 mb-1", dragOverCategory === cat.key ? "text-primary" : "text-muted-foreground")} />
                                         <p className={cn("text-[10px] text-center", dragOverCategory === cat.key ? "text-primary" : "text-muted-foreground")}>
-                                          Přetáhněte soubor nebo vyberte (max 100 MB)
+                                          {cat.key === "fotky" ? "Přetáhněte fotku nebo vyberte" : "Přetáhněte soubor nebo vyberte (max 100 MB)"}
                                         </p>
                                       </>
                                     )}
@@ -1535,7 +1554,18 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       onClose={() => setPhotoLightbox(null)}
       files={photoLightbox?.files ?? []}
       initialIndex={photoLightbox?.index ?? 0}
-      onDownload={(f) => { if (f.downloadUrl) window.open(f.downloadUrl, "_blank"); }}
+      projectName={project?.project_name}
+      canDelete={canUploadDocuments}
+      onDelete={(f) => {
+        handleDeleteFile("fotky", f.name);
+        // Update lightbox files
+        setPhotoLightbox((prev) => {
+          if (!prev) return null;
+          const updated = prev.files.filter((pf) => pf.itemId !== f.itemId);
+          if (updated.length === 0) return null;
+          return { files: updated, index: Math.min(prev.index, updated.length - 1) };
+        });
+      }}
     />
     </>
   );
