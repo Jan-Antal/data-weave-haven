@@ -379,7 +379,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
 // ── Memoized project row ────────────────────────────────────────────
 interface ProjectRowProps {
   project: Project;
-  docCount: number;
+  docCount: number | undefined;
   isExpanded: boolean;
   stageCount: number;
   onToggleExpand: (pid: string) => void;
