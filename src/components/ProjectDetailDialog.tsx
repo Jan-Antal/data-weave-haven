@@ -1398,6 +1398,19 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                       } : undefined}
                                     />
                                   ))}
+                                  {cat.key === "fotky" && (
+                                    <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-muted-foreground hover:text-foreground transition-colors">
+                                      <input
+                                        type="checkbox"
+                                        checked={reklamaceToggle}
+                                        onChange={(e) => setReklamaceToggle(e.target.checked)}
+                                        className="h-3 w-3 rounded border-border accent-red-500"
+                                      />
+                                      <span className={reklamaceToggle ? "text-red-500 font-medium" : ""}>
+                                        Označit jako reklamaci / škodu
+                                      </span>
+                                    </label>
+                                  )}
                                   <div
                                     className={cn(
                                       "relative rounded-md border-2 border-dashed border-muted-foreground/30 bg-background flex flex-col items-center justify-center py-3 px-2 cursor-pointer hover:border-muted-foreground/50 transition-colors",
@@ -1416,7 +1429,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                       <>
                                         <Upload className={cn("h-4 w-4 mb-1", dragOverCategory === cat.key ? "text-primary" : "text-muted-foreground")} />
                                         <p className={cn("text-[10px] text-center", dragOverCategory === cat.key ? "text-primary" : "text-muted-foreground")}>
-                                          Přetáhněte soubor nebo vyberte (max 100 MB)
+                                          {cat.key === "fotky" ? "Přetáhněte fotku nebo vyberte" : "Přetáhněte soubor nebo vyberte (max 100 MB)"}
                                         </p>
                                       </>
                                     )}
