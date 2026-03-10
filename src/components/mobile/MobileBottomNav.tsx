@@ -97,7 +97,7 @@ export function MobileBottomNav({
         reader.readAsDataURL(file);
       });
       const now = new Date();
-      const fileName = `foto_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}.jpg`;
+      const fileName = generatePhotoFilename(false);
       await supabase.functions.invoke("sharepoint-documents", {
         body: { action: "upload", projectId: qaProjectId, category: "Fotky", fileName, fileContent: base64 },
       });
