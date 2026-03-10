@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { useSharePointDocs, type SPFile, CATEGORY_FOLDER_MAP } from "@/hooks/useSharePointDocs";
 import { useChunkedUpload } from "@/hooks/useChunkedUpload";
 import { UploadProgressBar } from "./UploadProgressBar";
-import { dispatchDocCountUpdate, migrateDocCountCache } from "@/hooks/useDocumentCounts";
+import { dispatchDocCountUpdate, migrateDocCountCache, setDocCountAbsolute } from "@/hooks/useDocumentCounts";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { RozpadCeny } from "./RozpadCeny";
