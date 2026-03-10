@@ -1332,16 +1332,17 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                   )}
                                 </div>
                               ) : cat.key === "fotky" ? (
-                                  /* Photo thumbnail grid for Fotky category */
-                                  <PhotoThumbnailGrid
+                                  /* Photo timeline grid for Fotky category */
+                                  <PhotoTimelineGrid
                                     files={files}
-                                    maxHeight="200px"
+                                    maxHeight="260px"
+                                    canDelete={canUploadDocuments}
+                                    onDelete={(f) => { handleDeleteFile("fotky", f.name); }}
                                     onOpenLightbox={(index) => {
-                                      const f = files[index];
-                                      if (f && isImageFile(f.name)) {
-                                        setPhotoLightbox({ files, index });
-                                      } else {
-                                        handlePreview(f, cat.key);
+                                      // flatFiles from the grid — get the actual file list
+                                      const imageFiles = files.filter((f) => isImageFile(f.name));
+                                      if (imageFiles[index]) {
+                                        setPhotoLightbox({ files: imageFiles, index });
                                       }
                                     }}
                                   />
