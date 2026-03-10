@@ -1332,6 +1332,21 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                   )}
                                 </div>
                               ) : (
+                                {cat.key === "fotky" ? (
+                                  /* Photo thumbnail grid for Fotky category */
+                                  <PhotoThumbnailGrid
+                                    files={files}
+                                    maxHeight="200px"
+                                    onOpenLightbox={(index) => {
+                                      const f = files[index];
+                                      if (f && isImageFile(f.name)) {
+                                        setPhotoLightbox({ files, index });
+                                      } else {
+                                        handlePreview(f, cat.key);
+                                      }
+                                    }}
+                                  />
+                                ) : (
                                 <div className="space-y-0.5 max-h-[140px] overflow-y-auto">
                                   {files.map((f) => {
                                     const fileKey = `${cat.key}:${f.name}`;
@@ -1367,6 +1382,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                     );
                                   })}
                                 </div>
+                                )}
                               )}
 
                               {canUploadDocuments && (
