@@ -1530,6 +1530,13 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       onCancel={() => setUnsavedConfirmOpen(false)}
       description="Máte neuložené změny. Opravdu chcete zavřít?"
     />
+    <PhotoLightbox
+      open={!!photoLightbox}
+      onClose={() => setPhotoLightbox(null)}
+      files={photoLightbox?.files ?? []}
+      initialIndex={photoLightbox?.index ?? 0}
+      onDownload={(f) => { if (f.downloadUrl) window.open(f.downloadUrl, "_blank"); }}
+    />
     </>
   );
 }
