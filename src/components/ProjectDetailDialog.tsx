@@ -1331,8 +1331,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                     </p>
                                   )}
                                 </div>
-                              ) : (
-                                {cat.key === "fotky" ? (
+                              ) : cat.key === "fotky" ? (
                                   /* Photo thumbnail grid for Fotky category */
                                   <PhotoThumbnailGrid
                                     files={files}
