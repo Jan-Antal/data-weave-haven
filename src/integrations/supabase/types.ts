@@ -727,6 +727,7 @@ export type Database = {
           datum_tpv: string | null
           deleted_at: string | null
           dm: string | null
+          document_count: number | null
           expedice: string | null
           fakturace: string | null
           fee_proposal_link: string | null
@@ -782,6 +783,7 @@ export type Database = {
           datum_tpv?: string | null
           deleted_at?: string | null
           dm?: string | null
+          document_count?: number | null
           expedice?: string | null
           fakturace?: string | null
           fee_proposal_link?: string | null
@@ -837,6 +839,7 @@ export type Database = {
           datum_tpv?: string | null
           deleted_at?: string | null
           dm?: string | null
+          document_count?: number | null
           expedice?: string | null
           fakturace?: string | null
           fee_proposal_link?: string | null

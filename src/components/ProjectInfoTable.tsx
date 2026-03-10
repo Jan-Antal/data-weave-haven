@@ -380,6 +380,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
 interface ProjectRowProps {
   project: Project;
   docCount: number | undefined;
+  docFailed?: boolean;
   isExpanded: boolean;
   stageCount: number;
   onToggleExpand: (pid: string) => void;
@@ -399,6 +400,7 @@ interface ProjectRowProps {
 const ProjectRow = memo(function ProjectRow({
   project: p,
   docCount,
+  docFailed,
   isExpanded,
   stageCount,
   onToggleExpand,
@@ -429,9 +431,10 @@ const ProjectRow = memo(function ProjectRow({
             docCount !== undefined && docCount > 0 ? "text-[#223937]" : "text-[#99a5a3]"
           )}
           onClick={() => onEditProject(p)}
+          title={docFailed ? "Nepodařilo se načíst – klikněte pro ruční obnovení" : undefined}
         >
           <Paperclip className="h-3 w-3" />
-          {docCount !== undefined ? docCount : "—"}
+          {docFailed ? "?" : docCount !== undefined ? docCount : "—"}
         </span>
       </TableCell>
       {/* Col 2 — Chevron slot */}
@@ -472,7 +475,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     for (const p of projects) map[p.project_id] = p.status;
     return map;
   }, [projects]);
-  const { counts: docCounts } = useDocumentCounts(allProjectIds, projectStatuses);
+  const { counts: docCounts, failed: docFailed } = useDocumentCounts(allProjectIds, projectStatuses);
   const [addOpen, setAddOpen] = useState(false);
   const [newProj, setNewProj] = useState({ ...emptyProject });
   const [datumWarning, setDatumWarning] = useState(false);
@@ -786,6 +789,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                   key={p.id}
                   project={p}
                   docCount={docCounts[p.project_id]}
+                  docFailed={docFailed.has(p.project_id)}
                   isExpanded={expanded.has(p.project_id)}
                   stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
                   onToggleExpand={toggleExpand}
