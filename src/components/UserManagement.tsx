@@ -263,6 +263,21 @@ export function UserManagement({ open, onOpenChange }: Props) {
     }
   };
 
+  const handleUpdateName = async (userId: string) => {
+    const trimmed = editingNameValue.trim();
+    if (!trimmed) return;
+    const { data, error } = await supabase.functions.invoke("update-user", {
+      body: { user_id: userId, full_name: trimmed },
+    });
+    if (error || data?.error) {
+      toast({ title: "Chyba", description: data?.error || error?.message, variant: "destructive" });
+    } else {
+      toast({ title: "Jméno změněno" });
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, full_name: trimmed } : u));
+    }
+    setEditingNameId(null);
+  };
+
   const isOwner = (u: UserRow) => u.role === "owner";
   const nonOwnerUsers = users.filter((u) => u.role !== "owner");
 
