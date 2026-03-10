@@ -408,6 +408,14 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     }
   }, [project?.project_id, open]);
 
+  // Sync absolute document count after files are loaded
+  useEffect(() => {
+    if (project && open && Object.keys(sp.filesByCategory).length > 0) {
+      const total = Object.values(sp.filesByCategory).reduce((s, f) => s + f.length, 0);
+      setDocCountAbsolute(project.project_id, total);
+    }
+  }, [project?.project_id, open, sp.filesByCategory]);
+
   const uploadSingleFile = useCallback(async (categoryKey: string, file: File) => {
     const folder = CATEGORY_FOLDER_MAP[categoryKey];
     if (!folder || !project) return;
