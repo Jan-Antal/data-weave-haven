@@ -29,6 +29,7 @@ import { dispatchDocCountUpdate, migrateDocCountCache, setDocCountAbsolute } fro
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { RozpadCeny } from "./RozpadCeny";
+import { PhotoLightbox, PhotoThumbnailGrid, isImageFile } from "./PhotoLightbox";
 
 interface Project {
   id: string;
