@@ -687,10 +687,14 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
               const cap = getWeekCapacity(week.key);
               const pct = cap > 0 ? (used / cap) * 100 : 0;
               const isPast = week.end < new Date();
-              // Color logic matching WeeklySilos exactly
-              const fillColor = pct >= 100 ? "#EF4444" : pct >= 80 ? "#F59E0B" : "#22C55E";
-              const textColor = pct >= 100 ? "#DC2626" : pct >= 80 ? "#D97706" : "#16A34A";
-              const borderColor = pct >= 100 ? "#EF4444" : pct >= 80 ? "#FBBF24" : "#4ADE80";
+              const isOverloaded = pct > 120;
+              const isWarning = pct > 100 && pct <= 120;
+              const barColor = isPast ? "#b0bab8" : isOverloaded ? "#dc3545" : isWarning ? "#d97706" : "#3a8a36";
+              const barBg = isPast ? "linear-gradient(90deg, #d0d7d5, #b0bab8)"
+                : isOverloaded ? "linear-gradient(90deg, #fca5a5, #dc3545)"
+                : isWarning ? "linear-gradient(90deg, #fcd34d, #d97706)"
+                : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
+              const borderColor = isPast ? "#b0bab8" : isOverloaded ? "rgba(220,53,69,0.4)" : isWarning ? "#d97706" : "#4ADE80";
               return (
                 <div
                   key={week.key}
@@ -704,19 +708,19 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                 >
                   {/* Week number */}
                   <div className="font-semibold text-base text-foreground leading-tight">
-                    T{week.weekNum}{week.isCurrent && <span className="ml-0.5" style={{ color: "#22C55E" }}>•</span>}
+                    T{week.weekNum}{week.isCurrent && <span className="ml-0.5" style={{ color: "#3a8a36" }}>•</span>}
                   </div>
                   {/* Date range */}
                   <div className="text-xs text-muted-foreground mt-0.5">
                     {formatDateShort(week.start)} – {formatDateShort(week.end)}
                   </div>
-                  {/* Capacity bar */}
-                  <div className="relative w-full rounded-full overflow-hidden my-1" style={{ height: '8px', backgroundColor: '#e5e7eb' }}>
+                  {/* Capacity bar — matching Kanban WeeklySilos */}
+                  <div className="relative w-full rounded overflow-hidden my-1" style={{ height: '7px', backgroundColor: '#f0eee9' }}>
                     <div
-                      className="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
+                      className="h-full rounded transition-all duration-300"
                       style={{
                         width: `${Math.min(pct, 100)}%`,
-                        backgroundColor: pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#22c55e',
+                        background: barBg,
                       }}
                     />
                   </div>
