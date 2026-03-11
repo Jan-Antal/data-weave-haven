@@ -1,5 +1,4 @@
 import type { ProjectProgress } from "@/hooks/useProductionProgress";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Props {
   progress: ProjectProgress;
@@ -18,34 +17,50 @@ export function ProjectProgressBar({ progress, compact }: Props) {
 
   const accountedFor = progress.completed + progress.scheduled + progress.in_inbox + (progress.paused || 0);
 
+  const hasActivity = progress.completed > 0 || progress.scheduled > 0 || (progress.paused || 0) > 0 || progress.missing > 0;
+
   return (
-    <div className="relative w-full cursor-default" style={{ paddingTop: 8, paddingBottom: 8, marginTop: -8, marginBottom: -8 }}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="w-full">
-            {!compact && (
-              <div className="flex items-center justify-between mb-[2px]">
-                <span className="text-[9px] font-mono" style={{ color: "#6b7a78" }}>{accountedFor}/{total}</span>
-              </div>
-            )}
-            <div className="h-[4px] w-full rounded-full overflow-hidden flex" style={{ backgroundColor: "#e8e5e0" }}>
-              {pctCompleted > 0 && <div className="h-full" style={{ width: `${pctCompleted}%`, backgroundColor: "#6aab68" }} />}
-              {pctScheduled > 0 && <div className="h-full" style={{ width: `${pctScheduled}%`, backgroundColor: "#a8d5a6" }} />}
-              {pctPaused > 0 && <div className="h-full" style={{ width: `${pctPaused}%`, backgroundColor: "#e0c97a" }} />}
-              {pctInbox > 0 && <div className="h-full" style={{ width: `${pctInbox}%`, backgroundColor: "#c4bfb8" }} />}
-              {pctMissing > 0 && <div className="h-full" style={{ width: `${pctMissing}%`, backgroundColor: "#d4908e" }} />}
-            </div>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="z-[9999] text-[10px] space-y-0.5">
-          <div style={{ color: "#6aab68" }}>✓ Dokončeno: {progress.completed}</div>
-          <div style={{ color: "#a8d5a6" }}>📅 Naplánováno: {progress.scheduled}</div>
-          {(progress.paused || 0) > 0 && <div style={{ color: "#b8a44a" }}>⏸ Pozastaveno: {progress.paused}</div>}
-          <div style={{ color: "#9b9690" }}>📥 V Inboxu: {progress.in_inbox}</div>
-          {progress.missing > 0 && <div style={{ color: "#d4908e" }}>⚠ Chybí: {progress.missing}</div>}
-          <div className="text-muted-foreground pt-0.5 border-t" style={{ borderColor: "#e2ddd6" }}>TPV celkem: {progress.total_tpv}</div>
-        </TooltipContent>
-      </Tooltip>
+    <div className="w-full">
+      {!compact && (
+        <div className="flex items-center justify-between mb-[2px]">
+          <span className="text-[9px] font-mono" style={{ color: "#6b7a78" }}>{accountedFor}/{total}</span>
+        </div>
+      )}
+      <div className="h-[4px] w-full rounded-full overflow-hidden flex" style={{ backgroundColor: "#e8e5e0" }}>
+        {pctCompleted > 0 && <div className="h-full" style={{ width: `${pctCompleted}%`, backgroundColor: "#6aab68" }} />}
+        {pctScheduled > 0 && <div className="h-full" style={{ width: `${pctScheduled}%`, backgroundColor: "#a8d5a6" }} />}
+        {pctPaused > 0 && <div className="h-full" style={{ width: `${pctPaused}%`, backgroundColor: "#e0c97a" }} />}
+        {pctInbox > 0 && <div className="h-full" style={{ width: `${pctInbox}%`, backgroundColor: "#c4bfb8" }} />}
+        {pctMissing > 0 && <div className="h-full" style={{ width: `${pctMissing}%`, backgroundColor: "#d4908e" }} />}
+      </div>
+      {hasActivity && (
+        <div className="flex gap-2 mt-1 text-[10px] leading-none">
+          {progress.completed > 0 && (
+            <span className="flex items-center gap-0.5" style={{ color: "#6aab68" }}>
+              <span>✓</span>
+              <span>{progress.completed} hotovo</span>
+            </span>
+          )}
+          {progress.scheduled > 0 && (
+            <span className="flex items-center gap-0.5" style={{ color: "#a8d5a6" }}>
+              <span>⊙</span>
+              <span>{progress.scheduled} plán</span>
+            </span>
+          )}
+          {(progress.paused || 0) > 0 && (
+            <span className="flex items-center gap-0.5" style={{ color: "#b8a44a" }}>
+              <span>⏸</span>
+              <span>{progress.paused} pauza</span>
+            </span>
+          )}
+          {progress.missing > 0 && (
+            <span className="flex items-center gap-0.5" style={{ color: "#d4908e" }}>
+              <span>⚠</span>
+              <span>{progress.missing} chybí</span>
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
