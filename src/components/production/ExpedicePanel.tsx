@@ -71,6 +71,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
       setCollapsedGroups(new Set());
     }
   };
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   // Map project_id → expedice field
   const projectExpediceMap = useMemo(() => {
