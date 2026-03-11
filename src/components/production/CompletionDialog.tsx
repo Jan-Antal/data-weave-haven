@@ -24,8 +24,11 @@ type CompletionMode = "full" | "split";
 
 interface ItemCompletionConfig {
   mode: CompletionMode;
-  splitPct: number; // % to complete (10-90)
+  splitPct: number;
 }
+
+// Track which single item has split expanded
+
 
 export function CompletionDialog({
   open, onOpenChange, projectName, projectId, weekLabel, weekKey, items, preCheckedIds, hourlyRate,
