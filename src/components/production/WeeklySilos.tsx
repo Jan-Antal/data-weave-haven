@@ -695,16 +695,6 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
       border: "1px solid #ece8e2", borderLeft: `4px solid ${borderLeftColor}`,
       backgroundColor: "#ffffff", opacity: isDragging ? 0.3 : 1,
     }}>
-      {/* Warning badge */}
-      {severity && !allCompleted && (
-        <div className="absolute top-1 right-1 z-10 flex items-center justify-center rounded-full"
-          style={{
-            width: 14, height: 14, fontSize: 9, fontWeight: 700,
-            backgroundColor: severity === "overdue" ? "#dc3545" : "#d97706",
-            color: "#fff",
-          }}
-        >!</div>
-      )}
 
       <div className="flex" style={{ borderBottom: expanded ? "1px solid #ece8e2" : "none" }}>
         {/* Left strip: expand/collapse toggle — NOT draggable */}
