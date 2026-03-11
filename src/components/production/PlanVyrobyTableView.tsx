@@ -725,12 +725,12 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                     />
                   </div>
                   {/* Hours row */}
-                  <div className="flex items-center justify-between mt-1 font-mono text-[9px]">
+                  <div className="flex items-center justify-between mt-[3px] font-mono text-[9px]">
                     <div>
-                      <span className="font-bold" style={{ color: textColor }}>{Math.round(used)}h</span>
+                      <span className="font-bold" style={{ color: barColor }}>{Math.round(used)}h</span>
                       <span className="text-muted-foreground"> / {cap}h</span>
                     </div>
-                    <span className="font-bold" style={{ color: textColor }}>{cap > 0 ? Math.round(pct) : 0}%</span>
+                    <span className="font-bold" style={{ color: barColor }}>{cap > 0 ? Math.round(pct) : 0}%</span>
                   </div>
                 </div>
               );
