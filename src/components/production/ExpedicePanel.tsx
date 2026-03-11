@@ -391,7 +391,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
                       );
                     })}
                   </div>
-                </>
+                </div>
               )}
             </div>
           );
