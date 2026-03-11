@@ -658,10 +658,11 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
       backgroundColor: "#ffffff", opacity: isDragging ? 0.3 : 1,
     }}>
       <div ref={setDragRef} {...attributes} {...(hasUncompleted ? listeners : {})}
+        data-context="bundle"
         className={`flex items-center gap-1 px-[6px] py-[5px] ${hasUncompleted ? "cursor-grab" : "cursor-default"}`}
         style={{ borderBottom: expanded ? "1px solid #ece8e2" : "none" }}
         onClick={e => { if (!(e as any).__isDrag) setExpanded(!expanded); }}
-        onContextMenu={e => onBundleContextMenu(e, bundle, toggleExpand)}
+        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onBundleContextMenu(e, bundle, toggleExpand); }}
       >
         <ChevronRight className="shrink-0 transition-transform duration-150"
           style={{ width: 10, height: 10, color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }} />
@@ -676,14 +677,14 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
         </div>
       </div>
       {expanded && (
-        <div className="px-[3px] py-[2px]">
+        <div className="px-[3px] py-[2px]" onContextMenu={e => e.stopPropagation()}>
           {bundle.items.map(item =>
             item.status === "completed" ? (
-              <CompletedSiloItem key={item.id} item={item} onContextMenu={e => onItemContextMenu(e, item, bundle)} />
+              <CompletedSiloItem key={item.id} item={item} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
             ) : item.status === "paused" ? (
-              <PausedSiloItem key={item.id} item={item} onContextMenu={e => onItemContextMenu(e, item, bundle)} />
+              <PausedSiloItem key={item.id} item={item} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
             ) : (
-              <DraggableSiloItem key={item.id} item={item} weekKey={weekKey} showCzk={showCzk} onContextMenu={e => onItemContextMenu(e, item, bundle)} />
+              <DraggableSiloItem key={item.id} item={item} weekKey={weekKey} showCzk={showCzk} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
             )
           )}
         </div>
@@ -695,7 +696,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
 function CompletedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onContextMenu: (e: React.MouseEvent) => void }) {
   const isSplit = !!item.split_group_id;
   return (
-    <div className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-default transition-colors"
+    <div data-context="item" className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-default transition-colors"
       style={{ borderLeft: isSplit ? "2px dashed #c4ccc9" : undefined }}
       onMouseEnter={e => { e.currentTarget.style.backgroundColor = "#f8f7f5"; }}
       onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
@@ -720,7 +721,7 @@ function PausedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onContext
   const isOverdue = pauseExpDate && new Date(pauseExpDate) < new Date();
 
   return (
-    <div className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-default transition-colors"
+    <div data-context="item" className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-default transition-colors"
       style={{
         borderLeft: isSplit ? "2px dashed #d97706" : "2px dashed #d97706",
         backgroundColor: "rgba(217,119,6,0.03)",
@@ -767,13 +768,20 @@ function DraggableSiloItem({ item, weekKey, showCzk, onContextMenu }: {
     },
   });
 
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onContextMenu(e);
+  }, [onContextMenu]);
+
   return (
     <div ref={setNodeRef} {...attributes} {...listeners}
+      data-context="item"
       className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-grab transition-colors"
       style={{ opacity: isDragging ? 0.3 : 1, borderLeft: isSplit ? "2px dashed #99a5a3" : undefined }}
       onMouseEnter={e => { if (!isDragging) e.currentTarget.style.backgroundColor = "#f8f7f5"; }}
       onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
-      onContextMenu={onContextMenu}
+      onContextMenu={handleContextMenu}
     >
       <GripVertical className="shrink-0" style={{ width: 8, height: 8, color: "#99a5a3" }} />
       {adhocReason && (
