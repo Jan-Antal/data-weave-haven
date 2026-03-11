@@ -275,7 +275,7 @@ interface ItemAssignment {
   splitParts?: { hours: number; czk: number; weekKey: string }[];
 }
 
-function ByItemsTab({ items, weeks, onConfirm }: { items: PlanningItem[]; weeks: PlanningWeek[]; onConfirm: (plan: SchedulePlanEntry[]) => void }) {
+function ByItemsTab({ items, weeks, onConfirm, onCancel }: { items: PlanningItem[]; weeks: PlanningWeek[]; onConfirm: (plan: SchedulePlanEntry[]) => void; onCancel: () => void }) {
   const [assignments, setAssignments] = useState<ItemAssignment[]>(() =>
     items.map(item => {
       // Default: first week with enough capacity
