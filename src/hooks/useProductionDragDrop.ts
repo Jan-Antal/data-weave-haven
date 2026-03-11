@@ -182,7 +182,7 @@ export function useProductionDragDrop() {
   const moveScheduleItemToWeek = useCallback(async (scheduleItemId: string, newWeekDate: string) => {
     try {
       // Capture old week for undo
-      const { data: oldItem } = await supabase.from("production_schedule").select("scheduled_week, item_name").eq("id", scheduleItemId).single();
+      const { data: oldItem } = await supabase.from("production_schedule").select("scheduled_week, item_name, project_id, item_code").eq("id", scheduleItemId).single();
       const oldWeek = oldItem?.scheduled_week;
 
       const { error } = await supabase
