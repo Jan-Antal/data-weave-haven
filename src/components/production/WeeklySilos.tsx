@@ -553,6 +553,8 @@ function ToolbarButton({ active, disabled, label, onClick }: { active?: boolean;
   );
 }
 
+type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; status?: string | null; risk?: string | null }>;
+
 interface SiloProps {
   weekKey: string; weekNum: number; startDate: Date; endDate: Date;
   isCurrent: boolean; isPast: boolean; silo: WeekSilo | null;
@@ -561,10 +563,11 @@ interface SiloProps {
   onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem, bundle: ScheduleBundle) => void;
   allWeeksData: Map<string, { total_hours: number }>; weekKeys: string[];
   registerRef: (key: string, el: HTMLDivElement | null) => void;
+  projectLookup: ProjectLookup;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup }: SiloProps) {
   // Capacity calculation: exclude paused items
   const activeHours = useMemo(() => {
     if (!silo) return 0;
