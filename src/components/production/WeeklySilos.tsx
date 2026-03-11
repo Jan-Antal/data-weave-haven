@@ -937,7 +937,7 @@ function DraggableSiloItem({ item, weekKey, showCzk, onContextMenu }: {
       <span className="text-[10px] flex-1 truncate" style={{ color: "#6b7a78" }}>{item.item_name}</span>
       {isSplit && (
         <Tooltip><TooltipTrigger asChild><span className="text-[8px] font-mono shrink-0" style={{ color: "#99a5a3" }}>{item.split_part}/{item.split_total}</span></TooltipTrigger>
-          <TooltipContent className="text-[10px]">Část {item.split_part} ze {item.split_total}</TooltipContent></Tooltip>
+          <TooltipContent side="top" className="z-[9999] text-[10px]">Část {item.split_part} ze {item.split_total}</TooltipContent></Tooltip>
       )}
       <span className="font-mono text-[9px] shrink-0" style={{ color: "#99a5a3" }}>
         {item.scheduled_hours}h{showCzk && ` ${Math.round(item.scheduled_czk / 1000)}K`}
