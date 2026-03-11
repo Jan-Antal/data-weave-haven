@@ -774,10 +774,10 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
           <div className="flex-1 min-w-0">
             <div className="text-[11px] font-semibold truncate" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>{bundle.project_name}</div>
             <div className="flex items-center gap-1.5">
-              <span className="font-mono text-[8px]" style={{ color: "#99a5a3" }}>{bundle.project_id}</span>
-              {hasDates && !allCompleted && (
-                <span className="text-[7px] truncate" style={{ color: severity === "overdue" ? "#dc3545" : severity === "upcoming" ? "#d97706" : "#99a5a3" }}>
-                  {smlDate && `Sml: ${smlDate}`}{smlDate && expDate && " · "}{expDate && `Exp: ${expDate}`}
+              <span className="font-mono text-xs" style={{ color: "#99a5a3" }}>{bundle.project_id}</span>
+              {expDate && !allCompleted && (
+                <span className="text-xs truncate" style={{ color: expSeverity === "overdue" ? "#dc3545" : expSeverity === "urgent" ? "#d97706" : "#99a5a3" }}>
+                  Exp: {expDate}
                 </span>
               )}
             </div>
