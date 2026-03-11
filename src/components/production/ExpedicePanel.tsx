@@ -62,7 +62,15 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
   const { data: settings } = useProductionSettings();
   const hourlyRate = settings?.hourly_rate ?? 550;
   const [collapsed, setCollapsed] = useState(true);
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const allGroupsExpanded = projects.length > 0 && collapsedGroups.size === 0;
+  const handleToggleAllGroups = () => {
+    if (allGroupsExpanded) {
+      setCollapsedGroups(new Set(projects.map(p => p.project_id)));
+    } else {
+      setCollapsedGroups(new Set());
+    }
+  };
 
   // Map project_id → expedice field
   const projectExpediceMap = useMemo(() => {
