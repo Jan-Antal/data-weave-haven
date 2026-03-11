@@ -525,6 +525,9 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               onItemContextMenu={(e, item, bundle) => handleItemContextMenu(e, item, week.key, week.weekNum, week.start, week.end, bundle)}
               allWeeksData={weeksCapacityMap} weekKeys={weekKeys} registerRef={registerSiloRef}
               projectLookup={projectLookup}
+              spillDismissed={dismissedSpillWeeks.has(week.key)}
+              onDismissSpill={() => handleDismissSpill(week.key)}
+              onReopenSpill={() => handleReopenSpill(week.key)}
             />
           ))}
         </div>
