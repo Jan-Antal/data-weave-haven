@@ -249,30 +249,14 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
               className="rounded-lg p-2 space-y-1.5 border border-border bg-card"
               onContextMenu={(e) => handleProjectContextMenu(e, group.project_id)}
             >
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[12px] font-semibold truncate" style={{ color: "#16A34A" }}>
-                      {group.project_name}
-                    </span>
-                    {expediceStr && (
-                      <span className="text-[9px] font-medium shrink-0" style={{ color: headerColor }}>
-                        Exp: {expediceStr}
-                      </span>
-                    )}
-                  </div>
-                  <div className="font-mono text-[9px] text-muted-foreground">
-                    {group.project_id}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {showCzk && (
-                    <span className="font-mono text-[9px] text-muted-foreground">
-                      {formatCompactCzk(group.items.reduce((s, i) => s + i.scheduled_hours, 0) * hourlyRate)}
-                    </span>
-                  )}
+              <div className="space-y-0.5">
+                {/* ROW 1: Project name + badge */}
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-sm font-semibold truncate" style={{ color: getProjectColor(group.project_id) }}>
+                    {group.project_name}
+                  </span>
                   <span
-                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
                     style={{
                       backgroundColor: allDone ? "#16A34A" : "#D97706",
                       color: "#ffffff",
@@ -280,6 +264,20 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
                   >
                     {completedCount} / {totalCount} ks{allDone ? " ✓" : ""}
                   </span>
+                </div>
+                {/* ROW 2: Project ID + Exp date */}
+                <div className="flex items-center justify-between gap-1">
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {group.project_id}
+                  </span>
+                  {expediceStr && (
+                    <span className="text-xs font-medium shrink-0" style={{
+                      color: !allDone && expediceDate && expediceDate < new Date() ? "#dc3545"
+                        : headerColor
+                    }}>
+                      Exp: {expediceStr}
+                    </span>
+                  )}
                 </div>
               </div>
 
