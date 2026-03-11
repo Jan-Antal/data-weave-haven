@@ -574,10 +574,10 @@ export function InboxPlanningDialog({ open, onOpenChange, projectId, projectName
 
           <div className="flex-1 overflow-y-auto">
             <TabsContent value="by-weeks" className="mt-0">
-              <ByWeeksTab items={items} weeks={weeks} onConfirm={handleConfirm} />
+              <ByWeeksTab items={items} weeks={weeks} onConfirm={handleConfirm} onCancel={handleCancel} />
             </TabsContent>
             <TabsContent value="by-items" className="mt-0">
-              <ByItemsTab items={items} weeks={weeks} onConfirm={handleConfirm} />
+              <ByItemsTab items={items} weeks={weeks} onConfirm={handleConfirm} onCancel={handleCancel} />
             </TabsContent>
           </div>
         </Tabs>
