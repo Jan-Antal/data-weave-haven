@@ -705,7 +705,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
             })}
             {hasAnyExpedice && (
               <div
-                className="shrink-0 text-center px-1 py-1.5 border-b border-l border-border/50 sticky right-0 z-40"
+                className="shrink-0 text-center px-1 border-b border-l border-border/50 sticky right-0 z-40 flex items-center justify-center"
                 style={{ width: EXPEDICE_W, backgroundColor: STATUS_COLORS.completed.bg }}
               >
                 <div className="text-[10px] font-bold" style={{ color: STATUS_COLORS.completed.text }}>✓ Expedice</div>
