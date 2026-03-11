@@ -49,7 +49,7 @@ interface CancelState {
   source: "schedule" | "inbox"; splitGroupId: string | null;
 }
 
-export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV }: InboxPanelProps) {
+export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableDropZone }: InboxPanelProps) {
   const { data: projects = [], isLoading } = useProductionInbox();
   const { data: progressData } = useProductionProgress();
   const { data: settings } = useProductionSettings();
@@ -61,7 +61,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV }: InboxP
   const [addItemState, setAddItemState] = useState<{ projectId?: string; projectName?: string } | null>(null);
   const [cancelState, setCancelState] = useState<CancelState | null>(null);
 
-  const { setNodeRef, isOver } = useDroppable({ id: "inbox-drop-zone" });
+  const { setNodeRef, isOver } = useDroppable({ id: "inbox-drop-zone", disabled: !!disableDropZone });
 
   const totalHours = useMemo(() => projects.reduce((s, p) => s + p.total_hours, 0), [projects]);
   const hourlyRate = settings?.hourly_rate ?? 550;
