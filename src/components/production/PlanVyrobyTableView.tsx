@@ -788,7 +788,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                               style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff" }}
                             >
                               {item.inboxHours > 0 && (
-                                <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-semibold" style={{ backgroundColor: "#fff7ed", color: "#ea580c" }}>
+                                <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-semibold" style={{ backgroundColor: STATUS_COLORS.inbox.bg, color: STATUS_COLORS.inbox.text }}>
                                   {formatInboxValue(item.inboxHours, item.inboxCzk, item.totalHours)}
                                 </div>
                               )}
