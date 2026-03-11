@@ -18,6 +18,9 @@ import {
   DndContext,
   DragOverlay,
   pointerWithin,
+  PointerSensor,
+  useSensor,
+  useSensors,
   type DragStartEvent,
   type DragEndEvent,
   type DragOverEvent,
@@ -83,6 +86,7 @@ export default function PlanVyroby() {
   const [searchQuery, setSearchQuery] = useState("");
   const showCzk = displayMode === "czk";
   const [activeDrag, setActiveDrag] = useState<ActiveDragData | null>(null);
+  const isDraggingFromInbox = activeDrag?.type === "inbox-item" || activeDrag?.type === "inbox-project";
   const [overDroppableId, setOverDroppableId] = useState<string | null>(null);
   const [autoSplitState, setAutoSplitState] = useState<AutoSplitState | null>(null);
   const [mergeState, setMergeState] = useState<MergeState | null>(null);
@@ -99,6 +103,8 @@ export default function PlanVyroby() {
     returnBundleToInbox,
     mergeSplitItems,
   } = useProductionDragDrop();
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 10 } }));
 
   const weeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
@@ -354,6 +360,7 @@ export default function PlanVyroby() {
 
   return (
     <DndContext
+      sensors={sensors}
       collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
@@ -379,7 +386,7 @@ export default function PlanVyroby() {
 
         {viewTab === "kanban" ? (
           <div className="flex-1 flex min-h-0">
-            <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
+            <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} disableDropZone={isDraggingFromInbox} />
             <WeeklySilos showCzk={showCzk} onToggleCzk={(v) => setDisplayMode(v ? "czk" : "hours")} overDroppableId={overDroppableId} onNavigateToTPV={handleNavigateToTPV} displayMode={displayMode} onDisplayModeChange={setDisplayMode} />
             <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
           </div>
