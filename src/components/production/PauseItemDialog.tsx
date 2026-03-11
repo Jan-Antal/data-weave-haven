@@ -71,6 +71,16 @@ export function PauseItemDialog({ open, onOpenChange, itemId, itemName, itemCode
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
       qc.invalidateQueries({ queryKey: ["production-progress"] });
+
+      // Log activity
+      logActivity({
+        projectId: "_production_",
+        actionType: "item_paused",
+        oldValue: "Naplánováno",
+        newValue: "Pozastaveno",
+        detail: JSON.stringify({ item_name: itemName, item_code: itemCode, pause_reason: pauseReason, pause_expected_date: expectedDate?.toISOString().split("T")[0] }),
+      });
+
       toast({ title: `⏸ ${itemName} pozastaveno` });
       onOpenChange(false);
     } catch (err: any) {

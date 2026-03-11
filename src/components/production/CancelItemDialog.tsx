@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { renumberSiblings } from "./SplitItemDialog";
+import { logActivity } from "@/lib/activityLog";
 
 interface CancelItemDialogProps {
   open: boolean;
