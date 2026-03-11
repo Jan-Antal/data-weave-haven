@@ -403,25 +403,42 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
     return map;
   }, [scheduleData]);
 
+  // --- New color system ---
+  const STATUS_COLORS = {
+    inbox:       { bg: "#FEE2CD", text: "#EA580C", border: "#EA580C" },
+    scheduled:   { bg: "#DBEAFE", text: "#2563EB", border: "#2563EB" },
+    in_progress: { bg: "#D1FAE5", text: "#059669", border: "#059669" },
+    completed:   { bg: "#BBF7D0", text: "#16A34A", border: "#16A34A" },
+    paused:      { bg: "#F3F4F6", text: "#6B7280", border: "#6B7280" },
+    overdue:     { bg: "#FEE2E2", text: "#DC2626", border: "#DC2626" },
+  } as const;
+
   const getCellStyle = (status: string) => {
     switch (status) {
-      case "completed": return { bg: "#ecfdf5", text: "#059669", border: "#059669" };
-      case "in_progress": return { bg: "#fffbeb", text: "#d97706", border: "#d97706" };
-      case "paused": return { bg: "#fefce8", text: "#a16207", border: "#a16207" };
-      default: return { bg: "#eff6ff", text: "#3b82f6", border: "#3b82f6" };
+      case "completed": return STATUS_COLORS.completed;
+      case "in_progress": return STATUS_COLORS.in_progress;
+      case "paused": return STATUS_COLORS.paused;
+      default: return STATUS_COLORS.scheduled;
     }
+  };
+
+  // Bold variant for bundle-level cells (uses border color as bg, white text)
+  const getBundleCellStyle = (status: string) => {
+    const base = getCellStyle(status);
+    return { bg: base.border, text: "#ffffff", border: base.border };
   };
 
   const formatCellValue = (hours: number, czk: number, status: string, totalItemHours: number, splitPart?: number, splitTotal?: number) => {
     const splitLabel = splitPart && splitTotal
       ? ` ${["½", "²⁄₂", "⅓", "²⁄₃", "¼", "²⁄₄", "¾"][splitPart === 1 && splitTotal === 2 ? 0 : splitPart === 2 && splitTotal === 2 ? 1 : 0] || `${splitPart}/${splitTotal}`}`
       : "";
+    const prefix = status === "completed" ? "✓ " : status === "paused" ? "⏸ " : "";
     if (displayMode === "percent") {
       const pct = totalItemHours > 0 ? Math.round((hours / totalItemHours) * 100) : 0;
-      return `${pct}%${splitLabel}`;
+      return `${prefix}${pct}%${splitLabel}`;
     }
-    if (displayMode === "czk") return `${formatCzkShort(Math.round(czk))} Kč${splitLabel}`;
-    return `${Math.round(hours)}h${splitLabel}`;
+    if (displayMode === "czk") return `${prefix}${formatCzkShort(Math.round(czk))} Kč${splitLabel}`;
+    return `${prefix}${Math.round(hours)}h${splitLabel}`;
   };
 
   const formatCapacity = (used: number, weekKey: string) => {
@@ -551,6 +568,22 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
         </button>
       </div>
 
+      {/* Legend strip */}
+      <div className="px-3 py-1.5 flex items-center gap-4 shrink-0 border-b border-border bg-card/50">
+        {[
+          { label: "Inbox", bg: STATUS_COLORS.inbox.bg, border: STATUS_COLORS.inbox.border },
+          { label: "Naplánováno", bg: STATUS_COLORS.scheduled.bg, border: STATUS_COLORS.scheduled.border },
+          { label: "Ve výrobě", bg: STATUS_COLORS.in_progress.bg, border: STATUS_COLORS.in_progress.border },
+          { label: "✓ Dokončeno", bg: STATUS_COLORS.completed.bg, border: STATUS_COLORS.completed.border },
+          { label: "⏸ Pozastaveno", bg: STATUS_COLORS.paused.bg, border: STATUS_COLORS.paused.border },
+        ].map(l => (
+          <div key={l.label} className="flex items-center gap-1.5">
+            <div className="rounded" style={{ width: 16, height: 16, backgroundColor: l.bg, border: `1.5px solid ${l.border}` }} />
+            <span className="text-[10px] font-medium text-muted-foreground">{l.label}</span>
+          </div>
+        ))}
+      </div>
+
       {/* Table */}
       <div className="flex-1 overflow-auto bg-muted/30" ref={scrollRef} style={{ padding: "0 0 8px 0" }}>
         <div className="min-w-max">
@@ -564,9 +597,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
             {hasAnyInbox && (
               <div
                 className="shrink-0 text-center px-1 py-1.5 border-b border-r border-border/50 sticky z-40"
-                style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff7ed" }}
+                style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: STATUS_COLORS.inbox.bg }}
               >
-                <div className="text-[10px] font-bold" style={{ color: "#ea580c" }}>📥 Inbox</div>
+                <div className="text-[10px] font-bold" style={{ color: STATUS_COLORS.inbox.text }}>📥 Inbox</div>
               </div>
             )}
             {weeks.map(week => {
@@ -600,9 +633,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
             {hasAnyExpedice && (
               <div
                 className="shrink-0 text-center px-1 py-1.5 border-b border-l border-border/50 sticky right-0 z-40"
-                style={{ width: EXPEDICE_W, backgroundColor: "#ecfdf5" }}
+                style={{ width: EXPEDICE_W, backgroundColor: STATUS_COLORS.completed.bg }}
               >
-                <div className="text-[10px] font-bold" style={{ color: "#059669" }}>✓ Expedice</div>
+                <div className="text-[10px] font-bold" style={{ color: STATUS_COLORS.completed.text }}>✓ Expedice</div>
               </div>
             )}
           </div>
@@ -667,7 +700,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                         style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff", borderTop: "1px solid #e5e2dd", borderBottom: "1px solid #e5e2dd" }}
                       >
                         {proj.inboxTotalHours > 0 && (
-                          <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-bold" style={{ backgroundColor: "#fff7ed", color: "#ea580c" }}>
+                          <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-bold" style={{ backgroundColor: STATUS_COLORS.inbox.bg, color: STATUS_COLORS.inbox.text }}>
                             {formatInboxValue(proj.inboxTotalHours, proj.inboxTotalCzk, proj.totalHours)}
                           </div>
                         )}
@@ -712,7 +745,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                         }}
                       >
                         {proj.expediceTotalHours > 0 && (
-                          <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-bold" style={{ backgroundColor: "#ecfdf5", color: "#059669" }}>
+                          <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-bold" style={{ backgroundColor: STATUS_COLORS.completed.bg, color: STATUS_COLORS.completed.text }}>
                             {formatExpediceValue(proj.expediceTotalHours, proj.expediceTotalCzk, proj.totalHours)} ✓
                           </div>
                         )}
@@ -755,7 +788,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                               style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff" }}
                             >
                               {item.inboxHours > 0 && (
-                                <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-semibold" style={{ backgroundColor: "#fff7ed", color: "#ea580c" }}>
+                                <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-semibold" style={{ backgroundColor: STATUS_COLORS.inbox.bg, color: STATUS_COLORS.inbox.text }}>
                                   {formatInboxValue(item.inboxHours, item.inboxCzk, item.totalHours)}
                                 </div>
                               )}
@@ -816,14 +849,14 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                                 <div
                                   className="w-full text-center text-[9px] font-mono font-semibold"
                                   style={{
-                                    backgroundColor: "#ecfdf5",
-                                    color: "#059669",
+                                    backgroundColor: STATUS_COLORS.completed.bg,
+                                    color: STATUS_COLORS.completed.text,
                                     borderRadius: 4,
                                     padding: "3px 6px",
-                                    border: "1px solid #05966920",
+                                    border: `1px solid ${STATUS_COLORS.completed.border}20`,
                                   }}
                                 >
-                                  {formatExpediceValue(item.expediceHours, item.expediceCzk, item.totalHours)} ✓
+                                  ✓ {formatExpediceValue(item.expediceHours, item.expediceCzk, item.totalHours)}
                                 </div>
                               )}
                             </div>
@@ -846,21 +879,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
       </div>
 
       {/* Footer */}
-      <div className="px-3 py-2 flex items-center justify-between shrink-0 border-t border-border bg-card">
-        <div className="flex items-center gap-3">
-          {[
-            { label: "Inbox", bg: "#fff7ed", border: "#ea580c" },
-            { label: "Naplánováno", bg: "#eff6ff", border: "#3b82f6" },
-            { label: "Ve výrobě", bg: "#fffbeb", border: "#d97706" },
-            { label: "Dokončeno", bg: "#ecfdf5", border: "#059669" },
-            { label: "Pozastaveno", bg: "#fefce8", border: "#a16207" },
-          ].map(l => (
-            <div key={l.label} className="flex items-center gap-1">
-              <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: l.bg, border: `1px solid ${l.border}30` }} />
-              <span className="text-[9px] text-muted-foreground">{l.label}</span>
-            </div>
-          ))}
-        </div>
+      <div className="px-3 py-2 flex items-center justify-end shrink-0 border-t border-border bg-card">
         <span className="text-[9px] italic text-muted-foreground/60">
           Klikněte na buňku pro úpravu plánu
         </span>
