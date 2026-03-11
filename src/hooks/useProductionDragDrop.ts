@@ -384,7 +384,7 @@ export function useProductionDragDrop() {
         },
       });
 
-      toast({ title: `${itemIds.length} položek přesunuto do Expedice` });
+      // Toast is shown by pushUndo
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
