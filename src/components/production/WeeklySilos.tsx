@@ -658,10 +658,11 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
       backgroundColor: "#ffffff", opacity: isDragging ? 0.3 : 1,
     }}>
       <div ref={setDragRef} {...attributes} {...(hasUncompleted ? listeners : {})}
+        data-context="bundle"
         className={`flex items-center gap-1 px-[6px] py-[5px] ${hasUncompleted ? "cursor-grab" : "cursor-default"}`}
         style={{ borderBottom: expanded ? "1px solid #ece8e2" : "none" }}
         onClick={e => { if (!(e as any).__isDrag) setExpanded(!expanded); }}
-        onContextMenu={e => onBundleContextMenu(e, bundle, toggleExpand)}
+        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onBundleContextMenu(e, bundle, toggleExpand); }}
       >
         <ChevronRight className="shrink-0 transition-transform duration-150"
           style={{ width: 10, height: 10, color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }} />
@@ -676,14 +677,14 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
         </div>
       </div>
       {expanded && (
-        <div className="px-[3px] py-[2px]">
+        <div className="px-[3px] py-[2px]" onContextMenu={e => e.stopPropagation()}>
           {bundle.items.map(item =>
             item.status === "completed" ? (
-              <CompletedSiloItem key={item.id} item={item} onContextMenu={e => onItemContextMenu(e, item, bundle)} />
+              <CompletedSiloItem key={item.id} item={item} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
             ) : item.status === "paused" ? (
-              <PausedSiloItem key={item.id} item={item} onContextMenu={e => onItemContextMenu(e, item, bundle)} />
+              <PausedSiloItem key={item.id} item={item} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
             ) : (
-              <DraggableSiloItem key={item.id} item={item} weekKey={weekKey} showCzk={showCzk} onContextMenu={e => onItemContextMenu(e, item, bundle)} />
+              <DraggableSiloItem key={item.id} item={item} weekKey={weekKey} showCzk={showCzk} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
             )
           )}
         </div>
