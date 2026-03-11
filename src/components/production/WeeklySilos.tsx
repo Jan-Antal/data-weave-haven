@@ -635,7 +635,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
         {silo?.bundles.map(bundle => (
           <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey}
             showCzk={showCzk} hourlyRate={hourlyRate}
-            onBundleContextMenu={onBundleContextMenu} onItemContextMenu={onItemContextMenu} />
+            onBundleContextMenu={onBundleContextMenu} onItemContextMenu={onItemContextMenu}
+            projectLookup={projectLookup} />
         ))}
       </div>
 
