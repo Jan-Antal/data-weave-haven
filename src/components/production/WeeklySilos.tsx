@@ -783,14 +783,11 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            {severity && !allCompleted && (() => {
-              const smlParsed = project?.datum_smluvni ? parseAppDate(project.datum_smluvni) : null;
-              const warnColor = severity === "overdue" ? "#dc3545" : "#d97706";
-              const tooltipText = smlParsed
-                ? severity === "overdue"
-                  ? `Termín byl ${format(smlParsed, "dd.MM.yyyy")} — po termínu o ${differenceInDays(new Date(), smlParsed)} dní`
-                  : `Termín za ${differenceInDays(smlParsed, new Date())} dní (${format(smlParsed, "dd.MM.yyyy")})`
-                : "";
+            {expSeverity && !allCompleted && expParsed && (() => {
+              const warnColor = expSeverity === "overdue" ? "#dc3545" : "#d97706";
+              const tooltipText = expSeverity === "overdue"
+                ? `Expedice ${format(expParsed, "dd.MM.yyyy")} — po termínu o ${differenceInDays(new Date(), expParsed)} dní`
+                : `Expedice za ${differenceInDays(expParsed, new Date())} dní (${format(expParsed, "dd.MM.yyyy")})`;
               return (
                 <Tooltip>
                   <TooltipTrigger asChild>

@@ -761,13 +761,14 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                           <span className="text-[10px] text-muted-foreground font-mono leading-tight">{proj.projectId}</span>
                           {(() => {
                             const pd = projectDateLookup.get(proj.projectId);
-                            const sml = pd?.datum_smluvni ? parseAppDate(pd.datum_smluvni) : null;
                             const exp = pd?.expedice ? parseAppDate(pd.expedice) : null;
+                            if (!exp) return null;
                             const fmtD = (d: Date) => `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getFullYear()).slice(-2)}`;
-                            if (!sml && !exp) return null;
+                            const days = differenceInDays(exp, new Date());
+                            const clr = days < 0 ? "#dc3545" : days <= 3 ? "#d97706" : "#99a5a3";
                             return (
-                              <span className="text-[8px] truncate" style={{ color: "#99a5a3" }}>
-                                {sml && `Sml: ${fmtD(sml)}`}{sml && exp && " · "}{exp && `Exp: ${fmtD(exp)}`}
+                              <span className="text-[10px] truncate" style={{ color: clr }}>
+                                Exp: {fmtD(exp)}
                               </span>
                             );
                           })()}
@@ -776,15 +777,14 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                       {/* Inline deadline warning */}
                       {(() => {
                         const pd = projectDateLookup.get(proj.projectId);
-                        const severity = pd ? getProjectRiskSeverity(pd) : null;
-                        if (!severity) return null;
-                        const smlParsed = pd?.datum_smluvni ? parseAppDate(pd.datum_smluvni) : null;
-                        const warnColor = severity === "overdue" ? "#dc3545" : "#d97706";
-                        const tooltipText = smlParsed
-                          ? severity === "overdue"
-                            ? `Termín byl ${format(smlParsed, "dd.MM.yyyy")} — po termínu o ${differenceInDays(new Date(), smlParsed)} dní`
-                            : `Termín za ${differenceInDays(smlParsed, new Date())} dní (${format(smlParsed, "dd.MM.yyyy")})`
-                          : "";
+                        const exp = pd?.expedice ? parseAppDate(pd.expedice) : null;
+                        if (!exp) return null;
+                        const days = differenceInDays(exp, new Date());
+                        if (days >= 0 && days > 3) return null;
+                        const warnColor = days < 0 ? "#dc3545" : "#d97706";
+                        const tooltipText = days < 0
+                          ? `Expedice ${format(exp, "dd.MM.yyyy")} — po termínu o ${Math.abs(days)} dní`
+                          : `Expedice za ${days} dní (${format(exp, "dd.MM.yyyy")})`;
                         return (
                           <Tooltip>
                             <TooltipTrigger asChild>
