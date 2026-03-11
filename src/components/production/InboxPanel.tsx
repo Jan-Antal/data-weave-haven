@@ -3,6 +3,7 @@ import { ChevronRight, GripVertical, Check, Plus } from "lucide-react";
 import { useProductionInbox, type InboxProject, type InboxItem } from "@/hooks/useProductionInbox";
 import { useProductionProgress, type ProjectProgress } from "@/hooks/useProductionProgress";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
+import { useProjects } from "@/hooks/useProjects";
 import { getProjectColor } from "@/lib/projectColors";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -13,12 +14,47 @@ import { ProductionContextMenu, type ContextMenuAction } from "./ProductionConte
 import { AddItemPopover, getAdhocBadge } from "./AddItemPopover";
 import { CancelItemDialog } from "./CancelItemDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { parseAppDate } from "@/lib/dateFormat";
+import { differenceInDays, isPast } from "date-fns";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `${Math.round(v / 1_000)}K`;
   return `${Math.round(v)}`;
 }
+
+type UrgencyLevel = "overdue" | "urgent" | "upcoming" | "ok";
+
+function getUrgency(datumSmluvni: string | null | undefined, status: string | null | undefined): UrgencyLevel {
+  if (!datumSmluvni) return "ok";
+  const s = (status ?? "").toLowerCase();
+  if (s === "fakturace" || s === "dokonceno" || s === "dokončeno") return "ok";
+  const d = parseAppDate(datumSmluvni);
+  if (!d) return "ok";
+  if (isPast(d)) return "overdue";
+  const days = differenceInDays(d, new Date());
+  if (days <= 14) return "urgent";
+  if (days <= 30) return "upcoming";
+  return "ok";
+}
+
+function getUrgencyDaysLabel(datumSmluvni: string | null | undefined): string | null {
+  if (!datumSmluvni) return null;
+  const d = parseAppDate(datumSmluvni);
+  if (!d) return null;
+  const days = differenceInDays(d, new Date());
+  if (days <= 0) return null; // overdue uses badge text
+  return `${days} dní`;
+}
+
+const URGENCY_ORDER: Record<UrgencyLevel, number> = { overdue: 0, urgent: 1, upcoming: 2, ok: 3 };
+
+const URGENCY_COLORS: Record<UrgencyLevel, { border: string; text: string }> = {
+  overdue:  { border: "#DC2626", text: "#DC2626" },
+  urgent:   { border: "#D97706", text: "#D97706" },
+  upcoming: { border: "#2563EB", text: "#2563EB" },
+  ok:       { border: "transparent", text: "#223937" },
+};
 
 const SAMPLE_ITEMS = [
   { pid: "Z-2601-001", items: [{ name: "Kuchyňská linka A", code: "TK.01", h: 120 }, { name: "Obývací stěna", code: "OB.01", h: 85 }, { name: "Vestavěné skříně", code: "SK.01", h: 95 }, { name: "Jídelní stůl masiv", code: "JS.01", h: 60 }, { name: "Komoda předsíň", code: "KM.02", h: 45 }] },
@@ -53,6 +89,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
   const { data: projects = [], isLoading } = useProductionInbox();
   const { data: progressData } = useProductionProgress();
   const { data: settings } = useProductionSettings();
+  const { data: allDbProjects = [] } = useProjects();
   const qc = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [allExpanded, setAllExpanded] = useState(false);
@@ -67,13 +104,46 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
   const hourlyRate = settings?.hourly_rate ?? 550;
   const isHighlighted = isOver || overDroppableId === "inbox-drop-zone";
 
+  // Map project_id → { datum_smluvni, status }
+  const projectInfoMap = useMemo(() => {
+    const m = new Map<string, { datum_smluvni: string | null; status: string | null }>();
+    for (const p of allDbProjects) m.set(p.project_id, { datum_smluvni: p.datum_smluvni ?? null, status: p.status ?? null });
+    return m;
+  }, [allDbProjects]);
+
+  // Sort projects by urgency
+  const sortedProjects = useMemo(() => {
+    return [...projects].sort((a, b) => {
+      const infoA = projectInfoMap.get(a.project_id);
+      const infoB = projectInfoMap.get(b.project_id);
+      const uA = getUrgency(infoA?.datum_smluvni, infoA?.status);
+      const uB = getUrgency(infoB?.datum_smluvni, infoB?.status);
+      if (URGENCY_ORDER[uA] !== URGENCY_ORDER[uB]) return URGENCY_ORDER[uA] - URGENCY_ORDER[uB];
+      const dA = infoA?.datum_smluvni ? parseAppDate(infoA.datum_smluvni)?.getTime() ?? Infinity : Infinity;
+      const dB = infoB?.datum_smluvni ? parseAppDate(infoB.datum_smluvni)?.getTime() ?? Infinity : Infinity;
+      return dA - dB;
+    });
+  }, [projects, projectInfoMap]);
+
+  // Count overdue + urgent items
+  const urgentItemCount = useMemo(() => {
+    let count = 0;
+    for (const p of projects) {
+      const info = projectInfoMap.get(p.project_id);
+      const u = getUrgency(info?.datum_smluvni, info?.status);
+      if (u === "overdue" || u === "urgent") count += p.items.length;
+    }
+    return count;
+  }, [projects, projectInfoMap]);
+
+  const totalItemCount = projects.reduce((s, p) => s + p.items.length, 0);
+
   const completedProjects = useMemo(() => {
     if (!progressData) return [];
     const activeProjectIds = new Set(projects.map(p => p.project_id));
     return Array.from(progressData.values()).filter(p => p.is_complete && !activeProjectIds.has(p.project_id));
   }, [progressData, projects]);
 
-  // All unique project IDs for the add item dropdown
   const allProjectOptions = useMemo(() => {
     const seen = new Set<string>();
     const result: { project_id: string; project_name: string }[] = [];
@@ -177,9 +247,12 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
         <div className="flex items-center gap-2">
           <span className="text-sm">📥</span>
           <span className="text-[13px] font-semibold" style={{ color: "#223937" }}>Inbox</span>
-          {projects.length > 0 && (
+          {totalItemCount > 0 && (
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(217,151,6,0.12)", color: "#d97706" }}>
-              {projects.reduce((s, p) => s + p.items.length, 0)}
+              {totalItemCount}
+              {urgentItemCount > 0 && (
+                <span className="ml-1">· 🔴 {urgentItemCount}</span>
+              )}
             </span>
           )}
         </div>
@@ -205,14 +278,20 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
             <p className="text-[10px] mb-3" style={{ color: "#99a5a3" }}>Inbox je prázdný</p>
           </div>
         )}
-        {projects.map((project) => (
-          <InboxProjectGroup key={`${project.project_id}-${expandKey}`} project={project} hourlyRate={hourlyRate}
-            defaultExpanded={allExpanded} showCzk={showCzk} progress={progressData?.get(project.project_id)}
-            onNavigateToTPV={onNavigateToTPV}
-            onProjectContextMenu={handleProjectContextMenu}
-            onItemContextMenu={handleItemContextMenu}
-          />
-        ))}
+        {sortedProjects.map((project) => {
+          const info = projectInfoMap.get(project.project_id);
+          const urgency = getUrgency(info?.datum_smluvni, info?.status);
+          return (
+            <InboxProjectGroup key={`${project.project_id}-${expandKey}`} project={project} hourlyRate={hourlyRate}
+              defaultExpanded={allExpanded} showCzk={showCzk} progress={progressData?.get(project.project_id)}
+              onNavigateToTPV={onNavigateToTPV}
+              onProjectContextMenu={handleProjectContextMenu}
+              onItemContextMenu={handleItemContextMenu}
+              urgency={urgency}
+              daysLabel={getUrgencyDaysLabel(info?.datum_smluvni)}
+            />
+          );
+        })}
 
         {completedProjects.length > 0 && (
           <div className="mt-2 space-y-[2px]">
@@ -267,17 +346,24 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
   );
 }
 
-function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV, onProjectContextMenu, onItemContextMenu }: {
+function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV, onProjectContextMenu, onItemContextMenu, urgency, daysLabel }: {
   project: InboxProject; hourlyRate: number; defaultExpanded: boolean; showCzk?: boolean;
   progress?: ProjectProgress; onNavigateToTPV?: (projectId: string) => void;
   onProjectContextMenu: (e: React.MouseEvent, project: InboxProject) => void;
   onItemContextMenu: (e: React.MouseEvent, item: InboxItem, project: InboxProject) => void;
+  urgency: UrgencyLevel;
+  daysLabel: string | null;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const color = getProjectColor(project.project_id);
+  const uColors = URGENCY_COLORS[urgency];
+
+  // Use urgency border color if not "ok", otherwise project color
+  const leftBorderColor = urgency !== "ok" ? uColors.border : color;
+  const leftBorderWidth = urgency !== "ok" ? 3 : 4;
 
   return (
-    <div className="rounded-lg overflow-hidden" style={{ backgroundColor: "#ffffff", border: "1px solid #ece8e2", borderLeft: `4px solid ${color}` }}>
+    <div className="rounded-lg overflow-hidden" style={{ backgroundColor: "#ffffff", border: "1px solid #ece8e2", borderLeft: `${leftBorderWidth}px solid ${leftBorderColor}` }}>
       <button
         onClick={() => setExpanded(!expanded)}
         onContextMenu={e => onProjectContextMenu(e, project)}
@@ -288,7 +374,19 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
         <ChevronRight className="h-3 w-3 shrink-0 transition-transform duration-150"
           style={{ color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }} />
         <div className="flex-1 min-w-0">
-          <div className="text-[12px] font-semibold truncate" style={{ color: "#223937" }}>{project.project_name}</div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[12px] font-semibold truncate" style={{ color: uColors.text }}>{project.project_name}</span>
+            {urgency === "overdue" && (
+              <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(220,38,38,0.1)", color: "#DC2626" }}>
+                PO TERMÍNU
+              </span>
+            )}
+            {urgency === "urgent" && daysLabel && (
+              <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.1)", color: "#D97706" }}>
+                {daysLabel}
+              </span>
+            )}
+          </div>
           <div className="font-mono text-[9px]" style={{ color: "#99a5a3" }}>{project.project_id}</div>
           {progress && <div className="mt-1"><ProjectProgressBar progress={progress} compact /></div>}
         </div>
