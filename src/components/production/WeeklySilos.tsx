@@ -594,10 +594,13 @@ interface SiloProps {
   allWeeksData: Map<string, { total_hours: number }>; weekKeys: string[];
   registerRef: (key: string, el: HTMLDivElement | null) => void;
   projectLookup: ProjectLookup;
+  spillDismissed: boolean;
+  onDismissSpill: () => void;
+  onReopenSpill: () => void;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill }: SiloProps) {
   // Capacity calculation: exclude paused items
   const activeHours = useMemo(() => {
     if (!silo) return 0;
