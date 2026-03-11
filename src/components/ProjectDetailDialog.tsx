@@ -1449,7 +1449,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                   )}
                                 </div>
                               ) : cat.key === "fotky" ? (
-                                  /* Photo timeline grid for Fotky category */
+                              /* Photo timeline grid for Fotky category */
                                   <PhotoTimelineGrid
                                     files={files}
                                     maxHeight="260px"
@@ -1461,6 +1461,12 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                         setPhotoLightbox({ files: imageFiles, index });
                                       }
                                     }}
+                                    isDraggable={canUploadDocuments && !isMobile}
+                                    onDragStart={(e, f) => handleFileDragStart(e, f, "fotky")}
+                                    onDragEnd={handleFileDragEnd}
+                                    draggingFileId={fileDragActive && fileDragSourceCat === "fotky" ? Array.from(fileSelection.selected).find(() => true) : null}
+                                    selectedIds={openCategory === "fotky" ? fileSelection.selected : undefined}
+                                    onToggleSelect={(fileId, allFiles, e) => fileSelection.toggleFile(fileId, allFiles, e)}
                                   />
                                 ) : (
                                 <>
