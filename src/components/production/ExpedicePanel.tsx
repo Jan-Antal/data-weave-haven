@@ -272,7 +272,8 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
           return (
             <div
               key={group.project_id}
-              className="rounded-lg p-2 space-y-1.5 border border-border bg-card"
+              className="rounded-lg overflow-hidden"
+              style={{ backgroundColor: "#ffffff", border: "1px solid #ece8e2", borderLeft: `4px solid ${getProjectColor(group.project_id)}` }}
               onContextMenu={(e) => handleProjectContextMenu(e, group.project_id)}
             >
               <div className="space-y-0.5 cursor-pointer" onClick={toggleGroup}>
