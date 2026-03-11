@@ -46,6 +46,13 @@ const DOT_COLORS: Record<string, string> = {
   user_login: "bg-emerald-500",
   session_end: "bg-teal-400",
   project_id_change: "bg-indigo-500",
+  item_scheduled: "bg-sky-500",
+  item_moved: "bg-indigo-400",
+  item_completed: "bg-green-600",
+  item_paused: "bg-yellow-500",
+  item_cancelled: "bg-red-600",
+  item_returned_to_inbox: "bg-slate-500",
+  item_split: "bg-violet-500",
 };
 
 const CZECH_DAY_SHORT = ["Ne", "Po", "Út", "St", "Čt", "Pá", "So"];
