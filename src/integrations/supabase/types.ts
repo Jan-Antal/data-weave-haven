@@ -409,6 +409,7 @@ export type Database = {
           completed_by: string | null
           created_at: string
           created_by: string | null
+          expediced_at: string | null
           id: string
           inbox_item_id: string | null
           item_code: string | null
@@ -433,6 +434,7 @@ export type Database = {
           completed_by?: string | null
           created_at?: string
           created_by?: string | null
+          expediced_at?: string | null
           id?: string
           inbox_item_id?: string | null
           item_code?: string | null
@@ -457,6 +459,7 @@ export type Database = {
           completed_by?: string | null
           created_at?: string
           created_by?: string | null
+          expediced_at?: string | null
           id?: string
           inbox_item_id?: string | null
           item_code?: string | null

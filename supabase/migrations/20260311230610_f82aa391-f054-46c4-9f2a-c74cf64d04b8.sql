@@ -1,0 +1,1 @@
+ALTER TABLE public.production_schedule ADD COLUMN expediced_at timestamptz DEFAULT NULL;
