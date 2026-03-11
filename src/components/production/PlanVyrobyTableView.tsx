@@ -879,21 +879,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
       </div>
 
       {/* Footer */}
-      <div className="px-3 py-2 flex items-center justify-between shrink-0 border-t border-border bg-card">
-        <div className="flex items-center gap-3">
-          {[
-            { label: "Inbox", bg: "#fff7ed", border: "#ea580c" },
-            { label: "Naplánováno", bg: "#eff6ff", border: "#3b82f6" },
-            { label: "Ve výrobě", bg: "#fffbeb", border: "#d97706" },
-            { label: "Dokončeno", bg: "#ecfdf5", border: "#059669" },
-            { label: "Pozastaveno", bg: "#fefce8", border: "#a16207" },
-          ].map(l => (
-            <div key={l.label} className="flex items-center gap-1">
-              <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: l.bg, border: `1px solid ${l.border}30` }} />
-              <span className="text-[9px] text-muted-foreground">{l.label}</span>
-            </div>
-          ))}
-        </div>
+      <div className="px-3 py-2 flex items-center justify-end shrink-0 border-t border-border bg-card">
         <span className="text-[9px] italic text-muted-foreground/60">
           Klikněte na buňku pro úpravu plánu
         </span>
