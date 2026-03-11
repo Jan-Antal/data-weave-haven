@@ -6,7 +6,7 @@ import { useProductionSchedule } from "@/hooks/useProductionSchedule";
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProjects } from "@/hooks/useProjects";
 import { format, isPast, isFuture, differenceInDays } from "date-fns";
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { getProjectColor } from "@/lib/projectColors";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
 
@@ -62,6 +62,15 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
   const { data: settings } = useProductionSettings();
   const hourlyRate = settings?.hourly_rate ?? 550;
   const [collapsed, setCollapsed] = useState(true);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const allGroupsExpanded = projects.length > 0 && collapsedGroups.size === 0;
+  const handleToggleAllGroups = () => {
+    if (allGroupsExpanded) {
+      setCollapsedGroups(new Set(projects.map(p => p.project_id)));
+    } else {
+      setCollapsedGroups(new Set());
+    }
+  };
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   // Map project_id → expedice field
@@ -213,9 +222,18 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
               </span>
             )}
           </div>
-          <button onClick={() => setCollapsed(true)} className="p-0.5 rounded hover:bg-muted transition-colors">
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-          </button>
+          <div className="flex items-center gap-0.5">
+            {projects.length > 0 && (
+              <button onClick={handleToggleAllGroups} className="p-0.5 rounded hover:bg-muted transition-colors">
+                {allGroupsExpanded
+                  ? <ChevronDown className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                  : <ChevronUp className="h-4 w-4 text-gray-400 hover:text-gray-600" />}
+              </button>
+            )}
+            <button onClick={() => setCollapsed(true)} className="p-0.5 rounded hover:bg-muted transition-colors">
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          </div>
         </div>
         {totalItems > 0 && (
           <div className="text-[9px] text-muted-foreground">
@@ -244,13 +262,20 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
           const allDone = completedCount >= totalCount;
           const missingItems = totals?.nonCompleted ?? [];
 
+          const isGroupCollapsed = collapsedGroups.has(group.project_id);
+          const toggleGroup = () => setCollapsedGroups(prev => {
+            const next = new Set(prev);
+            next.has(group.project_id) ? next.delete(group.project_id) : next.add(group.project_id);
+            return next;
+          });
+
           return (
             <div
               key={group.project_id}
               className="rounded-lg p-2 space-y-1.5 border border-border bg-card"
               onContextMenu={(e) => handleProjectContextMenu(e, group.project_id)}
             >
-              <div className="space-y-0.5">
+              <div className="space-y-0.5 cursor-pointer" onClick={toggleGroup}>
                 {/* ROW 1: Project name + badge */}
                 <div className="flex items-center justify-between gap-1">
                   <span className="text-sm font-semibold truncate" style={{ color: getProjectColor(group.project_id) }}>
@@ -282,79 +307,81 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
                 </div>
               </div>
 
-              {/* Missing items indicator */}
-              {!allDone && missingItems.length > 0 && (
-                <div className="text-[8px] text-muted-foreground px-0.5">
-                  {missingItems.length <= 2 ? (
-                    <span>
-                      Zbývá: {missingItems.map((mi, idx) => (
-                        <span key={mi.id}>
-                          {idx > 0 && " · "}
-                          <span className="font-medium">{mi.item_code || mi.item_name}</span>
+              {!isGroupCollapsed && (
+                <>
+                  {/* Missing items indicator */}
+                  {!allDone && missingItems.length > 0 && (
+                    <div className="text-[8px] text-muted-foreground px-0.5">
+                      {missingItems.length <= 2 ? (
+                        <span>
+                          Zbývá: {missingItems.map((mi, idx) => (
+                            <span key={mi.id}>
+                              {idx > 0 && " · "}
+                              <span className="font-medium">{mi.item_code || mi.item_name}</span>
+                            </span>
+                          ))}
                         </span>
-                      ))}
-                    </span>
-                  ) : (
-                    <span
-                      className="cursor-pointer hover:underline"
-                      style={{ color: "#D97706" }}
-                      onClick={() => {
-                        if (onNavigateToTPV) onNavigateToTPV(group.project_id);
-                      }}
-                    >
-                      {missingItems.length} položek zbývá →
-                    </span>
-                  )}
-                </div>
-              )}
-
-              <div className="space-y-[2px]">
-                {group.items.map((item) => {
-                  const completedStr = formatShortDate(item.completed_at);
-                  const completedDate = parseDate(item.completed_at);
-                  // Item-level expedice color
-                  let itemExpColor = "#99a5a3";
-                  if (expediceDate && completedDate) {
-                    if (isPast(expediceDate)) itemExpColor = "#16A34A"; // green
-                    else if (isFuture(expediceDate)) itemExpColor = "#2563EB"; // blue - completed early
-                  }
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="rounded px-1 py-[3px] cursor-default transition-colors"
-                      onContextMenu={(e) => handleItemContextMenu(e, item)}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "hsl(var(--muted))")}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <Check className="shrink-0" style={{ width: 12, height: 12, color: "#16A34A", strokeWidth: 3 }} />
-                        {item.item_code && (
-                          <span className="font-mono text-[10px] shrink-0 text-foreground">
-                            {item.item_code}
-                          </span>
-                        )}
-                        <span className="text-[11px] truncate flex-1 text-muted-foreground">
-                          {item.item_name}
+                      ) : (
+                        <span
+                          className="cursor-pointer hover:underline"
+                          style={{ color: "#D97706" }}
+                          onClick={() => {
+                            if (onNavigateToTPV) onNavigateToTPV(group.project_id);
+                          }}
+                        >
+                          {missingItems.length} položek zbývá →
                         </span>
-                      </div>
-                      {/* Date details */}
-                      <div className="ml-[18px] flex flex-col gap-0">
-                        {completedStr && (
-                          <span className="text-[8px] text-muted-foreground">
-                            Dokončeno: {completedStr}
-                          </span>
-                        )}
-                        {expediceStr && (
-                          <span className="text-[8px] font-medium" style={{ color: itemExpColor }}>
-                            Expedice: {expediceStr}
-                          </span>
-                        )}
-                      </div>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
+                  )}
+
+                  <div className="space-y-[2px]">
+                    {group.items.map((item) => {
+                      const completedStr = formatShortDate(item.completed_at);
+                      const completedDate = parseDate(item.completed_at);
+                      let itemExpColor = "#99a5a3";
+                      if (expediceDate && completedDate) {
+                        if (isPast(expediceDate)) itemExpColor = "#16A34A";
+                        else if (isFuture(expediceDate)) itemExpColor = "#2563EB";
+                      }
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="rounded px-1 py-[3px] cursor-default transition-colors"
+                          onContextMenu={(e) => handleItemContextMenu(e, item)}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "hsl(var(--muted))")}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <Check className="shrink-0" style={{ width: 12, height: 12, color: "#16A34A", strokeWidth: 3 }} />
+                            {item.item_code && (
+                              <span className="font-mono text-[10px] shrink-0 text-foreground">
+                                {item.item_code}
+                              </span>
+                            )}
+                            <span className="text-[11px] truncate flex-1 text-muted-foreground">
+                              {item.item_name}
+                            </span>
+                          </div>
+                          <div className="ml-[18px] flex flex-col gap-0">
+                            {completedStr && (
+                              <span className="text-[8px] text-muted-foreground">
+                                Dokončeno: {completedStr}
+                              </span>
+                            )}
+                            {expediceStr && (
+                              <span className="text-[8px] font-medium" style={{ color: itemExpColor }}>
+                                Expedice: {expediceStr}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           );
         })}
