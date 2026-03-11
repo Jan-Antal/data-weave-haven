@@ -13,6 +13,7 @@ import { DragOverlayContent } from "@/components/production/DragOverlayContent";
 import { AutoSplitPopover } from "@/components/production/AutoSplitPopover";
 import { MergePopover } from "@/components/production/MergePopover";
 import { TPVList } from "@/components/TPVList";
+import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
 import { useProjects } from "@/hooks/useProjects";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
