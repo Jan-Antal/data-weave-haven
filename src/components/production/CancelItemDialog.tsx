@@ -3,6 +3,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { renumberSiblings } from "./SplitItemDialog";
 
 interface CancelItemDialogProps {
@@ -32,6 +33,7 @@ export function CancelItemDialog({
   source, splitGroupId, cancelAll,
 }: CancelItemDialogProps) {
   const qc = useQueryClient();
+  const { pushUndo } = useUndoRedo();
   const [reason, setReason] = useState("klient");
   const [submitting, setSubmitting] = useState(false);
 

@@ -3,6 +3,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
@@ -27,6 +28,7 @@ const REASON_OPTIONS = [
 
 export function PauseItemDialog({ open, onOpenChange, itemId, itemName, itemCode, source }: PauseItemDialogProps) {
   const qc = useQueryClient();
+  const { pushUndo } = useUndoRedo();
   const [reason, setReason] = useState("material");
   const [customReason, setCustomReason] = useState("");
   const [expectedDate, setExpectedDate] = useState<Date | undefined>();
