@@ -283,8 +283,6 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
           });
         } else {
           // Split across multiple weeks
-          const { data: inboxItem } = await supabase.from("production_inbox").select("*").eq("id", inboxItemId).single();
-          if (!inboxItem) continue;
 
           // Insert first part to get its id as split_group_id
           const { data: firstPart } = await supabase.from("production_schedule").insert({
