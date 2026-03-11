@@ -16,7 +16,8 @@ export type ActivityActionType =
   | "stage_datum_smluvni_change"
   | "stage_document_uploaded"
   | "stage_document_deleted"
-  | "project_id_change";
+  | "project_id_change"
+  | "document_moved";
 
 interface LogParams {
   projectId: string;

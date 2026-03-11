@@ -287,11 +287,51 @@ export function useSharePointDocs(projectId: string) {
     return result as SPPreview;
   }, [invoke]);
 
+  /** Move a single file from one category folder to another */
+  const moveFile = useCallback(async (sourceCategoryKey: string, destCategoryKey: string, file: SPFile) => {
+    const sourceFolder = CATEGORY_FOLDER_MAP[sourceCategoryKey];
+    const destFolder = CATEGORY_FOLDER_MAP[destCategoryKey];
+    if (!sourceFolder || !destFolder) throw new Error("Invalid category");
+
+    // Optimistic local update
+    setFilesByCategory((prev) => {
+      const updated = { ...prev };
+      updated[sourceCategoryKey] = (prev[sourceCategoryKey] ?? []).filter((f) => f.itemId !== file.itemId);
+      updated[destCategoryKey] = [...(prev[destCategoryKey] ?? []), file];
+      if (!globalFileCache[projectId]) globalFileCache[projectId] = {};
+      globalFileCache[projectId] = updated;
+      return updated;
+    });
+
+    try {
+      await invoke({
+        action: "move",
+        projectId,
+        sourceCategory: sourceFolder,
+        destCategory: destFolder,
+        fileName: file.name,
+      });
+      // Persist updated cache
+      persistToCache(projectId, { ...globalFileCache[projectId] });
+    } catch (err) {
+      // Revert optimistic update
+      setFilesByCategory((prev) => {
+        const reverted = { ...prev };
+        reverted[destCategoryKey] = (prev[destCategoryKey] ?? []).filter((f) => f.itemId !== file.itemId);
+        reverted[sourceCategoryKey] = [...(prev[sourceCategoryKey] ?? []), file];
+        if (!globalFileCache[projectId]) globalFileCache[projectId] = {};
+        globalFileCache[projectId] = reverted;
+        return reverted;
+      });
+      throw err;
+    }
+  }, [projectId, invoke, persistToCache]);
+
   const resetCache = useCallback(() => {
     fetchedRef.current.clear();
   }, []);
 
-  return { filesByCategory, loadingCategory, initialLoading, uploading, refreshing, cacheTimestamp, listFiles, fetchAllCategories, manualRefresh, uploadFile, getDownloadUrl, deleteFile, archiveProject, getPreview, resetCache };
+  return { filesByCategory, loadingCategory, initialLoading, uploading, refreshing, cacheTimestamp, listFiles, fetchAllCategories, manualRefresh, uploadFile, getDownloadUrl, deleteFile, archiveProject, getPreview, moveFile, resetCache };
 }
 
 function fileToBase64(file: File): Promise<string> {

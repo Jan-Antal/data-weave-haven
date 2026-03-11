@@ -30,6 +30,8 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { RozpadCeny } from "./RozpadCeny";
 import { PhotoLightbox, PhotoTimelineGrid, isImageFile, generatePhotoFilename } from "./PhotoLightbox";
+import { useFileSelection } from "@/hooks/useFileSelection";
+import { FileSelectionBar, FolderDropTarget } from "./DocumentDragDrop";
 
 interface Project {
   id: string;
@@ -289,6 +291,12 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const activeUploadCatRef = useRef<string | null>(null);
   const [photoLightbox, setPhotoLightbox] = useState<{ files: SPFile[]; index: number } | null>(null);
   const [reklamaceToggle, setReklamaceToggle] = useState(false);
+
+  // ── File selection & drag-to-move (desktop only) ────────────
+  const fileSelection = useFileSelection();
+  const [fileDragActive, setFileDragActive] = useState(false);
+  const [fileDragSourceCat, setFileDragSourceCat] = useState<string | null>(null);
+  const [movingFiles, setMovingFiles] = useState(false);
 
   // ── Mobile swipe-down-to-close ──────────────────────────────
   const [mobileDragY, setMobileDragY] = useState(0);
@@ -711,6 +719,94 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     }
     setDeletingFile(null);
   };
+
+  // ── Move files between folders ──────────────────────────────
+  const handleMoveFiles = useCallback(async (sourceCategoryKey: string, destCategoryKey: string, filesToMove: SPFile[]) => {
+    if (!project || filesToMove.length === 0) return;
+    setMovingFiles(true);
+    const destLabel = DOC_CATEGORIES.find((c) => c.key === destCategoryKey)?.label ?? destCategoryKey;
+    let succeeded = 0;
+    let failed = 0;
+
+    // Process in batches of 5
+    const batches: SPFile[][] = [];
+    for (let i = 0; i < filesToMove.length; i += 5) {
+      batches.push(filesToMove.slice(i, i + 5));
+    }
+
+    for (const batch of batches) {
+      const results = await Promise.allSettled(
+        batch.map((f) => sp.moveFile(sourceCategoryKey, destCategoryKey, f))
+      );
+      for (const r of results) {
+        if (r.status === "fulfilled") succeeded++;
+        else failed++;
+      }
+    }
+
+    fileSelection.clearSelection();
+    setFileDragActive(false);
+    setFileDragSourceCat(null);
+    setMovingFiles(false);
+
+    if (failed === 0) {
+      toast({
+        title: `${succeeded} ${succeeded === 1 ? "soubor přesunut" : succeeded < 5 ? "soubory přesunuty" : "souborů přesunuto"} do ${destLabel} ✓`,
+      });
+    } else {
+      toast({
+        title: `${succeeded} přesunuto, ${failed} selhalo`,
+        description: "Zkuste přesun zopakovat",
+        variant: "destructive",
+      });
+    }
+
+    // Log activity
+    logActivity({
+      projectId: project.project_id,
+      actionType: "document_moved",
+      detail: `${succeeded} souborů: ${DOC_CATEGORIES.find((c) => c.key === sourceCategoryKey)?.label} → ${destLabel}`,
+    });
+  }, [project, sp, fileSelection]);
+
+  const handleFileDragStart = useCallback((e: React.DragEvent, file: SPFile, categoryKey: string) => {
+    const files = sp.filesByCategory[categoryKey] ?? [];
+    // If dragged file is not selected, select only it
+    if (!fileSelection.isSelected(file.itemId)) {
+      fileSelection.clearSelection();
+      fileSelection.toggleFile(file.itemId, files);
+    }
+    setFileDragActive(true);
+    setFileDragSourceCat(categoryKey);
+    // Set drag data
+    e.dataTransfer.effectAllowed = "move";
+    const selectedFiles = files.filter((f) => fileSelection.isSelected(f.itemId));
+    const count = selectedFiles.length;
+    e.dataTransfer.setData("text/plain", `${count} soubor${count > 1 ? "ů" : ""}`);
+  }, [sp.filesByCategory, fileSelection]);
+
+  const handleFileDragEnd = useCallback(() => {
+    setFileDragActive(false);
+    setFileDragSourceCat(null);
+  }, []);
+
+  const handleFolderDrop = useCallback((destCategoryKey: string) => {
+    if (!fileDragSourceCat || fileDragSourceCat === destCategoryKey) return;
+    const sourceFiles = sp.filesByCategory[fileDragSourceCat] ?? [];
+    const selectedFiles = sourceFiles.filter((f) => fileSelection.isSelected(f.itemId));
+    if (selectedFiles.length > 0) {
+      handleMoveFiles(fileDragSourceCat, destCategoryKey, selectedFiles);
+    }
+  }, [fileDragSourceCat, sp.filesByCategory, fileSelection, handleMoveFiles]);
+
+  const handleSelectionBarMove = useCallback((destCategoryKey: string) => {
+    if (!openCategory || openCategory === destCategoryKey) return;
+    const sourceFiles = sp.filesByCategory[openCategory] ?? [];
+    const selectedFiles = sourceFiles.filter((f) => fileSelection.isSelected(f.itemId));
+    if (selectedFiles.length > 0) {
+      handleMoveFiles(openCategory, destCategoryKey, selectedFiles);
+    }
+  }, [openCategory, sp.filesByCategory, fileSelection, handleMoveFiles]);
 
   // ── Read-only style helper ──────────────────────────────────
   const roClass = "bg-[#f3f4f6] text-muted-foreground cursor-not-allowed opacity-70";
@@ -1302,10 +1398,16 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                       const files = sp.filesByCategory[cat.key] ?? [];
 
                       return (
-                        <div key={cat.key}>
+                        <FolderDropTarget
+                          key={cat.key}
+                          categoryKey={cat.key}
+                          isValidTarget={fileDragActive && fileDragSourceCat !== cat.key}
+                          isDragActive={fileDragActive}
+                          onDrop={handleFolderDrop}
+                        >
                           <button
                             type="button"
-                            onClick={() => handleToggleCategory(cat.key)}
+                            onClick={() => { handleToggleCategory(cat.key); fileSelection.clearSelection(); }}
                             className={cn(
                               "w-full flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-medium transition-all",
                               isOpen
@@ -1344,7 +1446,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                     canDelete={canUploadDocuments}
                                     onDelete={(f) => { handleDeleteFile("fotky", f.name); }}
                                     onOpenLightbox={(index) => {
-                                      // flatFiles from the grid — get the actual file list
                                       const imageFiles = files.filter((f) => isImageFile(f.name));
                                       if (imageFiles[index]) {
                                         setPhotoLightbox({ files: imageFiles, index });
@@ -1352,41 +1453,97 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                     }}
                                   />
                                 ) : (
-                                <div className="space-y-0.5 max-h-[140px] overflow-y-auto">
-                                  {files.map((f) => {
-                                    const fileKey = `${cat.key}:${f.name}`;
-                                    const isDeleting = deletingFile === fileKey;
-                                    
-                                    if (isDeleting) {
+                                <>
+                                  <div className="space-y-0.5 max-h-[140px] overflow-y-auto" onClick={(e) => {
+                                    // Click empty area = deselect
+                                    if (e.target === e.currentTarget) fileSelection.clearSelection();
+                                  }}>
+                                    {files.map((f) => {
+                                      const fileKey = `${cat.key}:${f.name}`;
+                                      const isDeleting = deletingFile === fileKey;
+                                      const isFileSelected = fileSelection.isSelected(f.itemId);
+                                      const isBeingDragged = fileDragActive && isFileSelected && fileDragSourceCat === cat.key;
+                                      
+                                      if (isDeleting) {
+                                        return (
+                                          <div key={f.name} className="flex items-center gap-2 py-1 px-1 rounded bg-accent/50 text-xs">
+                                            <span className="text-muted-foreground">Smazat soubor?</span>
+                                            <button type="button" className="text-destructive font-medium hover:underline" onClick={() => setDeletingFile(null)}>Zrušit</button>
+                                            <button type="button" className="text-muted-foreground font-medium hover:underline" onClick={() => handleDeleteFile(cat.key, f.name)}>Smazat</button>
+                                          </div>
+                                        );
+                                      }
+                                      
                                       return (
-                                        <div key={f.name} className="flex items-center gap-2 py-1 px-1 rounded bg-accent/50 text-xs">
-                                          <span className="text-muted-foreground">Smazat soubor?</span>
-                                          <button type="button" className="text-destructive font-medium hover:underline" onClick={() => setDeletingFile(null)}>Zrušit</button>
-                                          <button type="button" className="text-muted-foreground font-medium hover:underline" onClick={() => handleDeleteFile(cat.key, f.name)}>Smazat</button>
+                                        <div
+                                          key={f.name}
+                                          draggable={canUploadDocuments && !isMobile}
+                                          onDragStart={(e) => handleFileDragStart(e, f, cat.key)}
+                                          onDragEnd={handleFileDragEnd}
+                                          className={cn(
+                                            "group flex items-center gap-1 py-1 px-1 rounded hover:bg-accent/50 text-xs cursor-pointer relative transition-all",
+                                            isFileSelected && "bg-primary/5",
+                                            isBeingDragged && "opacity-50"
+                                          )}
+                                          onClick={(e) => {
+                                            if (e.shiftKey || e.metaKey || e.ctrlKey) {
+                                              e.stopPropagation();
+                                              fileSelection.toggleFile(f.itemId, files, e);
+                                            } else if (fileSelection.selectedCount > 0) {
+                                              e.stopPropagation();
+                                              fileSelection.toggleFile(f.itemId, files, e);
+                                            } else {
+                                              handlePreview(f, cat.key);
+                                            }
+                                          }}
+                                        >
+                                          {/* Selection checkbox */}
+                                          {canUploadDocuments && !isMobile && (
+                                            <button
+                                              type="button"
+                                              className={cn(
+                                                "w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-all mr-0.5",
+                                                isFileSelected
+                                                  ? "border-primary bg-primary text-primary-foreground"
+                                                  : "border-transparent group-hover:border-border"
+                                              )}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                fileSelection.toggleFile(f.itemId, files, e);
+                                              }}
+                                            >
+                                              {isFileSelected && <span className="text-[8px] leading-none">✓</span>}
+                                            </button>
+                                          )}
+                                          <FileText className={cn("h-3.5 w-3.5 shrink-0", getFileIconColor(f.name))} />
+                                          <span className="truncate flex-1 text-left text-foreground" title={f.name}>
+                                            {f.name}
+                                          </span>
+                                          <span className="text-muted-foreground shrink-0 text-[10px] group-hover:hidden">{formatFileSize(f.size)}</span>
+                                          {canUploadDocuments && (
+                                            <button
+                                              type="button"
+                                              className="hidden group-hover:block shrink-0 text-muted-foreground/30 hover:text-destructive transition-colors"
+                                              onClick={(e) => { e.stopPropagation(); setDeletingFile(fileKey); }}
+                                            >
+                                              <Trash2 className="h-3.5 w-3.5" />
+                                            </button>
+                                          )}
                                         </div>
                                       );
-                                    }
-                                    
-                                    return (
-                                      <div key={f.name} className="group flex items-center gap-1 py-1 px-1 rounded hover:bg-accent/50 text-xs cursor-pointer" onClick={() => handlePreview(f, cat.key)}>
-                                        <FileText className={cn("h-3.5 w-3.5 shrink-0", getFileIconColor(f.name))} />
-                                        <span className="truncate flex-1 text-left text-foreground" title={f.name}>
-                                          {f.name}
-                                        </span>
-                                        <span className="text-muted-foreground shrink-0 text-[10px] group-hover:hidden">{formatFileSize(f.size)}</span>
-                                        {canUploadDocuments && (
-                                          <button
-                                            type="button"
-                                            className="hidden group-hover:block shrink-0 text-muted-foreground/30 hover:text-destructive transition-colors"
-                                            onClick={(e) => { e.stopPropagation(); setDeletingFile(fileKey); }}
-                                          >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                          </button>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
+                                    })}
+                                  </div>
+                                  {/* Selection bar */}
+                                  {fileSelection.selectedCount > 0 && openCategory === cat.key && !isMobile && (
+                                    <FileSelectionBar
+                                      selectedCount={fileSelection.selectedCount}
+                                      categories={DOC_CATEGORIES}
+                                      currentCategory={cat.key}
+                                      onMoveTo={handleSelectionBarMove}
+                                      onClear={fileSelection.clearSelection}
+                                    />
+                                  )}
+                                </>
                               )}
 
                               {canUploadDocuments && (
@@ -1451,7 +1608,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                               )}
                             </div>
                           )}
-                        </div>
+                        </FolderDropTarget>
                       );
                     })}
                   </div>
