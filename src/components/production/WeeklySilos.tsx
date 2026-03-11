@@ -136,6 +136,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const [bundleSplitState, setBundleSplitState] = useState<BundleSplitState | null>(null);
   const [pauseState, setPauseState] = useState<PauseState | null>(null);
   const [cancelState, setCancelState] = useState<CancelState | null>(null);
+  const [dismissedSpillWeeks, setDismissedSpillWeeks] = useState<Set<string>>(new Set());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const siloRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [visiblePeriodLabel, setVisiblePeriodLabel] = useState("");
