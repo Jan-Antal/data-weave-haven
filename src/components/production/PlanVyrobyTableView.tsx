@@ -100,8 +100,8 @@ interface ProjectRow {
 }
 
 const CELL_W = 132;
-const INBOX_W = 80;
-const EXPEDICE_W = 80;
+const INBOX_W = 100;
+const EXPEDICE_W = 100;
 const LEFT_COL_W = 280;
 
 export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
@@ -668,10 +668,18 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
             </div>
             {hasAnyInbox && (
               <div
-                className="shrink-0 text-center px-1 border-b border-r border-border/50 sticky z-40 flex items-center justify-center"
-                style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: STATUS_COLORS.inbox.bg }}
+                className="shrink-0 px-2 py-2 border-b border-r border-border/50 sticky z-40 flex flex-col items-center justify-center"
+                style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff7ed" }}
               >
-                <div className="text-[10px] font-bold" style={{ color: STATUS_COLORS.inbox.text }}>📥 Inbox</div>
+                <div className="text-sm font-semibold" style={{ color: "#EA580C" }}>📥 Inbox</div>
+                {(() => {
+                  const totalInboxH = filteredRows.reduce((s, p) => s + p.inboxTotalHours, 0);
+                  return totalInboxH > 0 ? (
+                    <div className="text-[10px] font-mono font-bold mt-0.5" style={{ color: "#EA580C" }}>
+                      {Math.round(totalInboxH).toLocaleString("cs-CZ")}h
+                    </div>
+                  ) : null;
+                })()}
               </div>
             )}
             {weeks.map(week => {
@@ -703,10 +711,13 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                     {formatDateShort(week.start)} – {formatDateShort(week.end)}
                   </div>
                   {/* Capacity bar */}
-                  <div className="w-full bg-gray-200 rounded-full h-2 my-1">
+                  <div className="relative w-full rounded-full overflow-hidden my-1" style={{ height: '8px', backgroundColor: '#e5e7eb' }}>
                     <div
-                      className="h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: fillColor }}
+                      className="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
+                      style={{
+                        width: `${Math.min(pct, 100)}%`,
+                        backgroundColor: pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#22c55e',
+                      }}
                     />
                   </div>
                   {/* Hours row */}
@@ -722,10 +733,10 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
             })}
             {hasAnyExpedice && (
               <div
-                className="shrink-0 text-center px-1 border-b border-l border-border/50 sticky right-0 z-40 flex items-center justify-center"
-                style={{ width: EXPEDICE_W, backgroundColor: STATUS_COLORS.completed.bg }}
+                className="shrink-0 px-2 py-2 border-b border-l border-border/50 sticky right-0 z-40 flex flex-col items-center justify-center"
+                style={{ width: EXPEDICE_W, backgroundColor: "#f0fdf4" }}
               >
-                <div className="text-[10px] font-bold" style={{ color: STATUS_COLORS.completed.text }}>✓ Expedice</div>
+                <div className="text-sm font-semibold" style={{ color: "#16A34A" }}>📦 Expedice</div>
               </div>
             )}
           </div>
@@ -814,7 +825,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                         style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff", borderTop: "1px solid #e5e2dd", borderBottom: "1px solid #e5e2dd" }}
                       >
                         {proj.inboxTotalHours > 0 && (
-                          <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-bold" style={{ backgroundColor: STATUS_COLORS.inbox.bg, color: STATUS_COLORS.inbox.text }}>
+                          <div className="rounded-md px-2 py-0.5 text-center text-[10px] font-mono font-bold" style={{ backgroundColor: "#ffedd5", color: "#c2410c" }}>
                             {formatInboxValue(proj.inboxTotalHours, proj.inboxTotalCzk, proj.totalHours)}
                           </div>
                         )}
@@ -859,8 +870,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                         }}
                       >
                         {proj.expediceTotalHours > 0 && (
-                          <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-bold" style={{ backgroundColor: STATUS_COLORS.completed.bg, color: STATUS_COLORS.completed.text }}>
-                            {formatExpediceValue(proj.expediceTotalHours, proj.expediceTotalCzk, proj.totalHours)} ✓
+                          <div className="rounded-md px-2 py-0.5 text-center text-[10px] font-mono font-bold" style={{ backgroundColor: "#dcfce7", color: "#15803d" }}>
+                            ✓ {formatExpediceValue(proj.expediceTotalHours, proj.expediceTotalCzk, proj.totalHours)}
                           </div>
                         )}
                       </div>
@@ -923,7 +934,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                               style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff" }}
                             >
                               {item.inboxHours > 0 && (
-                                <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-semibold" style={{ backgroundColor: STATUS_COLORS.inbox.bg, color: STATUS_COLORS.inbox.text }}>
+                                <div className="rounded-md px-2 py-0.5 text-center text-[9px] font-mono font-semibold" style={{ backgroundColor: "#ffedd5", color: "#c2410c" }}>
                                   {formatInboxValue(item.inboxHours, item.inboxCzk, item.totalHours)}
                                 </div>
                               )}
@@ -982,14 +993,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                             >
                               {item.expediceHours > 0 && (
                                 <div
-                                  className="w-full text-center text-[9px] font-mono font-semibold"
-                                  style={{
-                                    backgroundColor: STATUS_COLORS.completed.bg,
-                                    color: STATUS_COLORS.completed.text,
-                                    borderRadius: 4,
-                                    padding: "3px 6px",
-                                    border: `1px solid ${STATUS_COLORS.completed.border}20`,
-                                  }}
+                                  className="rounded-md px-2 py-0.5 text-center text-[9px] font-mono font-semibold"
+                                  style={{ backgroundColor: "#dcfce7", color: "#15803d" }}
                                 >
                                   ✓ {formatExpediceValue(item.expediceHours, item.expediceCzk, item.totalHours)}
                                 </div>
