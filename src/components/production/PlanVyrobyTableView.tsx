@@ -678,26 +678,41 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
               const used = weekCapacities.get(week.key) ?? 0;
               const cap = getWeekCapacity(week.key);
               const pct = cap > 0 ? (used / cap) * 100 : 0;
-              const barColor = pct > 120 ? "hsl(var(--destructive))" : pct > 100 ? "#d97706" : "hsl(var(--primary))";
+              const isPast = week.end < new Date();
+              // Color logic matching WeeklySilos exactly
+              const fillColor = pct >= 100 ? "#EF4444" : pct >= 80 ? "#F59E0B" : "#22C55E";
+              const textColor = pct >= 100 ? "#DC2626" : pct >= 80 ? "#D97706" : "#16A34A";
+              const borderColor = pct >= 100 ? "#EF4444" : pct >= 80 ? "#FBBF24" : "#4ADE80";
               return (
                 <div
                   key={week.key}
-                  className="shrink-0 text-center px-1.5 py-2 border-b border-r border-border/50 bg-card"
+                  className="shrink-0 text-center px-2 py-2 border-r border-border/50 bg-card"
                   style={{
                     width: CELL_W,
                     backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : undefined,
-                    borderTop: week.isCurrent ? "2px solid hsl(var(--primary))" : undefined,
+                    borderBottom: `2px solid ${borderColor}`,
+                    opacity: isPast ? 0.6 : 1,
                   }}
                 >
-                  <div className="font-mono text-[12px] font-bold text-foreground leading-tight">T{week.weekNum}</div>
-                  <div className="text-[9px] text-muted-foreground mt-0.5">
+                  {/* Week number */}
+                  <div className="font-semibold text-base text-foreground leading-tight">
+                    T{week.weekNum}{week.isCurrent && <span className="ml-0.5" style={{ color: "#22C55E" }}>•</span>}
+                  </div>
+                  {/* Date range */}
+                  <div className="text-xs text-muted-foreground mt-0.5">
                     {formatDateShort(week.start)} – {formatDateShort(week.end)}
                   </div>
-                  <div className="h-[5px] rounded-full mt-1.5 mx-0.5 overflow-hidden" style={{ backgroundColor: "hsl(var(--muted))" }}>
-                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: barColor }} />
+                  {/* Capacity bar */}
+                  <div className="h-1.5 rounded-full mt-1.5 overflow-hidden" style={{ backgroundColor: "#E5E7EB" }}>
+                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: fillColor }} />
                   </div>
-                  <div className="font-mono text-[9px] mt-1 font-semibold" style={{ color: barColor }}>
-                    {formatCapacity(used, week.key)}
+                  {/* Hours row */}
+                  <div className="flex items-center justify-between mt-1 font-mono text-[9px]">
+                    <div>
+                      <span className="font-bold" style={{ color: textColor }}>{Math.round(used)}h</span>
+                      <span className="text-muted-foreground"> / {cap}h</span>
+                    </div>
+                    <span className="font-bold" style={{ color: textColor }}>{cap > 0 ? Math.round(pct) : 0}%</span>
                   </div>
                 </div>
               );
