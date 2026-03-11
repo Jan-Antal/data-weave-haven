@@ -93,6 +93,7 @@ export default function PlanVyroby() {
   const [autoSplitState, setAutoSplitState] = useState<AutoSplitState | null>(null);
   const [mergeState, setMergeState] = useState<MergeState | null>(null);
   const [tpvProjectId, setTpvProjectId] = useState<string | null>(null);
+  const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
   const { data: allProjects = [] } = useProjects();
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
