@@ -115,7 +115,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
   const [sortMode, setSortMode] = useState<SortMode>("project");
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
-
+  const initialScrollDone = useRef(false);
   // Cancel dialog state
   const [cancelDialog, setCancelDialog] = useState<{
     open: boolean; itemId: string; itemName: string; itemCode?: string | null;
