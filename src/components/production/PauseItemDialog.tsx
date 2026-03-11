@@ -29,6 +29,7 @@ const REASON_OPTIONS = [
 export function PauseItemDialog({ open, onOpenChange, itemId, itemName, itemCode, source }: PauseItemDialogProps) {
   const qc = useQueryClient();
   const { pushUndo } = useUndoRedo();
+  const [reason, setReason] = useState("material");
   const [customReason, setCustomReason] = useState("");
   const [expectedDate, setExpectedDate] = useState<Date | undefined>();
   const [submitting, setSubmitting] = useState(false);
