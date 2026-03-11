@@ -124,7 +124,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
   } | null>(null);
 
   const projectDateLookup = useMemo(() => {
-    const map = new Map<string, { expedice?: string | null; datum_smluvni?: string | null }>();
+    const map = new Map<string, any>();
     for (const p of allProjects) map.set(p.project_id, p);
     return map;
   }, [allProjects]);
