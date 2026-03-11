@@ -207,7 +207,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
     }));
     const actions: ContextMenuAction[] = [
       {
-        label: "Naplánovat projekt...", icon: "📅",
+        label: "Naplánovat výrobu...", icon: "📅",
         onClick: () => setPlanningState({ projectId: project.project_id, projectName: project.project_name, items: planItems }),
       },
       {
