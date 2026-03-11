@@ -287,7 +287,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
                   ? <ChevronRight className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />
                   : <ChevronDown className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center justify-between gap-1.5">
                     <span
                       className="text-[12px] font-semibold truncate"
                       style={{ color: getProjectColor(group.project_id) }}
