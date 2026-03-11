@@ -109,6 +109,14 @@ interface PhotoTimelineGridProps {
   onDelete?: (file: SPFile) => void;
   canDelete?: boolean;
   maxHeight?: string;
+  // Drag & drop support
+  isDraggable?: boolean;
+  onDragStart?: (e: React.DragEvent, file: SPFile) => void;
+  onDragEnd?: () => void;
+  draggingFileId?: string | null;
+  // Selection support
+  selectedIds?: Set<string>;
+  onToggleSelect?: (fileId: string, files: SPFile[], e?: React.MouseEvent) => void;
 }
 
 export function PhotoTimelineGrid({
@@ -117,6 +125,12 @@ export function PhotoTimelineGrid({
   onDelete,
   canDelete,
   maxHeight = "260px",
+  isDraggable,
+  onDragStart,
+  onDragEnd,
+  draggingFileId,
+  selectedIds,
+  onToggleSelect,
 }: PhotoTimelineGridProps) {
   const isMobile = useIsMobile();
   const [filter, setFilter] = useState<FilterMode>("all");
