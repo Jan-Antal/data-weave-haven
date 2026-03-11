@@ -119,8 +119,15 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
+  const { data: allProjects = [] } = useProjects();
   const qc = useQueryClient();
   const getWeekCapacity = useWeekCapacityLookup();
+
+  const projectLookup = useMemo(() => {
+    const map = new Map<string, { datum_smluvni?: string | null; expedice?: string | null; status?: string | null; risk?: string | null }>();
+    for (const p of allProjects) map.set(p.project_id, p);
+    return map;
+  }, [allProjects]);
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [completionState, setCompletionState] = useState<CompletionState | null>(null);
