@@ -303,8 +303,8 @@ function LazyThumbnail({ file, onClick }: { file: SPFile; onClick: () => void })
 
 // ─── Lightbox ───────────────────────────────────────────────────
 
-/** Session cache for medium-res images (800px) */
-const mediumResCache = new Map<string, string>();
+/** Session cache for large thumbnail images (800px) */
+const largeThumbCache = new Map<string, string>();
 
 interface PhotoLightboxProps {
   open: boolean;
