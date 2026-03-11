@@ -648,10 +648,21 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
   );
 }
 
-function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleContextMenu, onItemContextMenu }: {
+function formatDateShortYY(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  const d = parseAppDate(dateStr);
+  if (!d) return null;
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${dd}.${mm}.${yy}`;
+}
+
+function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleContextMenu, onItemContextMenu, projectLookup }: {
   bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number;
   onBundleContextMenu: (e: React.MouseEvent, bundle: ScheduleBundle, toggleExpand: () => void) => void;
   onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem, bundle: ScheduleBundle) => void;
+  projectLookup: ProjectLookup;
 }) {
   const [expanded, setExpanded] = useState(false);
   const color = getProjectColor(bundle.project_id);
@@ -659,6 +670,17 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
   const totalCount = bundle.items.length;
   const allCompleted = completedCount === totalCount && totalCount > 0;
   const hasUncompleted = completedCount < totalCount;
+
+  const project = projectLookup.get(bundle.project_id);
+  const severity = project ? getProjectRiskSeverity(project) : null;
+  const expDate = formatDateShortYY(project?.expedice);
+  const smlDate = formatDateShortYY(project?.datum_smluvni);
+  const hasDates = !!(expDate || smlDate);
+
+  const borderLeftColor = allCompleted ? "#3a8a36"
+    : severity === "overdue" ? "#dc3545"
+    : severity === "upcoming" ? "#d97706"
+    : color;
 
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: `silo-bundle-${bundle.project_id}-${weekKey}`,
@@ -668,10 +690,21 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
   const toggleExpand = useCallback(() => setExpanded(v => !v), []);
 
   return (
-    <div className="rounded-[6px] overflow-hidden" style={{
-      border: "1px solid #ece8e2", borderLeft: `4px solid ${allCompleted ? "#3a8a36" : color}`,
+    <div className="rounded-[6px] overflow-hidden relative" style={{
+      border: "1px solid #ece8e2", borderLeft: `4px solid ${borderLeftColor}`,
       backgroundColor: "#ffffff", opacity: isDragging ? 0.3 : 1,
     }}>
+      {/* Warning badge */}
+      {severity && !allCompleted && (
+        <div className="absolute top-1 right-1 z-10 flex items-center justify-center rounded-full"
+          style={{
+            width: 14, height: 14, fontSize: 9, fontWeight: 700,
+            backgroundColor: severity === "overdue" ? "#dc3545" : "#d97706",
+            color: "#fff",
+          }}
+        >!</div>
+      )}
+
       <div className="flex" style={{ borderBottom: expanded ? "1px solid #ece8e2" : "none" }}>
         {/* Left strip: expand/collapse toggle — NOT draggable */}
         <div
@@ -693,7 +726,14 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
         >
           <div className="flex-1 min-w-0">
             <div className="text-[11px] font-semibold truncate" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>{bundle.project_name}</div>
-            <div className="font-mono text-[8px]" style={{ color: "#99a5a3" }}>{bundle.project_id}</div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-[8px]" style={{ color: "#99a5a3" }}>{bundle.project_id}</span>
+              {hasDates && !allCompleted && (
+                <span className="text-[7px] truncate" style={{ color: severity === "overdue" ? "#dc3545" : severity === "upcoming" ? "#d97706" : "#99a5a3" }}>
+                  {smlDate && `Sml: ${smlDate}`}{smlDate && expDate && " · "}{expDate && `Exp: ${expDate}`}
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {completedCount > 0 && <span className="text-[9px] font-medium" style={{ color: "#3a8a36" }}>{completedCount}/{totalCount} ✓</span>}
