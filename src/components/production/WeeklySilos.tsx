@@ -657,23 +657,34 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
       border: "1px solid #ece8e2", borderLeft: `4px solid ${allCompleted ? "#3a8a36" : color}`,
       backgroundColor: "#ffffff", opacity: isDragging ? 0.3 : 1,
     }}>
-      <div ref={setDragRef} {...attributes} {...(hasUncompleted ? listeners : {})}
-        data-context="bundle"
-        className={`flex items-center gap-1 px-[6px] py-[5px] ${hasUncompleted ? "cursor-grab" : "cursor-default"}`}
-        style={{ borderBottom: expanded ? "1px solid #ece8e2" : "none" }}
-        onClick={e => { if (!(e as any).__isDrag) setExpanded(!expanded); }}
-        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onBundleContextMenu(e, bundle, toggleExpand); }}
-      >
-        <ChevronRight className="shrink-0 transition-transform duration-150"
-          style={{ width: 10, height: 10, color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }} />
-        <div className="flex-1 min-w-0">
-          <div className="text-[11px] font-semibold truncate" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>{bundle.project_name}</div>
-          <div className="font-mono text-[8px]" style={{ color: "#99a5a3" }}>{bundle.project_id}</div>
+      <div className="flex" style={{ borderBottom: expanded ? "1px solid #ece8e2" : "none" }}>
+        {/* Left strip: expand/collapse toggle — NOT draggable */}
+        <div
+          className="shrink-0 flex items-center justify-center cursor-pointer select-none"
+          style={{ width: 28 }}
+          onClick={toggleExpand}
+          onMouseDown={e => e.stopPropagation()}
+          onPointerDown={e => e.stopPropagation()}
+        >
+          <ChevronRight className="shrink-0 transition-transform duration-150"
+            style={{ width: 10, height: 10, color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }} />
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {completedCount > 0 && <span className="text-[9px] font-medium" style={{ color: "#3a8a36" }}>{completedCount}/{totalCount} ✓</span>}
-          <span className="font-mono text-[11px] font-bold" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>{Math.round(bundle.total_hours)}h</span>
-          {showCzk && <span className="font-mono text-[9px]" style={{ color: "#6b7a78" }}>{formatCompactCzk(bundle.total_hours * hourlyRate)}</span>}
+
+        {/* Right portion: drag handle + bundle info */}
+        <div ref={setDragRef} {...attributes} {...(hasUncompleted ? listeners : {})}
+          data-context="bundle"
+          className={`flex items-center gap-1 flex-1 min-w-0 pr-[6px] py-[5px] ${hasUncompleted ? "cursor-grab" : "cursor-default"}`}
+          onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onBundleContextMenu(e, bundle, toggleExpand); }}
+        >
+          <div className="flex-1 min-w-0">
+            <div className="text-[11px] font-semibold truncate" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>{bundle.project_name}</div>
+            <div className="font-mono text-[8px]" style={{ color: "#99a5a3" }}>{bundle.project_id}</div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            {completedCount > 0 && <span className="text-[9px] font-medium" style={{ color: "#3a8a36" }}>{completedCount}/{totalCount} ✓</span>}
+            <span className="font-mono text-[11px] font-bold" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>{Math.round(bundle.total_hours)}h</span>
+            {showCzk && <span className="font-mono text-[9px]" style={{ color: "#6b7a78" }}>{formatCompactCzk(bundle.total_hours * hourlyRate)}</span>}
+          </div>
         </div>
       </div>
       {expanded && (
