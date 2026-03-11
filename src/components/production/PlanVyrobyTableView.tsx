@@ -509,9 +509,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
     lastWeekMonday.setDate(lastWeekMonday.getDate() - 7);
     const lastWeekKey = lastWeekMonday.toISOString().split("T")[0];
     const lastWeekIdx = weeks.findIndex(w => w.key === lastWeekKey);
-    if (lastWeekIdx >= 0) {
-      // Scroll past: left fixed columns + inbox column + all week columns before last week
-      el.scrollLeft = LEFT_COL_W + INBOX_W + lastWeekIdx * CELL_W - LEFT_COL_W - INBOX_W;
+    if (lastWeekIdx > 0) {
+      el.scrollLeft = lastWeekIdx * CELL_W;
     }
     initialScrollDone.current = true;
   }, [weeks]);
