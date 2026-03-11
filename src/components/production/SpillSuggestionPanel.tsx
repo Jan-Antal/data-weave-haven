@@ -29,10 +29,15 @@ interface BundleSpillData {
 }
 
 export function SpillSuggestionPanel({
-  overloadHours, bundles, weekKey, allWeeksData, weeklyCapacity, weekKeys,
+  overloadHours, bundles, weekKey, allWeeksData, weeklyCapacity, weekKeys, onClose,
 }: SpillSuggestionPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+
+  const handleDismiss = useCallback(() => {
+    setDismissed(true);
+    onClose?.();
+  }, [onClose]);
 
   // Reset dismissed when panel is collapsed (not expanded) — so the warning bar reappears
   // Only truly dismiss after a successful spill (overload goes to 0)
