@@ -136,6 +136,17 @@ export function useProductionDragDrop() {
         .in("id", ids);
       if (updateErr) throw updateErr;
 
+      // Log activity for each item
+      for (const item of items) {
+        logActivity({
+          projectId: item.project_id,
+          actionType: "item_scheduled",
+          oldValue: "Inbox",
+          newValue: weekLabel(weekDate),
+          detail: JSON.stringify({ item_name: item.item_name, item_code: item.item_code, week: weekLabel(weekDate), scheduled_hours: item.estimated_hours, scheduled_czk: item.estimated_czk }),
+        });
+      }
+
       invalidateAll();
 
       const insertedIds = (inserted || []).map((r: any) => r.id);
