@@ -752,6 +752,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     setMovingFiles(false);
 
     if (failed === 0) {
+      flashFolder(destCategoryKey);
       toast({
         title: `${succeeded} ${succeeded === 1 ? "soubor přesunut" : succeeded < 5 ? "soubory přesunuty" : "souborů přesunuto"} do ${destLabel} ✓`,
       });
