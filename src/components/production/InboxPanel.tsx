@@ -1,9 +1,12 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { ChevronRight, GripVertical, Check, Plus } from "lucide-react";
 import { useProductionInbox, type InboxProject, type InboxItem } from "@/hooks/useProductionInbox";
 import { useProductionProgress, type ProjectProgress } from "@/hooks/useProductionProgress";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
+import { useProductionSchedule } from "@/hooks/useProductionSchedule";
 import { useProjects } from "@/hooks/useProjects";
+import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
+import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 import { getProjectColor } from "@/lib/projectColors";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -13,9 +16,10 @@ import { ProjectProgressBar } from "./ProjectProgressBar";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
 import { AddItemPopover, getAdhocBadge } from "./AddItemPopover";
 import { CancelItemDialog } from "./CancelItemDialog";
+import { InboxPlanningDialog, type SchedulePlanEntry, type PlanningItem, type PlanningWeek } from "./InboxPlanningDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { parseAppDate } from "@/lib/dateFormat";
-import { differenceInDays, isPast } from "date-fns";
+import { differenceInDays, isPast, addDays, format } from "date-fns";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
