@@ -228,7 +228,6 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
           }
           const proj = projectMap.get(bundle.project_id)!;
           for (const item of bundle.items) {
-            if (item.status === "completed") continue;
             const itemKey = item.split_group_id || item.id;
             if (!proj.items.has(itemKey)) {
               proj.items.set(itemKey, { itemName: cleanSplitName(item.item_name), itemCode: item.item_code, stageId: item.stage_id, weekAllocations: new Map(), totalHours: 0, totalCzk: 0 });
@@ -848,17 +847,38 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                   </div>
 
                   {/* Item rows — only when expanded */}
-                  {isExpanded && (
+                  {isExpanded && (() => {
+                    // Sort: active items first, completed items last
+                    const activeItems = proj.items.filter(i => {
+                      const hasOnlyExpedice = i.expediceHours > 0 && i.weekAllocations.size === 0 && i.inboxHours === 0;
+                      const allCompleted = [...i.weekAllocations.values()].every(a => a.status === "completed");
+                      return !hasOnlyExpedice && !allCompleted;
+                    });
+                    const completedItems = proj.items.filter(i => !activeItems.includes(i));
+                    const sortedItems = [...activeItems, ...completedItems];
+                    const firstCompletedIdx = activeItems.length;
+                    return (
                     <div>
-                      {proj.items.map((item, idx) => (
-                        <div
-                          key={item.id}
-                          className="flex"
-                          style={{
-                            height: 32,
-                            borderBottom: idx < proj.items.length - 1 ? "1px solid #f5f3f0" : undefined,
-                          }}
-                        >
+                      {sortedItems.map((item, idx) => {
+                        const isCompletedItem = idx >= firstCompletedIdx;
+                        const isFirstCompleted = idx === firstCompletedIdx && completedItems.length > 0;
+                        return (
+                        <div key={item.id}>
+                          {isFirstCompleted && (
+                            <div className="flex items-center gap-1.5 px-3 py-1" style={{ backgroundColor: "#fafaf8" }}>
+                              <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+                              <span className="text-[8px] font-medium" style={{ color: "#b0bab8" }}>Dokončeno</span>
+                              <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+                            </div>
+                          )}
+                          <div
+                            className="flex"
+                            style={{
+                              height: 32,
+                              borderBottom: idx < sortedItems.length - 1 ? "1px solid #f5f3f0" : undefined,
+                              opacity: isCompletedItem ? 0.5 : 1,
+                            }}
+                          >
                           <div
                             className="shrink-0 flex items-center gap-2 pr-2 sticky left-0 z-20"
                             style={{
@@ -956,9 +976,12 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                             </div>
                           )}
                         </div>
-                      ))}
+                        </div>
+                        );
+                      })}
                     </div>
-                  )}
+                    );
+                  })()}
                 </div>
               );
             })}
