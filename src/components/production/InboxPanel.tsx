@@ -1,9 +1,12 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { ChevronRight, GripVertical, Check, Plus } from "lucide-react";
 import { useProductionInbox, type InboxProject, type InboxItem } from "@/hooks/useProductionInbox";
 import { useProductionProgress, type ProjectProgress } from "@/hooks/useProductionProgress";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
+import { useProductionSchedule } from "@/hooks/useProductionSchedule";
 import { useProjects } from "@/hooks/useProjects";
+import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
+import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 import { getProjectColor } from "@/lib/projectColors";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -13,9 +16,10 @@ import { ProjectProgressBar } from "./ProjectProgressBar";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
 import { AddItemPopover, getAdhocBadge } from "./AddItemPopover";
 import { CancelItemDialog } from "./CancelItemDialog";
+import { InboxPlanningDialog, type SchedulePlanEntry, type PlanningItem, type PlanningWeek } from "./InboxPlanningDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { parseAppDate } from "@/lib/dateFormat";
-import { differenceInDays, isPast } from "date-fns";
+import { differenceInDays, isPast, addDays, format } from "date-fns";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -90,6 +94,9 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
   const { data: progressData } = useProductionProgress();
   const { data: settings } = useProductionSettings();
   const { data: allDbProjects = [] } = useProjects();
+  const { data: scheduleData } = useProductionSchedule();
+  const getWeekCapacity = useWeekCapacityLookup();
+  const { moveInboxItemToWeek } = useProductionDragDrop();
   const qc = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [allExpanded, setAllExpanded] = useState(false);
@@ -97,12 +104,48 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [addItemState, setAddItemState] = useState<{ projectId?: string; projectName?: string } | null>(null);
   const [cancelState, setCancelState] = useState<CancelState | null>(null);
+  const [planningState, setPlanningState] = useState<{ projectId: string; projectName: string; items: PlanningItem[] } | null>(null);
 
   const { setNodeRef, isOver } = useDroppable({ id: "inbox-drop-zone", disabled: !!disableDropZone });
 
   const totalHours = useMemo(() => projects.reduce((s, p) => s + p.total_hours, 0), [projects]);
   const hourlyRate = settings?.hourly_rate ?? 550;
+  const weeklyCapacity = settings?.weekly_capacity_hours ?? 875;
   const isHighlighted = isOver || overDroppableId === "inbox-drop-zone";
+
+  // Build next 12 weeks with remaining capacity
+  const planningWeeks = useMemo<PlanningWeek[]>(() => {
+    const now = new Date();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    const result: PlanningWeek[] = [];
+    for (let i = 0; i < 12; i++) {
+      const weekStart = new Date(monday);
+      weekStart.setDate(monday.getDate() + i * 7);
+      const key = weekStart.toISOString().split("T")[0];
+      const weekEnd = addDays(weekStart, 6);
+      const d = new Date(Date.UTC(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate()));
+      const dayNum = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      const weekNum = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+
+      const cap = getWeekCapacity(key);
+      // Sum already scheduled hours for this week
+      const silo = scheduleData?.get(key);
+      const scheduledHours = silo ? silo.total_hours : 0;
+      const remaining = Math.max(0, cap - scheduledHours);
+
+      result.push({
+        key,
+        weekNum,
+        label: `T${weekNum} · ${format(weekStart, "d.M")} – ${format(weekEnd, "d.M")}`,
+        remainingCapacity: remaining,
+      });
+    }
+    return result;
+  }, [getWeekCapacity, scheduleData]);
+
 
   // Map project_id → { datum_smluvni, status }
   const projectInfoMap = useMemo(() => {
@@ -158,7 +201,15 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
 
   const handleProjectContextMenu = (e: React.MouseEvent, project: InboxProject) => {
     e.preventDefault(); e.stopPropagation();
+    const planItems: PlanningItem[] = project.items.map(i => ({
+      id: i.id, item_name: i.item_name, item_code: i.item_code,
+      estimated_hours: i.estimated_hours, estimated_czk: i.estimated_czk, stage_id: i.stage_id,
+    }));
     const actions: ContextMenuAction[] = [
+      {
+        label: "Naplánovat projekt...", icon: "📅",
+        onClick: () => setPlanningState({ projectId: project.project_id, projectName: project.project_name, items: planItems }),
+      },
       {
         label: "Přidat položku", icon: "➕",
         onClick: () => setAddItemState({ projectId: project.project_id, projectName: project.project_name }),
@@ -172,7 +223,16 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
 
   const handleItemContextMenu = (e: React.MouseEvent, item: InboxItem, project: InboxProject) => {
     e.preventDefault(); e.stopPropagation();
-    const actions: ContextMenuAction[] = [];
+    const planItem: PlanningItem = {
+      id: item.id, item_name: item.item_name, item_code: item.item_code,
+      estimated_hours: item.estimated_hours, estimated_czk: item.estimated_czk, stage_id: item.stage_id,
+    };
+    const actions: ContextMenuAction[] = [
+      {
+        label: "Naplánovat...", icon: "📅",
+        onClick: () => setPlanningState({ projectId: project.project_id, projectName: project.project_name, items: [planItem] }),
+      },
+    ];
     if (onNavigateToTPV) {
       actions.push({ label: "Zobrazit v TPV", icon: "📋", onClick: () => onNavigateToTPV(project.project_id) });
     }
@@ -186,6 +246,99 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
     });
     setContextMenu({ x: e.clientX, y: e.clientY, actions });
   };
+
+  const handlePlanConfirm = useCallback(async (plan: SchedulePlanEntry[]) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Group plan entries by inboxItemId
+      const byItem = new Map<string, SchedulePlanEntry[]>();
+      for (const entry of plan) {
+        const arr = byItem.get(entry.inboxItemId) || [];
+        arr.push(entry);
+        byItem.set(entry.inboxItemId, arr);
+      }
+
+      for (const [inboxItemId, entries] of byItem) {
+        // Fetch inbox item details
+        const { data: inboxItem } = await supabase.from("production_inbox").select("*").eq("id", inboxItemId).single();
+        if (!inboxItem) continue;
+
+        if (entries.length === 1) {
+          // Simple schedule — single week
+          const e = entries[0];
+          await supabase.from("production_schedule").insert({
+            project_id: inboxItem.project_id,
+            stage_id: inboxItem.stage_id,
+            item_name: inboxItem.item_name,
+            item_code: inboxItem.item_code,
+            scheduled_week: e.scheduledWeek,
+            scheduled_hours: e.scheduledHours,
+            scheduled_czk: e.scheduledCzk,
+            position: 999,
+            status: "scheduled",
+            created_by: user.id,
+            inbox_item_id: inboxItemId,
+          });
+        } else {
+          // Split across multiple weeks
+
+          // Insert first part to get its id as split_group_id
+          const { data: firstPart } = await supabase.from("production_schedule").insert({
+            project_id: inboxItem.project_id,
+            stage_id: inboxItem.stage_id,
+            item_name: `${inboxItem.item_name} (1/${entries.length})`,
+            item_code: inboxItem.item_code,
+            scheduled_week: entries[0].scheduledWeek,
+            scheduled_hours: entries[0].scheduledHours,
+            scheduled_czk: entries[0].scheduledCzk,
+            position: 999,
+            status: "scheduled",
+            created_by: user.id,
+            inbox_item_id: inboxItemId,
+            split_part: 1,
+            split_total: entries.length,
+          }).select().single();
+
+          if (firstPart) {
+            // Update first part with its own id as split_group_id
+            await supabase.from("production_schedule").update({ split_group_id: firstPart.id }).eq("id", firstPart.id);
+
+            // Insert remaining parts
+            for (let i = 1; i < entries.length; i++) {
+              await supabase.from("production_schedule").insert({
+                project_id: inboxItem.project_id,
+                stage_id: inboxItem.stage_id,
+                item_name: `${inboxItem.item_name} (${i + 1}/${entries.length})`,
+                item_code: inboxItem.item_code,
+                scheduled_week: entries[i].scheduledWeek,
+                scheduled_hours: entries[i].scheduledHours,
+                scheduled_czk: entries[i].scheduledCzk,
+                position: 999,
+                status: "scheduled",
+                created_by: user.id,
+                inbox_item_id: inboxItemId,
+                split_group_id: firstPart.id,
+                split_part: i + 1,
+                split_total: entries.length,
+              });
+            }
+          }
+        }
+
+        // Mark inbox item as scheduled
+        await supabase.from("production_inbox").update({ status: "scheduled" }).eq("id", inboxItemId);
+      }
+
+      qc.invalidateQueries({ queryKey: ["production-inbox"] });
+      qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      qc.invalidateQueries({ queryKey: ["production-progress"] });
+      toast({ title: `${plan.length} položek naplánováno` });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [planningState, qc]);
 
   const handleSeedData = async () => {
     setLoading(true);
@@ -341,6 +494,20 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
       {/* Cancel dialog */}
       {cancelState && (
         <CancelItemDialog open={!!cancelState} onOpenChange={open => !open && setCancelState(null)} {...cancelState} itemCode={cancelState.itemCode} />
+      )}
+
+      {/* Planning dialog */}
+      {planningState && (
+        <InboxPlanningDialog
+          open={!!planningState}
+          onOpenChange={open => !open && setPlanningState(null)}
+          projectId={planningState.projectId}
+          projectName={planningState.projectName}
+          items={planningState.items}
+          weeks={planningWeeks}
+          weeklyCapacity={weeklyCapacity}
+          onConfirm={handlePlanConfirm}
+        />
       )}
     </div>
   );
