@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
-import { LayoutDashboard, Settings, Check, User, UserCog, LogOut } from "lucide-react";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
+import { LayoutDashboard, Settings, Check, User, UserCog, LogOut, Undo2, Redo2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { UserManagement } from "@/components/UserManagement";
 import { AccountSettings } from "@/components/AccountSettings";
 import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
@@ -26,7 +28,7 @@ export function ProductionHeader() {
   const { data: settings } = useProductionSettings();
   const { canAccessSettings, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, profile, signOut } = useAuth();
   const { openPeopleManagement } = usePeopleManagement();
-  
+  const { undo, redo, canUndo, canRedo, lastUndoDescription, lastRedoDescription } = useUndoRedo();
 
   const [userMgmtOpen, setUserMgmtOpen] = useState(false);
   const [exchangeRateOpen, setExchangeRateOpen] = useState(false);
@@ -38,6 +40,11 @@ export function ProductionHeader() {
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
 
   const toggleDataLog = useCallback(() => setDataLogOpen((p) => !p), []);
+
+  const hasUndo = canUndo("plan-vyroby");
+  const hasRedo = canRedo("plan-vyroby");
+  const undoDesc = lastUndoDescription("plan-vyroby");
+  const redoDesc = lastRedoDescription("plan-vyroby");
 
   return (
     <>
@@ -52,8 +59,42 @@ export function ProductionHeader() {
             <span className="text-primary-foreground/70 text-sm font-sans">Plán Výroby</span>
           </div>
 
-          {/* Right: user/settings */}
+          {/* Right: undo/redo + user/settings */}
           <div className="flex items-center gap-1 shrink-0">
+            {/* Undo button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => undo("plan-vyroby")}
+                  disabled={!hasUndo}
+                  className="p-2 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                >
+                  <Undo2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {hasUndo ? `Zpět: ${undoDesc}` : "Nic k vrácení"}
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Redo button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => redo("plan-vyroby")}
+                  disabled={!hasRedo}
+                  className="p-2 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                >
+                  <Redo2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {hasRedo ? `Obnovit: ${redoDesc}` : "Nic k obnovení"}
+              </TooltipContent>
+            </Tooltip>
+
+            <span className="w-px h-5 bg-primary-foreground/20 mx-1" />
+
             <button
               onClick={() => navigate("/")}
               className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"

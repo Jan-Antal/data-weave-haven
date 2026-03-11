@@ -23,9 +23,15 @@ interface UndoRedoState {
   /** Current page context — set by each page to scope shortcuts */
   setCurrentPage: (page: UndoPage | null) => void;
   currentPage: UndoPage | null;
+  /** Last undo entry description for the page (for tooltip) */
+  lastUndoDescription: (page?: UndoPage) => string | null;
+  lastRedoDescription: (page?: UndoPage) => string | null;
 }
 
-const MAX_STACK = 20;
+const PAGE_MAX_STACK: Record<string, number> = {
+  "plan-vyroby": 50,
+};
+const DEFAULT_MAX_STACK = 20;
 
 const UndoRedoContext = createContext<UndoRedoState | null>(null);
 
@@ -38,32 +44,17 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
   const currentPageRef = useRef<UndoPage | null>(null);
   const [currentPage, setCurrentPageState] = useState<UndoPage | null>(null);
   const executingRef = useRef(false);
+  const undoFnRef = useRef<(page?: UndoPage) => void>(() => {});
 
   const setCurrentPage = useCallback((page: UndoPage | null) => {
     currentPageRef.current = page;
     setCurrentPageState(page);
   }, []);
 
-  const pushUndo = useCallback(
-    (entry: Omit<UndoEntry, "id" | "timestamp">) => {
-      const full: UndoEntry = {
-        ...entry,
-        id: crypto.randomUUID(),
-        timestamp: new Date(),
-      };
-      undoStackRef.current = [...undoStackRef.current, full].slice(-MAX_STACK);
-      // New action clears redo for this page
-      redoStackRef.current = redoStackRef.current.filter((e) => e.page !== entry.page);
-      bump();
-    },
-    [bump]
-  );
-
   const undo = useCallback(
     async (page?: UndoPage) => {
       if (executingRef.current) return;
       const targetPage = page ?? currentPageRef.current;
-      // Find last entry for this page
       let idx = -1;
       const stack = undoStackRef.current;
       for (let i = stack.length - 1; i >= 0; i--) {
@@ -73,7 +64,8 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
 
       const entry = undoStackRef.current[idx];
       undoStackRef.current = [...undoStackRef.current.slice(0, idx), ...undoStackRef.current.slice(idx + 1)];
-      redoStackRef.current = [...redoStackRef.current, entry].slice(-MAX_STACK);
+      const maxForPage = PAGE_MAX_STACK[entry.page] ?? DEFAULT_MAX_STACK;
+      redoStackRef.current = [...redoStackRef.current, entry].slice(-maxForPage);
       bump();
 
       executingRef.current = true;
@@ -93,6 +85,9 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
     [bump]
   );
 
+  // Keep ref updated for use in pushUndo toast
+  useEffect(() => { undoFnRef.current = undo; }, [undo]);
+
   const redo = useCallback(
     async (page?: UndoPage) => {
       if (executingRef.current) return;
@@ -106,7 +101,8 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
 
       const entry = redoStackRef.current[idx];
       redoStackRef.current = [...redoStackRef.current.slice(0, idx), ...redoStackRef.current.slice(idx + 1)];
-      undoStackRef.current = [...undoStackRef.current, entry].slice(-MAX_STACK);
+      const maxForPage = PAGE_MAX_STACK[entry.page] ?? DEFAULT_MAX_STACK;
+      undoStackRef.current = [...undoStackRef.current, entry].slice(-maxForPage);
       bump();
 
       executingRef.current = true;
@@ -122,6 +118,64 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
         });
       }
       executingRef.current = false;
+    },
+    [bump]
+  );
+
+  const pushUndo = useCallback(
+    (entry: Omit<UndoEntry, "id" | "timestamp">) => {
+      const full: UndoEntry = {
+        ...entry,
+        id: crypto.randomUUID(),
+        timestamp: new Date(),
+      };
+      const maxForPage = PAGE_MAX_STACK[entry.page] ?? DEFAULT_MAX_STACK;
+      const newStack = [...undoStackRef.current, full];
+      // Trim oldest entries for this specific page if over limit
+      let pageCount = newStack.filter(e => e.page === entry.page).length;
+      while (pageCount > maxForPage) {
+        const oldest = newStack.findIndex(e => e.page === entry.page);
+        if (oldest === -1) break;
+        newStack.splice(oldest, 1);
+        pageCount--;
+      }
+      undoStackRef.current = newStack;
+      // New action clears redo for this page
+      redoStackRef.current = redoStackRef.current.filter((e) => e.page !== entry.page);
+      bump();
+
+      // Show undo toast for plan-vyroby actions
+      if (entry.page === "plan-vyroby") {
+        const { dismiss } = toast({
+          duration: 6000,
+          className: "bg-muted text-foreground border-border shadow-md",
+          title: (
+            <div className="flex items-center justify-between w-full gap-4">
+              <span className="text-sm font-medium">{entry.description}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  dismiss();
+                  undoFnRef.current?.();
+                }}
+                className="text-muted-foreground font-medium hover:text-foreground transition-colors text-sm shrink-0"
+              >
+                Zpět
+              </button>
+            </div>
+          ) as any,
+          description: (
+            <div className="mt-2 w-full">
+              <div
+                className="h-0.5 bg-border rounded-full origin-left"
+                style={{ animation: `undo-shrink 6000ms linear forwards` }}
+              />
+              <style>{`@keyframes undo-shrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }`}</style>
+            </div>
+          ) as any,
+        });
+      }
     },
     [bump]
   );
@@ -146,10 +200,37 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
     [bump]
   );
 
+  const lastUndoDescription = useCallback(
+    (page?: UndoPage) => {
+      const targetPage = page ?? currentPageRef.current;
+      for (let i = undoStackRef.current.length - 1; i >= 0; i--) {
+        if (!targetPage || undoStackRef.current[i].page === targetPage) {
+          return undoStackRef.current[i].description;
+        }
+      }
+      return null;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [bump]
+  );
+
+  const lastRedoDescription = useCallback(
+    (page?: UndoPage) => {
+      const targetPage = page ?? currentPageRef.current;
+      for (let i = redoStackRef.current.length - 1; i >= 0; i--) {
+        if (!targetPage || redoStackRef.current[i].page === targetPage) {
+          return redoStackRef.current[i].description;
+        }
+      }
+      return null;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [bump]
+  );
+
   // ── Global keyboard shortcuts ────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Don't capture in inputs/textareas/contentEditable
       const target = e.target as HTMLElement;
       if (
         target.tagName === "INPUT" ||
@@ -160,7 +241,6 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Don't capture when a dialog/modal is open (check for radix dialog overlay)
       if (document.querySelector("[data-radix-portal]")) return;
 
       const isMac = navigator.platform.toUpperCase().includes("MAC");
@@ -180,7 +260,7 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
   }, [undo, redo]);
 
   return (
-    <UndoRedoContext.Provider value={{ pushUndo, undo, redo, canUndo, canRedo, setCurrentPage, currentPage }}>
+    <UndoRedoContext.Provider value={{ pushUndo, undo, redo, canUndo, canRedo, setCurrentPage, currentPage, lastUndoDescription, lastRedoDescription }}>
       {children}
     </UndoRedoContext.Provider>
   );

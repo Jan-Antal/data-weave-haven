@@ -597,7 +597,7 @@ export function useProductionDragDrop() {
         },
       });
 
-      toast({ title: `${parts.length} částí spojeno zpět do "${cleanName}" (${totalHours}h)` });
+      // Toast is shown by pushUndo
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
