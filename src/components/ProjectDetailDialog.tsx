@@ -1490,9 +1490,10 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                           onDragStart={(e) => handleFileDragStart(e, f, cat.key)}
                                           onDragEnd={handleFileDragEnd}
                                           className={cn(
-                                            "group flex items-center gap-1 py-1 px-1 rounded hover:bg-accent/50 text-xs cursor-pointer relative transition-all",
+                                            "group flex items-center gap-1 py-1 px-1 rounded hover:bg-accent/50 text-xs relative transition-all",
+                                            canUploadDocuments && !isMobile && "cursor-grab active:cursor-grabbing",
                                             isFileSelected && "bg-primary/5",
-                                            isBeingDragged && "opacity-50"
+                                            isBeingDragged && "opacity-40 border-2 border-dashed border-border rounded-md bg-muted/30"
                                           )}
                                           onClick={(e) => {
                                             if (e.shiftKey || e.metaKey || e.ctrlKey) {
