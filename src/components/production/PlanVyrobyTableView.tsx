@@ -703,8 +703,11 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                     {formatDateShort(week.start)} – {formatDateShort(week.end)}
                   </div>
                   {/* Capacity bar */}
-                  <div className="h-1.5 rounded-full mt-1.5 overflow-hidden" style={{ backgroundColor: "#E5E7EB" }}>
-                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: fillColor }} />
+                  <div className="w-full bg-gray-200 rounded-full h-2 my-1">
+                    <div
+                      className="h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: fillColor }}
+                    />
                   </div>
                   {/* Hours row */}
                   <div className="flex items-center justify-between mt-1 font-mono text-[9px]">
