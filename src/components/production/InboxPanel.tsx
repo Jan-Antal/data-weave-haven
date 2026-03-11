@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { ChevronRight, GripVertical, Check, Plus } from "lucide-react";
+import { ChevronRight, ChevronDown, GripVertical, Check, Plus } from "lucide-react";
 import { useProductionInbox, type InboxProject, type InboxItem } from "@/hooks/useProductionInbox";
 import { useProductionProgress, type ProjectProgress } from "@/hooks/useProductionProgress";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
