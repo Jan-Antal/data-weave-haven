@@ -136,6 +136,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const [bundleSplitState, setBundleSplitState] = useState<BundleSplitState | null>(null);
   const [pauseState, setPauseState] = useState<PauseState | null>(null);
   const [cancelState, setCancelState] = useState<CancelState | null>(null);
+  const [dismissedSpillWeeks, setDismissedSpillWeeks] = useState<Set<string>>(new Set());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const siloRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [visiblePeriodLabel, setVisiblePeriodLabel] = useState("");
@@ -268,6 +269,31 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     if (scheduleData) { for (const [key, silo] of scheduleData) { map.set(key, { total_hours: silo.total_hours }); } }
     return map;
   }, [scheduleData]);
+
+  // Auto-clear dismissed spill state when overload is resolved
+  useEffect(() => {
+    setDismissedSpillWeeks(prev => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const wk of prev) {
+        const silo = scheduleData?.get(wk);
+        const activeH = silo ? silo.bundles.reduce((sum, b) =>
+          sum + b.items.reduce((s, i) => s + (i.status === "paused" ? 0 : i.scheduled_hours), 0), 0) : 0;
+        const cap = getWeekCapacity(wk);
+        const pct = cap > 0 ? (activeH / cap) * 100 : 0;
+        if (pct <= 120) { next.delete(wk); changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [scheduleData, getWeekCapacity]);
+
+  const handleDismissSpill = useCallback((weekKey: string) => {
+    setDismissedSpillWeeks(prev => new Set(prev).add(weekKey));
+  }, []);
+
+  const handleReopenSpill = useCallback((weekKey: string) => {
+    setDismissedSpillWeeks(prev => { const next = new Set(prev); next.delete(weekKey); return next; });
+  }, []);
 
   const findSameWeekSiblings = useCallback((item: ScheduleItem, weekKey: string): ScheduleItem[] => {
     if (!item.split_group_id) return [];
@@ -499,6 +525,9 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               onItemContextMenu={(e, item, bundle) => handleItemContextMenu(e, item, week.key, week.weekNum, week.start, week.end, bundle)}
               allWeeksData={weeksCapacityMap} weekKeys={weekKeys} registerRef={registerSiloRef}
               projectLookup={projectLookup}
+              spillDismissed={dismissedSpillWeeks.has(week.key)}
+              onDismissSpill={() => handleDismissSpill(week.key)}
+              onReopenSpill={() => handleReopenSpill(week.key)}
             />
           ))}
         </div>
@@ -565,10 +594,13 @@ interface SiloProps {
   allWeeksData: Map<string, { total_hours: number }>; weekKeys: string[];
   registerRef: (key: string, el: HTMLDivElement | null) => void;
   projectLookup: ProjectLookup;
+  spillDismissed: boolean;
+  onDismissSpill: () => void;
+  onReopenSpill: () => void;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill }: SiloProps) {
   // Capacity calculation: exclude paused items
   const activeHours = useMemo(() => {
     if (!silo) return 0;
@@ -619,6 +651,22 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
           </div>
         </div>
+        {/* Re-open spill pill — only when overloaded AND dismissed */}
+        {isOverloaded && !isPast && spillDismissed && (
+          <button
+            onClick={onReopenSpill}
+            className="mt-1 mx-auto block px-2 py-[2px] text-[8px] font-medium rounded-full transition-colors cursor-pointer"
+            style={{
+              backgroundColor: isOverloaded ? "rgba(220,53,69,0.08)" : "rgba(217,119,6,0.08)",
+              color: isOverloaded ? "#dc3545" : "#d97706",
+              border: `1px solid ${isOverloaded ? "rgba(220,53,69,0.2)" : "rgba(217,119,6,0.2)"}`,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = isOverloaded ? "rgba(220,53,69,0.15)" : "rgba(217,119,6,0.15)"; }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = isOverloaded ? "rgba(220,53,69,0.08)" : "rgba(217,119,6,0.08)"; }}
+          >
+            ⚡ Přetíženo — zobrazit návrhy
+          </button>
+        )}
       </div>
 
       {/* Items */}
@@ -641,9 +689,9 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
         ))}
       </div>
 
-      {isOverloaded && !isPast && silo && (
+      {isOverloaded && !isPast && silo && !spillDismissed && (
         <SpillSuggestionPanel overloadHours={overloadHours} bundles={silo.bundles} weekKey={weekKey}
-          allWeeksData={allWeeksData} weeklyCapacity={weeklyCapacity} weekKeys={weekKeys} />
+          allWeeksData={allWeeksData} weeklyCapacity={weeklyCapacity} weekKeys={weekKeys} onClose={onDismissSpill} />
       )}
     </div>
   );

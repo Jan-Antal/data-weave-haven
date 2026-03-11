@@ -15,6 +15,7 @@ interface SpillSuggestionPanelProps {
   allWeeksData: Map<string, { total_hours: number }> | null;
   weeklyCapacity: number;
   weekKeys: string[];
+  onClose?: () => void;
 }
 
 type SpillMode = "items" | "split";
@@ -28,10 +29,15 @@ interface BundleSpillData {
 }
 
 export function SpillSuggestionPanel({
-  overloadHours, bundles, weekKey, allWeeksData, weeklyCapacity, weekKeys,
+  overloadHours, bundles, weekKey, allWeeksData, weeklyCapacity, weekKeys, onClose,
 }: SpillSuggestionPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+
+  const handleDismiss = useCallback(() => {
+    setDismissed(true);
+    onClose?.();
+  }, [onClose]);
 
   // Reset dismissed when panel is collapsed (not expanded) — so the warning bar reappears
   // Only truly dismiss after a successful spill (overload goes to 0)
@@ -310,7 +316,7 @@ export function SpillSuggestionPanel({
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
       qc.invalidateQueries({ queryKey: ["production-expedice"] });
-      setDismissed(true);
+      handleDismiss();
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
@@ -527,7 +533,7 @@ export function SpillSuggestionPanel({
               : `Přelít → T${targetWeekNum}`}
           </button>
           <button
-            onClick={() => setDismissed(true)}
+            onClick={() => handleDismiss()}
             className="px-2 py-1 text-[8px] font-medium rounded transition-colors"
             style={{ color: "#6b7a78", border: "1px solid #e2ddd6" }}
           >
