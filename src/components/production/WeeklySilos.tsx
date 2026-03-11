@@ -295,7 +295,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     setDismissedSpillWeeks(prev => { const next = new Set(prev); next.delete(weekKey); return next; });
   }, []);
 
-
+  const findSameWeekSiblings = useCallback((item: ScheduleItem, weekKey: string): ScheduleItem[] => {
     if (!item.split_group_id) return [];
     const silo = scheduleData?.get(weekKey);
     if (!silo) return [];
