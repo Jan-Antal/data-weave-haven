@@ -581,7 +581,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
   const combinedRef = useCallback((el: HTMLDivElement | null) => { setNodeRef(el); registerRef(weekKey, el); }, [setNodeRef, registerRef, weekKey]);
 
   return (
-    <div ref={combinedRef} data-week-key={weekKey} className="w-[210px] shrink-0 flex flex-col transition-all"
+    <div ref={combinedRef} data-week-key={weekKey} className="w-[252px] shrink-0 flex flex-col transition-all"
       style={{
         backgroundColor: "#ffffff", borderRadius: 9,
         border: highlighted ? `2px solid ${dropBorderColor}` : isCurrent ? "2px solid #3a8a36" : isOverloaded && !isPast ? "1px solid rgba(220,53,69,0.4)" : "1px solid #ece8e2",
