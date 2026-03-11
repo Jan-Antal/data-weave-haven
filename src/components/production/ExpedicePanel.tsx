@@ -5,16 +5,13 @@ import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useProductionSchedule } from "@/hooks/useProductionSchedule";
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProjects } from "@/hooks/useProjects";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { format, isPast, isFuture, differenceInDays } from "date-fns";
-import { Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Search, Archive } from "lucide-react";
 import { getProjectColor } from "@/lib/projectColors";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
-
-function formatCompactCzk(v: number): string {
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `${Math.round(v / 1_000)}K`;
-  return `${Math.round(v)}`;
-}
+import { toast } from "@/hooks/use-toast";
 
 function formatShortDate(dateStr: string | null | undefined): string | null {
   if (!dateStr) return null;
@@ -25,20 +22,21 @@ function formatShortDate(dateStr: string | null | undefined): string | null {
   } catch { return null; }
 }
 
+function formatShortDateCompact(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  try {
+    const d = dateStr.includes("T") ? new Date(dateStr) : new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    return format(d, "dd.MM");
+  } catch { return null; }
+}
+
 function parseDate(dateStr: string | null | undefined): Date | null {
   if (!dateStr) return null;
   try {
     const d = dateStr.includes("T") ? new Date(dateStr) : new Date(dateStr);
     return isNaN(d.getTime()) ? null : d;
   } catch { return null; }
-}
-
-/** Color for expedice date relative to now */
-function getExpediceDateColor(expediceDate: Date | null): string {
-  if (!expediceDate) return "#99a5a3";
-  if (isPast(expediceDate)) return "#16A34A"; // green - delivered
-  if (differenceInDays(expediceDate, new Date()) <= 7) return "#D97706"; // amber - within 7 days
-  return "#2563EB"; // blue - future
 }
 
 interface ContextMenuState {
@@ -60,18 +58,20 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
   const { data: inboxProjects = [] } = useProductionInbox();
   const { returnToProduction, moveItemBackToInbox } = useProductionDragDrop();
   const { data: settings } = useProductionSettings();
+  const qc = useQueryClient();
   const hourlyRate = settings?.hourly_rate ?? 550;
   const [collapsed, setCollapsed] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const allGroupsExpanded = projects.length > 0 && collapsedGroups.size === 0;
-  const handleToggleAllGroups = () => {
-    if (allGroupsExpanded) {
-      setCollapsedGroups(new Set(projects.map(p => p.project_id)));
-    } else {
-      setCollapsedGroups(new Set());
-    }
-  };
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiveSearch, setArchiveSearch] = useState("");
+
+  const invalidateAll = useCallback(() => {
+    qc.invalidateQueries({ queryKey: ["production-expedice"] });
+    qc.invalidateQueries({ queryKey: ["production-schedule"] });
+    qc.invalidateQueries({ queryKey: ["production-inbox"] });
+    qc.invalidateQueries({ queryKey: ["production-progress"] });
+  }, [qc]);
 
   // Map project_id → expedice field
   const projectExpediceMap = useMemo(() => {
@@ -80,11 +80,51 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
     return m;
   }, [allProjects]);
 
-  // Compute total items per project (scheduled + inbox + completed)
+  // Split projects into active (has at least one non-expediced item) and archived (all expediced)
+  const { activeProjects, archivedProjects } = useMemo(() => {
+    const active: typeof projects = [];
+    const archived: typeof projects = [];
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    for (const group of projects) {
+      const hasNonExpediced = group.items.some(i => !i.expediced_at);
+      if (hasNonExpediced) {
+        active.push(group);
+      } else {
+        // Check if all expediced within 30 days
+        const allRecent = group.items.every(i => {
+          const d = parseDate(i.expediced_at);
+          return d && d >= thirtyDaysAgo;
+        });
+        if (allRecent) {
+          archived.push(group);
+        }
+      }
+    }
+
+    // Sort archived by most recent expediced_at
+    archived.sort((a, b) => {
+      const latestA = Math.max(...a.items.map(i => parseDate(i.expediced_at)?.getTime() ?? 0));
+      const latestB = Math.max(...b.items.map(i => parseDate(i.expediced_at)?.getTime() ?? 0));
+      return latestB - latestA;
+    });
+
+    return { activeProjects: active, archivedProjects: archived };
+  }, [projects]);
+
+  // Filtered archive
+  const filteredArchive = useMemo(() => {
+    if (!archiveSearch.trim()) return archivedProjects;
+    const q = archiveSearch.toLowerCase();
+    return archivedProjects.filter(g =>
+      g.project_name.toLowerCase().includes(q) || g.project_id.toLowerCase().includes(q)
+    );
+  }, [archivedProjects, archiveSearch]);
+
+  // Compute total items per project
   const projectTotalItems = useMemo(() => {
     const m = new Map<string, { total: number; nonCompleted: ScheduleItem[] }>();
-
-    // Count all schedule items (including completed) per project
     if (scheduleData) {
       for (const [, silo] of scheduleData) {
         for (const bundle of silo.bundles) {
@@ -92,36 +132,28 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
             if (!m.has(item.project_id)) m.set(item.project_id, { total: 0, nonCompleted: [] });
             const entry = m.get(item.project_id)!;
             entry.total++;
-            if (item.status !== "completed") {
-              entry.nonCompleted.push(item);
-            }
+            if (item.status !== "completed") entry.nonCompleted.push(item);
           }
         }
       }
     }
-
-    // Count completed items from expedice data
     for (const group of projects) {
       if (!m.has(group.project_id)) m.set(group.project_id, { total: 0, nonCompleted: [] });
       const entry = m.get(group.project_id)!;
       entry.total += group.count;
     }
-
-    // Count inbox items
     for (const inbox of inboxProjects) {
       if (!m.has(inbox.project_id)) m.set(inbox.project_id, { total: 0, nonCompleted: [] });
       const entry = m.get(inbox.project_id)!;
       entry.total += inbox.items.length;
     }
-
     return m;
   }, [scheduleData, projects, inboxProjects]);
 
-  // Summary: total items + most recent completed_at
   const { totalItems, lastCompletedStr } = useMemo(() => {
     let total = 0;
     let latest: Date | null = null;
-    for (const g of projects) {
+    for (const g of activeProjects) {
       total += g.count;
       for (const item of g.items) {
         const d = parseDate(item.completed_at);
@@ -129,10 +161,73 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
       }
     }
     return { totalItems: total, lastCompletedStr: latest ? format(latest, "dd.MM.yyyy") : null };
-  }, [projects]);
+  }, [activeProjects]);
 
+  const allGroupsExpanded = activeProjects.length > 0 && collapsedGroups.size === 0;
+  const handleToggleAllGroups = () => {
+    if (allGroupsExpanded) {
+      setCollapsedGroups(new Set(activeProjects.map(p => p.project_id)));
+    } else {
+      setCollapsedGroups(new Set());
+    }
+  };
+
+  // === EXPEDICE ACTIONS ===
+  const markAsExpediced = useCallback(async (itemId: string) => {
+    try {
+      const { error } = await supabase
+        .from("production_schedule")
+        .update({ expediced_at: new Date().toISOString() } as any)
+        .eq("id", itemId);
+      if (error) throw error;
+      invalidateAll();
+      toast({ title: "📦 Expedováno" });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [invalidateAll]);
+
+  const markAllAsExpediced = useCallback(async (projectId: string) => {
+    try {
+      // Get all completed items for this project that aren't yet expediced
+      const { data: items, error: fetchErr } = await supabase
+        .from("production_schedule")
+        .select("id")
+        .eq("project_id", projectId)
+        .eq("status", "completed")
+        .is("expediced_at", null);
+      if (fetchErr) throw fetchErr;
+      if (!items || items.length === 0) return;
+
+      const { error } = await supabase
+        .from("production_schedule")
+        .update({ expediced_at: new Date().toISOString() } as any)
+        .in("id", items.map(i => i.id));
+      if (error) throw error;
+      invalidateAll();
+      toast({ title: `📦 ${items.length} položek expedováno` });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [invalidateAll]);
+
+  const unExpedice = useCallback(async (itemId: string) => {
+    try {
+      const { error } = await supabase
+        .from("production_schedule")
+        .update({ expediced_at: null } as any)
+        .eq("id", itemId);
+      if (error) throw error;
+      invalidateAll();
+      toast({ title: "↩ Vráceno do Expedice" });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [invalidateAll]);
+
+  // === CONTEXT MENUS ===
   const buildContextActions = useCallback(
-    (item: ScheduleItem | null, projectId: string) => {
+    (item: ScheduleItem | null, projectId: string, isArchive = false) => {
       const weekNum = item ? (() => {
         const d = new Date(item.scheduled_week);
         const dayNum = d.getUTCDay() || 7;
@@ -143,9 +238,19 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
 
       const actions: ContextMenuAction[] = [];
 
-      if (item) {
+      if (isArchive && item) {
+        // Archive item context menu
+        actions.push({ label: "Vrátit do Expedice", icon: "📦", onClick: () => unExpedice(item.id) });
         actions.push({ label: `Vrátit do výroby (T${weekNum})`, icon: "↩", onClick: () => returnToProduction(item.id) });
         actions.push({ label: "Vrátit do Inboxu", icon: "↩", onClick: () => moveItemBackToInbox(item.id) });
+      } else if (item) {
+        // Active Expedice item context menu
+        actions.push({ label: "Expedováno ✓", icon: "📦", onClick: () => markAsExpediced(item.id) });
+        actions.push({ label: `Vrátit do výroby (T${weekNum})`, icon: "↩", onClick: () => returnToProduction(item.id) });
+        actions.push({ label: "Vrátit do Inboxu", icon: "↩", onClick: () => moveItemBackToInbox(item.id) });
+      } else {
+        // Project header context menu
+        actions.push({ label: "Expedovat vše", icon: "📦", onClick: () => markAllAsExpediced(projectId) });
       }
 
       if (onNavigateToTPV) {
@@ -157,14 +262,14 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
 
       return actions;
     },
-    [returnToProduction, moveItemBackToInbox, onNavigateToTPV, onOpenProjectDetail]
+    [returnToProduction, moveItemBackToInbox, onNavigateToTPV, onOpenProjectDetail, markAsExpediced, markAllAsExpediced, unExpedice]
   );
 
   const handleItemContextMenu = useCallback(
-    (e: React.MouseEvent, item: ScheduleItem) => {
+    (e: React.MouseEvent, item: ScheduleItem, isArchive = false) => {
       e.preventDefault();
       e.stopPropagation();
-      setContextMenu({ x: e.clientX, y: e.clientY, actions: buildContextActions(item, item.project_id) });
+      setContextMenu({ x: e.clientX, y: e.clientY, actions: buildContextActions(item, item.project_id, isArchive) });
     },
     [buildContextActions]
   );
@@ -178,6 +283,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
     [buildContextActions]
   );
 
+  // === COLLAPSED STATE ===
   if (collapsed) {
     return (
       <div
@@ -187,12 +293,12 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
       >
         <ChevronLeft className="h-3.5 w-3.5 mb-2 text-muted-foreground" />
         <span className="text-sm">📦</span>
-        {projects.length > 0 && (
+        {activeProjects.length > 0 && (
           <span
             className="text-[8px] font-bold px-1 py-0.5 rounded-full mt-1"
             style={{ backgroundColor: "#16A34A", color: "#ffffff" }}
           >
-            {projects.length}
+            {activeProjects.length}
           </span>
         )}
         <span
@@ -205,6 +311,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
     );
   }
 
+  // === EXPANDED STATE ===
   return (
     <div className="w-[270px] shrink-0 flex flex-col" style={{ borderLeft: "1px solid #ece8e2", backgroundColor: "#ffffff" }}>
       {/* Header */}
@@ -213,17 +320,17 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
           <div className="flex items-center gap-2">
             <span className="text-sm">📦</span>
             <span className="text-[13px] font-semibold" style={{ color: "#223937" }}>Expedice</span>
-            {projects.length > 0 && (
+            {activeProjects.length > 0 && (
               <span
                 className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
                 style={{ backgroundColor: "rgba(22,163,74,0.12)", color: "#16A34A" }}
               >
-                {projects.length}
+                {activeProjects.length}
               </span>
             )}
           </div>
           <div className="flex items-center gap-0.5">
-            {projects.length > 0 && (
+            {activeProjects.length > 0 && (
               <button onClick={handleToggleAllGroups} className="p-0.5 rounded hover:bg-muted transition-colors">
                 {allGroupsExpanded
                   ? <ChevronDown className="h-4 w-4 text-gray-400 hover:text-gray-600" />
@@ -242,162 +349,107 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
         )}
       </div>
 
-      {/* Items */}
+      {/* Active items */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-        {projects.length === 0 && (
+        {activeProjects.length === 0 && archivedProjects.length === 0 && (
           <div className="text-center py-8">
             <p className="text-[10px] text-muted-foreground">Žádné dokončené položky</p>
           </div>
         )}
-        {projects.map((group) => {
-          const expediceRaw = projectExpediceMap.get(group.project_id);
-          const expediceDate = parseDate(expediceRaw);
-          const expediceStr = formatShortDate(expediceRaw);
-          const headerColor = getExpediceDateColor(expediceDate);
+        {activeProjects.map((group) => (
+          <ProjectGroup
+            key={group.project_id}
+            group={group}
+            projectExpediceMap={projectExpediceMap}
+            projectTotalItems={projectTotalItems}
+            scheduleData={scheduleData}
+            inboxProjects={inboxProjects}
+            isGroupCollapsed={collapsedGroups.has(group.project_id)}
+            toggleGroup={() => setCollapsedGroups(prev => {
+              const next = new Set(prev);
+              next.has(group.project_id) ? next.delete(group.project_id) : next.add(group.project_id);
+              return next;
+            })}
+            onProjectContextMenu={handleProjectContextMenu}
+            onItemContextMenu={(e, item) => handleItemContextMenu(e, item, false)}
+            onNavigateToTPV={onNavigateToTPV}
+            isArchive={false}
+          />
+        ))}
+      </div>
 
-          // Completion tracking
-          const totals = projectTotalItems.get(group.project_id);
-          const completedCount = group.count;
-          const totalCount = totals ? totals.total : completedCount;
-          const allDone = completedCount >= totalCount;
-          const missingItems = totals?.nonCompleted ?? [];
+      {/* Archive section */}
+      <div style={{ borderTop: "1px solid #ece8e2" }}>
+        <button
+          onClick={() => setArchiveOpen(!archiveOpen)}
+          className="w-full flex items-center justify-between px-3 py-2 text-left transition-colors hover:bg-muted/50"
+        >
+          <div className="flex items-center gap-1.5">
+            <Archive className="h-3 w-3" style={{ color: "#99a5a3" }} />
+            <span className="text-[11px] font-medium" style={{ color: "#99a5a3" }}>Archiv</span>
+            <span className="text-[9px]" style={{ color: "#b0bab8" }}>· posledních 30 dní</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {archivedProjects.length > 0 && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                style={{ backgroundColor: "#f0eee9", color: "#99a5a3" }}>
+                {archivedProjects.length}
+              </span>
+            )}
+            {archiveOpen
+              ? <ChevronDown className="h-3 w-3" style={{ color: "#99a5a3" }} />
+              : <ChevronUp className="h-3 w-3" style={{ color: "#99a5a3" }} />}
+          </div>
+        </button>
 
-          const isGroupCollapsed = collapsedGroups.has(group.project_id);
-          const toggleGroup = () => setCollapsedGroups(prev => {
-            const next = new Set(prev);
-            next.has(group.project_id) ? next.delete(group.project_id) : next.add(group.project_id);
-            return next;
-          });
-
-          return (
-            <div
-              key={group.project_id}
-              className="rounded-lg overflow-hidden"
-              style={{ backgroundColor: "#ffffff", border: "1px solid #ece8e2", borderLeft: `4px solid ${getProjectColor(group.project_id)}` }}
-              onContextMenu={(e) => handleProjectContextMenu(e, group.project_id)}
-            >
-              <button
-                onClick={toggleGroup}
-                onContextMenu={(e) => handleProjectContextMenu(e, group.project_id)}
-                className="w-full flex items-center gap-1.5 px-2.5 py-2 text-left transition-colors"
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-              >
-                {isGroupCollapsed
-                  ? <ChevronRight className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />
-                  : <ChevronDown className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-1.5">
-                    <span
-                      className="text-[12px] font-semibold truncate"
-                      style={{ color: getProjectColor(group.project_id) }}
-                    >
-                      {group.project_name}
-                    </span>
-                    <span
-                      className="text-[11px] font-bold px-1.5 py-0.5 rounded-full shrink-0 text-center"
-                      style={{
-                        backgroundColor: allDone ? "rgba(22,163,74,0.12)" : "rgba(217,151,6,0.12)",
-                        color: allDone ? "#16A34A" : "#d97706",
-                        minWidth: 40,
-                      }}
-                    >
-                      {completedCount}/{totalCount}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-[9px]" style={{ color: "#99a5a3" }}>{group.project_id}</span>
-                    {expediceStr && (
-                      <span className="text-[9px] font-medium shrink-0" style={{
-                        color: expediceDate && expediceDate < new Date() ? "#dc3545"
-                          : expediceDate && differenceInDays(expediceDate, new Date()) <= 7 ? "#D97706"
-                          : "#223937"
-                      }}>
-                        Exp: {expediceStr}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </button>
-
-              {!isGroupCollapsed && (
-                <div className="px-2.5 pb-2 space-y-1.5">
-                  {/* Missing items indicator */}
-                  {!allDone && missingItems.length > 0 && (
-                    <div className="text-[8px] text-muted-foreground px-0.5">
-                      {missingItems.length <= 2 ? (
-                        <span>
-                          Zbývá: {missingItems.map((mi, idx) => (
-                            <span key={mi.id}>
-                              {idx > 0 && " · "}
-                              <span className="font-medium">{mi.item_code || mi.item_name}</span>
-                            </span>
-                          ))}
-                        </span>
-                      ) : (
-                        <span
-                          className="cursor-pointer hover:underline"
-                          style={{ color: "#D97706" }}
-                          onClick={() => {
-                            if (onNavigateToTPV) onNavigateToTPV(group.project_id);
-                          }}
-                        >
-                          {missingItems.length} položek zbývá →
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="space-y-[2px]">
-                    {group.items.map((item) => {
-                      const completedStr = formatShortDate(item.completed_at);
-                      const completedDate = parseDate(item.completed_at);
-                      let itemExpColor = "#99a5a3";
-                      if (expediceDate && completedDate) {
-                        if (isPast(expediceDate)) itemExpColor = "#16A34A";
-                        else if (isFuture(expediceDate)) itemExpColor = "#2563EB";
-                      }
-
-                      return (
-                        <div
-                          key={item.id}
-                          className="rounded px-1 py-[3px] cursor-default transition-colors"
-                          onContextMenu={(e) => handleItemContextMenu(e, item)}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "hsl(var(--muted))")}
-                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <Check className="shrink-0" style={{ width: 12, height: 12, color: "#16A34A", strokeWidth: 3 }} />
-                            {item.item_code && (
-                              <span className="font-mono text-[10px] shrink-0 text-foreground">
-                                {item.item_code}
-                              </span>
-                            )}
-                            <span className="text-[11px] truncate flex-1 text-muted-foreground">
-                              {item.item_name}
-                            </span>
-                          </div>
-                          <div className="ml-[18px] flex flex-col gap-0">
-                            {completedStr && (
-                              <span className="text-[8px] text-muted-foreground">
-                                Dokončeno: {completedStr}
-                              </span>
-                            )}
-                            {expediceStr && (
-                              <span className="text-[8px] font-medium" style={{ color: itemExpColor }}>
-                                Expedice: {expediceStr}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+        {archiveOpen && (
+          <div className="px-2 pb-2 space-y-1.5 overflow-y-auto" style={{ maxHeight: "40vh" }}>
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3" style={{ color: "#b0bab8" }} />
+              <input
+                type="text"
+                placeholder="Hledat projekt..."
+                value={archiveSearch}
+                onChange={(e) => setArchiveSearch(e.target.value)}
+                className="w-full border rounded px-2 py-1 text-[11px] pl-6"
+                style={{ borderColor: "#ece8e2", outline: "none" }}
+                onFocus={(e) => (e.target.style.borderColor = "#99a5a3")}
+                onBlur={(e) => (e.target.style.borderColor = "#ece8e2")}
+              />
             </div>
-          );
-        })}
+
+            {filteredArchive.length === 0 && (
+              <div className="text-center py-4">
+                <p className="text-[10px] text-muted-foreground">
+                  {archiveSearch ? "Nic nenalezeno" : "Archiv je prázdný"}
+                </p>
+              </div>
+            )}
+
+            {filteredArchive.map((group) => (
+              <ProjectGroup
+                key={group.project_id}
+                group={group}
+                projectExpediceMap={projectExpediceMap}
+                projectTotalItems={projectTotalItems}
+                scheduleData={scheduleData}
+                inboxProjects={inboxProjects}
+                isGroupCollapsed={collapsedGroups.has(`archive-${group.project_id}`)}
+                toggleGroup={() => setCollapsedGroups(prev => {
+                  const key = `archive-${group.project_id}`;
+                  const next = new Set(prev);
+                  next.has(key) ? next.delete(key) : next.add(key);
+                  return next;
+                })}
+                onProjectContextMenu={handleProjectContextMenu}
+                onItemContextMenu={(e, item) => handleItemContextMenu(e, item, true)}
+                onNavigateToTPV={onNavigateToTPV}
+                isArchive={true}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Context menu */}
@@ -408,6 +460,192 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
           actions={contextMenu.actions}
           onClose={() => setContextMenu(null)}
         />
+      )}
+    </div>
+  );
+}
+
+// === PROJECT GROUP COMPONENT ===
+interface ProjectGroupProps {
+  group: { project_id: string; project_name: string; items: ScheduleItem[]; count: number };
+  projectExpediceMap: Map<string, string | null>;
+  projectTotalItems: Map<string, { total: number; nonCompleted: ScheduleItem[] }>;
+  scheduleData: any;
+  inboxProjects: any[];
+  isGroupCollapsed: boolean;
+  toggleGroup: () => void;
+  onProjectContextMenu: (e: React.MouseEvent, projectId: string) => void;
+  onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem) => void;
+  onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void;
+  isArchive: boolean;
+}
+
+function ProjectGroup({
+  group, projectExpediceMap, projectTotalItems,
+  isGroupCollapsed, toggleGroup,
+  onProjectContextMenu, onItemContextMenu, onNavigateToTPV,
+  isArchive,
+}: ProjectGroupProps) {
+  const expediceRaw = projectExpediceMap.get(group.project_id);
+  const expediceDate = parseDate(expediceRaw);
+  const expediceStr = formatShortDate(expediceRaw);
+
+  const totals = projectTotalItems.get(group.project_id);
+  const completedCount = group.count;
+  const totalCount = totals ? totals.total : completedCount;
+  const allDone = completedCount >= totalCount;
+  const missingItems = totals?.nonCompleted ?? [];
+
+  // For archive, find latest expediced_at date
+  const latestExpedicedStr = isArchive
+    ? formatShortDate(
+        group.items.reduce((latest, i) => {
+          const d = i.expediced_at;
+          return d && (!latest || d > latest) ? d : latest;
+        }, null as string | null)
+      )
+    : null;
+
+  return (
+    <div
+      className="rounded-lg overflow-hidden"
+      style={{
+        backgroundColor: "#ffffff",
+        border: "1px solid #ece8e2",
+        borderLeft: `4px solid ${getProjectColor(group.project_id)}`,
+        opacity: isArchive ? 0.7 : 1,
+      }}
+      onContextMenu={(e) => onProjectContextMenu(e, group.project_id)}
+    >
+      <button
+        onClick={toggleGroup}
+        onContextMenu={(e) => onProjectContextMenu(e, group.project_id)}
+        className="w-full flex items-center gap-1.5 px-2.5 py-2 text-left transition-colors"
+        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
+        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+      >
+        {isGroupCollapsed
+          ? <ChevronRight className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />
+          : <ChevronDown className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-1.5">
+            <span
+              className="text-[12px] font-semibold truncate"
+              style={{ color: isArchive ? "#99a5a3" : getProjectColor(group.project_id) }}
+            >
+              {group.project_name}
+            </span>
+            <span
+              className="text-[11px] font-bold px-1.5 py-0.5 rounded-full shrink-0 text-center"
+              style={{
+                backgroundColor: allDone ? "rgba(22,163,74,0.12)" : "rgba(217,151,6,0.12)",
+                color: allDone ? "#16A34A" : "#d97706",
+                minWidth: 40,
+              }}
+            >
+              {completedCount}/{totalCount}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-[9px]" style={{ color: "#99a5a3" }}>{group.project_id}</span>
+            {isArchive && latestExpedicedStr ? (
+              <span className="text-[9px] font-medium shrink-0" style={{ color: "#16A34A" }}>
+                Expedováno: {latestExpedicedStr}
+              </span>
+            ) : expediceStr ? (
+              <span className="text-[9px] font-medium shrink-0" style={{
+                color: expediceDate && expediceDate < new Date() ? "#dc3545"
+                  : expediceDate && differenceInDays(expediceDate, new Date()) <= 7 ? "#D97706"
+                  : "#223937"
+              }}>
+                Exp: {expediceStr}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </button>
+
+      {!isGroupCollapsed && (
+        <div className="px-2.5 pb-2 space-y-1.5">
+          {/* Missing items indicator (active only) */}
+          {!isArchive && !allDone && missingItems.length > 0 && (
+            <div className="text-[8px] text-muted-foreground px-0.5">
+              {missingItems.length <= 2 ? (
+                <span>
+                  Zbývá: {missingItems.map((mi, idx) => (
+                    <span key={mi.id}>
+                      {idx > 0 && " · "}
+                      <span className="font-medium">{mi.item_code || mi.item_name}</span>
+                    </span>
+                  ))}
+                </span>
+              ) : (
+                <span
+                  className="cursor-pointer hover:underline"
+                  style={{ color: "#D97706" }}
+                  onClick={() => {
+                    if (onNavigateToTPV) onNavigateToTPV(group.project_id);
+                  }}
+                >
+                  {missingItems.length} položek zbývá →
+                </span>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-[2px]">
+            {group.items.map((item) => {
+              const isItemExpediced = !!item.expediced_at;
+              const completedStr = formatShortDate(item.completed_at);
+              const expedicedCompactStr = formatShortDateCompact(item.expediced_at);
+
+              return (
+                <div
+                  key={item.id}
+                  className="rounded px-1 py-[3px] cursor-default transition-colors"
+                  style={{ opacity: (isArchive || isItemExpediced) ? 0.4 : 1 }}
+                  onContextMenu={(e) => onItemContextMenu(e, item)}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "hsl(var(--muted))")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                >
+                  <div className="flex items-center gap-1.5">
+                    {isItemExpediced ? (
+                      <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0"
+                        style={{ backgroundColor: "rgba(13,148,136,0.12)", color: "#0d9488" }}>
+                        ✓ Exp
+                      </span>
+                    ) : (
+                      <Check className="shrink-0" style={{ width: 12, height: 12, color: "#16A34A", strokeWidth: 3 }} />
+                    )}
+                    {item.item_code && (
+                      <span className="font-mono text-[10px] shrink-0 text-foreground">
+                        {item.item_code}
+                      </span>
+                    )}
+                    <span
+                      className="text-[11px] truncate flex-1 text-muted-foreground"
+                      style={{ textDecoration: (isArchive || isItemExpediced) ? "line-through" : "none" }}
+                    >
+                      {item.item_name}
+                    </span>
+                  </div>
+                  <div className="ml-[18px] flex flex-col gap-0">
+                    {completedStr && (
+                      <span className="text-[8px] text-muted-foreground">
+                        Dokončeno: {completedStr}
+                      </span>
+                    )}
+                    {isArchive && expedicedCompactStr && (
+                      <span className="text-[8px] font-medium" style={{ color: "#0d9488" }}>
+                        ✓ Expedováno {expedicedCompactStr}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );
