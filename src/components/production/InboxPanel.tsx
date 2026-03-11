@@ -94,6 +94,9 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
   const { data: progressData } = useProductionProgress();
   const { data: settings } = useProductionSettings();
   const { data: allDbProjects = [] } = useProjects();
+  const { data: scheduleData } = useProductionSchedule();
+  const getWeekCapacity = useWeekCapacityLookup();
+  const { moveInboxItemToWeek } = useProductionDragDrop();
   const qc = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [allExpanded, setAllExpanded] = useState(false);
@@ -101,12 +104,48 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [addItemState, setAddItemState] = useState<{ projectId?: string; projectName?: string } | null>(null);
   const [cancelState, setCancelState] = useState<CancelState | null>(null);
+  const [planningState, setPlanningState] = useState<{ projectId: string; projectName: string; items: PlanningItem[] } | null>(null);
 
   const { setNodeRef, isOver } = useDroppable({ id: "inbox-drop-zone", disabled: !!disableDropZone });
 
   const totalHours = useMemo(() => projects.reduce((s, p) => s + p.total_hours, 0), [projects]);
   const hourlyRate = settings?.hourly_rate ?? 550;
+  const weeklyCapacity = settings?.weekly_capacity_hours ?? 875;
   const isHighlighted = isOver || overDroppableId === "inbox-drop-zone";
+
+  // Build next 12 weeks with remaining capacity
+  const planningWeeks = useMemo<PlanningWeek[]>(() => {
+    const now = new Date();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    const result: PlanningWeek[] = [];
+    for (let i = 0; i < 12; i++) {
+      const weekStart = new Date(monday);
+      weekStart.setDate(monday.getDate() + i * 7);
+      const key = weekStart.toISOString().split("T")[0];
+      const weekEnd = addDays(weekStart, 6);
+      const d = new Date(Date.UTC(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate()));
+      const dayNum = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      const weekNum = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+
+      const cap = getWeekCapacity(key);
+      // Sum already scheduled hours for this week
+      const silo = scheduleData?.get(key);
+      const scheduledHours = silo ? silo.total_hours : 0;
+      const remaining = Math.max(0, cap - scheduledHours);
+
+      result.push({
+        key,
+        weekNum,
+        label: `T${weekNum} · ${format(weekStart, "d.M")} – ${format(weekEnd, "d.M")}`,
+        remainingCapacity: remaining,
+      });
+    }
+    return result;
+  }, [getWeekCapacity, scheduleData]);
+
 
   // Map project_id → { datum_smluvni, status }
   const projectInfoMap = useMemo(() => {
