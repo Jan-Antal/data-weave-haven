@@ -31,7 +31,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RozpadCeny } from "./RozpadCeny";
 import { PhotoLightbox, PhotoTimelineGrid, isImageFile, generatePhotoFilename } from "./PhotoLightbox";
 import { useFileSelection } from "@/hooks/useFileSelection";
-import { FileSelectionBar, FolderDropTarget } from "./DocumentDragDrop";
+import { FileSelectionBar, FolderDropTarget, useFileDragVisuals, useDropFlash } from "./DocumentDragDrop";
 
 interface Project {
   id: string;
