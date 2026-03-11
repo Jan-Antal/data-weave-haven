@@ -683,21 +683,21 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
               return (
                 <div
                   key={week.key}
-                  className="shrink-0 text-center px-1 py-1.5 border-b border-r border-border/50 bg-card"
+                  className="shrink-0 text-center px-1.5 py-2 border-b border-r border-border/50 bg-card"
                   style={{
                     width: CELL_W,
                     backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : undefined,
                     borderTop: week.isCurrent ? "2px solid hsl(var(--primary))" : undefined,
                   }}
                 >
-                  <div className="font-mono text-[11px] font-bold text-foreground">T{week.weekNum}</div>
-                  <div className="text-[8px] text-muted-foreground">
+                  <div className="font-mono text-[12px] font-bold text-foreground leading-tight">T{week.weekNum}</div>
+                  <div className="text-[9px] text-muted-foreground mt-0.5">
                     {formatDateShort(week.start)} – {formatDateShort(week.end)}
                   </div>
-                  <div className="h-[4px] rounded mt-1 mx-1 overflow-hidden" style={{ backgroundColor: "hsl(var(--muted))" }}>
-                    <div className="h-full rounded" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: barColor }} />
+                  <div className="h-[5px] rounded-full mt-1.5 mx-0.5 overflow-hidden" style={{ backgroundColor: "hsl(var(--muted))" }}>
+                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: barColor }} />
                   </div>
-                  <div className="font-mono text-[9px] mt-0.5 font-semibold" style={{ color: barColor }}>
+                  <div className="font-mono text-[9px] mt-1 font-semibold" style={{ color: barColor }}>
                     {formatCapacity(used, week.key)}
                   </div>
                 </div>
