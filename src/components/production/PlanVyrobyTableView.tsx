@@ -86,10 +86,17 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
   const { data: expediceData } = useProductionExpedice();
   const { data: inboxProjects = [] } = useProductionInbox();
   const { data: settings } = useProductionSettings();
+  const { data: allProjects = [] } = useProjects();
   const getWeekCapacity = useWeekCapacityLookup();
   const [sortMode, setSortMode] = useState<SortMode>("project");
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const projectDateLookup = useMemo(() => {
+    const map = new Map<string, { expedice?: string | null; datum_smluvni?: string | null }>();
+    for (const p of allProjects) map.set(p.project_id, p);
+    return map;
+  }, [allProjects]);
 
   const hourlyRate = settings?.hourly_rate ?? 550;
 
