@@ -309,15 +309,41 @@ export function useProductionDragDrop() {
 
   const reorderItemsInWeek = useCallback(async (weekDate: string, orderedItemIds: string[]) => {
     try {
+      // Capture old order for undo
+      const { data: oldItems } = await supabase.from("production_schedule")
+        .select("id, position")
+        .in("id", orderedItemIds);
+      const oldOrder = (oldItems || []).sort((a, b) => a.position - b.position).map(i => i.id);
+
       const updates = orderedItemIds.map((id, i) =>
         supabase.from("production_schedule").update({ position: i }).eq("id", id)
       );
       await Promise.all(updates);
       invalidateAll();
+
+      pushUndo({
+        page: "plan-vyroby",
+        actionType: "reorder",
+        description: "Změna pořadí položek",
+        undo: async () => {
+          const restores = oldOrder.map((id, i) =>
+            supabase.from("production_schedule").update({ position: i }).eq("id", id)
+          );
+          await Promise.all(restores);
+          invalidateAll();
+        },
+        redo: async () => {
+          const reapply = orderedItemIds.map((id, i) =>
+            supabase.from("production_schedule").update({ position: i }).eq("id", id)
+          );
+          await Promise.all(reapply);
+          invalidateAll();
+        },
+      });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
-  }, [invalidateAll]);
+  }, [invalidateAll, pushUndo]);
 
   const completeItems = useCallback(async (itemIds: string[]) => {
     try {
