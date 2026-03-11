@@ -13,10 +13,13 @@ import { SplitBundleDialog } from "./SplitBundleDialog";
 import { PauseItemDialog } from "./PauseItemDialog";
 import { CancelItemDialog } from "./CancelItemDialog";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
+import { useProjects } from "@/hooks/useProjects";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import { parseAppDate } from "@/lib/dateFormat";
+import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -116,8 +119,15 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
+  const { data: allProjects = [] } = useProjects();
   const qc = useQueryClient();
   const getWeekCapacity = useWeekCapacityLookup();
+
+  const projectLookup = useMemo(() => {
+    const map = new Map<string, { datum_smluvni?: string | null; expedice?: string | null; status?: string | null; risk?: string | null }>();
+    for (const p of allProjects) map.set(p.project_id, p);
+    return map;
+  }, [allProjects]);
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [completionState, setCompletionState] = useState<CompletionState | null>(null);
@@ -487,6 +497,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               onBundleContextMenu={(e, bundle, toggleExpand) => handleBundleContextMenu(e, bundle, week.key, week.weekNum, week.start, week.end, toggleExpand)}
               onItemContextMenu={(e, item, bundle) => handleItemContextMenu(e, item, week.key, week.weekNum, week.start, week.end, bundle)}
               allWeeksData={weeksCapacityMap} weekKeys={weekKeys} registerRef={registerSiloRef}
+              projectLookup={projectLookup}
             />
           ))}
         </div>
@@ -542,6 +553,8 @@ function ToolbarButton({ active, disabled, label, onClick }: { active?: boolean;
   );
 }
 
+type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; status?: string | null; risk?: string | null }>;
+
 interface SiloProps {
   weekKey: string; weekNum: number; startDate: Date; endDate: Date;
   isCurrent: boolean; isPast: boolean; silo: WeekSilo | null;
@@ -550,10 +563,11 @@ interface SiloProps {
   onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem, bundle: ScheduleBundle) => void;
   allWeeksData: Map<string, { total_hours: number }>; weekKeys: string[];
   registerRef: (key: string, el: HTMLDivElement | null) => void;
+  projectLookup: ProjectLookup;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup }: SiloProps) {
   // Capacity calculation: exclude paused items
   const activeHours = useMemo(() => {
     if (!silo) return 0;
@@ -621,7 +635,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
         {silo?.bundles.map(bundle => (
           <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey}
             showCzk={showCzk} hourlyRate={hourlyRate}
-            onBundleContextMenu={onBundleContextMenu} onItemContextMenu={onItemContextMenu} />
+            onBundleContextMenu={onBundleContextMenu} onItemContextMenu={onItemContextMenu}
+            projectLookup={projectLookup} />
         ))}
       </div>
 
@@ -633,10 +648,21 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
   );
 }
 
-function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleContextMenu, onItemContextMenu }: {
+function formatDateShortYY(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  const d = parseAppDate(dateStr);
+  if (!d) return null;
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${dd}.${mm}.${yy}`;
+}
+
+function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleContextMenu, onItemContextMenu, projectLookup }: {
   bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number;
   onBundleContextMenu: (e: React.MouseEvent, bundle: ScheduleBundle, toggleExpand: () => void) => void;
   onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem, bundle: ScheduleBundle) => void;
+  projectLookup: ProjectLookup;
 }) {
   const [expanded, setExpanded] = useState(false);
   const color = getProjectColor(bundle.project_id);
@@ -644,6 +670,17 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
   const totalCount = bundle.items.length;
   const allCompleted = completedCount === totalCount && totalCount > 0;
   const hasUncompleted = completedCount < totalCount;
+
+  const project = projectLookup.get(bundle.project_id);
+  const severity = project ? getProjectRiskSeverity(project) : null;
+  const expDate = formatDateShortYY(project?.expedice);
+  const smlDate = formatDateShortYY(project?.datum_smluvni);
+  const hasDates = !!(expDate || smlDate);
+
+  const borderLeftColor = allCompleted ? "#3a8a36"
+    : severity === "overdue" ? "#dc3545"
+    : severity === "upcoming" ? "#d97706"
+    : color;
 
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: `silo-bundle-${bundle.project_id}-${weekKey}`,
@@ -653,10 +690,21 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
   const toggleExpand = useCallback(() => setExpanded(v => !v), []);
 
   return (
-    <div className="rounded-[6px] overflow-hidden" style={{
-      border: "1px solid #ece8e2", borderLeft: `4px solid ${allCompleted ? "#3a8a36" : color}`,
+    <div className="rounded-[6px] overflow-hidden relative" style={{
+      border: "1px solid #ece8e2", borderLeft: `4px solid ${borderLeftColor}`,
       backgroundColor: "#ffffff", opacity: isDragging ? 0.3 : 1,
     }}>
+      {/* Warning badge */}
+      {severity && !allCompleted && (
+        <div className="absolute top-1 right-1 z-10 flex items-center justify-center rounded-full"
+          style={{
+            width: 14, height: 14, fontSize: 9, fontWeight: 700,
+            backgroundColor: severity === "overdue" ? "#dc3545" : "#d97706",
+            color: "#fff",
+          }}
+        >!</div>
+      )}
+
       <div className="flex" style={{ borderBottom: expanded ? "1px solid #ece8e2" : "none" }}>
         {/* Left strip: expand/collapse toggle — NOT draggable */}
         <div
@@ -678,7 +726,14 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
         >
           <div className="flex-1 min-w-0">
             <div className="text-[11px] font-semibold truncate" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>{bundle.project_name}</div>
-            <div className="font-mono text-[8px]" style={{ color: "#99a5a3" }}>{bundle.project_id}</div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-[8px]" style={{ color: "#99a5a3" }}>{bundle.project_id}</span>
+              {hasDates && !allCompleted && (
+                <span className="text-[7px] truncate" style={{ color: severity === "overdue" ? "#dc3545" : severity === "upcoming" ? "#d97706" : "#99a5a3" }}>
+                  {smlDate && `Sml: ${smlDate}`}{smlDate && expDate && " · "}{expDate && `Exp: ${expDate}`}
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {completedCount > 0 && <span className="text-[9px] font-medium" style={{ color: "#3a8a36" }}>{completedCount}/{totalCount} ✓</span>}
