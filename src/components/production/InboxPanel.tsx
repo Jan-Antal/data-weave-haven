@@ -588,7 +588,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
           <DraggableInboxProject project={project} />
           {onNavigateToTPV && (
             <button onClick={() => onNavigateToTPV(project.project_id)} className="w-full text-[9px] text-center py-1 hover:underline transition-colors" style={{ color: "#6b7a78" }}>
-              📋 Zobrazit TPV položky
+              📋 Zobrazit položky
             </button>
           )}
         </div>
