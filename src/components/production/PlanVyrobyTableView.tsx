@@ -733,10 +733,10 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
             })}
             {hasAnyExpedice && (
               <div
-                className="shrink-0 text-center px-1 border-b border-l border-border/50 sticky right-0 z-40 flex items-center justify-center"
-                style={{ width: EXPEDICE_W, backgroundColor: STATUS_COLORS.completed.bg }}
+                className="shrink-0 px-2 py-2 border-b border-l border-border/50 sticky right-0 z-40 flex flex-col items-center justify-center"
+                style={{ width: EXPEDICE_W, backgroundColor: "#f0fdf4" }}
               >
-                <div className="text-[10px] font-bold" style={{ color: STATUS_COLORS.completed.text }}>✓ Expedice</div>
+                <div className="text-sm font-semibold" style={{ color: "#16A34A" }}>📦 Expedice</div>
               </div>
             )}
           </div>
