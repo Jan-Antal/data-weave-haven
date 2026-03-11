@@ -127,9 +127,14 @@ export default function PlanVyroby() {
 
 
   const tpvProject = tpvProjectId ? allProjects.find(p => p.project_id === tpvProjectId) : null;
+  const detailProject = detailProjectId ? allProjects.find(p => p.project_id === detailProjectId) || null : null;
 
   const handleNavigateToTPV = useCallback((projectId: string, _itemCode?: string | null) => {
     setTpvProjectId(projectId);
+  }, []);
+
+  const handleOpenProjectDetail = useCallback((projectId: string) => {
+    setDetailProjectId(projectId);
   }, []);
 
   const findSpillWeek = useCallback((afterWeekKey: string): { key: string; weekNum: number } => {
