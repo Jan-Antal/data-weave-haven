@@ -502,6 +502,20 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
       {cancelState && (
         <CancelItemDialog open={!!cancelState} onOpenChange={open => !open && setCancelState(null)} {...cancelState} itemCode={cancelState.itemCode} />
       )}
+
+      {/* Planning dialog */}
+      {planningState && (
+        <InboxPlanningDialog
+          open={!!planningState}
+          onOpenChange={open => !open && setPlanningState(null)}
+          projectId={planningState.projectId}
+          projectName={planningState.projectName}
+          items={planningState.items}
+          weeks={planningWeeks}
+          weeklyCapacity={weeklyCapacity}
+          onConfirm={handlePlanConfirm}
+        />
+      )}
     </div>
   );
 }
