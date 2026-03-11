@@ -656,35 +656,20 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
         </div>
       </div>
 
-      {/* Legend strip */}
-      <div className="px-3 py-1.5 flex items-center gap-4 shrink-0 border-b border-border bg-card/50">
-        {[
-          { label: "Inbox", bg: STATUS_COLORS.inbox.bg, border: STATUS_COLORS.inbox.border },
-          { label: "Naplánováno", bg: STATUS_COLORS.scheduled.bg, border: STATUS_COLORS.scheduled.border },
-          { label: "Ve výrobě", bg: STATUS_COLORS.in_progress.bg, border: STATUS_COLORS.in_progress.border },
-          { label: "✓ Dokončeno", bg: STATUS_COLORS.completed.bg, border: STATUS_COLORS.completed.border },
-          { label: "⏸ Pozastaveno", bg: STATUS_COLORS.paused.bg, border: STATUS_COLORS.paused.border },
-        ].map(l => (
-          <div key={l.label} className="flex items-center gap-1.5">
-            <div className="rounded" style={{ width: 16, height: 16, backgroundColor: l.bg, border: `1.5px solid ${l.border}` }} />
-            <span className="text-[10px] font-medium text-muted-foreground">{l.label}</span>
-          </div>
-        ))}
-      </div>
 
       {/* Table */}
       <div className="flex-1 overflow-auto bg-muted/30" ref={scrollRef} style={{ padding: "0 0 8px 0" }}>
         <div className="min-w-max">
           {/* Header row */}
           <div className="flex sticky top-0 z-30" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            <div className="shrink-0 sticky left-0 z-40 border-r border-b border-border bg-card" style={{ width: LEFT_COL_W }}>
-              <div className="px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+            <div className="shrink-0 sticky left-0 z-40 border-r border-b border-border bg-card flex items-end" style={{ width: LEFT_COL_W }}>
+              <div className="px-3 pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                 Projekt / Položka
               </div>
             </div>
             {hasAnyInbox && (
               <div
-                className="shrink-0 text-center px-1 py-1.5 border-b border-r border-border/50 sticky z-40"
+                className="shrink-0 text-center px-1 border-b border-r border-border/50 sticky z-40 flex items-center justify-center"
                 style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: STATUS_COLORS.inbox.bg }}
               >
                 <div className="text-[10px] font-bold" style={{ color: STATUS_COLORS.inbox.text }}>📥 Inbox</div>
@@ -698,21 +683,21 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
               return (
                 <div
                   key={week.key}
-                  className="shrink-0 text-center px-1 py-1.5 border-b border-r border-border/50 bg-card"
+                  className="shrink-0 text-center px-1.5 py-2 border-b border-r border-border/50 bg-card"
                   style={{
                     width: CELL_W,
                     backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : undefined,
                     borderTop: week.isCurrent ? "2px solid hsl(var(--primary))" : undefined,
                   }}
                 >
-                  <div className="font-mono text-[11px] font-bold text-foreground">T{week.weekNum}</div>
-                  <div className="text-[8px] text-muted-foreground">
+                  <div className="font-mono text-[12px] font-bold text-foreground leading-tight">T{week.weekNum}</div>
+                  <div className="text-[9px] text-muted-foreground mt-0.5">
                     {formatDateShort(week.start)} – {formatDateShort(week.end)}
                   </div>
-                  <div className="h-[4px] rounded mt-1 mx-1 overflow-hidden" style={{ backgroundColor: "hsl(var(--muted))" }}>
-                    <div className="h-full rounded" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: barColor }} />
+                  <div className="h-[5px] rounded-full mt-1.5 mx-0.5 overflow-hidden" style={{ backgroundColor: "hsl(var(--muted))" }}>
+                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: barColor }} />
                   </div>
-                  <div className="font-mono text-[9px] mt-0.5 font-semibold" style={{ color: barColor }}>
+                  <div className="font-mono text-[9px] mt-1 font-semibold" style={{ color: barColor }}>
                     {formatCapacity(used, week.key)}
                   </div>
                 </div>
@@ -720,7 +705,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
             })}
             {hasAnyExpedice && (
               <div
-                className="shrink-0 text-center px-1 py-1.5 border-b border-l border-border/50 sticky right-0 z-40"
+                className="shrink-0 text-center px-1 border-b border-l border-border/50 sticky right-0 z-40 flex items-center justify-center"
                 style={{ width: EXPEDICE_W, backgroundColor: STATUS_COLORS.completed.bg }}
               >
                 <div className="text-[10px] font-bold" style={{ color: STATUS_COLORS.completed.text }}>✓ Expedice</div>
@@ -987,11 +972,20 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="px-3 py-2 flex items-center justify-end shrink-0 border-t border-border bg-card">
-        <span className="text-[9px] italic text-muted-foreground/60">
-          Klikněte na buňku pro úpravu plánu
-        </span>
+      {/* Legend footer */}
+      <div className="shrink-0 border-t border-border bg-card flex items-center justify-center gap-5" style={{ height: 32 }}>
+        {[
+          { label: "Inbox", bg: STATUS_COLORS.inbox.bg, border: STATUS_COLORS.inbox.border },
+          { label: "Naplánováno", bg: STATUS_COLORS.scheduled.bg, border: STATUS_COLORS.scheduled.border },
+          { label: "Ve výrobě", bg: STATUS_COLORS.in_progress.bg, border: STATUS_COLORS.in_progress.border },
+          { label: "✓ Dokončeno", bg: STATUS_COLORS.completed.bg, border: STATUS_COLORS.completed.border },
+          { label: "⏸ Pozastaveno", bg: STATUS_COLORS.paused.bg, border: STATUS_COLORS.paused.border },
+        ].map(l => (
+          <div key={l.label} className="flex items-center gap-1.5">
+            <div className="rounded-full" style={{ width: 8, height: 8, backgroundColor: l.border }} />
+            <span className="text-[10px] font-medium text-muted-foreground">{l.label}</span>
+          </div>
+        ))}
       </div>
 
       {/* Cancel dialog */}
