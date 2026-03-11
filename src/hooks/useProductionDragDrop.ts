@@ -57,6 +57,15 @@ export function useProductionDragDrop() {
         .eq("id", inboxItemId);
       if (updateErr) throw updateErr;
 
+      // Log activity
+      logActivity({
+        projectId: item.project_id,
+        actionType: "item_scheduled",
+        oldValue: "Inbox",
+        newValue: weekLabel(weekDate),
+        detail: JSON.stringify({ item_name: item.item_name, item_code: item.item_code, week: weekLabel(weekDate), scheduled_hours: item.estimated_hours, scheduled_czk: item.estimated_czk }),
+      });
+
       invalidateAll();
 
       // Push undo
