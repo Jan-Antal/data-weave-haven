@@ -735,8 +735,8 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
     : null;
 
   const borderLeftColor = allCompleted ? "#3a8a36"
-    : severity === "overdue" ? "#dc3545"
-    : severity === "upcoming" ? "#d97706"
+    : expSeverity === "overdue" ? "#dc3545"
+    : expSeverity === "urgent" ? "#d97706"
     : color;
 
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
