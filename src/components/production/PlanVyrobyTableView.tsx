@@ -870,8 +870,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                         }}
                       >
                         {proj.expediceTotalHours > 0 && (
-                          <div className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-bold" style={{ backgroundColor: STATUS_COLORS.completed.bg, color: STATUS_COLORS.completed.text }}>
-                            {formatExpediceValue(proj.expediceTotalHours, proj.expediceTotalCzk, proj.totalHours)} ✓
+                          <div className="rounded-md px-2 py-0.5 text-center text-[10px] font-mono font-bold" style={{ backgroundColor: "#dcfce7", color: "#15803d" }}>
+                            ✓ {formatExpediceValue(proj.expediceTotalHours, proj.expediceTotalCzk, proj.totalHours)}
                           </div>
                         )}
                       </div>
