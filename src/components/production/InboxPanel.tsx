@@ -3,6 +3,7 @@ import { ChevronRight, GripVertical, Check, Plus } from "lucide-react";
 import { useProductionInbox, type InboxProject, type InboxItem } from "@/hooks/useProductionInbox";
 import { useProductionProgress, type ProjectProgress } from "@/hooks/useProductionProgress";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
+import { useProjects } from "@/hooks/useProjects";
 import { getProjectColor } from "@/lib/projectColors";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -13,6 +14,8 @@ import { ProductionContextMenu, type ContextMenuAction } from "./ProductionConte
 import { AddItemPopover, getAdhocBadge } from "./AddItemPopover";
 import { CancelItemDialog } from "./CancelItemDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { parseAppDate } from "@/lib/dateFormat";
+import { differenceInDays, isPast } from "date-fns";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -20,68 +23,30 @@ function formatCompactCzk(v: number): string {
   return `${Math.round(v)}`;
 }
 
-const SAMPLE_ITEMS = [
-  { pid: "Z-2601-001", items: [{ name: "Kuchyňská linka A", code: "TK.01", h: 120 }, { name: "Obývací stěna", code: "OB.01", h: 85 }, { name: "Vestavěné skříně", code: "SK.01", h: 95 }, { name: "Jídelní stůl masiv", code: "JS.01", h: 60 }, { name: "Komoda předsíň", code: "KM.02", h: 45 }] },
-  { pid: "Z-2502-011", items: [{ name: "Recepční pult", code: "NB.01", h: 180 }, { name: "Jednací stoly 6ks", code: "ST.01", h: 65 }, { name: "Knihovna lobby", code: "KN.01", h: 140 }, { name: "Kancelářské příčky", code: "PR.01", h: 210 }, { name: "Šatní skříně 12ks", code: "SS.01", h: 160 }, { name: "Kuchyňka kancelář", code: "TK.05", h: 90 }] },
-  { pid: "Z-2504-019", items: [{ name: "Kuchyň - spodní skříňky", code: "TK.02", h: 75 }, { name: "Kuchyň - horní skříňky", code: "TK.03", h: 55 }, { name: "Ostrůvek s digestoří", code: "TK.06", h: 130 }, { name: "Spižní skříň", code: "TK.07", h: 40 }] },
-  { pid: "Z-2513-002", items: [{ name: "Stolové desky 10ks", code: "SD.01", h: 35 }, { name: "Podnoží 10ks", code: "PD.01", h: 45 }, { name: "Montáž a povrch", code: "MP.01", h: 60 }, { name: "Konferenční stůl", code: "KS.01", h: 80 }] },
-  { pid: "Z-2603-002", items: [{ name: "Doplňky set A", code: "DP.01", h: 40 }, { name: "Doplňky set B", code: "DP.02", h: 55 }, { name: "Zrcadlová stěna", code: "ZS.01", h: 70 }] },
-  { pid: "Z-2607-002", items: [{ name: "Skříň PPF Gate", code: "SK.02", h: 280 }, { name: "Vitrína showroom", code: "VT.01", h: 150 }, { name: "Pult info", code: "NB.04", h: 95 }] },
-  { pid: "Z-2601-005", items: [{ name: "Ložnicová sestava", code: "LS.01", h: 200 }, { name: "Noční stolky 2ks", code: "NS.01", h: 30 }, { name: "Šatní vestavba", code: "SV.01", h: 170 }, { name: "Toaletní stolek", code: "TS.01", h: 50 }] },
-  { pid: "Z-2508-003", items: [{ name: "Barový pult hotel", code: "BP.01", h: 320 }, { name: "Zadní stěna baru", code: "ZB.01", h: 180 }, { name: "Poličky na lahve", code: "PL.03", h: 65 }, { name: "Chladící skříň obklad", code: "CH.01", h: 110 }, { name: "Sedací boxy 4ks", code: "SB.01", h: 240 }] },
-  { pid: "Z-2610-001", items: [{ name: "Stůl jednací oval", code: "SJ.01", h: 90 }, { name: "Kredenc ředitelna", code: "KR.01", h: 120 }, { name: "Obklad stěn dýha", code: "OD.01", h: 260 }] },
-];
+type UrgencyLevel = "overdue" | "urgent" | "upcoming" | "ok";
 
-interface InboxPanelProps {
-  overDroppableId?: string | null;
-  showCzk?: boolean;
-  onNavigateToTPV?: (projectId: string) => void;
-  disableDropZone?: boolean;
+function getUrgency(datumSmluvni: string | null | undefined, status: string | null | undefined): UrgencyLevel {
+  if (!datumSmluvni) return "ok";
+  // Exclude finished projects
+  const s = (status ?? "").toLowerCase();
+  if (s === "fakturace" || s === "dokonceno" || s === "dokončeno") return "ok";
+  const d = parseAppDate(datumSmluvni);
+  if (!d) return "ok";
+  if (isPast(d)) return "overdue";
+  const days = differenceInDays(d, new Date());
+  if (days <= 14) return "urgent";
+  if (days <= 30) return "upcoming";
+  return "ok";
 }
 
-interface ContextMenuState {
-  x: number; y: number; actions: ContextMenuAction[];
-}
+const URGENCY_ORDER: Record<UrgencyLevel, number> = { overdue: 0, urgent: 1, upcoming: 2, ok: 3 };
 
-interface CancelState {
-  itemId: string; itemName: string; itemCode: string | null;
-  hours: number; projectName: string; projectId: string;
-  source: "schedule" | "inbox"; splitGroupId: string | null;
-}
-
-export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableDropZone }: InboxPanelProps) {
-  const { data: projects = [], isLoading } = useProductionInbox();
-  const { data: progressData } = useProductionProgress();
-  const { data: settings } = useProductionSettings();
-  const qc = useQueryClient();
-  const [loading, setLoading] = useState(false);
-  const [allExpanded, setAllExpanded] = useState(false);
-  const [expandKey, setExpandKey] = useState(0);
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [addItemState, setAddItemState] = useState<{ projectId?: string; projectName?: string } | null>(null);
-  const [cancelState, setCancelState] = useState<CancelState | null>(null);
-
-  const { setNodeRef, isOver } = useDroppable({ id: "inbox-drop-zone", disabled: !!disableDropZone });
-
-  const totalHours = useMemo(() => projects.reduce((s, p) => s + p.total_hours, 0), [projects]);
-  const hourlyRate = settings?.hourly_rate ?? 550;
-  const isHighlighted = isOver || overDroppableId === "inbox-drop-zone";
-
-  const completedProjects = useMemo(() => {
-    if (!progressData) return [];
-    const activeProjectIds = new Set(projects.map(p => p.project_id));
-    return Array.from(progressData.values()).filter(p => p.is_complete && !activeProjectIds.has(p.project_id));
-  }, [progressData, projects]);
-
-  // All unique project IDs for the add item dropdown
-  const allProjectOptions = useMemo(() => {
-    const seen = new Set<string>();
-    const result: { project_id: string; project_name: string }[] = [];
-    for (const p of projects) {
-      if (!seen.has(p.project_id)) { seen.add(p.project_id); result.push({ project_id: p.project_id, project_name: p.project_name }); }
-    }
-    return result;
-  }, [projects]);
+const URGENCY_COLORS: Record<UrgencyLevel, { border: string; text: string; bg: string }> = {
+  overdue:  { border: "#DC2626", text: "#DC2626", bg: "rgba(220,38,38,0.08)" },
+  urgent:   { border: "#D97706", text: "#D97706", bg: "rgba(217,119,6,0.08)" },
+  upcoming: { border: "#2563EB", text: "#2563EB", bg: "transparent" },
+  ok:       { border: "transparent", text: "#223937", bg: "transparent" },
+};
 
   const handleExpandAll = () => { setAllExpanded(true); setExpandKey((k) => k + 1); };
   const handleCollapseAll = () => { setAllExpanded(false); setExpandKey((k) => k + 1); };
