@@ -668,10 +668,18 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
             </div>
             {hasAnyInbox && (
               <div
-                className="shrink-0 text-center px-1 border-b border-r border-border/50 sticky z-40 flex items-center justify-center"
-                style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: STATUS_COLORS.inbox.bg }}
+                className="shrink-0 px-2 py-2 border-b border-r border-border/50 sticky z-40 flex flex-col items-center justify-center"
+                style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff7ed" }}
               >
-                <div className="text-[10px] font-bold" style={{ color: STATUS_COLORS.inbox.text }}>📥 Inbox</div>
+                <div className="text-sm font-semibold" style={{ color: "#EA580C" }}>📥 Inbox</div>
+                {(() => {
+                  const totalInboxH = filteredRows.reduce((s, p) => s + p.inboxTotalHours, 0);
+                  return totalInboxH > 0 ? (
+                    <div className="text-[10px] font-mono font-bold mt-0.5" style={{ color: "#EA580C" }}>
+                      {Math.round(totalInboxH).toLocaleString("cs-CZ")}h
+                    </div>
+                  ) : null;
+                })()}
               </div>
             )}
             {weeks.map(week => {
