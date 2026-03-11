@@ -4,6 +4,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
+import { logActivity } from "@/lib/activityLog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
 import { Slider } from "@/components/ui/slider";
 
