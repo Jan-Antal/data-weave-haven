@@ -81,6 +81,43 @@ export function SplitItemDialog({
   const [editingPart, setEditingPart] = useState<1 | 2 | null>(null);
   const [editValue, setEditValue] = useState("");
 
+  const czkPerHour = totalHours > 0 ? scheduledCzk / totalHours : 550;
+  const part1Hours = Math.round(totalHours * pct / 100);
+  const part2Hours = totalHours - part1Hours;
+
+  const futureWeeks = useMemo(() => {
+    const today = getMonday(new Date()).toISOString().split("T")[0];
+    return weeks.filter(w => w.key >= today);
+  }, [weeks]);
+
+  const defaultTargetWeek = useMemo(() => {
+    if (!currentWeekKey) return futureWeeks[0]?.key || "";
+    const idx = futureWeeks.findIndex(w => w.key === currentWeekKey);
+    for (let i = idx + 1; i < futureWeeks.length; i++) {
+      if (futureWeeks[i].remainingCapacity > 0) return futureWeeks[i].key;
+    }
+    return futureWeeks[idx + 1]?.key || futureWeeks[0]?.key || "";
+  }, [currentWeekKey, futureWeeks]);
+
+  const [targetWeek, setTargetWeek] = useState(defaultTargetWeek);
+
+  useEffect(() => {
+    setTargetWeek(defaultTargetWeek);
+    setPct(50);
+  }, [defaultTargetWeek, open]);
+
+  const currentWeekNum = useMemo(() => {
+    if (!currentWeekKey) return "?";
+    return getISOWeekNumber(new Date(currentWeekKey));
+  }, [currentWeekKey]);
+
+  const targetWeekNum = useMemo(() => {
+    const w = futureWeeks.find(w => w.key === targetWeek);
+    return w?.weekNum ?? "?";
+  }, [targetWeek, futureWeeks]);
+
+  const cleanName = itemName.replace(/\s*\(\d+\/\d+\)$/, "");
+
   const invalidateAll = useCallback(() => {
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
     qc.invalidateQueries({ queryKey: ["production-inbox"] });
