@@ -3,6 +3,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { renumberSiblings } from "./SplitItemDialog";
 
 interface CancelItemDialogProps {
