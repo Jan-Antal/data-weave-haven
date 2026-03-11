@@ -445,6 +445,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
             <InboxProjectGroup key={`${project.project_id}-${expandKey}`} project={project} hourlyRate={hourlyRate}
               defaultExpanded={allExpanded} showCzk={showCzk} progress={progressData?.get(project.project_id)}
               onNavigateToTPV={onNavigateToTPV}
+              onOpenProjectDetail={onOpenProjectDetail}
               onProjectContextMenu={handleProjectContextMenu}
               onItemContextMenu={handleItemContextMenu}
               urgency={urgency}
