@@ -888,7 +888,7 @@ function PausedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onContext
             {isOverdue ? "⚠ " : ""}⏸ {pauseReason}
           </span>
         </TooltipTrigger>
-        <TooltipContent className="text-[10px]">
+        <TooltipContent side="top" className="z-[9999] text-[10px]">
           {pauseExpDate ? `Očekávané uvolnění: ${new Date(pauseExpDate).toLocaleDateString("cs-CZ")}` : "Bez termínu uvolnění"}
         </TooltipContent>
       </Tooltip>
