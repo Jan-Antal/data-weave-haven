@@ -533,7 +533,7 @@ export function SpillSuggestionPanel({
               : `Přelít → T${targetWeekNum}`}
           </button>
           <button
-            onClick={() => setDismissed(true)}
+            onClick={() => handleDismiss()}
             className="px-2 py-1 text-[8px] font-medium rounded transition-colors"
             style={{ color: "#6b7a78", border: "1px solid #e2ddd6" }}
           >
