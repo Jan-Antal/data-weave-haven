@@ -452,15 +452,105 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   const { data: settings } = useProductionSettings();
   const { data: scheduleData } = useProductionSchedule();
   const { data: inboxProjects = [] } = useProductionInbox();
+  const getWeekCapacity = useWeekCapacityLookup();
 
-  const monthlyHours = settings?.monthly_capacity_hours ?? 3500;
+  type StatsScope = "week" | "month" | "all";
+  const [statsScope, setStatsScope] = useState<StatsScope>(() => {
+    const saved = localStorage.getItem("ami_plan_stats_scope");
+    return (saved === "week" || saved === "month" || saved === "all") ? saved : "month";
+  });
+  const handleScopeChange = (s: StatsScope) => {
+    setStatsScope(s);
+    localStorage.setItem("ami_plan_stats_scope", s);
+  };
+
   const hourlyRate = settings?.hourly_rate ?? 550;
-  const monthlyCzk = monthlyHours * hourlyRate;
-  const scheduledHours = scheduleData
-    ? Array.from(scheduleData.values()).reduce((s, w) => s + w.total_hours, 0)
-    : 0;
   const inboxHours = inboxProjects.reduce((s, p) => s + p.total_hours, 0);
-  const isOverCapacity = scheduledHours > monthlyHours;
+
+  // Current week key
+  const currentWeekKey = useMemo(() => {
+    const d = new Date();
+    const day = d.getDay();
+    d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString().split("T")[0];
+  }, []);
+
+  // Current month boundaries (week keys whose Monday falls in the current month)
+  const currentMonthWeekKeys = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const keys: string[] = [];
+    // Generate all Mondays that fall within this calendar month
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    // Find the Monday on or before first day of month
+    const d = new Date(firstDay);
+    const day = d.getDay();
+    d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
+    // Iterate through Mondays
+    while (d <= lastDay) {
+      // Include if Monday falls within this month
+      if (d.getMonth() === month && d.getFullYear() === year) {
+        keys.push(d.toISOString().split("T")[0]);
+      }
+      d.setDate(d.getDate() + 7);
+    }
+    // Also check weeks from schedule data that have any day in this month
+    if (scheduleData) {
+      for (const weekKey of scheduleData.keys()) {
+        const monday = new Date(weekKey + "T00:00:00");
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        if ((monday.getMonth() === month && monday.getFullYear() === year) ||
+            (sunday.getMonth() === month && sunday.getFullYear() === year)) {
+          if (!keys.includes(weekKey)) keys.push(weekKey);
+        }
+      }
+    }
+    return keys;
+  }, [scheduleData]);
+
+  const { capacityHours, scheduledHours, scheduledCzk } = useMemo(() => {
+    if (!scheduleData) return { capacityHours: 0, scheduledHours: 0, scheduledCzk: 0 };
+
+    if (statsScope === "week") {
+      const silo = scheduleData.get(currentWeekKey);
+      const cap = getWeekCapacity(currentWeekKey);
+      const hours = silo ? silo.total_hours : 0;
+      const czk = silo ? silo.bundles.reduce((s, b) => s + b.items.reduce((ss, i) => ss + i.scheduled_czk, 0), 0) : 0;
+      return { capacityHours: cap, scheduledHours: hours, scheduledCzk: czk };
+    }
+
+    if (statsScope === "month") {
+      let cap = 0;
+      let hours = 0;
+      let czk = 0;
+      for (const wk of currentMonthWeekKeys) {
+        cap += getWeekCapacity(wk);
+        const silo = scheduleData.get(wk);
+        if (silo) {
+          hours += silo.total_hours;
+          czk += silo.bundles.reduce((s, b) => s + b.items.reduce((ss, i) => ss + i.scheduled_czk, 0), 0);
+        }
+      }
+      return { capacityHours: cap, scheduledHours: hours, scheduledCzk: czk };
+    }
+
+    // "all"
+    const monthlyHours = settings?.monthly_capacity_hours ?? 3500;
+    let hours = 0;
+    let czk = 0;
+    for (const [, silo] of scheduleData) {
+      hours += silo.total_hours;
+      czk += silo.bundles.reduce((s, b) => s + b.items.reduce((ss, i) => ss + i.scheduled_czk, 0), 0);
+    }
+    return { capacityHours: monthlyHours, scheduledHours: hours, scheduledCzk: czk };
+  }, [scheduleData, statsScope, currentWeekKey, currentMonthWeekKeys, getWeekCapacity, settings]);
+
+  const isOverCapacity = scheduledHours > capacityHours;
+  const displayCzk = statsScope === "all" ? capacityHours * hourlyRate : scheduledCzk;
 
   const formatCzk = (v: number) => {
     if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M Kč`;
@@ -482,6 +572,12 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
     }
     return `${months[first.getMonth()]} ${first.getFullYear()} – ${months[last.getMonth()]} ${last.getFullYear()}`;
   }, [scheduleData]);
+
+  const scopeOptions: { key: StatsScope; label: string }[] = [
+    { key: "week", label: "Týden" },
+    { key: "month", label: "Měsíc" },
+    { key: "all", label: "Vše" },
+  ];
 
   return (
     <div className="shrink-0 border-b border-border px-6 py-1.5 flex items-center gap-4 bg-card" style={{ minHeight: 40 }}>
@@ -512,15 +608,34 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Center: Stats */}
-      <div className="flex items-center gap-1 text-xs text-muted-foreground font-mono shrink-0">
-        <span>Kapacita <span className="font-semibold text-foreground">{monthlyHours.toLocaleString("cs-CZ")}h</span></span>
-        <span className="text-border">·</span>
-        <span>CZK <span className="font-semibold text-foreground">{formatCzk(monthlyCzk)}</span></span>
-        <span className="text-border">·</span>
-        <span>Naplánováno <span className="font-semibold" style={{ color: isOverCapacity ? "hsl(var(--destructive))" : "hsl(142 76% 36%)" }}>{Math.round(scheduledHours).toLocaleString("cs-CZ")}h</span></span>
-        <span className="text-border">·</span>
-        <span>V Inboxu <span className="font-semibold" style={{ color: "#d97706" }}>{Math.round(inboxHours).toLocaleString("cs-CZ")}h</span></span>
+      {/* Center: Scope toggle + Stats */}
+      <div className="flex items-center gap-2 shrink-0">
+        {/* Scope toggle */}
+        <div className="inline-flex h-6 items-center rounded-md bg-muted border border-border p-0.5">
+          {scopeOptions.map(opt => (
+            <button
+              key={opt.key}
+              onClick={() => handleScopeChange(opt.key)}
+              className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2 py-0.5 text-[10px] font-medium transition-all ${
+                statsScope === opt.key
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
+          <span>Kapacita <span className="font-semibold text-foreground">{Math.round(capacityHours).toLocaleString("cs-CZ")}h</span></span>
+          <span className="text-border">·</span>
+          <span>CZK <span className="font-semibold text-foreground">{formatCzk(displayCzk)}</span></span>
+          <span className="text-border">·</span>
+          <span>Naplánováno <span className="font-semibold" style={{ color: isOverCapacity ? "hsl(var(--destructive))" : "hsl(142 76% 36%)" }}>{Math.round(scheduledHours).toLocaleString("cs-CZ")}h</span></span>
+          <span className="text-border">·</span>
+          <span>V Inboxu <span className="font-semibold" style={{ color: "#d97706" }}>{Math.round(inboxHours).toLocaleString("cs-CZ")}h</span></span>
+        </div>
       </div>
 
       {/* Spacer */}
