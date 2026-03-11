@@ -662,14 +662,14 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
         <div className="min-w-max">
           {/* Header row */}
           <div className="flex sticky top-0 z-30" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            <div className="shrink-0 sticky left-0 z-40 border-r border-b border-border bg-card" style={{ width: LEFT_COL_W }}>
-              <div className="px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+            <div className="shrink-0 sticky left-0 z-40 border-r border-b border-border bg-card flex items-end" style={{ width: LEFT_COL_W }}>
+              <div className="px-3 pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                 Projekt / Položka
               </div>
             </div>
             {hasAnyInbox && (
               <div
-                className="shrink-0 text-center px-1 py-1.5 border-b border-r border-border/50 sticky z-40"
+                className="shrink-0 text-center px-1 border-b border-r border-border/50 sticky z-40 flex items-center justify-center"
                 style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: STATUS_COLORS.inbox.bg }}
               >
                 <div className="text-[10px] font-bold" style={{ color: STATUS_COLORS.inbox.text }}>📥 Inbox</div>
