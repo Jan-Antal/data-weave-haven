@@ -15,6 +15,7 @@ interface SpillSuggestionPanelProps {
   allWeeksData: Map<string, { total_hours: number }> | null;
   weeklyCapacity: number;
   weekKeys: string[];
+  onClose?: () => void;
 }
 
 type SpillMode = "items" | "split";
