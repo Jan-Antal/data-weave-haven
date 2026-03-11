@@ -1449,7 +1449,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                   )}
                                 </div>
                               ) : cat.key === "fotky" ? (
-                              /* Photo timeline grid for Fotky category */
+                                  <>
+                                  {/* Photo timeline grid for Fotky category */}
                                   <PhotoTimelineGrid
                                     files={files}
                                     maxHeight="260px"
@@ -1478,6 +1479,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                       onClear={fileSelection.clearSelection}
                                     />
                                   )}
+                                  </>
                                 ) : (
                                 <>
                                   <div className="space-y-0.5 max-h-[140px] overflow-y-auto" onClick={(e) => {
