@@ -270,7 +270,32 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     return map;
   }, [scheduleData]);
 
-  const findSameWeekSiblings = useCallback((item: ScheduleItem, weekKey: string): ScheduleItem[] => {
+  // Auto-clear dismissed spill state when overload is resolved
+  useEffect(() => {
+    setDismissedSpillWeeks(prev => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const wk of prev) {
+        const silo = scheduleData?.get(wk);
+        const activeH = silo ? silo.bundles.reduce((sum, b) =>
+          sum + b.items.reduce((s, i) => s + (i.status === "paused" ? 0 : i.scheduled_hours), 0), 0) : 0;
+        const cap = getWeekCapacity(wk);
+        const pct = cap > 0 ? (activeH / cap) * 100 : 0;
+        if (pct <= 120) { next.delete(wk); changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [scheduleData, getWeekCapacity]);
+
+  const handleDismissSpill = useCallback((weekKey: string) => {
+    setDismissedSpillWeeks(prev => new Set(prev).add(weekKey));
+  }, []);
+
+  const handleReopenSpill = useCallback((weekKey: string) => {
+    setDismissedSpillWeeks(prev => { const next = new Set(prev); next.delete(weekKey); return next; });
+  }, []);
+
+
     if (!item.split_group_id) return [];
     const silo = scheduleData?.get(weekKey);
     if (!silo) return [];
