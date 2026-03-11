@@ -261,13 +261,18 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
       }
 
       for (const [inboxItemId, entries] of byItem) {
+        // Fetch inbox item details
+        const { data: inboxItem } = await supabase.from("production_inbox").select("*").eq("id", inboxItemId).single();
+        if (!inboxItem) continue;
+
         if (entries.length === 1) {
           // Simple schedule — single week
           const e = entries[0];
           await supabase.from("production_schedule").insert({
-            project_id: planningState!.projectId,
-            item_name: plan.find(p => p.inboxItemId === inboxItemId)?.scheduledHours ? "" : "",
-            item_code: null,
+            project_id: inboxItem.project_id,
+            stage_id: inboxItem.stage_id,
+            item_name: inboxItem.item_name,
+            item_code: inboxItem.item_code,
             scheduled_week: e.scheduledWeek,
             scheduled_hours: e.scheduledHours,
             scheduled_czk: e.scheduledCzk,
@@ -276,16 +281,6 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
             created_by: user.id,
             inbox_item_id: inboxItemId,
           });
-          // We need the item details; fetch from inbox
-          const { data: inboxItem } = await supabase.from("production_inbox").select("*").eq("id", inboxItemId).single();
-          if (inboxItem) {
-            await supabase.from("production_schedule").update({
-              item_name: inboxItem.item_name,
-              item_code: inboxItem.item_code,
-              stage_id: inboxItem.stage_id,
-              project_id: inboxItem.project_id,
-            }).eq("inbox_item_id", inboxItemId).eq("scheduled_hours", e.scheduledHours);
-          }
         } else {
           // Split across multiple weeks
           const { data: inboxItem } = await supabase.from("production_inbox").select("*").eq("id", inboxItemId).single();
