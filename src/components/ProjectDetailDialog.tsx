@@ -1536,7 +1536,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                                 "w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-all mr-0.5",
                                                 isFileSelected
                                                   ? "border-primary bg-primary text-primary-foreground"
-                                                  : "border-transparent group-hover:border-border"
+                                                  : fileSelection.selectedCount > 0
+                                                    ? "border-border"
+                                                    : "border-transparent group-hover:border-border"
                                               )}
                                               onClick={(e) => {
                                                 e.stopPropagation();
