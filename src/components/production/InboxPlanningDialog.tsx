@@ -530,7 +530,7 @@ function ByItemsTab({ items, weeks, onConfirm, onCancel }: { items: PlanningItem
 
       {/* Confirm */}
       <DialogFooter>
-        <Button variant="outline" size="sm" onClick={() => {}}>
+        <Button variant="outline" size="sm" onClick={onCancel}>
           Zrušit
         </Button>
         <Button size="sm" disabled={!allAssigned} onClick={handleConfirm}>
