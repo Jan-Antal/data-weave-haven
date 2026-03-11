@@ -109,6 +109,14 @@ interface PhotoTimelineGridProps {
   onDelete?: (file: SPFile) => void;
   canDelete?: boolean;
   maxHeight?: string;
+  // Drag & drop support
+  isDraggable?: boolean;
+  onDragStart?: (e: React.DragEvent, file: SPFile) => void;
+  onDragEnd?: () => void;
+  draggingFileId?: string | null;
+  // Selection support
+  selectedIds?: Set<string>;
+  onToggleSelect?: (fileId: string, files: SPFile[], e?: React.MouseEvent) => void;
 }
 
 export function PhotoTimelineGrid({
@@ -117,6 +125,12 @@ export function PhotoTimelineGrid({
   onDelete,
   canDelete,
   maxHeight = "260px",
+  isDraggable,
+  onDragStart,
+  onDragEnd,
+  draggingFileId,
+  selectedIds,
+  onToggleSelect,
 }: PhotoTimelineGridProps) {
   const isMobile = useIsMobile();
   const [filter, setFilter] = useState<FilterMode>("all");
@@ -219,6 +233,13 @@ export function PhotoTimelineGrid({
                         key={f.itemId}
                         file={f}
                         onClick={() => onOpenLightbox(flatIdx)}
+                        isDraggable={isDraggable}
+                        onDragStart={onDragStart}
+                        onDragEnd={onDragEnd}
+                        isBeingDragged={draggingFileId === f.itemId}
+                        isSelected={selectedIds?.has(f.itemId)}
+                        onToggleSelect={onToggleSelect ? (e) => onToggleSelect(f.itemId, flatFiles, e) : undefined}
+                        hasAnySelection={(selectedIds?.size ?? 0) > 0}
                       />
                     );
                   })}
@@ -234,10 +255,23 @@ export function PhotoTimelineGrid({
 
 // ─── Lazy Thumbnail ─────────────────────────────────────────────
 
-function LazyThumbnail({ file, onClick }: { file: SPFile; onClick: () => void }) {
+interface LazyThumbnailProps {
+  file: SPFile;
+  onClick: () => void;
+  isDraggable?: boolean;
+  onDragStart?: (e: React.DragEvent, file: SPFile) => void;
+  onDragEnd?: () => void;
+  isBeingDragged?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (e: React.MouseEvent) => void;
+  hasAnySelection?: boolean;
+}
+
+function LazyThumbnail({ file, onClick, isDraggable, onDragStart, onDragEnd, isBeingDragged, isSelected, onToggleSelect, hasAnySelection }: LazyThumbnailProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [loaded, setLoaded] = useState(() => thumbCache.has(file.itemId));
+  const mouseDownRef = useRef<{ time: number; x: number; y: number } | null>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -256,18 +290,55 @@ function LazyThumbnail({ file, onClick }: { file: SPFile; onClick: () => void })
   }, [file.itemId]);
 
   const isRec = isReklamace(file.name);
-
-  // Prefer SharePoint thumbnail API (medium ~176px) over full download URL
   const thumbSrc = file.thumbnailUrl || file.downloadUrl;
+
+  // Click vs drag: only open lightbox if mousedown→mouseup < 200ms and minimal movement
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    mouseDownRef.current = { time: Date.now(), x: e.clientX, y: e.clientY };
+  }, []);
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    const md = mouseDownRef.current;
+    mouseDownRef.current = null;
+    // If there was significant drag movement, don't count as click
+    if (md) {
+      const dt = Date.now() - md.time;
+      const dist = Math.sqrt((e.clientX - md.x) ** 2 + (e.clientY - md.y) ** 2);
+      if (dt > 300 || dist > 10) return;
+    }
+    // Selection mode
+    if (e.shiftKey || e.metaKey || e.ctrlKey) {
+      e.stopPropagation();
+      onToggleSelect?.(e);
+      return;
+    }
+    if (hasAnySelection) {
+      e.stopPropagation();
+      onToggleSelect?.(e);
+      return;
+    }
+    onClick();
+  }, [onClick, onToggleSelect, hasAnySelection]);
+
+  const handleDragStart = useCallback((e: React.DragEvent) => {
+    onDragStart?.(e, file);
+  }, [onDragStart, file]);
 
   return (
     <div
       ref={ref}
+      draggable={isDraggable}
+      onDragStart={isDraggable ? handleDragStart : undefined}
+      onDragEnd={isDraggable ? onDragEnd : undefined}
+      onMouseDown={handleMouseDown}
+      onClick={handleClick}
       className={cn(
-        "relative aspect-square rounded-md overflow-hidden cursor-pointer group",
-        isRec ? "ring-2 ring-red-400" : "bg-accent/30"
+        "relative aspect-square rounded-md overflow-hidden cursor-pointer group transition-all",
+        isRec ? "ring-2 ring-red-400" : "bg-accent/30",
+        isDraggable && "cursor-grab active:cursor-grabbing",
+        isBeingDragged && "opacity-40 outline-2 outline-dashed outline-border",
+        isSelected && "ring-2 ring-primary"
       )}
-      onClick={onClick}
     >
       {visible && thumbSrc ? (
         <>
@@ -292,6 +363,20 @@ function LazyThumbnail({ file, onClick }: { file: SPFile; onClick: () => void })
             <span className="absolute top-1 left-1 bg-red-500 text-white text-[8px] px-1 py-0.5 rounded font-semibold leading-none">
               REC
             </span>
+          )}
+          {/* Selection checkbox overlay */}
+          {isDraggable && (
+            <div
+              className={cn(
+                "absolute top-1 right-1 w-4 h-4 rounded border flex items-center justify-center transition-all z-10",
+                isSelected
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-transparent group-hover:border-white/80 group-hover:bg-black/30"
+              )}
+              onClick={(e) => { e.stopPropagation(); onToggleSelect?.(e); }}
+            >
+              {isSelected && <span className="text-[9px] leading-none font-bold">✓</span>}
+            </div>
           )}
         </>
       ) : (
