@@ -74,7 +74,7 @@ interface ProjectRow {
   expediceTotalCzk: number;
 }
 
-const CELL_W = 110;
+const CELL_W = 132;
 const INBOX_W = 80;
 const EXPEDICE_W = 80;
 const LEFT_COL_W = 280;

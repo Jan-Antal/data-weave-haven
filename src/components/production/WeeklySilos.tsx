@@ -138,7 +138,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     if (initialScrollDone.current) return;
     const el = scrollContainerRef.current;
     if (!el) return;
-    el.scrollLeft = 4 * 216;
+    el.scrollLeft = 4 * 259;
     initialScrollDone.current = true;
   }, []);
 
@@ -464,7 +464,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       {/* Toolbar */}
       <div className="px-3 py-[6px] flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid #ece8e2" }}>
         <button
-          onClick={() => { const el = scrollContainerRef.current; if (el) el.scrollTo({ left: 4 * 216, behavior: "smooth" }); }}
+          onClick={() => { const el = scrollContainerRef.current; if (el) el.scrollTo({ left: 4 * 259, behavior: "smooth" }); }}
           className="px-2 py-[3px] text-[10px] font-medium rounded transition-colors"
           style={{ backgroundColor: "#ffffff", color: "#6b7a78", border: "1px solid #e2ddd6", cursor: "pointer" }}
         >
@@ -475,7 +475,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
 
       {/* Silos */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden" ref={scrollContainerRef}>
-        <div className="flex gap-[6px] p-2 h-full" style={{ minWidth: `${weeks.length * 216}px` }}>
+        <div className="flex gap-[6px] p-2 h-full" style={{ minWidth: `${weeks.length * 259}px` }}>
           {weeks.map(week => (
             <SiloColumn
               key={week.key} weekKey={week.key} weekNum={week.weekNum}
@@ -581,7 +581,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
   const combinedRef = useCallback((el: HTMLDivElement | null) => { setNodeRef(el); registerRef(weekKey, el); }, [setNodeRef, registerRef, weekKey]);
 
   return (
-    <div ref={combinedRef} data-week-key={weekKey} className="w-[210px] shrink-0 flex flex-col transition-all"
+    <div ref={combinedRef} data-week-key={weekKey} className="w-[252px] shrink-0 flex flex-col transition-all"
       style={{
         backgroundColor: "#ffffff", borderRadius: 9,
         border: highlighted ? `2px solid ${dropBorderColor}` : isCurrent ? "2px solid #3a8a36" : isOverloaded && !isPast ? "1px solid rgba(220,53,69,0.4)" : "1px solid #ece8e2",
