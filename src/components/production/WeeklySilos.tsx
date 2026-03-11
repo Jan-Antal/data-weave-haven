@@ -721,7 +721,7 @@ function PausedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onContext
   const isOverdue = pauseExpDate && new Date(pauseExpDate) < new Date();
 
   return (
-    <div className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-default transition-colors"
+    <div data-context="item" className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-default transition-colors"
       style={{
         borderLeft: isSplit ? "2px dashed #d97706" : "2px dashed #d97706",
         backgroundColor: "rgba(217,119,6,0.03)",
