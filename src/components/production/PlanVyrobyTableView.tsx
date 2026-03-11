@@ -976,9 +976,12 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                             </div>
                           )}
                         </div>
-                      ))}
+                        </div>
+                        );
+                      })}
                     </div>
-                  )}
+                    );
+                  })()}
                 </div>
               );
             })}
