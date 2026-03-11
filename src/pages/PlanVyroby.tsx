@@ -86,6 +86,7 @@ export default function PlanVyroby() {
   const [searchQuery, setSearchQuery] = useState("");
   const showCzk = displayMode === "czk";
   const [activeDrag, setActiveDrag] = useState<ActiveDragData | null>(null);
+  const isDraggingFromInbox = activeDrag?.type === "inbox-item" || activeDrag?.type === "inbox-project";
   const [overDroppableId, setOverDroppableId] = useState<string | null>(null);
   const [autoSplitState, setAutoSplitState] = useState<AutoSplitState | null>(null);
   const [mergeState, setMergeState] = useState<MergeState | null>(null);
