@@ -138,7 +138,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     if (initialScrollDone.current) return;
     const el = scrollContainerRef.current;
     if (!el) return;
-    el.scrollLeft = 4 * 216;
+    el.scrollLeft = 4 * 259;
     initialScrollDone.current = true;
   }, []);
 
