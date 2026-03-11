@@ -475,7 +475,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
 
       {/* Silos */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden" ref={scrollContainerRef}>
-        <div className="flex gap-[6px] p-2 h-full" style={{ minWidth: `${weeks.length * 216}px` }}>
+        <div className="flex gap-[6px] p-2 h-full" style={{ minWidth: `${weeks.length * 259}px` }}>
           {weeks.map(week => (
             <SiloColumn
               key={week.key} weekKey={week.key} weekNum={week.weekNum}
