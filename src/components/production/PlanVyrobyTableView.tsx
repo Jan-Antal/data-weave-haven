@@ -774,6 +774,27 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                           })()}
                         </div>
                       </div>
+                      {/* Inline deadline warning */}
+                      {(() => {
+                        const pd = projectDateLookup.get(proj.projectId);
+                        const severity = pd ? getProjectRiskSeverity(pd) : null;
+                        if (!severity) return null;
+                        const smlParsed = pd?.datum_smluvni ? parseAppDate(pd.datum_smluvni) : null;
+                        const warnColor = severity === "overdue" ? "#dc3545" : "#d97706";
+                        const tooltipText = smlParsed
+                          ? severity === "overdue"
+                            ? `Termín byl ${format(smlParsed, "dd.MM.yyyy")} — po termínu o ${differenceInDays(new Date(), smlParsed)} dní`
+                            : `Termín za ${differenceInDays(smlParsed, new Date())} dní (${format(smlParsed, "dd.MM.yyyy")})`
+                          : "";
+                        return (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle size={14} style={{ color: warnColor }} className="shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">{tooltipText}</TooltipContent>
+                          </Tooltip>
+                        );
+                      })()}
                       <div
                         className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-mono font-bold"
                         style={{ backgroundColor: proj.color + "18", color: proj.color }}
