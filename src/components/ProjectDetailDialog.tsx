@@ -720,6 +720,94 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     setDeletingFile(null);
   };
 
+  // ── Move files between folders ──────────────────────────────
+  const handleMoveFiles = useCallback(async (sourceCategoryKey: string, destCategoryKey: string, filesToMove: SPFile[]) => {
+    if (!project || filesToMove.length === 0) return;
+    setMovingFiles(true);
+    const destLabel = DOC_CATEGORIES.find((c) => c.key === destCategoryKey)?.label ?? destCategoryKey;
+    let succeeded = 0;
+    let failed = 0;
+
+    // Process in batches of 5
+    const batches: SPFile[][] = [];
+    for (let i = 0; i < filesToMove.length; i += 5) {
+      batches.push(filesToMove.slice(i, i + 5));
+    }
+
+    for (const batch of batches) {
+      const results = await Promise.allSettled(
+        batch.map((f) => sp.moveFile(sourceCategoryKey, destCategoryKey, f))
+      );
+      for (const r of results) {
+        if (r.status === "fulfilled") succeeded++;
+        else failed++;
+      }
+    }
+
+    fileSelection.clearSelection();
+    setFileDragActive(false);
+    setFileDragSourceCat(null);
+    setMovingFiles(false);
+
+    if (failed === 0) {
+      toast({
+        title: `${succeeded} ${succeeded === 1 ? "soubor přesunut" : succeeded < 5 ? "soubory přesunuty" : "souborů přesunuto"} do ${destLabel} ✓`,
+      });
+    } else {
+      toast({
+        title: `${succeeded} přesunuto, ${failed} selhalo`,
+        description: "Zkuste přesun zopakovat",
+        variant: "destructive",
+      });
+    }
+
+    // Log activity
+    logActivity({
+      projectId: project.project_id,
+      actionType: "document_moved",
+      detail: `${succeeded} souborů: ${DOC_CATEGORIES.find((c) => c.key === sourceCategoryKey)?.label} → ${destLabel}`,
+    });
+  }, [project, sp, fileSelection]);
+
+  const handleFileDragStart = useCallback((e: React.DragEvent, file: SPFile, categoryKey: string) => {
+    const files = sp.filesByCategory[categoryKey] ?? [];
+    // If dragged file is not selected, select only it
+    if (!fileSelection.isSelected(file.itemId)) {
+      fileSelection.clearSelection();
+      fileSelection.toggleFile(file.itemId, files);
+    }
+    setFileDragActive(true);
+    setFileDragSourceCat(categoryKey);
+    // Set drag data
+    e.dataTransfer.effectAllowed = "move";
+    const selectedFiles = files.filter((f) => fileSelection.isSelected(f.itemId));
+    const count = selectedFiles.length;
+    e.dataTransfer.setData("text/plain", `${count} soubor${count > 1 ? "ů" : ""}`);
+  }, [sp.filesByCategory, fileSelection]);
+
+  const handleFileDragEnd = useCallback(() => {
+    setFileDragActive(false);
+    setFileDragSourceCat(null);
+  }, []);
+
+  const handleFolderDrop = useCallback((destCategoryKey: string) => {
+    if (!fileDragSourceCat || fileDragSourceCat === destCategoryKey) return;
+    const sourceFiles = sp.filesByCategory[fileDragSourceCat] ?? [];
+    const selectedFiles = sourceFiles.filter((f) => fileSelection.isSelected(f.itemId));
+    if (selectedFiles.length > 0) {
+      handleMoveFiles(fileDragSourceCat, destCategoryKey, selectedFiles);
+    }
+  }, [fileDragSourceCat, sp.filesByCategory, fileSelection, handleMoveFiles]);
+
+  const handleSelectionBarMove = useCallback((destCategoryKey: string) => {
+    if (!openCategory || openCategory === destCategoryKey) return;
+    const sourceFiles = sp.filesByCategory[openCategory] ?? [];
+    const selectedFiles = sourceFiles.filter((f) => fileSelection.isSelected(f.itemId));
+    if (selectedFiles.length > 0) {
+      handleMoveFiles(openCategory, destCategoryKey, selectedFiles);
+    }
+  }, [openCategory, sp.filesByCategory, fileSelection, handleMoveFiles]);
+
   // ── Read-only style helper ──────────────────────────────────
   const roClass = "bg-[#f3f4f6] text-muted-foreground cursor-not-allowed opacity-70";
 
