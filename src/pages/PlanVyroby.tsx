@@ -394,9 +394,9 @@ export default function PlanVyroby() {
 
         {viewTab === "kanban" ? (
           <div className="flex-1 flex min-h-0">
-            <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} disableDropZone={isDraggingFromInbox} />
-            <WeeklySilos showCzk={showCzk} onToggleCzk={(v) => setDisplayMode(v ? "czk" : "hours")} overDroppableId={overDroppableId} onNavigateToTPV={handleNavigateToTPV} displayMode={displayMode} onDisplayModeChange={setDisplayMode} />
-            <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
+            <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} disableDropZone={isDraggingFromInbox} />
+            <WeeklySilos showCzk={showCzk} onToggleCzk={(v) => setDisplayMode(v ? "czk" : "hours")} overDroppableId={overDroppableId} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} displayMode={displayMode} onDisplayModeChange={setDisplayMode} />
+            <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} />
           </div>
         ) : (
           <PlanVyrobyTableView displayMode={displayMode} searchQuery={searchQuery} />
