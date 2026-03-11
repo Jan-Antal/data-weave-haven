@@ -651,6 +651,22 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
           </div>
         </div>
+        {/* Re-open spill pill — only when overloaded AND dismissed */}
+        {isOverloaded && !isPast && spillDismissed && (
+          <button
+            onClick={onReopenSpill}
+            className="mt-1 mx-auto block px-2 py-[2px] text-[8px] font-medium rounded-full transition-colors cursor-pointer"
+            style={{
+              backgroundColor: isOverloaded ? "rgba(220,53,69,0.08)" : "rgba(217,119,6,0.08)",
+              color: isOverloaded ? "#dc3545" : "#d97706",
+              border: `1px solid ${isOverloaded ? "rgba(220,53,69,0.2)" : "rgba(217,119,6,0.2)"}`,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = isOverloaded ? "rgba(220,53,69,0.15)" : "rgba(217,119,6,0.15)"; }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = isOverloaded ? "rgba(220,53,69,0.08)" : "rgba(217,119,6,0.08)"; }}
+          >
+            ⚡ Přetíženo — zobrazit návrhy
+          </button>
+        )}
       </div>
 
       {/* Items */}
@@ -673,9 +689,9 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
         ))}
       </div>
 
-      {isOverloaded && !isPast && silo && (
+      {isOverloaded && !isPast && silo && !spillDismissed && (
         <SpillSuggestionPanel overloadHours={overloadHours} bundles={silo.bundles} weekKey={weekKey}
-          allWeeksData={allWeeksData} weeklyCapacity={weeklyCapacity} weekKeys={weekKeys} />
+          allWeeksData={allWeeksData} weeklyCapacity={weeklyCapacity} weekKeys={weekKeys} onClose={onDismissSpill} />
       )}
     </div>
   );
