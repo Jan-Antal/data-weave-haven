@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useProductionSchedule, useProductionExpedice, getISOWeekNumber, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
@@ -7,9 +7,13 @@ import { useProjects } from "@/hooks/useProjects";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 import { getProjectColor } from "@/lib/projectColors";
 import { exportToExcel } from "@/lib/exportExcel";
+import { buildPrintableHtml } from "@/lib/exportPdf";
 import { parseAppDate } from "@/lib/dateFormat";
-import { Download, ChevronRight, ChevronDown, Plus, ArrowRight, Inbox, CheckCircle2, XCircle } from "lucide-react";
+import { format } from "date-fns";
+import { cs } from "date-fns/locale";
+import { Download, ChevronRight, ChevronDown, Plus, ArrowRight, Inbox, CheckCircle2, XCircle, FileSpreadsheet, FileText, ChevronUp } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { PdfPreviewModal } from "@/components/PdfPreviewModal";
 import { CancelItemDialog } from "./CancelItemDialog";
 import { toast } from "@/hooks/use-toast";
 
