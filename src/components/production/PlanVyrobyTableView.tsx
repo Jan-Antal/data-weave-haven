@@ -115,7 +115,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
   const [sortMode, setSortMode] = useState<SortMode>("project");
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
-
+  const initialScrollDone = useRef(false);
   // Cancel dialog state
   const [cancelDialog, setCancelDialog] = useState<{
     open: boolean; itemId: string; itemName: string; itemCode?: string | null;
@@ -498,6 +498,22 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [exportDropdownOpen]);
+
+  // Initial scroll — show last week as first visible week column
+  useEffect(() => {
+    if (initialScrollDone.current || weeks.length === 0) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const currentMonday = getMonday(new Date());
+    const lastWeekMonday = new Date(currentMonday);
+    lastWeekMonday.setDate(lastWeekMonday.getDate() - 7);
+    const lastWeekKey = lastWeekMonday.toISOString().split("T")[0];
+    const lastWeekIdx = weeks.findIndex(w => w.key === lastWeekKey);
+    if (lastWeekIdx > 0) {
+      el.scrollLeft = lastWeekIdx * CELL_W;
+    }
+    initialScrollDone.current = true;
+  }, [weeks]);
 
   const buildExportData = useCallback(() => {
     const weekHeaders = weeks.map(w => `T${w.weekNum}`);

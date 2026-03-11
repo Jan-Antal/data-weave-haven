@@ -146,12 +146,12 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const defaultWeeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
 
-  // Initial scroll — run exactly once
+  // Initial scroll — show last week (index 3) as first visible column
   useEffect(() => {
     if (initialScrollDone.current) return;
     const el = scrollContainerRef.current;
     if (!el) return;
-    el.scrollLeft = 4 * 259;
+    el.scrollLeft = 3 * 259;
     initialScrollDone.current = true;
   }, []);
 
