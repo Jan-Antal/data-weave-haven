@@ -16,6 +16,7 @@ export interface ScheduleItem {
   status: string;
   completed_at: string | null;
   completed_by: string | null;
+  expediced_at: string | null;
   split_group_id: string | null;
   split_part: number | null;
   split_total: number | null;
