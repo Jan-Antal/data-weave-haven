@@ -18,7 +18,7 @@ const PAGE_SIZE = 30;
 export type DateRange = "today" | "yesterday" | "7d" | "30d" | "all";
 
 interface Filters {
-  category: "all" | "status" | "terminy" | "documents" | "projects" | "users";
+  category: "all" | "status" | "terminy" | "documents" | "projects" | "users" | "vyroba";
   projectId: string | null;
   userEmail: string | null;
   dateRange?: DateRange;
