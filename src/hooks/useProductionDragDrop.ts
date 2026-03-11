@@ -3,6 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useCallback } from "react";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
+import { logActivity } from "@/lib/activityLog";
+import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
+
+function weekLabel(weekDate: string): string {
+  try {
+    const d = new Date(weekDate);
+    return `T${getISOWeekNumber(d)}`;
+  } catch { return weekDate; }
+}
 
 export function useProductionDragDrop() {
   const qc = useQueryClient();
@@ -47,6 +56,15 @@ export function useProductionDragDrop() {
         .update({ status: "scheduled" })
         .eq("id", inboxItemId);
       if (updateErr) throw updateErr;
+
+      // Log activity
+      logActivity({
+        projectId: item.project_id,
+        actionType: "item_scheduled",
+        oldValue: "Inbox",
+        newValue: weekLabel(weekDate),
+        detail: JSON.stringify({ item_name: item.item_name, item_code: item.item_code, week: weekLabel(weekDate), scheduled_hours: item.estimated_hours, scheduled_czk: item.estimated_czk }),
+      });
 
       invalidateAll();
 
@@ -118,6 +136,17 @@ export function useProductionDragDrop() {
         .in("id", ids);
       if (updateErr) throw updateErr;
 
+      // Log activity for each item
+      for (const item of items) {
+        logActivity({
+          projectId: item.project_id,
+          actionType: "item_scheduled",
+          oldValue: "Inbox",
+          newValue: weekLabel(weekDate),
+          detail: JSON.stringify({ item_name: item.item_name, item_code: item.item_code, week: weekLabel(weekDate), scheduled_hours: item.estimated_hours, scheduled_czk: item.estimated_czk }),
+        });
+      }
+
       invalidateAll();
 
       const insertedIds = (inserted || []).map((r: any) => r.id);
@@ -153,7 +182,7 @@ export function useProductionDragDrop() {
   const moveScheduleItemToWeek = useCallback(async (scheduleItemId: string, newWeekDate: string) => {
     try {
       // Capture old week for undo
-      const { data: oldItem } = await supabase.from("production_schedule").select("scheduled_week, item_name").eq("id", scheduleItemId).single();
+      const { data: oldItem } = await supabase.from("production_schedule").select("scheduled_week, item_name, project_id, item_code").eq("id", scheduleItemId).single();
       const oldWeek = oldItem?.scheduled_week;
 
       const { error } = await supabase
@@ -161,6 +190,17 @@ export function useProductionDragDrop() {
         .update({ scheduled_week: newWeekDate })
         .eq("id", scheduleItemId);
       if (error) throw error;
+      // Log activity
+      if (oldItem) {
+        logActivity({
+          projectId: oldItem.project_id || "",
+          actionType: "item_moved",
+          oldValue: weekLabel(oldWeek || ""),
+          newValue: weekLabel(newWeekDate),
+          detail: JSON.stringify({ item_name: oldItem.item_name, from_week: weekLabel(oldWeek || ""), to_week: weekLabel(newWeekDate) }),
+        });
+      }
+
       invalidateAll();
 
       pushUndo({
@@ -260,6 +300,15 @@ export function useProductionDragDrop() {
         if (insertErr) throw insertErr;
       }
 
+      // Log activity
+      logActivity({
+        projectId: schedItem.project_id,
+        actionType: "item_returned_to_inbox",
+        oldValue: weekLabel(schedItem.scheduled_week),
+        newValue: "Inbox",
+        detail: JSON.stringify({ item_name: schedItem.item_name, item_code: schedItem.item_code, from_week: weekLabel(schedItem.scheduled_week) }),
+      });
+
       invalidateAll();
 
       pushUndo({
@@ -352,7 +401,7 @@ export function useProductionDragDrop() {
 
       // Capture old statuses for undo
       const { data: oldItems } = await supabase.from("production_schedule")
-        .select("id, status, completed_at, completed_by, item_name")
+        .select("id, status, completed_at, completed_by, item_name, item_code, project_id, scheduled_week")
         .in("id", itemIds);
 
       const { error } = await supabase
@@ -360,6 +409,18 @@ export function useProductionDragDrop() {
         .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user.id })
         .in("id", itemIds);
       if (error) throw error;
+
+      // Log activity
+      for (const old of (oldItems || [])) {
+        logActivity({
+          projectId: old.project_id,
+          actionType: "item_completed",
+          oldValue: "Naplánováno",
+          newValue: "Dokončeno",
+          detail: JSON.stringify({ item_name: old.item_name, item_code: old.item_code, week: weekLabel(old.scheduled_week), completed_at: new Date().toISOString() }),
+        });
+      }
+
       invalidateAll();
 
       pushUndo({
@@ -468,6 +529,17 @@ export function useProductionDragDrop() {
         }));
         const { error: insertErr } = await supabase.from("production_inbox").insert(newItems);
         if (insertErr) throw insertErr;
+      }
+
+      // Log activity
+      for (const item of items) {
+        logActivity({
+          projectId: item.project_id,
+          actionType: "item_returned_to_inbox",
+          oldValue: weekLabel(weekDate),
+          newValue: "Inbox",
+          detail: JSON.stringify({ item_name: item.item_name, item_code: item.item_code, from_week: weekLabel(weekDate) }),
+        });
       }
 
       invalidateAll();

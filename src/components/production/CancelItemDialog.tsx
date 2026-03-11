@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { renumberSiblings } from "./SplitItemDialog";
+import { logActivity } from "@/lib/activityLog";
 
 interface CancelItemDialogProps {
   open: boolean;
@@ -108,6 +109,16 @@ export function CancelItemDialog({
       }
 
       invalidateAll();
+
+      // Log activity
+      logActivity({
+        projectId: projectId || "_production_",
+        actionType: "item_cancelled",
+        oldValue: source === "schedule" ? "Naplánováno" : "Inbox",
+        newValue: "Zrušeno",
+        detail: JSON.stringify({ item_name: itemName, item_code: itemCode, cancel_reason: cancelReason }),
+      });
+
       toast({ title: `✕ Položka zrušena: ${cancelReason}` });
       onOpenChange(false);
     } catch (err: any) {

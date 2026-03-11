@@ -4,6 +4,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
+import { logActivity } from "@/lib/activityLog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
 import { Slider } from "@/components/ui/slider";
 
@@ -300,6 +301,15 @@ export function SplitItemDialog({
           },
         });
       }
+
+      // Log activity
+      logActivity({
+        projectId: projectId,
+        actionType: "item_split",
+        oldValue: String(totalHours),
+        newValue: "Rozděleno na 2 části",
+        detail: JSON.stringify({ item_name: cleanName, original_hours: totalHours, parts: [{ week: source === "schedule" ? `T${currentWeekNum}` : "Inbox", hours: part1Hours }, { week: `T${targetWeekNum}`, hours: part2Hours }] }),
+      });
 
       toast({ title: `Položka rozdělena: ${part1Hours}h + ${part2Hours}h` });
       onOpenChange(false);

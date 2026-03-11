@@ -18,7 +18,7 @@ const PAGE_SIZE = 30;
 export type DateRange = "today" | "yesterday" | "7d" | "30d" | "all";
 
 interface Filters {
-  category: "all" | "status" | "terminy" | "documents" | "projects" | "users";
+  category: "all" | "status" | "terminy" | "documents" | "projects" | "users" | "vyroba";
   projectId: string | null;
   userEmail: string | null;
   dateRange?: DateRange;
@@ -32,6 +32,7 @@ function getActionTypes(category: Filters["category"]): string[] | null {
     case "documents": return ["document_uploaded", "document_deleted", "stage_document_uploaded", "stage_document_deleted"];
     case "projects": return ["project_created", "project_deleted", "project_restored", "stage_created", "stage_deleted"];
     case "users": return ["user_login", "session_end"];
+    case "vyroba": return ["item_scheduled", "item_moved", "item_completed", "item_paused", "item_cancelled", "item_returned_to_inbox", "item_split"];
     default: return null;
   }
 }
