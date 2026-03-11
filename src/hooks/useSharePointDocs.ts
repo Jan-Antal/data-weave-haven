@@ -8,6 +8,8 @@ export interface SPFile {
   lastModified: string;
   downloadUrl: string | null;
   webUrl: string | null;
+  thumbnailUrl?: string | null;
+  largeThumbUrl?: string | null;
 }
 
 export interface SPPreview {

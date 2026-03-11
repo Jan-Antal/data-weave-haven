@@ -160,7 +160,7 @@ async function listFiles(
   category: string
 ) {
   const path = folderPath(projectId, category);
-  const url = `${GRAPH}/drives/${driveId}/root:/${path}:/children?$select=id,name,size,lastModifiedDateTime,webUrl,file,@microsoft.graph.downloadUrl`;
+  const url = `${GRAPH}/drives/${driveId}/root:/${path}:/children?$select=id,name,size,lastModifiedDateTime,webUrl,file,@microsoft.graph.downloadUrl&$expand=thumbnails`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -182,6 +182,8 @@ async function listFiles(
       lastModified: f.lastModifiedDateTime,
       downloadUrl: f["@microsoft.graph.downloadUrl"] ?? null,
       webUrl: f.webUrl ?? null,
+      thumbnailUrl: f.thumbnails?.[0]?.medium?.url ?? null,
+      largeThumbUrl: f.thumbnails?.[0]?.large?.url ?? null,
     }));
 }
 
