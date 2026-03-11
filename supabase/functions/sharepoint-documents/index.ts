@@ -389,7 +389,74 @@ async function renameProjectFolder(
   return { success: true };
 }
 
-const CATEGORIES = ["Cenova-nabidka", "Smlouva", "Vykresy", "Dokumentace", "Dodaci-list"];
+const CATEGORIES = ["Cenova-nabidka", "Smlouva", "Zadani", "Vykresy", "Dokumentace", "Dodaci-list", "Fotky"];
+
+// ---------- move file between folders ----------
+
+async function moveFile(
+  token: string,
+  driveId: string,
+  projectId: string,
+  sourceCategory: string,
+  destCategory: string,
+  fileName: string
+) {
+  // Get the source file's item ID
+  const sourcePath = folderPath(projectId, sourceCategory);
+  const encodedFileName = encodeURIComponent(fileName);
+  const itemUrl = `${GRAPH}/drives/${driveId}/root:/${sourcePath}/${encodedFileName}`;
+  const itemRes = await fetch(itemUrl, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!itemRes.ok) {
+    const t = await itemRes.text();
+    throw new Error(`Move resolve error ${itemRes.status}: ${t}`);
+  }
+  const item = await itemRes.json();
+  const itemId = item.id;
+
+  // Ensure destination folder exists
+  const destPath = folderPath(projectId, destCategory);
+  await ensureFolder(token, driveId, destPath);
+
+  // Get destination folder ID
+  const destFolderUrl = `${GRAPH}/drives/${driveId}/root:/${destPath}`;
+  const destRes = await fetch(destFolderUrl, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!destRes.ok) {
+    const t = await destRes.text();
+    throw new Error(`Move dest resolve error ${destRes.status}: ${t}`);
+  }
+  const destFolder = await destRes.json();
+  const destFolderId = destFolder.id;
+
+  // Move the file via PATCH
+  const moveRes = await fetch(`${GRAPH}/drives/${driveId}/items/${itemId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      parentReference: { id: destFolderId },
+      name: fileName,
+    }),
+  });
+  if (!moveRes.ok) {
+    const t = await moveRes.text();
+    throw new Error(`Move error ${moveRes.status}: ${t}`);
+  }
+  const movedItem = await moveRes.json();
+  return {
+    success: true,
+    itemId: movedItem.id,
+    name: movedItem.name,
+    size: movedItem.size,
+    downloadUrl: movedItem["@microsoft.graph.downloadUrl"] ?? null,
+    webUrl: movedItem.webUrl ?? null,
+  };
+}
 
 async function countFilesForProjects(
   token: string,
