@@ -262,6 +262,13 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
           const allDone = completedCount >= totalCount;
           const missingItems = totals?.nonCompleted ?? [];
 
+          const isGroupCollapsed = collapsedGroups.has(group.project_id);
+          const toggleGroup = () => setCollapsedGroups(prev => {
+            const next = new Set(prev);
+            next.has(group.project_id) ? next.delete(group.project_id) : next.add(group.project_id);
+            return next;
+          });
+
           return (
             <div
               key={group.project_id}
