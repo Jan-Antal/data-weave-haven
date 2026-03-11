@@ -432,12 +432,13 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
     const splitLabel = splitPart && splitTotal
       ? ` ${["½", "²⁄₂", "⅓", "²⁄₃", "¼", "²⁄₄", "¾"][splitPart === 1 && splitTotal === 2 ? 0 : splitPart === 2 && splitTotal === 2 ? 1 : 0] || `${splitPart}/${splitTotal}`}`
       : "";
+    const prefix = status === "completed" ? "✓ " : status === "paused" ? "⏸ " : "";
     if (displayMode === "percent") {
       const pct = totalItemHours > 0 ? Math.round((hours / totalItemHours) * 100) : 0;
-      return `${pct}%${splitLabel}`;
+      return `${prefix}${pct}%${splitLabel}`;
     }
-    if (displayMode === "czk") return `${formatCzkShort(Math.round(czk))} Kč${splitLabel}`;
-    return `${Math.round(hours)}h${splitLabel}`;
+    if (displayMode === "czk") return `${prefix}${formatCzkShort(Math.round(czk))} Kč${splitLabel}`;
+    return `${prefix}${Math.round(hours)}h${splitLabel}`;
   };
 
   const formatCapacity = (used: number, weekKey: string) => {
