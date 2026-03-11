@@ -565,7 +565,21 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                       }
                       <div className="min-w-0 flex-1">
                         <div className="text-[14px] font-semibold truncate text-foreground leading-tight">{proj.projectName}</div>
-                        <div className="text-[10px] text-muted-foreground font-mono leading-tight">{proj.projectId}</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-muted-foreground font-mono leading-tight">{proj.projectId}</span>
+                          {(() => {
+                            const pd = projectDateLookup.get(proj.projectId);
+                            const sml = pd?.datum_smluvni ? parseAppDate(pd.datum_smluvni) : null;
+                            const exp = pd?.expedice ? parseAppDate(pd.expedice) : null;
+                            const fmtD = (d: Date) => `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getFullYear()).slice(-2)}`;
+                            if (!sml && !exp) return null;
+                            return (
+                              <span className="text-[8px] truncate" style={{ color: "#99a5a3" }}>
+                                {sml && `Sml: ${fmtD(sml)}`}{sml && exp && " · "}{exp && `Exp: ${fmtD(exp)}`}
+                              </span>
+                            );
+                          })()}
+                        </div>
                       </div>
                       <div
                         className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-mono font-bold"
