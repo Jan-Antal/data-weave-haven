@@ -50,6 +50,7 @@ interface Props {
   onToggleCzk: (v: boolean) => void;
   overDroppableId?: string | null;
   onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void;
+  onOpenProjectDetail?: (projectId: string) => void;
   displayMode?: DisplayMode;
   onDisplayModeChange?: (mode: DisplayMode) => void;
 }
@@ -116,7 +117,7 @@ interface CancelState {
   cancelAll?: boolean;
 }
 
-export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, displayMode, onDisplayModeChange }: Props) {
+export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
@@ -389,7 +390,10 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
 
       actions.push({ label: "Rozbalit / Sbalit", icon: "⇅", onClick: toggleExpand });
       if (onNavigateToTPV) {
-        actions.push({ label: "Zobrazit TPV položky", icon: "📋", onClick: () => onNavigateToTPV(bundle.project_id) });
+        actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(bundle.project_id) });
+      }
+      if (onOpenProjectDetail) {
+        actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(bundle.project_id) });
       }
       if (hasUncompleted) {
         actions.push({
@@ -404,7 +408,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       }
       setContextMenu({ x: e.clientX, y: e.clientY, actions });
     },
-    [returnBundleToInbox, onNavigateToTPV, handleReleaseItem, mergeSplitItems]
+    [returnBundleToInbox, onNavigateToTPV, onOpenProjectDetail, handleReleaseItem, mergeSplitItems]
   );
 
   const handleItemContextMenu = useCallback(
@@ -444,7 +448,10 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
         });
 
         if (onNavigateToTPV) {
-          actions.push({ label: "Zobrazit v TPV", icon: "📋", onClick: () => onNavigateToTPV(item.project_id, item.item_code) });
+          actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(item.project_id, item.item_code) });
+        }
+        if (onOpenProjectDetail) {
+          actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(item.project_id) });
         }
 
         actions.push({ label: "Vrátit do Inboxu", icon: "←", onClick: () => moveItemBackToInbox(item.id) });
@@ -493,7 +500,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
 
       setContextMenu({ x: e.clientX, y: e.clientY, actions });
     },
-    [moveItemBackToInbox, returnToProduction, mergeSplitItems, findSameWeekSiblings, onNavigateToTPV, handleReleaseItem]
+    [moveItemBackToInbox, returnToProduction, mergeSplitItems, findSameWeekSiblings, onNavigateToTPV, onOpenProjectDetail, handleReleaseItem]
   );
 
   return (
@@ -787,7 +794,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
                   <TooltipTrigger asChild>
                     <AlertTriangle size={14} style={{ color: warnColor }} className="shrink-0" />
                   </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs">{tooltipText}</TooltipContent>
+                  <TooltipContent side="top" className="z-[9999] text-xs">{tooltipText}</TooltipContent>
                 </Tooltip>
               );
             })()}
@@ -844,7 +851,7 @@ function CompletedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onCont
       <span className="text-[10px] flex-1 truncate" style={{ color: "#99a5a3", textDecoration: "line-through" }}>{item.item_name}</span>
       {isSplit && (
         <Tooltip><TooltipTrigger asChild><span className="text-[8px] font-mono shrink-0" style={{ color: "#c4ccc9" }}>{item.split_part}/{item.split_total}</span></TooltipTrigger>
-          <TooltipContent className="text-[10px]">Část {item.split_part} ze {item.split_total}</TooltipContent></Tooltip>
+          <TooltipContent side="top" className="z-[9999] text-[10px]">Část {item.split_part} ze {item.split_total}</TooltipContent></Tooltip>
       )}
       <span className="font-mono text-[9px] shrink-0" style={{ color: "#c4ccc9" }}>{item.scheduled_hours}h</span>
     </div>
@@ -881,7 +888,7 @@ function PausedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onContext
             {isOverdue ? "⚠ " : ""}⏸ {pauseReason}
           </span>
         </TooltipTrigger>
-        <TooltipContent className="text-[10px]">
+        <TooltipContent side="top" className="z-[9999] text-[10px]">
           {pauseExpDate ? `Očekávané uvolnění: ${new Date(pauseExpDate).toLocaleDateString("cs-CZ")}` : "Bez termínu uvolnění"}
         </TooltipContent>
       </Tooltip>
@@ -930,7 +937,7 @@ function DraggableSiloItem({ item, weekKey, showCzk, onContextMenu }: {
       <span className="text-[10px] flex-1 truncate" style={{ color: "#6b7a78" }}>{item.item_name}</span>
       {isSplit && (
         <Tooltip><TooltipTrigger asChild><span className="text-[8px] font-mono shrink-0" style={{ color: "#99a5a3" }}>{item.split_part}/{item.split_total}</span></TooltipTrigger>
-          <TooltipContent className="text-[10px]">Část {item.split_part} ze {item.split_total}</TooltipContent></Tooltip>
+          <TooltipContent side="top" className="z-[9999] text-[10px]">Část {item.split_part} ze {item.split_total}</TooltipContent></Tooltip>
       )}
       <span className="font-mono text-[9px] shrink-0" style={{ color: "#99a5a3" }}>
         {item.scheduled_hours}h{showCzk && ` ${Math.round(item.scheduled_czk / 1000)}K`}

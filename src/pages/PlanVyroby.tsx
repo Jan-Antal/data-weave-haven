@@ -13,6 +13,7 @@ import { DragOverlayContent } from "@/components/production/DragOverlayContent";
 import { AutoSplitPopover } from "@/components/production/AutoSplitPopover";
 import { MergePopover } from "@/components/production/MergePopover";
 import { TPVList } from "@/components/TPVList";
+import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
 import { useProjects } from "@/hooks/useProjects";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
@@ -92,6 +93,7 @@ export default function PlanVyroby() {
   const [autoSplitState, setAutoSplitState] = useState<AutoSplitState | null>(null);
   const [mergeState, setMergeState] = useState<MergeState | null>(null);
   const [tpvProjectId, setTpvProjectId] = useState<string | null>(null);
+  const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
   const { data: allProjects = [] } = useProjects();
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
@@ -125,9 +127,14 @@ export default function PlanVyroby() {
 
 
   const tpvProject = tpvProjectId ? allProjects.find(p => p.project_id === tpvProjectId) : null;
+  const detailProject = detailProjectId ? allProjects.find(p => p.project_id === detailProjectId) || null : null;
 
   const handleNavigateToTPV = useCallback((projectId: string, _itemCode?: string | null) => {
     setTpvProjectId(projectId);
+  }, []);
+
+  const handleOpenProjectDetail = useCallback((projectId: string) => {
+    setDetailProjectId(projectId);
   }, []);
 
   const findSpillWeek = useCallback((afterWeekKey: string): { key: string; weekNum: number } => {
@@ -387,9 +394,9 @@ export default function PlanVyroby() {
 
         {viewTab === "kanban" ? (
           <div className="flex-1 flex min-h-0">
-            <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} disableDropZone={isDraggingFromInbox} />
-            <WeeklySilos showCzk={showCzk} onToggleCzk={(v) => setDisplayMode(v ? "czk" : "hours")} overDroppableId={overDroppableId} onNavigateToTPV={handleNavigateToTPV} displayMode={displayMode} onDisplayModeChange={setDisplayMode} />
-            <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} />
+            <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} disableDropZone={isDraggingFromInbox} />
+            <WeeklySilos showCzk={showCzk} onToggleCzk={(v) => setDisplayMode(v ? "czk" : "hours")} overDroppableId={overDroppableId} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} displayMode={displayMode} onDisplayModeChange={setDisplayMode} />
+            <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} />
           </div>
         ) : (
           <PlanVyrobyTableView displayMode={displayMode} searchQuery={searchQuery} />
@@ -436,6 +443,12 @@ export default function PlanVyroby() {
           </DialogContent>
         </Dialog>
       )}
+
+      <ProjectDetailDialog
+        project={detailProject as any}
+        open={!!detailProjectId}
+        onOpenChange={(open) => { if (!open) setDetailProjectId(null); }}
+      />
     </DndContext>
   );
 }

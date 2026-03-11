@@ -76,6 +76,7 @@ interface InboxPanelProps {
   overDroppableId?: string | null;
   showCzk?: boolean;
   onNavigateToTPV?: (projectId: string) => void;
+  onOpenProjectDetail?: (projectId: string) => void;
   disableDropZone?: boolean;
 }
 
@@ -89,7 +90,7 @@ interface CancelState {
   source: "schedule" | "inbox"; splitGroupId: string | null;
 }
 
-export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableDropZone }: InboxPanelProps) {
+export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenProjectDetail, disableDropZone }: InboxPanelProps) {
   const { data: projects = [], isLoading } = useProductionInbox();
   const { data: progressData } = useProductionProgress();
   const { data: settings } = useProductionSettings();
@@ -216,7 +217,10 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
       },
     ];
     if (onNavigateToTPV) {
-      actions.push({ label: "Zobrazit TPV položky", icon: "📋", onClick: () => onNavigateToTPV(project.project_id) });
+      actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(project.project_id) });
+    }
+    if (onOpenProjectDetail) {
+      actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(project.project_id) });
     }
     setContextMenu({ x: e.clientX, y: e.clientY, actions });
   };
@@ -234,7 +238,10 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
       },
     ];
     if (onNavigateToTPV) {
-      actions.push({ label: "Zobrazit v TPV", icon: "📋", onClick: () => onNavigateToTPV(project.project_id) });
+      actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(project.project_id) });
+    }
+    if (onOpenProjectDetail) {
+      actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(project.project_id) });
     }
     actions.push({
       label: "Zrušit položku", icon: "✕", danger: true, dividerBefore: true,
@@ -438,6 +445,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
             <InboxProjectGroup key={`${project.project_id}-${expandKey}`} project={project} hourlyRate={hourlyRate}
               defaultExpanded={allExpanded} showCzk={showCzk} progress={progressData?.get(project.project_id)}
               onNavigateToTPV={onNavigateToTPV}
+              onOpenProjectDetail={onOpenProjectDetail}
               onProjectContextMenu={handleProjectContextMenu}
               onItemContextMenu={handleItemContextMenu}
               urgency={urgency}
@@ -513,9 +521,10 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
   );
 }
 
-function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV, onProjectContextMenu, onItemContextMenu, urgency, daysLabel }: {
+function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel }: {
   project: InboxProject; hourlyRate: number; defaultExpanded: boolean; showCzk?: boolean;
   progress?: ProjectProgress; onNavigateToTPV?: (projectId: string) => void;
+  onOpenProjectDetail?: (projectId: string) => void;
   onProjectContextMenu: (e: React.MouseEvent, project: InboxProject) => void;
   onItemContextMenu: (e: React.MouseEvent, item: InboxItem, project: InboxProject) => void;
   urgency: UrgencyLevel;
@@ -579,7 +588,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
           <DraggableInboxProject project={project} />
           {onNavigateToTPV && (
             <button onClick={() => onNavigateToTPV(project.project_id)} className="w-full text-[9px] text-center py-1 hover:underline transition-colors" style={{ color: "#6b7a78" }}>
-              📋 Zobrazit TPV položky
+              📋 Zobrazit položky
             </button>
           )}
         </div>
