@@ -677,6 +677,21 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
         <SpillSuggestionPanel overloadHours={overloadHours} bundles={silo.bundles} weekKey={weekKey}
           allWeeksData={allWeeksData} weeklyCapacity={weeklyCapacity} weekKeys={weekKeys} onClose={onDismissSpill} />
       )}
+      {isOverloaded && !isPast && spillDismissed && (
+        <button
+          onClick={onReopenSpill}
+          className="w-full px-2 py-[3px] text-[9px] font-semibold text-center transition-colors cursor-pointer"
+          style={{
+            backgroundColor: "rgba(220,53,69,0.06)",
+            color: "#dc3545",
+            borderRadius: "0 0 8px 8px",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = "rgba(220,53,69,0.12)"; }}
+          onMouseLeave={e => { e.currentTarget.style.backgroundColor = "rgba(220,53,69,0.06)"; }}
+        >
+          ⚡ Přetíženo — zobrazit návrhy
+        </button>
+      )}
     </div>
   );
 }
