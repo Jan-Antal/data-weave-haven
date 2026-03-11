@@ -408,10 +408,12 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const handleToggleCategory = useCallback((key: string) => {
     const willOpen = openCategory !== key;
     setOpenCategory(willOpen ? key : null);
+    // Clear selection when switching folders
+    fileSelection.clearSelection();
     if (willOpen) {
       sp.listFiles(key);
     }
-  }, [openCategory, sp]);
+  }, [openCategory, sp, fileSelection]);
 
   useEffect(() => {
     if (project && open) {
