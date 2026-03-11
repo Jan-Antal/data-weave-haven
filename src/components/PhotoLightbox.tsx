@@ -348,12 +348,12 @@ export const PhotoLightbox = memo(function PhotoLightbox({
   const canGoPrev = currentIndex > 0;
   const canGoNext = currentIndex < files.length - 1;
 
-  // Load medium-res for current
+  // Load large thumbnail for current image (800px, ~100-300KB vs 2-8MB original)
+  const largeUrl = file?.largeThumbUrl || file?.downloadUrl;
   useEffect(() => {
-    if (!open || !file?.downloadUrl) return;
-    const url = file.downloadUrl;
+    if (!open || !largeUrl) return;
 
-    if (mediumResCache.has(url)) {
+    if (largeThumbCache.has(largeUrl)) {
       setMediumReady(true);
       return;
     }
@@ -361,22 +361,23 @@ export const PhotoLightbox = memo(function PhotoLightbox({
     setMediumReady(false);
     const img = new Image();
     img.onload = () => {
-      mediumResCache.set(url, url);
+      largeThumbCache.set(largeUrl, largeUrl);
       setMediumReady(true);
     };
     img.onerror = () => setMediumReady(true);
-    img.src = url;
+    img.src = largeUrl;
     return () => { img.onload = null; img.onerror = null; };
-  }, [open, file?.downloadUrl]);
+  }, [open, largeUrl]);
 
-  // Preload adjacent
+  // Preload adjacent large thumbnails
   useEffect(() => {
     if (!open) return;
     [files[currentIndex - 1], files[currentIndex + 1]].filter(Boolean).forEach((f) => {
-      if (f.downloadUrl && !mediumResCache.has(f.downloadUrl)) {
+      const url = f.largeThumbUrl || f.downloadUrl;
+      if (url && !largeThumbCache.has(url)) {
         const img = new Image();
-        img.src = f.downloadUrl;
-        img.onload = () => mediumResCache.set(f.downloadUrl!, f.downloadUrl!);
+        img.src = url;
+        img.onload = () => largeThumbCache.set(url, url);
       }
     });
   }, [open, currentIndex, files]);
