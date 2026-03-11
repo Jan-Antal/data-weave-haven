@@ -499,6 +499,23 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
     return () => document.removeEventListener("mousedown", handler);
   }, [exportDropdownOpen]);
 
+  // Initial scroll — show last week as first visible week column
+  useEffect(() => {
+    if (initialScrollDone.current || weeks.length === 0) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const currentMonday = getMonday(new Date());
+    const lastWeekMonday = new Date(currentMonday);
+    lastWeekMonday.setDate(lastWeekMonday.getDate() - 7);
+    const lastWeekKey = lastWeekMonday.toISOString().split("T")[0];
+    const lastWeekIdx = weeks.findIndex(w => w.key === lastWeekKey);
+    if (lastWeekIdx >= 0) {
+      // Scroll past: left fixed columns + inbox column + all week columns before last week
+      el.scrollLeft = LEFT_COL_W + INBOX_W + lastWeekIdx * CELL_W - LEFT_COL_W - INBOX_W;
+    }
+    initialScrollDone.current = true;
+  }, [weeks]);
+
   const buildExportData = useCallback(() => {
     const weekHeaders = weeks.map(w => `T${w.weekNum}`);
     const headers = ["Projekt", "ID projektu", "Položka", "Kód položky", "Celkem hodin", ...weekHeaders, "Expedice"];
