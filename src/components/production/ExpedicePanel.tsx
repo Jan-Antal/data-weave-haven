@@ -307,79 +307,81 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
                 </div>
               </div>
 
-              {/* Missing items indicator */}
-              {!allDone && missingItems.length > 0 && (
-                <div className="text-[8px] text-muted-foreground px-0.5">
-                  {missingItems.length <= 2 ? (
-                    <span>
-                      Zbývá: {missingItems.map((mi, idx) => (
-                        <span key={mi.id}>
-                          {idx > 0 && " · "}
-                          <span className="font-medium">{mi.item_code || mi.item_name}</span>
+              {!isGroupCollapsed && (
+                <>
+                  {/* Missing items indicator */}
+                  {!allDone && missingItems.length > 0 && (
+                    <div className="text-[8px] text-muted-foreground px-0.5">
+                      {missingItems.length <= 2 ? (
+                        <span>
+                          Zbývá: {missingItems.map((mi, idx) => (
+                            <span key={mi.id}>
+                              {idx > 0 && " · "}
+                              <span className="font-medium">{mi.item_code || mi.item_name}</span>
+                            </span>
+                          ))}
                         </span>
-                      ))}
-                    </span>
-                  ) : (
-                    <span
-                      className="cursor-pointer hover:underline"
-                      style={{ color: "#D97706" }}
-                      onClick={() => {
-                        if (onNavigateToTPV) onNavigateToTPV(group.project_id);
-                      }}
-                    >
-                      {missingItems.length} položek zbývá →
-                    </span>
-                  )}
-                </div>
-              )}
-
-              <div className="space-y-[2px]">
-                {group.items.map((item) => {
-                  const completedStr = formatShortDate(item.completed_at);
-                  const completedDate = parseDate(item.completed_at);
-                  // Item-level expedice color
-                  let itemExpColor = "#99a5a3";
-                  if (expediceDate && completedDate) {
-                    if (isPast(expediceDate)) itemExpColor = "#16A34A"; // green
-                    else if (isFuture(expediceDate)) itemExpColor = "#2563EB"; // blue - completed early
-                  }
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="rounded px-1 py-[3px] cursor-default transition-colors"
-                      onContextMenu={(e) => handleItemContextMenu(e, item)}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "hsl(var(--muted))")}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <Check className="shrink-0" style={{ width: 12, height: 12, color: "#16A34A", strokeWidth: 3 }} />
-                        {item.item_code && (
-                          <span className="font-mono text-[10px] shrink-0 text-foreground">
-                            {item.item_code}
-                          </span>
-                        )}
-                        <span className="text-[11px] truncate flex-1 text-muted-foreground">
-                          {item.item_name}
+                      ) : (
+                        <span
+                          className="cursor-pointer hover:underline"
+                          style={{ color: "#D97706" }}
+                          onClick={() => {
+                            if (onNavigateToTPV) onNavigateToTPV(group.project_id);
+                          }}
+                        >
+                          {missingItems.length} položek zbývá →
                         </span>
-                      </div>
-                      {/* Date details */}
-                      <div className="ml-[18px] flex flex-col gap-0">
-                        {completedStr && (
-                          <span className="text-[8px] text-muted-foreground">
-                            Dokončeno: {completedStr}
-                          </span>
-                        )}
-                        {expediceStr && (
-                          <span className="text-[8px] font-medium" style={{ color: itemExpColor }}>
-                            Expedice: {expediceStr}
-                          </span>
-                        )}
-                      </div>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
+                  )}
+
+                  <div className="space-y-[2px]">
+                    {group.items.map((item) => {
+                      const completedStr = formatShortDate(item.completed_at);
+                      const completedDate = parseDate(item.completed_at);
+                      let itemExpColor = "#99a5a3";
+                      if (expediceDate && completedDate) {
+                        if (isPast(expediceDate)) itemExpColor = "#16A34A";
+                        else if (isFuture(expediceDate)) itemExpColor = "#2563EB";
+                      }
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="rounded px-1 py-[3px] cursor-default transition-colors"
+                          onContextMenu={(e) => handleItemContextMenu(e, item)}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "hsl(var(--muted))")}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <Check className="shrink-0" style={{ width: 12, height: 12, color: "#16A34A", strokeWidth: 3 }} />
+                            {item.item_code && (
+                              <span className="font-mono text-[10px] shrink-0 text-foreground">
+                                {item.item_code}
+                              </span>
+                            )}
+                            <span className="text-[11px] truncate flex-1 text-muted-foreground">
+                              {item.item_name}
+                            </span>
+                          </div>
+                          <div className="ml-[18px] flex flex-col gap-0">
+                            {completedStr && (
+                              <span className="text-[8px] text-muted-foreground">
+                                Dokončeno: {completedStr}
+                              </span>
+                            )}
+                            {expediceStr && (
+                              <span className="text-[8px] font-medium" style={{ color: itemExpColor }}>
+                                Expedice: {expediceStr}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           );
         })}
