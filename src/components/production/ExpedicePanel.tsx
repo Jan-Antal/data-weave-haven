@@ -221,9 +221,18 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
               </span>
             )}
           </div>
-          <button onClick={() => setCollapsed(true)} className="p-0.5 rounded hover:bg-muted transition-colors">
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-          </button>
+          <div className="flex items-center gap-0.5">
+            {projects.length > 0 && (
+              <button onClick={handleToggleAllGroups} className="p-0.5 rounded hover:bg-muted transition-colors">
+                {allGroupsExpanded
+                  ? <ChevronDown className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                  : <ChevronUp className="h-4 w-4 text-gray-400 hover:text-gray-600" />}
+              </button>
+            )}
+            <button onClick={() => setCollapsed(true)} className="p-0.5 rounded hover:bg-muted transition-colors">
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          </div>
         </div>
         {totalItems > 0 && (
           <div className="text-[9px] text-muted-foreground">
