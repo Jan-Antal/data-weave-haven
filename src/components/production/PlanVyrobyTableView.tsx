@@ -985,6 +985,14 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
           source="schedule"
         />
       )}
+
+      {pdfHtml && (
+        <PdfPreviewModal
+          html={pdfHtml}
+          tabLabel="Plán Výroby"
+          onClose={() => setPdfHtml(null)}
+        />
+      )}
     </div>
   );
 }
