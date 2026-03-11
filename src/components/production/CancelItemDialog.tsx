@@ -33,7 +33,7 @@ export function CancelItemDialog({
   source, splitGroupId, cancelAll,
 }: CancelItemDialogProps) {
   const qc = useQueryClient();
-  const [reason, setReason] = useState("klient");
+  const { pushUndo } = useUndoRedo();
   const [submitting, setSubmitting] = useState(false);
 
   const invalidateAll = useCallback(() => {
