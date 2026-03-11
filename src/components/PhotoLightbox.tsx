@@ -257,6 +257,9 @@ function LazyThumbnail({ file, onClick }: { file: SPFile; onClick: () => void })
 
   const isRec = isReklamace(file.name);
 
+  // Prefer SharePoint thumbnail API (medium ~176px) over full download URL
+  const thumbSrc = file.thumbnailUrl || file.downloadUrl;
+
   return (
     <div
       ref={ref}
@@ -266,7 +269,7 @@ function LazyThumbnail({ file, onClick }: { file: SPFile; onClick: () => void })
       )}
       onClick={onClick}
     >
-      {visible && file.downloadUrl ? (
+      {visible && thumbSrc ? (
         <>
           {!loaded && (
             <div className="absolute inset-0 flex items-center justify-center bg-accent/40 animate-pulse">
@@ -274,7 +277,7 @@ function LazyThumbnail({ file, onClick }: { file: SPFile; onClick: () => void })
             </div>
           )}
           <img
-            src={file.downloadUrl}
+            src={thumbSrc}
             alt={file.name}
             loading="lazy"
             className={cn(
@@ -300,8 +303,8 @@ function LazyThumbnail({ file, onClick }: { file: SPFile; onClick: () => void })
 
 // ─── Lightbox ───────────────────────────────────────────────────
 
-/** Session cache for medium-res images (800px) */
-const mediumResCache = new Map<string, string>();
+/** Session cache for large thumbnail images (800px) */
+const largeThumbCache = new Map<string, string>();
 
 interface PhotoLightboxProps {
   open: boolean;
@@ -345,12 +348,12 @@ export const PhotoLightbox = memo(function PhotoLightbox({
   const canGoPrev = currentIndex > 0;
   const canGoNext = currentIndex < files.length - 1;
 
-  // Load medium-res for current
+  // Load large thumbnail for current image (800px, ~100-300KB vs 2-8MB original)
+  const largeUrl = file?.largeThumbUrl || file?.downloadUrl;
   useEffect(() => {
-    if (!open || !file?.downloadUrl) return;
-    const url = file.downloadUrl;
+    if (!open || !largeUrl) return;
 
-    if (mediumResCache.has(url)) {
+    if (largeThumbCache.has(largeUrl)) {
       setMediumReady(true);
       return;
     }
@@ -358,22 +361,23 @@ export const PhotoLightbox = memo(function PhotoLightbox({
     setMediumReady(false);
     const img = new Image();
     img.onload = () => {
-      mediumResCache.set(url, url);
+      largeThumbCache.set(largeUrl, largeUrl);
       setMediumReady(true);
     };
     img.onerror = () => setMediumReady(true);
-    img.src = url;
+    img.src = largeUrl;
     return () => { img.onload = null; img.onerror = null; };
-  }, [open, file?.downloadUrl]);
+  }, [open, largeUrl]);
 
-  // Preload adjacent
+  // Preload adjacent large thumbnails
   useEffect(() => {
     if (!open) return;
     [files[currentIndex - 1], files[currentIndex + 1]].filter(Boolean).forEach((f) => {
-      if (f.downloadUrl && !mediumResCache.has(f.downloadUrl)) {
+      const url = f.largeThumbUrl || f.downloadUrl;
+      if (url && !largeThumbCache.has(url)) {
         const img = new Image();
-        img.src = f.downloadUrl;
-        img.onload = () => mediumResCache.set(f.downloadUrl!, f.downloadUrl!);
+        img.src = url;
+        img.onload = () => largeThumbCache.set(url, url);
       }
     });
   }, [open, currentIndex, files]);
@@ -540,17 +544,27 @@ export const PhotoLightbox = memo(function PhotoLightbox({
       >
         {!mediumReady && (
           <div className="absolute inset-0 flex items-center justify-center z-10">
-            <Loader2 className="h-8 w-8 animate-spin text-white/50" />
+            {/* Show grid thumbnail as instant placeholder while large loads */}
+            {file.thumbnailUrl ? (
+              <img
+                src={file.thumbnailUrl}
+                alt={file.name}
+                className="max-w-full max-h-full object-contain rounded opacity-60 blur-sm scale-[1.02]"
+                draggable={false}
+              />
+            ) : (
+              <Loader2 className="h-8 w-8 animate-spin text-white/50" />
+            )}
           </div>
         )}
-        {file.downloadUrl && (
+        {(file.largeThumbUrl || file.downloadUrl) && (
           <img
             key={file.itemId}
-            src={file.downloadUrl}
+            src={file.largeThumbUrl || file.downloadUrl!}
             alt={file.name}
             className={cn(
               "max-w-full max-h-full object-contain rounded transition-all duration-300",
-              mediumReady ? "opacity-100 blur-0 scale-100" : "opacity-40 blur-sm scale-[1.02]"
+              mediumReady ? "opacity-100 blur-0 scale-100" : "opacity-0"
             )}
             draggable={false}
           />
