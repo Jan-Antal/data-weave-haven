@@ -443,6 +443,12 @@ export default function PlanVyroby() {
           </DialogContent>
         </Dialog>
       )}
+
+      <ProjectDetailDialog
+        project={detailProject as any}
+        open={!!detailProjectId}
+        onOpenChange={(open) => { if (!open) setDetailProjectId(null); }}
+      />
     </DndContext>
   );
 }
