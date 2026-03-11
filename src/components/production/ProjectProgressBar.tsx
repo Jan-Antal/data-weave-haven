@@ -18,6 +18,8 @@ export function ProjectProgressBar({ progress, compact }: Props) {
   const accountedFor = progress.completed + progress.scheduled + progress.in_inbox + (progress.paused || 0);
 
   const hasActivity = progress.completed > 0 || progress.scheduled > 0 || (progress.paused || 0) > 0 || progress.missing > 0;
+  const stillInTpv = progress.total_tpv - (progress.completed + progress.scheduled + progress.in_inbox + (progress.paused || 0));
+  const tpvCount = Math.max(0, stillInTpv);
 
   return (
     <div className="w-full">
@@ -33,8 +35,14 @@ export function ProjectProgressBar({ progress, compact }: Props) {
         {pctInbox > 0 && <div className="h-full" style={{ width: `${pctInbox}%`, backgroundColor: "#c4bfb8" }} />}
         {pctMissing > 0 && <div className="h-full" style={{ width: `${pctMissing}%`, backgroundColor: "#d4908e" }} />}
       </div>
-      {hasActivity && (
+      {(hasActivity || tpvCount > 0) && (
         <div className="flex gap-2 mt-1 text-[10px] leading-none">
+          {tpvCount > 0 && (
+            <span className="flex items-center gap-0.5" style={{ color: "#8a8578" }}>
+              <span>◇</span>
+              <span>{tpvCount} v TPV</span>
+            </span>
+          )}
           {progress.completed > 0 && (
             <span className="flex items-center gap-0.5" style={{ color: "#6aab68" }}>
               <span>✓</span>
