@@ -35,6 +35,7 @@ export function CompletionDialog({
 }: CompletionDialogProps) {
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set(preCheckedIds ?? []));
   const [itemConfigs, setItemConfigs] = useState<Record<string, ItemCompletionConfig>>({});
+  const [splitOpenId, setSplitOpenId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const qc = useQueryClient();
 
