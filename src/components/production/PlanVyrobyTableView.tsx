@@ -1,13 +1,17 @@
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useProductionSchedule, useProductionExpedice, getISOWeekNumber, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
 import { useProjects } from "@/hooks/useProjects";
+import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 import { getProjectColor } from "@/lib/projectColors";
 import { exportToExcel } from "@/lib/exportExcel";
 import { parseAppDate } from "@/lib/dateFormat";
-import { Download, ChevronRight, ChevronDown } from "lucide-react";
+import { Download, ChevronRight, ChevronDown, Plus, ArrowRight, Inbox, CheckCircle2, XCircle } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CancelItemDialog } from "./CancelItemDialog";
+import { toast } from "@/hooks/use-toast";
 
 type DisplayMode = "hours" | "czk" | "percent";
 type SortMode = "project" | "deadline" | "hours";
@@ -49,17 +53,30 @@ interface WeekColumn {
   isCurrent: boolean;
 }
 
+interface WeekAlloc {
+  hours: number;
+  czk: number;
+  status: string;
+  splitPart?: number;
+  splitTotal?: number;
+  scheduleItemIds: string[];
+}
+
 interface ItemRow {
   id: string;
   itemName: string;
   itemCode: string | null;
   totalHours: number;
   totalCzk: number;
-  weekAllocations: Map<string, { hours: number; czk: number; status: string; splitPart?: number; splitTotal?: number }>;
+  weekAllocations: Map<string, WeekAlloc>;
   inboxHours: number;
   inboxCzk: number;
+  inboxItemIds: string[];
   expediceHours: number;
   expediceCzk: number;
+  projectId: string;
+  projectName: string;
+  stageId: string | null;
 }
 
 interface ProjectRow {
@@ -88,9 +105,17 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
   const { data: settings } = useProductionSettings();
   const { data: allProjects = [] } = useProjects();
   const getWeekCapacity = useWeekCapacityLookup();
+  const { moveScheduleItemToWeek, moveItemBackToInbox, completeItems, moveInboxItemToWeek } = useProductionDragDrop();
   const [sortMode, setSortMode] = useState<SortMode>("project");
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Cancel dialog state
+  const [cancelDialog, setCancelDialog] = useState<{
+    open: boolean; itemId: string; itemName: string; itemCode?: string | null;
+    hours: number; projectName: string; projectId: string;
+    splitGroupId?: string | null;
+  } | null>(null);
 
   const projectDateLookup = useMemo(() => {
     const map = new Map<string, { expedice?: string | null; datum_smluvni?: string | null }>();
@@ -132,12 +157,25 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
     return result;
   }, [scheduleData]);
 
+  // Next 8 weeks from current for move targets
+  const moveTargetWeeks = useMemo(() => {
+    const monday = getMonday(new Date());
+    const targets: { key: string; weekNum: number; label: string }[] = [];
+    for (let i = 1; i <= 8; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i * 7);
+      const key = d.toISOString().split("T")[0];
+      targets.push({ key, weekNum: getISOWeekNumber(d), label: `T${getISOWeekNumber(d)} (${formatDateShort(d)})` });
+    }
+    return targets;
+  }, []);
+
   const inboxByProject = useMemo(() => {
-    const map = new Map<string, { items: { name: string; code: string | null; hours: number; czk: number }[]; totalHours: number; totalCzk: number }>();
+    const map = new Map<string, { items: { id: string; name: string; code: string | null; hours: number; czk: number; stageId: string | null }[]; totalHours: number; totalCzk: number }>();
     for (const p of inboxProjects) {
       if (p.total_hours <= 0) continue;
       map.set(p.project_id, {
-        items: p.items.map(i => ({ name: i.item_name, code: i.item_code, hours: i.estimated_hours, czk: i.estimated_czk })),
+        items: p.items.map(i => ({ id: i.id, name: i.item_name, code: i.item_code, hours: i.estimated_hours, czk: i.estimated_czk, stageId: i.stage_id })),
         totalHours: p.total_hours,
         totalCzk: p.items.reduce((s, i) => s + i.estimated_czk, 0),
       });
@@ -169,7 +207,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
       items: Map<string, {
         itemName: string;
         itemCode: string | null;
-        weekAllocations: Map<string, { hours: number; czk: number; status: string; splitPart?: number; splitTotal?: number }>;
+        stageId: string | null;
+        weekAllocations: Map<string, WeekAlloc>;
         totalHours: number;
         totalCzk: number;
       }>;
@@ -186,7 +225,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
             if (item.status === "completed") continue;
             const itemKey = item.split_group_id || item.id;
             if (!proj.items.has(itemKey)) {
-              proj.items.set(itemKey, { itemName: cleanSplitName(item.item_name), itemCode: item.item_code, weekAllocations: new Map(), totalHours: 0, totalCzk: 0 });
+              proj.items.set(itemKey, { itemName: cleanSplitName(item.item_name), itemCode: item.item_code, stageId: item.stage_id, weekAllocations: new Map(), totalHours: 0, totalCzk: 0 });
             }
             const entry = proj.items.get(itemKey)!;
             const existing = entry.weekAllocations.get(weekKey);
@@ -196,6 +235,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
               status: item.status,
               splitPart: item.split_part ?? undefined,
               splitTotal: item.split_total ?? undefined,
+              scheduleItemIds: [...(existing?.scheduleItemIds ?? []), item.id],
             });
             entry.totalHours += item.scheduled_hours;
             entry.totalCzk += item.scheduled_czk;
@@ -214,6 +254,10 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
       const items: ItemRow[] = [];
       const knownItemKeys = new Set<string>();
 
+      const realName = inboxProjects.find(p => p.project_id === pid)?.project_name ||
+        expediceData?.find(g => g.project_id === pid)?.project_name ||
+        proj?.projectName || pid;
+
       if (proj) {
         for (const [, entry] of proj.items) {
           if (entry.totalHours <= 0) continue;
@@ -227,7 +271,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
             totalHours: entry.totalHours,
             totalCzk: entry.totalCzk,
             weekAllocations: entry.weekAllocations,
-            inboxHours: 0, inboxCzk: 0, expediceHours: 0, expediceCzk: 0,
+            inboxHours: 0, inboxCzk: 0, inboxItemIds: [],
+            expediceHours: 0, expediceCzk: 0,
+            projectId: pid, projectName: realName, stageId: entry.stageId,
           });
         }
       }
@@ -247,6 +293,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
             existing.inboxCzk += inItem.czk;
             existing.totalHours += inItem.hours;
             existing.totalCzk += inItem.czk;
+            existing.inboxItemIds.push(inItem.id);
           } else {
             if (codeKey) knownItemKeys.add(codeKey);
             knownItemKeys.add(nameKey);
@@ -255,8 +302,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
               itemName: cleanName, itemCode: inItem.code,
               totalHours: inItem.hours, totalCzk: inItem.czk,
               weekAllocations: new Map(),
-              inboxHours: inItem.hours, inboxCzk: inItem.czk,
+              inboxHours: inItem.hours, inboxCzk: inItem.czk, inboxItemIds: [inItem.id],
               expediceHours: 0, expediceCzk: 0,
+              projectId: pid, projectName: realName, stageId: inItem.stageId,
             });
           }
         }
@@ -283,14 +331,14 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
               itemName: cleanName, itemCode: exItem.code,
               totalHours: exItem.hours, totalCzk: exItem.czk,
               weekAllocations: new Map(),
-              inboxHours: 0, inboxCzk: 0,
+              inboxHours: 0, inboxCzk: 0, inboxItemIds: [],
               expediceHours: exItem.hours, expediceCzk: exItem.czk,
+              projectId: pid, projectName: realName, stageId: null,
             });
           }
         }
       }
 
-      // Hide empty item rows
       const visibleItems = items.filter(i => i.totalHours > 0 || i.inboxHours > 0 || i.expediceHours > 0);
       if (visibleItems.length === 0) continue;
 
@@ -301,10 +349,6 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
           weekTotals.set(wk, { hours: (existing?.hours ?? 0) + alloc.hours, czk: (existing?.czk ?? 0) + alloc.czk });
         }
       }
-
-      const realName = inboxProjects.find(p => p.project_id === pid)?.project_name ||
-        expediceData?.find(g => g.project_id === pid)?.project_name ||
-        proj?.projectName || pid;
 
       rows.push({
         projectId: pid, projectName: realName, color: getProjectColor(pid),
@@ -438,7 +482,38 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
     exportToExcel({ sheetName: "Plán Výroby", fileName: `AMI-Plan-Vyroby-${today}.xlsx`, headers, rows });
   };
 
-  // Always show Inbox and Expedice columns as fixed/sticky
+  // Action handlers
+  const handleMoveToWeek = useCallback(async (scheduleItemIds: string[], targetWeekKey: string) => {
+    try {
+      for (const id of scheduleItemIds) {
+        await moveScheduleItemToWeek(id, targetWeekKey);
+      }
+      toast({ title: `Přesunuto do T${getISOWeekNumber(new Date(targetWeekKey))}` });
+    } catch { /* error handled in hook */ }
+  }, [moveScheduleItemToWeek]);
+
+  const handleReturnToInbox = useCallback(async (scheduleItemIds: string[]) => {
+    try {
+      for (const id of scheduleItemIds) {
+        await moveItemBackToInbox(id);
+      }
+      toast({ title: "Vráceno do Inboxu" });
+    } catch { /* error handled in hook */ }
+  }, [moveItemBackToInbox]);
+
+  const handleComplete = useCallback(async (scheduleItemIds: string[]) => {
+    try {
+      await completeItems(scheduleItemIds);
+    } catch { /* error handled in hook */ }
+  }, [completeItems]);
+
+  const handleScheduleFromInbox = useCallback(async (inboxItemId: string, weekKey: string) => {
+    try {
+      await moveInboxItemToWeek(inboxItemId, weekKey);
+      toast({ title: `Naplánováno do T${getISOWeekNumber(new Date(weekKey))}` });
+    } catch { /* error handled in hook */ }
+  }, [moveInboxItemToWeek]);
+
   const hasAnyInbox = true;
   const hasAnyExpedice = true;
 
@@ -538,14 +613,11 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
               const isExpanded = expandedProjects.has(proj.projectId);
               return (
                 <div key={proj.projectId} style={{ marginLeft: 4, marginRight: 4 }}>
-                  {/* Project header row — card style */}
+                  {/* Project header row */}
                   <div
                     className="flex cursor-pointer transition-all"
                     onClick={() => toggleProject(proj.projectId)}
-                    style={{
-                      height: 48,
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                    }}
+                    style={{ height: 48, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
                   >
                     <div
                       className="shrink-0 flex items-center gap-2.5 px-3 sticky left-0 z-20"
@@ -689,40 +761,49 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                               )}
                             </div>
                           )}
-                          {/* Week cells */}
+                          {/* Week cells — interactive */}
                           {weeks.map(week => {
                             const alloc = item.weekAllocations.get(week.key);
-                            if (!alloc) {
+                            if (alloc) {
                               return (
-                                <div key={week.key} className="shrink-0" style={{
-                                  width: CELL_W,
-                                  backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : "#fff",
-                                }} />
+                                <FilledWeekCell
+                                  key={week.key}
+                                  weekKey={week.key}
+                                  isCurrent={week.isCurrent}
+                                  alloc={alloc}
+                                  item={item}
+                                  displayMode={displayMode}
+                                  formatCellValue={formatCellValue}
+                                  getCellStyle={getCellStyle}
+                                  moveTargetWeeks={moveTargetWeeks}
+                                  getWeekCapacity={getWeekCapacity}
+                                  weekCapacities={weekCapacities}
+                                  onMoveToWeek={handleMoveToWeek}
+                                  onReturnToInbox={handleReturnToInbox}
+                                  onComplete={handleComplete}
+                                  onCancel={(ids) => {
+                                    setCancelDialog({
+                                      open: true,
+                                      itemId: ids[0],
+                                      itemName: item.itemName,
+                                      itemCode: item.itemCode,
+                                      hours: alloc.hours,
+                                      projectName: item.projectName,
+                                      projectId: item.projectId,
+                                    });
+                                  }}
+                                />
                               );
                             }
-                            const cellStyle = getCellStyle(alloc.status);
+                            // Empty cell — show "+" if item has inbox items
                             return (
-                              <div
+                              <EmptyWeekCell
                                 key={week.key}
-                                className="shrink-0 flex items-center justify-center px-1 py-0.5"
-                                style={{
-                                  width: CELL_W,
-                                  backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : "#fff",
-                                }}
-                              >
-                                <div
-                                  className="w-full text-center text-[9px] font-mono font-semibold"
-                                  style={{
-                                    backgroundColor: cellStyle.bg,
-                                    color: cellStyle.text,
-                                    borderRadius: 4,
-                                    padding: "3px 6px",
-                                    border: `1px solid ${cellStyle.border}20`,
-                                  }}
-                                >
-                                  {formatCellValue(alloc.hours, alloc.czk, alloc.status, item.totalHours, alloc.splitPart, alloc.splitTotal)}
-                                </div>
-                              </div>
+                                weekKey={week.key}
+                                isCurrent={week.isCurrent}
+                                item={item}
+                                onSchedule={handleScheduleFromInbox}
+                              />
                             );
                           })}
                           {/* Expedice cell */}
@@ -781,9 +862,212 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
           ))}
         </div>
         <span className="text-[9px] italic text-muted-foreground/60">
-          Pro úpravu plánu přepněte na Kanban zobrazení
+          Klikněte na buňku pro úpravu plánu
         </span>
       </div>
+
+      {/* Cancel dialog */}
+      {cancelDialog && (
+        <CancelItemDialog
+          open={cancelDialog.open}
+          onOpenChange={(open) => { if (!open) setCancelDialog(null); }}
+          itemId={cancelDialog.itemId}
+          itemName={cancelDialog.itemName}
+          itemCode={cancelDialog.itemCode}
+          hours={cancelDialog.hours}
+          projectName={cancelDialog.projectName}
+          projectId={cancelDialog.projectId}
+          source="schedule"
+        />
+      )}
+    </div>
+  );
+}
+
+/* ─── Filled week cell with popover ─── */
+function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCellValue, getCellStyle, moveTargetWeeks, getWeekCapacity, weekCapacities, onMoveToWeek, onReturnToInbox, onComplete, onCancel }: {
+  weekKey: string;
+  isCurrent: boolean;
+  alloc: WeekAlloc;
+  item: ItemRow;
+  displayMode: DisplayMode;
+  formatCellValue: (hours: number, czk: number, status: string, totalItemHours: number, splitPart?: number, splitTotal?: number) => string;
+  getCellStyle: (status: string) => { bg: string; text: string; border: string };
+  moveTargetWeeks: { key: string; weekNum: number; label: string }[];
+  getWeekCapacity: (weekKey: string) => number;
+  weekCapacities: Map<string, number>;
+  onMoveToWeek: (ids: string[], weekKey: string) => Promise<void>;
+  onReturnToInbox: (ids: string[]) => Promise<void>;
+  onComplete: (ids: string[]) => Promise<void>;
+  onCancel: (ids: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [showMoveList, setShowMoveList] = useState(false);
+  const cellStyle = getCellStyle(alloc.status);
+  const ids = alloc.scheduleItemIds;
+
+  const handleAction = async (action: () => Promise<void>) => {
+    setOpen(false);
+    setShowMoveList(false);
+    await action();
+  };
+
+  return (
+    <div
+      className="shrink-0 flex items-center justify-center px-1 py-0.5"
+      style={{ width: CELL_W, backgroundColor: isCurrent ? "hsl(142 76% 97%)" : "#fff" }}
+    >
+      <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setShowMoveList(false); }}>
+        <PopoverTrigger asChild>
+          <button
+            className="w-full text-center text-[9px] font-mono font-semibold transition-all"
+            style={{
+              backgroundColor: cellStyle.bg,
+              color: cellStyle.text,
+              borderRadius: 4,
+              padding: "3px 6px",
+              border: `1px solid ${cellStyle.border}20`,
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.filter = "brightness(0.93)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.filter = "none"; }}
+          >
+            {formatCellValue(alloc.hours, alloc.czk, alloc.status, item.totalHours, alloc.splitPart, alloc.splitTotal)}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-52 p-0" align="center" sideOffset={4}>
+          {!showMoveList ? (
+            <div className="py-1">
+              <button
+                className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 transition-colors hover:bg-accent"
+                onClick={() => setShowMoveList(true)}
+              >
+                <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                Přesunout do týdne…
+              </button>
+              <button
+                className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 transition-colors hover:bg-accent"
+                onClick={() => handleAction(() => onReturnToInbox(ids))}
+              >
+                <Inbox className="h-3 w-3 text-muted-foreground" />
+                Vrátit do Inboxu
+              </button>
+              {alloc.status !== "completed" && (
+                <button
+                  className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 transition-colors hover:bg-accent"
+                  onClick={() => handleAction(() => onComplete(ids))}
+                >
+                  <CheckCircle2 className="h-3 w-3" style={{ color: "#059669" }} />
+                  Dokončit → Expedice
+                </button>
+              )}
+              <div className="my-1 h-px bg-border" />
+              <button
+                className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 transition-colors hover:bg-destructive/10"
+                style={{ color: "hsl(var(--destructive))" }}
+                onClick={() => { setOpen(false); onCancel(ids); }}
+              >
+                <XCircle className="h-3 w-3" />
+                Zrušit
+              </button>
+            </div>
+          ) : (
+            <div className="py-1">
+              <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                Přesunout do týdne
+              </div>
+              <div className="max-h-[200px] overflow-y-auto">
+                {moveTargetWeeks.map(tw => {
+                  const used = weekCapacities.get(tw.key) ?? 0;
+                  const cap = getWeekCapacity(tw.key);
+                  const remaining = Math.max(0, cap - used);
+                  const isFull = remaining <= 0;
+                  return (
+                    <button
+                      key={tw.key}
+                      className={`w-full text-left px-3 py-1.5 text-[11px] flex items-center justify-between transition-colors ${
+                        isFull ? "opacity-50" : "hover:bg-accent"
+                      }`}
+                      onClick={() => handleAction(() => onMoveToWeek(ids, tw.key))}
+                    >
+                      <span className="font-medium">{tw.label}</span>
+                      <span className="font-mono text-[9px] text-muted-foreground">
+                        {Math.round(remaining)}h volno
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="my-1 h-px bg-border" />
+              <button
+                className="w-full text-left px-3 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent"
+                onClick={() => setShowMoveList(false)}
+              >
+                ← Zpět
+              </button>
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+/* ─── Empty week cell with "+" for scheduling from inbox ─── */
+function EmptyWeekCell({ weekKey, isCurrent, item, onSchedule }: {
+  weekKey: string;
+  isCurrent: boolean;
+  item: ItemRow;
+  onSchedule: (inboxItemId: string, weekKey: string) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasInbox = item.inboxItemIds.length > 0;
+
+  if (!hasInbox) {
+    return (
+      <div
+        className="shrink-0"
+        style={{ width: CELL_W, backgroundColor: isCurrent ? "hsl(142 76% 97%)" : "#fff" }}
+      />
+    );
+  }
+
+  return (
+    <div
+      className="shrink-0 flex items-center justify-center"
+      style={{ width: CELL_W, backgroundColor: isCurrent ? "hsl(142 76% 97%)" : "#fff" }}
+    >
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            className="w-full h-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-pointer group"
+          >
+            <Plus className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-muted-foreground/70 transition-colors" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-44 p-0" align="center" sideOffset={4}>
+          <div className="py-1">
+            <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+              Naplánovat sem
+            </div>
+            {item.inboxItemIds.map((inboxId, i) => (
+              <button
+                key={inboxId}
+                className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 transition-colors hover:bg-accent"
+                onClick={async () => {
+                  setOpen(false);
+                  await onSchedule(inboxId, weekKey);
+                }}
+              >
+                <Plus className="h-3 w-3 text-muted-foreground" />
+                <span className="truncate">
+                  {item.inboxItemIds.length > 1 ? `Část ${i + 1} (${Math.round(item.inboxHours / item.inboxItemIds.length)}h)` : `${item.itemName}`}
+                </span>
+              </button>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
