@@ -783,14 +783,18 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     // Set drag data
     e.dataTransfer.effectAllowed = "move";
     const selectedFiles = files.filter((f) => fileSelection.isSelected(f.itemId));
-    const count = selectedFiles.length;
+    const count = Math.max(selectedFiles.length, 1);
     e.dataTransfer.setData("text/plain", `${count} soubor${count > 1 ? "ů" : ""}`);
-  }, [sp.filesByCategory, fileSelection]);
+    
+    // Custom drag ghost
+    dragVisuals.attachGhost(e, file.name, count);
+  }, [sp.filesByCategory, fileSelection, dragVisuals]);
 
   const handleFileDragEnd = useCallback(() => {
     setFileDragActive(false);
     setFileDragSourceCat(null);
-  }, []);
+    dragVisuals.cleanup();
+  }, [dragVisuals]);
 
   const handleFolderDrop = useCallback((destCategoryKey: string) => {
     if (!fileDragSourceCat || fileDragSourceCat === destCategoryKey) return;
