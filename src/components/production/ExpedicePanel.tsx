@@ -276,42 +276,47 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
               style={{ backgroundColor: "#ffffff", border: "1px solid #ece8e2", borderLeft: `4px solid ${getProjectColor(group.project_id)}` }}
               onContextMenu={(e) => handleProjectContextMenu(e, group.project_id)}
             >
-              <div className="space-y-0.5 cursor-pointer" onClick={toggleGroup}>
-                {/* ROW 1: Project name + badge */}
-                <div className="flex items-center justify-between gap-1">
-                  <span
-                    className="text-sm font-semibold truncate max-w-[130px]"
-                    style={{ color: getProjectColor(group.project_id) }}
-                  >
-                    {group.project_name}
-                  </span>
-                  <span
-                    className="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 text-center"
-                    style={{
-                      backgroundColor: allDone ? "#22c55e" : "#f59e0b",
-                      color: "#ffffff",
-                      minWidth: 52,
-                    }}
-                  >
-                    {completedCount} / {totalCount} ks
-                  </span>
-                </div>
-                {/* ROW 2: Project ID + Exp date */}
-                <div className="flex items-center justify-between gap-1">
-                  <span className="font-mono text-xs" style={{ color: "#9ca3af" }}>
-                    {group.project_id}
-                  </span>
+              <button
+                onClick={toggleGroup}
+                onContextMenu={(e) => handleProjectContextMenu(e, group.project_id)}
+                className="w-full flex items-center gap-1.5 px-2.5 py-2 text-left transition-colors"
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              >
+                {isGroupCollapsed
+                  ? <ChevronRight className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />
+                  : <ChevronDown className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="text-[12px] font-semibold truncate"
+                      style={{ color: getProjectColor(group.project_id) }}
+                    >
+                      {group.project_name}
+                    </span>
+                  </div>
+                  <div className="font-mono text-[9px]" style={{ color: "#99a5a3" }}>{group.project_id}</div>
                   {expediceStr && (
-                    <span className="text-xs font-medium shrink-0" style={{
+                    <div className="text-[9px] font-medium" style={{
                       color: !allDone && expediceDate && expediceDate < new Date() ? "#dc3545"
                         : !allDone && expediceDate && differenceInDays(expediceDate, new Date()) <= 7 ? "#D97706"
-                        : "#9ca3af"
+                        : "#99a5a3"
                     }}>
                       Exp: {expediceStr}
-                    </span>
+                    </div>
                   )}
                 </div>
-              </div>
+                <span
+                  className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 text-center"
+                  style={{
+                    backgroundColor: allDone ? "rgba(22,163,74,0.12)" : "rgba(217,151,6,0.12)",
+                    color: allDone ? "#16A34A" : "#d97706",
+                    minWidth: 46,
+                  }}
+                >
+                  {completedCount}/{totalCount}
+                </span>
+              </button>
 
               {!isGroupCollapsed && (
                 <>
