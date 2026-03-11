@@ -1401,7 +1401,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                         <FolderDropTarget
                           key={cat.key}
                           categoryKey={cat.key}
+                          categoryLabel={cat.label}
                           isValidTarget={fileDragActive && fileDragSourceCat !== cat.key}
+                          isInvalidTarget={fileDragActive && fileDragSourceCat === cat.key}
                           isDragActive={fileDragActive}
                           onDrop={handleFolderDrop}
                         >
