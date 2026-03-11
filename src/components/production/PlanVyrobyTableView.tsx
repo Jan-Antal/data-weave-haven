@@ -100,8 +100,8 @@ interface ProjectRow {
 }
 
 const CELL_W = 132;
-const INBOX_W = 80;
-const EXPEDICE_W = 80;
+const INBOX_W = 100;
+const EXPEDICE_W = 100;
 const LEFT_COL_W = 280;
 
 export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
