@@ -278,28 +278,33 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
               <div className="space-y-0.5 cursor-pointer" onClick={toggleGroup}>
                 {/* ROW 1: Project name + badge */}
                 <div className="flex items-center justify-between gap-1">
-                  <span className="text-sm font-semibold truncate" style={{ color: getProjectColor(group.project_id) }}>
+                  <span
+                    className="text-sm font-semibold truncate max-w-[130px]"
+                    style={{ color: getProjectColor(group.project_id) }}
+                  >
                     {group.project_name}
                   </span>
                   <span
-                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                    className="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 text-center"
                     style={{
-                      backgroundColor: allDone ? "#16A34A" : "#D97706",
+                      backgroundColor: allDone ? "#22c55e" : "#f59e0b",
                       color: "#ffffff",
+                      minWidth: 52,
                     }}
                   >
-                    {completedCount} / {totalCount} ks{allDone ? " ✓" : ""}
+                    {completedCount} / {totalCount} ks
                   </span>
                 </div>
                 {/* ROW 2: Project ID + Exp date */}
                 <div className="flex items-center justify-between gap-1">
-                  <span className="font-mono text-xs text-muted-foreground">
+                  <span className="font-mono text-xs" style={{ color: "#9ca3af" }}>
                     {group.project_id}
                   </span>
                   {expediceStr && (
                     <span className="text-xs font-medium shrink-0" style={{
                       color: !allDone && expediceDate && expediceDate < new Date() ? "#dc3545"
-                        : headerColor
+                        : !allDone && expediceDate && differenceInDays(expediceDate, new Date()) <= 7 ? "#D97706"
+                        : "#9ca3af"
                     }}>
                       Exp: {expediceStr}
                     </span>
