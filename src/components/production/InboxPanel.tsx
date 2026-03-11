@@ -36,6 +36,7 @@ interface InboxPanelProps {
   overDroppableId?: string | null;
   showCzk?: boolean;
   onNavigateToTPV?: (projectId: string) => void;
+  disableDropZone?: boolean;
 }
 
 interface ContextMenuState {
