@@ -292,6 +292,12 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const [photoLightbox, setPhotoLightbox] = useState<{ files: SPFile[]; index: number } | null>(null);
   const [reklamaceToggle, setReklamaceToggle] = useState(false);
 
+  // ── File selection & drag-to-move (desktop only) ────────────
+  const fileSelection = useFileSelection();
+  const [fileDragActive, setFileDragActive] = useState(false);
+  const [fileDragSourceCat, setFileDragSourceCat] = useState<string | null>(null);
+  const [movingFiles, setMovingFiles] = useState(false);
+
   // ── Mobile swipe-down-to-close ──────────────────────────────
   const [mobileDragY, setMobileDragY] = useState(0);
   const mobileDragRef = useRef({ startY: 0, startTime: 0, dragging: false });
