@@ -190,6 +190,17 @@ export function useProductionDragDrop() {
         .update({ scheduled_week: newWeekDate })
         .eq("id", scheduleItemId);
       if (error) throw error;
+      // Log activity
+      if (oldItem) {
+        logActivity({
+          projectId: oldItem.project_id || "",
+          actionType: "item_moved",
+          oldValue: weekLabel(oldWeek || ""),
+          newValue: weekLabel(newWeekDate),
+          detail: JSON.stringify({ item_name: oldItem.item_name, from_week: weekLabel(oldWeek || ""), to_week: weekLabel(newWeekDate) }),
+        });
+      }
+
       invalidateAll();
 
       pushUndo({
