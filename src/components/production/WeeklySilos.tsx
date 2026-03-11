@@ -851,7 +851,7 @@ function CompletedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onCont
       <span className="text-[10px] flex-1 truncate" style={{ color: "#99a5a3", textDecoration: "line-through" }}>{item.item_name}</span>
       {isSplit && (
         <Tooltip><TooltipTrigger asChild><span className="text-[8px] font-mono shrink-0" style={{ color: "#c4ccc9" }}>{item.split_part}/{item.split_total}</span></TooltipTrigger>
-          <TooltipContent className="text-[10px]">Část {item.split_part} ze {item.split_total}</TooltipContent></Tooltip>
+          <TooltipContent side="top" className="z-[9999] text-[10px]">Část {item.split_part} ze {item.split_total}</TooltipContent></Tooltip>
       )}
       <span className="font-mono text-[9px] shrink-0" style={{ color: "#c4ccc9" }}>{item.scheduled_hours}h</span>
     </div>
