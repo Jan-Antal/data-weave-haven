@@ -61,7 +61,7 @@ interface WeekRow {
   hours: number;
 }
 
-function ByWeeksTab({ items, weeks, onConfirm }: { items: PlanningItem[]; weeks: PlanningWeek[]; onConfirm: (plan: SchedulePlanEntry[]) => void }) {
+function ByWeeksTab({ items, weeks, onConfirm, onCancel }: { items: PlanningItem[]; weeks: PlanningWeek[]; onConfirm: (plan: SchedulePlanEntry[]) => void; onCancel: () => void }) {
   const totalHours = items.reduce((s, i) => s + i.estimated_hours, 0);
   const totalCzk = items.reduce((s, i) => s + i.estimated_czk, 0);
   const czkPerHour = totalHours > 0 ? totalCzk / totalHours : 0;
