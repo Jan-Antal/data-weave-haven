@@ -7,6 +7,7 @@ import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProjects } from "@/hooks/useProjects";
 import { format, isPast, isFuture, differenceInDays } from "date-fns";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { getProjectColor } from "@/lib/projectColors";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
 
 function formatCompactCzk(v: number): string {
