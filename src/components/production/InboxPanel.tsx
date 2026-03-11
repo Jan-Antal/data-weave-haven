@@ -416,16 +416,22 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           {projects.length > 0 && (
             <>
-              <button onClick={handleExpandAll} className="text-[9px] hover:underline" style={{ color: "#6b7a78" }}>Rozbalit</button>
-              <span className="text-[9px]" style={{ color: "#99a5a3" }}>|</span>
-              <button onClick={handleCollapseAll} className="text-[9px] hover:underline" style={{ color: "#6b7a78" }}>Sbalit</button>
-              <span className="text-[9px] ml-1.5 font-mono font-medium" style={{ color: "#6b7a78" }}>
+              <span className="text-[9px] font-mono font-medium" style={{ color: "#6b7a78" }}>
                 {Math.round(totalHours).toLocaleString("cs-CZ")}h
                 {showCzk && ` ${formatCompactCzk(totalHours * hourlyRate)}`}
               </span>
+              <button
+                onClick={allExpanded ? handleCollapseAll : handleExpandAll}
+                className="hover:text-gray-600 transition-colors"
+                style={{ color: "#9CA3AF" }}
+              >
+                {allExpanded
+                  ? <ChevronDown className="h-4 w-4" />
+                  : <ChevronRight className="h-4 w-4" />}
+              </button>
             </>
           )}
         </div>
