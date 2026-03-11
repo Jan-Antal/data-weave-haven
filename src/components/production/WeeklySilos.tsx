@@ -727,14 +727,16 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
   const hasUncompleted = completedCount < totalCount;
 
   const project = projectLookup.get(bundle.project_id);
-  const severity = project ? getProjectRiskSeverity(project) : null;
   const expDate = formatDateShortYY(project?.expedice);
-  const smlDate = formatDateShortYY(project?.datum_smluvni);
-  const hasDates = !!(expDate || smlDate);
+  const expParsed = project?.expedice ? parseAppDate(project.expedice) : null;
+  const daysUntilExp = expParsed ? differenceInDays(expParsed, new Date()) : null;
+  const expSeverity: "overdue" | "urgent" | null = daysUntilExp !== null
+    ? (daysUntilExp < 0 ? "overdue" : daysUntilExp <= 3 ? "urgent" : null)
+    : null;
 
   const borderLeftColor = allCompleted ? "#3a8a36"
-    : severity === "overdue" ? "#dc3545"
-    : severity === "upcoming" ? "#d97706"
+    : expSeverity === "overdue" ? "#dc3545"
+    : expSeverity === "urgent" ? "#d97706"
     : color;
 
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
@@ -772,23 +774,20 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
           <div className="flex-1 min-w-0">
             <div className="text-[11px] font-semibold truncate" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>{bundle.project_name}</div>
             <div className="flex items-center gap-1.5">
-              <span className="font-mono text-[8px]" style={{ color: "#99a5a3" }}>{bundle.project_id}</span>
-              {hasDates && !allCompleted && (
-                <span className="text-[7px] truncate" style={{ color: severity === "overdue" ? "#dc3545" : severity === "upcoming" ? "#d97706" : "#99a5a3" }}>
-                  {smlDate && `Sml: ${smlDate}`}{smlDate && expDate && " · "}{expDate && `Exp: ${expDate}`}
+              <span className="font-mono text-xs" style={{ color: "#99a5a3" }}>{bundle.project_id}</span>
+              {expDate && !allCompleted && (
+                <span className="text-xs truncate" style={{ color: expSeverity === "overdue" ? "#dc3545" : expSeverity === "urgent" ? "#d97706" : "#99a5a3" }}>
+                  Exp: {expDate}
                 </span>
               )}
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            {severity && !allCompleted && (() => {
-              const smlParsed = project?.datum_smluvni ? parseAppDate(project.datum_smluvni) : null;
-              const warnColor = severity === "overdue" ? "#dc3545" : "#d97706";
-              const tooltipText = smlParsed
-                ? severity === "overdue"
-                  ? `Termín byl ${format(smlParsed, "dd.MM.yyyy")} — po termínu o ${differenceInDays(new Date(), smlParsed)} dní`
-                  : `Termín za ${differenceInDays(smlParsed, new Date())} dní (${format(smlParsed, "dd.MM.yyyy")})`
-                : "";
+            {expSeverity && !allCompleted && expParsed && (() => {
+              const warnColor = expSeverity === "overdue" ? "#dc3545" : "#d97706";
+              const tooltipText = expSeverity === "overdue"
+                ? `Expedice ${format(expParsed, "dd.MM.yyyy")} — po termínu o ${differenceInDays(new Date(), expParsed)} dní`
+                : `Expedice za ${differenceInDays(expParsed, new Date())} dní (${format(expParsed, "dd.MM.yyyy")})`;
               return (
                 <Tooltip>
                   <TooltipTrigger asChild>
