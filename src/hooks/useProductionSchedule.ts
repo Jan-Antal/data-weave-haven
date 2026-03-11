@@ -93,6 +93,7 @@ export function useProductionSchedule() {
           status: row.status,
           completed_at: row.completed_at,
           completed_by: row.completed_by,
+          expediced_at: (row as any).expediced_at ?? null,
           split_group_id: (row as any).split_group_id ?? null,
           split_part: (row as any).split_part ?? null,
           split_total: (row as any).split_total ?? null,
