@@ -18,6 +18,8 @@ export function ProjectProgressBar({ progress, compact }: Props) {
   const accountedFor = progress.completed + progress.scheduled + progress.in_inbox + (progress.paused || 0);
 
   const hasActivity = progress.completed > 0 || progress.scheduled > 0 || (progress.paused || 0) > 0 || progress.missing > 0;
+  const stillInTpv = progress.total_tpv - (progress.completed + progress.scheduled + progress.in_inbox + (progress.paused || 0));
+  const tpvCount = Math.max(0, stillInTpv);
 
   return (
     <div className="w-full">
