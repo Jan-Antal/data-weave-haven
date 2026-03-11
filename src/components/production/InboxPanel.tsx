@@ -520,9 +520,10 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
   );
 }
 
-function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV, onProjectContextMenu, onItemContextMenu, urgency, daysLabel }: {
+function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel }: {
   project: InboxProject; hourlyRate: number; defaultExpanded: boolean; showCzk?: boolean;
   progress?: ProjectProgress; onNavigateToTPV?: (projectId: string) => void;
+  onOpenProjectDetail?: (projectId: string) => void;
   onProjectContextMenu: (e: React.MouseEvent, project: InboxProject) => void;
   onItemContextMenu: (e: React.MouseEvent, item: InboxItem, project: InboxProject) => void;
   urgency: UrgencyLevel;
