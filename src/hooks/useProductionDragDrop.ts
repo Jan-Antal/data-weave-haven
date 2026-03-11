@@ -300,6 +300,15 @@ export function useProductionDragDrop() {
         if (insertErr) throw insertErr;
       }
 
+      // Log activity
+      logActivity({
+        projectId: schedItem.project_id,
+        actionType: "item_returned_to_inbox",
+        oldValue: weekLabel(schedItem.scheduled_week),
+        newValue: "Inbox",
+        detail: JSON.stringify({ item_name: schedItem.item_name, item_code: schedItem.item_code, from_week: weekLabel(schedItem.scheduled_week) }),
+      });
+
       invalidateAll();
 
       pushUndo({

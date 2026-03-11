@@ -15,7 +15,7 @@ interface DataLogPanelProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type Category = "all" | "status" | "terminy" | "documents" | "projects" | "users";
+type Category = "all" | "status" | "terminy" | "documents" | "projects" | "users" | "vyroba";
 type PanelTab = "activity" | "users";
 
 const CATEGORY_PILLS: { value: Category; label: string }[] = [
@@ -24,6 +24,7 @@ const CATEGORY_PILLS: { value: Category; label: string }[] = [
   { value: "terminy", label: "Termíny" },
   { value: "documents", label: "Dokumenty" },
   { value: "projects", label: "Projekty" },
+  { value: "vyroba", label: "Výroba" },
   { value: "users", label: "Uživatelé" },
 ];
 
