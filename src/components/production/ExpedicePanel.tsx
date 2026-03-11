@@ -275,7 +275,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
               className="rounded-lg p-2 space-y-1.5 border border-border bg-card"
               onContextMenu={(e) => handleProjectContextMenu(e, group.project_id)}
             >
-              <div className="space-y-0.5">
+              <div className="space-y-0.5 cursor-pointer" onClick={toggleGroup}>
                 {/* ROW 1: Project name + badge */}
                 <div className="flex items-center justify-between gap-1">
                   <span className="text-sm font-semibold truncate" style={{ color: getProjectColor(group.project_id) }}>
