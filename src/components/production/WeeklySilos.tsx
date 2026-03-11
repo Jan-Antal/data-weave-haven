@@ -696,7 +696,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
 function CompletedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onContextMenu: (e: React.MouseEvent) => void }) {
   const isSplit = !!item.split_group_id;
   return (
-    <div className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-default transition-colors"
+    <div data-context="item" className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-default transition-colors"
       style={{ borderLeft: isSplit ? "2px dashed #c4ccc9" : undefined }}
       onMouseEnter={e => { e.currentTarget.style.backgroundColor = "#f8f7f5"; }}
       onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
