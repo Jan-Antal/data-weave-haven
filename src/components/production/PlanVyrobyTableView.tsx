@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useProductionSchedule, useProductionExpedice, getISOWeekNumber, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
@@ -7,9 +7,13 @@ import { useProjects } from "@/hooks/useProjects";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 import { getProjectColor } from "@/lib/projectColors";
 import { exportToExcel } from "@/lib/exportExcel";
+import { buildPrintableHtml } from "@/lib/exportPdf";
 import { parseAppDate } from "@/lib/dateFormat";
-import { Download, ChevronRight, ChevronDown, Plus, ArrowRight, Inbox, CheckCircle2, XCircle } from "lucide-react";
+import { format } from "date-fns";
+import { cs } from "date-fns/locale";
+import { Download, ChevronRight, ChevronDown, Plus, ArrowRight, Inbox, CheckCircle2, XCircle, FileSpreadsheet, FileText, ChevronUp } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { PdfPreviewModal } from "@/components/PdfPreviewModal";
 import { CancelItemDialog } from "./CancelItemDialog";
 import { toast } from "@/hooks/use-toast";
 
@@ -481,22 +485,83 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
     return `${Math.round(item.totalHours)}h`;
   };
 
-  const handleExport = () => {
-    const headers = ["Projekt", "ID", "Položka", "Kód", "Inbox h", ...weeks.map(w => `T${w.weekNum}`), "Expedice h"];
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+  const [pdfHtml, setPdfHtml] = useState<string | null>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!exportDropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportDropdownOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [exportDropdownOpen]);
+
+  const buildExportData = useCallback(() => {
+    const weekHeaders = weeks.map(w => `T${w.weekNum}`);
+    const headers = ["Projekt", "ID projektu", "Položka", "Kód položky", "Celkem hodin", ...weekHeaders, "Expedice"];
     const rows: (string | number)[][] = [];
+
+    const formatVal = (hours: number, czk: number, totalH: number) => {
+      if (displayMode === "czk") return Math.round(czk);
+      if (displayMode === "percent") return totalH > 0 ? Math.round((hours / totalH) * 100) : 0;
+      return Math.round(hours);
+    };
+
     for (const proj of filteredRows) {
-      for (const item of proj.items) {
-        const row: (string | number)[] = [proj.projectName, proj.projectId, item.itemName, item.itemCode || "", item.inboxHours || ""];
+      const isExpanded = expandedProjects.has(proj.projectId);
+      if (!isExpanded) {
+        // Collapsed: summary row only
+        const row: (string | number)[] = [proj.projectName, proj.projectId, "", "", Math.round(proj.totalHours)];
         for (const week of weeks) {
-          const alloc = item.weekAllocations.get(week.key);
-          row.push(alloc ? Math.round(alloc.hours) : "");
+          const wt = proj.weekTotals.get(week.key);
+          row.push(wt ? formatVal(wt.hours, wt.czk, proj.totalHours) : "");
         }
-        row.push(item.expediceHours || "");
+        row.push(proj.expediceTotalHours > 0 ? formatVal(proj.expediceTotalHours, proj.expediceTotalCzk, proj.totalHours) : "");
         rows.push(row);
+      } else {
+        // Expanded: item rows
+        for (const item of proj.items) {
+          const row: (string | number)[] = [proj.projectName, proj.projectId, item.itemName, item.itemCode || "", Math.round(item.totalHours)];
+          for (const week of weeks) {
+            const alloc = item.weekAllocations.get(week.key);
+            row.push(alloc ? formatVal(alloc.hours, alloc.czk, item.totalHours) : "");
+          }
+          row.push(item.expediceHours > 0 ? formatVal(item.expediceHours, item.expediceCzk, item.totalHours) : "");
+          rows.push(row);
+        }
       }
     }
-    const today = new Date().toISOString().split("T")[0];
-    exportToExcel({ sheetName: "Plán Výroby", fileName: `AMI-Plan-Vyroby-${today}.xlsx`, headers, rows });
+    return { headers, rows };
+  }, [filteredRows, weeks, displayMode, expandedProjects]);
+
+  const handleExcelExport = () => {
+    setExportDropdownOpen(false);
+    const { headers, rows } = buildExportData();
+    const monthLabel = format(new Date(), "yyyy-MM");
+    const sheetName = `Plán výroby · ${format(new Date(), "LLLL yyyy", { locale: cs })}`;
+    exportToExcel({ sheetName, fileName: `plan-vyroby-${monthLabel}.xlsx`, headers, rows });
+  };
+
+  const handlePdfExport = () => {
+    setExportDropdownOpen(false);
+    const { headers, rows } = buildExportData();
+    // Add capacity sub-header row
+    const capacityRow: (string | number)[] = ["", "", "", "", ""];
+    for (const week of weeks) {
+      const cap = getWeekCapacity(week.key);
+      capacityRow.push(`Kapacita: ${cap}h`);
+    }
+    capacityRow.push("");
+    const allRows = [capacityRow, ...rows];
+    const monthLabel = format(new Date(), "LLLL yyyy", { locale: cs });
+    const html = buildPrintableHtml({
+      tabLabel: `Plán Výroby · ${monthLabel}`,
+      headers,
+      rows: allRows,
+    });
+    setPdfHtml(html);
   };
 
   // Action handlers
@@ -559,13 +624,34 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
             ))}
           </div>
         </div>
-        <button
-          onClick={handleExport}
-          className="flex items-center gap-1 px-2 py-[3px] text-[10px] font-medium rounded bg-card text-muted-foreground border border-border transition-colors hover:bg-accent"
-        >
-          <Download className="h-3 w-3" />
-          Export
-        </button>
+        <div ref={exportRef} className="relative">
+          <button
+            onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+            className="flex items-center gap-1 px-2 py-[3px] text-[10px] font-medium rounded bg-card text-muted-foreground border border-border transition-colors hover:bg-accent"
+          >
+            <Download className="h-3 w-3" />
+            Export
+            <ChevronDown className="h-2.5 w-2.5 opacity-50" />
+          </button>
+          {exportDropdownOpen && (
+            <div className="absolute top-full right-0 mt-1 z-50 w-44 bg-popover rounded-lg shadow-lg border border-border py-1">
+              <button
+                onClick={handleExcelExport}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-popover-foreground hover:bg-muted transition-colors text-left"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5 text-green-600" />
+                Export do Excelu
+              </button>
+              <button
+                onClick={handlePdfExport}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-popover-foreground hover:bg-muted transition-colors text-left"
+              >
+                <FileText className="h-3.5 w-3.5 text-red-500" />
+                Export do PDF
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Legend strip */}
@@ -897,6 +983,14 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
           projectName={cancelDialog.projectName}
           projectId={cancelDialog.projectId}
           source="schedule"
+        />
+      )}
+
+      {pdfHtml && (
+        <PdfPreviewModal
+          html={pdfHtml}
+          tabLabel="Plán Výroby"
+          onClose={() => setPdfHtml(null)}
         />
       )}
     </div>
