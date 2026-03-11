@@ -3,8 +3,10 @@ import { useProductionSchedule, useProductionExpedice, getISOWeekNumber, type Sc
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
+import { useProjects } from "@/hooks/useProjects";
 import { getProjectColor } from "@/lib/projectColors";
 import { exportToExcel } from "@/lib/exportExcel";
+import { parseAppDate } from "@/lib/dateFormat";
 import { Download, ChevronRight, ChevronDown } from "lucide-react";
 
 type DisplayMode = "hours" | "czk" | "percent";
