@@ -656,21 +656,6 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
         </div>
       </div>
 
-      {/* Legend strip */}
-      <div className="px-3 py-1.5 flex items-center gap-4 shrink-0 border-b border-border bg-card/50">
-        {[
-          { label: "Inbox", bg: STATUS_COLORS.inbox.bg, border: STATUS_COLORS.inbox.border },
-          { label: "Naplánováno", bg: STATUS_COLORS.scheduled.bg, border: STATUS_COLORS.scheduled.border },
-          { label: "Ve výrobě", bg: STATUS_COLORS.in_progress.bg, border: STATUS_COLORS.in_progress.border },
-          { label: "✓ Dokončeno", bg: STATUS_COLORS.completed.bg, border: STATUS_COLORS.completed.border },
-          { label: "⏸ Pozastaveno", bg: STATUS_COLORS.paused.bg, border: STATUS_COLORS.paused.border },
-        ].map(l => (
-          <div key={l.label} className="flex items-center gap-1.5">
-            <div className="rounded" style={{ width: 16, height: 16, backgroundColor: l.bg, border: `1.5px solid ${l.border}` }} />
-            <span className="text-[10px] font-medium text-muted-foreground">{l.label}</span>
-          </div>
-        ))}
-      </div>
 
       {/* Table */}
       <div className="flex-1 overflow-auto bg-muted/30" ref={scrollRef} style={{ padding: "0 0 8px 0" }}>
