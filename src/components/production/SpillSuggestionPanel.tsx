@@ -316,7 +316,7 @@ export function SpillSuggestionPanel({
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
       qc.invalidateQueries({ queryKey: ["production-expedice"] });
-      setDismissed(true);
+      handleDismiss();
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
