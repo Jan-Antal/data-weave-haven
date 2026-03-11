@@ -302,6 +302,15 @@ export function SplitItemDialog({
         });
       }
 
+      // Log activity
+      logActivity({
+        projectId: projectId,
+        actionType: "item_split",
+        oldValue: String(totalHours),
+        newValue: "Rozděleno na 2 části",
+        detail: JSON.stringify({ item_name: cleanName, original_hours: totalHours, parts: [{ week: source === "schedule" ? `T${currentWeekNum}` : "Inbox", hours: part1Hours }, { week: `T${targetWeekNum}`, hours: part2Hours }] }),
+      });
+
       toast({ title: `Položka rozdělena: ${part1Hours}h + ${part2Hours}h` });
       onOpenChange(false);
     } catch (err: any) {
