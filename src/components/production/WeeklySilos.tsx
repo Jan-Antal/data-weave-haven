@@ -787,9 +787,9 @@ function CompletedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onCont
   const isSplit = !!item.split_group_id;
   return (
     <div data-context="item" className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-default transition-colors"
-      style={{ borderLeft: isSplit ? "2px dashed #c4ccc9" : undefined }}
-      onMouseEnter={e => { e.currentTarget.style.backgroundColor = "#f8f7f5"; }}
-      onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
+      style={{ borderLeft: isSplit ? "2px dashed #c4ccc9" : undefined, backgroundColor: "#f5f3f0" }}
+      onMouseEnter={e => { e.currentTarget.style.backgroundColor = "#eceae6"; }}
+      onMouseLeave={e => { e.currentTarget.style.backgroundColor = "#f5f3f0"; }}
       onContextMenu={onContextMenu}
     >
       <span style={{ width: 10, fontSize: 9, color: "#3a8a36", fontWeight: 700 }}>✓</span>
