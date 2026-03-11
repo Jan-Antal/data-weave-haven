@@ -1464,10 +1464,20 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                     isDraggable={canUploadDocuments && !isMobile}
                                     onDragStart={(e, f) => handleFileDragStart(e, f, "fotky")}
                                     onDragEnd={handleFileDragEnd}
-                                    draggingFileId={fileDragActive && fileDragSourceCat === "fotky" ? Array.from(fileSelection.selected).find(() => true) : null}
+                                    draggingFileId={fileDragActive && fileDragSourceCat === "fotky" ? [...fileSelection.selected][0] ?? null : null}
                                     selectedIds={openCategory === "fotky" ? fileSelection.selected : undefined}
                                     onToggleSelect={(fileId, allFiles, e) => fileSelection.toggleFile(fileId, allFiles, e)}
                                   />
+                                  {/* Selection bar for photos */}
+                                  {fileSelection.selectedCount > 0 && openCategory === "fotky" && !isMobile && (
+                                    <FileSelectionBar
+                                      selectedCount={fileSelection.selectedCount}
+                                      categories={DOC_CATEGORIES}
+                                      currentCategory="fotky"
+                                      onMoveTo={handleSelectionBarMove}
+                                      onClear={fileSelection.clearSelection}
+                                    />
+                                  )}
                                 ) : (
                                 <>
                                   <div className="space-y-0.5 max-h-[140px] overflow-y-auto" onClick={(e) => {
