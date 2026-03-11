@@ -206,7 +206,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
   }
 
   return (
-    <div className="w-[230px] shrink-0 flex flex-col" style={{ borderLeft: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))" }}>
+    <div className="w-[270px] shrink-0 flex flex-col" style={{ borderLeft: "1px solid #ece8e2", backgroundColor: "#ffffff" }}>
       {/* Header */}
       <div className="px-3 py-2 flex flex-col gap-1" style={{ borderBottom: "1px solid hsl(var(--border))" }}>
         <div className="flex items-center justify-between">
