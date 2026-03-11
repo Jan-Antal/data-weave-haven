@@ -546,6 +546,23 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Move file between folders
+    if (action === "move") {
+      const { sourceCategory, destCategory } = body;
+      if (!projectId || !sourceCategory || !destCategory || !fileName) {
+        return new Response(
+          JSON.stringify({ error: "Missing projectId, sourceCategory, destCategory, or fileName for move" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const accessToken = await getAccessToken();
+      const driveId = await getDriveId(accessToken);
+      const result = await moveFile(accessToken, driveId, projectId, sourceCategory, destCategory, fileName);
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Delete file action
     if (action === "delete") {
       if (!projectId || !category || !fileName) {
