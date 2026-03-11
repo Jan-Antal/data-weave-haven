@@ -228,7 +228,6 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
           }
           const proj = projectMap.get(bundle.project_id)!;
           for (const item of bundle.items) {
-            if (item.status === "completed") continue;
             const itemKey = item.split_group_id || item.id;
             if (!proj.items.has(itemKey)) {
               proj.items.set(itemKey, { itemName: cleanSplitName(item.item_name), itemCode: item.item_code, stageId: item.stage_id, weekAllocations: new Map(), totalHours: 0, totalCzk: 0 });

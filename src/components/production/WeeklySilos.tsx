@@ -750,19 +750,35 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
           </div>
         </div>
       </div>
-      {expanded && (
-        <div className="px-[3px] py-[2px]" onContextMenu={e => e.stopPropagation()}>
-          {bundle.items.map(item =>
-            item.status === "completed" ? (
-              <CompletedSiloItem key={item.id} item={item} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
-            ) : item.status === "paused" ? (
-              <PausedSiloItem key={item.id} item={item} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
-            ) : (
-              <DraggableSiloItem key={item.id} item={item} weekKey={weekKey} showCzk={showCzk} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
-            )
-          )}
-        </div>
-      )}
+      {expanded && (() => {
+        const activeItems = bundle.items.filter(i => i.status !== "completed");
+        const completedItems = bundle.items.filter(i => i.status === "completed");
+        return (
+          <div className="px-[3px] py-[2px]" onContextMenu={e => e.stopPropagation()}>
+            {activeItems.map(item =>
+              item.status === "paused" ? (
+                <PausedSiloItem key={item.id} item={item} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
+              ) : (
+                <DraggableSiloItem key={item.id} item={item} weekKey={weekKey} showCzk={showCzk} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
+              )
+            )}
+            {completedItems.length > 0 && (
+              <>
+                <div className="flex items-center gap-1.5 px-1.5 mt-1 mb-0.5">
+                  <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+                  <span className="text-[8px] font-medium" style={{ color: "#b0bab8" }}>Dokončeno</span>
+                  <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+                </div>
+                <div style={{ opacity: 0.5 }}>
+                  {completedItems.map(item => (
+                    <CompletedSiloItem key={item.id} item={item} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
