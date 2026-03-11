@@ -730,7 +730,8 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
   const expDate = formatDateShortYY(project?.expedice);
   const expParsed = project?.expedice ? parseAppDate(project.expedice) : null;
   const daysUntilExp = expParsed ? differenceInDays(expParsed, new Date()) : null;
-  const expSeverity: "overdue" | "urgent" | null = daysUntilExp !== null
+  const isProjectDone = ["Fakturace", "Dokonceno", "Dokončeno", "Expedice"].includes(project?.status ?? "");
+  const expSeverity: "overdue" | "urgent" | null = (!isProjectDone && !allCompleted && daysUntilExp !== null)
     ? (daysUntilExp < 0 ? "overdue" : daysUntilExp <= 3 ? "urgent" : null)
     : null;
 
