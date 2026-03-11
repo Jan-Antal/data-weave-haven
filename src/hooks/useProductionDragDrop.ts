@@ -459,7 +459,7 @@ export function useProductionDragDrop() {
 
       const { error } = await supabase
         .from("production_schedule")
-        .update({ status: "scheduled", completed_at: null, completed_by: null })
+        .update({ status: "scheduled", completed_at: null, completed_by: null, expediced_at: null } as any)
         .eq("id", scheduleItemId);
       if (error) throw error;
       invalidateAll();

@@ -16,6 +16,7 @@ export interface ScheduleItem {
   status: string;
   completed_at: string | null;
   completed_by: string | null;
+  expediced_at: string | null;
   split_group_id: string | null;
   split_part: number | null;
   split_total: number | null;
@@ -92,6 +93,7 @@ export function useProductionSchedule() {
           status: row.status,
           completed_at: row.completed_at,
           completed_by: row.completed_by,
+          expediced_at: (row as any).expediced_at ?? null,
           split_group_id: (row as any).split_group_id ?? null,
           split_part: (row as any).split_part ?? null,
           split_total: (row as any).split_total ?? null,
@@ -156,6 +158,7 @@ export function useProductionExpedice() {
           scheduled_hours: row.scheduled_hours, scheduled_czk: row.scheduled_czk,
           position: row.position, status: row.status,
           completed_at: row.completed_at, completed_by: row.completed_by,
+          expediced_at: (row as any).expediced_at ?? null,
           split_group_id: (row as any).split_group_id ?? null,
           split_part: (row as any).split_part ?? null,
           split_total: (row as any).split_total ?? null,
