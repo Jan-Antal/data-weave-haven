@@ -230,6 +230,82 @@ function ActivityItem({
         </div>
       );
       break;
+    case "item_scheduled": {
+      let detail: any = {};
+      try { detail = JSON.parse(entry.detail || "{}"); } catch {}
+      mainText = <>📅 <span className="font-medium">{userName}</span> naplánoval/a do výroby {projectLabel}</>;
+      subContent = (
+        <div className="text-[11px] mt-0.5 text-muted-foreground">
+          {detail.item_name}{detail.item_code ? ` (${detail.item_code})` : ""} → {entry.new_value} · {detail.scheduled_hours}h
+        </div>
+      );
+      break;
+    }
+    case "item_moved": {
+      let detail: any = {};
+      try { detail = JSON.parse(entry.detail || "{}"); } catch {}
+      mainText = <>↔ <span className="font-medium">{userName}</span> přesunul/a v plánu {projectLabel}</>;
+      subContent = (
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted">{entry.old_value}</span>
+          <span className="text-[10px]" style={{ color: '#9ca3af' }}>→</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted">{entry.new_value}</span>
+          {detail.item_name && <span className="text-[10px] text-muted-foreground">· {detail.item_name}</span>}
+        </div>
+      );
+      break;
+    }
+    case "item_completed": {
+      let detail: any = {};
+      try { detail = JSON.parse(entry.detail || "{}"); } catch {}
+      mainText = <>✓ <span className="font-medium">{userName}</span> dokončil/a → Expedice {projectLabel}</>;
+      subContent = detail.item_name ? (
+        <div className="text-[11px] mt-0.5 text-muted-foreground">{detail.item_name}</div>
+      ) : null;
+      break;
+    }
+    case "item_paused": {
+      let detail: any = {};
+      try { detail = JSON.parse(entry.detail || "{}"); } catch {}
+      mainText = <>⏸ <span className="font-medium">{userName}</span> pozastavil/a {projectLabel}</>;
+      subContent = (
+        <div className="text-[11px] mt-0.5 text-muted-foreground">
+          {detail.item_name}{detail.pause_reason ? ` — ${detail.pause_reason}` : ""}
+        </div>
+      );
+      break;
+    }
+    case "item_cancelled": {
+      let detail: any = {};
+      try { detail = JSON.parse(entry.detail || "{}"); } catch {}
+      mainText = <>✕ <span className="font-medium">{userName}</span> zrušil/a {projectLabel}</>;
+      subContent = (
+        <div className="text-[11px] mt-0.5 text-muted-foreground">
+          {detail.item_name}{detail.cancel_reason ? ` — ${detail.cancel_reason}` : ""}
+        </div>
+      );
+      break;
+    }
+    case "item_returned_to_inbox": {
+      let detail: any = {};
+      try { detail = JSON.parse(entry.detail || "{}"); } catch {}
+      mainText = <>← <span className="font-medium">{userName}</span> vrátil/a do Inboxu {projectLabel}</>;
+      subContent = detail.item_name ? (
+        <div className="text-[11px] mt-0.5 text-muted-foreground">{detail.item_name} z {detail.from_week}</div>
+      ) : null;
+      break;
+    }
+    case "item_split": {
+      let detail: any = {};
+      try { detail = JSON.parse(entry.detail || "{}"); } catch {}
+      mainText = <>✂ <span className="font-medium">{userName}</span> rozdělil/a {projectLabel}</>;
+      subContent = (
+        <div className="text-[11px] mt-0.5 text-muted-foreground">
+          {detail.item_name} · {entry.old_value}h → {entry.new_value}
+        </div>
+      );
+      break;
+    }
     default:
       mainText = <><span className="font-medium">{userName}</span> — {entry.action_type} {projectLabel}</>;
   }
