@@ -86,7 +86,7 @@ async function fetchOneProject(projectId: string) {
 /** Enqueue projects for background fetching */
 export function enqueueDocCountFetch(projectIds: string[]) {
   const toFetch = projectIds.filter(
-    (id) => !isStage(id) && !fetchedThisSession.has(id) && !fetchQueue.includes(id)
+    (id) => !fetchedThisSession.has(id) && !fetchQueue.includes(id)
   );
   if (toFetch.length === 0) return;
   fetchQueue.push(...toFetch);
