@@ -624,13 +624,34 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
             ))}
           </div>
         </div>
-        <button
-          onClick={handleExport}
-          className="flex items-center gap-1 px-2 py-[3px] text-[10px] font-medium rounded bg-card text-muted-foreground border border-border transition-colors hover:bg-accent"
-        >
-          <Download className="h-3 w-3" />
-          Export
-        </button>
+        <div ref={exportRef} className="relative">
+          <button
+            onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+            className="flex items-center gap-1 px-2 py-[3px] text-[10px] font-medium rounded bg-card text-muted-foreground border border-border transition-colors hover:bg-accent"
+          >
+            <Download className="h-3 w-3" />
+            Export
+            <ChevronDown className="h-2.5 w-2.5 opacity-50" />
+          </button>
+          {exportDropdownOpen && (
+            <div className="absolute top-full right-0 mt-1 z-50 w-44 bg-popover rounded-lg shadow-lg border border-border py-1">
+              <button
+                onClick={handleExcelExport}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-popover-foreground hover:bg-muted transition-colors text-left"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5 text-green-600" />
+                Export do Excelu
+              </button>
+              <button
+                onClick={handlePdfExport}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-popover-foreground hover:bg-muted transition-colors text-left"
+              >
+                <FileText className="h-3.5 w-3.5 text-red-500" />
+                Export do PDF
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Legend strip */}
