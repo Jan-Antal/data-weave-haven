@@ -297,6 +297,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const [fileDragActive, setFileDragActive] = useState(false);
   const [fileDragSourceCat, setFileDragSourceCat] = useState<string | null>(null);
   const [movingFiles, setMovingFiles] = useState(false);
+  const dragVisuals = useFileDragVisuals();
+  const { flashingCategory, flash: flashFolder } = useDropFlash();
 
   // ── Mobile swipe-down-to-close ──────────────────────────────
   const [mobileDragY, setMobileDragY] = useState(0);
