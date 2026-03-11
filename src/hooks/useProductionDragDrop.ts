@@ -505,7 +505,7 @@ export function useProductionDragDrop() {
         },
       });
 
-      toast({ title: `${items.length} položek vráceno do Inboxu` });
+      // Toast is shown by pushUndo
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
