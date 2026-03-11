@@ -544,17 +544,27 @@ export const PhotoLightbox = memo(function PhotoLightbox({
       >
         {!mediumReady && (
           <div className="absolute inset-0 flex items-center justify-center z-10">
-            <Loader2 className="h-8 w-8 animate-spin text-white/50" />
+            {/* Show grid thumbnail as instant placeholder while large loads */}
+            {file.thumbnailUrl ? (
+              <img
+                src={file.thumbnailUrl}
+                alt={file.name}
+                className="max-w-full max-h-full object-contain rounded opacity-60 blur-sm scale-[1.02]"
+                draggable={false}
+              />
+            ) : (
+              <Loader2 className="h-8 w-8 animate-spin text-white/50" />
+            )}
           </div>
         )}
-        {file.downloadUrl && (
+        {(file.largeThumbUrl || file.downloadUrl) && (
           <img
             key={file.itemId}
-            src={file.downloadUrl}
+            src={file.largeThumbUrl || file.downloadUrl!}
             alt={file.name}
             className={cn(
               "max-w-full max-h-full object-contain rounded transition-all duration-300",
-              mediumReady ? "opacity-100 blur-0 scale-100" : "opacity-40 blur-sm scale-[1.02]"
+              mediumReady ? "opacity-100 blur-0 scale-100" : "opacity-0"
             )}
             draggable={false}
           />
