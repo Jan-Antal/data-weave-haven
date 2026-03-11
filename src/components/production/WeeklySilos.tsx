@@ -13,10 +13,13 @@ import { SplitBundleDialog } from "./SplitBundleDialog";
 import { PauseItemDialog } from "./PauseItemDialog";
 import { CancelItemDialog } from "./CancelItemDialog";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
+import { useProjects } from "@/hooks/useProjects";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import { parseAppDate } from "@/lib/dateFormat";
+import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
