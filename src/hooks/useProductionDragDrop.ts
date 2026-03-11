@@ -401,7 +401,7 @@ export function useProductionDragDrop() {
 
       // Capture old statuses for undo
       const { data: oldItems } = await supabase.from("production_schedule")
-        .select("id, status, completed_at, completed_by, item_name")
+        .select("id, status, completed_at, completed_by, item_name, item_code, project_id, scheduled_week")
         .in("id", itemIds);
 
       const { error } = await supabase
@@ -409,6 +409,18 @@ export function useProductionDragDrop() {
         .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user.id })
         .in("id", itemIds);
       if (error) throw error;
+
+      // Log activity
+      for (const old of (oldItems || [])) {
+        logActivity({
+          projectId: old.project_id,
+          actionType: "item_completed",
+          oldValue: "Naplánováno",
+          newValue: "Dokončeno",
+          detail: JSON.stringify({ item_name: old.item_name, item_code: old.item_code, week: weekLabel(old.scheduled_week), completed_at: new Date().toISOString() }),
+        });
+      }
+
       invalidateAll();
 
       pushUndo({
