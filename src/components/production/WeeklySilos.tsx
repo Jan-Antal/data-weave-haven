@@ -50,6 +50,7 @@ interface Props {
   onToggleCzk: (v: boolean) => void;
   overDroppableId?: string | null;
   onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void;
+  onOpenProjectDetail?: (projectId: string) => void;
   displayMode?: DisplayMode;
   onDisplayModeChange?: (mode: DisplayMode) => void;
 }
