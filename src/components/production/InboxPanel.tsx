@@ -217,7 +217,10 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
       },
     ];
     if (onNavigateToTPV) {
-      actions.push({ label: "Zobrazit TPV položky", icon: "📋", onClick: () => onNavigateToTPV(project.project_id) });
+      actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(project.project_id) });
+    }
+    if (onOpenProjectDetail) {
+      actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(project.project_id) });
     }
     setContextMenu({ x: e.clientX, y: e.clientY, actions });
   };
