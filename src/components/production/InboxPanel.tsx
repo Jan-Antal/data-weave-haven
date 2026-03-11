@@ -76,6 +76,7 @@ interface InboxPanelProps {
   overDroppableId?: string | null;
   showCzk?: boolean;
   onNavigateToTPV?: (projectId: string) => void;
+  onOpenProjectDetail?: (projectId: string) => void;
   disableDropZone?: boolean;
 }
 
