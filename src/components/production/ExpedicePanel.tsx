@@ -6,7 +6,7 @@ import { useProductionSchedule } from "@/hooks/useProductionSchedule";
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProjects } from "@/hooks/useProjects";
 import { format, isPast, isFuture, differenceInDays } from "date-fns";
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { getProjectColor } from "@/lib/projectColors";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
 
