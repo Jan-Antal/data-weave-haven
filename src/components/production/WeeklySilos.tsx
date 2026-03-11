@@ -390,7 +390,10 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
 
       actions.push({ label: "Rozbalit / Sbalit", icon: "⇅", onClick: toggleExpand });
       if (onNavigateToTPV) {
-        actions.push({ label: "Zobrazit TPV položky", icon: "📋", onClick: () => onNavigateToTPV(bundle.project_id) });
+        actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(bundle.project_id) });
+      }
+      if (onOpenProjectDetail) {
+        actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(bundle.project_id) });
       }
       if (hasUncompleted) {
         actions.push({
