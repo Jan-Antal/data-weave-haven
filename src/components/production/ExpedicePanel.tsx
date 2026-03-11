@@ -319,7 +319,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
               </button>
 
               {!isGroupCollapsed && (
-                <>
+                <div className="px-2.5 pb-2 space-y-1.5">
                   {/* Missing items indicator */}
                   {!allDone && missingItems.length > 0 && (
                     <div className="text-[8px] text-muted-foreground px-0.5">
