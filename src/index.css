@@ -231,6 +231,17 @@
   }
 }
 
+/* File drag & drop visual feedback */
+body.file-dragging-active {
+  cursor: grabbing !important;
+}
+body.file-dragging-active * {
+  cursor: grabbing !important;
+}
+.ring-dashed {
+  --tw-ring-style: dashed;
+}
+
 /* Mobile project detail: slide from top instead of center */
 @media (max-width: 767px) {
   [data-mobile-top-sheet] {
