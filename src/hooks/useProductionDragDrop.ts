@@ -3,6 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useCallback } from "react";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
+import { logActivity } from "@/lib/activityLog";
+import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
+
+function weekLabel(weekDate: string): string {
+  try {
+    const d = new Date(weekDate);
+    return `T${getISOWeekNumber(d)}`;
+  } catch { return weekDate; }
+}
 
 export function useProductionDragDrop() {
   const qc = useQueryClient();
