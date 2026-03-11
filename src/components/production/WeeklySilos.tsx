@@ -727,10 +727,12 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
   const hasUncompleted = completedCount < totalCount;
 
   const project = projectLookup.get(bundle.project_id);
-  const severity = project ? getProjectRiskSeverity(project) : null;
   const expDate = formatDateShortYY(project?.expedice);
-  const smlDate = formatDateShortYY(project?.datum_smluvni);
-  const hasDates = !!(expDate || smlDate);
+  const expParsed = project?.expedice ? parseAppDate(project.expedice) : null;
+  const daysUntilExp = expParsed ? differenceInDays(expParsed, new Date()) : null;
+  const expSeverity: "overdue" | "urgent" | null = daysUntilExp !== null
+    ? (daysUntilExp < 0 ? "overdue" : daysUntilExp <= 3 ? "urgent" : null)
+    : null;
 
   const borderLeftColor = allCompleted ? "#3a8a36"
     : severity === "overdue" ? "#dc3545"
