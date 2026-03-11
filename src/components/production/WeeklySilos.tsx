@@ -794,7 +794,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
                   <TooltipTrigger asChild>
                     <AlertTriangle size={14} style={{ color: warnColor }} className="shrink-0" />
                   </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs">{tooltipText}</TooltipContent>
+                  <TooltipContent side="top" className="z-[9999] text-xs">{tooltipText}</TooltipContent>
                 </Tooltip>
               );
             })()}
