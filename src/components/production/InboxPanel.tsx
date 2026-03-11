@@ -201,7 +201,15 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
 
   const handleProjectContextMenu = (e: React.MouseEvent, project: InboxProject) => {
     e.preventDefault(); e.stopPropagation();
+    const planItems: PlanningItem[] = project.items.map(i => ({
+      id: i.id, item_name: i.item_name, item_code: i.item_code,
+      estimated_hours: i.estimated_hours, estimated_czk: i.estimated_czk, stage_id: i.stage_id,
+    }));
     const actions: ContextMenuAction[] = [
+      {
+        label: "Naplánovat projekt...", icon: "📅",
+        onClick: () => setPlanningState({ projectId: project.project_id, projectName: project.project_name, items: planItems }),
+      },
       {
         label: "Přidat položku", icon: "➕",
         onClick: () => setAddItemState({ projectId: project.project_id, projectName: project.project_name }),
@@ -215,7 +223,16 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
 
   const handleItemContextMenu = (e: React.MouseEvent, item: InboxItem, project: InboxProject) => {
     e.preventDefault(); e.stopPropagation();
-    const actions: ContextMenuAction[] = [];
+    const planItem: PlanningItem = {
+      id: item.id, item_name: item.item_name, item_code: item.item_code,
+      estimated_hours: item.estimated_hours, estimated_czk: item.estimated_czk, stage_id: item.stage_id,
+    };
+    const actions: ContextMenuAction[] = [
+      {
+        label: "Naplánovat...", icon: "📅",
+        onClick: () => setPlanningState({ projectId: project.project_id, projectName: project.project_name, items: [planItem] }),
+      },
+    ];
     if (onNavigateToTPV) {
       actions.push({ label: "Zobrazit v TPV", icon: "📋", onClick: () => onNavigateToTPV(project.project_id) });
     }
@@ -229,6 +246,106 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, disableD
     });
     setContextMenu({ x: e.clientX, y: e.clientY, actions });
   };
+
+  const handlePlanConfirm = useCallback(async (plan: SchedulePlanEntry[]) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Group plan entries by inboxItemId
+      const byItem = new Map<string, SchedulePlanEntry[]>();
+      for (const entry of plan) {
+        const arr = byItem.get(entry.inboxItemId) || [];
+        arr.push(entry);
+        byItem.set(entry.inboxItemId, arr);
+      }
+
+      for (const [inboxItemId, entries] of byItem) {
+        if (entries.length === 1) {
+          // Simple schedule — single week
+          const e = entries[0];
+          await supabase.from("production_schedule").insert({
+            project_id: planningState!.projectId,
+            item_name: plan.find(p => p.inboxItemId === inboxItemId)?.scheduledHours ? "" : "",
+            item_code: null,
+            scheduled_week: e.scheduledWeek,
+            scheduled_hours: e.scheduledHours,
+            scheduled_czk: e.scheduledCzk,
+            position: 999,
+            status: "scheduled",
+            created_by: user.id,
+            inbox_item_id: inboxItemId,
+          });
+          // We need the item details; fetch from inbox
+          const { data: inboxItem } = await supabase.from("production_inbox").select("*").eq("id", inboxItemId).single();
+          if (inboxItem) {
+            await supabase.from("production_schedule").update({
+              item_name: inboxItem.item_name,
+              item_code: inboxItem.item_code,
+              stage_id: inboxItem.stage_id,
+              project_id: inboxItem.project_id,
+            }).eq("inbox_item_id", inboxItemId).eq("scheduled_hours", e.scheduledHours);
+          }
+        } else {
+          // Split across multiple weeks
+          const { data: inboxItem } = await supabase.from("production_inbox").select("*").eq("id", inboxItemId).single();
+          if (!inboxItem) continue;
+
+          // Insert first part to get its id as split_group_id
+          const { data: firstPart } = await supabase.from("production_schedule").insert({
+            project_id: inboxItem.project_id,
+            stage_id: inboxItem.stage_id,
+            item_name: `${inboxItem.item_name} (1/${entries.length})`,
+            item_code: inboxItem.item_code,
+            scheduled_week: entries[0].scheduledWeek,
+            scheduled_hours: entries[0].scheduledHours,
+            scheduled_czk: entries[0].scheduledCzk,
+            position: 999,
+            status: "scheduled",
+            created_by: user.id,
+            inbox_item_id: inboxItemId,
+            split_part: 1,
+            split_total: entries.length,
+          }).select().single();
+
+          if (firstPart) {
+            // Update first part with its own id as split_group_id
+            await supabase.from("production_schedule").update({ split_group_id: firstPart.id }).eq("id", firstPart.id);
+
+            // Insert remaining parts
+            for (let i = 1; i < entries.length; i++) {
+              await supabase.from("production_schedule").insert({
+                project_id: inboxItem.project_id,
+                stage_id: inboxItem.stage_id,
+                item_name: `${inboxItem.item_name} (${i + 1}/${entries.length})`,
+                item_code: inboxItem.item_code,
+                scheduled_week: entries[i].scheduledWeek,
+                scheduled_hours: entries[i].scheduledHours,
+                scheduled_czk: entries[i].scheduledCzk,
+                position: 999,
+                status: "scheduled",
+                created_by: user.id,
+                inbox_item_id: inboxItemId,
+                split_group_id: firstPart.id,
+                split_part: i + 1,
+                split_total: entries.length,
+              });
+            }
+          }
+        }
+
+        // Mark inbox item as scheduled
+        await supabase.from("production_inbox").update({ status: "scheduled" }).eq("id", inboxItemId);
+      }
+
+      qc.invalidateQueries({ queryKey: ["production-inbox"] });
+      qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      qc.invalidateQueries({ queryKey: ["production-progress"] });
+      toast({ title: `${plan.length} položek naplánováno` });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [planningState, qc]);
 
   const handleSeedData = async () => {
     setLoading(true);
