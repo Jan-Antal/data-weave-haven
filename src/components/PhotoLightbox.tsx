@@ -371,7 +371,9 @@ function LazyThumbnail({ file, onClick, isDraggable, onDragStart, onDragEnd, isB
                 "absolute top-1 right-1 w-4 h-4 rounded border flex items-center justify-center transition-all z-10",
                 isSelected
                   ? "border-primary bg-primary text-primary-foreground"
-                  : "border-transparent group-hover:border-white/80 group-hover:bg-black/30"
+                  : hasAnySelection
+                    ? "border-white/80 bg-black/30"
+                    : "border-transparent group-hover:border-white/80 group-hover:bg-black/30"
               )}
               onClick={(e) => { e.stopPropagation(); onToggleSelect?.(e); }}
             >
