@@ -305,16 +305,18 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
                       {completedCount}/{totalCount}
                     </span>
                   </div>
-                  <div className="font-mono text-[9px]" style={{ color: "#99a5a3" }}>{group.project_id}</div>
-                  {expediceStr && (
-                    <div className="text-[9px] font-medium" style={{
-                      color: !allDone && expediceDate && expediceDate < new Date() ? "#dc3545"
-                        : !allDone && expediceDate && differenceInDays(expediceDate, new Date()) <= 7 ? "#D97706"
-                        : "#99a5a3"
-                    }}>
-                      Exp: {expediceStr}
-                    </div>
-                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[9px]" style={{ color: "#99a5a3" }}>{group.project_id}</span>
+                    {expediceStr && (
+                      <span className="text-[9px] font-medium shrink-0" style={{
+                        color: expediceDate && expediceDate < new Date() ? "#dc3545"
+                          : expediceDate && differenceInDays(expediceDate, new Date()) <= 7 ? "#D97706"
+                          : "#223937"
+                      }}>
+                        Exp: {expediceStr}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </button>
 
