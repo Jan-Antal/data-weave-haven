@@ -257,6 +257,9 @@ function LazyThumbnail({ file, onClick }: { file: SPFile; onClick: () => void })
 
   const isRec = isReklamace(file.name);
 
+  // Prefer SharePoint thumbnail API (medium ~176px) over full download URL
+  const thumbSrc = file.thumbnailUrl || file.downloadUrl;
+
   return (
     <div
       ref={ref}
@@ -266,7 +269,7 @@ function LazyThumbnail({ file, onClick }: { file: SPFile; onClick: () => void })
       )}
       onClick={onClick}
     >
-      {visible && file.downloadUrl ? (
+      {visible && thumbSrc ? (
         <>
           {!loaded && (
             <div className="absolute inset-0 flex items-center justify-center bg-accent/40 animate-pulse">
@@ -274,7 +277,7 @@ function LazyThumbnail({ file, onClick }: { file: SPFile; onClick: () => void })
             </div>
           )}
           <img
-            src={file.downloadUrl}
+            src={thumbSrc}
             alt={file.name}
             loading="lazy"
             className={cn(
