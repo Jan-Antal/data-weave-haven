@@ -104,6 +104,8 @@ export default function PlanVyroby() {
     mergeSplitItems,
   } = useProductionDragDrop();
 
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 10 } }));
+
   const weeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
 
