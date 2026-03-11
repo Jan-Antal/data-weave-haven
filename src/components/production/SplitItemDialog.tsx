@@ -75,7 +75,7 @@ export function SplitItemDialog({
   scheduledCzk, source, currentWeekKey, weeks, weeklyCapacity, splitGroupId,
 }: SplitItemDialogProps) {
   const qc = useQueryClient();
-  const [submitting, setSubmitting] = useState(false);
+  const { pushUndo } = useUndoRedo();
   const [pct, setPct] = useState(50);
   const [editingPart, setEditingPart] = useState<1 | 2 | null>(null);
   const [editValue, setEditValue] = useState("");
