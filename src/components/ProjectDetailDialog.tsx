@@ -1418,10 +1418,11 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                             type="button"
                             onClick={() => { handleToggleCategory(cat.key); fileSelection.clearSelection(); }}
                             className={cn(
-                              "w-full flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-medium transition-all",
+                              "w-full flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-medium transition-all duration-200",
                               isOpen
                                 ? "border-[hsl(var(--primary))] bg-primary/5 text-foreground"
-                                : "border-border bg-background text-foreground hover:bg-accent"
+                                : "border-border bg-background text-foreground hover:bg-accent",
+                              flashingCategory === cat.key && "border-[hsl(var(--success))] bg-[hsl(var(--success)/0.1)] animate-pulse"
                             )}
                           >
                             <span className="text-base leading-none">{cat.icon}</span>
