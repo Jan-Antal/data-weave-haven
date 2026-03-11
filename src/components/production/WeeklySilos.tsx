@@ -497,6 +497,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               onBundleContextMenu={(e, bundle, toggleExpand) => handleBundleContextMenu(e, bundle, week.key, week.weekNum, week.start, week.end, toggleExpand)}
               onItemContextMenu={(e, item, bundle) => handleItemContextMenu(e, item, week.key, week.weekNum, week.start, week.end, bundle)}
               allWeeksData={weeksCapacityMap} weekKeys={weekKeys} registerRef={registerSiloRef}
+              projectLookup={projectLookup}
             />
           ))}
         </div>
