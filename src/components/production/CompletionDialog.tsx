@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Slider } from "@/components/ui/slider";
+
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -24,14 +24,18 @@ type CompletionMode = "full" | "split";
 
 interface ItemCompletionConfig {
   mode: CompletionMode;
-  splitPct: number; // % to complete (10-90)
+  splitPct: number;
 }
+
+// Track which single item has split expanded
+
 
 export function CompletionDialog({
   open, onOpenChange, projectName, projectId, weekLabel, weekKey, items, preCheckedIds, hourlyRate,
 }: CompletionDialogProps) {
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set(preCheckedIds ?? []));
   const [itemConfigs, setItemConfigs] = useState<Record<string, ItemCompletionConfig>>({});
+  const [splitOpenId, setSplitOpenId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const qc = useQueryClient();
 
@@ -189,19 +193,23 @@ export function CompletionDialog({
           ) : null;
         })()}
 
-        <div className="px-5 pb-3 space-y-1.5 max-h-[400px] overflow-y-auto">
+        <div className="px-5 pb-3 space-y-1 max-h-[400px] overflow-y-auto">
           {items.map(item => {
             const isCompleted = item.status === "completed";
             const isChecked = checkedIds.has(item.id);
             const config = getConfig(item.id);
+            const isSplitOpen = splitOpenId === item.id && isChecked && !isCompleted;
+            const doneH = Math.round(item.scheduled_hours * config.splitPct / 100);
+            const remainH = item.scheduled_hours - doneH;
 
             return (
               <div key={item.id}>
-                <label
-                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-md cursor-pointer transition-colors"
+                <div
+                  className="group flex items-center gap-2.5 px-2.5 py-2 rounded-md transition-colors cursor-pointer"
                   style={{ border: "1px solid #ece8e2" }}
                   onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
                   onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+                  onClick={() => !isCompleted && toggleItem(item.id)}
                 >
                   <Checkbox
                     checked={isCompleted || isChecked}
@@ -223,52 +231,67 @@ export function CompletionDialog({
                     <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(58,138,54,0.12)", color: "#3a8a36" }}>
                       ✓ Hotovo
                     </span>
-                  ) : (
-                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(217,151,6,0.12)", color: "#d97706" }}>
-                      Ve výrobě
+                  ) : isChecked && config.mode === "split" ? (
+                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(99,102,241,0.1)", color: "#6366f1" }}>
+                      ✂ {doneH}h+{remainH}h
                     </span>
-                  )}
-                </label>
+                  ) : isChecked ? (
+                    <>
+                      <button
+                        className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:underline shrink-0"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setSplitOpenId(item.id);
+                          setConfig(item.id, { mode: "split" });
+                        }}
+                      >
+                        Rozdělit…
+                      </button>
+                    </>
+                  ) : null}
+                </div>
 
-                {/* Split-at-completion option — only for checked, uncompleted items */}
-                {isChecked && !isCompleted && (
-                  <div className="ml-8 mt-1 mb-1 px-2.5 py-1.5 rounded" style={{ backgroundColor: "#fafaf8", border: "1px solid #f0eee9" }}>
-                    <div className="flex items-center gap-3 mb-1">
-                      <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input
-                          type="radio"
-                          checked={config.mode === "full"}
-                          onChange={() => setConfig(item.id, { mode: "full" })}
-                          className="accent-green-700"
-                        />
-                        <span className="text-[10px] font-medium" style={{ color: "#223937" }}>Celé</span>
-                      </label>
-                      <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input
-                          type="radio"
-                          checked={config.mode === "split"}
-                          onChange={() => setConfig(item.id, { mode: "split" })}
-                          className="accent-green-700"
-                        />
-                        <span className="text-[10px] font-medium" style={{ color: "#223937" }}>Rozdělit</span>
-                      </label>
+                {/* Inline split row */}
+                {isSplitOpen && (
+                  <div className="ml-8 mt-1 mb-1 flex items-center gap-2 px-2.5 py-2 rounded" style={{ backgroundColor: "#fafaf8", border: "1px solid #f0eee9" }}>
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                      <input
+                        type="number"
+                        min={1}
+                        max={item.scheduled_hours - 1}
+                        value={doneH}
+                        onChange={e => {
+                          const v = Math.max(1, Math.min(item.scheduled_hours - 1, Number(e.target.value) || 1));
+                          setConfig(item.id, { splitPct: Math.round((v / item.scheduled_hours) * 100) });
+                        }}
+                        onClick={e => e.stopPropagation()}
+                        className="w-14 text-center text-[11px] font-mono border border-border rounded px-1 py-0.5 bg-background"
+                      />
+                      <span className="text-[10px] text-muted-foreground">+</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={item.scheduled_hours - 1}
+                        value={remainH}
+                        onChange={e => {
+                          const v = Math.max(1, Math.min(item.scheduled_hours - 1, Number(e.target.value) || 1));
+                          setConfig(item.id, { splitPct: Math.round(((item.scheduled_hours - v) / item.scheduled_hours) * 100) });
+                        }}
+                        onClick={e => e.stopPropagation()}
+                        className="w-14 text-center text-[11px] font-mono border border-border rounded px-1 py-0.5 bg-background"
+                      />
+                      <span className="text-[10px] font-mono text-muted-foreground shrink-0">= {item.scheduled_hours}h</span>
                     </div>
-                    {config.mode === "split" && (
-                      <div className="space-y-1">
-                        <Slider
-                          value={[config.splitPct]}
-                          min={10}
-                          max={90}
-                          step={5}
-                          onValueChange={([v]) => setConfig(item.id, { splitPct: v })}
-                          className="w-full"
-                        />
-                        <div className="flex items-center justify-between text-[9px] font-mono" style={{ color: "#6b7a78" }}>
-                          <span>✓ {Math.round(item.scheduled_hours * config.splitPct / 100)}h → Expedice</span>
-                          <span>⚙ {item.scheduled_hours - Math.round(item.scheduled_hours * config.splitPct / 100)}h zůstává</span>
-                        </div>
-                      </div>
-                    )}
+                    <button
+                      className="text-[10px] text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                      onClick={e => {
+                        e.stopPropagation();
+                        setSplitOpenId(null);
+                        setConfig(item.id, { mode: "full" });
+                      }}
+                    >
+                      ✕
+                    </button>
                   </div>
                 )}
               </div>
