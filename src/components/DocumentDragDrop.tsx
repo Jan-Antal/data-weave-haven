@@ -1,7 +1,6 @@
-import { useState, useCallback, useRef } from "react";
-import { X, MoveRight, GripVertical, Check } from "lucide-react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { X, MoveRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { SPFile } from "@/hooks/useSharePointDocs";
 
@@ -10,6 +9,40 @@ interface DOC_CAT {
   icon: string;
   label: string;
 }
+
+// ─── Custom drag ghost creator ──────────────────────────────────
+
+export function createDragGhost(fileName: string, count: number): HTMLElement {
+  const ghost = document.createElement("div");
+  ghost.style.cssText = `
+    position: fixed; top: -1000px; left: -1000px;
+    background: hsl(0 0% 100%); border: 1px solid hsl(var(--border));
+    border-radius: 8px; padding: 6px 12px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; font-family: inherit;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    white-space: nowrap; max-width: 240px; z-index: 999999;
+    pointer-events: none;
+  `;
+
+  if (count > 1) {
+    ghost.style.background = "hsl(var(--primary) / 0.08)";
+    ghost.style.borderColor = "hsl(var(--primary))";
+    ghost.innerHTML = `
+      <span style="font-size:14px">📄</span>
+      <span style="font-weight:500;color:hsl(var(--primary))">Přesunout ${count} ${count < 5 ? "soubory" : "souborů"}</span>
+    `;
+  } else {
+    ghost.innerHTML = `
+      <span style="font-size:14px">📄</span>
+      <span style="overflow:hidden;text-overflow:ellipsis;max-width:180px;color:hsl(var(--foreground))">${fileName}</span>
+    `;
+  }
+
+  return ghost;
+}
+
+// ─── Selection bar ──────────────────────────────────────────────
 
 interface FileSelectionBarProps {
   selectedCount: number;
@@ -73,70 +106,13 @@ export function FileSelectionBar({ selectedCount, categories, currentCategory, o
   );
 }
 
-// ─── Drag handle wrapper for file rows ──────────────────────────
-
-interface DraggableFileRowProps {
-  file: SPFile;
-  categoryKey: string;
-  isSelected: boolean;
-  isDragging: boolean;
-  children: React.ReactNode;
-  onSelect: (e: React.MouseEvent) => void;
-  onDragStart: (e: React.DragEvent) => void;
-  onDragEnd: () => void;
-  canDrag: boolean;
-}
-
-export function DraggableFileRow({
-  file,
-  categoryKey,
-  isSelected,
-  isDragging,
-  children,
-  onSelect,
-  onDragStart,
-  onDragEnd,
-  canDrag,
-}: DraggableFileRowProps) {
-  return (
-    <div
-      draggable={canDrag}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      className={cn(
-        "relative transition-opacity",
-        isDragging && "opacity-50",
-        isSelected && "bg-primary/5 rounded"
-      )}
-    >
-      {/* Checkbox overlay on hover */}
-      {canDrag && (
-        <button
-          type="button"
-          className={cn(
-            "absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 z-10 w-4 h-4 rounded border flex items-center justify-center transition-all",
-            isSelected
-              ? "border-primary bg-primary text-primary-foreground opacity-100"
-              : "border-border bg-background text-transparent opacity-0 group-hover:opacity-100 hover:opacity-100"
-          )}
-          onClick={(e) => {
-            e.stopPropagation();
-            onSelect(e);
-          }}
-        >
-          {isSelected && <Check className="h-2.5 w-2.5" />}
-        </button>
-      )}
-      {children}
-    </div>
-  );
-}
-
 // ─── Drop target overlay for folder headers ─────────────────────
 
 interface FolderDropTargetProps {
   categoryKey: string;
+  categoryLabel?: string;
   isValidTarget: boolean;
+  isInvalidTarget: boolean;
   isDragActive: boolean;
   children: React.ReactNode;
   onDrop: (destCategoryKey: string) => void;
@@ -144,7 +120,9 @@ interface FolderDropTargetProps {
 
 export function FolderDropTarget({
   categoryKey,
+  categoryLabel,
   isValidTarget,
+  isInvalidTarget,
   isDragActive,
   children,
   onDrop,
@@ -170,6 +148,9 @@ export function FolderDropTarget({
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    // Only set isOver false if leaving the container, not entering a child
+    const related = e.relatedTarget as Node | null;
+    if (related && (e.currentTarget as Node).contains(related)) return;
     setIsOver(false);
   }, []);
 
@@ -189,12 +170,73 @@ export function FolderDropTarget({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={cn(
-        "transition-all rounded-md",
-        isDragActive && isValidTarget && "ring-2 ring-primary/30",
-        isOver && isValidTarget && "ring-2 ring-primary bg-primary/10"
+        "transition-all duration-100 rounded-md relative",
+        // Valid target during drag: dashed border
+        isDragActive && isValidTarget && !isOver && "ring-2 ring-dashed ring-primary/30 bg-primary/[0.03]",
+        // Hovered valid target: solid border + bg
+        isOver && isValidTarget && "ring-2 ring-primary bg-primary/10 scale-[1.01]",
+        // Invalid target (current folder): red dashed
+        isDragActive && isInvalidTarget && "ring-2 ring-dashed ring-destructive/30 bg-destructive/[0.03] opacity-60",
       )}
     >
       {children}
+      {/* "→ Přesunout sem" indicator on hover */}
+      {isOver && isValidTarget && (
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[10px] font-medium text-primary animate-in fade-in-0 duration-100 pointer-events-none z-10">
+          <MoveRight className="h-3 w-3" />
+          <span>Přesunout sem</span>
+        </div>
+      )}
     </div>
   );
+}
+
+// ─── Hook for managing drag ghost + body cursor ─────────────────
+
+export function useFileDragVisuals() {
+  const ghostRef = useRef<HTMLElement | null>(null);
+
+  const attachGhost = useCallback((e: React.DragEvent, fileName: string, count: number) => {
+    // Clean up previous ghost if any
+    if (ghostRef.current) {
+      document.body.removeChild(ghostRef.current);
+    }
+    const ghost = createDragGhost(fileName, count);
+    document.body.appendChild(ghost);
+    ghostRef.current = ghost;
+    e.dataTransfer.setDragImage(ghost, 20, 20);
+
+    // Set body cursor
+    document.body.style.cursor = "grabbing";
+    document.body.classList.add("file-dragging-active");
+  }, []);
+
+  const cleanup = useCallback(() => {
+    if (ghostRef.current) {
+      try { document.body.removeChild(ghostRef.current); } catch {}
+      ghostRef.current = null;
+    }
+    document.body.style.cursor = "";
+    document.body.classList.remove("file-dragging-active");
+  }, []);
+
+  // Ensure cleanup on unmount
+  useEffect(() => {
+    return () => cleanup();
+  }, [cleanup]);
+
+  return { attachGhost, cleanup };
+}
+
+// ─── Flash animation hook for successful drop ───────────────────
+
+export function useDropFlash() {
+  const [flashingCategory, setFlashingCategory] = useState<string | null>(null);
+
+  const flash = useCallback((categoryKey: string) => {
+    setFlashingCategory(categoryKey);
+    setTimeout(() => setFlashingCategory(null), 600);
+  }, []);
+
+  return { flashingCategory, flash };
 }

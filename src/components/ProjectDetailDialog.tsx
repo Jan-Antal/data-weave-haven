@@ -31,7 +31,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RozpadCeny } from "./RozpadCeny";
 import { PhotoLightbox, PhotoTimelineGrid, isImageFile, generatePhotoFilename } from "./PhotoLightbox";
 import { useFileSelection } from "@/hooks/useFileSelection";
-import { FileSelectionBar, FolderDropTarget } from "./DocumentDragDrop";
+import { FileSelectionBar, FolderDropTarget, useFileDragVisuals, useDropFlash } from "./DocumentDragDrop";
 
 interface Project {
   id: string;
@@ -297,6 +297,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const [fileDragActive, setFileDragActive] = useState(false);
   const [fileDragSourceCat, setFileDragSourceCat] = useState<string | null>(null);
   const [movingFiles, setMovingFiles] = useState(false);
+  const dragVisuals = useFileDragVisuals();
+  const { flashingCategory, flash: flashFolder } = useDropFlash();
 
   // ── Mobile swipe-down-to-close ──────────────────────────────
   const [mobileDragY, setMobileDragY] = useState(0);
@@ -750,6 +752,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     setMovingFiles(false);
 
     if (failed === 0) {
+      flashFolder(destCategoryKey);
       toast({
         title: `${succeeded} ${succeeded === 1 ? "soubor přesunut" : succeeded < 5 ? "soubory přesunuty" : "souborů přesunuto"} do ${destLabel} ✓`,
       });
@@ -781,14 +784,18 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     // Set drag data
     e.dataTransfer.effectAllowed = "move";
     const selectedFiles = files.filter((f) => fileSelection.isSelected(f.itemId));
-    const count = selectedFiles.length;
+    const count = Math.max(selectedFiles.length, 1);
     e.dataTransfer.setData("text/plain", `${count} soubor${count > 1 ? "ů" : ""}`);
-  }, [sp.filesByCategory, fileSelection]);
+    
+    // Custom drag ghost
+    dragVisuals.attachGhost(e, file.name, count);
+  }, [sp.filesByCategory, fileSelection, dragVisuals]);
 
   const handleFileDragEnd = useCallback(() => {
     setFileDragActive(false);
     setFileDragSourceCat(null);
-  }, []);
+    dragVisuals.cleanup();
+  }, [dragVisuals]);
 
   const handleFolderDrop = useCallback((destCategoryKey: string) => {
     if (!fileDragSourceCat || fileDragSourceCat === destCategoryKey) return;
@@ -1401,7 +1408,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                         <FolderDropTarget
                           key={cat.key}
                           categoryKey={cat.key}
+                          categoryLabel={cat.label}
                           isValidTarget={fileDragActive && fileDragSourceCat !== cat.key}
+                          isInvalidTarget={fileDragActive && fileDragSourceCat === cat.key}
                           isDragActive={fileDragActive}
                           onDrop={handleFolderDrop}
                         >
@@ -1409,10 +1418,11 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                             type="button"
                             onClick={() => { handleToggleCategory(cat.key); fileSelection.clearSelection(); }}
                             className={cn(
-                              "w-full flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-medium transition-all",
+                              "w-full flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-medium transition-all duration-200",
                               isOpen
                                 ? "border-[hsl(var(--primary))] bg-primary/5 text-foreground"
-                                : "border-border bg-background text-foreground hover:bg-accent"
+                                : "border-border bg-background text-foreground hover:bg-accent",
+                              flashingCategory === cat.key && "border-[hsl(var(--success))] bg-[hsl(var(--success)/0.1)] animate-pulse"
                             )}
                           >
                             <span className="text-base leading-none">{cat.icon}</span>
@@ -1481,9 +1491,10 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                           onDragStart={(e) => handleFileDragStart(e, f, cat.key)}
                                           onDragEnd={handleFileDragEnd}
                                           className={cn(
-                                            "group flex items-center gap-1 py-1 px-1 rounded hover:bg-accent/50 text-xs cursor-pointer relative transition-all",
+                                            "group flex items-center gap-1 py-1 px-1 rounded hover:bg-accent/50 text-xs relative transition-all",
+                                            canUploadDocuments && !isMobile && "cursor-grab active:cursor-grabbing",
                                             isFileSelected && "bg-primary/5",
-                                            isBeingDragged && "opacity-50"
+                                            isBeingDragged && "opacity-40 border-2 border-dashed border-border rounded-md bg-muted/30"
                                           )}
                                           onClick={(e) => {
                                             if (e.shiftKey || e.metaKey || e.ctrlKey) {
