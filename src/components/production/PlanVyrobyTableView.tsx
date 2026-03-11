@@ -403,13 +403,29 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
     return map;
   }, [scheduleData]);
 
+  // --- New color system ---
+  const STATUS_COLORS = {
+    inbox:       { bg: "#FEE2CD", text: "#EA580C", border: "#EA580C" },
+    scheduled:   { bg: "#DBEAFE", text: "#2563EB", border: "#2563EB" },
+    in_progress: { bg: "#D1FAE5", text: "#059669", border: "#059669" },
+    completed:   { bg: "#BBF7D0", text: "#16A34A", border: "#16A34A" },
+    paused:      { bg: "#F3F4F6", text: "#6B7280", border: "#6B7280" },
+    overdue:     { bg: "#FEE2E2", text: "#DC2626", border: "#DC2626" },
+  } as const;
+
   const getCellStyle = (status: string) => {
     switch (status) {
-      case "completed": return { bg: "#ecfdf5", text: "#059669", border: "#059669" };
-      case "in_progress": return { bg: "#fffbeb", text: "#d97706", border: "#d97706" };
-      case "paused": return { bg: "#fefce8", text: "#a16207", border: "#a16207" };
-      default: return { bg: "#eff6ff", text: "#3b82f6", border: "#3b82f6" };
+      case "completed": return STATUS_COLORS.completed;
+      case "in_progress": return STATUS_COLORS.in_progress;
+      case "paused": return STATUS_COLORS.paused;
+      default: return STATUS_COLORS.scheduled;
     }
+  };
+
+  // Bold variant for bundle-level cells (uses border color as bg, white text)
+  const getBundleCellStyle = (status: string) => {
+    const base = getCellStyle(status);
+    return { bg: base.border, text: "#ffffff", border: base.border };
   };
 
   const formatCellValue = (hours: number, czk: number, status: string, totalItemHours: number, splitPart?: number, splitTotal?: number) => {
