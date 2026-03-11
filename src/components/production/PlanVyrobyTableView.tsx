@@ -9,9 +9,11 @@ import { getProjectColor } from "@/lib/projectColors";
 import { exportToExcel } from "@/lib/exportExcel";
 import { buildPrintableHtml } from "@/lib/exportPdf";
 import { parseAppDate } from "@/lib/dateFormat";
-import { format } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { cs } from "date-fns/locale";
-import { Download, ChevronRight, ChevronDown, Plus, ArrowRight, Inbox, CheckCircle2, XCircle, FileSpreadsheet, FileText, ChevronUp } from "lucide-react";
+import { Download, ChevronRight, ChevronDown, Plus, ArrowRight, Inbox, CheckCircle2, XCircle, FileSpreadsheet, FileText, AlertTriangle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PdfPreviewModal } from "@/components/PdfPreviewModal";
 import { CancelItemDialog } from "./CancelItemDialog";
@@ -122,7 +124,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
   } | null>(null);
 
   const projectDateLookup = useMemo(() => {
-    const map = new Map<string, { expedice?: string | null; datum_smluvni?: string | null }>();
+    const map = new Map<string, any>();
     for (const p of allProjects) map.set(p.project_id, p);
     return map;
   }, [allProjects]);
@@ -772,6 +774,27 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                           })()}
                         </div>
                       </div>
+                      {/* Inline deadline warning */}
+                      {(() => {
+                        const pd = projectDateLookup.get(proj.projectId);
+                        const severity = pd ? getProjectRiskSeverity(pd) : null;
+                        if (!severity) return null;
+                        const smlParsed = pd?.datum_smluvni ? parseAppDate(pd.datum_smluvni) : null;
+                        const warnColor = severity === "overdue" ? "#dc3545" : "#d97706";
+                        const tooltipText = smlParsed
+                          ? severity === "overdue"
+                            ? `Termín byl ${format(smlParsed, "dd.MM.yyyy")} — po termínu o ${differenceInDays(new Date(), smlParsed)} dní`
+                            : `Termín za ${differenceInDays(smlParsed, new Date())} dní (${format(smlParsed, "dd.MM.yyyy")})`
+                          : "";
+                        return (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle size={14} style={{ color: warnColor }} className="shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">{tooltipText}</TooltipContent>
+                          </Tooltip>
+                        );
+                      })()}
                       <div
                         className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-mono font-bold"
                         style={{ backgroundColor: proj.color + "18", color: proj.color }}

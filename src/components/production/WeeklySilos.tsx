@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from "react";
-import { GripVertical, ChevronRight } from "lucide-react";
+import { GripVertical, ChevronRight, AlertTriangle } from "lucide-react";
+import { differenceInDays, format } from "date-fns";
 import { useProductionSchedule, getISOWeekNumber, type WeekSilo, type ScheduleBundle, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
@@ -694,16 +695,6 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
       border: "1px solid #ece8e2", borderLeft: `4px solid ${borderLeftColor}`,
       backgroundColor: "#ffffff", opacity: isDragging ? 0.3 : 1,
     }}>
-      {/* Warning badge */}
-      {severity && !allCompleted && (
-        <div className="absolute top-1 right-1 z-10 flex items-center justify-center rounded-full"
-          style={{
-            width: 14, height: 14, fontSize: 9, fontWeight: 700,
-            backgroundColor: severity === "overdue" ? "#dc3545" : "#d97706",
-            color: "#fff",
-          }}
-        >!</div>
-      )}
 
       <div className="flex" style={{ borderBottom: expanded ? "1px solid #ece8e2" : "none" }}>
         {/* Left strip: expand/collapse toggle — NOT draggable */}
@@ -736,6 +727,23 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            {severity && !allCompleted && (() => {
+              const smlParsed = project?.datum_smluvni ? parseAppDate(project.datum_smluvni) : null;
+              const warnColor = severity === "overdue" ? "#dc3545" : "#d97706";
+              const tooltipText = smlParsed
+                ? severity === "overdue"
+                  ? `Termín byl ${format(smlParsed, "dd.MM.yyyy")} — po termínu o ${differenceInDays(new Date(), smlParsed)} dní`
+                  : `Termín za ${differenceInDays(smlParsed, new Date())} dní (${format(smlParsed, "dd.MM.yyyy")})`
+                : "";
+              return (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AlertTriangle size={14} style={{ color: warnColor }} className="shrink-0" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">{tooltipText}</TooltipContent>
+                </Tooltip>
+              );
+            })()}
             {completedCount > 0 && <span className="text-[9px] font-medium" style={{ color: "#3a8a36" }}>{completedCount}/{totalCount} ✓</span>}
             <span className="font-mono text-[11px] font-bold" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>{Math.round(bundle.total_hours)}h</span>
             {showCzk && <span className="font-mono text-[9px]" style={{ color: "#6b7a78" }}>{formatCompactCzk(bundle.total_hours * hourlyRate)}</span>}
