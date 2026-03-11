@@ -294,6 +294,16 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
                     >
                       {group.project_name}
                     </span>
+                    <span
+                      className="text-[11px] font-bold px-1.5 py-0.5 rounded-full shrink-0 text-center"
+                      style={{
+                        backgroundColor: allDone ? "rgba(22,163,74,0.12)" : "rgba(217,151,6,0.12)",
+                        color: allDone ? "#16A34A" : "#d97706",
+                        minWidth: 40,
+                      }}
+                    >
+                      {completedCount}/{totalCount}
+                    </span>
                   </div>
                   <div className="font-mono text-[9px]" style={{ color: "#99a5a3" }}>{group.project_id}</div>
                   {expediceStr && (
@@ -306,16 +316,6 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
                     </div>
                   )}
                 </div>
-                <span
-                  className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 text-center"
-                  style={{
-                    backgroundColor: allDone ? "rgba(22,163,74,0.12)" : "rgba(217,151,6,0.12)",
-                    color: allDone ? "#16A34A" : "#d97706",
-                    minWidth: 46,
-                  }}
-                >
-                  {completedCount}/{totalCount}
-                </span>
               </button>
 
               {!isGroupCollapsed && (
