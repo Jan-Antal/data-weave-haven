@@ -1608,7 +1608,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                               )}
                             </div>
                           )}
-                        </div>
+                        </FolderDropTarget>
                       );
                     })}
                   </div>
