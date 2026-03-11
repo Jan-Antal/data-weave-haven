@@ -531,6 +531,17 @@ export function useProductionDragDrop() {
         if (insertErr) throw insertErr;
       }
 
+      // Log activity
+      for (const item of items) {
+        logActivity({
+          projectId: item.project_id,
+          actionType: "item_returned_to_inbox",
+          oldValue: weekLabel(weekDate),
+          newValue: "Inbox",
+          detail: JSON.stringify({ item_name: item.item_name, item_code: item.item_code, from_week: weekLabel(weekDate) }),
+        });
+      }
+
       invalidateAll();
 
       pushUndo({
