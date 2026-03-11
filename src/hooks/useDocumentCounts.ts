@@ -167,7 +167,7 @@ export function useDocumentCounts(
   projectIds: string[],
   projectStatuses?: Record<string, string | null>
 ) {
-  const mainProjectIds = projectIds.filter((id) => !isStage(id));
+  const mainProjectIds = projectIds;
   const queryClient = useQueryClient();
 
   const { data: cacheMap } = useDocCountCache();
