@@ -5,12 +5,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 // Global event bus so ProjectDetailDialog can notify the table
 const DOC_COUNT_EVENT = "doc-count-updated";
 
-// Stage pattern: ends with -A, -B, etc. (single uppercase letter after last dash)
-const STAGE_SUFFIX_PATTERN = /-[A-Z]$/;
-
-export function isStage(projectId: string): boolean {
-  return STAGE_SUFFIX_PATTERN.test(projectId);
-}
+// Stage detection removed — project IDs from the projects table are never stages.
+// Stages exist only in project_stages table with stage_name like "-A", "-B" etc.
 
 // ── Queue-based SharePoint fetcher (max 3 concurrent) ──────────────
 const MAX_CONCURRENT = 3;
@@ -90,7 +86,7 @@ async function fetchOneProject(projectId: string) {
 /** Enqueue projects for background fetching */
 export function enqueueDocCountFetch(projectIds: string[]) {
   const toFetch = projectIds.filter(
-    (id) => !isStage(id) && !fetchedThisSession.has(id) && !fetchQueue.includes(id)
+    (id) => !fetchedThisSession.has(id) && !fetchQueue.includes(id)
   );
   if (toFetch.length === 0) return;
   fetchQueue.push(...toFetch);
@@ -171,7 +167,7 @@ export function useDocumentCounts(
   projectIds: string[],
   projectStatuses?: Record<string, string | null>
 ) {
-  const mainProjectIds = projectIds.filter((id) => !isStage(id));
+  const mainProjectIds = projectIds;
   const queryClient = useQueryClient();
 
   const { data: cacheMap } = useDocCountCache();
