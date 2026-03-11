@@ -182,7 +182,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
     return (
       <div
         className="w-[40px] shrink-0 flex flex-col items-center py-3 cursor-pointer transition-colors"
-        style={{ borderLeft: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))" }}
+        style={{ borderLeft: "1px solid #ece8e2", backgroundColor: "#ffffff" }}
         onClick={() => setCollapsed(false)}
       >
         <ChevronLeft className="h-3.5 w-3.5 mb-2 text-muted-foreground" />
