@@ -768,13 +768,20 @@ function DraggableSiloItem({ item, weekKey, showCzk, onContextMenu }: {
     },
   });
 
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onContextMenu(e);
+  }, [onContextMenu]);
+
   return (
     <div ref={setNodeRef} {...attributes} {...listeners}
+      data-context="item"
       className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-grab transition-colors"
       style={{ opacity: isDragging ? 0.3 : 1, borderLeft: isSplit ? "2px dashed #99a5a3" : undefined }}
       onMouseEnter={e => { if (!isDragging) e.currentTarget.style.backgroundColor = "#f8f7f5"; }}
       onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
-      onContextMenu={onContextMenu}
+      onContextMenu={handleContextMenu}
     >
       <GripVertical className="shrink-0" style={{ width: 8, height: 8, color: "#99a5a3" }} />
       {adhocReason && (
