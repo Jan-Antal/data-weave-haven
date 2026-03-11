@@ -233,6 +233,13 @@ export function PhotoTimelineGrid({
                         key={f.itemId}
                         file={f}
                         onClick={() => onOpenLightbox(flatIdx)}
+                        isDraggable={isDraggable}
+                        onDragStart={onDragStart}
+                        onDragEnd={onDragEnd}
+                        isBeingDragged={draggingFileId === f.itemId}
+                        isSelected={selectedIds?.has(f.itemId)}
+                        onToggleSelect={onToggleSelect ? (e) => onToggleSelect(f.itemId, flatFiles, e) : undefined}
+                        hasAnySelection={(selectedIds?.size ?? 0) > 0}
                       />
                     );
                   })}
