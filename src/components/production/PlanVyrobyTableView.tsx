@@ -597,9 +597,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
             {hasAnyInbox && (
               <div
                 className="shrink-0 text-center px-1 py-1.5 border-b border-r border-border/50 sticky z-40"
-                style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff7ed" }}
+                style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: STATUS_COLORS.inbox.bg }}
               >
-                <div className="text-[10px] font-bold" style={{ color: "#ea580c" }}>📥 Inbox</div>
+                <div className="text-[10px] font-bold" style={{ color: STATUS_COLORS.inbox.text }}>📥 Inbox</div>
               </div>
             )}
             {weeks.map(week => {
