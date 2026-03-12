@@ -78,6 +78,8 @@ interface InboxPanelProps {
   onNavigateToTPV?: (projectId: string) => void;
   onOpenProjectDetail?: (projectId: string) => void;
   disableDropZone?: boolean;
+  selectedProjectId?: string | null;
+  onSelectProject?: (projectId: string) => void;
 }
 
 interface ContextMenuState {
