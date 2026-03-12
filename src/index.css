@@ -230,8 +230,8 @@
 
 /* Mobile touch targets */
 @media (max-width: 767px) {
-  /* Ensure minimum tap targets */
-  button, [role="button"], a {
+  /* Ensure minimum tap targets — exclude small controls like checkboxes, switches, toggles */
+  button:not([role="checkbox"]):not([data-slot="switch"]):not(.shrink-0), [role="button"], a {
     min-height: 36px;
   }
 }
