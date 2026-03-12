@@ -227,7 +227,12 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
   const completedProjects = useMemo(() => {
     if (!progressData) return [];
     const activeProjectIds = new Set(projects.map(p => p.project_id));
-    return Array.from(progressData.values()).filter(p => p.is_complete && !activeProjectIds.has(p.project_id));
+    let result = Array.from(progressData.values()).filter(p => p.is_complete && !activeProjectIds.has(p.project_id));
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(p => p.project_name.toLowerCase().includes(q) || p.project_id.toLowerCase().includes(q));
+    }
+    return result;
   }, [progressData, projects]);
 
   const allProjectOptions = useMemo(() => {
