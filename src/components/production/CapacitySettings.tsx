@@ -54,6 +54,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
 
   const standardCapacity = settings?.weekly_capacity_hours ?? 875;
+  const [standardCapacityInput, setStandardCapacityInput] = useState<string>("");
   const workingDaysPerWeek = 5;
   const calculatedHoursPerDay = workingDaysPerWeek > 0 ? Math.round(standardCapacity / workingDaysPerWeek) : 175;
 
@@ -89,9 +90,11 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     if (value <= 0 || isNaN(value)) return;
     try {
       await updateSettings.mutateAsync({ weekly_capacity_hours: value, monthly_capacity_hours: value * 4 });
-      // Clear non-manual future weeks so they recalculate
-      const fromWeek = selectedYear === currentYear ? currentWeek : 1;
-      await bulkUpdate.mutateAsync({ year: selectedYear, fromWeek, capacity: value, workingDays: workingDaysPerWeek });
+      // Only clear non-manual FUTURE weeks (current week + 1 onward)
+      const futureFromWeek = selectedYear < currentYear ? 53 : (selectedYear === currentYear ? currentWeek + 1 : 1);
+      if (futureFromWeek <= 52) {
+        await bulkUpdate.mutateAsync({ year: selectedYear, fromWeek: futureFromWeek, capacity: value, workingDays: workingDaysPerWeek });
+      }
       toast({ title: "✓ Kapacita aktualizována" });
     } catch (e: any) {
       toast({ title: "Chyba", description: e.message, variant: "destructive" });
@@ -209,10 +212,19 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               <label className="text-xs text-muted-foreground">Kapacita (h/týden)</label>
               <Input
                 type="number"
-                value={standardCapacity}
-                onChange={e => {
-                  const v = parseInt(e.target.value);
+                value={standardCapacityInput || String(standardCapacity)}
+                onChange={e => setStandardCapacityInput(e.target.value)}
+                onBlur={() => {
+                  const v = parseInt(standardCapacityInput);
                   if (v > 0) handleStandardCapacityChange(v);
+                  setStandardCapacityInput("");
+                }}
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    const v = parseInt(standardCapacityInput);
+                    if (v > 0) handleStandardCapacityChange(v);
+                    setStandardCapacityInput("");
+                  }
                 }}
                 className="h-8 text-sm font-mono"
               />
@@ -268,15 +280,14 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   const isManual = week.is_manual_override && Math.round(week.capacity_hours) !== Math.round(standardCapacity);
                   const hasHoliday = !!week.holiday_name;
                   const hasCompanyHol = !!week.company_holiday_name;
-                  const isCurrent = selectedYear === currentYear && wn === currentWeek;
+                  const _isCurrent = selectedYear === currentYear && wn === currentWeek;
                   const isBarSelected = selectedWeeks.has(wn);
 
-                  let barColor: string;
-                  if (past) barColor = "hsl(var(--muted-foreground) / 0.3)";
-                  else if (hasCompanyHol) barColor = "#f59e0b";
-                  else if (isManual) barColor = "#2d6a4f";
-                  else if (hasHoliday) barColor = "#d97706";
-                  else barColor = "hsl(var(--primary) / 0.6)";
+                  const barColor = past ? "hsl(var(--muted-foreground) / 0.3)"
+                    : hasCompanyHol ? "#f59e0b"
+                    : isManual ? "#2d6a4f"
+                    : hasHoliday ? "#d97706"
+                    : "hsl(var(--primary) / 0.6)";
 
                   return (
                     <button
@@ -285,32 +296,19 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                       style={{
                         height: barH,
                         backgroundColor: barColor,
-                        outline: isCurrent ? "3px solid hsl(var(--primary))" : "none",
-                        outlineOffset: isCurrent ? "-1px" : undefined,
                       }}
-                      title={`T${wn}: ${Math.round(cap)}h · ${week.working_days} dní${week.holiday_name ? ` · ${week.holiday_name}` : ""}${week.company_holiday_name ? ` · ${week.company_holiday_name}` : ""}${isCurrent ? " · Tento týden" : ""}`}
+                      title={`T${wn}: ${Math.round(cap)}h · ${week.working_days} dní${week.holiday_name ? ` · ${week.holiday_name}` : ""}${week.company_holiday_name ? ` · ${week.company_holiday_name}` : ""}`}
                       onClick={e => handleBarClick(wn, e)}
                     />
                   );
                 })}
               </div>
 
-              {/* Current week marker */}
-              {selectedYear === currentYear && (
-                <div className="flex gap-[2px] mt-0.5">
-                  {Array.from({ length: 52 }, (_, i) => i + 1).map(wn => (
-                    <div key={wn} className="flex-1 min-w-[12px] flex justify-center">
-                      {wn === currentWeek && <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "hsl(var(--primary))" }} />}
-                    </div>
-                  ))}
-                </div>
-              )}
-
               {/* Week labels */}
               <div className="flex gap-[2px] mt-0.5">
                 {Array.from({ length: 52 }, (_, i) => i + 1).map(wn => (
-                  <div key={wn} className={`flex-1 min-w-[12px] text-center text-[6px] font-mono ${selectedYear === currentYear && wn === currentWeek ? "text-foreground font-bold" : "text-muted-foreground"}`}>
-                    {wn % 4 === 1 || (selectedYear === currentYear && wn === currentWeek) ? `T${wn}` : ""}
+                  <div key={wn} className="flex-1 min-w-[12px] text-center text-[6px] font-mono text-muted-foreground">
+                    {wn % 4 === 1 ? `T${wn}` : ""}
                   </div>
                 ))}
               </div>
@@ -324,7 +322,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#2d6a4f" }} />Ručně upraveno</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(var(--muted-foreground) / 0.3)" }} />Minulé</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />Firemní dovolená</span>
-            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "hsl(var(--primary))" }} />Tento týden</span>
+            
           </div>
 
           {/* Inline Week Editor */}
