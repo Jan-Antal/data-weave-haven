@@ -170,7 +170,7 @@ export function RozpadCeny({ projectId, prodejniCena, costValues, onChange, read
               </SelectContent>
             </Select>
           ) : (
-            <Input value={presetLabel || "—"} disabled className="h-9 bg-muted text-muted-foreground cursor-not-allowed opacity-70" />
+            <Input value={dropdownLabel} disabled className="h-9 bg-muted text-muted-foreground cursor-not-allowed opacity-70" />
           )}
         </div>
         {kalkulantSlot}
