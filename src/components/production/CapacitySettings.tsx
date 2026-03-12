@@ -23,6 +23,48 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
+// --- Capacity color interpolation ---
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgbToHex(r: number, g: number, b: number): string {
+  return "#" + [r, g, b].map(v => Math.round(v).toString(16).padStart(2, "0")).join("");
+}
+function lerpColor(a: string, b: string, t: number): string {
+  const [r1, g1, b1] = hexToRgb(a);
+  const [r2, g2, b2] = hexToRgb(b);
+  return rgbToHex(r1 + (r2 - r1) * t, g1 + (g2 - g1) * t, b1 + (b2 - b1) * t);
+}
+
+const CAPACITY_COLOR_STOPS: Array<{ pct: number; color: string }> = [
+  { pct: 0,   color: "#b45309" },
+  { pct: 50,  color: "#d97706" },
+  { pct: 75,  color: "#f5a742" },
+  { pct: 90,  color: "#fde8cc" },
+  { pct: 100, color: "#9ca3af" },
+  { pct: 110, color: "#a3c9a8" },
+  { pct: 120, color: "#5a9e6f" },
+  { pct: 130, color: "#2d6a4f" },
+];
+
+function getCapacityColor(actualHours: number, standardHours: number): string {
+  if (standardHours <= 0) return "#9ca3af";
+  const pct = (actualHours / standardHours) * 100;
+  if (pct <= CAPACITY_COLOR_STOPS[0].pct) return CAPACITY_COLOR_STOPS[0].color;
+  if (pct >= CAPACITY_COLOR_STOPS[CAPACITY_COLOR_STOPS.length - 1].pct) return CAPACITY_COLOR_STOPS[CAPACITY_COLOR_STOPS.length - 1].color;
+  for (let i = 0; i < CAPACITY_COLOR_STOPS.length - 1; i++) {
+    const a = CAPACITY_COLOR_STOPS[i], b = CAPACITY_COLOR_STOPS[i + 1];
+    if (pct >= a.pct && pct <= b.pct) {
+      const t = (pct - a.pct) / (b.pct - a.pct);
+      return lerpColor(a.color, b.color, t);
+    }
+  }
+  return "#9ca3af";
+}
+
+const PAST_WEEK_COLOR = "#d1d5db";
+
 function getISOWeekNumber(date: Date): number {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const dayNum = d.getUTCDay() || 7;
@@ -366,17 +408,10 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   const cap = week.capacity_hours;
                   const barH = maxCapacity > 0 ? Math.max(4, (cap / (maxCapacity * 1.1)) * 140) : 4;
                   const past = isPastWeek(wn);
-                  const isManual = week.is_manual_override && Math.round(week.capacity_hours) !== Math.round(standardCapacity);
-                  const hasHoliday = !!week.holiday_name;
-                  const hasCompanyHol = !!week.company_holiday_name;
                   const isBarSelected = selectedWeeks.has(wn);
                   const typeLabel = getWeekTypeLabel(week, past);
 
-                  const barColor = past ? "hsl(var(--muted-foreground) / 0.3)"
-                    : hasCompanyHol ? "#f59e0b"
-                    : isManual ? "#2d6a4f"
-                    : hasHoliday ? "#d97706"
-                    : "hsl(var(--primary) / 0.6)";
+                  const barColor = past ? PAST_WEEK_COLOR : getCapacityColor(cap, standardCapacity);
 
                   const weekStart = new Date(week.week_start + "T00:00:00");
                   const weekEnd = new Date(weekStart);
@@ -418,13 +453,18 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             </div>
           </TooltipProvider>
 
-          {/* Legend */}
-          <div className="flex items-center gap-4 text-[9px] text-muted-foreground">
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(var(--primary) / 0.6)" }} />Standard</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#d97706" }} />Svátek</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#2d6a4f" }} />Ručně upraveno</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(var(--muted-foreground) / 0.3)" }} />Minulé</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />Firemní dovolená</span>
+          {/* Legend — gradient strip */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="h-2.5 flex-1 rounded-sm" style={{ background: "linear-gradient(to right, #b45309, #d97706, #f5a742, #fde8cc, #9ca3af, #a3c9a8, #5a9e6f, #2d6a4f)" }} />
+              <div className="w-4 h-2.5 rounded-sm" style={{ backgroundColor: PAST_WEEK_COLOR }} />
+            </div>
+            <div className="flex text-[9px] text-muted-foreground">
+              <span className="flex-1 text-left">Nízká kapacita</span>
+              <span className="flex-1 text-center">Standard</span>
+              <span className="flex-1 text-right mr-6">Vysoká kapacita</span>
+              <span className="w-4 text-center">Min.</span>
+            </div>
           </div>
 
           {/* Inline Week Editor */}
