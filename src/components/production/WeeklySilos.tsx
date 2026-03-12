@@ -588,7 +588,6 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               onSelectProject={onSelectProject}
               searchQuery={searchQuery}
             />
-            />
           ))}
         </div>
       </div>
