@@ -759,11 +759,13 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
 
   return (
     <div className="rounded-[6px] overflow-hidden relative" style={{
-      border: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
-      borderLeftWidth: 4, borderLeftStyle: "solid", borderLeftColor: borderLeftColor,
+      borderTop: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+      borderRight: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+      borderBottom: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+      borderLeft: `4px solid ${borderLeftColor}`,
       backgroundColor: isSelected ? "rgba(217,119,6,0.05)" : "#ffffff", opacity: isDragging ? 0.3 : 1,
       boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
-      transition: "border-color 150ms, box-shadow 150ms",
+      transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, box-shadow 150ms",
     }}>
 
       <div className="flex" style={{ borderBottom: expanded ? "1px solid #ece8e2" : "none" }}>
