@@ -1277,7 +1277,29 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   );
 }
 
-/* ─── Filled week cell with popover ─── */
+/* ─── Droppable week cell wrapper ─── */
+function DroppableWeekCell({ droppableId, weekKey, isCurrent, children }: {
+  droppableId: string; weekKey: string; isCurrent: boolean; children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: droppableId, data: { weekKey } });
+  return (
+    <div
+      ref={setNodeRef}
+      className="shrink-0 flex items-center justify-center px-1 py-0.5"
+      style={{
+        width: CELL_W,
+        backgroundColor: isOver ? "hsl(210 80% 95%)" : isCurrent ? "hsl(142 76% 97%)" : "#fff",
+        outline: isOver ? "2px solid hsl(210 80% 60%)" : undefined,
+        outlineOffset: -2,
+        transition: "background-color 150ms, outline 150ms",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/* ─── Filled week cell with popover + draggable ─── */
 function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCellValue, getCellStyle, moveTargetWeeks, getWeekCapacity, weekCapacities, onMoveToWeek, onReturnToInbox, onComplete, onCancel }: {
   weekKey: string;
   isCurrent: boolean;
@@ -1299,6 +1321,11 @@ function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCe
   const cellStyle = getCellStyle(alloc.status);
   const ids = alloc.scheduleItemIds;
 
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
+    id: `drag-${ids[0]}`,
+    data: { type: "table-item", itemIds: ids, fromWeek: weekKey },
+  });
+
   const handleAction = async (action: () => Promise<void>) => {
     setOpen(false);
     setShowMoveList(false);
@@ -1306,10 +1333,7 @@ function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCe
   };
 
   return (
-    <div
-      className="shrink-0 flex items-center justify-center px-1 py-0.5"
-      style={{ width: CELL_W, backgroundColor: isCurrent ? "hsl(142 76% 97%)" : "#fff" }}
-    >
+    <div ref={setDragRef} {...attributes} {...listeners} style={{ opacity: isDragging ? 0.4 : 1, width: "100%" }}>
       <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setShowMoveList(false); }}>
         <PopoverTrigger asChild>
           <button
