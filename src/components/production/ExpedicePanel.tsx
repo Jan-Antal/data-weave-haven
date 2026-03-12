@@ -49,9 +49,11 @@ interface ExpedicePanelProps {
   showCzk?: boolean;
   onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void;
   onOpenProjectDetail?: (projectId: string) => void;
+  selectedProjectId?: string | null;
+  onSelectProject?: (projectId: string) => void;
 }
 
-export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }: ExpedicePanelProps) {
+export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, selectedProjectId, onSelectProject }: ExpedicePanelProps) {
   const { data: projects = [] } = useProductionExpedice();
   const { data: allProjects = [] } = useProjects();
   const { data: scheduleData } = useProductionSchedule();
@@ -437,6 +439,8 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
             onItemContextMenu={(e, item) => handleItemContextMenu(e, item, false)}
             onNavigateToTPV={onNavigateToTPV}
             isArchive={false}
+            isSelected={selectedProjectId === group.project_id}
+            onSelectProject={onSelectProject}
           />
         ))}
       </div>
@@ -508,6 +512,8 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
                 onItemContextMenu={(e, item) => handleItemContextMenu(e, item, true)}
                 onNavigateToTPV={onNavigateToTPV}
                 isArchive={true}
+                isSelected={selectedProjectId === group.project_id}
+                onSelectProject={onSelectProject}
               />
             ))}
           </div>
@@ -540,13 +546,15 @@ interface ProjectGroupProps {
   onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem) => void;
   onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void;
   isArchive: boolean;
+  isSelected?: boolean;
+  onSelectProject?: (projectId: string) => void;
 }
 
 function ProjectGroup({
   group, projectExpediceMap, projectTotalItems,
   isGroupCollapsed, toggleGroup,
   onProjectContextMenu, onItemContextMenu, onNavigateToTPV,
-  isArchive,
+  isArchive, isSelected, onSelectProject,
 }: ProjectGroupProps) {
   const expediceRaw = projectExpediceMap.get(group.project_id);
   const expediceDate = parseDate(expediceRaw);
@@ -573,13 +581,15 @@ function ProjectGroup({
       className="rounded-lg overflow-hidden"
       style={{
         backgroundColor: isArchive ? "hsl(var(--muted) / 0.5)" : "#ffffff",
-        border: `1px solid ${isArchive ? "hsl(var(--border))" : "#ece8e2"}`,
+        border: isSelected ? "2px solid hsl(var(--primary))" : `1px solid ${isArchive ? "hsl(var(--border))" : "#ece8e2"}`,
         borderLeft: `4px solid ${isArchive ? "#d1d5db" : getProjectColor(group.project_id)}`,
+        boxShadow: isSelected ? "0 0 0 1px hsl(var(--primary) / 0.2)" : undefined,
+        transition: "border-color 150ms, box-shadow 150ms",
       }}
       onContextMenu={(e) => onProjectContextMenu(e, group.project_id, isArchive)}
     >
       <button
-        onClick={toggleGroup}
+        onClick={() => { toggleGroup(); onSelectProject?.(group.project_id); }}
         onContextMenu={(e) => onProjectContextMenu(e, group.project_id, isArchive)}
         className="w-full flex items-center gap-1.5 px-2.5 py-2 text-left transition-colors"
         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = isArchive ? "hsl(210 20% 96%)" : "#f8f7f5")}

@@ -53,6 +53,8 @@ interface Props {
   onOpenProjectDetail?: (projectId: string) => void;
   displayMode?: DisplayMode;
   onDisplayModeChange?: (mode: DisplayMode) => void;
+  selectedProjectId?: string | null;
+  onSelectProject?: (projectId: string) => void;
 }
 
 interface ContextMenuState {
@@ -117,7 +119,7 @@ interface CancelState {
   cancelAll?: boolean;
 }
 
-export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange }: Props) {
+export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
@@ -535,6 +537,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               spillDismissed={dismissedSpillWeeks.has(week.key)}
               onDismissSpill={() => handleDismissSpill(week.key)}
               onReopenSpill={() => handleReopenSpill(week.key)}
+              selectedProjectId={selectedProjectId}
+              onSelectProject={onSelectProject}
             />
           ))}
         </div>
@@ -604,10 +608,12 @@ interface SiloProps {
   spillDismissed: boolean;
   onDismissSpill: () => void;
   onReopenSpill: () => void;
+  selectedProjectId?: string | null;
+  onSelectProject?: (projectId: string) => void;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject }: SiloProps) {
   // Capacity calculation: exclude paused items
   const activeHours = useMemo(() => {
     if (!silo) return 0;
@@ -676,7 +682,9 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
           <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey}
             showCzk={showCzk} hourlyRate={hourlyRate}
             onBundleContextMenu={onBundleContextMenu} onItemContextMenu={onItemContextMenu}
-            projectLookup={projectLookup} />
+            projectLookup={projectLookup}
+            isSelected={selectedProjectId === bundle.project_id}
+            onSelectProject={onSelectProject} />
         ))}
       </div>
 
@@ -713,11 +721,13 @@ function formatDateShortYY(dateStr: string | null | undefined): string | null {
   return `${dd}.${mm}.${yy}`;
 }
 
-function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleContextMenu, onItemContextMenu, projectLookup }: {
+function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleContextMenu, onItemContextMenu, projectLookup, isSelected, onSelectProject }: {
   bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number;
   onBundleContextMenu: (e: React.MouseEvent, bundle: ScheduleBundle, toggleExpand: () => void) => void;
   onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem, bundle: ScheduleBundle) => void;
   projectLookup: ProjectLookup;
+  isSelected?: boolean;
+  onSelectProject?: (projectId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const color = getProjectColor(bundle.project_id);
@@ -749,8 +759,11 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
 
   return (
     <div className="rounded-[6px] overflow-hidden relative" style={{
-      border: "1px solid #ece8e2", borderLeft: `4px solid ${borderLeftColor}`,
+      border: isSelected ? "2px solid hsl(var(--primary))" : "1px solid #ece8e2",
+      borderLeft: `4px solid ${borderLeftColor}`,
       backgroundColor: "#ffffff", opacity: isDragging ? 0.3 : 1,
+      boxShadow: isSelected ? "0 0 0 1px hsl(var(--primary) / 0.2)" : undefined,
+      transition: "border-color 150ms, box-shadow 150ms",
     }}>
 
       <div className="flex" style={{ borderBottom: expanded ? "1px solid #ece8e2" : "none" }}>
@@ -758,7 +771,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
         <div
           className="shrink-0 flex items-center justify-center cursor-pointer select-none"
           style={{ width: 28 }}
-          onClick={toggleExpand}
+          onClick={() => { toggleExpand(); onSelectProject?.(bundle.project_id); }}
           onMouseDown={e => e.stopPropagation()}
           onPointerDown={e => e.stopPropagation()}
         >

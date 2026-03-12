@@ -78,6 +78,8 @@ interface InboxPanelProps {
   onNavigateToTPV?: (projectId: string) => void;
   onOpenProjectDetail?: (projectId: string) => void;
   disableDropZone?: boolean;
+  selectedProjectId?: string | null;
+  onSelectProject?: (projectId: string) => void;
 }
 
 interface ContextMenuState {
@@ -90,7 +92,7 @@ interface CancelState {
   source: "schedule" | "inbox"; splitGroupId: string | null;
 }
 
-export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenProjectDetail, disableDropZone }: InboxPanelProps) {
+export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenProjectDetail, disableDropZone, selectedProjectId, onSelectProject }: InboxPanelProps) {
   const { data: projects = [], isLoading } = useProductionInbox();
   const { data: progressData } = useProductionProgress();
   const { data: settings } = useProductionSettings();
@@ -456,6 +458,8 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
               onItemContextMenu={handleItemContextMenu}
               urgency={urgency}
               daysLabel={getUrgencyDaysLabel(info?.datum_smluvni)}
+              isSelected={selectedProjectId === project.project_id}
+              onSelectProject={onSelectProject}
             />
           );
         })}
@@ -527,7 +531,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
   );
 }
 
-function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel }: {
+function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel, isSelected, onSelectProject }: {
   project: InboxProject; hourlyRate: number; defaultExpanded: boolean; showCzk?: boolean;
   progress?: ProjectProgress; onNavigateToTPV?: (projectId: string) => void;
   onOpenProjectDetail?: (projectId: string) => void;
@@ -535,6 +539,8 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
   onItemContextMenu: (e: React.MouseEvent, item: InboxItem, project: InboxProject) => void;
   urgency: UrgencyLevel;
   daysLabel: string | null;
+  isSelected?: boolean;
+  onSelectProject?: (projectId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const color = getProjectColor(project.project_id);
@@ -545,9 +551,15 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
   const leftBorderWidth = urgency !== "ok" ? 3 : 4;
 
   return (
-    <div className="rounded-lg overflow-hidden" style={{ backgroundColor: "#ffffff", border: "1px solid #ece8e2", borderLeft: `${leftBorderWidth}px solid ${leftBorderColor}` }}>
+    <div className="rounded-lg overflow-hidden" style={{
+      backgroundColor: "#ffffff",
+      border: isSelected ? "2px solid hsl(var(--primary))" : "1px solid #ece8e2",
+      borderLeft: `${leftBorderWidth}px solid ${leftBorderColor}`,
+      boxShadow: isSelected ? "0 0 0 1px hsl(var(--primary) / 0.2)" : undefined,
+      transition: "border-color 150ms, box-shadow 150ms",
+    }}>
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); onSelectProject?.(project.project_id); }}
         onContextMenu={e => onProjectContextMenu(e, project)}
         className="w-full flex items-center gap-1.5 px-2.5 py-2 text-left transition-colors"
         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
