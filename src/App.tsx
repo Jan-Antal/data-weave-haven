@@ -113,6 +113,7 @@ function AppRoutes() {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/plan-vyroby" element={<PlanVyroby />} />
+            <Route path="/vyroba" element={<Vyroba />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/set-password" element={<SetPassword />} />
             <Route path="*" element={<NotFound />} />
