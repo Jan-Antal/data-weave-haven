@@ -711,6 +711,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
   onToggleCheck: (itemId: string) => void;
   onClearChecked: () => void;
   allInboxItemsMap: Map<string, InboxItem & { projectName: string }>;
+  searchQuery?: string;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const color = getProjectColor(project.project_id);
