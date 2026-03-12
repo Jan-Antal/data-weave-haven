@@ -272,6 +272,24 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(var(--muted-foreground) / 0.3)" }} />Minulé</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />Firemní dovolená</span>
           </div>
+
+          {/* Inline Week Editor */}
+          {editingWeek !== null && weekMap.get(editingWeek) && (() => {
+            const week = weekMap.get(editingWeek)!;
+            const past = isPastWeek(editingWeek);
+            return (
+              <WeekEditor
+                key={editingWeek}
+                week={week}
+                weekNum={editingWeek}
+                isPast={past}
+                standardCapacity={standardCapacity}
+                onSave={(cap, days) => handleWeekCapacityUpdate(editingWeek, cap, days)}
+                onReset={() => handleResetWeek(editingWeek)}
+                onClose={() => setEditingWeek(null)}
+              />
+            );
+          })()}
         </div>
 
         {/* Holiday Summary */}
