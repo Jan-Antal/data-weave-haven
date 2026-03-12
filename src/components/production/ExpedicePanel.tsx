@@ -415,7 +415,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
       </div>
 
       {/* Active items */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+      <div className="flex-1 overflow-y-auto p-2 space-y-1.5" onClick={() => onSelectProject?.(null as any)}>
         {activeProjects.length === 0 && archivedProjects.length === 0 && (
           <div className="text-center py-8">
             <p className="text-[10px] text-muted-foreground">Žádné dokončené položky</p>
@@ -576,20 +576,24 @@ function ProjectGroup({
       )
     : null;
 
+  const projectColor = isArchive ? "#d1d5db" : getProjectColor(group.project_id);
+
   return (
     <div
       className="rounded-lg overflow-hidden"
       style={{
         backgroundColor: isSelected ? "rgba(217,119,6,0.04)" : (isArchive ? "hsl(var(--muted) / 0.5)" : "#ffffff"),
-        border: isSelected ? "2px solid #d97706" : `1px solid ${isArchive ? "hsl(var(--border))" : "#ece8e2"}`,
-        borderLeft: `4px solid ${isArchive ? "#d1d5db" : getProjectColor(group.project_id)}`,
+        borderTop: isSelected ? "2px solid #d97706" : `1px solid ${isArchive ? "hsl(var(--border))" : "#ece8e2"}`,
+        borderRight: isSelected ? "2px solid #d97706" : `1px solid ${isArchive ? "hsl(var(--border))" : "#ece8e2"}`,
+        borderBottom: isSelected ? "2px solid #d97706" : `1px solid ${isArchive ? "hsl(var(--border))" : "#ece8e2"}`,
+        borderLeft: `4px solid ${projectColor}`,
         boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
         transition: "border-color 150ms, box-shadow 150ms",
       }}
       onContextMenu={(e) => onProjectContextMenu(e, group.project_id, isArchive)}
     >
       <button
-        onClick={() => { toggleGroup(); onSelectProject?.(group.project_id); }}
+        onClick={(e) => { e.stopPropagation(); toggleGroup(); onSelectProject?.(group.project_id); }}
         onContextMenu={(e) => onProjectContextMenu(e, group.project_id, isArchive)}
         className="w-full flex items-center gap-1.5 px-2.5 py-2 text-left transition-colors"
         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = isArchive ? "hsl(210 20% 96%)" : "#f8f7f5")}
