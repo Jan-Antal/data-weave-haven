@@ -309,6 +309,11 @@ const Index = () => {
                       Rozpad ceny
                     </DropdownMenuItem>
                   )}
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => setCapacitySettingsOpen(true)}>
+                      Kapacita výroby
+                    </DropdownMenuItem>
+                  )}
                   {canManageStatuses && (
                     <DropdownMenuItem onClick={() => setStatusMgmtOpen(true)}>
                       Správa statusů
