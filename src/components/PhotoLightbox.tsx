@@ -52,8 +52,10 @@ function parseTimeFromFilename(name: string): string | null {
   return null;
 }
 
+const CZECH_MONTHS = ["ledna", "února", "března", "dubna", "května", "června", "července", "srpna", "září", "října", "listopadu", "prosince"];
+
 function formatCzechDate(d: Date): string {
-  return `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()}`;
+  return `${d.getDate()}. ${CZECH_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 function dateKey(d: Date): string {
