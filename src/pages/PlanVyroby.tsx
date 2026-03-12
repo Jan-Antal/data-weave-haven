@@ -476,8 +476,8 @@ export default function PlanVyroby() {
           setViewTab={setViewTab}
           displayMode={displayMode}
           onDisplayModeChange={setDisplayMode}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
+          searchQuery={searchInput}
+          onSearchChange={handleSearchChange}
         />
 
         {viewTab === "kanban" ? (
