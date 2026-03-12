@@ -649,7 +649,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
           style={{ color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-[12px] font-semibold truncate" style={{ color: uColors.text }}>{project.project_name}</span>
+            <span className="text-[12px] truncate" style={{ color: urgency === "ok" ? "#1a1a1a" : uColors.text, fontWeight: 600 }}>{project.project_name}</span>
             {urgency === "overdue" && (
               <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(220,38,38,0.1)", color: "#DC2626" }}>
                 PO TERMÍNU
