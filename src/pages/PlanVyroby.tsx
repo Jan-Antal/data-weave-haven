@@ -187,7 +187,46 @@ export default function PlanVyroby() {
     return null;
   }, [scheduleData]);
 
-  const handleDragStart = useCallback((event: DragStartEvent) => {
+  const formatWeekLabel = useCallback((weekKey: string): string => {
+    const d = new Date(weekKey);
+    const weekNum = getISOWeekNumber(d);
+    const end = new Date(d);
+    end.setDate(d.getDate() + 6);
+    return `T${weekNum} · ${d.getDate()}.${d.getMonth() + 1}–${end.getDate()}.${end.getMonth() + 1}.${end.getFullYear()}`;
+  }, []);
+
+  /** Returns true if action should proceed, false if blocked by hard warning */
+  const checkAndWarnDeadline = useCallback((projectId: string, weekKey: string, action: () => Promise<void>): boolean => {
+    const project = allProjects.find(p => p.project_id === projectId);
+    if (!project) return true;
+    const deadline = resolveDeadline(project);
+    const weekStart = new Date(weekKey);
+    const result = checkDeadlineWarning(deadline, weekStart);
+
+    if (result.level === "hard" && result.deadline) {
+      pendingDeadlineAction.current = action;
+      setDeadlineWarning({
+        projectName: project.project_name,
+        deadlineLabel: result.deadline.fieldLabel,
+        deadlineDate: result.deadline.date,
+        weekLabel: formatWeekLabel(weekKey),
+      });
+      return false;
+    }
+
+    if (result.level === "soft" && result.deadline) {
+      const formattedDate = format(result.deadline.date, "d.M.yyyy");
+      toast({
+        title: `⏰ Blíží se termín: ${project.project_name}`,
+        description: `${result.deadline.fieldLabel} za ${result.daysUntilDeadline} dní (${formattedDate})`,
+        className: "border-amber-400 bg-amber-50 text-amber-900",
+      });
+    }
+
+    return true;
+  }, [allProjects, formatWeekLabel]);
+
+
     const data = event.active.data.current as ActiveDragData | undefined;
     if (data) setActiveDrag(data);
   }, []);
