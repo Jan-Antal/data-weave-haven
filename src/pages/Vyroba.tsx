@@ -1059,7 +1059,7 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, bundleColor }
         </div>
       )}
 
-      {isToday && !isManagement && (
+      {isToday && (
         <button onClick={onOpenLog} className="mt-1 w-full text-[9px] font-medium py-0.5 rounded transition-colors"
           style={{ background: `${bundleColor}15`, color: bundleColor, border: `1px solid ${bundleColor}40` }}>
           {cumulative?.hasLog ? "Upravit log" : "+ Log dnes"}
