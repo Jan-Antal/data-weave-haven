@@ -579,6 +579,26 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
           onConfirm={handlePlanConfirm}
         />
       )}
+      {deadlineWarning && (
+        <DeadlineWarningDialog
+          open={!!deadlineWarning}
+          projectName={deadlineWarning.projectName}
+          deadlineLabel={deadlineWarning.deadlineLabel}
+          deadlineDate={deadlineWarning.deadlineDate}
+          weekLabel={deadlineWarning.weekLabel}
+          onCancel={() => {
+            setDeadlineWarning(null);
+            pendingDeadlineAction.current = null;
+          }}
+          onConfirm={async () => {
+            setDeadlineWarning(null);
+            if (pendingDeadlineAction.current) {
+              await pendingDeadlineAction.current();
+              pendingDeadlineAction.current = null;
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
