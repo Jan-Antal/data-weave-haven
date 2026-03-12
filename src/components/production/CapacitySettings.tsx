@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const currentYear = new Date().getFullYear();
   const currentWeek = getISOWeekNumber(new Date());
   const [selectedYear, setSelectedYear] = useState(currentYear);
-  const [editingWeek, setEditingWeek] = useState<number | null>(null);
+  const [selectedWeeks, setSelectedWeeks] = useState<Set<number>>(new Set());
+  const [lastClickedWeek, setLastClickedWeek] = useState<number | null>(null);
   const [newHolidayName, setNewHolidayName] = useState("");
   const [newHolidayStart, setNewHolidayStart] = useState("");
   const [newHolidayEnd, setNewHolidayEnd] = useState("");
@@ -49,6 +51,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const deleteCompanyHoliday = useDeleteCompanyHoliday();
   const upsertWeek = useUpsertWeekCapacity();
   const bulkUpdate = useBulkUpdateFutureCapacity();
+  const queryClient = useQueryClient();
 
   const standardCapacity = settings?.weekly_capacity_hours ?? 875;
   const workingDaysPerWeek = 5;
@@ -95,43 +98,43 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     }
   };
 
-  const handleWeekCapacityUpdate = async (wn: number, capacity: number, workingDays: number) => {
-    const week = weekMap.get(wn);
-    if (!week) return;
+  const handleWeekCapacityUpdate = async (weeks: number[], capacity: number, workingDays: number) => {
     try {
-      await upsertWeek.mutateAsync({
-        week_year: selectedYear,
-        week_number: wn,
-        week_start: week.week_start,
-        capacity_hours: capacity,
-        working_days: workingDays,
-        is_manual_override: true,
-        holiday_name: week.holiday_name,
-      });
-      toast({ title: `✓ T${wn} aktualizován` });
+      for (const wn of weeks) {
+        const week = weekMap.get(wn);
+        if (!week) continue;
+        // Only save as manual override if capacity differs from what it would be without override
+        const isActuallyDifferent = capacity !== standardCapacity || week.holiday_name;
+        await upsertWeek.mutateAsync({
+          week_year: selectedYear,
+          week_number: wn,
+          week_start: week.week_start,
+          capacity_hours: capacity,
+          working_days: workingDays,
+          is_manual_override: isActuallyDifferent ? true : false,
+          holiday_name: week.holiday_name,
+        });
+      }
+      toast({ title: `✓ ${weeks.length > 1 ? `${weeks.length} týdnů` : `T${weeks[0]}`} aktualizován` });
     } catch (e: any) {
       toast({ title: "Chyba", description: e.message, variant: "destructive" });
     }
   };
 
-  const handleResetWeek = async (wn: number) => {
+  const handleResetWeeks = async (weeks: number[]) => {
     try {
       const { supabase } = await import("@/integrations/supabase/client");
-      const { error } = await supabase
-        .from("production_capacity")
-        .delete()
-        .eq("week_year", selectedYear)
-        .eq("week_number", wn);
-      if (error) throw error;
-      // Invalidate query to refetch
-      const { QueryClient } = await import("@tanstack/react-query");
-      // Use the global query client by refetching
-      upsertWeek.reset();
-      toast({ title: `✓ T${wn} obnoven na standard` });
-      // Force data refetch by triggering a state change
-      setEditingWeek(null);
-      setSelectedYear(y => y); // trigger re-render
-      window.dispatchEvent(new Event("capacity-reset"));
+      for (const wn of weeks) {
+        const { error } = await supabase
+          .from("production_capacity")
+          .delete()
+          .eq("week_year", selectedYear)
+          .eq("week_number", wn);
+        if (error) throw error;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["production-capacity", selectedYear] });
+      toast({ title: `✓ ${weeks.length > 1 ? `${weeks.length} týdnů` : `T${weeks[0]}`} obnoveno na standard` });
+      setSelectedWeeks(new Set());
     } catch {
       toast({ title: "Chyba při resetování", variant: "destructive" });
     }
@@ -157,6 +160,37 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   };
 
   const isPastWeek = (wn: number) => selectedYear < currentYear || (selectedYear === currentYear && wn < currentWeek);
+
+  const handleBarClick = useCallback((wn: number, e: React.MouseEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      // Toggle individual week
+      setSelectedWeeks(prev => {
+        const next = new Set(prev);
+        if (next.has(wn)) next.delete(wn); else next.add(wn);
+        return next;
+      });
+      setLastClickedWeek(wn);
+    } else if (e.shiftKey && lastClickedWeek !== null) {
+      // Range select
+      const from = Math.min(lastClickedWeek, wn);
+      const to = Math.max(lastClickedWeek, wn);
+      setSelectedWeeks(prev => {
+        const next = new Set(prev);
+        for (let i = from; i <= to; i++) next.add(i);
+        return next;
+      });
+    } else {
+      // Single select / toggle
+      setSelectedWeeks(prev => prev.size === 1 && prev.has(wn) ? new Set() : new Set([wn]));
+      setLastClickedWeek(wn);
+    }
+  }, [lastClickedWeek]);
+
+  // First selected week data for editor
+  const editingWeeks = Array.from(selectedWeeks).sort((a, b) => a - b);
+  const firstEditingWeek = editingWeeks.length > 0 ? editingWeeks[0] : null;
+  const firstEditingWeekData = firstEditingWeek !== null ? weekMap.get(firstEditingWeek) : null;
+  const anyManualOverride = editingWeeks.some(wn => weekMap.get(wn)?.is_manual_override);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -210,6 +244,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             </div>
           </div>
 
+          <p className="text-[10px] text-muted-foreground">Klikni na bar pro editaci · Ctrl+klik pro výběr více · Shift+klik pro rozsah</p>
+
           {/* Bar chart */}
           <div className="overflow-x-auto">
             <div className="relative" style={{ minWidth: 52 * 16, height: 140 }}>
@@ -229,10 +265,11 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   const cap = week.capacity_hours;
                   const barH = maxCapacity > 0 ? Math.max(2, (cap / (maxCapacity * 1.1)) * 120) : 2;
                   const past = isPastWeek(wn);
-                  const isManual = week.is_manual_override;
+                  const isManual = week.is_manual_override && Math.round(week.capacity_hours) !== Math.round(standardCapacity);
                   const hasHoliday = !!week.holiday_name;
                   const hasCompanyHol = !!week.company_holiday_name;
                   const isCurrent = selectedYear === currentYear && wn === currentWeek;
+                  const isBarSelected = selectedWeeks.has(wn);
 
                   let barColor: string;
                   if (past) barColor = "hsl(var(--muted-foreground) / 0.3)";
@@ -244,20 +281,36 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   return (
                     <button
                       key={wn}
-                      className={`flex-1 min-w-[12px] rounded-t-sm transition-all hover:opacity-80 relative ${editingWeek === wn ? "ring-2 ring-foreground" : ""}`}
-                      style={{ height: barH, backgroundColor: barColor, outline: isCurrent ? "2px solid hsl(var(--primary))" : "none" }}
-                      title={`T${wn}: ${Math.round(cap)}h · ${week.working_days} dní${week.holiday_name ? ` · ${week.holiday_name}` : ""}${week.company_holiday_name ? ` · ${week.company_holiday_name}` : ""}`}
-                      onClick={() => setEditingWeek(editingWeek === wn ? null : wn)}
+                      className={`flex-1 min-w-[12px] rounded-t-sm transition-all hover:opacity-80 relative ${isBarSelected ? "ring-2 ring-foreground" : ""}`}
+                      style={{
+                        height: barH,
+                        backgroundColor: barColor,
+                        outline: isCurrent ? "3px solid hsl(var(--primary))" : "none",
+                        outlineOffset: isCurrent ? "-1px" : undefined,
+                      }}
+                      title={`T${wn}: ${Math.round(cap)}h · ${week.working_days} dní${week.holiday_name ? ` · ${week.holiday_name}` : ""}${week.company_holiday_name ? ` · ${week.company_holiday_name}` : ""}${isCurrent ? " · Tento týden" : ""}`}
+                      onClick={e => handleBarClick(wn, e)}
                     />
                   );
                 })}
               </div>
 
+              {/* Current week marker */}
+              {selectedYear === currentYear && (
+                <div className="flex gap-[2px] mt-0.5">
+                  {Array.from({ length: 52 }, (_, i) => i + 1).map(wn => (
+                    <div key={wn} className="flex-1 min-w-[12px] flex justify-center">
+                      {wn === currentWeek && <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "hsl(var(--primary))" }} />}
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Week labels */}
-              <div className="flex gap-[2px] mt-1">
+              <div className="flex gap-[2px] mt-0.5">
                 {Array.from({ length: 52 }, (_, i) => i + 1).map(wn => (
-                  <div key={wn} className="flex-1 min-w-[12px] text-center text-[6px] text-muted-foreground font-mono">
-                    {wn % 4 === 1 ? `T${wn}` : ""}
+                  <div key={wn} className={`flex-1 min-w-[12px] text-center text-[6px] font-mono ${selectedYear === currentYear && wn === currentWeek ? "text-foreground font-bold" : "text-muted-foreground"}`}>
+                    {wn % 4 === 1 || (selectedYear === currentYear && wn === currentWeek) ? `T${wn}` : ""}
                   </div>
                 ))}
               </div>
@@ -271,25 +324,25 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#2d6a4f" }} />Ručně upraveno</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(var(--muted-foreground) / 0.3)" }} />Minulé</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />Firemní dovolená</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "hsl(var(--primary))" }} />Tento týden</span>
           </div>
 
           {/* Inline Week Editor */}
-          {editingWeek !== null && weekMap.get(editingWeek) && (() => {
-            const week = weekMap.get(editingWeek)!;
-            const past = isPastWeek(editingWeek);
-            return (
-              <WeekEditor
-                key={editingWeek}
-                week={week}
-                weekNum={editingWeek}
-                isPast={past}
-                standardCapacity={standardCapacity}
-                onSave={(cap, days) => handleWeekCapacityUpdate(editingWeek, cap, days)}
-                onReset={() => handleResetWeek(editingWeek)}
-                onClose={() => setEditingWeek(null)}
-              />
-            );
-          })()}
+          {firstEditingWeekData && firstEditingWeek !== null && (
+            <WeekEditor
+              key={`${editingWeeks.join("-")}`}
+              week={firstEditingWeekData}
+              weekNum={firstEditingWeek}
+              selectedCount={editingWeeks.length}
+              isPast={isPastWeek(firstEditingWeek)}
+              standardCapacity={standardCapacity}
+              hoursPerDay={calculatedHoursPerDay}
+              onSave={(cap, days) => handleWeekCapacityUpdate(editingWeeks, cap, days)}
+              onReset={() => handleResetWeeks(editingWeeks)}
+              onClose={() => setSelectedWeeks(new Set())}
+              hasManualOverride={anyManualOverride}
+            />
+          )}
         </div>
 
         {/* Holiday Summary */}
@@ -384,14 +437,17 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   );
 }
 
-function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, onClose }: {
+function WeekEditor({ week, weekNum, selectedCount, isPast, standardCapacity, hoursPerDay, onSave, onReset, onClose, hasManualOverride }: {
   week: WeekCapacity;
   weekNum: number;
+  selectedCount: number;
   isPast: boolean;
   standardCapacity: number;
+  hoursPerDay: number;
   onSave: (cap: number, days: number) => void;
   onReset: () => void;
   onClose: () => void;
+  hasManualOverride: boolean;
 }) {
   const [cap, setCap] = useState(String(Math.round(week.capacity_hours)));
   const [days, setDays] = useState(String(week.working_days));
@@ -401,6 +457,7 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
   weekEnd.setDate(weekStart.getDate() + 6);
 
   const formatDate = (d: Date) => `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+  const step = hoursPerDay || 8;
 
   const save = () => {
     const v = parseInt(cap);
@@ -412,35 +469,46 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") save();
     if (e.key === "Escape") onClose();
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setCap(v => String(Math.max(0, parseInt(v || "0") + step)));
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setCap(v => String(Math.max(0, parseInt(v || "0") - step)));
+    }
   };
+
+  const title = selectedCount > 1
+    ? `${selectedCount} týdnů vybráno (T${weekNum} + ${selectedCount - 1} dalších)`
+    : `T${weekNum} · ${formatDate(weekStart)} – ${formatDate(weekEnd)}`;
 
   return (
     <div className="border border-border rounded-md p-3 bg-muted/30 space-y-2">
       <div className="flex items-center justify-between">
-        <div className="text-xs font-bold text-foreground">
-          T{weekNum} · {formatDate(weekStart)} – {formatDate(weekEnd)}
-        </div>
+        <div className="text-xs font-bold text-foreground">{title}</div>
         <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onClose}>
           <X className="h-3 w-3" />
         </Button>
       </div>
-      {isPast && (
+      {isPast && selectedCount === 1 && (
         <div className="text-[10px] text-amber-600 font-medium">⚠ Minulý týden</div>
       )}
-      {week.holiday_name && (
+      {week.holiday_name && selectedCount === 1 && (
         <div className="text-[10px] text-amber-600">🇨🇿 {week.holiday_name}</div>
       )}
-      {week.company_holiday_name && (
+      {week.company_holiday_name && selectedCount === 1 && (
         <div className="text-[10px] text-amber-600">🏖 {week.company_holiday_name}</div>
       )}
       <div className="flex items-end gap-2">
         <div className="flex-1">
-          <label className="text-[10px] text-muted-foreground">Kapacita (h)</label>
+          <label className="text-[10px] text-muted-foreground">Kapacita (h) · ↑↓ ±{step}h</label>
           <Input
             type="number"
             value={cap}
             onChange={e => setCap(e.target.value)}
             onKeyDown={handleKeyDown}
+            step={step}
             className="h-7 text-xs font-mono"
             autoFocus
           />
@@ -458,8 +526,8 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
         <Button size="sm" className="h-7 text-xs" onClick={save}>
           Uložit
         </Button>
-        {week.is_manual_override && (
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { onReset(); onClose(); }}>
+        {hasManualOverride && (
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { onReset(); }}>
             <RotateCcw className="h-3 w-3 mr-1" /> Reset
           </Button>
         )}
