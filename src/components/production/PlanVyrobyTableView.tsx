@@ -1194,6 +1194,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                                         projectId: item.projectId,
                                       });
                                     }}
+                                    onContextMenu={handleWeekCellContextMenu}
                                   />
                                 </DroppableWeekCell>
                               );
