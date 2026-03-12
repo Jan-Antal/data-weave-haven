@@ -280,7 +280,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   const isManual = week.is_manual_override && Math.round(week.capacity_hours) !== Math.round(standardCapacity);
                   const hasHoliday = !!week.holiday_name;
                   const hasCompanyHol = !!week.company_holiday_name;
-                  const isCurrent = selectedYear === currentYear && wn === currentWeek;
+                  const _isCurrent = selectedYear === currentYear && wn === currentWeek;
                   const isBarSelected = selectedWeeks.has(wn);
 
                   const barColor = past ? "hsl(var(--muted-foreground) / 0.3)"
