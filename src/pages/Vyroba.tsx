@@ -421,7 +421,7 @@ export default function Vyroba() {
             <SidebarRow key={b.bundleId} bundle={b} selected={selectedBundleId === b.bundleId} onSelect={setSelectedBundleId}
               latestPct={getLatestPercent(b.bundleId)} latestPhase={getLatestPhase(b.bundleId)} behind={isBehind(b.bundleId)} />
           ))}
-          {visibleBundles.length === 0 && (
+          {bundles.length === 0 && (
             <div className="flex-1 flex items-center justify-center text-[#99a5a3] text-sm p-4 text-center">
               Žádné bundly v tomto týdnu
             </div>
