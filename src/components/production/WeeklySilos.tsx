@@ -586,6 +586,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               onReopenSpill={() => handleReopenSpill(week.key)}
               selectedProjectId={selectedProjectId}
               onSelectProject={onSelectProject}
+              searchQuery={searchQuery}
+            />
             />
           ))}
         </div>

@@ -572,6 +572,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
               onToggleCheck={toggleCheckItem}
               onClearChecked={clearCheckedItems}
               allInboxItemsMap={allInboxItemsMap}
+              searchQuery={searchQuery}
             />
           );
         })}
