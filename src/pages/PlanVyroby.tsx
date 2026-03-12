@@ -579,11 +579,6 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
     return `${months[first.getMonth()]} ${first.getFullYear()} – ${months[last.getMonth()]} ${last.getFullYear()}`;
   }, [scheduleData]);
 
-  const scopeOptions: { key: StatsScope; label: string }[] = [
-    { key: "week", label: "Týden" },
-    { key: "month", label: "Měsíc" },
-    { key: "all", label: "Vše" },
-  ];
 
   return (
     <div className="shrink-0 border-b border-border px-6 py-1.5 flex items-center gap-4 bg-card" style={{ minHeight: 40 }}>
