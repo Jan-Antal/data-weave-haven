@@ -75,6 +75,19 @@ const SAMPLE_ITEMS = [
   { pid: "Z-2610-001", items: [{ name: "Stůl jednací oval", code: "SJ.01", h: 90 }, { name: "Kredenc ředitelna", code: "KR.01", h: 120 }, { name: "Obklad stěn dýha", code: "OD.01", h: 260 }] },
 ];
 
+function highlightMatch(text: string, query: string): React.ReactNode {
+  if (!query) return text;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <span style={{ background: "#fef08a", borderRadius: 2, padding: "0 2px" }}>{text.slice(idx, idx + query.length)}</span>
+      {text.slice(idx + query.length)}
+    </>
+  );
+}
+
 interface InboxPanelProps {
   overDroppableId?: string | null;
   showCzk?: boolean;
@@ -83,6 +96,7 @@ interface InboxPanelProps {
   disableDropZone?: boolean;
   selectedProjectId?: string | null;
   onSelectProject?: (projectId: string) => void;
+  searchQuery?: string;
 }
 
 interface ContextMenuState {
@@ -95,7 +109,7 @@ interface CancelState {
   source: "schedule" | "inbox"; splitGroupId: string | null;
 }
 
-export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenProjectDetail, disableDropZone, selectedProjectId, onSelectProject }: InboxPanelProps) {
+export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenProjectDetail, disableDropZone, selectedProjectId, onSelectProject, searchQuery = "" }: InboxPanelProps) {
   const { data: projects = [], isLoading } = useProductionInbox();
   const { data: progressData } = useProductionProgress();
   const { data: settings } = useProductionSettings();
@@ -180,7 +194,12 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
 
   // Sort projects by urgency
   const sortedProjects = useMemo(() => {
-    return [...projects].sort((a, b) => {
+    let filtered = [...projects];
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(p => p.project_name.toLowerCase().includes(q) || p.project_id.toLowerCase().includes(q));
+    }
+    return filtered.sort((a, b) => {
       const infoA = projectInfoMap.get(a.project_id);
       const infoB = projectInfoMap.get(b.project_id);
       const uA = getUrgency(infoA?.datum_smluvni, infoA?.status);
@@ -190,7 +209,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
       const dB = infoB?.datum_smluvni ? parseAppDate(infoB.datum_smluvni)?.getTime() ?? Infinity : Infinity;
       return dA - dB;
     });
-  }, [projects, projectInfoMap]);
+  }, [projects, projectInfoMap, searchQuery]);
 
   // Count overdue + urgent items
   const urgentItemCount = useMemo(() => {
@@ -208,8 +227,13 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
   const completedProjects = useMemo(() => {
     if (!progressData) return [];
     const activeProjectIds = new Set(projects.map(p => p.project_id));
-    return Array.from(progressData.values()).filter(p => p.is_complete && !activeProjectIds.has(p.project_id));
-  }, [progressData, projects]);
+    let result = Array.from(progressData.values()).filter(p => p.is_complete && !activeProjectIds.has(p.project_id));
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(p => p.project_name.toLowerCase().includes(q) || p.project_id.toLowerCase().includes(q));
+    }
+    return result;
+  }, [progressData, projects, searchQuery]);
 
   const allProjectOptions = useMemo(() => {
     const seen = new Set<string>();
@@ -553,6 +577,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
               onToggleCheck={toggleCheckItem}
               onClearChecked={clearCheckedItems}
               allInboxItemsMap={allInboxItemsMap}
+              searchQuery={searchQuery}
             />
           );
         })}
@@ -677,7 +702,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
   );
 }
 
-function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel, isSelected, onSelectProject, projectInfo, checkedItems, onToggleCheck, onClearChecked, allInboxItemsMap }: {
+function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel, isSelected, onSelectProject, projectInfo, checkedItems, onToggleCheck, onClearChecked, allInboxItemsMap, searchQuery = "" }: {
   project: InboxProject; hourlyRate: number; defaultExpanded: boolean; showCzk?: boolean;
   progress?: ProjectProgress; onNavigateToTPV?: (projectId: string) => void;
   onOpenProjectDetail?: (projectId: string) => void;
@@ -692,6 +717,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
   onToggleCheck: (itemId: string) => void;
   onClearChecked: () => void;
   allInboxItemsMap: Map<string, InboxItem & { projectName: string }>;
+  searchQuery?: string;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const color = getProjectColor(project.project_id);
@@ -737,7 +763,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
           style={{ color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="truncate" style={{ fontSize: 13, color: urgency === "ok" ? "#1a1a1a" : uColors.text, fontWeight: 600 }}>{project.project_name}</span>
+            <span className="truncate" style={{ fontSize: 13, color: urgency === "ok" ? "#1a1a1a" : uColors.text, fontWeight: 600 }}>{highlightMatch(project.project_name, searchQuery || "")}</span>
             {urgency === "overdue" && (
               <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(220,38,38,0.1)", color: "#DC2626" }}>
                 PO TERMÍNU

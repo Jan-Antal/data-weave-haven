@@ -45,6 +45,19 @@ const MONTH_NAMES = ["Leden", "Únor", "Březen", "Duben", "Květen", "Červen",
 
 type DisplayMode = "hours" | "czk" | "percent";
 
+function highlightMatch(text: string, query: string): React.ReactNode {
+  if (!query) return text;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <span style={{ background: "#fef08a", borderRadius: 2, padding: "0 2px" }}>{text.slice(idx, idx + query.length)}</span>
+      {text.slice(idx + query.length)}
+    </>
+  );
+}
+
 interface Props {
   showCzk: boolean;
   onToggleCzk: (v: boolean) => void;
@@ -55,6 +68,7 @@ interface Props {
   onDisplayModeChange?: (mode: DisplayMode) => void;
   selectedProjectId?: string | null;
   onSelectProject?: (projectId: string) => void;
+  searchQuery?: string;
 }
 
 interface ContextMenuState {
@@ -119,7 +133,7 @@ interface CancelState {
   cancelAll?: boolean;
 }
 
-export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject }: Props) {
+export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "" }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
@@ -572,6 +586,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               onReopenSpill={() => handleReopenSpill(week.key)}
               selectedProjectId={selectedProjectId}
               onSelectProject={onSelectProject}
+              searchQuery={searchQuery}
             />
           ))}
         </div>
@@ -644,10 +659,11 @@ interface SiloProps {
   onReopenSpill: () => void;
   selectedProjectId?: string | null;
   onSelectProject?: (projectId: string) => void;
+  searchQuery?: string;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "" }: SiloProps) {
   // Capacity calculation: exclude paused items
   const activeHours = useMemo(() => {
     if (!silo) return 0;
@@ -714,24 +730,35 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
 
       {/* Items */}
       <div className="flex-1 overflow-y-auto p-1.5" style={{ display: "flex", flexDirection: "column", gap: 3, opacity: isPast ? 0.7 : 1 }}>
-        {(!silo || silo.bundles.length === 0) && !isPast && (
-          <div className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all" style={{ border: "1.5px dashed #e2ddd6" }}>
-            <span className="text-[9px] text-center" style={{ color: "#99a5a3" }}>Přetáhni sem z Inboxu</span>
-          </div>
-        )}
-        {(!silo || silo.bundles.length === 0) && isPast && (
-          <div className="flex-1 flex items-center justify-center px-2 py-[14px]">
-            <span className="text-[9px] text-center" style={{ color: "#c4ccc9" }}>Prázdný týden</span>
-          </div>
-        )}
-        {silo?.bundles.map(bundle => (
-          <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey}
-            showCzk={showCzk} hourlyRate={hourlyRate} displayMode={displayMode}
-            onBundleContextMenu={onBundleContextMenu} onItemContextMenu={onItemContextMenu}
-            projectLookup={projectLookup}
-            isSelected={selectedProjectId === bundle.project_id}
-            onSelectProject={onSelectProject} />
-        ))}
+        {(() => {
+          const filteredBundles = silo?.bundles.filter(b => {
+            if (!searchQuery) return true;
+            const q = searchQuery.toLowerCase();
+            return b.project_name.toLowerCase().includes(q) || b.project_id.toLowerCase().includes(q);
+          }) ?? [];
+          return (
+            <>
+              {filteredBundles.length === 0 && !isPast && (
+                <div className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all" style={{ border: "1.5px dashed #e2ddd6" }}>
+                  <span className="text-[9px] text-center" style={{ color: "#99a5a3" }}>{searchQuery ? "Žádné výsledky" : "Přetáhni sem z Inboxu"}</span>
+                </div>
+              )}
+              {filteredBundles.length === 0 && isPast && (
+                <div className="flex-1 flex items-center justify-center px-2 py-[14px]">
+                  <span className="text-[9px] text-center" style={{ color: "#c4ccc9" }}>Prázdný týden</span>
+                </div>
+              )}
+              {filteredBundles.map(bundle => (
+                <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey}
+                  showCzk={showCzk} hourlyRate={hourlyRate} displayMode={displayMode}
+                  onBundleContextMenu={onBundleContextMenu} onItemContextMenu={onItemContextMenu}
+                  projectLookup={projectLookup}
+                  isSelected={selectedProjectId === bundle.project_id}
+                  onSelectProject={onSelectProject} searchQuery={searchQuery} />
+              ))}
+            </>
+          );
+        })()}
       </div>
 
       {isOverloaded && !isPast && silo && !spillDismissed && (
@@ -767,7 +794,7 @@ function formatDateShortYY(dateStr: string | null | undefined): string | null {
   return `${dd}.${mm}.${yy}`;
 }
 
-function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleContextMenu, onItemContextMenu, projectLookup, isSelected, onSelectProject, displayMode }: {
+function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleContextMenu, onItemContextMenu, projectLookup, isSelected, onSelectProject, displayMode, searchQuery = "" }: {
   bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number;
   displayMode: DisplayMode;
   onBundleContextMenu: (e: React.MouseEvent, bundle: ScheduleBundle, toggleExpand: () => void) => void;
@@ -775,6 +802,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
   projectLookup: ProjectLookup;
   isSelected?: boolean;
   onSelectProject?: (projectId: string) => void;
+  searchQuery?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const color = getProjectColor(bundle.project_id);
@@ -836,7 +864,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onBundleContextMenu(e, bundle, toggleExpand); }}
         >
           <div className="flex-1 min-w-0">
-            <div className="text-[11px] truncate" style={{ color: allCompleted ? "#9ca3af" : "#1a1a1a", fontWeight: allCompleted ? 500 : 600 }}>{bundle.project_name}</div>
+            <div className="text-[11px] truncate" style={{ color: allCompleted ? "#9ca3af" : "#1a1a1a", fontWeight: allCompleted ? 500 : 600 }}>{highlightMatch(bundle.project_name, searchQuery)}</div>
             <div className="flex items-center gap-1.5">
               <span className="font-mono text-xs" style={{ color: allCompleted ? "#b0b7c3" : "#6b7280" }}>{bundle.project_id}</span>
               {expDate && !allCompleted && (
