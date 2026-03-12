@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo, type UIEvent } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileTPVCardList } from "./mobile/MobileTPVCardList";
 import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColumns";
@@ -178,6 +178,15 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const [inlineName, setInlineName] = useState("");
   const inlineRef = useRef<HTMLInputElement>(null);
 
+  // ── Scroll sync refs for split header/body ───────────────────────
+  const tpvHeaderScrollRef = useRef<HTMLDivElement>(null);
+  const tpvBodyScrollRef = useRef<HTMLDivElement>(null);
+  const handleTpvBodyScroll = useCallback(() => {
+    if (tpvBodyScrollRef.current && tpvHeaderScrollRef.current) {
+      tpvHeaderScrollRef.current.scrollLeft = tpvBodyScrollRef.current.scrollLeft;
+    }
+  }, []);
+
   const visibleColCount = renderKeys.length + 2; // +checkbox +actions
 
   const toggleSelect = (id: string) => {
@@ -348,207 +357,199 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         </div>
       )}
 
-      <div className={cn("rounded-lg border bg-card overflow-x-auto always-scrollbar", editMode && "rounded-t-none border-t-0")}>
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-primary/5">
-              <TableHead className="w-10">
-                <Checkbox checked={items.length > 0 && selected.size === items.length} onCheckedChange={toggleAll} />
-              </TableHead>
-              {/* Dynamic columns (all, including item_type) */}
-              {renderKeys.map(key => (
-                <SortableHeader key={key} {...headerProps(key)} />
-              ))}
-              {/* Column toggle */}
-              <ColumnVisibilityToggle
-                standalone
-                columns={TPV_LIST_COLUMNS}
-                groupLabel="TPV List"
-                labelTab="tpv-list"
-                tableName="tpv_items"
-                isVisible={isColVisible}
-                toggleColumn={toggleColVis}
-                editMode={editMode}
-                onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined}
-                onCancelEditMode={canEditColumns ? handleCancelEditMode : undefined}
-              />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow><TableCell colSpan={visibleColCount} className="text-center text-muted-foreground">Načítání...</TableCell></TableRow>
-            ) : sortedItems.length === 0 ? (
-              <TableRow><TableCell colSpan={visibleColCount} className="text-center text-muted-foreground">Žádné položky</TableCell></TableRow>
-            ) : sortedItems.map(item => (
-              <TableRow key={item.id} className={`hover:bg-muted/50 transition-colors h-9 ${selected.has(item.id) ? "bg-primary/5" : ""}`}>
-                {canManageTPV && <TableCell><Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} /></TableCell>}
-                {!canManageTPV && <TableCell />}
-                {renderKeys.map(key => {
-                  if (key === "item_name") return (
-                    <TableCell key={key}>
-                      <InlineEditableCell value={item.item_name || ""} onSave={(v) => saveField(item.id, "item_name", v, item.item_name || "")} className="font-mono text-xs" readOnly={!canManageTPV} />
-                    </TableCell>
-                  );
-                  if (key === "item_type") return (
-                    <TableCell key={key}>
-                      <InlineEditableCell value={item.item_type || ""} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} className="font-semibold" readOnly={!canManageTPV} />
-                    </TableCell>
-                  );
-                  if (key === "nazev_prvku") return (
-                    <TableCell key={key}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="max-w-[300px] truncate">
-                            <InlineEditableCell value={(item as any).nazev_prvku || ""} onSave={(v) => saveField(item.id, "nazev_prvku", v, (item as any).nazev_prvku || "")} readOnly={!canManageTPV} />
-                          </div>
-                        </TooltipTrigger>
-                        {(item as any).nazev_prvku && (item as any).nazev_prvku.length > 40 && (
-                          <TooltipContent className="max-w-[400px]">{(item as any).nazev_prvku}</TooltipContent>
-                        )}
-                      </Tooltip>
-                    </TableCell>
-                  );
-                  if (key === "konstrukter") return (
-                    <TableCell key={key}>
-                      <InlineEditableCell value={item.konstrukter || ""} type="people" peopleRole="Konstruktér" onSave={(v) => saveField(item.id, "konstrukter", v, item.konstrukter || "")} readOnly={!canManageTPV} />
-                    </TableCell>
-                  );
-                  if (key === "status") {
-                    const statusOpt = statusOptions.find(o => o.label === item.status);
-                    const statusColor = statusOpt?.color;
-                    const statusDisplay = item.status && statusColor ? (
-                      <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: `${statusColor}20`, color: statusColor, borderColor: `${statusColor}50` }}>
-                        {item.status}
-                      </span>
-                    ) : undefined;
-                    return <TableCell key={key}><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} displayValue={statusDisplay} onSave={(v) => saveField(item.id, "status", v, item.status || "")} readOnly={!canManageTPV} /></TableCell>;
-                  }
-                  if (key === "vyroba_status") {
-                    const itemKey = item.item_name || item.item_type;
-                    const statuses = productionStatusMap.get(itemKey);
-                    if (!statuses || statuses.length === 0) {
+      <div className={cn("rounded-lg border bg-card flex flex-col", editMode && "rounded-t-none border-t-0")} style={{ maxHeight: "calc(100vh - 320px)" }}>
+        {/* FIXED HEADER — never scrolls */}
+        <div ref={tpvHeaderScrollRef} className="flex-shrink-0 overflow-hidden border-b border-border">
+          <Table>
+            <TableHeader className="sticky-off">
+              <TableRow className="bg-primary/5">
+                <TableHead className="w-10">
+                  <Checkbox checked={items.length > 0 && selected.size === items.length} onCheckedChange={toggleAll} />
+                </TableHead>
+                {renderKeys.map(key => (
+                  <SortableHeader key={key} {...headerProps(key)} />
+                ))}
+                <ColumnVisibilityToggle
+                  standalone
+                  columns={TPV_LIST_COLUMNS}
+                  groupLabel="TPV List"
+                  labelTab="tpv-list"
+                  tableName="tpv_items"
+                  isVisible={isColVisible}
+                  toggleColumn={toggleColVis}
+                  editMode={editMode}
+                  onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined}
+                  onCancelEditMode={canEditColumns ? handleCancelEditMode : undefined}
+                />
+              </TableRow>
+            </TableHeader>
+          </Table>
+        </div>
+
+        {/* SCROLLABLE BODY */}
+        <div ref={tpvBodyScrollRef} className="flex-1 overflow-auto always-scrollbar" onScroll={handleTpvBodyScroll}>
+          <Table>
+            <TableBody>
+              {isLoading ? (
+                <TableRow><TableCell colSpan={visibleColCount} className="text-center text-muted-foreground">Načítání...</TableCell></TableRow>
+              ) : sortedItems.length === 0 ? (
+                <TableRow><TableCell colSpan={visibleColCount} className="text-center text-muted-foreground">Žádné položky</TableCell></TableRow>
+              ) : sortedItems.map(item => (
+                <TableRow key={item.id} className={`hover:bg-muted/50 transition-colors h-9 ${selected.has(item.id) ? "bg-primary/5" : ""}`}>
+                  {canManageTPV && <TableCell><Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} /></TableCell>}
+                  {!canManageTPV && <TableCell />}
+                  {renderKeys.map(key => {
+                    if (key === "item_name") return (
+                      <TableCell key={key}>
+                        <InlineEditableCell value={item.item_name || ""} onSave={(v) => saveField(item.id, "item_name", v, item.item_name || "")} className="font-mono text-xs" readOnly={!canManageTPV} />
+                      </TableCell>
+                    );
+                    if (key === "item_type") return (
+                      <TableCell key={key}>
+                        <InlineEditableCell value={item.item_type || ""} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} className="font-semibold" readOnly={!canManageTPV} />
+                      </TableCell>
+                    );
+                    if (key === "nazev_prvku") return (
+                      <TableCell key={key}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="max-w-[300px] truncate">
+                              <InlineEditableCell value={(item as any).nazev_prvku || ""} onSave={(v) => saveField(item.id, "nazev_prvku", v, (item as any).nazev_prvku || "")} readOnly={!canManageTPV} />
+                            </div>
+                          </TooltipTrigger>
+                          {(item as any).nazev_prvku && (item as any).nazev_prvku.length > 40 && (
+                            <TooltipContent className="max-w-[400px]">{(item as any).nazev_prvku}</TooltipContent>
+                          )}
+                        </Tooltip>
+                      </TableCell>
+                    );
+                    if (key === "konstrukter") return (
+                      <TableCell key={key}>
+                        <InlineEditableCell value={item.konstrukter || ""} type="people" peopleRole="Konstruktér" onSave={(v) => saveField(item.id, "konstrukter", v, item.konstrukter || "")} readOnly={!canManageTPV} />
+                      </TableCell>
+                    );
+                    if (key === "status") {
+                      const statusOpt = statusOptions.find(o => o.label === item.status);
+                      const statusColor = statusOpt?.color;
+                      const statusDisplay = item.status && statusColor ? (
+                        <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: `${statusColor}20`, color: statusColor, borderColor: `${statusColor}50` }}>
+                          {item.status}
+                        </span>
+                      ) : undefined;
+                      return <TableCell key={key}><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} displayValue={statusDisplay} onSave={(v) => saveField(item.id, "status", v, item.status || "")} readOnly={!canManageTPV} /></TableCell>;
+                    }
+                    if (key === "vyroba_status") {
+                      const itemKey = item.item_name || item.item_type;
+                      const statuses = productionStatusMap.get(itemKey);
+                      if (!statuses || statuses.length === 0) {
+                        return (
+                          <TableCell key={key}>
+                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: "#f0eee9", color: "#99a5a3", borderColor: "#e2ddd6" }}>
+                              Neodesláno
+                            </span>
+                          </TableCell>
+                        );
+                      }
                       return (
                         <TableCell key={key}>
-                          <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: "#f0eee9", color: "#99a5a3", borderColor: "#e2ddd6" }}>
-                            Neodesláno
-                          </span>
+                          <div className="flex flex-wrap gap-0.5">
+                            {statuses.map((s, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                                style={{
+                                  backgroundColor: `${s.color}15`,
+                                  color: s.color,
+                                  borderColor: `${s.color}40`,
+                                  textDecoration: s.label.startsWith("✕") ? "line-through" : undefined,
+                                }}
+                              >
+                                {s.label}
+                              </span>
+                            ))}
+                          </div>
                         </TableCell>
                       );
                     }
-                    return (
-                      <TableCell key={key}>
-                        <div className="flex flex-wrap gap-0.5">
-                          {statuses.map((s, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
-                              style={{
-                                backgroundColor: `${s.color}15`,
-                                color: s.color,
-                                borderColor: `${s.color}40`,
-                                textDecoration: s.label.startsWith("✕") ? "line-through" : undefined,
-                              }}
-                            >
-                              {s.splitPart && s.splitTotal ? `${s.splitPart}/${s.splitTotal} ` : ""}
-                              {s.label}
-                            </span>
-                          ))}
-                        </div>
-                      </TableCell>
-                    );
-                  }
-                  if (key === "sent_date") return <TableCell key={key}><InlineEditableCell value={item.sent_date} type="date" onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>;
-                  if (key === "accepted_date") return <TableCell key={key}><InlineEditableCell value={item.accepted_date} type="date" onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>;
-                  if (key === "notes") return <TableCell key={key}><InlineEditableCell value={item.notes} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} readOnly={!canManageTPV} /></TableCell>;
-                  if (key === "pocet") return <TableCell key={key} className="text-right"><InlineEditableCell value={item.pocet != null ? String(item.pocet) : ""} type="number" onSave={(v) => saveField(item.id, "pocet", v, item.pocet != null ? String(item.pocet) : "")} readOnly={!canManageTPV} /></TableCell>;
-                  if (key === "cena") {
-                    const displayVal = item.cena != null && item.cena !== 0
-                      ? formatCurrency(Math.round(item.cena), currency)
-                      : "—";
-                    return (
-                      <TableCell key={key} className="text-right">
-                        <InlineEditableCell
-                          value={item.cena != null ? String(item.cena) : ""}
-                          type="number"
-                          displayValue={<span>{displayVal}</span>}
-                          onSave={(v) => saveField(item.id, "cena", v, item.cena != null ? String(item.cena) : "")}
-                          readOnly={!canManageTPV}
+                    // remaining columns: sent_date, accepted_date, notes, pocet, cena, custom fields
+                    if (key === "sent_date") return <TableCell key={key}><InlineEditableCell value={item.sent_date || ""} type="date" onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>;
+                    if (key === "accepted_date") return <TableCell key={key}><InlineEditableCell value={item.accepted_date || ""} type="date" onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>;
+                    if (key === "notes") return <TableCell key={key}><InlineEditableCell value={item.notes || ""} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} readOnly={!canManageTPV} /></TableCell>;
+                    if (key === "pocet") return <TableCell key={key}><InlineEditableCell value={String(item.pocet ?? "")} type="number" onSave={(v) => saveField(item.id, "pocet", v, String(item.pocet ?? ""))} readOnly={!canManageTPV} /></TableCell>;
+                    if (key === "cena") return <TableCell key={key} className="text-right"><span className="text-xs font-mono">{formatCurrency(item.cena, currency)}</span></TableCell>;
+                    // Custom columns
+                    if (key.startsWith("custom_") && customColumns) {
+                      const def = customColumns.find(c => c.column_key === key);
+                      if (!def) return null;
+                      const customFields = (item as any).custom_fields || {};
+                      const val = customFields[key] || "";
+                      const cellType = def.data_type === "date" ? "date" : def.data_type === "number" ? "number" : def.data_type === "select" ? "select" : def.data_type === "people" ? "people" : undefined;
+                      return (
+                        <TableCell key={key}>
+                          <InlineEditableCell
+                            value={val}
+                            type={cellType as any}
+                            options={def.data_type === "select" ? def.select_options : undefined}
+                            peopleRole={def.data_type === "people" ? (def.people_role as any || undefined) : undefined}
+                            onSave={(v) => updateCustomField.mutate({ tableName: "tpv_items", rowId: item.id, columnKey: key, value: v, oldValue: val })}
+                            readOnly={!canManageTPV}
+                          />
+                        </TableCell>
+                      );
+                    }
+                    return null;
+                  })}
+                  <TableCell>
+                    {canManageTPV && (
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
+                        if (selected.size > 1 && selected.has(item.id)) {
+                          setDeleteIds(Array.from(selected));
+                        } else {
+                          setDeleteIds([item.id]);
+                        }
+                      }}>
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {/* Inline add row */}
+              {canManageTPV && (
+                <TableRow className="h-9 hover:bg-muted/30">
+                  <TableCell />
+                  <TableCell colSpan={renderKeys.length + 2}>
+                    {addingInline ? (
+                      <div className="flex items-center gap-2">
+                        <Plus className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                        <Input
+                          ref={inlineRef}
+                          value={inlineName}
+                          onChange={e => setInlineName(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") handleInlineAdd();
+                            if (e.key === "Escape") { setAddingInline(false); setInlineName(""); }
+                          }}
+                          onBlur={handleInlineAdd}
+                          placeholder="Název položky…"
+                          className="h-7 text-sm border-0 shadow-none focus-visible:ring-0 px-0"
                         />
-                      </TableCell>
-                    );
-                  }
-                  // Custom columns
-                  if (key.startsWith("custom_")) {
-                    const def = customColumns.find(c => c.column_key === key);
-                    if (!def) return null;
-                    const customFields = (item as any).custom_fields || {};
-                    const val = customFields[key] || "";
-                    const cellType = def.data_type === "date" ? "date" : def.data_type === "number" ? "number" : def.data_type === "select" ? "select" : def.data_type === "people" ? "people" : undefined;
-                    return (
-                      <TableCell key={key}>
-                        <InlineEditableCell
-                          value={val}
-                          type={cellType as any}
-                          options={def.data_type === "select" ? def.select_options : undefined}
-                          peopleRole={def.data_type === "people" ? (def.people_role as any || undefined) : undefined}
-                          onSave={(v) => updateCustomField.mutate({ rowId: item.id, tableName: "tpv_items", columnKey: key, value: v, oldValue: val })}
-                          readOnly={!canManageTPV}
-                        />
-                      </TableCell>
-                    );
-                  }
-                  return null;
-                })}
-                <TableCell>
-                  {canManageTPV && (
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
-                      if (selected.size > 1 && selected.has(item.id)) {
-                        setDeleteIds(Array.from(selected));
-                      } else {
-                        setDeleteIds([item.id]);
-                      }
-                    }}>
-                      <Trash2 className="h-3 w-3 text-destructive" />
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-            {/* Inline add row */}
-            {canManageTPV && (
-              <TableRow className="h-9 hover:bg-muted/30">
-                <TableCell />
-                <TableCell colSpan={renderKeys.length + 2}>
-                  {addingInline ? (
-                    <div className="flex items-center gap-2">
-                      <Plus className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                      <Input
-                        ref={inlineRef}
-                        value={inlineName}
-                        onChange={e => setInlineName(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === "Enter") handleInlineAdd();
-                          if (e.key === "Escape") { setAddingInline(false); setInlineName(""); }
-                        }}
-                        onBlur={handleInlineAdd}
-                        placeholder="Název položky…"
-                        className="h-7 text-sm border-0 shadow-none focus-visible:ring-0 px-0"
-                      />
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setAddingInline(true)}
-                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Přidat položku
-                    </button>
-                  )}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setAddingInline(true)}
+                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Přidat položku
+                      </button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {/* Delete Confirmation */}
