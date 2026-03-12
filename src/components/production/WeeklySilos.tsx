@@ -537,6 +537,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               spillDismissed={dismissedSpillWeeks.has(week.key)}
               onDismissSpill={() => handleDismissSpill(week.key)}
               onReopenSpill={() => handleReopenSpill(week.key)}
+              selectedProjectId={selectedProjectId}
+              onSelectProject={onSelectProject}
             />
           ))}
         </div>
