@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback, useRef } from "react";
-import { ChevronRight, ChevronDown, GripVertical, Check, Plus } from "lucide-react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { ChevronRight, ChevronDown, GripVertical, Check, Plus, X } from "lucide-react";
 import { useProductionInbox, type InboxProject, type InboxItem } from "@/hooks/useProductionInbox";
 import { useProductionProgress, type ProjectProgress } from "@/hooks/useProductionProgress";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
@@ -111,10 +111,24 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
   const [addItemState, setAddItemState] = useState<{ projectId?: string; projectName?: string } | null>(null);
   const [cancelState, setCancelState] = useState<CancelState | null>(null);
   const [planningState, setPlanningState] = useState<{ projectId: string; projectName: string; items: PlanningItem[] } | null>(null);
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
   const [deadlineWarning, setDeadlineWarning] = useState<{
     projectName: string; deadlineLabel: string; deadlineDate: Date; weekLabel: string;
   } | null>(null);
   const pendingDeadlineAction = useRef<(() => Promise<void>) | null>(null);
+
+  // Clean up checked items that no longer exist in inbox
+  useEffect(() => {
+    if (checkedItems.size === 0) return;
+    const allItemIds = new Set(projects.flatMap(p => p.items.map(i => i.id)));
+    setCheckedItems(prev => {
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (allItemIds.has(id)) next.add(id);
+      }
+      return next.size === prev.size ? prev : next;
+    });
+  }, [projects]);
 
   const { setNodeRef, isOver } = useDroppable({ id: "inbox-drop-zone", disabled: !!disableDropZone });
 
@@ -208,6 +222,28 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
 
   const handleExpandAll = () => { setAllExpanded(true); setExpandKey((k) => k + 1); };
   const handleCollapseAll = () => { setAllExpanded(false); setExpandKey((k) => k + 1); };
+
+  const toggleCheckItem = useCallback((itemId: string) => {
+    setCheckedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }, []);
+
+  const clearCheckedItems = useCallback(() => setCheckedItems(new Set()), []);
+
+  // Build a lookup of all inbox items for batch drag data
+  const allInboxItemsMap = useMemo(() => {
+    const m = new Map<string, InboxItem & { projectName: string }>();
+    for (const p of projects) {
+      for (const item of p.items) {
+        m.set(item.id, { ...item, projectName: p.project_name });
+      }
+    }
+    return m;
+  }, [projects]);
 
   const handleProjectContextMenu = (e: React.MouseEvent, project: InboxProject) => {
     e.preventDefault(); e.stopPropagation();
@@ -513,6 +549,10 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
               isSelected={selectedProjectId === project.project_id}
               onSelectProject={onSelectProject}
               projectInfo={info}
+              checkedItems={checkedItems}
+              onToggleCheck={toggleCheckItem}
+              onClearChecked={clearCheckedItems}
+              allInboxItemsMap={allInboxItemsMap}
             />
           );
         })}
@@ -637,7 +677,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
   );
 }
 
-function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel, isSelected, onSelectProject, projectInfo }: {
+function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel, isSelected, onSelectProject, projectInfo, checkedItems, onToggleCheck, onClearChecked, allInboxItemsMap }: {
   project: InboxProject; hourlyRate: number; defaultExpanded: boolean; showCzk?: boolean;
   progress?: ProjectProgress; onNavigateToTPV?: (projectId: string) => void;
   onOpenProjectDetail?: (projectId: string) => void;
@@ -648,6 +688,10 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
   isSelected?: boolean;
   onSelectProject?: (projectId: string) => void;
   projectInfo?: { datum_smluvni: string | null; status: string | null; expedice: string | null; montaz: string | null };
+  checkedItems: Set<string>;
+  onToggleCheck: (itemId: string) => void;
+  onClearChecked: () => void;
+  allInboxItemsMap: Map<string, InboxItem & { projectName: string }>;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const color = getProjectColor(project.project_id);
@@ -718,7 +762,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
           {showCzk && <span className="font-mono text-[9px] ml-1" style={{ color: "#6b7a78" }}>{formatCompactCzk(project.total_hours * hourlyRate)}</span>}
         </div>
       </button>
-      {expanded && (
+    {expanded && (
         <div className="px-2 pb-2 space-y-[2px]">
           {progress?.scheduled_items.map(si => (
             <div key={si.id} className="flex items-center gap-1.5 px-2 py-[3px] rounded-[5px]" style={{ opacity: si.status === "completed" ? 0.6 : 0.7 }}>
@@ -730,8 +774,38 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
           ))}
           {project.items.map((item) => (
             <DraggableInboxItem key={item.id} item={item} projectName={project.project_name}
-              onContextMenu={e => onItemContextMenu(e, item, project)} />
+              onContextMenu={e => onItemContextMenu(e, item, project)}
+              isChecked={checkedItems.has(item.id)}
+              onToggleCheck={onToggleCheck}
+              checkedItems={checkedItems}
+              allInboxItemsMap={allInboxItemsMap}
+            />
           ))}
+          {/* Checked items footer bar */}
+          {(() => {
+            const checkedInProject = project.items.filter(i => checkedItems.has(i.id));
+            if (checkedInProject.length < 2) return null;
+            const totalH = checkedInProject.reduce((s, i) => s + i.estimated_hours, 0);
+            return (
+              <div style={{
+                borderTop: "1px solid rgba(58,138,54,0.2)",
+                backgroundColor: "rgba(58,138,54,0.08)",
+                padding: "6px 12px",
+                fontSize: 11,
+                color: "#3a8a36",
+                fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                borderRadius: "0 0 6px 6px",
+              }}>
+                <span>✓ {checkedInProject.length} položek vybráno · {Math.round(totalH)}h — Přetáhnout jako skupinu</span>
+                <button onClick={onClearChecked} className="ml-auto hover:opacity-70" title="Zrušit výběr">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            );
+          })()}
           <DraggableInboxProject project={project} />
           {onNavigateToTPV && (
             <button onClick={() => onNavigateToTPV(project.project_id)} className="w-full text-[9px] text-center py-1 hover:underline transition-colors" style={{ color: "#6b7a78" }}>
@@ -744,26 +818,87 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
   );
 }
 
-function DraggableInboxItem({ item, projectName, onContextMenu }: { item: InboxItem; projectName: string; onContextMenu: (e: React.MouseEvent) => void }) {
+function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onToggleCheck, checkedItems, allInboxItemsMap }: {
+  item: InboxItem; projectName: string; onContextMenu: (e: React.MouseEvent) => void;
+  isChecked: boolean; onToggleCheck: (itemId: string) => void;
+  checkedItems: Set<string>;
+  allInboxItemsMap: Map<string, InboxItem & { projectName: string }>;
+}) {
+  const [hovered, setHovered] = useState(false);
   const adhocBadge = getAdhocBadge((item as any).adhoc_reason);
+
+  // Determine drag data: if this item is checked and there are other checked items, drag as batch
+  const otherCheckedCount = checkedItems.size;
+  const isBatchDrag = isChecked && otherCheckedCount >= 2;
+
+  const batchHours = useMemo(() => {
+    if (!isBatchDrag) return item.estimated_hours;
+    let total = 0;
+    for (const id of checkedItems) {
+      const it = allInboxItemsMap.get(id);
+      if (it) total += it.estimated_hours;
+    }
+    return total;
+  }, [isBatchDrag, checkedItems, allInboxItemsMap, item.estimated_hours]);
+
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `inbox-item-${item.id}`,
-    data: {
-      type: "inbox-item", itemId: item.id, itemName: item.item_name, itemCode: item.item_code,
+    id: isBatchDrag ? `inbox-items-${item.id}` : `inbox-item-${item.id}`,
+    data: isBatchDrag ? {
+      type: "inbox-items" as const,
+      itemId: item.id,
+      projectId: item.project_id,
+      projectName,
+      hours: batchHours,
+      itemCount: checkedItems.size,
+      batchItemIds: Array.from(checkedItems),
+    } : {
+      type: "inbox-item" as const, itemId: item.id, itemName: item.item_name, itemCode: item.item_code,
       projectId: item.project_id, projectName, hours: item.estimated_hours, stageId: item.stage_id,
       scheduledCzk: item.estimated_czk,
     },
   });
 
+  const showCheckbox = hovered || isChecked;
+
   return (
     <div ref={setNodeRef} {...attributes} {...listeners}
       className="flex items-center gap-1.5 px-2 py-[5px] rounded-[5px] cursor-grab transition-all"
-      style={{ backgroundColor: "#ffffff", border: "1px solid #ece8e2", opacity: isDragging ? 0.3 : 1 }}
-      onMouseEnter={(e) => { if (!isDragging) { e.currentTarget.style.backgroundColor = "rgba(59,130,246,0.04)"; e.currentTarget.style.borderColor = "#3b82f6"; } }}
-      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "#ffffff"; e.currentTarget.style.borderColor = "#ece8e2"; }}
+      style={{
+        backgroundColor: isChecked ? "rgba(58,138,54,0.06)" : "#ffffff",
+        border: isChecked ? "1px solid rgba(58,138,54,0.25)" : "1px solid #ece8e2",
+        opacity: isDragging ? 0.3 : 1,
+      }}
+      onMouseEnter={(e) => {
+        setHovered(true);
+        if (!isDragging && !isChecked) { e.currentTarget.style.backgroundColor = "rgba(59,130,246,0.04)"; e.currentTarget.style.borderColor = "#3b82f6"; }
+      }}
+      onMouseLeave={(e) => {
+        setHovered(false);
+        if (!isChecked) { e.currentTarget.style.backgroundColor = "#ffffff"; e.currentTarget.style.borderColor = "#ece8e2"; }
+      }}
       onContextMenu={onContextMenu}
     >
-      <GripVertical className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />
+      {/* Checkbox or grip handle — same 14px slot */}
+      {showCheckbox ? (
+        <div
+          className="shrink-0 flex items-center justify-center"
+          style={{ width: 14, height: 14 }}
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleCheck(item.id); }}
+          onPointerDown={(e) => { e.stopPropagation(); }}
+        >
+          <div style={{
+            width: 12, height: 12, borderRadius: 3,
+            border: isChecked ? "none" : "1.5px solid #9ca3af",
+            backgroundColor: isChecked ? "#3a8a36" : "transparent",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer",
+          }}>
+            {isChecked && <Check className="h-2.5 w-2.5" style={{ color: "#ffffff" }} />}
+          </div>
+        </div>
+      ) : (
+        <GripVertical className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />
+      )}
       {adhocBadge && (
         <span className="text-[8px] shrink-0" title={adhocBadge.label}>{adhocBadge.emoji}</span>
       )}

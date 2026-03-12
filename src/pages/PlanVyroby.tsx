@@ -41,7 +41,7 @@ export type DisplayMode = "hours" | "czk" | "percent";
 type ViewTab = "kanban" | "table";
 
 interface ActiveDragData {
-  type: "inbox-item" | "inbox-project" | "silo-item" | "silo-bundle";
+  type: "inbox-item" | "inbox-items" | "inbox-project" | "silo-item" | "silo-bundle";
   itemId?: string;
   itemName?: string;
   itemCode?: string | null;
@@ -54,6 +54,8 @@ interface ActiveDragData {
   scheduledCzk?: number;
   inboxItemId?: string;
   splitGroupId?: string | null;
+  /** For inbox-items: array of item IDs to schedule as a batch */
+  batchItemIds?: string[];
 }
 
 interface AutoSplitState {
@@ -92,7 +94,7 @@ export default function PlanVyroby() {
   const [searchQuery, setSearchQuery] = useState("");
   const showCzk = displayMode === "czk";
   const [activeDrag, setActiveDrag] = useState<ActiveDragData | null>(null);
-  const isDraggingFromInbox = activeDrag?.type === "inbox-item" || activeDrag?.type === "inbox-project";
+  const isDraggingFromInbox = activeDrag?.type === "inbox-item" || activeDrag?.type === "inbox-items" || activeDrag?.type === "inbox-project";
   const [overDroppableId, setOverDroppableId] = useState<string | null>(null);
   const [autoSplitState, setAutoSplitState] = useState<AutoSplitState | null>(null);
   const [mergeState, setMergeState] = useState<MergeState | null>(null);
@@ -361,7 +363,20 @@ export default function PlanVyroby() {
 
       const projectId = dragData.projectId || "";
 
-      if (dragData.type === "inbox-item" && dragData.itemId) {
+      if (dragData.type === "inbox-items" && dragData.batchItemIds && dragData.batchItemIds.length > 0) {
+        // Batch schedule all checked items to the same week
+        const action = async () => {
+          for (const itemId of dragData.batchItemIds!) {
+            await moveInboxItemToWeek(itemId, weekDate);
+          }
+          const weekNum = getISOWeekNumber(new Date(weekDate));
+          toast({
+            title: `${dragData.batchItemIds!.length} položek naplánováno do T${weekNum}`,
+          });
+        };
+        if (!checkAndWarnDeadline(projectId, weekDate, action)) return;
+        await action();
+      } else if (dragData.type === "inbox-item" && dragData.itemId) {
         const action = async () => { await moveInboxItemToWeek(dragData.itemId!, weekDate); };
         if (!checkAndWarnDeadline(projectId, weekDate, action)) return;
         await action();
