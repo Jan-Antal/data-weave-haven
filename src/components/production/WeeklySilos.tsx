@@ -826,15 +826,16 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
     disabled: allCompleted,
   });
   const toggleExpand = useCallback(() => setExpanded(v => !v), []);
+  const isSearchMatch = bundleMatchesSearch(bundle, searchQuery);
 
   return (
     <div className="rounded-[6px] overflow-hidden relative" style={{
-      borderTop: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
-      borderRight: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
-      borderBottom: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+      borderTop: isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2",
+      borderRight: isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2",
+      borderBottom: isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2",
       borderLeft: `4px solid ${borderLeftColor}`,
-      backgroundColor: isSelected ? "rgba(217,119,6,0.05)" : "#ffffff", opacity: isDragging ? 0.3 : 1,
-      boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
+      backgroundColor: isSelected ? "rgba(217,119,6,0.05)" : isSearchMatch ? "rgba(254,240,138,0.15)" : "#ffffff", opacity: isDragging ? 0.3 : 1,
+      boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : isSearchMatch ? "0 0 0 2px rgba(250,204,21,0.25)" : undefined,
       transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, box-shadow 150ms",
     }}>
 
