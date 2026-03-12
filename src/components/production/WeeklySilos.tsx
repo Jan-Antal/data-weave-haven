@@ -133,7 +133,7 @@ interface CancelState {
   cancelAll?: boolean;
 }
 
-export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject }: Props) {
+export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "" }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
