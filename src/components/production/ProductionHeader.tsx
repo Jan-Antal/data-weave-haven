@@ -4,7 +4,7 @@ import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
-import { LayoutDashboard, Settings, Check, User, UserCog, LogOut, Undo2, Redo2 } from "lucide-react";
+import { LayoutDashboard, Factory, Settings, Check, User, UserCog, LogOut, Undo2, Redo2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { UserManagement } from "@/components/UserManagement";
@@ -98,9 +98,10 @@ export function ProductionHeader() {
             {isOwner && (
               <button
                 onClick={() => navigate("/vyroba")}
-                className="px-2 py-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors text-xs font-sans"
+                className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+                title="Výroba"
               >
-                Výroba
+                <Factory className="h-5 w-5" />
               </button>
             )}
 
