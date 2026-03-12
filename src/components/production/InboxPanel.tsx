@@ -552,10 +552,10 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
 
   return (
     <div className="rounded-lg overflow-hidden" style={{
-      backgroundColor: "#ffffff",
-      border: isSelected ? "2px solid hsl(var(--primary))" : "1px solid #ece8e2",
+      backgroundColor: isSelected ? "rgba(217,119,6,0.04)" : "#ffffff",
+      border: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
       borderLeft: `${leftBorderWidth}px solid ${leftBorderColor}`,
-      boxShadow: isSelected ? "0 0 0 1px hsl(var(--primary) / 0.2)" : undefined,
+      boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
       transition: "border-color 150ms, box-shadow 150ms",
     }}>
       <button

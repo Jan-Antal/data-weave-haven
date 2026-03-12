@@ -398,7 +398,7 @@ export default function PlanVyroby() {
         />
 
         {viewTab === "kanban" ? (
-          <div className="flex-1 flex min-h-0">
+          <div className="flex-1 flex min-h-0" onClick={() => setSelectedProjectId(null)}>
             <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} disableDropZone={isDraggingFromInbox} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} />
             <WeeklySilos showCzk={showCzk} onToggleCzk={(v) => setDisplayMode(v ? "czk" : "hours")} overDroppableId={overDroppableId} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} displayMode={displayMode} onDisplayModeChange={setDisplayMode} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} />
             <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} />
