@@ -16,6 +16,7 @@ import SetPassword from "./pages/SetPassword";
 import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 import PlanVyroby from "./pages/PlanVyroby";
+import Vyroba from "./pages/Vyroba";
 
 const queryClient = new QueryClient();
 
@@ -112,6 +113,7 @@ function AppRoutes() {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/plan-vyroby" element={<PlanVyroby />} />
+            <Route path="/vyroba" element={<Vyroba />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/set-password" element={<SetPassword />} />
             <Route path="*" element={<NotFound />} />

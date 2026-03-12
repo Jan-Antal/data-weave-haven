@@ -95,6 +95,15 @@ export function ProductionHeader() {
 
             <span className="w-px h-5 bg-primary-foreground/20 mx-1" />
 
+            {isOwner && (
+              <button
+                onClick={() => navigate("/vyroba")}
+                className="px-2 py-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors text-xs font-sans"
+              >
+                Výroba
+              </button>
+            )}
+
             <button
               onClick={() => navigate("/")}
               className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
