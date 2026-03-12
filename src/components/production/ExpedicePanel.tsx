@@ -379,26 +379,25 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
       </div>
 
       {/* Archive section */}
-      <div style={{ borderTop: "1px solid #ece8e2" }}>
+      <div className="bg-gray-50" style={{ borderTop: "1px solid hsl(var(--border))" }}>
         <button
           onClick={() => setArchiveOpen(!archiveOpen)}
-          className="w-full flex items-center justify-between px-3 py-2 text-left transition-colors hover:bg-muted/50"
+          className="w-full flex items-center justify-between px-3 py-2 text-left transition-colors hover:bg-gray-100"
         >
           <div className="flex items-center gap-1.5">
-            <Archive className="h-3 w-3" style={{ color: "#99a5a3" }} />
-            <span className="text-[11px] font-medium" style={{ color: "#99a5a3" }}>Archiv</span>
-            <span className="text-[9px]" style={{ color: "#b0bab8" }}>· posledních 30 dní</span>
+            <span className="text-sm">📁</span>
+            <span className="text-[11px] font-medium text-gray-500">Archiv</span>
+            <span className="text-[9px] text-gray-400">· posledních 30 dní</span>
           </div>
           <div className="flex items-center gap-1.5">
             {archivedProjects.length > 0 && (
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                style={{ backgroundColor: "#f0eee9", color: "#99a5a3" }}>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
                 {archivedProjects.length}
               </span>
             )}
             {archiveOpen
-              ? <ChevronDown className="h-3 w-3" style={{ color: "#99a5a3" }} />
-              : <ChevronUp className="h-3 w-3" style={{ color: "#99a5a3" }} />}
+              ? <ChevronUp className="h-3 w-3 text-gray-400" />
+              : <ChevronDown className="h-3 w-3 text-gray-400" />}
           </div>
         </button>
 
