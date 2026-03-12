@@ -44,13 +44,13 @@ export function ProjectProgressBar({ progress, compact }: Props) {
             </span>
           )}
           {progress.completed > 0 && (
-            <span className="flex items-center gap-0.5" style={{ color: "#6aab68" }}>
+            <span className="flex items-center gap-0.5" style={{ color: "#3a8a36", fontWeight: 500 }}>
               <span>✓</span>
               <span>{progress.completed} hotovo</span>
             </span>
           )}
           {progress.scheduled > 0 && (
-            <span className="flex items-center gap-0.5" style={{ color: "#a8d5a6" }}>
+            <span className="flex items-center gap-0.5" style={{ color: "#6b7280", fontWeight: 500 }}>
               <span>⊙</span>
               <span>{progress.scheduled} plán</span>
             </span>
