@@ -1101,6 +1101,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                           >
                           <div
                             className="shrink-0 flex items-center gap-2 pr-2 sticky left-0 z-20"
+                            onContextMenu={(e) => handleItemContextMenu(e, item)}
                             style={{
                               width: LEFT_COL_W,
                               backgroundColor: "#fff",
