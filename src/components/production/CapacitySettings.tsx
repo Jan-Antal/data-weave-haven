@@ -437,14 +437,17 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   );
 }
 
-function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, onClose }: {
+function WeekEditor({ week, weekNum, selectedCount, isPast, standardCapacity, hoursPerDay, onSave, onReset, onClose, hasManualOverride }: {
   week: WeekCapacity;
   weekNum: number;
+  selectedCount: number;
   isPast: boolean;
   standardCapacity: number;
+  hoursPerDay: number;
   onSave: (cap: number, days: number) => void;
   onReset: () => void;
   onClose: () => void;
+  hasManualOverride: boolean;
 }) {
   const [cap, setCap] = useState(String(Math.round(week.capacity_hours)));
   const [days, setDays] = useState(String(week.working_days));
@@ -454,6 +457,7 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
   weekEnd.setDate(weekStart.getDate() + 6);
 
   const formatDate = (d: Date) => `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+  const step = hoursPerDay || 8;
 
   const save = () => {
     const v = parseInt(cap);
@@ -465,35 +469,46 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") save();
     if (e.key === "Escape") onClose();
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setCap(v => String(Math.max(0, parseInt(v || "0") + step)));
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setCap(v => String(Math.max(0, parseInt(v || "0") - step)));
+    }
   };
+
+  const title = selectedCount > 1
+    ? `${selectedCount} týdnů vybráno (T${weekNum} + ${selectedCount - 1} dalších)`
+    : `T${weekNum} · ${formatDate(weekStart)} – ${formatDate(weekEnd)}`;
 
   return (
     <div className="border border-border rounded-md p-3 bg-muted/30 space-y-2">
       <div className="flex items-center justify-between">
-        <div className="text-xs font-bold text-foreground">
-          T{weekNum} · {formatDate(weekStart)} – {formatDate(weekEnd)}
-        </div>
+        <div className="text-xs font-bold text-foreground">{title}</div>
         <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onClose}>
           <X className="h-3 w-3" />
         </Button>
       </div>
-      {isPast && (
+      {isPast && selectedCount === 1 && (
         <div className="text-[10px] text-amber-600 font-medium">⚠ Minulý týden</div>
       )}
-      {week.holiday_name && (
+      {week.holiday_name && selectedCount === 1 && (
         <div className="text-[10px] text-amber-600">🇨🇿 {week.holiday_name}</div>
       )}
-      {week.company_holiday_name && (
+      {week.company_holiday_name && selectedCount === 1 && (
         <div className="text-[10px] text-amber-600">🏖 {week.company_holiday_name}</div>
       )}
       <div className="flex items-end gap-2">
         <div className="flex-1">
-          <label className="text-[10px] text-muted-foreground">Kapacita (h)</label>
+          <label className="text-[10px] text-muted-foreground">Kapacita (h) · ↑↓ ±{step}h</label>
           <Input
             type="number"
             value={cap}
             onChange={e => setCap(e.target.value)}
             onKeyDown={handleKeyDown}
+            step={step}
             className="h-7 text-xs font-mono"
             autoFocus
           />
@@ -511,8 +526,8 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
         <Button size="sm" className="h-7 text-xs" onClick={save}>
           Uložit
         </Button>
-        {week.is_manual_override && (
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { onReset(); onClose(); }}>
+        {hasManualOverride && (
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { onReset(); }}>
             <RotateCcw className="h-3 w-3 mr-1" /> Reset
           </Button>
         )}
