@@ -27,6 +27,7 @@ import { UserManagement } from "@/components/UserManagement";
 import { AccountSettings } from "@/components/AccountSettings";
 import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDialog";
 import { DataLogPanel } from "@/components/DataLogPanel";
+import { CapacitySettings } from "@/components/production/CapacitySettings";
 import { DataLogHighlightProvider } from "@/components/DataLogHighlightContext";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -63,6 +64,7 @@ const Index = () => {
   const [userMgmtOpen, setUserMgmtOpen] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [costPresetsOpen, setCostPresetsOpen] = useState(false);
+  const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
   const [dataLogOpen, setDataLogOpen] = useState(() => {
     try { return sessionStorage.getItem("datalog-open") === "true"; } catch { return false; }
   });
@@ -309,6 +311,11 @@ const Index = () => {
                       Rozpad ceny
                     </DropdownMenuItem>
                   )}
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => setCapacitySettingsOpen(true)}>
+                      Kapacita výroby
+                    </DropdownMenuItem>
+                  )}
                   {canManageStatuses && (
                     <DropdownMenuItem onClick={() => setStatusMgmtOpen(true)}>
                       Správa statusů
@@ -551,6 +558,7 @@ const Index = () => {
       <UserManagement open={userMgmtOpen} onOpenChange={setUserMgmtOpen} />
       <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
       <CostBreakdownPresetsDialog open={costPresetsOpen} onOpenChange={setCostPresetsOpen} />
+      <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
       <AmiAssistant />
       <AchievementCelebration />
     </div>

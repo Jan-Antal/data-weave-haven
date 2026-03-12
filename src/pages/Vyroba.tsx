@@ -1,13 +1,14 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useProductionSchedule, getISOWeekNumber, type ScheduleBundle } from "@/hooks/useProductionSchedule";
 import { useProductionDailyLogs, saveDailyLog, type DailyLog } from "@/hooks/useProductionDailyLogs";
 import { useAllTPVItems } from "@/hooks/useAllTPVItems";
 import { getProjectColor } from "@/lib/projectColors";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList, AlertTriangle, User, UserCog, Settings, LogOut, LayoutDashboard, CalendarRange } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList, AlertTriangle, User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,13 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Progress } from "@/components/ui/progress";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AccountSettings } from "@/components/AccountSettings";
+import { UserManagement } from "@/components/UserManagement";
+import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
+import { StatusManagement } from "@/components/StatusManagement";
+import { RecycleBin } from "@/components/RecycleBin";
+import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDialog";
+import { DataLogPanel } from "@/components/DataLogPanel";
+import { CapacitySettings } from "@/components/production/CapacitySettings";
 
 /* ═══ helpers ═══ */
 function getMonday(d: Date): Date {
@@ -65,11 +73,19 @@ interface VyrobaBundle {
 
 /* ═══ MAIN PAGE ═══ */
 export default function Vyroba() {
-  const { isOwner, loading, profile, signOut } = useAuth();
+  const { isOwner, isAdmin, loading, profile, signOut, canAccessSettings, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, realRole, simulatedRole, setSimulatedRole, role } = useAuth();
+  const { openPeopleManagement } = usePeopleManagement();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [userMgmtOpen, setUserMgmtOpen] = useState(false);
+  const [exchangeRateOpen, setExchangeRateOpen] = useState(false);
+  const [statusMgmtOpen, setStatusMgmtOpen] = useState(false);
+  const [recycleBinOpen, setRecycleBinOpen] = useState(false);
+  const [costPresetsOpen, setCostPresetsOpen] = useState(false);
+  const [dataLogOpen, setDataLogOpen] = useState(false);
+  const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
 
   // Owner-only guard
   useEffect(() => {
@@ -307,7 +323,77 @@ export default function Vyroba() {
                   Odhlásit se
                 </DropdownMenuItem>
               </DropdownMenuContent>
-            </DropdownMenu>
+              </DropdownMenu>
+
+            {(canAccessSettings || realRole === "owner") && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+                    <Settings className="h-5 w-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {canManageUsers && (
+                    <DropdownMenuItem onClick={() => setUserMgmtOpen(true)}>
+                      Správa uživatelů
+                    </DropdownMenuItem>
+                  )}
+                  {canManagePeople && (
+                    <DropdownMenuItem onClick={openPeopleManagement}>
+                      Správa osob
+                    </DropdownMenuItem>
+                  )}
+                  {canManageExchangeRates && (
+                    <DropdownMenuItem onClick={() => setExchangeRateOpen(true)}>
+                      Kurzovní lístek
+                    </DropdownMenuItem>
+                  )}
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => setCostPresetsOpen(true)}>
+                      Rozpad ceny
+                    </DropdownMenuItem>
+                  )}
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => setCapacitySettingsOpen(true)}>
+                      Kapacita výroby
+                    </DropdownMenuItem>
+                  )}
+                  {canManageStatuses && (
+                    <DropdownMenuItem onClick={() => setStatusMgmtOpen(true)}>
+                      Správa statusů
+                    </DropdownMenuItem>
+                  )}
+                  {canAccessRecycleBin && (
+                    <DropdownMenuItem onClick={() => setRecycleBinOpen(true)}>
+                      Koš
+                    </DropdownMenuItem>
+                  )}
+                  {(isAdmin || role === "pm" || isOwner) && (
+                    <DropdownMenuItem onClick={() => setDataLogOpen(true)}>
+                      Data Log
+                    </DropdownMenuItem>
+                  )}
+                  {realRole === "owner" && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Zobrazit jako</div>
+                      {(["admin", "pm", "konstrukter", "viewer"] as const).map((r) => (
+                        <DropdownMenuItem
+                          key={r}
+                          onClick={() => setSimulatedRole(r === "admin" ? null : r)}
+                          className="flex items-center justify-between"
+                        >
+                          <span>{r === "admin" ? "Admin" : r === "pm" ? "PM" : r === "konstrukter" ? "Konstruktér" : "Viewer"}</span>
+                          {((r === "admin" && !simulatedRole) || simulatedRole === r) && (
+                            <Check className="h-4 w-4 text-green-600" />
+                          )}
+                        </DropdownMenuItem>
+                      ))}
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
       </header>
@@ -454,6 +540,13 @@ export default function Vyroba() {
       </Dialog>
 
       <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
+      <UserManagement open={userMgmtOpen} onOpenChange={setUserMgmtOpen} />
+      <ExchangeRateSettings open={exchangeRateOpen} onOpenChange={setExchangeRateOpen} />
+      <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />
+      <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
+      <CostBreakdownPresetsDialog open={costPresetsOpen} onOpenChange={setCostPresetsOpen} />
+      <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} />
+      <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
     </div>
   );
 }

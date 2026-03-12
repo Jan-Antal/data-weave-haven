@@ -163,7 +163,7 @@ export function ProductionHeader() {
                   )}
                   {isAdmin && (
                     <DropdownMenuItem onClick={() => setCapacitySettingsOpen(true)}>
-                      📊 Kapacita výroby
+                      Kapacita výroby
                     </DropdownMenuItem>
                   )}
                   {canManageStatuses && (
