@@ -114,7 +114,12 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Sticky scrollbar at bottom of viewport */
+  /* Override sticky on split-header tables where header is outside scroll container */
+  thead.sticky-off {
+    position: static;
+    box-shadow: none;
+  }
+
   .sticky-scrollbar {
     overflow-x: auto;
     overflow-y: visible;
