@@ -263,7 +263,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
     setContextMenu({ x: e.clientX, y: e.clientY, actions });
   };
 
-  const handlePlanConfirm = useCallback(async (plan: SchedulePlanEntry[]) => {
+  const executePlan = useCallback(async (plan: SchedulePlanEntry[]) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
