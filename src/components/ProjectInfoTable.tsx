@@ -555,8 +555,15 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
 
   // Infinite scroll
   const tableScrollRef = useRef<HTMLDivElement>(null);
+  const headerScrollRef = useRef<HTMLDivElement>(null);
   const scrollResetKey = `${computeKey}|${sortCol}|${sortDir}`;
   const { visible, hasMore } = useInfiniteScroll(sorted, tableScrollRef, scrollResetKey);
+
+  const handleBodyScroll = useCallback(() => {
+    if (tableScrollRef.current && headerScrollRef.current) {
+      headerScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+    }
+  }, []);
 
   // Persisted group order from DB (for side panel)
   const orderedNativeKeys = useMemo(() => getOrderedKeys(PROJECT_INFO_NATIVE), [getOrderedKeys]);
@@ -744,104 +751,112 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
           Režim úpravy sloupců
         </div>
       )}
-      <div ref={tableScrollRef} className={cn("rounded-lg border bg-card overflow-auto always-scrollbar", editMode && "rounded-t-none border-t-0")} style={{ maxHeight: "calc(100vh - 260px)" }}>
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-primary/5">
-              {/* Col 1 — Icon slot */}
-              <TableHead style={COL_ICON_STYLE} className="text-center px-0">
-                <Paperclip className="h-3.5 w-3.5 text-gray-400 mx-auto" />
-              </TableHead>
-              {/* Col 2 — Chevron slot */}
-              <TableHead style={COL_CHEVRON_STYLE} className="shrink-0 px-0">
-                {sorted.length > 0 && (
-                  <button
-                    className="text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-                    title={expanded.size === sorted.length ? "Sbalit vše" : "Rozbalit vše"}
-                    onClick={() => {
-                      if (expanded.size === sorted.length) {
-                        setExpanded(new Set());
-                        setShowAddButton(new Set());
-                      } else {
-                        setExpanded(new Set(sorted.map((p) => p.project_id)));
-                        setShowAddButton(new Set());
-                      }
-                    }}
-                  >
-                    {expanded.size === sorted.length ? (
-                      <ChevronsUp className="h-3.5 w-3.5" />
-                    ) : (
-                      <ChevronsDown className="h-3.5 w-3.5" />
-                    )}
-                  </button>
-                )}
-              </TableHead>
-              {v("project_id") && renderColumnHeader(headerProps("project_id"))}
-              {v("project_name") && renderColumnHeader(headerProps("project_name"))}
-              {renderKeys.map((key) => renderColumnHeader(headerProps(key)))}
-              <ColumnVisibilityToggle tabKey="projectInfo" editMode={editMode} onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined} onCancelEditMode={canEditColumns ? handleCancelEditMode : undefined} />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visible.map((p) => (
-              <Fragment key={p.id}>
-                <ProjectRow
-                  key={p.id}
-                  project={p}
-                  docCount={docCounts[p.project_id]}
-                  docFailed={docFailed.has(p.project_id)}
-                  isExpanded={expanded.has(p.project_id)}
-                  stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
-                  onToggleExpand={toggleExpand}
-                  isVisible={v}
-                  renderKeys={renderKeys}
-                  save={save}
-                  saveCurrency={saveCurrency}
-                  canEdit={canEdit}
-                  statusLabels={statusLabels}
-                  customColumns={customColumns}
-                  saveCustomField={handleSaveCustomField}
-                  riskHighlight={riskHighlight}
-                  onEditProject={handleEditProject}
-                  isFieldReadOnly={isFieldReadOnly}
-                />
-                {expanded.has(p.project_id) && (
-                  <StagesSection
-                    projectId={p.project_id}
+      <div className={cn("rounded-lg border bg-card flex flex-col", editMode && "rounded-t-none border-t-0")} style={{ maxHeight: "calc(100vh - 260px)" }}>
+        {/* FIXED HEADER — never scrolls vertically, syncs horizontally */}
+        <div ref={headerScrollRef} className="flex-shrink-0 overflow-hidden border-b border-border">
+          <Table>
+            <TableHeader className="sticky-off">
+              <TableRow className="bg-primary/5">
+                {/* Col 1 — Icon slot */}
+                <TableHead style={COL_ICON_STYLE} className="text-center px-0">
+                  <Paperclip className="h-3.5 w-3.5 text-muted-foreground/40 mx-auto" />
+                </TableHead>
+                {/* Col 2 — Chevron slot */}
+                <TableHead style={COL_CHEVRON_STYLE} className="shrink-0 px-0">
+                  {sorted.length > 0 && (
+                    <button
+                      className="text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                      title={expanded.size === sorted.length ? "Sbalit vše" : "Rozbalit vše"}
+                      onClick={() => {
+                        if (expanded.size === sorted.length) {
+                          setExpanded(new Set());
+                          setShowAddButton(new Set());
+                        } else {
+                          setExpanded(new Set(sorted.map((p) => p.project_id)));
+                          setShowAddButton(new Set());
+                        }
+                      }}
+                    >
+                      {expanded.size === sorted.length ? (
+                        <ChevronsUp className="h-3.5 w-3.5" />
+                      ) : (
+                        <ChevronsDown className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  )}
+                </TableHead>
+                {v("project_id") && renderColumnHeader(headerProps("project_id"))}
+                {v("project_name") && renderColumnHeader(headerProps("project_name"))}
+                {renderKeys.map((key) => renderColumnHeader(headerProps(key)))}
+                <ColumnVisibilityToggle tabKey="projectInfo" editMode={editMode} onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined} onCancelEditMode={canEditColumns ? handleCancelEditMode : undefined} />
+              </TableRow>
+            </TableHeader>
+          </Table>
+        </div>
+        {/* SCROLLABLE BODY */}
+        <div ref={tableScrollRef} className="flex-1 overflow-auto always-scrollbar" onScroll={handleBodyScroll}>
+          <Table>
+            <TableBody>
+              {visible.map((p) => (
+                <Fragment key={p.id}>
+                  <ProjectRow
+                    key={p.id}
                     project={p}
+                    docCount={docCounts[p.project_id]}
+                    docFailed={docFailed.has(p.project_id)}
+                    isExpanded={expanded.has(p.project_id)}
+                    stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
+                    onToggleExpand={toggleExpand}
                     isVisible={v}
-                    statusLabels={statusLabels}
-                    canEdit={canEdit}
                     renderKeys={renderKeys}
-                    personFilter={personFilter}
-                    statusFilterSet={statusFilterSet}
-                    searchLower={searchLower}
-                    showAddButton={showAddButton.has(p.project_id)}
+                    save={save}
                     saveCurrency={saveCurrency}
-                    parentMatchesSearch={!!searchLower && [p.project_id, p.project_name, p.klient, p.pm].some(v => normalizedIncludes(v, searchLower))}
+                    canEdit={canEdit}
+                    statusLabels={statusLabels}
+                    customColumns={customColumns}
+                    saveCustomField={handleSaveCustomField}
+                    riskHighlight={riskHighlight}
+                    onEditProject={handleEditProject}
+                    isFieldReadOnly={isFieldReadOnly}
                   />
-                )}
-              </Fragment>
-            ))}
-            {sorted.length === 0 && !isLoading && (
-              <TableRow>
-                <TableCell colSpan={99} className="text-center py-8 text-muted-foreground text-sm">
-                  Žádné výsledky
-                </TableCell>
-              </TableRow>
-            )}
-            {hasMore && (
-              <TableRow>
-                <TableCell colSpan={99} className="text-center py-3">
-                  <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-                    Načítání…
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+                  {expanded.has(p.project_id) && (
+                    <StagesSection
+                      projectId={p.project_id}
+                      project={p}
+                      isVisible={v}
+                      statusLabels={statusLabels}
+                      canEdit={canEdit}
+                      renderKeys={renderKeys}
+                      personFilter={personFilter}
+                      statusFilterSet={statusFilterSet}
+                      searchLower={searchLower}
+                      showAddButton={showAddButton.has(p.project_id)}
+                      saveCurrency={saveCurrency}
+                      parentMatchesSearch={!!searchLower && [p.project_id, p.project_name, p.klient, p.pm].some(v => normalizedIncludes(v, searchLower))}
+                    />
+                  )}
+                </Fragment>
+              ))}
+              {sorted.length === 0 && !isLoading && (
+                <TableRow>
+                  <TableCell colSpan={99} className="text-center py-8 text-muted-foreground text-sm">
+                    Žádné výsledky
+                  </TableCell>
+                </TableRow>
+              )}
+              {hasMore && (
+                <TableRow>
+                  <TableCell colSpan={99} className="text-center py-3">
+                    <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                      Načítání…
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
