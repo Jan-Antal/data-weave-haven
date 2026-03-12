@@ -448,7 +448,13 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       const actions: ContextMenuAction[] = [];
 
       if (isCompleted) {
-        actions.push({ label: "Vrátit do výroby", icon: "↩", onClick: () => returnToProduction(item.id) });
+        if (onNavigateToTPV) {
+          actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(item.project_id, item.item_code) });
+        }
+        if (onOpenProjectDetail) {
+          actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(item.project_id) });
+        }
+        actions.push({ label: "Vrátit do výroby", icon: "↩", dividerBefore: true, onClick: () => returnToProduction(item.id) });
       } else if (isPaused) {
         actions.push({ label: "Uvolnit položku", icon: "▶", onClick: () => handleReleaseItem(item.id) });
         actions.push({ label: "Vrátit do Inboxu", icon: "←", onClick: () => moveItemBackToInbox(item.id) });
