@@ -58,6 +58,12 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   );
 }
 
+function bundleMatchesSearch(bundle: { project_name: string; project_id: string; items: Array<{ item_code: string | null }> }, query: string): boolean {
+  if (!query) return false;
+  const q = query.toLowerCase();
+  return bundle.project_name.toLowerCase().includes(q) || bundle.project_id.toLowerCase().includes(q) || bundle.items.some(i => i.item_code?.toLowerCase().includes(q));
+}
+
 interface Props {
   showCzk: boolean;
   onToggleCzk: (v: boolean) => void;
