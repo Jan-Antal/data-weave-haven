@@ -283,12 +283,11 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   const isCurrent = selectedYear === currentYear && wn === currentWeek;
                   const isBarSelected = selectedWeeks.has(wn);
 
-                  let barColor: string;
-                  if (past) barColor = "hsl(var(--muted-foreground) / 0.3)";
-                  else if (hasCompanyHol) barColor = "#f59e0b";
-                  else if (isManual) barColor = "#2d6a4f";
-                  else if (hasHoliday) barColor = "#d97706";
-                  else barColor = "hsl(var(--primary) / 0.6)";
+                  const barColor = past ? "hsl(var(--muted-foreground) / 0.3)"
+                    : hasCompanyHol ? "#f59e0b"
+                    : isManual ? "#2d6a4f"
+                    : hasHoliday ? "#d97706"
+                    : "hsl(var(--primary) / 0.6)";
 
                   return (
                     <button
@@ -297,10 +296,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                       style={{
                         height: barH,
                         backgroundColor: barColor,
-                        outline: isCurrent ? "3px solid hsl(var(--primary))" : "none",
-                        outlineOffset: isCurrent ? "-1px" : undefined,
                       }}
-                      title={`T${wn}: ${Math.round(cap)}h · ${week.working_days} dní${week.holiday_name ? ` · ${week.holiday_name}` : ""}${week.company_holiday_name ? ` · ${week.company_holiday_name}` : ""}${isCurrent ? " · Tento týden" : ""}`}
+                      title={`T${wn}: ${Math.round(cap)}h · ${week.working_days} dní${week.holiday_name ? ` · ${week.holiday_name}` : ""}${week.company_holiday_name ? ` · ${week.company_holiday_name}` : ""}`}
                       onClick={e => handleBarClick(wn, e)}
                     />
                   );
