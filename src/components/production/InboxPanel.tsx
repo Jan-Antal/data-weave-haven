@@ -524,14 +524,14 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
               <div key={p.project_id} className="flex items-center gap-1.5 px-2 py-[4px] rounded-[5px] cursor-pointer"
                 onClick={(e) => { e.stopPropagation(); onSelectProject?.(p.project_id); }}
                 style={{
-                  backgroundColor: isCompletedSelected ? "rgba(217,119,6,0.05)" : "rgba(58,138,54,0.04)",
-                  border: isCompletedSelected ? "2px solid #d97706" : "1px solid rgba(58,138,54,0.15)",
+                  backgroundColor: isCompletedSelected ? "rgba(217,119,6,0.05)" : "#ffffff",
+                  border: isCompletedSelected ? "2px solid #d97706" : "1px solid #e5e2dd",
                   boxShadow: isCompletedSelected ? "0 0 0 1px rgba(217,119,6,0.1)" : undefined,
                 }}>
                 <Check className="h-3 w-3 shrink-0" style={{ color: "#3a8a36" }} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-[10px] font-medium truncate" style={{ color: "#3a8a36" }}>{p.project_name}</div>
-                  <div className="font-mono text-[9px] truncate" style={{ color: "#6b7a78" }}>{p.project_id}</div>
+                <div className="text-[10px] font-medium truncate" style={{ color: "#374151" }}>{p.project_name}</div>
+                  <div className="font-mono text-[9px] truncate" style={{ color: "#6b7280" }}>{p.project_id}</div>
                 </div>
                 <span className="text-[9px] shrink-0" style={{ color: "#6b7a78" }}>✓</span>
               </div>
@@ -649,7 +649,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
           style={{ color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-[12px] font-semibold truncate" style={{ color: uColors.text }}>{project.project_name}</span>
+            <span className="text-[12px] truncate" style={{ color: urgency === "ok" ? "#1a1a1a" : uColors.text, fontWeight: 600 }}>{project.project_name}</span>
             {urgency === "overdue" && (
               <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(220,38,38,0.1)", color: "#DC2626" }}>
                 PO TERMÍNU
@@ -661,11 +661,11 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
               </span>
             )}
           </div>
-          <div className="font-mono text-[9px]" style={{ color: "#99a5a3" }}>{project.project_id}</div>
+          <div className="font-mono text-[9px]" style={{ color: "#6b7280" }}>{project.project_id}</div>
           {progress && <div className="mt-1"><ProjectProgressBar progress={progress} compact /></div>}
         </div>
         <div className="text-right shrink-0">
-          <span className="font-mono text-[12px] font-semibold" style={{ color: "#223937" }}>{Math.round(project.total_hours)}h</span>
+          <span className="font-mono text-[12px]" style={{ color: "#1a1a1a", fontWeight: 700 }}>{Math.round(project.total_hours)}h</span>
           {showCzk && <span className="font-mono text-[9px] ml-1" style={{ color: "#6b7a78" }}>{formatCompactCzk(project.total_hours * hourlyRate)}</span>}
         </div>
       </button>
@@ -720,7 +720,7 @@ function DraggableInboxItem({ item, projectName, onContextMenu }: { item: InboxI
       )}
       {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
       <span className="text-[11px] font-medium flex-1 truncate" style={{ color: "#6b7a78" }}>{item.item_name}</span>
-      <span className="font-mono text-[10px] shrink-0" style={{ color: "#6b7a78" }}>{item.estimated_hours}h</span>
+      <span className="font-mono text-[10px] shrink-0" style={{ color: "#1a1a1a", fontWeight: 700 }}>{item.estimated_hours}h</span>
     </div>
   );
 }

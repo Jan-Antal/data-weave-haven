@@ -636,7 +636,9 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
   const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}`, disabled: isPast });
   const highlighted = !isPast && (isOver || isOverTarget);
   const dropBorderColor = highlighted ? (isOverloaded ? "#d97706" : "#3b82f6") : undefined;
-  const headerColor = isPast ? "#99a5a3" : "#223937";
+  const headerColor = isPast ? "#9ca3af" : isCurrent ? "#223937" : "#1a1a1a";
+  const headerWeight = isCurrent ? 700 : isPast ? 500 : 600;
+  const dateRangeColor = isPast ? "#b0b7c3" : "#6b7280";
 
   const combinedRef = useCallback((el: HTMLDivElement | null) => { setNodeRef(el); registerRef(weekKey, el); }, [setNodeRef, registerRef, weekKey]);
 
@@ -650,10 +652,10 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       {/* Header */}
       <div className="px-2.5 py-1.5 text-center" style={{ borderBottom: "1px solid #ece8e2" }}>
         <div className="flex items-center justify-center gap-1.5">
-          <span className="font-mono text-[14px] font-bold" style={{ color: headerColor }}>T{weekNum}</span>
+          <span className="font-mono text-[14px]" style={{ color: headerColor, fontWeight: headerWeight }}>T{weekNum}</span>
           {isCurrent && <span className="w-[5px] h-[5px] rounded-full" style={{ backgroundColor: "#3a8a36" }} />}
         </div>
-        <div className="text-[9px] mt-0.5" style={{ color: "#99a5a3" }}>{formatDateShort(startDate)} – {formatDateShort(endDate)}</div>
+        <div className="text-[9px] mt-0.5" style={{ color: dateRangeColor }}>{formatDateShort(startDate)} – {formatDateShort(endDate)}</div>
         <div className="mt-1.5" style={{ opacity: isPast ? 0.6 : 1 }}>
           <div className="h-[7px] rounded" style={{ backgroundColor: "#f0eee9", overflow: "hidden" }}>
             <div className="h-full rounded transition-all duration-300" style={{ width: `${Math.min(pct, 100)}%`, background: barBg }} />
@@ -789,11 +791,11 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onBundleContextMenu(e, bundle, toggleExpand); }}
         >
           <div className="flex-1 min-w-0">
-            <div className="text-[11px] font-semibold truncate" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>{bundle.project_name}</div>
+            <div className="text-[11px] truncate" style={{ color: allCompleted ? "#9ca3af" : "#1a1a1a", fontWeight: allCompleted ? 500 : 600 }}>{bundle.project_name}</div>
             <div className="flex items-center gap-1.5">
-              <span className="font-mono text-xs" style={{ color: "#99a5a3" }}>{bundle.project_id}</span>
+              <span className="font-mono text-xs" style={{ color: allCompleted ? "#b0b7c3" : "#6b7280" }}>{bundle.project_id}</span>
               {expDate && !allCompleted && (
-                <span className="text-xs truncate" style={{ color: expSeverity === "overdue" ? "#dc3545" : expSeverity === "urgent" ? "#d97706" : "#99a5a3" }}>
+                <span className="text-xs truncate" style={{ color: expSeverity === "overdue" ? "#dc2626" : expSeverity === "urgent" ? "#d97706" : daysUntilExp !== null && daysUntilExp <= 14 ? "#d97706" : "#6b7280" }}>
                   Exp: {expDate}
                 </span>
               )}
@@ -814,8 +816,8 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
                 </Tooltip>
               );
             })()}
-            {completedCount > 0 && <span className="text-[9px] font-medium" style={{ color: "#3a8a36" }}>{completedCount}/{totalCount} ✓</span>}
-            <span className="font-mono text-[11px] font-bold" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>{Math.round(bundle.total_hours)}h</span>
+            {completedCount > 0 && <span className="text-[9px]" style={{ color: "#3a8a36", fontWeight: 600 }}>{completedCount}/{totalCount} ✓</span>}
+            <span className="font-mono text-[11px]" style={{ color: allCompleted ? "#9ca3af" : "#1a1a1a", fontWeight: 700 }}>{Math.round(bundle.total_hours)}h</span>
             {showCzk && <span className="font-mono text-[9px]" style={{ color: "#6b7a78" }}>{formatCompactCzk(bundle.total_hours * hourlyRate)}</span>}
           </div>
         </div>
@@ -857,7 +859,7 @@ function CompletedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onCont
   const isSplit = !!item.split_group_id;
   return (
     <div data-context="item" className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-default transition-colors"
-      style={{ borderLeft: isSplit ? "2px dashed #c4ccc9" : undefined, backgroundColor: "#f5f3f0" }}
+      style={{ borderLeft: isSplit ? "2px dashed #c4ccc9" : undefined, backgroundColor: "#f8f7f4" }}
       onMouseEnter={e => { e.currentTarget.style.backgroundColor = "#eceae6"; }}
       onMouseLeave={e => { e.currentTarget.style.backgroundColor = "#f5f3f0"; }}
       onContextMenu={onContextMenu}

@@ -28,7 +28,7 @@ export function ProjectProgressBar({ progress, compact }: Props) {
           <span className="text-[9px] font-mono" style={{ color: "#6b7a78" }}>{accountedFor}/{total}</span>
         </div>
       )}
-      <div className="h-[4px] w-full rounded-full overflow-hidden flex" style={{ backgroundColor: "#e8e5e0" }}>
+      <div className="h-[4px] w-full rounded-full overflow-hidden flex" style={{ backgroundColor: "#d1d5db" }}>
         {pctCompleted > 0 && <div className="h-full" style={{ width: `${pctCompleted}%`, backgroundColor: "#6aab68" }} />}
         {pctScheduled > 0 && <div className="h-full" style={{ width: `${pctScheduled}%`, backgroundColor: "#a8d5a6" }} />}
         {pctPaused > 0 && <div className="h-full" style={{ width: `${pctPaused}%`, backgroundColor: "#e0c97a" }} />}
@@ -44,13 +44,13 @@ export function ProjectProgressBar({ progress, compact }: Props) {
             </span>
           )}
           {progress.completed > 0 && (
-            <span className="flex items-center gap-0.5" style={{ color: "#6aab68" }}>
+            <span className="flex items-center gap-0.5" style={{ color: "#3a8a36", fontWeight: 500 }}>
               <span>✓</span>
               <span>{progress.completed} hotovo</span>
             </span>
           )}
           {progress.scheduled > 0 && (
-            <span className="flex items-center gap-0.5" style={{ color: "#a8d5a6" }}>
+            <span className="flex items-center gap-0.5" style={{ color: "#6b7280", fontWeight: 500 }}>
               <span>⊙</span>
               <span>{progress.scheduled} plán</span>
             </span>

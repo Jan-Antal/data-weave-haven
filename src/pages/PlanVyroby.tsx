@@ -683,9 +683,9 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
           <span className="text-border">·</span>
           <span>CZK <span className="font-semibold text-foreground">{formatCzk(displayCzk)}</span></span>
           <span className="text-border">·</span>
-          <span>Naplánováno <span className="font-semibold" style={{ color: isOverCapacity ? "hsl(var(--destructive))" : "hsl(142 76% 36%)" }}>{Math.round(scheduledHours).toLocaleString("cs-CZ")}h</span></span>
+          <span>Naplánováno <span style={{ fontWeight: 600, color: isOverCapacity ? "hsl(var(--destructive))" : "hsl(142 76% 36%)" }}>{Math.round(scheduledHours).toLocaleString("cs-CZ")}h</span></span>
           <span className="text-border">·</span>
-          <span>V Inboxu <span className="font-semibold" style={{ color: "#d97706" }}>{Math.round(inboxHours).toLocaleString("cs-CZ")}h</span></span>
+          <span>V Inboxu <span style={{ fontWeight: 600, color: "#d97706" }}>{Math.round(inboxHours).toLocaleString("cs-CZ")}h</span></span>
         </div>
       </div>
 
