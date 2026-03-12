@@ -268,15 +268,7 @@ export default function Vyroba() {
 
             <span className="w-px h-5 bg-primary-foreground/20 mx-1" />
 
-            {/* Role toggle */}
-            <button
-              onClick={() => setRoleView((r) => r === "manager" ? "management" : "manager")}
-              className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors text-xs font-sans"
-            >
-              {isManagement ? "👔 Management" : "🔧 Výrobní Manažer"}
-            </button>
 
-            <span className="w-px h-5 bg-primary-foreground/20 mx-1" />
 
             {/* Nav icons */}
             <button
