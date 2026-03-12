@@ -122,6 +122,7 @@ export default function Vyroba() {
       projectId: b.project_id,
       projectName: b.project_name,
       totalHours: b.total_hours,
+      scheduleItems: b.items,
       items: b.items.map((i) => ({ id: i.id, item_name: i.item_name, item_code: i.item_code })),
       color: getProjectColor(b.project_id),
     }));
