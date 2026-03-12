@@ -237,64 +237,78 @@ export default function Vyroba() {
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: "#f8f7f4" }}>
       {/* ═══ HEADER ═══ */}
-      <header className="shrink-0 flex items-center justify-between px-4" style={{ height: 44, background: "#223937" }}>
-        <div className="flex items-center gap-3">
-          <h1 className="text-base font-serif text-white tracking-wide">
-            A→M <span className="font-sans font-normal text-sm opacity-80">Interior</span>
-          </h1>
-          <span className="text-white/30 text-xs">|</span>
-          <span className="text-white/70 text-sm font-sans">Výroba</span>
-        </div>
+      <header className="border-b bg-primary px-6 py-4 shrink-0 z-50">
+        <div className="flex items-center justify-between">
+          {/* Left: Logo + module name */}
+          <div className="flex items-center gap-3 shrink-0">
+            <h1 className="text-xl font-serif text-primary-foreground tracking-wide">
+              A→M <span className="font-sans font-normal text-base opacity-80">Interior</span>
+            </h1>
+            <span className="text-primary-foreground/40 text-sm">|</span>
+            <span className="text-primary-foreground/70 text-sm font-sans">Výroba</span>
+          </div>
 
-        <div className="flex items-center gap-2">
-          {/* Week navigator */}
-          <button onClick={() => setWeekOffset((w) => w - 1)} className="p-1 rounded hover:bg-white/10 text-white/70 hover:text-white transition-colors">
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="text-white text-sm font-mono select-none min-w-[200px] text-center">
-            Týden {weekNum} · {fmtDate(currentMonday)}–{fmtDate(friday)}{currentMonday.getFullYear()}
-          </span>
-          <button onClick={() => setWeekOffset((w) => w + 1)} className="p-1 rounded hover:bg-white/10 text-white/70 hover:text-white transition-colors">
-            <ChevronRight className="h-4 w-4" />
-          </button>
+          {/* Right: week nav + controls */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Week navigator */}
+            <button onClick={() => setWeekOffset((w) => w - 1)} className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-primary-foreground text-sm font-mono select-none min-w-[200px] text-center">
+              Týden {weekNum} · {fmtDate(currentMonday)}–{fmtDate(friday)}{currentMonday.getFullYear()}
+            </span>
+            <button onClick={() => setWeekOffset((w) => w + 1)} className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+              <ChevronRight className="h-4 w-4" />
+            </button>
 
-          <span className="w-px h-5 bg-white/20 mx-1" />
+            <span className="w-px h-5 bg-primary-foreground/20 mx-1" />
 
-          {/* Role toggle */}
-          <button
-            onClick={() => setRoleView((r) => r === "manager" ? "management" : "manager")}
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-white/80 hover:bg-white/10 transition-colors"
-          >
-            {isManagement ? "👔 Management" : "🔧 Výrobní Manažer"}
-          </button>
+            {/* Role toggle */}
+            <button
+              onClick={() => setRoleView((r) => r === "manager" ? "management" : "manager")}
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors text-xs font-sans"
+            >
+              {isManagement ? "👔 Management" : "🔧 Výrobní Manažer"}
+            </button>
 
-          <span className="w-px h-5 bg-white/20 mx-1" />
+            <span className="w-px h-5 bg-primary-foreground/20 mx-1" />
 
-          {/* Nav + user */}
-          <button onClick={() => navigate("/plan-vyroby")} className="p-1 rounded text-white/70 hover:text-white hover:bg-white/10 transition-colors text-xs px-2">
-            Plán
-          </button>
-          <button onClick={() => navigate("/")} className="p-1 rounded text-white/70 hover:text-white hover:bg-white/10 transition-colors text-xs px-2">
-            Přehled
-          </button>
+            {/* Nav icons */}
+            <button
+              onClick={() => navigate("/plan-vyroby")}
+              className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+              title="Plán Výroby"
+            >
+              <CalendarRange className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => navigate("/")}
+              className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+              title="Přehled projektů"
+            >
+              <LayoutDashboard className="h-5 w-5" />
+            </button>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-1 px-2 py-1 rounded text-white/70 hover:text-white hover:bg-white/10 transition-colors text-xs">
-                <User className="h-3.5 w-3.5" />
-                <span>{profile?.full_name || "Uživatel"}</span>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setAccountSettingsOpen(true)}>
-                <Settings className="h-4 w-4 mr-2" /> Nastavení účtu
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={signOut}>
-                <LogOut className="h-4 w-4 mr-2" /> Odhlásit se
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors text-sm">
+                  <User className="h-4 w-4" />
+                  <span className="font-sans text-xs">{profile?.full_name || profile?.email || "Uživatel"}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setAccountSettingsOpen(true)}>
+                  <UserCog className="h-4 w-4 mr-2" />
+                  Nastavení účtu
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={signOut}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Odhlásit se
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </header>
 
