@@ -837,7 +837,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
                   <span className="text-[8px] font-medium" style={{ color: "#b0bab8" }}>Dokončeno</span>
                   <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
                 </div>
-                <div style={{ opacity: 0.5 }}>
+                <div style={{ opacity: 0.65 }}>
                   {completedItems.map(item => (
                     <CompletedSiloItem key={item.id} item={item} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
                   ))}
