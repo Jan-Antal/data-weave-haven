@@ -8,7 +8,7 @@ import { useProjects } from "@/hooks/useProjects";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isPast, isFuture, differenceInDays } from "date-fns";
-import { Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Search, Archive } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { getProjectColor } from "@/lib/projectColors";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
 import { toast } from "@/hooks/use-toast";
