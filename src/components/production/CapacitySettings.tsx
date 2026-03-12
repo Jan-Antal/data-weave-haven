@@ -54,6 +54,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
 
   const standardCapacity = settings?.weekly_capacity_hours ?? 875;
+  const [standardCapacityInput, setStandardCapacityInput] = useState<string>("");
   const workingDaysPerWeek = 5;
   const calculatedHoursPerDay = workingDaysPerWeek > 0 ? Math.round(standardCapacity / workingDaysPerWeek) : 175;
 
