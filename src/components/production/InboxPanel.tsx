@@ -878,24 +878,27 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
       }}
       onContextMenu={onContextMenu}
     >
-      {/* Checkbox area */}
-      <div
-        className="shrink-0 flex items-center justify-center transition-opacity"
-        style={{ width: 14, height: 14, opacity: showCheckbox ? 1 : 0 }}
-        onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleCheck(item.id); }}
-        onPointerDown={(e) => { if (showCheckbox) { e.stopPropagation(); } }}
-      >
-        <div style={{
-          width: 12, height: 12, borderRadius: 3,
-          border: isChecked ? "none" : "1.5px solid #9ca3af",
-          backgroundColor: isChecked ? "#3a8a36" : "transparent",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          cursor: "pointer",
-        }}>
-          {isChecked && <Check className="h-2.5 w-2.5" style={{ color: "#ffffff" }} />}
+      {/* Checkbox or grip handle — same 14px slot */}
+      {showCheckbox ? (
+        <div
+          className="shrink-0 flex items-center justify-center"
+          style={{ width: 14, height: 14 }}
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleCheck(item.id); }}
+          onPointerDown={(e) => { e.stopPropagation(); }}
+        >
+          <div style={{
+            width: 12, height: 12, borderRadius: 3,
+            border: isChecked ? "none" : "1.5px solid #9ca3af",
+            backgroundColor: isChecked ? "#3a8a36" : "transparent",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer",
+          }}>
+            {isChecked && <Check className="h-2.5 w-2.5" style={{ color: "#ffffff" }} />}
+          </div>
         </div>
-      </div>
-      {!showCheckbox && <GripVertical className="h-3 w-3 shrink-0" style={{ color: "#99a5a3", marginLeft: -14 }} />}
+      ) : (
+        <GripVertical className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />
+      )}
       {adhocBadge && (
         <span className="text-[8px] shrink-0" title={adhocBadge.label}>{adhocBadge.emoji}</span>
       )}
