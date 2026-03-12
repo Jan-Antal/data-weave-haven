@@ -1129,49 +1129,50 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                               )}
                             </div>
                           )}
-                          {/* Week cells — interactive */}
+                          {/* Week cells — interactive + droppable */}
                           {weeks.map(week => {
                             const alloc = item.weekAllocations.get(week.key);
                             if (alloc) {
                               return (
-                                <FilledWeekCell
-                                  key={week.key}
-                                  weekKey={week.key}
-                                  isCurrent={week.isCurrent}
-                                  alloc={alloc}
-                                  item={item}
-                                  displayMode={displayMode}
-                                  formatCellValue={formatCellValue}
-                                  getCellStyle={getCellStyle}
-                                  moveTargetWeeks={moveTargetWeeks}
-                                  getWeekCapacity={getWeekCapacity}
-                                  weekCapacities={weekCapacities}
-                                  onMoveToWeek={handleMoveToWeek}
-                                  onReturnToInbox={handleReturnToInbox}
-                                  onComplete={handleComplete}
-                                  onCancel={(ids) => {
-                                    setCancelDialog({
-                                      open: true,
-                                      itemId: ids[0],
-                                      itemName: item.itemName,
-                                      itemCode: item.itemCode,
-                                      hours: alloc.hours,
-                                      projectName: item.projectName,
-                                      projectId: item.projectId,
-                                    });
-                                  }}
-                                />
+                                <DroppableWeekCell key={week.key} droppableId={`${week.key}-${item.id}`} weekKey={week.key} isCurrent={week.isCurrent}>
+                                  <FilledWeekCell
+                                    weekKey={week.key}
+                                    isCurrent={week.isCurrent}
+                                    alloc={alloc}
+                                    item={item}
+                                    displayMode={displayMode}
+                                    formatCellValue={formatCellValue}
+                                    getCellStyle={getCellStyle}
+                                    moveTargetWeeks={moveTargetWeeks}
+                                    getWeekCapacity={getWeekCapacity}
+                                    weekCapacities={weekCapacities}
+                                    onMoveToWeek={handleMoveToWeek}
+                                    onReturnToInbox={handleReturnToInbox}
+                                    onComplete={handleComplete}
+                                    onCancel={(ids) => {
+                                      setCancelDialog({
+                                        open: true,
+                                        itemId: ids[0],
+                                        itemName: item.itemName,
+                                        itemCode: item.itemCode,
+                                        hours: alloc.hours,
+                                        projectName: item.projectName,
+                                        projectId: item.projectId,
+                                      });
+                                    }}
+                                  />
+                                </DroppableWeekCell>
                               );
                             }
-                            // Empty cell — show "+" if item has inbox items
                             return (
-                              <EmptyWeekCell
-                                key={week.key}
-                                weekKey={week.key}
-                                isCurrent={week.isCurrent}
-                                item={item}
-                                onSchedule={handleScheduleFromInbox}
-                              />
+                              <DroppableWeekCell key={week.key} droppableId={`${week.key}-${item.id}`} weekKey={week.key} isCurrent={week.isCurrent}>
+                                <EmptyWeekCell
+                                  weekKey={week.key}
+                                  isCurrent={week.isCurrent}
+                                  item={item}
+                                  onSchedule={handleScheduleFromInbox}
+                                />
+                              </DroppableWeekCell>
                             );
                           })}
                           {/* Expedice cell */}
