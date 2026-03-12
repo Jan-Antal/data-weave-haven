@@ -53,7 +53,7 @@ interface ExpedicePanelProps {
   onSelectProject?: (projectId: string) => void;
 }
 
-export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }: ExpedicePanelProps) {
+export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, selectedProjectId, onSelectProject }: ExpedicePanelProps) {
   const { data: projects = [] } = useProductionExpedice();
   const { data: allProjects = [] } = useProjects();
   const { data: scheduleData } = useProductionSchedule();

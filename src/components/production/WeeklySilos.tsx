@@ -753,8 +753,11 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
 
   return (
     <div className="rounded-[6px] overflow-hidden relative" style={{
-      border: "1px solid #ece8e2", borderLeft: `4px solid ${borderLeftColor}`,
+      border: isSelected ? "2px solid hsl(var(--primary))" : "1px solid #ece8e2",
+      borderLeft: `4px solid ${borderLeftColor}`,
       backgroundColor: "#ffffff", opacity: isDragging ? 0.3 : 1,
+      boxShadow: isSelected ? "0 0 0 1px hsl(var(--primary) / 0.2)" : undefined,
+      transition: "border-color 150ms, box-shadow 150ms",
     }}>
 
       <div className="flex" style={{ borderBottom: expanded ? "1px solid #ece8e2" : "none" }}>
@@ -762,7 +765,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
         <div
           className="shrink-0 flex items-center justify-center cursor-pointer select-none"
           style={{ width: 28 }}
-          onClick={toggleExpand}
+          onClick={() => { toggleExpand(); onSelectProject?.(bundle.project_id); }}
           onMouseDown={e => e.stopPropagation()}
           onPointerDown={e => e.stopPropagation()}
         >
