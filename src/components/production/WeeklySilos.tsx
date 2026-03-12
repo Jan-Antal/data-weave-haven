@@ -771,7 +771,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
         <div
           className="shrink-0 flex items-center justify-center cursor-pointer select-none"
           style={{ width: 28 }}
-          onClick={() => { toggleExpand(); onSelectProject?.(bundle.project_id); }}
+          onClick={() => toggleExpand()}
           onMouseDown={e => e.stopPropagation()}
           onPointerDown={e => e.stopPropagation()}
         >
