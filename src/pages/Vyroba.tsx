@@ -432,7 +432,7 @@ export default function Vyroba() {
                 bundle={selectedBundle}
                 logs={getLogsForBundle(selectedBundle.bundleId)}
                 todayDayIndex={todayDayIndex}
-                isManagement={isManagement}
+                isManagement={false}
                 onOpenLog={openLogModal}
                 nextWeekNum={getISOWeekNumber(addWeeks(currentMonday, 1))}
                 nextWeekKey={weekKeyStr(addWeeks(currentMonday, 1))}
