@@ -736,35 +736,24 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
 
       {/* Items */}
       <div className="flex-1 overflow-y-auto p-1.5" style={{ display: "flex", flexDirection: "column", gap: 3, opacity: isPast ? 0.7 : 1 }}>
-        {(() => {
-          const filteredBundles = silo?.bundles.filter(b => {
-            if (!searchQuery) return true;
-            const q = searchQuery.toLowerCase();
-            return b.project_name.toLowerCase().includes(q) || b.project_id.toLowerCase().includes(q);
-          }) ?? [];
-          return (
-            <>
-              {filteredBundles.length === 0 && !isPast && (
-                <div className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all" style={{ border: "1.5px dashed #e2ddd6" }}>
-                  <span className="text-[9px] text-center" style={{ color: "#99a5a3" }}>{searchQuery ? "Žádné výsledky" : "Přetáhni sem z Inboxu"}</span>
-                </div>
-              )}
-              {filteredBundles.length === 0 && isPast && (
-                <div className="flex-1 flex items-center justify-center px-2 py-[14px]">
-                  <span className="text-[9px] text-center" style={{ color: "#c4ccc9" }}>Prázdný týden</span>
-                </div>
-              )}
-              {filteredBundles.map(bundle => (
-                <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey}
-                  showCzk={showCzk} hourlyRate={hourlyRate} displayMode={displayMode}
-                  onBundleContextMenu={onBundleContextMenu} onItemContextMenu={onItemContextMenu}
-                  projectLookup={projectLookup}
-                  isSelected={selectedProjectId === bundle.project_id}
-                  onSelectProject={onSelectProject} searchQuery={searchQuery} />
-              ))}
-            </>
-          );
-        })()}
+        {(!silo || silo.bundles.length === 0) && !isPast && (
+          <div className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all" style={{ border: "1.5px dashed #e2ddd6" }}>
+            <span className="text-[9px] text-center" style={{ color: "#99a5a3" }}>Přetáhni sem z Inboxu</span>
+          </div>
+        )}
+        {(!silo || silo.bundles.length === 0) && isPast && (
+          <div className="flex-1 flex items-center justify-center px-2 py-[14px]">
+            <span className="text-[9px] text-center" style={{ color: "#c4ccc9" }}>Prázdný týden</span>
+          </div>
+        )}
+        {silo?.bundles.map(bundle => (
+          <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey}
+            showCzk={showCzk} hourlyRate={hourlyRate} displayMode={displayMode}
+            onBundleContextMenu={onBundleContextMenu} onItemContextMenu={onItemContextMenu}
+            projectLookup={projectLookup}
+            isSelected={selectedProjectId === bundle.project_id}
+            onSelectProject={onSelectProject} searchQuery={searchQuery} />
+        ))}
       </div>
 
       {isOverloaded && !isPast && silo && !spillDismissed && (
