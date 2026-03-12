@@ -238,7 +238,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   let barColor: string;
                   if (past) barColor = "hsl(var(--muted-foreground) / 0.3)";
                   else if (hasCompanyHol) barColor = "#f59e0b";
-                  else if (isManual) barColor = "#4f87c5";
+                  else if (isManual) barColor = "#2d6a4f";
                   else if (hasHoliday) barColor = "#d97706";
                   else barColor = "hsl(var(--primary) / 0.6)";
 
@@ -282,7 +282,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
           <div className="flex items-center gap-4 text-[9px] text-muted-foreground">
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(var(--primary) / 0.6)" }} />Standard</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#d97706" }} />Svátek</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#4f87c5" }} />Ručně upraveno</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#2d6a4f" }} />Ručně upraveno</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(var(--muted-foreground) / 0.3)" }} />Minulé</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />Firemní dovolená</span>
           </div>
