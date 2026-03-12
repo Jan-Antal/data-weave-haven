@@ -215,6 +215,7 @@ export function CompletionDialog({
                     checked={isCompleted || isChecked}
                     disabled={isCompleted}
                     onCheckedChange={() => !isCompleted && toggleItem(item.id)}
+                    onClick={(e) => e.stopPropagation()}
                   />
                   {item.item_code && (
                     <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>
