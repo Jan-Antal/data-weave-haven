@@ -662,9 +662,19 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             <div className="h-full rounded transition-all duration-300" style={{ width: `${Math.min(pct, 100)}%`, background: barBg }} />
           </div>
           <div className="flex items-baseline justify-between mt-[3px]">
-            <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{Math.round(totalHours)}h</span>
-            <span className="font-mono text-[10px]" style={{ color: "#99a5a3" }}>/ {weeklyCapacity}h</span>
-            <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
+            {displayMode === "czk" ? (
+              <>
+                <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{formatCompactCzk(totalHours * hourlyRate)}</span>
+                <span className="font-mono text-[10px]" style={{ color: "#99a5a3" }}>/ {formatCompactCzk(weeklyCapacity * hourlyRate)}</span>
+                <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
+              </>
+            ) : (
+              <>
+                <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{Math.round(totalHours)}h</span>
+                <span className="font-mono text-[10px]" style={{ color: "#99a5a3" }}>/ {weeklyCapacity}h</span>
+                <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
+              </>
+            )}
           </div>
         </div>
       </div>
