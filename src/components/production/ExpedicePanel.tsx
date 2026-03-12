@@ -225,6 +225,64 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
     }
   }, [invalidateAll]);
 
+  const unExpediceAll = useCallback(async (projectId: string) => {
+    try {
+      const { data: items, error: fetchErr } = await supabase
+        .from("production_schedule")
+        .select("id")
+        .eq("project_id", projectId)
+        .eq("status", "completed")
+        .not("expediced_at", "is", null);
+      if (fetchErr) throw fetchErr;
+      if (!items || items.length === 0) return;
+      const { error } = await supabase
+        .from("production_schedule")
+        .update({ expediced_at: null } as any)
+        .in("id", items.map(i => i.id));
+      if (error) throw error;
+      invalidateAll();
+      toast({ title: `↩ ${items.length} položek vráceno do Expedice` });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [invalidateAll]);
+
+  const returnAllToProduction = useCallback(async (projectId: string) => {
+    try {
+      const { data: items, error: fetchErr } = await supabase
+        .from("production_schedule")
+        .select("id")
+        .eq("project_id", projectId)
+        .eq("status", "completed");
+      if (fetchErr) throw fetchErr;
+      if (!items || items.length === 0) return;
+      for (const item of items) {
+        await returnToProduction(item.id);
+      }
+      toast({ title: `↩ ${items.length} položek vráceno do výroby` });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [returnToProduction]);
+
+  const returnAllToInbox = useCallback(async (projectId: string) => {
+    try {
+      const { data: items, error: fetchErr } = await supabase
+        .from("production_schedule")
+        .select("id")
+        .eq("project_id", projectId)
+        .eq("status", "completed");
+      if (fetchErr) throw fetchErr;
+      if (!items || items.length === 0) return;
+      for (const item of items) {
+        await moveItemBackToInbox(item.id);
+      }
+      toast({ title: `📥 ${items.length} položek vráceno do Inboxu` });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [moveItemBackToInbox]);
+
   // === CONTEXT MENUS ===
   const buildContextActions = useCallback(
     (item: ScheduleItem | null, projectId: string, isArchive = false) => {
@@ -240,21 +298,26 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
 
       if (isArchive && item) {
         // Archive item context menu
-        actions.push({ label: "Vrátit do Expedice", icon: "📦", onClick: () => unExpedice(item.id) });
-        actions.push({ label: `Vrátit do výroby (T${weekNum})`, icon: "↩", onClick: () => returnToProduction(item.id) });
-        actions.push({ label: "Vrátit do Inboxu", icon: "↩", onClick: () => moveItemBackToInbox(item.id) });
+        actions.push({ label: "Vrátit do Expedice", icon: "↩", onClick: () => unExpedice(item.id) });
+        actions.push({ label: `Vrátit do výroby (T${weekNum})`, icon: "🔧", onClick: () => returnToProduction(item.id) });
+        actions.push({ label: "Vrátit do Inboxu", icon: "📥", onClick: () => moveItemBackToInbox(item.id) });
+      } else if (isArchive && !item) {
+        // Archive project header context menu
+        actions.push({ label: "Vrátit do Expedice", icon: "↩", onClick: () => unExpediceAll(projectId) });
+        actions.push({ label: "Vrátit do Výroby", icon: "🔧", onClick: () => returnAllToProduction(projectId) });
+        actions.push({ label: "Vrátit do Inboxu", icon: "📥", onClick: () => returnAllToInbox(projectId) });
       } else if (item) {
         // Active Expedice item context menu
         actions.push({ label: "Expedováno ✓", icon: "📦", onClick: () => markAsExpediced(item.id) });
         actions.push({ label: `Vrátit do výroby (T${weekNum})`, icon: "↩", onClick: () => returnToProduction(item.id) });
         actions.push({ label: "Vrátit do Inboxu", icon: "↩", onClick: () => moveItemBackToInbox(item.id) });
       } else {
-        // Project header context menu
+        // Active project header context menu
         actions.push({ label: "Expedovat vše", icon: "📦", onClick: () => markAllAsExpediced(projectId) });
       }
 
       if (onNavigateToTPV) {
-        actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(projectId, item?.item_code) });
+        actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(projectId, item?.item_code), dividerBefore: isArchive && !item });
       }
       if (onOpenProjectDetail) {
         actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(projectId) });
@@ -262,7 +325,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
 
       return actions;
     },
-    [returnToProduction, moveItemBackToInbox, onNavigateToTPV, onOpenProjectDetail, markAsExpediced, markAllAsExpediced, unExpedice]
+    [returnToProduction, moveItemBackToInbox, onNavigateToTPV, onOpenProjectDetail, markAsExpediced, markAllAsExpediced, unExpedice, unExpediceAll, returnAllToProduction, returnAllToInbox]
   );
 
   const handleItemContextMenu = useCallback(
@@ -275,10 +338,10 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
   );
 
   const handleProjectContextMenu = useCallback(
-    (e: React.MouseEvent, projectId: string) => {
+    (e: React.MouseEvent, projectId: string, isArchive = false) => {
       e.preventDefault();
       e.stopPropagation();
-      setContextMenu({ x: e.clientX, y: e.clientY, actions: buildContextActions(null, projectId) });
+      setContextMenu({ x: e.clientX, y: e.clientY, actions: buildContextActions(null, projectId, isArchive) });
     },
     [buildContextActions]
   );
@@ -473,7 +536,7 @@ interface ProjectGroupProps {
   inboxProjects: any[];
   isGroupCollapsed: boolean;
   toggleGroup: () => void;
-  onProjectContextMenu: (e: React.MouseEvent, projectId: string) => void;
+  onProjectContextMenu: (e: React.MouseEvent, projectId: string, isArchive?: boolean) => void;
   onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem) => void;
   onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void;
   isArchive: boolean;
@@ -513,11 +576,11 @@ function ProjectGroup({
         border: `1px solid ${isArchive ? "hsl(var(--border))" : "#ece8e2"}`,
         borderLeft: `4px solid ${isArchive ? "#d1d5db" : getProjectColor(group.project_id)}`,
       }}
-      onContextMenu={(e) => onProjectContextMenu(e, group.project_id)}
+      onContextMenu={(e) => onProjectContextMenu(e, group.project_id, isArchive)}
     >
       <button
         onClick={toggleGroup}
-        onContextMenu={(e) => onProjectContextMenu(e, group.project_id)}
+        onContextMenu={(e) => onProjectContextMenu(e, group.project_id, isArchive)}
         className="w-full flex items-center gap-1.5 px-2.5 py-2 text-left transition-colors"
         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = isArchive ? "hsl(210 20% 96%)" : "#f8f7f5")}
         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
