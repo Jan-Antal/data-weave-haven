@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo, type UIEvent } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileTPVCardList } from "./mobile/MobileTPVCardList";
 import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColumns";
