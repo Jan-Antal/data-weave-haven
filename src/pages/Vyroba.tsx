@@ -1,13 +1,14 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useProductionSchedule, getISOWeekNumber, type ScheduleBundle } from "@/hooks/useProductionSchedule";
 import { useProductionDailyLogs, saveDailyLog, type DailyLog } from "@/hooks/useProductionDailyLogs";
 import { useAllTPVItems } from "@/hooks/useAllTPVItems";
 import { getProjectColor } from "@/lib/projectColors";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList, AlertTriangle, User, UserCog, Settings, LogOut, LayoutDashboard, CalendarRange } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList, AlertTriangle, User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,13 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Progress } from "@/components/ui/progress";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AccountSettings } from "@/components/AccountSettings";
+import { UserManagement } from "@/components/UserManagement";
+import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
+import { StatusManagement } from "@/components/StatusManagement";
+import { RecycleBin } from "@/components/RecycleBin";
+import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDialog";
+import { DataLogPanel } from "@/components/DataLogPanel";
+import { CapacitySettings } from "@/components/production/CapacitySettings";
 
 /* ═══ helpers ═══ */
 function getMonday(d: Date): Date {
