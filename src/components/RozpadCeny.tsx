@@ -114,7 +114,18 @@ export function RozpadCeny({ projectId, prodejniCena, costValues, onChange, read
     const num = parseFloat(val);
     if (!isNaN(num)) {
       const costKey = `cost_${key}` as keyof CostValues;
-      onChange({ [costKey]: num, cost_is_custom: true });
+      // Check if values now differ from the selected preset
+      const currentPreset = presets.find((p) => p.id === costValues.cost_preset_id);
+      let isCustom = costValues.cost_is_custom;
+      if (currentPreset) {
+        const updatedValues = { ...pctValues, [key]: num };
+        isCustom = SEGMENT_COLORS.some((seg) => {
+          const presetVal = currentPreset[seg.key as keyof CostBreakdownPreset] as number;
+          const curVal = seg.key === key ? num : (updatedValues[seg.key] ?? 0);
+          return Math.round(curVal * 100) !== Math.round(presetVal * 100);
+        });
+      }
+      onChange({ [costKey]: num, cost_is_custom: isCustom });
     }
     setEditing((prev) => {
       const next = { ...prev };
@@ -130,9 +141,9 @@ export function RozpadCeny({ projectId, prodejniCena, costValues, onChange, read
   const productionHours = hourlyRate > 0 ? productionCzk / hourlyRate : 0;
 
   const selectedPreset = presets.find((p) => p.id === costValues.cost_preset_id);
-  const presetLabel = selectedPreset
-    ? `${selectedPreset.name}${costValues.cost_is_custom ? " (Upraveno)" : ""}`
-    : undefined;
+  const dropdownLabel = selectedPreset
+    ? (costValues.cost_is_custom ? `Vlastní: ${selectedPreset.name}` : selectedPreset.name)
+    : "— Žádná šablona —";
 
   if (readOnly && !hasValues) return null;
 
