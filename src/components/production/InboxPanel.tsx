@@ -536,6 +536,10 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
               isSelected={selectedProjectId === project.project_id}
               onSelectProject={onSelectProject}
               projectInfo={info}
+              checkedItems={checkedItems}
+              onToggleCheck={toggleCheckItem}
+              onClearChecked={clearCheckedItems}
+              allInboxItemsMap={allInboxItemsMap}
             />
           );
         })}
