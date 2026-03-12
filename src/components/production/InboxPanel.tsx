@@ -210,6 +210,28 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
   const handleExpandAll = () => { setAllExpanded(true); setExpandKey((k) => k + 1); };
   const handleCollapseAll = () => { setAllExpanded(false); setExpandKey((k) => k + 1); };
 
+  const toggleCheckItem = useCallback((itemId: string) => {
+    setCheckedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }, []);
+
+  const clearCheckedItems = useCallback(() => setCheckedItems(new Set()), []);
+
+  // Build a lookup of all inbox items for batch drag data
+  const allInboxItemsMap = useMemo(() => {
+    const m = new Map<string, InboxItem & { projectName: string }>();
+    for (const p of projects) {
+      for (const item of p.items) {
+        m.set(item.id, { ...item, projectName: p.project_name });
+      }
+    }
+    return m;
+  }, [projects]);
+
   const handleProjectContextMenu = (e: React.MouseEvent, project: InboxProject) => {
     e.preventDefault(); e.stopPropagation();
     const planItems: PlanningItem[] = project.items.map(i => ({
