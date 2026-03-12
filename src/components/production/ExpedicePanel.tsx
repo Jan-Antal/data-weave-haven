@@ -592,7 +592,7 @@ function ProjectGroup({
           <div className="flex items-center justify-between gap-1.5">
             <span
               className="text-[12px] font-semibold truncate"
-              style={{ color: getProjectColor(group.project_id) }}
+              style={{ color: "hsl(var(--foreground))" }}
             >
               {group.project_name}
             </span>
