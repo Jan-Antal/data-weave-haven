@@ -316,7 +316,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   }
 
   return (
-    <div className="w-full min-w-0">
+    <div className="w-full min-w-0 h-full flex flex-col">
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap mb-4">
         <Button variant="ghost" size="sm" onClick={onBack}>
