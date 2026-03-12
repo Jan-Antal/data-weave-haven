@@ -157,10 +157,10 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
   }, [getWeekCapacity, scheduleData]);
 
 
-  // Map project_id → { datum_smluvni, status }
+  // Map project_id → project info including deadline fields
   const projectInfoMap = useMemo(() => {
-    const m = new Map<string, { datum_smluvni: string | null; status: string | null }>();
-    for (const p of allDbProjects) m.set(p.project_id, { datum_smluvni: p.datum_smluvni ?? null, status: p.status ?? null });
+    const m = new Map<string, { datum_smluvni: string | null; status: string | null; expedice: string | null; montaz: string | null }>();
+    for (const p of allDbProjects) m.set(p.project_id, { datum_smluvni: p.datum_smluvni ?? null, status: p.status ?? null, expedice: (p as any).expedice ?? null, montaz: (p as any).montaz ?? null });
     return m;
   }, [allDbProjects]);
 
@@ -512,6 +512,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
               daysLabel={getUrgencyDaysLabel(info?.datum_smluvni)}
               isSelected={selectedProjectId === project.project_id}
               onSelectProject={onSelectProject}
+              projectInfo={info}
             />
           );
         })}
@@ -520,20 +521,30 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
           <div className="mt-2 space-y-[2px]">
             {completedProjects.map(p => {
               const isCompletedSelected = selectedProjectId === p.project_id;
+              const completedColor = getProjectColor(p.project_id);
+              const completedInfo = projectInfoMap.get(p.project_id);
+              const completedDeadline = resolveDeadline({ expedice: completedInfo?.expedice, montaz: completedInfo?.montaz, datum_smluvni: completedInfo?.datum_smluvni });
+              const completedDeadlineShort = completedDeadline ? `${completedDeadline.date.getDate()}.${completedDeadline.date.getMonth() + 1}.` : null;
               return (
               <div key={p.project_id} className="flex items-center gap-1.5 px-2 py-[4px] rounded-[5px] cursor-pointer"
                 onClick={(e) => { e.stopPropagation(); onSelectProject?.(p.project_id); }}
                 style={{
                   backgroundColor: isCompletedSelected ? "rgba(217,119,6,0.05)" : "#ffffff",
-                  border: isCompletedSelected ? "2px solid #d97706" : "1px solid #e5e2dd",
-                  boxShadow: isCompletedSelected ? "0 0 0 1px rgba(217,119,6,0.1)" : undefined,
+                  borderTop: isCompletedSelected ? "2px solid #d97706" : "1px solid #e5e2dd",
+                  borderRight: isCompletedSelected ? "2px solid #d97706" : "1px solid #e5e2dd",
+                  borderBottom: isCompletedSelected ? "2px solid #d97706" : "1px solid #e5e2dd",
+                  borderLeft: `4px solid ${completedColor}`,
+                  boxShadow: isCompletedSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
                 }}>
                 <Check className="h-3 w-3 shrink-0" style={{ color: "#3a8a36" }} />
                 <div className="flex-1 min-w-0">
-                <div className="text-[10px] font-medium truncate" style={{ color: "#374151" }}>{p.project_name}</div>
-                  <div className="font-mono text-[9px] truncate" style={{ color: "#6b7280" }}>{p.project_id}</div>
+                  <div className="truncate" style={{ fontSize: 13, fontWeight: 500, color: "#374151" }}>{p.project_name}</div>
+                  <div className="font-mono truncate" style={{ fontSize: 11, color: "#6b7280" }}>{p.project_id}</div>
                 </div>
-                <span className="text-[9px] shrink-0" style={{ color: "#6b7a78" }}>✓</span>
+                {completedDeadlineShort && (
+                  <span className="font-mono text-[9px] shrink-0" style={{ color: "#6b7280" }}>{completedDeadlineShort}</span>
+                )}
+                <span className="text-[9px] shrink-0" style={{ color: "#3a8a36" }}>✓</span>
               </div>
               );
             })}
@@ -611,7 +622,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
   );
 }
 
-function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel, isSelected, onSelectProject }: {
+function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel, isSelected, onSelectProject, projectInfo }: {
   project: InboxProject; hourlyRate: number; defaultExpanded: boolean; showCzk?: boolean;
   progress?: ProjectProgress; onNavigateToTPV?: (projectId: string) => void;
   onOpenProjectDetail?: (projectId: string) => void;
@@ -621,6 +632,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
   daysLabel: string | null;
   isSelected?: boolean;
   onSelectProject?: (projectId: string) => void;
+  projectInfo?: { datum_smluvni: string | null; status: string | null; expedice: string | null; montaz: string | null };
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const color = getProjectColor(project.project_id);
@@ -630,10 +642,27 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
   const leftBorderColor = urgency !== "ok" ? uColors.border : color;
   const leftBorderWidth = urgency !== "ok" ? 3 : 4;
 
+  // Resolve deadline for display
+  const deadline = useMemo(() => {
+    if (!projectInfo) return null;
+    return resolveDeadline({ expedice: projectInfo.expedice, montaz: projectInfo.montaz, datum_smluvni: projectInfo.datum_smluvni });
+  }, [projectInfo]);
+
+  const deadlineDisplay = useMemo(() => {
+    if (!deadline) return null;
+    const days = differenceInDays(deadline.date, new Date());
+    const dateStr = `${deadline.date.getDate()}.${deadline.date.getMonth() + 1}.${deadline.date.getFullYear()}`;
+    const label = deadline.fieldName === "expedice" ? "Exp" : deadline.fieldName === "montaz" ? "Montáž" : "Sml";
+    const color = days < 0 ? "#dc2626" : days <= 14 ? "#d97706" : "#6b7280";
+    return { label, dateStr, color };
+  }, [deadline]);
+
   return (
     <div className="rounded-lg overflow-hidden" style={{
       backgroundColor: isSelected ? "rgba(217,119,6,0.04)" : "#ffffff",
-      border: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+      borderTop: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+      borderRight: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+      borderBottom: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
       borderLeft: `${leftBorderWidth}px solid ${leftBorderColor}`,
       boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
       transition: "border-color 150ms, box-shadow 150ms",
@@ -649,7 +678,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
           style={{ color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-[12px] truncate" style={{ color: urgency === "ok" ? "#1a1a1a" : uColors.text, fontWeight: 600 }}>{project.project_name}</span>
+            <span className="truncate" style={{ fontSize: 14, color: urgency === "ok" ? "#1a1a1a" : uColors.text, fontWeight: 600 }}>{project.project_name}</span>
             {urgency === "overdue" && (
               <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(220,38,38,0.1)", color: "#DC2626" }}>
                 PO TERMÍNU
@@ -661,22 +690,27 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
               </span>
             )}
           </div>
-          <div className="font-mono text-[9px]" style={{ color: "#6b7280" }}>{project.project_id}</div>
+          <div className="font-mono" style={{ fontSize: 11, color: "#6b7280" }}>{project.project_id}</div>
+          {deadlineDisplay && (
+            <div style={{ fontSize: 11, color: deadlineDisplay.color, marginTop: 1 }}>
+              {deadlineDisplay.label}: {deadlineDisplay.dateStr}
+            </div>
+          )}
           {progress && <div className="mt-1"><ProjectProgressBar progress={progress} compact /></div>}
         </div>
         <div className="text-right shrink-0">
-          <span className="font-mono text-[12px]" style={{ color: "#1a1a1a", fontWeight: 700 }}>{Math.round(project.total_hours)}h</span>
+          <span className="font-mono" style={{ fontSize: 15, color: "#1a1a1a", fontWeight: 700 }}>{Math.round(project.total_hours)}h</span>
           {showCzk && <span className="font-mono text-[9px] ml-1" style={{ color: "#6b7a78" }}>{formatCompactCzk(project.total_hours * hourlyRate)}</span>}
         </div>
       </button>
       {expanded && (
         <div className="px-2 pb-2 space-y-[2px]">
           {progress?.scheduled_items.map(si => (
-            <div key={si.id} className="flex items-center gap-1.5 px-2 py-[3px] rounded-[5px]" style={{ opacity: 0.5 }}>
-              <span className="text-[9px]" style={{ color: si.status === "completed" ? "#3a8a36" : "#3b82f6" }}>{si.status === "completed" ? "✓" : "→"}</span>
-              {si.item_code && <span className="font-mono text-[9px] shrink-0" style={{ color: "#99a5a3" }}>{si.item_code}</span>}
-              <span className="text-[10px] flex-1 truncate" style={{ color: "#99a5a3" }}>{si.item_name}</span>
-              <span className="font-mono text-[9px] shrink-0" style={{ color: "#99a5a3" }}>{si.week_label}</span>
+            <div key={si.id} className="flex items-center gap-1.5 px-2 py-[3px] rounded-[5px]" style={{ opacity: si.status === "completed" ? 0.6 : 0.7 }}>
+              <span style={{ fontSize: 11, color: si.status === "completed" ? "#3a8a36" : "#3b82f6" }}>{si.status === "completed" ? "✓" : "→"}</span>
+              {si.item_code && <span className="font-mono shrink-0" style={{ fontSize: 11, color: si.status === "completed" ? "#9ca3af" : "#223937", fontWeight: 500 }}>{si.item_code}</span>}
+              <span className="flex-1 truncate" style={{ fontSize: 12, color: si.status === "completed" ? "#9ca3af" : "#4b5563" }}>{si.item_name}</span>
+              <span className="font-mono shrink-0" style={{ fontSize: 11, color: "#6b7280" }}>{si.week_label}</span>
             </div>
           ))}
           {project.items.map((item) => (
@@ -718,8 +752,8 @@ function DraggableInboxItem({ item, projectName, onContextMenu }: { item: InboxI
       {adhocBadge && (
         <span className="text-[8px] shrink-0" title={adhocBadge.label}>{adhocBadge.emoji}</span>
       )}
-      {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
-      <span className="text-[11px] font-medium flex-1 truncate" style={{ color: "#6b7a78" }}>{item.item_name}</span>
+      {item.item_code && <span className="font-mono shrink-0" style={{ fontSize: 11, color: "#223937", fontWeight: 500 }}>{item.item_code}</span>}
+      <span className="flex-1 truncate" style={{ fontSize: 12, color: "#4b5563" }}>{item.item_name}</span>
       <span className="font-mono text-[10px] shrink-0" style={{ color: "#1a1a1a", fontWeight: 700 }}>{item.estimated_hours}h</span>
     </div>
   );
