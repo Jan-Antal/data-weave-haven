@@ -229,23 +229,8 @@ export default function Vyroba() {
     }
   }
 
-  /* ── Spill to next week ── */
-  const [spilledIds, setSpilledIds] = useState<Set<string>>(new Set());
-  function handleSpill(bundleId: string) {
-    setSpilledIds((prev) => new Set(prev).add(bundleId));
-    const nextWeekNum = getISOWeekNumber(addWeeks(currentMonday, 1));
-    toast(`Přesunuto do T${nextWeekNum}`, {
-      action: {
-        label: "Zpět",
-        onClick: () => setSpilledIds((prev) => { const n = new Set(prev); n.delete(bundleId); return n; }),
-      },
-      duration: 5000,
-    });
-  }
-
-  const visibleBundles = bundles.filter((b) => !spilledIds.has(b.bundleId));
-  const spillBundles = visibleBundles.filter((b) => b.spillFrom);
-  const activeBundles = visibleBundles.filter((b) => !b.spillFrom);
+  const spillBundles = bundles.filter((b) => b.spillFrom);
+  const activeBundles = bundles.filter((b) => !b.spillFrom);
 
   if (loading) {
     return <div className="min-h-screen bg-[#f8f7f4] flex items-center justify-center"><p className="text-[#6b7280]">Načítání...</p></div>;
