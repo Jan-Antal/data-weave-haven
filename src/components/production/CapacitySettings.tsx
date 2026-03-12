@@ -51,6 +51,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const deleteCompanyHoliday = useDeleteCompanyHoliday();
   const upsertWeek = useUpsertWeekCapacity();
   const bulkUpdate = useBulkUpdateFutureCapacity();
+  const queryClient = useQueryClient();
 
   const standardCapacity = settings?.weekly_capacity_hours ?? 875;
   const workingDaysPerWeek = 5;
