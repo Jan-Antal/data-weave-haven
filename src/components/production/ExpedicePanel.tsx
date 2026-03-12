@@ -453,12 +453,11 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
         >
           <div className="flex items-center gap-1.5">
             <span className="text-sm">📁</span>
-            <span className="text-[11px] font-medium text-gray-500">Archiv</span>
-            <span className="text-[9px] text-gray-400">· posledních 30 dní</span>
+            <span style={{ fontSize: 11, fontWeight: 500, color: "#6b7280" }}>Archiv · posledních 30 dní</span>
           </div>
           <div className="flex items-center gap-1.5">
             {archivedProjects.length > 0 && (
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+              <span className="rounded-full" style={{ fontSize: 11, fontWeight: 600, padding: "2px 7px", backgroundColor: "rgba(217,151,6,0.12)", color: "#d97706" }}>
                 {archivedProjects.length}
               </span>
             )}
