@@ -689,30 +689,30 @@ function ProjectGroup({
                 <div
                   key={item.id}
                   className="rounded px-1 py-[3px] cursor-default transition-colors"
-                  style={{ opacity: isArchive ? 0.8 : (isItemExpediced ? 0.4 : 1) }}
+                  style={{ opacity: isArchive ? 0.75 : (isItemExpediced ? 0.4 : 1) }}
                   onContextMenu={(e) => onItemContextMenu(e, item)}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "hsl(var(--muted))")}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  onMouseEnter={(e) => { if (!isArchive) e.currentTarget.style.backgroundColor = "hsl(var(--muted))"; }}
+                  onMouseLeave={(e) => { if (!isArchive) e.currentTarget.style.backgroundColor = "transparent"; }}
                 >
                   <div className="flex items-center gap-1.5">
                     {isArchive ? (
-                      <span className="text-teal-500 text-[11px] shrink-0">✓</span>
+                      <span className="shrink-0" style={{ fontSize: 12, color: "#9ca3af" }}>✓</span>
                     ) : isItemExpediced ? (
-                      <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0"
-                        style={{ backgroundColor: "rgba(13,148,136,0.12)", color: "#0d9488" }}>
+                      <span className="font-bold px-1 py-[1px] rounded shrink-0"
+                        style={{ fontSize: 8, backgroundColor: "rgba(13,148,136,0.12)", color: "#0d9488" }}>
                         ✓ Exp
                       </span>
                     ) : (
-                      <Check className="shrink-0" style={{ width: 12, height: 12, color: "#16A34A", strokeWidth: 3 }} />
+                      <Check className="shrink-0" style={{ width: 12, height: 12, color: "#3a8a36", strokeWidth: 3 }} />
                     )}
                     {item.item_code && (
-                      <span className={`font-mono text-[10px] shrink-0 ${isArchive ? "text-gray-500" : "text-foreground"}`}>
+                      <span className="font-mono shrink-0" style={{ fontSize: 11, fontWeight: 500, color: isArchive ? "#9ca3af" : "#223937" }}>
                         {item.item_code}
                       </span>
                     )}
                     <span
-                      className={`text-[11px] truncate flex-1 ${isArchive ? "text-gray-600" : "text-muted-foreground"}`}
-                      style={{ textDecoration: (!isArchive && isItemExpediced) ? "line-through" : "none" }}
+                      className="truncate flex-1"
+                      style={{ fontSize: 12, color: isArchive ? "#9ca3af" : "#4b5563", textDecoration: (!isArchive && isItemExpediced) ? "line-through" : "none" }}
                     >
                       {item.item_name}
                     </span>
@@ -720,7 +720,7 @@ function ProjectGroup({
                   {isArchive ? (
                     expedicedCompactStr && (
                       <div className="ml-[18px]">
-                        <span className="text-[10px] font-medium px-1.5 py-[1px] rounded bg-teal-50 text-teal-600 border border-teal-200">
+                        <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, backgroundColor: "#f0fdf4", color: "#3a8a36", border: "1px solid #86efac" }}>
                           ✓ Expedováno {expedicedCompactStr}
                         </span>
                       </div>
@@ -728,7 +728,7 @@ function ProjectGroup({
                   ) : (
                     <div className="ml-[18px] flex flex-col gap-0">
                       {completedStr && (
-                        <span className="text-[8px] text-muted-foreground">
+                        <span style={{ fontSize: 10, color: "#9ca3af" }}>
                           Dokončeno: {completedStr}
                         </span>
                       )}
