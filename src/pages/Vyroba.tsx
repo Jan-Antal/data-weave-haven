@@ -801,7 +801,7 @@ function DetailPanel({ bundle, logs, todayDayIndex, onOpenLog, nextWeekNum, next
         </div>
 
         {/* Spill to next week — items/split mode UI */}
-        {!isManagement && activeScheduleItems.length > 0 && (
+        {activeScheduleItems.length > 0 && (
           <div className="rounded-lg overflow-hidden" style={{ background: "#ffffff", border: "1px solid #e5e2dd" }}>
             <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "1px solid #f0eeea" }}>
               <span className="text-xs font-semibold" style={{ color: "#1a1a1a" }}>Přesunutí do T{nextWeekNum}</span>
