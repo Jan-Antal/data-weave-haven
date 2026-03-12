@@ -518,9 +518,16 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
 
         {completedProjects.length > 0 && (
           <div className="mt-2 space-y-[2px]">
-            {completedProjects.map(p => (
-              <div key={p.project_id} className="flex items-center gap-1.5 px-2 py-[4px] rounded-[5px]"
-                style={{ backgroundColor: "rgba(58,138,54,0.04)", border: "1px solid rgba(58,138,54,0.15)" }}>
+            {completedProjects.map(p => {
+              const isCompletedSelected = selectedProjectId === p.project_id;
+              return (
+              <div key={p.project_id} className="flex items-center gap-1.5 px-2 py-[4px] rounded-[5px] cursor-pointer"
+                onClick={(e) => { e.stopPropagation(); onSelectProject?.(p.project_id); }}
+                style={{
+                  backgroundColor: isCompletedSelected ? "rgba(217,119,6,0.05)" : "rgba(58,138,54,0.04)",
+                  border: isCompletedSelected ? "2px solid #d97706" : "1px solid rgba(58,138,54,0.15)",
+                  boxShadow: isCompletedSelected ? "0 0 0 1px rgba(217,119,6,0.1)" : undefined,
+                }}>
                 <Check className="h-3 w-3 shrink-0" style={{ color: "#3a8a36" }} />
                 <div className="flex-1 min-w-0">
                   <div className="text-[10px] font-medium truncate" style={{ color: "#3a8a36" }}>{p.project_name}</div>
@@ -528,7 +535,8 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
                 </div>
                 <span className="text-[9px] shrink-0" style={{ color: "#6b7a78" }}>✓</span>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
