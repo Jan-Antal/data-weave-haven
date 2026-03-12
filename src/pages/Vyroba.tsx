@@ -69,6 +69,7 @@ interface VyrobaBundle {
   projectId: string;
   projectName: string;
   totalHours: number;
+  scheduleItems: ScheduleItem[];
   items: { id: string; item_name: string; item_code: string | null }[];
   color: string;
   spillFrom?: boolean;
