@@ -62,7 +62,7 @@ const PHASES = [
   { name: "Expedice", color: "#16a34a" },
 ];
 
-type RoleView = "manager" | "management";
+
 
 interface VyrobaBundle {
   bundleId: string;
@@ -104,8 +104,7 @@ export default function Vyroba() {
   const friday = addWeeks(currentMonday, 0);
   friday.setDate(friday.getDate() + 4);
 
-  // Role view toggle
-  const [roleView, setRoleView] = useState<RoleView>("manager");
+
 
   // Data
   const { data: scheduleData } = useProductionSchedule();
@@ -238,7 +237,7 @@ export default function Vyroba() {
 
   if (!isOwner) return null;
 
-  const isManagement = roleView === "management";
+  
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: "#f8f7f4" }}>
@@ -269,15 +268,7 @@ export default function Vyroba() {
 
             <span className="w-px h-5 bg-primary-foreground/20 mx-1" />
 
-            {/* Role toggle */}
-            <button
-              onClick={() => setRoleView((r) => r === "manager" ? "management" : "manager")}
-              className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors text-xs font-sans"
-            >
-              {isManagement ? "👔 Management" : "🔧 Výrobní Manažer"}
-            </button>
 
-            <span className="w-px h-5 bg-primary-foreground/20 mx-1" />
 
             {/* Nav icons */}
             <button
@@ -441,7 +432,7 @@ export default function Vyroba() {
                 bundle={selectedBundle}
                 logs={getLogsForBundle(selectedBundle.bundleId)}
                 todayDayIndex={todayDayIndex}
-                isManagement={isManagement}
+                
                 onOpenLog={openLogModal}
                 nextWeekNum={getISOWeekNumber(addWeeks(currentMonday, 1))}
                 nextWeekKey={weekKeyStr(addWeeks(currentMonday, 1))}
@@ -456,7 +447,7 @@ export default function Vyroba() {
                 daysLogged={getDaysLogged(selectedBundle.bundleId)}
               />
               {/* Pinned bottom log button */}
-              {!isManagement && todayDayIndex >= 0 && (
+              {todayDayIndex >= 0 && (
                 <div className="shrink-0 p-3" style={{ borderTop: "1px solid #e5e2dd" }}>
                   <button
                     onClick={openLogModal}
@@ -601,11 +592,10 @@ function SidebarRow({ bundle, selected, onSelect, latestPct, latestPhase, behind
 
 interface CumulativeInfo { percent: number; phase: string | null; isCarryForward: boolean; hasLog: boolean }
 
-function DetailPanel({ bundle, logs, todayDayIndex, isManagement, onOpenLog, nextWeekNum, nextWeekKey, weekKey, tpvItems, expandedMap, setExpandedMap, getCumulativeForDay, getExpectedPct, isBehind: isBehindProp, latestPct, daysLogged }: {
+function DetailPanel({ bundle, logs, todayDayIndex, onOpenLog, nextWeekNum, nextWeekKey, weekKey, tpvItems, expandedMap, setExpandedMap, getCumulativeForDay, getExpectedPct, isBehind: isBehindProp, latestPct, daysLogged }: {
   bundle: VyrobaBundle;
   logs: DailyLog[];
   todayDayIndex: number;
-  isManagement: boolean;
   onOpenLog: () => void;
   nextWeekNum: number;
   nextWeekKey: string;
@@ -783,7 +773,7 @@ function DetailPanel({ bundle, logs, todayDayIndex, isManagement, onOpenLog, nex
           <div className="grid grid-cols-5 gap-2">
             {[0, 1, 2, 3, 4].map((di) => (
               <DayCell key={di} dayIndex={di} todayDayIndex={todayDayIndex} cumulative={getCumulativeForDay(di)}
-                isManagement={isManagement} onOpenLog={onOpenLog} bundleColor={bundle.color} />
+                onOpenLog={onOpenLog} bundleColor={bundle.color} />
             ))}
           </div>
         </div>
@@ -811,7 +801,7 @@ function DetailPanel({ bundle, logs, todayDayIndex, isManagement, onOpenLog, nex
         </div>
 
         {/* Spill to next week — items/split mode UI */}
-        {!isManagement && activeScheduleItems.length > 0 && (
+        {activeScheduleItems.length > 0 && (
           <div className="rounded-lg overflow-hidden" style={{ background: "#ffffff", border: "1px solid #e5e2dd" }}>
             <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "1px solid #f0eeea" }}>
               <span className="text-xs font-semibold" style={{ color: "#1a1a1a" }}>Přesunutí do T{nextWeekNum}</span>
@@ -999,11 +989,10 @@ function DetailPanel({ bundle, logs, todayDayIndex, isManagement, onOpenLog, nex
 /* DAY CELL                                */
 /* ═══════════════════════════════════════ */
 
-function DayCell({ dayIndex, todayDayIndex, cumulative, isManagement, onOpenLog, bundleColor }: {
+function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, bundleColor }: {
   dayIndex: number;
   todayDayIndex: number;
   cumulative: CumulativeInfo | null;
-  isManagement: boolean;
   onOpenLog: () => void;
   bundleColor: string;
 }) {
@@ -1070,7 +1059,7 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, isManagement, onOpenLog,
         </div>
       )}
 
-      {isToday && !isManagement && (
+      {isToday && (
         <button onClick={onOpenLog} className="mt-1 w-full text-[9px] font-medium py-0.5 rounded transition-colors"
           style={{ background: `${bundleColor}15`, color: bundleColor, border: `1px solid ${bundleColor}40` }}>
           {cumulative?.hasLog ? "Upravit log" : "+ Log dnes"}
