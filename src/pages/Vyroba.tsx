@@ -592,11 +592,10 @@ function SidebarRow({ bundle, selected, onSelect, latestPct, latestPhase, behind
 
 interface CumulativeInfo { percent: number; phase: string | null; isCarryForward: boolean; hasLog: boolean }
 
-function DetailPanel({ bundle, logs, todayDayIndex, isManagement, onOpenLog, nextWeekNum, nextWeekKey, weekKey, tpvItems, expandedMap, setExpandedMap, getCumulativeForDay, getExpectedPct, isBehind: isBehindProp, latestPct, daysLogged }: {
+function DetailPanel({ bundle, logs, todayDayIndex, onOpenLog, nextWeekNum, nextWeekKey, weekKey, tpvItems, expandedMap, setExpandedMap, getCumulativeForDay, getExpectedPct, isBehind: isBehindProp, latestPct, daysLogged }: {
   bundle: VyrobaBundle;
   logs: DailyLog[];
   todayDayIndex: number;
-  isManagement: boolean;
   onOpenLog: () => void;
   nextWeekNum: number;
   nextWeekKey: string;
