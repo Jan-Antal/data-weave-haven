@@ -53,6 +53,8 @@ interface Props {
   onOpenProjectDetail?: (projectId: string) => void;
   displayMode?: DisplayMode;
   onDisplayModeChange?: (mode: DisplayMode) => void;
+  selectedProjectId?: string | null;
+  onSelectProject?: (projectId: string) => void;
 }
 
 interface ContextMenuState {
