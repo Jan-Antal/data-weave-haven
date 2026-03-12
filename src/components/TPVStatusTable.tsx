@@ -669,7 +669,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
       )}
       <div className={cn("rounded-lg border bg-card flex flex-col flex-1 min-h-0", editMode && "rounded-t-none border-t-0")}>
         {/* FIXED HEADER */}
-        <div ref={headerScrollRef} className="flex-shrink-0 overflow-hidden border-b border-border">
+        <div ref={headerScrollRef} className="flex-shrink-0 overflow-hidden rounded-t-lg">
           <Table>
             <TableHeader className="sticky-off">
               <TableRow className="bg-primary/5">
