@@ -238,7 +238,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   let barColor: string;
                   if (past) barColor = "hsl(var(--muted-foreground) / 0.3)";
                   else if (hasCompanyHol) barColor = "#f59e0b";
-                  else if (isManual) barColor = "hsl(var(--primary))";
+                  else if (isManual) barColor = "#4f87c5";
                   else if (hasHoliday) barColor = "#d97706";
                   else barColor = "hsl(var(--primary) / 0.6)";
 
@@ -282,7 +282,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
           <div className="flex items-center gap-4 text-[9px] text-muted-foreground">
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(var(--primary) / 0.6)" }} />Standard</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#d97706" }} />Svátek</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(var(--primary))" }} />Ručně upraveno</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#4f87c5" }} />Ručně upraveno</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(var(--muted-foreground) / 0.3)" }} />Minulé</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />Firemní dovolená</span>
           </div>
@@ -396,6 +396,8 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
 
+  const formatDate = (d: Date) => `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+
   const save = () => {
     const v = parseInt(cap);
     const d = parseInt(days);
@@ -411,7 +413,7 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
   return (
     <div className="space-y-2">
       <div className="text-xs font-bold text-foreground">
-        T{weekNum}: {weekStart.getDate()}.{weekStart.getMonth() + 1} – {weekEnd.getDate()}.{weekEnd.getMonth() + 1}
+        T{weekNum} · {formatDate(weekStart)} – {formatDate(weekEnd)}
       </div>
       {isPast && (
         <div className="text-[10px] text-amber-600 font-medium">⚠ Minulý týden</div>
@@ -429,7 +431,6 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
             type="number"
             value={cap}
             onChange={e => setCap(e.target.value)}
-            onBlur={save}
             onKeyDown={handleKeyDown}
             className="h-7 text-xs font-mono"
             autoFocus
@@ -441,17 +442,21 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
             type="number"
             value={days}
             onChange={e => setDays(e.target.value)}
-            onBlur={save}
             onKeyDown={handleKeyDown}
             className="h-7 text-xs font-mono"
           />
         </div>
       </div>
-      {week.is_manual_override && (
-        <Button variant="outline" size="sm" className="h-6 text-[10px] w-full" onClick={() => { onReset(); onClose(); }}>
-          <RotateCcw className="h-3 w-3 mr-1" /> Obnovit standard ({standardCapacity}h)
+      <div className="flex gap-2">
+        <Button size="sm" className="h-7 text-[10px] flex-1" onClick={save}>
+          Uložit
         </Button>
-      )}
+        {week.is_manual_override && (
+          <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1" onClick={() => { onReset(); onClose(); }}>
+            <RotateCcw className="h-3 w-3 mr-1" /> Reset na standard
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
