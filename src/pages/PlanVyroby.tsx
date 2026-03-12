@@ -226,7 +226,7 @@ export default function PlanVyroby() {
     return true;
   }, [allProjects, formatWeekLabel]);
 
-
+  const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current as ActiveDragData | undefined;
     if (data) setActiveDrag(data);
   }, []);
