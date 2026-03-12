@@ -678,7 +678,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
           style={{ color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="truncate" style={{ fontSize: 14, color: urgency === "ok" ? "#1a1a1a" : uColors.text, fontWeight: 600 }}>{project.project_name}</span>
+            <span className="truncate" style={{ fontSize: 13, color: urgency === "ok" ? "#1a1a1a" : uColors.text, fontWeight: 600 }}>{project.project_name}</span>
             {urgency === "overdue" && (
               <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(220,38,38,0.1)", color: "#DC2626" }}>
                 PO TERMÍNU
@@ -699,7 +699,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
           {progress && <div className="mt-1"><ProjectProgressBar progress={progress} compact /></div>}
         </div>
         <div className="text-right shrink-0">
-          <span className="font-mono" style={{ fontSize: 15, color: "#1a1a1a", fontWeight: 700 }}>{Math.round(project.total_hours)}h</span>
+          <span className="font-mono" style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 700 }}>{Math.round(project.total_hours)}h</span>
           {showCzk && <span className="font-mono text-[9px] ml-1" style={{ color: "#6b7a78" }}>{formatCompactCzk(project.total_hours * hourlyRate)}</span>}
         </div>
       </button>
