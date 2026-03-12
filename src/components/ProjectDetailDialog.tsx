@@ -235,10 +235,10 @@ function buildFormState(p: Project | null) {
     cost_preset_id: p.cost_preset_id || null,
     cost_material_pct: p.cost_material_pct ?? null,
     cost_overhead_pct: p.cost_overhead_pct ?? null,
-    cost_logistics_pct: p.cost_logistics_pct ?? null,
+    cost_doprava_pct: p.cost_doprava_pct ?? null,
     cost_production_pct: p.cost_production_pct ?? null,
     cost_subcontractors_pct: p.cost_subcontractors_pct ?? null,
-    cost_margin_pct: p.cost_margin_pct ?? null,
+    cost_montaz_pct: p.cost_montaz_pct ?? null,
     cost_is_custom: p.cost_is_custom ?? false,
   };
 }
