@@ -158,7 +158,7 @@ export function RozpadCeny({ projectId, prodejniCena, costValues, onChange, read
               onValueChange={handlePresetSelect}
             >
               <SelectTrigger className="h-9">
-                <SelectValue placeholder="Vybrat šablonu...">{presetLabel}</SelectValue>
+                <SelectValue placeholder="Vybrat šablonu...">{dropdownLabel}</SelectValue>
               </SelectTrigger>
               <SelectContent className="z-[99999]">
                 <SelectItem value="__none__">— Žádná šablona —</SelectItem>
