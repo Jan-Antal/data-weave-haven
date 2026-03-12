@@ -73,11 +73,19 @@ interface VyrobaBundle {
 
 /* ═══ MAIN PAGE ═══ */
 export default function Vyroba() {
-  const { isOwner, loading, profile, signOut } = useAuth();
+  const { isOwner, isAdmin, loading, profile, signOut, canAccessSettings, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, realRole, simulatedRole, setSimulatedRole, role } = useAuth();
+  const { openPeopleManagement } = usePeopleManagement();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [userMgmtOpen, setUserMgmtOpen] = useState(false);
+  const [exchangeRateOpen, setExchangeRateOpen] = useState(false);
+  const [statusMgmtOpen, setStatusMgmtOpen] = useState(false);
+  const [recycleBinOpen, setRecycleBinOpen] = useState(false);
+  const [costPresetsOpen, setCostPresetsOpen] = useState(false);
+  const [dataLogOpen, setDataLogOpen] = useState(false);
+  const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
 
   // Owner-only guard
   useEffect(() => {
