@@ -749,7 +749,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
           {showCzk && <span className="font-mono text-[9px] ml-1" style={{ color: "#6b7a78" }}>{formatCompactCzk(project.total_hours * hourlyRate)}</span>}
         </div>
       </button>
-      {expanded && (
+    {expanded && (
         <div className="px-2 pb-2 space-y-[2px]">
           {progress?.scheduled_items.map(si => (
             <div key={si.id} className="flex items-center gap-1.5 px-2 py-[3px] rounded-[5px]" style={{ opacity: si.status === "completed" ? 0.6 : 0.7 }}>
@@ -761,8 +761,38 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
           ))}
           {project.items.map((item) => (
             <DraggableInboxItem key={item.id} item={item} projectName={project.project_name}
-              onContextMenu={e => onItemContextMenu(e, item, project)} />
+              onContextMenu={e => onItemContextMenu(e, item, project)}
+              isChecked={checkedItems.has(item.id)}
+              onToggleCheck={onToggleCheck}
+              checkedItems={checkedItems}
+              allInboxItemsMap={allInboxItemsMap}
+            />
           ))}
+          {/* Checked items footer bar */}
+          {(() => {
+            const checkedInProject = project.items.filter(i => checkedItems.has(i.id));
+            if (checkedInProject.length < 2) return null;
+            const totalH = checkedInProject.reduce((s, i) => s + i.estimated_hours, 0);
+            return (
+              <div style={{
+                borderTop: "1px solid rgba(58,138,54,0.2)",
+                backgroundColor: "rgba(58,138,54,0.08)",
+                padding: "6px 12px",
+                fontSize: 11,
+                color: "#3a8a36",
+                fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                borderRadius: "0 0 6px 6px",
+              }}>
+                <span>✓ {checkedInProject.length} položek vybráno · {Math.round(totalH)}h — Přetáhnout jako skupinu</span>
+                <button onClick={onClearChecked} className="ml-auto hover:opacity-70" title="Zrušit výběr">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            );
+          })()}
           <DraggableInboxProject project={project} />
           {onNavigateToTPV && (
             <button onClick={() => onNavigateToTPV(project.project_id)} className="w-full text-[9px] text-center py-1 hover:underline transition-colors" style={{ color: "#6b7a78" }}>
