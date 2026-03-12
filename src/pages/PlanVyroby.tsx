@@ -91,7 +91,15 @@ export default function PlanVyroby() {
   const { setCurrentPage } = useUndoRedo();
   const [displayMode, setDisplayMode] = useState<DisplayMode>("hours");
   const [viewTab, setViewTab] = useState<ViewTab>("kanban");
+  const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const handleSearchChange = useCallback((v: string) => {
+    setSearchInput(v);
+    clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => setSearchQuery(v), 300);
+  }, []);
+  useEffect(() => () => clearTimeout(searchTimerRef.current), []);
   const showCzk = displayMode === "czk";
   const [activeDrag, setActiveDrag] = useState<ActiveDragData | null>(null);
   const isDraggingFromInbox = activeDrag?.type === "inbox-item" || activeDrag?.type === "inbox-items" || activeDrag?.type === "inbox-project";
@@ -468,8 +476,8 @@ export default function PlanVyroby() {
           setViewTab={setViewTab}
           displayMode={displayMode}
           onDisplayModeChange={setDisplayMode}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
+          searchQuery={searchInput}
+          onSearchChange={handleSearchChange}
         />
 
         {viewTab === "kanban" ? (

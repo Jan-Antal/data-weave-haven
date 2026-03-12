@@ -83,19 +83,14 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     return m;
   }, [allProjects]);
 
-  // Split projects into active/archived, then filter by searchQuery
+  // Split projects into active (has at least one non-expediced item) and archived (all expediced)
   const { activeProjects, archivedProjects } = useMemo(() => {
     const active: typeof projects = [];
     const archived: typeof projects = [];
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const q = searchQuery.toLowerCase();
-    const matchesSearch = (g: typeof projects[0]) =>
-      !q || g.project_name.toLowerCase().includes(q) || g.project_id.toLowerCase().includes(q);
-
     for (const group of projects) {
-      if (!matchesSearch(group)) continue;
       const hasNonExpediced = group.items.some(i => !i.expediced_at);
       if (hasNonExpediced) {
         active.push(group);
@@ -117,7 +112,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     });
 
     return { activeProjects: active, archivedProjects: archived };
-  }, [projects, searchQuery]);
+  }, [projects]);
 
   // Filtered archive
   const filteredArchive = useMemo(() => {

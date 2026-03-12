@@ -58,6 +58,12 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   );
 }
 
+function bundleMatchesSearch(bundle: { project_name: string; project_id: string; items: Array<{ item_code: string | null }> }, query: string): boolean {
+  if (!query) return false;
+  const q = query.toLowerCase();
+  return bundle.project_name.toLowerCase().includes(q) || bundle.project_id.toLowerCase().includes(q) || bundle.items.some(i => i.item_code?.toLowerCase().includes(q));
+}
+
 interface Props {
   showCzk: boolean;
   onToggleCzk: (v: boolean) => void;
@@ -730,35 +736,24 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
 
       {/* Items */}
       <div className="flex-1 overflow-y-auto p-1.5" style={{ display: "flex", flexDirection: "column", gap: 3, opacity: isPast ? 0.7 : 1 }}>
-        {(() => {
-          const filteredBundles = silo?.bundles.filter(b => {
-            if (!searchQuery) return true;
-            const q = searchQuery.toLowerCase();
-            return b.project_name.toLowerCase().includes(q) || b.project_id.toLowerCase().includes(q);
-          }) ?? [];
-          return (
-            <>
-              {filteredBundles.length === 0 && !isPast && (
-                <div className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all" style={{ border: "1.5px dashed #e2ddd6" }}>
-                  <span className="text-[9px] text-center" style={{ color: "#99a5a3" }}>{searchQuery ? "Žádné výsledky" : "Přetáhni sem z Inboxu"}</span>
-                </div>
-              )}
-              {filteredBundles.length === 0 && isPast && (
-                <div className="flex-1 flex items-center justify-center px-2 py-[14px]">
-                  <span className="text-[9px] text-center" style={{ color: "#c4ccc9" }}>Prázdný týden</span>
-                </div>
-              )}
-              {filteredBundles.map(bundle => (
-                <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey}
-                  showCzk={showCzk} hourlyRate={hourlyRate} displayMode={displayMode}
-                  onBundleContextMenu={onBundleContextMenu} onItemContextMenu={onItemContextMenu}
-                  projectLookup={projectLookup}
-                  isSelected={selectedProjectId === bundle.project_id}
-                  onSelectProject={onSelectProject} searchQuery={searchQuery} />
-              ))}
-            </>
-          );
-        })()}
+        {(!silo || silo.bundles.length === 0) && !isPast && (
+          <div className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all" style={{ border: "1.5px dashed #e2ddd6" }}>
+            <span className="text-[9px] text-center" style={{ color: "#99a5a3" }}>Přetáhni sem z Inboxu</span>
+          </div>
+        )}
+        {(!silo || silo.bundles.length === 0) && isPast && (
+          <div className="flex-1 flex items-center justify-center px-2 py-[14px]">
+            <span className="text-[9px] text-center" style={{ color: "#c4ccc9" }}>Prázdný týden</span>
+          </div>
+        )}
+        {silo?.bundles.map(bundle => (
+          <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey}
+            showCzk={showCzk} hourlyRate={hourlyRate} displayMode={displayMode}
+            onBundleContextMenu={onBundleContextMenu} onItemContextMenu={onItemContextMenu}
+            projectLookup={projectLookup}
+            isSelected={selectedProjectId === bundle.project_id}
+            onSelectProject={onSelectProject} searchQuery={searchQuery} />
+        ))}
       </div>
 
       {isOverloaded && !isPast && silo && !spillDismissed && (
@@ -831,15 +826,16 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
     disabled: allCompleted,
   });
   const toggleExpand = useCallback(() => setExpanded(v => !v), []);
+  const isSearchMatch = bundleMatchesSearch(bundle, searchQuery);
 
   return (
     <div className="rounded-[6px] overflow-hidden relative" style={{
-      borderTop: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
-      borderRight: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
-      borderBottom: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+      borderTop: isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2",
+      borderRight: isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2",
+      borderBottom: isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2",
       borderLeft: `4px solid ${borderLeftColor}`,
-      backgroundColor: isSelected ? "rgba(217,119,6,0.05)" : "#ffffff", opacity: isDragging ? 0.3 : 1,
-      boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
+      backgroundColor: isSelected ? "rgba(217,119,6,0.05)" : isSearchMatch ? "rgba(254,240,138,0.15)" : "#ffffff", opacity: isDragging ? 0.3 : 1,
+      boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : isSearchMatch ? "0 0 0 2px rgba(250,204,21,0.25)" : undefined,
       transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, box-shadow 150ms",
     }}>
 
