@@ -439,6 +439,8 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
             onItemContextMenu={(e, item) => handleItemContextMenu(e, item, false)}
             onNavigateToTPV={onNavigateToTPV}
             isArchive={false}
+            isSelected={selectedProjectId === group.project_id}
+            onSelectProject={onSelectProject}
           />
         ))}
       </div>
