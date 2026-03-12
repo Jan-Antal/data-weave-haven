@@ -304,22 +304,11 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                 })}
               </div>
 
-              {/* Current week marker */}
-              {selectedYear === currentYear && (
-                <div className="flex gap-[2px] mt-0.5">
-                  {Array.from({ length: 52 }, (_, i) => i + 1).map(wn => (
-                    <div key={wn} className="flex-1 min-w-[12px] flex justify-center">
-                      {wn === currentWeek && <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "hsl(var(--primary))" }} />}
-                    </div>
-                  ))}
-                </div>
-              )}
-
               {/* Week labels */}
               <div className="flex gap-[2px] mt-0.5">
                 {Array.from({ length: 52 }, (_, i) => i + 1).map(wn => (
-                  <div key={wn} className={`flex-1 min-w-[12px] text-center text-[6px] font-mono ${selectedYear === currentYear && wn === currentWeek ? "text-foreground font-bold" : "text-muted-foreground"}`}>
-                    {wn % 4 === 1 || (selectedYear === currentYear && wn === currentWeek) ? `T${wn}` : ""}
+                  <div key={wn} className="flex-1 min-w-[12px] text-center text-[6px] font-mono text-muted-foreground">
+                    {wn % 4 === 1 ? `T${wn}` : ""}
                   </div>
                 ))}
               </div>
