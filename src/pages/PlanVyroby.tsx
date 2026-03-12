@@ -359,13 +359,21 @@ export default function PlanVyroby() {
         }
       }
 
+      const projectId = dragData.projectId || "";
+
       if (dragData.type === "inbox-item" && dragData.itemId) {
-        await moveInboxItemToWeek(dragData.itemId, weekDate);
+        const action = async () => { await moveInboxItemToWeek(dragData.itemId!, weekDate); };
+        if (!checkAndWarnDeadline(projectId, weekDate, action)) return;
+        await action();
       } else if (dragData.type === "inbox-project" && dragData.projectId) {
-        await moveInboxProjectToWeek(dragData.projectId, weekDate);
+        const action = async () => { await moveInboxProjectToWeek(dragData.projectId!, weekDate); };
+        if (!checkAndWarnDeadline(dragData.projectId, weekDate, action)) return;
+        await action();
       } else if (dragData.type === "silo-item" && dragData.itemId) {
         if (dragData.weekDate !== weekDate) {
-          await moveScheduleItemToWeek(dragData.itemId, weekDate);
+          const action = async () => { await moveScheduleItemToWeek(dragData.itemId!, weekDate); };
+          if (!checkAndWarnDeadline(projectId, weekDate, action)) return;
+          await action();
         }
     } else if (dragData.type === "silo-bundle" && dragData.projectId && dragData.weekDate) {
         if (dragData.weekDate !== weekDate) {
@@ -390,12 +398,14 @@ export default function PlanVyroby() {
               return;
             }
           }
-          await moveBundleToWeek(dragData.projectId, dragData.weekDate, weekDate);
+          const action = async () => { await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate); };
+          if (!checkAndWarnDeadline(dragData.projectId, weekDate, action)) return;
+          await action();
         }
       }
   }, [moveInboxItemToWeek, moveInboxProjectToWeek, moveScheduleItemToWeek, moveBundleToWeek,
     moveItemBackToInbox, returnBundleToInbox, scheduleData, weeklyCapacity, hourlyRate,
-    findSpillWeek, findSiblingInWeek, mergeSplitItems, resolveTargetWeek]);
+    findSpillWeek, findSiblingInWeek, mergeSplitItems, resolveTargetWeek, checkAndWarnDeadline]);
 
   if (loading) {
     return (
