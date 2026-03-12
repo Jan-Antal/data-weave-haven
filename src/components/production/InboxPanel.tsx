@@ -690,12 +690,12 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
               </span>
             )}
           </div>
-          <div className="font-mono" style={{ fontSize: 11, color: "#6b7280" }}>{project.project_id}</div>
-          {deadlineDisplay && (
-            <div style={{ fontSize: 11, color: deadlineDisplay.color, marginTop: 1 }}>
-              {deadlineDisplay.label}: {deadlineDisplay.dateStr}
-            </div>
-          )}
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono" style={{ fontSize: 11, color: "#6b7280" }}>{project.project_id}</span>
+            {deadlineDisplay && (
+              <span style={{ fontSize: 11, color: deadlineDisplay.color }}>· {deadlineDisplay.label}: {deadlineDisplay.dateStr}</span>
+            )}
+          </div>
           {progress && <div className="mt-1"><ProjectProgressBar progress={progress} compact /></div>}
         </div>
         <div className="text-right shrink-0">
