@@ -164,6 +164,23 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     return max;
   }, [weekMap, standardCapacity]);
 
+  // Visible window min/max for dynamic color scaling (excluding past weeks)
+  const visibleRange = useMemo(() => {
+    let min = standardCapacity;
+    let max = standardCapacity;
+    const end = Math.min(52, viewStart + VISIBLE_WEEKS - 1);
+    for (let wn = viewStart; wn <= end; wn++) {
+      const week = weekMap.get(wn);
+      if (!week) continue;
+      const past = selectedYear < currentYear || (selectedYear === currentYear && wn < currentWeek);
+      if (past) continue;
+      const cap = week.capacity_hours;
+      if (cap < min) min = cap;
+      if (cap > max) max = cap;
+    }
+    return { min, max };
+  }, [weekMap, viewStart, selectedYear, currentYear, currentWeek, standardCapacity]);
+
   // Holiday impact summary
   const holidayImpacts = useMemo(() => {
     const impacts: Array<{ date: string; name: string; weekNum: number; reducedHours: number; workingDays: number }> = [];
