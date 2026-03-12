@@ -467,15 +467,8 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   const { data: inboxProjects = [] } = useProductionInbox();
   const getWeekCapacity = useWeekCapacityLookup();
 
-  type StatsScope = "week" | "month" | "all";
-  const [statsScope, setStatsScope] = useState<StatsScope>(() => {
-    const saved = localStorage.getItem("ami_plan_stats_scope");
-    return (saved === "week" || saved === "month" || saved === "all") ? saved : "month";
-  });
-  const handleScopeChange = (s: StatsScope) => {
-    setStatsScope(s);
-    localStorage.setItem("ami_plan_stats_scope", s);
-  };
+   type StatsScope = "week" | "month" | "all";
+  const statsScope: StatsScope = "month";
 
   const hourlyRate = settings?.hourly_rate ?? 550;
   const inboxHours = inboxProjects.reduce((s, p) => s + p.total_hours, 0);
