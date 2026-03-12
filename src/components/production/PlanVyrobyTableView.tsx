@@ -9,7 +9,7 @@ import { getProjectColor } from "@/lib/projectColors";
 import { exportToExcel } from "@/lib/exportExcel";
 import { buildPrintableHtml } from "@/lib/exportPdf";
 import { parseAppDate } from "@/lib/dateFormat";
-import { format, differenceInDays } from "date-fns";
+import { format, differenceInDays, addDays } from "date-fns";
 import { cs } from "date-fns/locale";
 import { Download, ChevronRight, ChevronDown, Plus, ArrowRight, Inbox, CheckCircle2, XCircle, FileSpreadsheet, FileText, AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -17,6 +17,11 @@ import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PdfPreviewModal } from "@/components/PdfPreviewModal";
 import { CancelItemDialog } from "./CancelItemDialog";
+import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
+import { InboxPlanningDialog, type SchedulePlanEntry, type PlanningItem, type PlanningWeek } from "./InboxPlanningDialog";
+import { DndContext, closestCenter, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 
 type DisplayMode = "hours" | "czk" | "percent";
@@ -25,6 +30,8 @@ type SortMode = "project" | "deadline" | "hours";
 interface Props {
   displayMode: DisplayMode;
   searchQuery?: string;
+  onNavigateToTPV?: (projectId: string) => void;
+  onOpenProjectDetail?: (projectId: string) => void;
 }
 
 function formatCzk(v: number): string {
@@ -104,7 +111,7 @@ const INBOX_W = 100;
 const EXPEDICE_W = 100;
 const LEFT_COL_W = 280;
 
-export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
+export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateToTPV, onOpenProjectDetail }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: expediceData } = useProductionExpedice();
   const { data: inboxProjects = [] } = useProductionInbox();
@@ -112,10 +119,18 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
   const { data: allProjects = [] } = useProjects();
   const getWeekCapacity = useWeekCapacityLookup();
   const { moveScheduleItemToWeek, moveItemBackToInbox, completeItems, moveInboxItemToWeek } = useProductionDragDrop();
+  const qc = useQueryClient();
   const [sortMode, setSortMode] = useState<SortMode>("project");
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialScrollDone = useRef(false);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
+
+  // Planning dialog state
+  const [planningState, setPlanningState] = useState<{ projectId: string; projectName: string; items: PlanningItem[] } | null>(null);
+
   // Cancel dialog state
   const [cancelDialog, setCancelDialog] = useState<{
     open: boolean; itemId: string; itemName: string; itemCode?: string | null;
@@ -611,10 +626,164 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
     } catch { /* error handled in hook */ }
   }, [moveInboxItemToWeek]);
 
+  // Build planning weeks for InboxPlanningDialog
+  const weeklyCapacity = settings?.weekly_capacity_hours ?? 875;
+  const planningWeeks = useMemo<PlanningWeek[]>(() => {
+    const now = new Date();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    const result: PlanningWeek[] = [];
+    for (let i = 0; i < 12; i++) {
+      const weekStart = new Date(monday);
+      weekStart.setDate(monday.getDate() + i * 7);
+      const key = weekStart.toISOString().split("T")[0];
+      const weekEnd = addDays(weekStart, 6);
+      const weekNum = getISOWeekNumber(weekStart);
+      const cap = getWeekCapacity(key);
+      const silo = scheduleData?.get(key);
+      const scheduledHours = silo ? silo.total_hours : 0;
+      const remaining = Math.max(0, cap - scheduledHours);
+      result.push({ key, weekNum, label: `T${weekNum} · ${format(weekStart, "d.M")} – ${format(weekEnd, "d.M")}`, remainingCapacity: remaining });
+    }
+    return result;
+  }, [getWeekCapacity, scheduleData]);
+
+  const handlePlanConfirm = useCallback(async (plan: SchedulePlanEntry[]) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const byItem = new Map<string, SchedulePlanEntry[]>();
+      for (const entry of plan) {
+        const arr = byItem.get(entry.inboxItemId) || [];
+        arr.push(entry);
+        byItem.set(entry.inboxItemId, arr);
+      }
+      for (const [inboxItemId, entries] of byItem) {
+        const { data: inboxItem } = await supabase.from("production_inbox").select("*").eq("id", inboxItemId).single();
+        if (!inboxItem) continue;
+        if (entries.length === 1) {
+          await supabase.from("production_schedule").insert({
+            project_id: inboxItem.project_id, stage_id: inboxItem.stage_id,
+            item_name: inboxItem.item_name, item_code: inboxItem.item_code,
+            scheduled_week: entries[0].scheduledWeek, scheduled_hours: entries[0].scheduledHours,
+            scheduled_czk: entries[0].scheduledCzk, position: 999, status: "scheduled",
+            created_by: user.id, inbox_item_id: inboxItemId,
+          });
+        } else {
+          const { data: firstPart } = await supabase.from("production_schedule").insert({
+            project_id: inboxItem.project_id, stage_id: inboxItem.stage_id,
+            item_name: `${inboxItem.item_name} (1/${entries.length})`, item_code: inboxItem.item_code,
+            scheduled_week: entries[0].scheduledWeek, scheduled_hours: entries[0].scheduledHours,
+            scheduled_czk: entries[0].scheduledCzk, position: 999, status: "scheduled",
+            created_by: user.id, inbox_item_id: inboxItemId, split_part: 1, split_total: entries.length,
+          }).select().single();
+          if (firstPart) {
+            await supabase.from("production_schedule").update({ split_group_id: firstPart.id }).eq("id", firstPart.id);
+            for (let i = 1; i < entries.length; i++) {
+              await supabase.from("production_schedule").insert({
+                project_id: inboxItem.project_id, stage_id: inboxItem.stage_id,
+                item_name: `${inboxItem.item_name} (${i + 1}/${entries.length})`, item_code: inboxItem.item_code,
+                scheduled_week: entries[i].scheduledWeek, scheduled_hours: entries[i].scheduledHours,
+                scheduled_czk: entries[i].scheduledCzk, position: 999, status: "scheduled",
+                created_by: user.id, inbox_item_id: inboxItemId, split_group_id: firstPart.id,
+                split_part: i + 1, split_total: entries.length,
+              });
+            }
+          }
+        }
+        await supabase.from("production_inbox").update({ status: "scheduled" }).eq("id", inboxItemId);
+      }
+      qc.invalidateQueries({ queryKey: ["production-inbox"] });
+      qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      qc.invalidateQueries({ queryKey: ["production-progress"] });
+      toast({ title: `${plan.length} položek naplánováno` });
+    } catch (err: any) {
+      toast({ title: "Chyba při plánování", description: err?.message, variant: "destructive" });
+    }
+    setPlanningState(null);
+  }, [qc]);
+
+  // Context menu: project header row
+  const handleProjectContextMenu = useCallback((e: React.MouseEvent, proj: ProjectRow) => {
+    e.preventDefault(); e.stopPropagation();
+    const inbox = inboxByProject.get(proj.projectId);
+    const actions: ContextMenuAction[] = [];
+    if (inbox && inbox.totalHours > 0) {
+      const planItems: PlanningItem[] = inbox.items.map(i => ({
+        id: i.id, item_name: i.name, item_code: i.code,
+        estimated_hours: i.hours, estimated_czk: i.czk, stage_id: i.stageId,
+      }));
+      actions.push({ label: "Naplánovat výrobu…", icon: "📋", onClick: () => setPlanningState({ projectId: proj.projectId, projectName: proj.projectName, items: planItems }) });
+    }
+    if (onNavigateToTPV) {
+      actions.push({ label: "Zobrazit položky", icon: "📦", onClick: () => onNavigateToTPV(proj.projectId) });
+    }
+    if (onOpenProjectDetail) {
+      actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(proj.projectId) });
+    }
+    if (actions.length > 0) setContextMenu({ x: e.clientX, y: e.clientY, actions });
+  }, [inboxByProject, onNavigateToTPV, onOpenProjectDetail]);
+
+  // Context menu: item left-column cell
+  const handleItemContextMenu = useCallback((e: React.MouseEvent, item: ItemRow) => {
+    e.preventDefault(); e.stopPropagation();
+    const allIds = [...item.weekAllocations.values()].flatMap(a => a.scheduleItemIds);
+    const actions: ContextMenuAction[] = [];
+
+    if (item.weekAllocations.size > 0) {
+      // Scheduled item actions
+      actions.push({
+        label: "Přesunout do týdne…", icon: "➡️",
+        onClick: () => {
+          // Show submenu via a secondary context menu with week targets
+          const weekActions: ContextMenuAction[] = moveTargetWeeks.map(tw => ({
+            label: tw.label, icon: "📅",
+            onClick: () => handleMoveToWeek(allIds, tw.key),
+          }));
+          setContextMenu({ x: e.clientX, y: e.clientY, actions: weekActions });
+        },
+      });
+      actions.push({ label: "Vrátit do Inboxu", icon: "📥", onClick: () => handleReturnToInbox(allIds) });
+      actions.push({ label: "Dokončit → Expedice", icon: "✓", onClick: () => handleComplete(allIds) });
+      actions.push({
+        label: "Zrušit", icon: "✕", danger: true, dividerBefore: true,
+        onClick: () => setCancelDialog({
+          open: true, itemId: allIds[0], itemName: item.itemName, itemCode: item.itemCode,
+          hours: item.totalHours, projectName: item.projectName, projectId: item.projectId,
+        }),
+      });
+    } else if (item.inboxHours > 0 && item.inboxItemIds.length > 0) {
+      // Inbox-only item: schedule submenu
+      const weekActions: ContextMenuAction[] = moveTargetWeeks.map(tw => ({
+        label: tw.label, icon: "📅",
+        onClick: () => handleScheduleFromInbox(item.inboxItemIds[0], tw.key),
+      }));
+      actions.push({
+        label: "Naplánovat…", icon: "📋",
+        onClick: () => setContextMenu({ x: e.clientX, y: e.clientY, actions: weekActions }),
+      });
+    }
+
+    if (actions.length > 0) setContextMenu({ x: e.clientX, y: e.clientY, actions });
+  }, [moveTargetWeeks, handleMoveToWeek, handleReturnToInbox, handleComplete, handleScheduleFromInbox]);
+
+  // Drag & Drop handler
+  const handleTableDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+    const activeData = active.data.current as { itemIds: string[]; fromWeek: string } | undefined;
+    const overData = over.data.current as { weekKey: string } | undefined;
+    if (!activeData || !overData) return;
+    if (activeData.fromWeek !== overData.weekKey) {
+      await handleMoveToWeek(activeData.itemIds, overData.weekKey);
+    }
+  }, [handleMoveToWeek]);
+
   const hasAnyInbox = true;
   const hasAnyExpedice = true;
 
   return (
+    <DndContext onDragEnd={handleTableDragEnd} collisionDetection={closestCenter}>
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
       {/* Toolbar */}
       <div className="px-3 py-[6px] flex items-center justify-between shrink-0 border-b border-border">
@@ -769,6 +938,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                   <div
                     className="flex cursor-pointer transition-all"
                     onClick={() => toggleProject(proj.projectId)}
+                    onContextMenu={(e) => handleProjectContextMenu(e, proj)}
                     style={{ height: 48, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
                   >
                     <div
@@ -931,6 +1101,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                           >
                           <div
                             className="shrink-0 flex items-center gap-2 pr-2 sticky left-0 z-20"
+                            onContextMenu={(e) => handleItemContextMenu(e, item)}
                             style={{
                               width: LEFT_COL_W,
                               backgroundColor: "#fff",
@@ -958,49 +1129,50 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
                               )}
                             </div>
                           )}
-                          {/* Week cells — interactive */}
+                          {/* Week cells — interactive + droppable */}
                           {weeks.map(week => {
                             const alloc = item.weekAllocations.get(week.key);
                             if (alloc) {
                               return (
-                                <FilledWeekCell
-                                  key={week.key}
-                                  weekKey={week.key}
-                                  isCurrent={week.isCurrent}
-                                  alloc={alloc}
-                                  item={item}
-                                  displayMode={displayMode}
-                                  formatCellValue={formatCellValue}
-                                  getCellStyle={getCellStyle}
-                                  moveTargetWeeks={moveTargetWeeks}
-                                  getWeekCapacity={getWeekCapacity}
-                                  weekCapacities={weekCapacities}
-                                  onMoveToWeek={handleMoveToWeek}
-                                  onReturnToInbox={handleReturnToInbox}
-                                  onComplete={handleComplete}
-                                  onCancel={(ids) => {
-                                    setCancelDialog({
-                                      open: true,
-                                      itemId: ids[0],
-                                      itemName: item.itemName,
-                                      itemCode: item.itemCode,
-                                      hours: alloc.hours,
-                                      projectName: item.projectName,
-                                      projectId: item.projectId,
-                                    });
-                                  }}
-                                />
+                                <DroppableWeekCell key={week.key} droppableId={`${week.key}-${item.id}`} weekKey={week.key} isCurrent={week.isCurrent}>
+                                  <FilledWeekCell
+                                    weekKey={week.key}
+                                    isCurrent={week.isCurrent}
+                                    alloc={alloc}
+                                    item={item}
+                                    displayMode={displayMode}
+                                    formatCellValue={formatCellValue}
+                                    getCellStyle={getCellStyle}
+                                    moveTargetWeeks={moveTargetWeeks}
+                                    getWeekCapacity={getWeekCapacity}
+                                    weekCapacities={weekCapacities}
+                                    onMoveToWeek={handleMoveToWeek}
+                                    onReturnToInbox={handleReturnToInbox}
+                                    onComplete={handleComplete}
+                                    onCancel={(ids) => {
+                                      setCancelDialog({
+                                        open: true,
+                                        itemId: ids[0],
+                                        itemName: item.itemName,
+                                        itemCode: item.itemCode,
+                                        hours: alloc.hours,
+                                        projectName: item.projectName,
+                                        projectId: item.projectId,
+                                      });
+                                    }}
+                                  />
+                                </DroppableWeekCell>
                               );
                             }
-                            // Empty cell — show "+" if item has inbox items
                             return (
-                              <EmptyWeekCell
-                                key={week.key}
-                                weekKey={week.key}
-                                isCurrent={week.isCurrent}
-                                item={item}
-                                onSchedule={handleScheduleFromInbox}
-                              />
+                              <DroppableWeekCell key={week.key} droppableId={`${week.key}-${item.id}`} weekKey={week.key} isCurrent={week.isCurrent}>
+                                <EmptyWeekCell
+                                  weekKey={week.key}
+                                  isCurrent={week.isCurrent}
+                                  item={item}
+                                  onSchedule={handleScheduleFromInbox}
+                                />
+                              </DroppableWeekCell>
                             );
                           })}
                           {/* Expedice cell */}
@@ -1077,11 +1249,57 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
           onClose={() => setPdfHtml(null)}
         />
       )}
+      {/* Context menu */}
+      {contextMenu && (
+        <ProductionContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          actions={contextMenu.actions}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {/* Planning dialog */}
+      {planningState && (
+        <InboxPlanningDialog
+          open={!!planningState}
+          onOpenChange={open => !open && setPlanningState(null)}
+          projectId={planningState.projectId}
+          projectName={planningState.projectName}
+          items={planningState.items}
+          weeks={planningWeeks}
+          weeklyCapacity={weeklyCapacity}
+          onConfirm={handlePlanConfirm}
+        />
+      )}
+    </div>
+    </DndContext>
+  );
+}
+
+/* ─── Droppable week cell wrapper ─── */
+function DroppableWeekCell({ droppableId, weekKey, isCurrent, children }: {
+  droppableId: string; weekKey: string; isCurrent: boolean; children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: droppableId, data: { weekKey } });
+  return (
+    <div
+      ref={setNodeRef}
+      className="shrink-0 flex items-center justify-center px-1 py-0.5"
+      style={{
+        width: CELL_W,
+        backgroundColor: isOver ? "hsl(210 80% 95%)" : isCurrent ? "hsl(142 76% 97%)" : "#fff",
+        outline: isOver ? "2px solid hsl(210 80% 60%)" : undefined,
+        outlineOffset: -2,
+        transition: "background-color 150ms, outline 150ms",
+      }}
+    >
+      {children}
     </div>
   );
 }
 
-/* ─── Filled week cell with popover ─── */
+/* ─── Filled week cell with popover + draggable ─── */
 function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCellValue, getCellStyle, moveTargetWeeks, getWeekCapacity, weekCapacities, onMoveToWeek, onReturnToInbox, onComplete, onCancel }: {
   weekKey: string;
   isCurrent: boolean;
@@ -1103,6 +1321,11 @@ function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCe
   const cellStyle = getCellStyle(alloc.status);
   const ids = alloc.scheduleItemIds;
 
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
+    id: `drag-${ids[0]}`,
+    data: { type: "table-item", itemIds: ids, fromWeek: weekKey },
+  });
+
   const handleAction = async (action: () => Promise<void>) => {
     setOpen(false);
     setShowMoveList(false);
@@ -1110,10 +1333,7 @@ function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCe
   };
 
   return (
-    <div
-      className="shrink-0 flex items-center justify-center px-1 py-0.5"
-      style={{ width: CELL_W, backgroundColor: isCurrent ? "hsl(142 76% 97%)" : "#fff" }}
-    >
+    <div ref={setDragRef} {...attributes} {...listeners} style={{ opacity: isDragging ? 0.4 : 1, width: "100%" }}>
       <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setShowMoveList(false); }}>
         <PopoverTrigger asChild>
           <button
@@ -1221,19 +1441,11 @@ function EmptyWeekCell({ weekKey, isCurrent, item, onSchedule }: {
   const hasInbox = item.inboxItemIds.length > 0;
 
   if (!hasInbox) {
-    return (
-      <div
-        className="shrink-0"
-        style={{ width: CELL_W, backgroundColor: isCurrent ? "hsl(142 76% 97%)" : "#fff" }}
-      />
-    );
+    return <div className="w-full" />;
   }
 
   return (
-    <div
-      className="shrink-0 flex items-center justify-center"
-      style={{ width: CELL_W, backgroundColor: isCurrent ? "hsl(142 76% 97%)" : "#fff" }}
-    >
+    <div className="w-full flex items-center justify-center">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
