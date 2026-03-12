@@ -636,7 +636,9 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
   const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}`, disabled: isPast });
   const highlighted = !isPast && (isOver || isOverTarget);
   const dropBorderColor = highlighted ? (isOverloaded ? "#d97706" : "#3b82f6") : undefined;
-  const headerColor = isPast ? "#99a5a3" : "#223937";
+  const headerColor = isPast ? "#9ca3af" : isCurrent ? "#223937" : "#1a1a1a";
+  const headerWeight = isCurrent ? 700 : isPast ? 500 : 600;
+  const dateRangeColor = isPast ? "#b0b7c3" : "#6b7280";
 
   const combinedRef = useCallback((el: HTMLDivElement | null) => { setNodeRef(el); registerRef(weekKey, el); }, [setNodeRef, registerRef, weekKey]);
 
