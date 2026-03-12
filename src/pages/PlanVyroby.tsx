@@ -664,10 +664,10 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   return (
     <div className="shrink-0 border-b border-border px-6 py-1.5 flex items-center gap-4 bg-card" style={{ minHeight: 40 }}>
       {/* Left: Tabs */}
-      <div className="inline-flex h-9 items-center rounded-md bg-card border border-border p-1 shrink-0">
+      <div className="inline-flex h-8 items-center rounded-md bg-card border border-border p-0.5 shrink-0">
         <button
           onClick={() => setViewTab("kanban")}
-          className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-sm font-medium transition-all ${
+          className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-[13px] font-medium transition-all ${
             viewTab === "kanban"
               ? "bg-primary text-primary-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
@@ -677,7 +677,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
         </button>
         <button
           onClick={() => setViewTab("table")}
-          className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-sm font-medium transition-all ${
+          className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-[13px] font-medium transition-all ${
             viewTab === "table"
               ? "bg-primary text-primary-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
