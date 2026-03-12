@@ -64,10 +64,10 @@ interface Project {
   cost_preset_id: string | null;
   cost_material_pct: number | null;
   cost_overhead_pct: number | null;
-  cost_logistics_pct: number | null;
+  cost_doprava_pct: number | null;
   cost_production_pct: number | null;
   cost_subcontractors_pct: number | null;
-  cost_margin_pct: number | null;
+  cost_montaz_pct: number | null;
   cost_is_custom: boolean | null;
 }
 
