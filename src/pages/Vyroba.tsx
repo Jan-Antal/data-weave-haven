@@ -989,11 +989,10 @@ function DetailPanel({ bundle, logs, todayDayIndex, onOpenLog, nextWeekNum, next
 /* DAY CELL                                */
 /* ═══════════════════════════════════════ */
 
-function DayCell({ dayIndex, todayDayIndex, cumulative, isManagement, onOpenLog, bundleColor }: {
+function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, bundleColor }: {
   dayIndex: number;
   todayDayIndex: number;
   cumulative: CumulativeInfo | null;
-  isManagement: boolean;
   onOpenLog: () => void;
   bundleColor: string;
 }) {
