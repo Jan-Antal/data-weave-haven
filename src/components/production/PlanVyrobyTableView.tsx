@@ -1248,7 +1248,31 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
           onClose={() => setPdfHtml(null)}
         />
       )}
+      {/* Context menu */}
+      {contextMenu && (
+        <ProductionContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          actions={contextMenu.actions}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {/* Planning dialog */}
+      {planningState && (
+        <InboxPlanningDialog
+          open={!!planningState}
+          onOpenChange={open => !open && setPlanningState(null)}
+          projectId={planningState.projectId}
+          projectName={planningState.projectName}
+          items={planningState.items}
+          weeks={planningWeeks}
+          weeklyCapacity={weeklyCapacity}
+          onConfirm={handlePlanConfirm}
+        />
+      )}
     </div>
+    </DndContext>
   );
 }
 
