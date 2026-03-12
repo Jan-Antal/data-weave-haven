@@ -399,7 +399,7 @@ export default function PlanVyroby() {
             <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} />
           </div>
         ) : (
-          <PlanVyrobyTableView displayMode={displayMode} searchQuery={searchQuery} />
+          <PlanVyrobyTableView displayMode={displayMode} searchQuery={searchQuery} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} />
         )}
       </div>
 
