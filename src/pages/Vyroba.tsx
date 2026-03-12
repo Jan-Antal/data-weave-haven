@@ -616,14 +616,15 @@ function SidebarRow({ bundle, selected, onSelect, latestPct, latestPhase, behind
 
 interface CumulativeInfo { percent: number; phase: string | null; isCarryForward: boolean; hasLog: boolean }
 
-function DetailPanel({ bundle, logs, todayDayIndex, isManagement, onOpenLog, onSpill, nextWeekNum, tpvItems, expandedMap, setExpandedMap, getCumulativeForDay, getExpectedPct, isBehind: isBehindProp, latestPct, daysLogged }: {
+function DetailPanel({ bundle, logs, todayDayIndex, isManagement, onOpenLog, nextWeekNum, nextWeekKey, weekKey, tpvItems, expandedMap, setExpandedMap, getCumulativeForDay, getExpectedPct, isBehind: isBehindProp, latestPct, daysLogged }: {
   bundle: VyrobaBundle;
   logs: DailyLog[];
   todayDayIndex: number;
   isManagement: boolean;
   onOpenLog: () => void;
-  onSpill: () => void;
   nextWeekNum: number;
+  nextWeekKey: string;
+  weekKey: string;
   tpvItems: any[];
   expandedMap: Record<string, boolean>;
   setExpandedMap: (fn: (m: Record<string, boolean>) => Record<string, boolean>) => void;
@@ -635,6 +636,123 @@ function DetailPanel({ bundle, logs, todayDayIndex, isManagement, onOpenLog, onS
 }) {
   const expectedPct = todayDayIndex >= 0 ? getExpectedPct(todayDayIndex) : 0;
   const isExpanded = expandedMap[bundle.bundleId] ?? false;
+  const qc = useQueryClient();
+
+  // Spill state
+  type SpillMode = "items" | "split";
+  const [spillMode, setSpillMode] = useState<SpillMode>("items");
+  const [spillCheckedIds, setSpillCheckedIds] = useState<Set<string>>(new Set());
+  const [spillSplitPcts, setSpillSplitPcts] = useState<Record<string, number>>({});
+  const [spillSubmitting, setSpillSubmitting] = useState(false);
+
+  // Get active schedule items for this bundle
+  const activeScheduleItems = useMemo(() =>
+    bundle.scheduleItems.filter(i => i.status !== "completed" && i.status !== "paused" && i.status !== "cancelled"),
+    [bundle.scheduleItems]
+  );
+
+  // Reset spill state when bundle changes
+  useEffect(() => {
+    setSpillCheckedIds(new Set());
+    setSpillSplitPcts({});
+    setSpillMode("items");
+  }, [bundle.bundleId]);
+
+  const toggleSpillItem = (id: string) => {
+    setSpillCheckedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSpillConfirm = useCallback(async () => {
+    if (!nextWeekKey) return;
+    setSpillSubmitting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      if (spillMode === "items") {
+        const ids = Array.from(spillCheckedIds);
+        if (ids.length === 0) return;
+        const { error } = await supabase.from("production_schedule")
+          .update({ scheduled_week: nextWeekKey }).in("id", ids);
+        if (error) throw error;
+        toast(`${ids.length} položek přesunuto do T${nextWeekNum}`, { duration: 3000 });
+      } else {
+        let movedCount = 0;
+        for (const item of activeScheduleItems) {
+          const pct = spillSplitPcts[item.id] || 0;
+          if (pct === 0) continue;
+
+          if (pct === 100) {
+            await supabase.from("production_schedule")
+              .update({ scheduled_week: nextWeekKey }).eq("id", item.id);
+            movedCount++;
+          } else {
+            const spillHours = Math.round(item.scheduled_hours * pct / 100);
+            const keepHours = item.scheduled_hours - spillHours;
+            const czkPerHour = item.scheduled_hours > 0 ? item.scheduled_czk / item.scheduled_hours : 550;
+            const groupId = item.split_group_id || item.id;
+            const cleanName = item.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
+
+            await supabase.from("production_schedule").update({
+              scheduled_hours: keepHours,
+              scheduled_czk: keepHours * czkPerHour,
+              split_group_id: groupId,
+            }).eq("id", item.id);
+
+            await supabase.from("production_schedule").insert({
+              project_id: item.project_id,
+              stage_id: item.stage_id,
+              item_name: cleanName,
+              item_code: item.item_code,
+              scheduled_week: nextWeekKey,
+              scheduled_hours: spillHours,
+              scheduled_czk: spillHours * czkPerHour,
+              position: 999,
+              status: "scheduled",
+              created_by: user.id,
+              split_group_id: groupId,
+            });
+
+            await renumberSiblings(groupId);
+
+            const { data: allParts } = await supabase
+              .from("production_schedule")
+              .select("id, split_part, split_total")
+              .or(`split_group_id.eq.${groupId},id.eq.${groupId}`)
+              .order("scheduled_week");
+            if (allParts) {
+              for (const p of allParts) {
+                await supabase.from("production_schedule").update({
+                  item_name: `${cleanName} (${p.split_part}/${p.split_total})`,
+                }).eq("id", p.id);
+              }
+            }
+            movedCount++;
+          }
+        }
+        toast(`${movedCount} položek přelito/rozděleno → T${nextWeekNum}`, { duration: 3000 });
+      }
+
+      qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      qc.invalidateQueries({ queryKey: ["production-inbox"] });
+      qc.invalidateQueries({ queryKey: ["production-expedice"] });
+    } catch (err: any) {
+      toast.error(err.message || "Chyba při přesunu");
+    }
+    setSpillSubmitting(false);
+  }, [nextWeekKey, spillMode, spillCheckedIds, spillSplitPcts, activeScheduleItems, qc, nextWeekNum]);
+
+  const spillTotalHours = useMemo(() => {
+    if (spillMode === "items") {
+      return activeScheduleItems.filter(i => spillCheckedIds.has(i.id)).reduce((s, i) => s + i.scheduled_hours, 0);
+    }
+    return activeScheduleItems.reduce((s, i) => s + Math.round(i.scheduled_hours * (spillSplitPcts[i.id] || 0) / 100), 0);
+  }, [spillMode, activeScheduleItems, spillCheckedIds, spillSplitPcts]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -707,42 +825,183 @@ function DetailPanel({ bundle, logs, todayDayIndex, isManagement, onOpenLog, onS
           </div>
         </div>
 
-        {/* Spill */}
-        {!isManagement && (
-          <div className="rounded-lg p-3" style={{ background: "#ffffff", border: "1px solid #e5e2dd" }}>
-            <div className="text-xs font-semibold mb-1" style={{ color: "#1a1a1a" }}>Přesunutí do příštího týdne</div>
-            <p className="text-xs mb-2" style={{ color: "#6b7280" }}>Bundle bude přesunut do T{nextWeekNum} a zmizí z aktuálního týdne.</p>
-            <button onClick={onSpill} className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-colors"
-              style={{ background: "#fffbeb", border: "1px solid #fcd34d", color: "#d97706" }}>
-              ⏭ Přesunout do T{nextWeekNum}
-            </button>
+        {/* Spill to next week — items/split mode UI */}
+        {!isManagement && activeScheduleItems.length > 0 && (
+          <div className="rounded-lg overflow-hidden" style={{ background: "#ffffff", border: "1px solid #e5e2dd" }}>
+            <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "1px solid #f0eeea" }}>
+              <span className="text-xs font-semibold" style={{ color: "#1a1a1a" }}>Přesunutí do T{nextWeekNum}</span>
+              <div className="flex items-center gap-0">
+                <button
+                  onClick={() => setSpillMode("items")}
+                  className="px-2 py-1 text-[10px] font-medium rounded-l transition-colors"
+                  style={{
+                    backgroundColor: spillMode === "items" ? "#223937" : "#ffffff",
+                    color: spillMode === "items" ? "#ffffff" : "#6b7a78",
+                    border: spillMode === "items" ? "none" : "1px solid #e5e2dd",
+                  }}
+                >
+                  Po položkách
+                </button>
+                <button
+                  onClick={() => setSpillMode("split")}
+                  className="px-2 py-1 text-[10px] font-medium rounded-r transition-colors"
+                  style={{
+                    backgroundColor: spillMode === "split" ? "#223937" : "#ffffff",
+                    color: spillMode === "split" ? "#ffffff" : "#6b7a78",
+                    border: spillMode === "split" ? "none" : "1px solid #e5e2dd",
+                  }}
+                >
+                  Rozdělit %
+                </button>
+              </div>
+            </div>
+
+            <div className="px-3 py-2 space-y-1 max-h-[220px] overflow-y-auto">
+              {activeScheduleItems.map(item => (
+                <div key={item.id}>
+                  {spillMode === "items" ? (
+                    <label
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors text-xs"
+                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
+                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+                    >
+                      <Checkbox
+                        className="h-3.5 w-3.5"
+                        checked={spillCheckedIds.has(item.id)}
+                        onCheckedChange={() => toggleSpillItem(item.id)}
+                      />
+                      {item.item_code && (
+                        <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>
+                          {item.item_code}
+                        </span>
+                      )}
+                      <span className="flex-1 truncate" style={{ color: "#6b7a78" }}>
+                        {item.item_name}
+                      </span>
+                      <span className="font-mono text-[10px] shrink-0" style={{ color: "#99a5a3" }}>
+                        {item.scheduled_hours}h
+                      </span>
+                    </label>
+                  ) : (
+                    <div className="px-2 py-1.5">
+                      <div className="flex items-center gap-2 text-xs mb-1">
+                        {item.item_code && (
+                          <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>
+                            {item.item_code}
+                          </span>
+                        )}
+                        <span className="flex-1 truncate" style={{ color: "#6b7a78" }}>
+                          {item.item_name}
+                        </span>
+                        <span className="font-mono text-[10px] font-semibold shrink-0" style={{ color: "#223937" }}>
+                          {spillSplitPcts[item.id] || 0}%
+                        </span>
+                        <span className="font-mono text-[10px] shrink-0" style={{ color: "#99a5a3" }}>
+                          {Math.round(item.scheduled_hours * (spillSplitPcts[item.id] || 0) / 100)}h
+                        </span>
+                      </div>
+                      <Slider
+                        value={[spillSplitPcts[item.id] || 0]}
+                        min={0} max={100} step={5}
+                        onValueChange={([v]) => setSpillSplitPcts(prev => ({ ...prev, [item.id]: v }))}
+                        className="w-full"
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Summary + confirm */}
+            <div className="px-3 py-2 flex items-center justify-between gap-2" style={{ borderTop: "1px solid #f0eeea" }}>
+              <span className="text-[10px] font-mono" style={{ color: "#6b7280" }}>
+                {Math.round(spillTotalHours)}h k přesunu
+              </span>
+              <button
+                onClick={handleSpillConfirm}
+                disabled={(spillMode === "items" ? spillCheckedIds.size === 0 : spillTotalHours === 0) || spillSubmitting}
+                className="px-3 py-1.5 text-[10px] font-semibold rounded text-white transition-colors"
+                style={{
+                  backgroundColor: (spillMode === "items" ? spillCheckedIds.size > 0 : spillTotalHours > 0) ? "#d97706" : "#99a5a3",
+                  cursor: (spillMode === "items" ? spillCheckedIds.size > 0 : spillTotalHours > 0) ? "pointer" : "not-allowed",
+                  opacity: spillSubmitting ? 0.7 : 1,
+                }}
+              >
+                {spillSubmitting ? "..." : `⏭ Přesunout → T${nextWeekNum}`}
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Items list */}
+        {/* Items list — card-style rows */}
         <Collapsible open={isExpanded} onOpenChange={(open) => setExpandedMap((m) => ({ ...m, [bundle.bundleId]: open }))}>
           <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold cursor-pointer" style={{ color: "#6b7280" }}>
             {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-            Položky ({bundle.items.length})
+            Položky ({bundle.scheduleItems.length})
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <div className="mt-2 rounded-lg overflow-hidden" style={{ border: "1px solid #e5e2dd", maxHeight: 280, overflowY: "auto" }}>
-              <table className="w-full text-xs">
-                <thead>
-                  <tr style={{ background: "#f5f3f0" }}>
-                    <th className="text-left px-2 py-1 font-medium" style={{ color: "#6b7280" }}>Kód</th>
-                    <th className="text-left px-2 py-1 font-medium" style={{ color: "#6b7280" }}>Název</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(tpvItems.length > 0 ? tpvItems : bundle.items).map((item: any, i: number) => (
-                    <tr key={item.id || i} style={{ borderTop: i > 0 ? "1px solid #f0eeea" : undefined }}>
-                      <td className="px-2 py-1 font-mono">{item.item_name || item.item_code || "–"}</td>
-                      <td className="px-2 py-1">{item.item_type || item.nazev_prvku || item.item_name || "–"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="mt-2 space-y-1" style={{ maxHeight: 280, overflowY: "auto" }}>
+              {bundle.scheduleItems.map((item) => {
+                const isCompleted = item.status === "completed";
+                const isCancelled = item.status === "cancelled";
+                const isPaused = item.status === "paused";
+                const isDimmed = isCompleted || isCancelled;
+
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-md transition-colors"
+                    style={{
+                      border: "1px solid #ece8e2",
+                      background: "#ffffff",
+                      opacity: isDimmed ? 0.5 : 1,
+                    }}
+                  >
+                    {/* Status indicator */}
+                    {isCompleted ? (
+                      <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: "#3a8a36" }} />
+                    ) : (
+                      <Circle className="h-4 w-4 shrink-0" style={{ color: "#d0cdc8" }} />
+                    )}
+                    {/* Code */}
+                    {item.item_code && (
+                      <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>
+                        {item.item_code}
+                      </span>
+                    )}
+                    {/* Name */}
+                    <span
+                      className="text-[11px] flex-1 truncate"
+                      style={{
+                        color: isDimmed ? "#99a5a3" : "#6b7a78",
+                        textDecoration: isCompleted ? "line-through" : undefined,
+                      }}
+                    >
+                      {item.item_name}
+                    </span>
+                    {/* Hours */}
+                    <span className="font-mono text-[10px] shrink-0" style={{ color: "#6b7a78" }}>
+                      {item.scheduled_hours}h
+                    </span>
+                    {/* Status badge */}
+                    {isPaused && (
+                      <span className="text-[8px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(217,119,6,0.12)", color: "#d97706" }}>
+                        ⏸
+                      </span>
+                    )}
+                    {isCancelled && (
+                      <span className="text-[8px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(220,38,38,0.1)", color: "#dc2626" }}>
+                        ✕
+                      </span>
+                    )}
+                    {isCompleted && (
+                      <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(58,138,54,0.12)", color: "#3a8a36" }}>
+                        ✓
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </CollapsibleContent>
         </Collapsible>
