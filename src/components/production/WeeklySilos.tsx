@@ -816,8 +816,8 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
                 </Tooltip>
               );
             })()}
-            {completedCount > 0 && <span className="text-[9px] font-medium" style={{ color: "#3a8a36" }}>{completedCount}/{totalCount} ✓</span>}
-            <span className="font-mono text-[11px] font-bold" style={{ color: allCompleted ? "#99a5a3" : "#223937" }}>{Math.round(bundle.total_hours)}h</span>
+            {completedCount > 0 && <span className="text-[9px]" style={{ color: "#3a8a36", fontWeight: 600 }}>{completedCount}/{totalCount} ✓</span>}
+            <span className="font-mono text-[11px]" style={{ color: allCompleted ? "#9ca3af" : "#1a1a1a", fontWeight: 700 }}>{Math.round(bundle.total_hours)}h</span>
             {showCzk && <span className="font-mono text-[9px]" style={{ color: "#6b7a78" }}>{formatCompactCzk(bundle.total_hours * hourlyRate)}</span>}
           </div>
         </div>
