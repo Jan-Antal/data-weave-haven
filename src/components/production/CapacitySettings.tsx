@@ -212,10 +212,19 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               <label className="text-xs text-muted-foreground">Kapacita (h/týden)</label>
               <Input
                 type="number"
-                value={standardCapacity}
-                onChange={e => {
-                  const v = parseInt(e.target.value);
+                value={standardCapacityInput || String(standardCapacity)}
+                onChange={e => setStandardCapacityInput(e.target.value)}
+                onBlur={() => {
+                  const v = parseInt(standardCapacityInput);
                   if (v > 0) handleStandardCapacityChange(v);
+                  setStandardCapacityInput("");
+                }}
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    const v = parseInt(standardCapacityInput);
+                    if (v > 0) handleStandardCapacityChange(v);
+                    setStandardCapacityInput("");
+                  }
                 }}
                 className="h-8 text-sm font-mono"
               />
