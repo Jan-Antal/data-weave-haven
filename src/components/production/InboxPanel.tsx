@@ -194,12 +194,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
 
   // Sort projects by urgency
   const sortedProjects = useMemo(() => {
-    let filtered = [...projects];
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(p => p.project_name.toLowerCase().includes(q) || p.project_id.toLowerCase().includes(q));
-    }
-    return filtered.sort((a, b) => {
+    return [...projects].sort((a, b) => {
       const infoA = projectInfoMap.get(a.project_id);
       const infoB = projectInfoMap.get(b.project_id);
       const uA = getUrgency(infoA?.datum_smluvni, infoA?.status);
@@ -209,7 +204,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
       const dB = infoB?.datum_smluvni ? parseAppDate(infoB.datum_smluvni)?.getTime() ?? Infinity : Infinity;
       return dA - dB;
     });
-  }, [projects, projectInfoMap, searchQuery]);
+  }, [projects, projectInfoMap]);
 
   // Count overdue + urgent items
   const urgentItemCount = useMemo(() => {
