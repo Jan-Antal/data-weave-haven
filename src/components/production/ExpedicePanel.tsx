@@ -49,6 +49,8 @@ interface ExpedicePanelProps {
   showCzk?: boolean;
   onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void;
   onOpenProjectDetail?: (projectId: string) => void;
+  selectedProjectId?: string | null;
+  onSelectProject?: (projectId: string) => void;
 }
 
 export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }: ExpedicePanelProps) {
