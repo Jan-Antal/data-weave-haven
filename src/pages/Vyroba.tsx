@@ -293,7 +293,7 @@ export default function Vyroba() {
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors text-sm">
                   <User className="h-4 w-4" />
-                  <span className="font-sans text-xs">{profile?.full_name || profile?.email || "Uživatel"}</span>
+                  <span className="font-sans">{profile?.full_name || profile?.email || "Uživatel"}</span>
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
