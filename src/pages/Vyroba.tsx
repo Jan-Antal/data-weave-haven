@@ -7,7 +7,7 @@ import { useAllTPVItems } from "@/hooks/useAllTPVItems";
 import { getProjectColor } from "@/lib/projectColors";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList, AlertTriangle, User, Settings, LogOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList, AlertTriangle, User, UserCog, Settings, LogOut, LayoutDashboard, CalendarRange } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
