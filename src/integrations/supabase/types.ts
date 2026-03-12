@@ -332,6 +332,39 @@ export type Database = {
         }
         Relationships: []
       }
+      production_daily_logs: {
+        Row: {
+          bundle_id: string
+          day_index: number
+          id: string
+          logged_at: string | null
+          logged_by: string | null
+          percent: number
+          phase: string | null
+          week_key: string
+        }
+        Insert: {
+          bundle_id: string
+          day_index: number
+          id?: string
+          logged_at?: string | null
+          logged_by?: string | null
+          percent?: number
+          phase?: string | null
+          week_key: string
+        }
+        Update: {
+          bundle_id?: string
+          day_index?: number
+          id?: string
+          logged_at?: string | null
+          logged_by?: string | null
+          percent?: number
+          phase?: string | null
+          week_key?: string
+        }
+        Relationships: []
+      }
       production_inbox: {
         Row: {
           adhoc_reason: string | null
