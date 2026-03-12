@@ -1,7 +1,7 @@
 import { getProjectColor } from "@/lib/projectColors";
 
 interface DragData {
-  type: "inbox-item" | "inbox-project" | "silo-item" | "silo-bundle";
+  type: "inbox-item" | "inbox-items" | "inbox-project" | "silo-item" | "silo-bundle";
   itemName?: string;
   itemCode?: string | null;
   projectName?: string;
