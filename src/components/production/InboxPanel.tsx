@@ -111,6 +111,10 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
   const [addItemState, setAddItemState] = useState<{ projectId?: string; projectName?: string } | null>(null);
   const [cancelState, setCancelState] = useState<CancelState | null>(null);
   const [planningState, setPlanningState] = useState<{ projectId: string; projectName: string; items: PlanningItem[] } | null>(null);
+  const [deadlineWarning, setDeadlineWarning] = useState<{
+    projectName: string; deadlineLabel: string; deadlineDate: Date; weekLabel: string;
+  } | null>(null);
+  const pendingDeadlineAction = useRef<(() => Promise<void>) | null>(null);
 
   const { setNodeRef, isOver } = useDroppable({ id: "inbox-drop-zone", disabled: !!disableDropZone });
 
