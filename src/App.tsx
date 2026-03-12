@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { PeopleManagementProvider } from "@/components/PeopleManagementContext";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { UndoRedoProvider } from "@/hooks/useUndoRedo";
+import { useVersionCheck } from "@/hooks/useVersionCheck";
 
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -122,16 +123,19 @@ function AppRoutes() {
 }
 
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <AppRoutes />
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  useVersionCheck();
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <Toaster />
+          <Sonner />
+          <AppRoutes />
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
