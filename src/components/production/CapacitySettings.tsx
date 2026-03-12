@@ -111,7 +111,38 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
 
   const standardCapacity = settings?.weekly_capacity_hours ?? 875;
-  const [standardCapacityInput, setStandardCapacityInput] = useState<string>("");
+  const [standardCapacityInput, setStandardCapacityInput] = useState<string>(String(standardCapacity));
+  const [capacityInputFocused, setCapacityInputFocused] = useState(false);
+
+  // Safe math expression evaluator
+  const safeEvalExpr = (expr: string): number | null => {
+    try {
+      if (!/^[\d\s+\-*/().]+$/.test(expr)) return null;
+      const result = Function('"use strict"; return (' + expr + ')')();
+      if (typeof result !== "number" || !isFinite(result) || isNaN(result)) return null;
+      return Math.round(result);
+    } catch { return null; }
+  };
+
+  const isExpr = /[*/()]/.test(standardCapacityInput);
+  const exprPreview = isExpr ? safeEvalExpr(standardCapacityInput) : null;
+
+  const commitCapacityInput = () => {
+    const evaluated = safeEvalExpr(standardCapacityInput);
+    if (evaluated !== null && evaluated > 0) {
+      handleStandardCapacityChange(evaluated);
+      setStandardCapacityInput(String(evaluated));
+    } else {
+      const v = parseInt(standardCapacityInput);
+      if (v > 0) {
+        handleStandardCapacityChange(v);
+        setStandardCapacityInput(String(v));
+      } else {
+        setStandardCapacityInput(String(standardCapacity));
+      }
+    }
+    setCapacityInputFocused(false);
+  };
   const workingDaysPerWeek = 5;
   const calculatedHoursPerDay = workingDaysPerWeek > 0 ? Math.round(standardCapacity / workingDaysPerWeek) : 175;
 
@@ -326,23 +357,24 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             <div>
               <label className="text-xs text-muted-foreground">Kapacita (h/týden)</label>
               <Input
-                type="number"
-                value={standardCapacityInput || String(standardCapacity)}
-                onChange={e => setStandardCapacityInput(e.target.value)}
-                onBlur={() => {
-                  const v = parseInt(standardCapacityInput);
-                  if (v > 0) handleStandardCapacityChange(v);
-                  setStandardCapacityInput("");
+                type="text"
+                inputMode="numeric"
+                value={capacityInputFocused ? standardCapacityInput : String(standardCapacity)}
+                onFocus={() => {
+                  setCapacityInputFocused(true);
+                  setStandardCapacityInput(String(standardCapacity));
                 }}
+                onChange={e => setStandardCapacityInput(e.target.value)}
+                onBlur={commitCapacityInput}
                 onKeyDown={e => {
-                  if (e.key === "Enter") {
-                    const v = parseInt(standardCapacityInput);
-                    if (v > 0) handleStandardCapacityChange(v);
-                    setStandardCapacityInput("");
-                  }
+                  if (e.key === "Enter") { e.preventDefault(); commitCapacityInput(); (e.target as HTMLInputElement).blur(); }
+                  if (e.key === "Escape") { setStandardCapacityInput(String(standardCapacity)); setCapacityInputFocused(false); (e.target as HTMLInputElement).blur(); }
                 }}
                 className="h-8 text-sm font-mono"
               />
+              {capacityInputFocused && isExpr && exprPreview !== null && (
+                <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">= {exprPreview}</div>
+              )}
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Pracovní dny</label>
