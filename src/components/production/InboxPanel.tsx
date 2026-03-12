@@ -514,7 +514,6 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
               onSelectProject={onSelectProject}
               projectInfo={info}
             />
-            />
           );
         })}
 
