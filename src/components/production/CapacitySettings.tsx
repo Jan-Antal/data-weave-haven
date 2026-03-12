@@ -34,7 +34,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const currentYear = new Date().getFullYear();
   const currentWeek = getISOWeekNumber(new Date());
   const [selectedYear, setSelectedYear] = useState(currentYear);
-  const [editingWeek, setEditingWeek] = useState<number | null>(null);
+  const [selectedWeeks, setSelectedWeeks] = useState<Set<number>>(new Set());
+  const [lastClickedWeek, setLastClickedWeek] = useState<number | null>(null);
   const [newHolidayName, setNewHolidayName] = useState("");
   const [newHolidayStart, setNewHolidayStart] = useState("");
   const [newHolidayEnd, setNewHolidayEnd] = useState("");
