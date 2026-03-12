@@ -75,6 +75,19 @@ const SAMPLE_ITEMS = [
   { pid: "Z-2610-001", items: [{ name: "Stůl jednací oval", code: "SJ.01", h: 90 }, { name: "Kredenc ředitelna", code: "KR.01", h: 120 }, { name: "Obklad stěn dýha", code: "OD.01", h: 260 }] },
 ];
 
+function highlightMatch(text: string, query: string): React.ReactNode {
+  if (!query) return text;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <span style={{ background: "#fef08a", borderRadius: 2, padding: "0 2px" }}>{text.slice(idx, idx + query.length)}</span>
+      {text.slice(idx + query.length)}
+    </>
+  );
+}
+
 interface InboxPanelProps {
   overDroppableId?: string | null;
   showCzk?: boolean;
@@ -83,6 +96,7 @@ interface InboxPanelProps {
   disableDropZone?: boolean;
   selectedProjectId?: string | null;
   onSelectProject?: (projectId: string) => void;
+  searchQuery?: string;
 }
 
 interface ContextMenuState {
