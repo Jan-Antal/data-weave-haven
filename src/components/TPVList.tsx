@@ -491,7 +491,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                             type={cellType as any}
                             options={def.data_type === "select" ? def.select_options : undefined}
                             peopleRole={def.data_type === "people" ? (def.people_role as any || undefined) : undefined}
-                            onSave={(v) => updateCustomField.mutate({ tableName: "tpv_items", rowId: item.id, columnKey: key, value: v, projectId })}
+                            onSave={(v) => updateCustomField.mutate({ tableName: "tpv_items", rowId: item.id, columnKey: key, value: v, oldValue: val })}
                             readOnly={!canManageTPV}
                           />
                         </TableCell>
