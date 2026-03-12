@@ -512,6 +512,8 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
               daysLabel={getUrgencyDaysLabel(info?.datum_smluvni)}
               isSelected={selectedProjectId === project.project_id}
               onSelectProject={onSelectProject}
+              projectInfo={info}
+            />
             />
           );
         })}
