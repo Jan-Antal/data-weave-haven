@@ -518,33 +518,48 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
         })}
 
         {completedProjects.length > 0 && (
-          <div className="mt-2 space-y-[2px]">
+          <div className="mt-3 space-y-[2px]">
+            {/* Section divider */}
+            <div className="flex items-center gap-0 mb-1.5">
+              <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+              <span className="px-2" style={{ fontSize: 11, color: "#6b7280", backgroundColor: "#f8f7f4" }}>
+                ✓ Naplánováno ({completedProjects.length})
+              </span>
+              <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+            </div>
             {completedProjects.map(p => {
               const isCompletedSelected = selectedProjectId === p.project_id;
               const completedColor = getProjectColor(p.project_id);
               const completedInfo = projectInfoMap.get(p.project_id);
               const completedDeadline = resolveDeadline({ expedice: completedInfo?.expedice, montaz: completedInfo?.montaz, datum_smluvni: completedInfo?.datum_smluvni });
-              const completedDeadlineShort = completedDeadline ? `${completedDeadline.date.getDate()}.${completedDeadline.date.getMonth() + 1}.` : null;
+              let completedDeadlineDisplay: { label: string; dateStr: string; color: string } | null = null;
+              if (completedDeadline) {
+                const days = differenceInDays(completedDeadline.date, new Date());
+                const dateStr = `${completedDeadline.date.getDate()}.${completedDeadline.date.getMonth() + 1}.${completedDeadline.date.getFullYear()}`;
+                const dlLabel = completedDeadline.fieldName === "expedice" ? "Exp" : completedDeadline.fieldName === "montaz" ? "Montáž" : "Sml";
+                const dlColor = days < 0 ? "#dc2626" : days <= 14 ? "#d97706" : "#6b7280";
+                completedDeadlineDisplay = { label: dlLabel, dateStr, color: dlColor };
+              }
               return (
               <div key={p.project_id} className="flex items-center gap-1.5 px-2 py-[4px] rounded-[5px] cursor-pointer"
                 onClick={(e) => { e.stopPropagation(); onSelectProject?.(p.project_id); }}
                 style={{
-                  backgroundColor: isCompletedSelected ? "rgba(217,119,6,0.05)" : "#ffffff",
+                  backgroundColor: isCompletedSelected ? "rgba(217,119,6,0.05)" : "#f5f3f0",
                   borderTop: isCompletedSelected ? "2px solid #d97706" : "1px solid #e5e2dd",
                   borderRight: isCompletedSelected ? "2px solid #d97706" : "1px solid #e5e2dd",
                   borderBottom: isCompletedSelected ? "2px solid #d97706" : "1px solid #e5e2dd",
-                  borderLeft: `4px solid ${completedColor}`,
+                  borderLeft: `4px solid ${completedColor}80`,
                   boxShadow: isCompletedSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
                 }}>
-                <Check className="h-3 w-3 shrink-0" style={{ color: "#3a8a36" }} />
                 <div className="flex-1 min-w-0">
-                  <div className="truncate" style={{ fontSize: 13, fontWeight: 500, color: "#374151" }}>{p.project_name}</div>
-                  <div className="font-mono truncate" style={{ fontSize: 11, color: "#6b7280" }}>{p.project_id}</div>
+                  <div className="truncate" style={{ fontSize: 12, fontWeight: 500, color: "#6b7280" }}>{p.project_name}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono" style={{ fontSize: 10, color: "#9ca3af" }}>{p.project_id}</span>
+                    {completedDeadlineDisplay && (
+                      <span style={{ fontSize: 10, color: completedDeadlineDisplay.color }}>· {completedDeadlineDisplay.label}: {completedDeadlineDisplay.dateStr}</span>
+                    )}
+                  </div>
                 </div>
-                {completedDeadlineShort && (
-                  <span className="font-mono text-[9px] shrink-0" style={{ color: "#6b7280" }}>{completedDeadlineShort}</span>
-                )}
-                <span className="text-[9px] shrink-0" style={{ color: "#3a8a36" }}>✓</span>
               </div>
               );
             })}
