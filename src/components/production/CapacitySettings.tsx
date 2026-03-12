@@ -453,13 +453,18 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             </div>
           </TooltipProvider>
 
-          {/* Legend */}
-          <div className="flex items-center gap-4 text-[9px] text-muted-foreground">
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(var(--primary) / 0.6)" }} />Standard</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#d97706" }} />Svátek</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#2d6a4f" }} />Ručně upraveno</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(var(--muted-foreground) / 0.3)" }} />Minulé</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />Firemní dovolená</span>
+          {/* Legend — gradient strip */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="h-2.5 flex-1 rounded-sm" style={{ background: "linear-gradient(to right, #b45309, #d97706, #f5a742, #fde8cc, #9ca3af, #a3c9a8, #5a9e6f, #2d6a4f)" }} />
+              <div className="w-4 h-2.5 rounded-sm" style={{ backgroundColor: PAST_WEEK_COLOR }} />
+            </div>
+            <div className="flex text-[9px] text-muted-foreground">
+              <span className="flex-1 text-left">Nízká kapacita</span>
+              <span className="flex-1 text-center">Standard</span>
+              <span className="flex-1 text-right mr-6">Vysoká kapacita</span>
+              <span className="w-4 text-center">Min.</span>
+            </div>
           </div>
 
           {/* Inline Week Editor */}
