@@ -521,42 +521,22 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   const { capacityHours, scheduledHours, scheduledCzk } = useMemo(() => {
     if (!scheduleData) return { capacityHours: 0, scheduledHours: 0, scheduledCzk: 0 };
 
-    if (statsScope === "week") {
-      const silo = scheduleData.get(currentWeekKey);
-      const cap = getWeekCapacity(currentWeekKey);
-      const hours = silo ? silo.total_hours : 0;
-      const czk = silo ? silo.bundles.reduce((s, b) => s + b.items.reduce((ss, i) => ss + i.scheduled_czk, 0), 0) : 0;
-      return { capacityHours: cap, scheduledHours: hours, scheduledCzk: czk };
-    }
-
-    if (statsScope === "month") {
-      let cap = 0;
-      let hours = 0;
-      let czk = 0;
-      for (const wk of currentMonthWeekKeys) {
-        cap += getWeekCapacity(wk);
-        const silo = scheduleData.get(wk);
-        if (silo) {
-          hours += silo.total_hours;
-          czk += silo.bundles.reduce((s, b) => s + b.items.reduce((ss, i) => ss + i.scheduled_czk, 0), 0);
-        }
-      }
-      return { capacityHours: cap, scheduledHours: hours, scheduledCzk: czk };
-    }
-
-    // "all"
-    const monthlyHours = settings?.monthly_capacity_hours ?? 3500;
+    let cap = 0;
     let hours = 0;
     let czk = 0;
-    for (const [, silo] of scheduleData) {
-      hours += silo.total_hours;
-      czk += silo.bundles.reduce((s, b) => s + b.items.reduce((ss, i) => ss + i.scheduled_czk, 0), 0);
+    for (const wk of currentMonthWeekKeys) {
+      cap += getWeekCapacity(wk);
+      const silo = scheduleData.get(wk);
+      if (silo) {
+        hours += silo.total_hours;
+        czk += silo.bundles.reduce((s, b) => s + b.items.reduce((ss, i) => ss + i.scheduled_czk, 0), 0);
+      }
     }
-    return { capacityHours: monthlyHours, scheduledHours: hours, scheduledCzk: czk };
-  }, [scheduleData, statsScope, currentWeekKey, currentMonthWeekKeys, getWeekCapacity, settings]);
+    return { capacityHours: cap, scheduledHours: hours, scheduledCzk: czk };
+  }, [scheduleData, currentMonthWeekKeys, getWeekCapacity]);
 
   const isOverCapacity = scheduledHours > capacityHours;
-  const displayCzk = statsScope === "all" ? capacityHours * hourlyRate : scheduledCzk;
+  const displayCzk = scheduledCzk;
 
   const formatCzk = (v: number) => {
     if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M Kč`;
