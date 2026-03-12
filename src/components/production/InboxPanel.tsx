@@ -551,9 +551,15 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
   const leftBorderWidth = urgency !== "ok" ? 3 : 4;
 
   return (
-    <div className="rounded-lg overflow-hidden" style={{ backgroundColor: "#ffffff", border: "1px solid #ece8e2", borderLeft: `${leftBorderWidth}px solid ${leftBorderColor}` }}>
+    <div className="rounded-lg overflow-hidden" style={{
+      backgroundColor: "#ffffff",
+      border: isSelected ? "2px solid hsl(var(--primary))" : "1px solid #ece8e2",
+      borderLeft: `${leftBorderWidth}px solid ${leftBorderColor}`,
+      boxShadow: isSelected ? "0 0 0 1px hsl(var(--primary) / 0.2)" : undefined,
+      transition: "border-color 150ms, box-shadow 150ms",
+    }}>
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={(e) => { e.stopPropagation(); onSelectProject?.(project.project_id); }}
         onContextMenu={e => onProjectContextMenu(e, project)}
         className="w-full flex items-center gap-1.5 px-2.5 py-2 text-left transition-colors"
         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
