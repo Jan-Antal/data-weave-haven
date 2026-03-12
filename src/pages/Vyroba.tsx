@@ -447,7 +447,7 @@ export default function Vyroba() {
                 daysLogged={getDaysLogged(selectedBundle.bundleId)}
               />
               {/* Pinned bottom log button */}
-              {!isManagement && todayDayIndex >= 0 && (
+              {todayDayIndex >= 0 && (
                 <div className="shrink-0 p-3" style={{ borderTop: "1px solid #e5e2dd" }}>
                   <button
                     onClick={openLogModal}
