@@ -117,6 +117,19 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
   } | null>(null);
   const pendingDeadlineAction = useRef<(() => Promise<void>) | null>(null);
 
+  // Clean up checked items that no longer exist in inbox
+  useEffect(() => {
+    if (checkedItems.size === 0) return;
+    const allItemIds = new Set(projects.flatMap(p => p.items.map(i => i.id)));
+    setCheckedItems(prev => {
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (allItemIds.has(id)) next.add(id);
+      }
+      return next.size === prev.size ? prev : next;
+    });
+  }, [projects]);
+
   const { setNodeRef, isOver } = useDroppable({ id: "inbox-drop-zone", disabled: !!disableDropZone });
 
   const totalHours = useMemo(() => projects.reduce((s, p) => s + p.total_hours, 0), [projects]);
