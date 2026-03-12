@@ -617,10 +617,10 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       cost_preset_id: form.cost_preset_id || null,
       cost_material_pct: form.cost_material_pct,
       cost_overhead_pct: form.cost_overhead_pct,
-      cost_logistics_pct: form.cost_logistics_pct,
+      cost_doprava_pct: form.cost_doprava_pct,
       cost_production_pct: form.cost_production_pct,
       cost_subcontractors_pct: form.cost_subcontractors_pct,
-      cost_margin_pct: form.cost_margin_pct,
+      cost_montaz_pct: form.cost_montaz_pct,
       cost_is_custom: form.cost_is_custom,
     };
 
