@@ -408,17 +408,10 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   const cap = week.capacity_hours;
                   const barH = maxCapacity > 0 ? Math.max(4, (cap / (maxCapacity * 1.1)) * 140) : 4;
                   const past = isPastWeek(wn);
-                  const isManual = week.is_manual_override && Math.round(week.capacity_hours) !== Math.round(standardCapacity);
-                  const hasHoliday = !!week.holiday_name;
-                  const hasCompanyHol = !!week.company_holiday_name;
                   const isBarSelected = selectedWeeks.has(wn);
                   const typeLabel = getWeekTypeLabel(week, past);
 
-                  const barColor = past ? "hsl(var(--muted-foreground) / 0.3)"
-                    : hasCompanyHol ? "#f59e0b"
-                    : isManual ? "#2d6a4f"
-                    : hasHoliday ? "#d97706"
-                    : "hsl(var(--primary) / 0.6)";
+                  const barColor = past ? PAST_WEEK_COLOR : getCapacityColor(cap, standardCapacity);
 
                   const weekStart = new Date(week.week_start + "T00:00:00");
                   const weekEnd = new Date(weekStart);
