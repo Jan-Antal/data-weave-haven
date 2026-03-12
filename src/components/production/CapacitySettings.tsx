@@ -161,6 +161,37 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
   const isPastWeek = (wn: number) => selectedYear < currentYear || (selectedYear === currentYear && wn < currentWeek);
 
+  const handleBarClick = useCallback((wn: number, e: React.MouseEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      // Toggle individual week
+      setSelectedWeeks(prev => {
+        const next = new Set(prev);
+        if (next.has(wn)) next.delete(wn); else next.add(wn);
+        return next;
+      });
+      setLastClickedWeek(wn);
+    } else if (e.shiftKey && lastClickedWeek !== null) {
+      // Range select
+      const from = Math.min(lastClickedWeek, wn);
+      const to = Math.max(lastClickedWeek, wn);
+      setSelectedWeeks(prev => {
+        const next = new Set(prev);
+        for (let i = from; i <= to; i++) next.add(i);
+        return next;
+      });
+    } else {
+      // Single select / toggle
+      setSelectedWeeks(prev => prev.size === 1 && prev.has(wn) ? new Set() : new Set([wn]));
+      setLastClickedWeek(wn);
+    }
+  }, [lastClickedWeek]);
+
+  // First selected week data for editor
+  const editingWeeks = Array.from(selectedWeeks).sort((a, b) => a - b);
+  const firstEditingWeek = editingWeeks.length > 0 ? editingWeeks[0] : null;
+  const firstEditingWeekData = firstEditingWeek !== null ? weekMap.get(firstEditingWeek) : null;
+  const anyManualOverride = editingWeeks.some(wn => weekMap.get(wn)?.is_manual_override);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[900px] max-h-[85vh] overflow-y-auto">
@@ -213,6 +244,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             </div>
           </div>
 
+          <p className="text-[10px] text-muted-foreground">Klikni na bar pro editaci · Ctrl+klik pro výběr více · Shift+klik pro rozsah</p>
+
           {/* Bar chart */}
           <div className="overflow-x-auto">
             <div className="relative" style={{ minWidth: 52 * 16, height: 140 }}>
@@ -232,10 +265,11 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   const cap = week.capacity_hours;
                   const barH = maxCapacity > 0 ? Math.max(2, (cap / (maxCapacity * 1.1)) * 120) : 2;
                   const past = isPastWeek(wn);
-                  const isManual = week.is_manual_override;
+                  const isManual = week.is_manual_override && Math.round(week.capacity_hours) !== Math.round(standardCapacity);
                   const hasHoliday = !!week.holiday_name;
                   const hasCompanyHol = !!week.company_holiday_name;
                   const isCurrent = selectedYear === currentYear && wn === currentWeek;
+                  const isBarSelected = selectedWeeks.has(wn);
 
                   let barColor: string;
                   if (past) barColor = "hsl(var(--muted-foreground) / 0.3)";
@@ -247,20 +281,36 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   return (
                     <button
                       key={wn}
-                      className={`flex-1 min-w-[12px] rounded-t-sm transition-all hover:opacity-80 relative ${editingWeek === wn ? "ring-2 ring-foreground" : ""}`}
-                      style={{ height: barH, backgroundColor: barColor, outline: isCurrent ? "2px solid hsl(var(--primary))" : "none" }}
-                      title={`T${wn}: ${Math.round(cap)}h · ${week.working_days} dní${week.holiday_name ? ` · ${week.holiday_name}` : ""}${week.company_holiday_name ? ` · ${week.company_holiday_name}` : ""}`}
-                      onClick={() => setEditingWeek(editingWeek === wn ? null : wn)}
+                      className={`flex-1 min-w-[12px] rounded-t-sm transition-all hover:opacity-80 relative ${isBarSelected ? "ring-2 ring-foreground" : ""}`}
+                      style={{
+                        height: barH,
+                        backgroundColor: barColor,
+                        outline: isCurrent ? "3px solid hsl(var(--primary))" : "none",
+                        outlineOffset: isCurrent ? "-1px" : undefined,
+                      }}
+                      title={`T${wn}: ${Math.round(cap)}h · ${week.working_days} dní${week.holiday_name ? ` · ${week.holiday_name}` : ""}${week.company_holiday_name ? ` · ${week.company_holiday_name}` : ""}${isCurrent ? " · Tento týden" : ""}`}
+                      onClick={e => handleBarClick(wn, e)}
                     />
                   );
                 })}
               </div>
 
+              {/* Current week marker */}
+              {selectedYear === currentYear && (
+                <div className="flex gap-[2px] mt-0.5">
+                  {Array.from({ length: 52 }, (_, i) => i + 1).map(wn => (
+                    <div key={wn} className="flex-1 min-w-[12px] flex justify-center">
+                      {wn === currentWeek && <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "hsl(var(--primary))" }} />}
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Week labels */}
-              <div className="flex gap-[2px] mt-1">
+              <div className="flex gap-[2px] mt-0.5">
                 {Array.from({ length: 52 }, (_, i) => i + 1).map(wn => (
-                  <div key={wn} className="flex-1 min-w-[12px] text-center text-[6px] text-muted-foreground font-mono">
-                    {wn % 4 === 1 ? `T${wn}` : ""}
+                  <div key={wn} className={`flex-1 min-w-[12px] text-center text-[6px] font-mono ${selectedYear === currentYear && wn === currentWeek ? "text-foreground font-bold" : "text-muted-foreground"}`}>
+                    {wn % 4 === 1 || (selectedYear === currentYear && wn === currentWeek) ? `T${wn}` : ""}
                   </div>
                 ))}
               </div>
@@ -274,25 +324,25 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#2d6a4f" }} />Ručně upraveno</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(var(--muted-foreground) / 0.3)" }} />Minulé</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />Firemní dovolená</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "hsl(var(--primary))" }} />Tento týden</span>
           </div>
 
           {/* Inline Week Editor */}
-          {editingWeek !== null && weekMap.get(editingWeek) && (() => {
-            const week = weekMap.get(editingWeek)!;
-            const past = isPastWeek(editingWeek);
-            return (
-              <WeekEditor
-                key={editingWeek}
-                week={week}
-                weekNum={editingWeek}
-                isPast={past}
-                standardCapacity={standardCapacity}
-                onSave={(cap, days) => handleWeekCapacityUpdate(editingWeek, cap, days)}
-                onReset={() => handleResetWeek(editingWeek)}
-                onClose={() => setEditingWeek(null)}
-              />
-            );
-          })()}
+          {firstEditingWeekData && firstEditingWeek !== null && (
+            <WeekEditor
+              key={`${editingWeeks.join("-")}`}
+              week={firstEditingWeekData}
+              weekNum={firstEditingWeek}
+              selectedCount={editingWeeks.length}
+              isPast={isPastWeek(firstEditingWeek)}
+              standardCapacity={standardCapacity}
+              hoursPerDay={calculatedHoursPerDay}
+              onSave={(cap, days) => handleWeekCapacityUpdate(editingWeeks, cap, days)}
+              onReset={() => handleResetWeeks(editingWeeks)}
+              onClose={() => setSelectedWeeks(new Set())}
+              hasManualOverride={anyManualOverride}
+            />
+          )}
         </div>
 
         {/* Holiday Summary */}
