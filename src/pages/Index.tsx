@@ -63,6 +63,7 @@ const Index = () => {
   const [userMgmtOpen, setUserMgmtOpen] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [costPresetsOpen, setCostPresetsOpen] = useState(false);
+  const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
   const [dataLogOpen, setDataLogOpen] = useState(() => {
     try { return sessionStorage.getItem("datalog-open") === "true"; } catch { return false; }
   });
