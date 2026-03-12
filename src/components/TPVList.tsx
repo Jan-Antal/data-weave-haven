@@ -316,7 +316,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   }
 
   return (
-    <div className="w-full min-w-0">
+    <div className="w-full min-w-0 h-full flex flex-col">
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap mb-4">
         <Button variant="ghost" size="sm" onClick={onBack}>
@@ -357,7 +357,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         </div>
       )}
 
-      <div className={cn("rounded-lg border bg-card flex flex-col", editMode && "rounded-t-none border-t-0")} style={{ maxHeight: "calc(100vh - 320px)" }}>
+      <div className={cn("rounded-lg border bg-card flex flex-col flex-1 min-h-0", editMode && "rounded-t-none border-t-0")}>
         {/* FIXED HEADER — never scrolls */}
         <div ref={tpvHeaderScrollRef} className="flex-shrink-0 overflow-hidden border-b border-border">
           <Table>

@@ -482,13 +482,13 @@ const Index = () => {
                 </div>
               </div>
 
-              <TabsContent value="project-info" forceMount className={cn("flex-1 min-h-0 overflow-y-auto", activeTab !== "project-info" ? "hidden" : "")}>
+              <TabsContent value="project-info" forceMount className={cn("flex-1 min-h-0 overflow-hidden", activeTab !== "project-info" ? "hidden" : "")}>
                 <ProjectInfoTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
               </TabsContent>
-              <TabsContent value="pm-status" forceMount className={cn("flex-1 min-h-0 overflow-y-auto", activeTab !== "pm-status" ? "hidden" : "")}>
+              <TabsContent value="pm-status" forceMount className={cn("flex-1 min-h-0 overflow-hidden", activeTab !== "pm-status" ? "hidden" : "")}>
                 <PMStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
               </TabsContent>
-              <TabsContent value="tpv-status" forceMount className={cn("flex-1 min-h-0 overflow-y-auto", activeTab !== "tpv-status" ? "hidden" : "")}>
+              <TabsContent value="tpv-status" forceMount className={cn("flex-1 min-h-0 overflow-hidden", activeTab !== "tpv-status" ? "hidden" : "")}>
                 <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRequestTab={() => handleTabChange("tpv-status")} closeDetailRef={tpvCloseDetailRef} onActiveProjectChange={setTpvListActive} />
               </TabsContent>
               {activeTab === "plan" && (
