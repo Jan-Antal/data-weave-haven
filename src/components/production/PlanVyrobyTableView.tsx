@@ -1441,19 +1441,11 @@ function EmptyWeekCell({ weekKey, isCurrent, item, onSchedule }: {
   const hasInbox = item.inboxItemIds.length > 0;
 
   if (!hasInbox) {
-    return (
-      <div
-        className="shrink-0"
-        style={{ width: CELL_W, backgroundColor: isCurrent ? "hsl(142 76% 97%)" : "#fff" }}
-      />
-    );
+    return <div className="w-full" />;
   }
 
   return (
-    <div
-      className="shrink-0 flex items-center justify-center"
-      style={{ width: CELL_W, backgroundColor: isCurrent ? "hsl(142 76% 97%)" : "#fff" }}
-    >
+    <div className="w-full flex items-center justify-center">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
