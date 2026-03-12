@@ -8,7 +8,7 @@ import { useProjects } from "@/hooks/useProjects";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isPast, isFuture, differenceInDays } from "date-fns";
-import { Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Search, Archive } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { getProjectColor } from "@/lib/projectColors";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
 import { toast } from "@/hooks/use-toast";
@@ -379,31 +379,30 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
       </div>
 
       {/* Archive section */}
-      <div style={{ borderTop: "1px solid #ece8e2" }}>
+      <div className="bg-gray-50" style={{ borderTop: "1px solid hsl(var(--border))" }}>
         <button
           onClick={() => setArchiveOpen(!archiveOpen)}
-          className="w-full flex items-center justify-between px-3 py-2 text-left transition-colors hover:bg-muted/50"
+          className="w-full flex items-center justify-between px-3 py-2 text-left transition-colors hover:bg-gray-100"
         >
           <div className="flex items-center gap-1.5">
-            <Archive className="h-3 w-3" style={{ color: "#99a5a3" }} />
-            <span className="text-[11px] font-medium" style={{ color: "#99a5a3" }}>Archiv</span>
-            <span className="text-[9px]" style={{ color: "#b0bab8" }}>· posledních 30 dní</span>
+            <span className="text-sm">📁</span>
+            <span className="text-[11px] font-medium text-gray-500">Archiv</span>
+            <span className="text-[9px] text-gray-400">· posledních 30 dní</span>
           </div>
           <div className="flex items-center gap-1.5">
             {archivedProjects.length > 0 && (
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                style={{ backgroundColor: "#f0eee9", color: "#99a5a3" }}>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
                 {archivedProjects.length}
               </span>
             )}
             {archiveOpen
-              ? <ChevronDown className="h-3 w-3" style={{ color: "#99a5a3" }} />
-              : <ChevronUp className="h-3 w-3" style={{ color: "#99a5a3" }} />}
+              ? <ChevronUp className="h-3 w-3 text-gray-400" />
+              : <ChevronDown className="h-3 w-3 text-gray-400" />}
           </div>
         </button>
 
         {archiveOpen && (
-          <div className="px-2 pb-2 space-y-1.5 overflow-y-auto" style={{ maxHeight: "40vh" }}>
+          <div className="px-2 pb-2 space-y-1.5 overflow-y-auto bg-gray-50" style={{ maxHeight: "40vh" }}>
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3" style={{ color: "#b0bab8" }} />
@@ -510,10 +509,9 @@ function ProjectGroup({
     <div
       className="rounded-lg overflow-hidden"
       style={{
-        backgroundColor: "#ffffff",
-        border: "1px solid #ece8e2",
-        borderLeft: `4px solid ${getProjectColor(group.project_id)}`,
-        opacity: isArchive ? 0.7 : 1,
+        backgroundColor: isArchive ? "hsl(var(--muted) / 0.5)" : "#ffffff",
+        border: `1px solid ${isArchive ? "hsl(var(--border))" : "#ece8e2"}`,
+        borderLeft: `4px solid ${isArchive ? "#d1d5db" : getProjectColor(group.project_id)}`,
       }}
       onContextMenu={(e) => onProjectContextMenu(e, group.project_id)}
     >
@@ -521,23 +519,27 @@ function ProjectGroup({
         onClick={toggleGroup}
         onContextMenu={(e) => onProjectContextMenu(e, group.project_id)}
         className="w-full flex items-center gap-1.5 px-2.5 py-2 text-left transition-colors"
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
+        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = isArchive ? "hsl(210 20% 96%)" : "#f8f7f5")}
         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
       >
         {isGroupCollapsed
-          ? <ChevronRight className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />
-          : <ChevronDown className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />}
+          ? <ChevronRight className="h-3 w-3 shrink-0 text-gray-400" />
+          : <ChevronDown className="h-3 w-3 shrink-0 text-gray-400" />}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-1.5">
             <span
               className="text-[12px] font-semibold truncate"
-              style={{ color: isArchive ? "#99a5a3" : getProjectColor(group.project_id) }}
+              style={{ color: getProjectColor(group.project_id) }}
             >
               {group.project_name}
             </span>
             <span
               className="text-[11px] font-bold px-1.5 py-0.5 rounded-full shrink-0 text-center"
-              style={{
+              style={isArchive ? {
+                backgroundColor: "hsl(var(--muted))",
+                color: "hsl(var(--muted-foreground))",
+                minWidth: 40,
+              } : {
                 backgroundColor: allDone ? "rgba(22,163,74,0.12)" : "rgba(217,151,6,0.12)",
                 color: allDone ? "#16A34A" : "#d97706",
                 minWidth: 40,
@@ -547,9 +549,9 @@ function ProjectGroup({
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="font-mono text-[9px]" style={{ color: "#99a5a3" }}>{group.project_id}</span>
+            <span className="font-mono text-[9px] text-gray-400">{group.project_id}</span>
             {isArchive && latestExpedicedStr ? (
-              <span className="text-[9px] font-medium shrink-0" style={{ color: "#16A34A" }}>
+              <span className="text-[9px] text-gray-400">
                 Expedováno: {latestExpedicedStr}
               </span>
             ) : expediceStr ? (
@@ -603,13 +605,15 @@ function ProjectGroup({
                 <div
                   key={item.id}
                   className="rounded px-1 py-[3px] cursor-default transition-colors"
-                  style={{ opacity: (isArchive || isItemExpediced) ? 0.4 : 1 }}
+                  style={{ opacity: isArchive ? 0.8 : (isItemExpediced ? 0.4 : 1) }}
                   onContextMenu={(e) => onItemContextMenu(e, item)}
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "hsl(var(--muted))")}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                 >
                   <div className="flex items-center gap-1.5">
-                    {isItemExpediced ? (
+                    {isArchive ? (
+                      <span className="text-teal-500 text-[11px] shrink-0">✓</span>
+                    ) : isItemExpediced ? (
                       <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0"
                         style={{ backgroundColor: "rgba(13,148,136,0.12)", color: "#0d9488" }}>
                         ✓ Exp
@@ -618,29 +622,34 @@ function ProjectGroup({
                       <Check className="shrink-0" style={{ width: 12, height: 12, color: "#16A34A", strokeWidth: 3 }} />
                     )}
                     {item.item_code && (
-                      <span className="font-mono text-[10px] shrink-0 text-foreground">
+                      <span className={`font-mono text-[10px] shrink-0 ${isArchive ? "text-gray-500" : "text-foreground"}`}>
                         {item.item_code}
                       </span>
                     )}
                     <span
-                      className="text-[11px] truncate flex-1 text-muted-foreground"
-                      style={{ textDecoration: (isArchive || isItemExpediced) ? "line-through" : "none" }}
+                      className={`text-[11px] truncate flex-1 ${isArchive ? "text-gray-600" : "text-muted-foreground"}`}
+                      style={{ textDecoration: (!isArchive && isItemExpediced) ? "line-through" : "none" }}
                     >
                       {item.item_name}
                     </span>
                   </div>
-                  <div className="ml-[18px] flex flex-col gap-0">
-                    {completedStr && (
-                      <span className="text-[8px] text-muted-foreground">
-                        Dokončeno: {completedStr}
-                      </span>
-                    )}
-                    {isArchive && expedicedCompactStr && (
-                      <span className="text-[8px] font-medium" style={{ color: "#0d9488" }}>
-                        ✓ Expedováno {expedicedCompactStr}
-                      </span>
-                    )}
-                  </div>
+                  {isArchive ? (
+                    expedicedCompactStr && (
+                      <div className="ml-[18px]">
+                        <span className="text-[10px] font-medium px-1.5 py-[1px] rounded bg-teal-50 text-teal-600 border border-teal-200">
+                          ✓ Expedováno {expedicedCompactStr}
+                        </span>
+                      </div>
+                    )
+                  ) : (
+                    <div className="ml-[18px] flex flex-col gap-0">
+                      {completedStr && (
+                        <span className="text-[8px] text-muted-foreground">
+                          Dokončeno: {completedStr}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
