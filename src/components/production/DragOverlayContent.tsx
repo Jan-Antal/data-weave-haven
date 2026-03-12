@@ -13,6 +13,30 @@ interface DragData {
 export function DragOverlayContent({ data }: { data: DragData }) {
   const color = data.projectId ? getProjectColor(data.projectId) : "#3b82f6";
 
+  // Multi-item drag from inbox
+  if (data.type === "inbox-items") {
+    return (
+      <div
+        className="px-3 py-2 rounded-lg shadow-lg"
+        style={{
+          backgroundColor: "#ffffff",
+          border: `1px solid #ece8e2`,
+          borderLeft: `4px solid ${color}`,
+          transform: "rotate(1deg)",
+          maxWidth: 220,
+          opacity: 0.92,
+        }}
+      >
+        <div className="text-[10px] font-semibold truncate" style={{ color: "#3a8a36" }}>
+          {data.itemCount} položek
+        </div>
+        <div className="font-mono text-[9px] mt-0.5" style={{ color: "#6b7a78" }}>
+          {Math.round(data.hours ?? 0)}h
+        </div>
+      </div>
+    );
+  }
+
   if (data.type === "inbox-item" || data.type === "silo-item") {
     return (
       <div
