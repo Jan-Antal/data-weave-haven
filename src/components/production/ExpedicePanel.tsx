@@ -542,13 +542,15 @@ interface ProjectGroupProps {
   onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem) => void;
   onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void;
   isArchive: boolean;
+  isSelected?: boolean;
+  onSelectProject?: (projectId: string) => void;
 }
 
 function ProjectGroup({
   group, projectExpediceMap, projectTotalItems,
   isGroupCollapsed, toggleGroup,
   onProjectContextMenu, onItemContextMenu, onNavigateToTPV,
-  isArchive,
+  isArchive, isSelected, onSelectProject,
 }: ProjectGroupProps) {
   const expediceRaw = projectExpediceMap.get(group.project_id);
   const expediceDate = parseDate(expediceRaw);
