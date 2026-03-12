@@ -326,6 +326,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       e.preventDefault(); e.stopPropagation();
       const activeItems = bundle.items.filter(i => i.status !== "completed" && i.status !== "paused" && i.status !== "cancelled");
       const hasUncompleted = activeItems.length > 0;
+      const completedItems = bundle.items.filter(i => i.status === "completed");
+      const allCompleted = completedItems.length > 0 && activeItems.length === 0 && bundle.items.filter(i => i.status === "paused").length === 0;
       const pausedItems = bundle.items.filter(i => i.status === "paused");
       const actions: ContextMenuAction[] = [];
       if (hasUncompleted) {
@@ -397,6 +399,31 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       if (onOpenProjectDetail) {
         actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(bundle.project_id) });
       }
+
+      // Completed bundle: add "Vrátit do výroby" and "Zrušit"
+      if (allCompleted) {
+        actions.push({
+          label: "Vrátit do výroby", icon: "↩", dividerBefore: true,
+          onClick: async () => {
+            try {
+              for (const ci of completedItems) await returnToProduction(ci.id);
+              toast({ title: `↩ ${completedItems.length} položek vráceno do výroby` });
+            } catch (err: any) {
+              toast({ title: "Chyba", description: err.message, variant: "destructive" });
+            }
+          },
+        });
+        actions.push({
+          label: "Zrušit", icon: "✕", danger: true,
+          onClick: () => setCancelState({
+            itemId: completedItems.map(i => i.id).join(","), itemName: `${bundle.project_name} — ${completedItems.length} položek`,
+            itemCode: null, hours: completedItems.reduce((s, i) => s + i.scheduled_hours, 0),
+            projectName: bundle.project_name, projectId: bundle.project_id,
+            source: "schedule", splitGroupId: null, cancelAll: true,
+          }),
+        });
+      }
+
       if (hasUncompleted) {
         actions.push({
           label: `Zrušit vše (${activeItems.length})`, icon: "✕", danger: true, dividerBefore: true,
@@ -410,7 +437,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       }
       setContextMenu({ x: e.clientX, y: e.clientY, actions });
     },
-    [returnBundleToInbox, onNavigateToTPV, onOpenProjectDetail, handleReleaseItem, mergeSplitItems]
+    [returnBundleToInbox, returnToProduction, onNavigateToTPV, onOpenProjectDetail, handleReleaseItem, mergeSplitItems]
   );
 
   const handleItemContextMenu = useCallback(
@@ -421,7 +448,13 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       const actions: ContextMenuAction[] = [];
 
       if (isCompleted) {
-        actions.push({ label: "Vrátit do výroby", icon: "↩", onClick: () => returnToProduction(item.id) });
+        if (onNavigateToTPV) {
+          actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(item.project_id, item.item_code) });
+        }
+        if (onOpenProjectDetail) {
+          actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(item.project_id) });
+        }
+        actions.push({ label: "Vrátit do výroby", icon: "↩", dividerBefore: true, onClick: () => returnToProduction(item.id) });
       } else if (isPaused) {
         actions.push({ label: "Uvolnit položku", icon: "▶", onClick: () => handleReleaseItem(item.id) });
         actions.push({ label: "Vrátit do Inboxu", icon: "←", onClick: () => moveItemBackToInbox(item.id) });
