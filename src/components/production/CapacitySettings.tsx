@@ -251,7 +251,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                           title={`T${wn}: ${Math.round(cap)}h · ${week.working_days} dní${week.holiday_name ? ` · ${week.holiday_name}` : ""}${week.company_holiday_name ? ` · ${week.company_holiday_name}` : ""}`}
                         />
                       </PopoverTrigger>
-                      <PopoverContent className="w-56 p-3 space-y-2">
+                      <PopoverContent className="w-56 p-3 space-y-2 z-[100]" side="bottom" align="center">
                         <WeekEditor
                           week={week}
                           weekNum={wn}
