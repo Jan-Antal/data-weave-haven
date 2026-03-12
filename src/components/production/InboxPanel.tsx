@@ -524,8 +524,8 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
               <div key={p.project_id} className="flex items-center gap-1.5 px-2 py-[4px] rounded-[5px] cursor-pointer"
                 onClick={(e) => { e.stopPropagation(); onSelectProject?.(p.project_id); }}
                 style={{
-                  backgroundColor: isCompletedSelected ? "rgba(217,119,6,0.05)" : "rgba(58,138,54,0.04)",
-                  border: isCompletedSelected ? "2px solid #d97706" : "1px solid rgba(58,138,54,0.15)",
+                  backgroundColor: isCompletedSelected ? "rgba(217,119,6,0.05)" : "#ffffff",
+                  border: isCompletedSelected ? "2px solid #d97706" : "1px solid #e5e2dd",
                   boxShadow: isCompletedSelected ? "0 0 0 1px rgba(217,119,6,0.1)" : undefined,
                 }}>
                 <Check className="h-3 w-3 shrink-0" style={{ color: "#3a8a36" }} />
