@@ -298,21 +298,26 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
 
       if (isArchive && item) {
         // Archive item context menu
-        actions.push({ label: "Vrátit do Expedice", icon: "📦", onClick: () => unExpedice(item.id) });
-        actions.push({ label: `Vrátit do výroby (T${weekNum})`, icon: "↩", onClick: () => returnToProduction(item.id) });
-        actions.push({ label: "Vrátit do Inboxu", icon: "↩", onClick: () => moveItemBackToInbox(item.id) });
+        actions.push({ label: "Vrátit do Expedice", icon: "↩", onClick: () => unExpedice(item.id) });
+        actions.push({ label: `Vrátit do výroby (T${weekNum})`, icon: "🔧", onClick: () => returnToProduction(item.id) });
+        actions.push({ label: "Vrátit do Inboxu", icon: "📥", onClick: () => moveItemBackToInbox(item.id) });
+      } else if (isArchive && !item) {
+        // Archive project header context menu
+        actions.push({ label: "Vrátit do Expedice", icon: "↩", onClick: () => unExpediceAll(projectId) });
+        actions.push({ label: "Vrátit do Výroby", icon: "🔧", onClick: () => returnAllToProduction(projectId) });
+        actions.push({ label: "Vrátit do Inboxu", icon: "📥", onClick: () => returnAllToInbox(projectId) });
       } else if (item) {
         // Active Expedice item context menu
         actions.push({ label: "Expedováno ✓", icon: "📦", onClick: () => markAsExpediced(item.id) });
         actions.push({ label: `Vrátit do výroby (T${weekNum})`, icon: "↩", onClick: () => returnToProduction(item.id) });
         actions.push({ label: "Vrátit do Inboxu", icon: "↩", onClick: () => moveItemBackToInbox(item.id) });
       } else {
-        // Project header context menu
+        // Active project header context menu
         actions.push({ label: "Expedovat vše", icon: "📦", onClick: () => markAllAsExpediced(projectId) });
       }
 
       if (onNavigateToTPV) {
-        actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(projectId, item?.item_code) });
+        actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(projectId, item?.item_code), dividerBefore: isArchive && !item });
       }
       if (onOpenProjectDetail) {
         actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(projectId) });
@@ -320,7 +325,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
 
       return actions;
     },
-    [returnToProduction, moveItemBackToInbox, onNavigateToTPV, onOpenProjectDetail, markAsExpediced, markAllAsExpediced, unExpedice]
+    [returnToProduction, moveItemBackToInbox, onNavigateToTPV, onOpenProjectDetail, markAsExpediced, markAllAsExpediced, unExpedice, unExpediceAll, returnAllToProduction, returnAllToInbox]
   );
 
   const handleItemContextMenu = useCallback(
