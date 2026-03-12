@@ -401,7 +401,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
     await executePlan(plan);
   }, [planningState, allDbProjects, executePlan, formatWeekLabel]);
 
-
+  const handleSeedData = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
