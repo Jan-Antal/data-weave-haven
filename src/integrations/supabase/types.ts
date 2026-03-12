@@ -88,11 +88,11 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          doprava_pct: number
           id: string
           is_default: boolean
-          logistics_pct: number
-          margin_pct: number
           material_pct: number
+          montaz_pct: number
           name: string
           overhead_pct: number
           production_pct: number
@@ -104,11 +104,11 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          doprava_pct?: number
           id?: string
           is_default?: boolean
-          logistics_pct?: number
-          margin_pct?: number
           material_pct?: number
+          montaz_pct?: number
           name: string
           overhead_pct?: number
           production_pct?: number
@@ -120,11 +120,11 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          doprava_pct?: number
           id?: string
           is_default?: boolean
-          logistics_pct?: number
-          margin_pct?: number
           material_pct?: number
+          montaz_pct?: number
           name?: string
           overhead_pct?: number
           production_pct?: number
@@ -747,10 +747,10 @@ export type Database = {
         Row: {
           architekt: string | null
           contract_link: string | null
+          cost_doprava_pct: number | null
           cost_is_custom: boolean | null
-          cost_logistics_pct: number | null
-          cost_margin_pct: number | null
           cost_material_pct: number | null
+          cost_montaz_pct: number | null
           cost_overhead_pct: number | null
           cost_preset_id: string | null
           cost_production_pct: number | null
@@ -803,10 +803,10 @@ export type Database = {
         Insert: {
           architekt?: string | null
           contract_link?: string | null
+          cost_doprava_pct?: number | null
           cost_is_custom?: boolean | null
-          cost_logistics_pct?: number | null
-          cost_margin_pct?: number | null
           cost_material_pct?: number | null
+          cost_montaz_pct?: number | null
           cost_overhead_pct?: number | null
           cost_preset_id?: string | null
           cost_production_pct?: number | null
@@ -859,10 +859,10 @@ export type Database = {
         Update: {
           architekt?: string | null
           contract_link?: string | null
+          cost_doprava_pct?: number | null
           cost_is_custom?: boolean | null
-          cost_logistics_pct?: number | null
-          cost_margin_pct?: number | null
           cost_material_pct?: number | null
+          cost_montaz_pct?: number | null
           cost_overhead_pct?: number | null
           cost_preset_id?: string | null
           cost_production_pct?: number | null
