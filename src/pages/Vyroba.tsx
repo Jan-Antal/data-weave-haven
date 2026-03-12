@@ -62,7 +62,7 @@ const PHASES = [
   { name: "Expedice", color: "#16a34a" },
 ];
 
-type RoleView = "manager" | "management";
+
 
 interface VyrobaBundle {
   bundleId: string;
