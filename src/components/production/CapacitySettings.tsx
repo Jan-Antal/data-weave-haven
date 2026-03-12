@@ -59,12 +59,27 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
   const CZECH_MONTHS = ["Leden","Únor","Březen","Duben","Květen","Červen","Červenec","Srpen","Září","Říjen","Listopad","Prosinec"];
 
+  const { data: settings } = useProductionSettings();
+  const updateSettings = useUpdateProductionSettings();
+  const { weekMap, defaultCapacity, hoursPerDay } = useWeeklyCapacity(selectedYear);
+  const { data: holidays = [] } = useCzechHolidays(selectedYear);
+  const { data: companyHolidays = [] } = useCompanyHolidays();
+  const addCompanyHoliday = useAddCompanyHoliday();
+  const deleteCompanyHoliday = useDeleteCompanyHoliday();
+  const upsertWeek = useUpsertWeekCapacity();
+  const bulkUpdate = useBulkUpdateFutureCapacity();
+  const queryClient = useQueryClient();
+
+  const standardCapacity = settings?.weekly_capacity_hours ?? 875;
+  const [standardCapacityInput, setStandardCapacityInput] = useState<string>("");
+  const workingDaysPerWeek = 5;
+  const calculatedHoursPerDay = workingDaysPerWeek > 0 ? Math.round(standardCapacity / workingDaysPerWeek) : 175;
+
   // Get month for a week number
   const getWeekMonth = useCallback((wn: number): number => {
     const week = weekMap.get(wn);
     if (!week) return 0;
     const d = new Date(week.week_start + "T00:00:00");
-    // Use Thursday of the week to determine month
     d.setDate(d.getDate() + 3);
     return d.getMonth();
   }, [weekMap]);
@@ -100,22 +115,6 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     }
     return groups;
   }, [viewStart, getWeekMonth]);
-
-  const { data: settings } = useProductionSettings();
-  const updateSettings = useUpdateProductionSettings();
-  const { weekMap, defaultCapacity, hoursPerDay } = useWeeklyCapacity(selectedYear);
-  const { data: holidays = [] } = useCzechHolidays(selectedYear);
-  const { data: companyHolidays = [] } = useCompanyHolidays();
-  const addCompanyHoliday = useAddCompanyHoliday();
-  const deleteCompanyHoliday = useDeleteCompanyHoliday();
-  const upsertWeek = useUpsertWeekCapacity();
-  const bulkUpdate = useBulkUpdateFutureCapacity();
-  const queryClient = useQueryClient();
-
-  const standardCapacity = settings?.weekly_capacity_hours ?? 875;
-  const [standardCapacityInput, setStandardCapacityInput] = useState<string>("");
-  const workingDaysPerWeek = 5;
-  const calculatedHoursPerDay = workingDaysPerWeek > 0 ? Math.round(standardCapacity / workingDaysPerWeek) : 175;
 
   const maxCapacity = useMemo(() => {
     let max = standardCapacity;
