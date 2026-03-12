@@ -760,8 +760,8 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
   return (
     <div className="rounded-[6px] overflow-hidden relative" style={{
       border: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
-      borderLeft: `4px solid ${borderLeftColor}`,
-      backgroundColor: isSelected ? "rgba(217,119,6,0.04)" : "#ffffff", opacity: isDragging ? 0.3 : 1,
+      borderLeftWidth: 4, borderLeftStyle: "solid", borderLeftColor: borderLeftColor,
+      backgroundColor: isSelected ? "rgba(217,119,6,0.05)" : "#ffffff", opacity: isDragging ? 0.3 : 1,
       boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
       transition: "border-color 150ms, box-shadow 150ms",
     }}>
@@ -837,7 +837,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
                   <span className="text-[8px] font-medium" style={{ color: "#b0bab8" }}>Dokončeno</span>
                   <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
                 </div>
-                <div style={{ opacity: 0.5 }}>
+                <div style={{ opacity: 0.65 }}>
                   {completedItems.map(item => (
                     <CompletedSiloItem key={item.id} item={item} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
                   ))}
@@ -861,8 +861,8 @@ function CompletedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onCont
       onContextMenu={onContextMenu}
     >
       <span style={{ width: 10, fontSize: 9, color: "#3a8a36", fontWeight: 700 }}>✓</span>
-      {item.item_code && <span className="font-mono text-[9px] font-bold shrink-0" style={{ color: "#c4ccc9" }}>{item.item_code}</span>}
-      <span className="text-[10px] flex-1 truncate" style={{ color: "#99a5a3", textDecoration: "line-through" }}>{item.item_name}</span>
+      {item.item_code && <span className="font-mono text-[9px] font-bold shrink-0" style={{ color: "#99a5a3" }}>{item.item_code}</span>}
+      <span className="text-[10px] flex-1 truncate" style={{ color: "#6b7280", textDecoration: "line-through" }}>{item.item_name}</span>
       {isSplit && (
         <Tooltip><TooltipTrigger asChild><span className="text-[8px] font-mono shrink-0" style={{ color: "#c4ccc9" }}>{item.split_part}/{item.split_total}</span></TooltipTrigger>
           <TooltipContent side="top" className="z-[9999] text-[10px]">Část {item.split_part} ze {item.split_total}</TooltipContent></Tooltip>
