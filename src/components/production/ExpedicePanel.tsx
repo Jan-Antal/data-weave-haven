@@ -415,7 +415,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
       </div>
 
       {/* Active items */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+      <div className="flex-1 overflow-y-auto p-2 space-y-1.5" onClick={() => onSelectProject?.(null as any)}>
         {activeProjects.length === 0 && archivedProjects.length === 0 && (
           <div className="text-center py-8">
             <p className="text-[10px] text-muted-foreground">Žádné dokončené položky</p>
