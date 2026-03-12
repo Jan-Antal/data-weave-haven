@@ -104,8 +104,7 @@ export default function Vyroba() {
   const friday = addWeeks(currentMonday, 0);
   friday.setDate(friday.getDate() + 4);
 
-  // Role view toggle
-  const [roleView, setRoleView] = useState<RoleView>("manager");
+
 
   // Data
   const { data: scheduleData } = useProductionSchedule();
