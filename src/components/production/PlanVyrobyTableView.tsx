@@ -767,6 +767,40 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     if (actions.length > 0) setContextMenu({ x: e.clientX, y: e.clientY, actions });
   }, [moveTargetWeeks, handleMoveToWeek, handleReturnToInbox, handleComplete, handleScheduleFromInbox]);
 
+  // Context menu: week cell (right-click on a scheduled item in a week)
+  const handleWeekCellContextMenu = useCallback((e: React.MouseEvent, ids: string[], alloc: { hours: number; czk: number; status: string; splitPart?: number; splitTotal?: number }, item: ItemRow) => {
+    e.preventDefault(); e.stopPropagation();
+    const actions: ContextMenuAction[] = [];
+    actions.push({
+      label: "Přesunout do týdne…", icon: "➡️",
+      onClick: () => {
+        const weekActions: ContextMenuAction[] = moveTargetWeeks.map(tw => ({
+          label: tw.label, icon: "📅",
+          onClick: () => handleMoveToWeek(ids, tw.key),
+        }));
+        setContextMenu({ x: e.clientX, y: e.clientY, actions: weekActions });
+      },
+    });
+    actions.push({ label: "Vrátit do Inboxu", icon: "📥", onClick: () => handleReturnToInbox(ids) });
+    if (alloc.status !== "completed") {
+      actions.push({ label: "Dokončit → Expedice", icon: "✓", onClick: () => handleComplete(ids) });
+    }
+    actions.push({
+      label: "Zrušit", icon: "✕", danger: true, dividerBefore: true,
+      onClick: () => setCancelDialog({
+        open: true, itemId: ids[0], itemName: item.itemName, itemCode: item.itemCode,
+        hours: alloc.hours, projectName: item.projectName, projectId: item.projectId,
+      }),
+    });
+    if (onNavigateToTPV) {
+      actions.push({ label: "Zobrazit položky", icon: "📦", dividerBefore: true, onClick: () => onNavigateToTPV(item.projectId) });
+    }
+    if (onOpenProjectDetail) {
+      actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(item.projectId) });
+    }
+    setContextMenu({ x: e.clientX, y: e.clientY, actions });
+  }, [moveTargetWeeks, handleMoveToWeek, handleReturnToInbox, handleComplete, onNavigateToTPV, onOpenProjectDetail]);
+
   // Drag & Drop handler
   const handleTableDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event;
