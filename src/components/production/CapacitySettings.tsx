@@ -90,9 +90,11 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     if (value <= 0 || isNaN(value)) return;
     try {
       await updateSettings.mutateAsync({ weekly_capacity_hours: value, monthly_capacity_hours: value * 4 });
-      // Clear non-manual future weeks so they recalculate
-      const fromWeek = selectedYear === currentYear ? currentWeek : 1;
-      await bulkUpdate.mutateAsync({ year: selectedYear, fromWeek, capacity: value, workingDays: workingDaysPerWeek });
+      // Only clear non-manual FUTURE weeks (current week + 1 onward)
+      const futureFromWeek = selectedYear < currentYear ? 53 : (selectedYear === currentYear ? currentWeek + 1 : 1);
+      if (futureFromWeek <= 52) {
+        await bulkUpdate.mutateAsync({ year: selectedYear, fromWeek: futureFromWeek, capacity: value, workingDays: workingDaysPerWeek });
+      }
       toast({ title: "✓ Kapacita aktualizována" });
     } catch (e: any) {
       toast({ title: "Chyba", description: e.message, variant: "destructive" });
