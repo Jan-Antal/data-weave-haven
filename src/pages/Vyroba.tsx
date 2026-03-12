@@ -458,8 +458,9 @@ export default function Vyroba() {
                 todayDayIndex={todayDayIndex}
                 isManagement={isManagement}
                 onOpenLog={openLogModal}
-                onSpill={() => handleSpill(selectedBundle.bundleId)}
                 nextWeekNum={getISOWeekNumber(addWeeks(currentMonday, 1))}
+                nextWeekKey={weekKeyStr(addWeeks(currentMonday, 1))}
+                weekKey={weekKey}
                 tpvItems={itemsByProject.get(selectedBundle.projectId) || []}
                 expandedMap={expandedMap}
                 setExpandedMap={setExpandedMap}
