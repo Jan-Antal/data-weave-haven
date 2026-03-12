@@ -461,7 +461,86 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                           </div>
                         </TableCell>
                       );
+                    // remaining columns: sent_date, accepted_date, notes, pocet, cena, custom fields
+                    if (key === "sent_date") return <TableCell key={key}><InlineEditableCell value={item.sent_date || ""} type="date" onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>;
+                    if (key === "accepted_date") return <TableCell key={key}><InlineEditableCell value={item.accepted_date || ""} type="date" onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>;
+                    if (key === "notes") return <TableCell key={key}><InlineEditableCell value={item.notes || ""} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} readOnly={!canManageTPV} /></TableCell>;
+                    if (key === "pocet") return <TableCell key={key}><InlineEditableCell value={String(item.pocet ?? "")} type="number" onSave={(v) => saveField(item.id, "pocet", v, String(item.pocet ?? ""))} readOnly={!canManageTPV} /></TableCell>;
+                    if (key === "cena") return <TableCell key={key} className="text-right"><span className="text-xs font-mono">{formatCurrency(item.cena, currency)}</span></TableCell>;
+                    // Custom columns
+                    if (key.startsWith("custom_") && customColumns) {
+                      const def = customColumns.find(c => c.column_key === key);
+                      if (!def) return null;
+                      const customFields = (item as any).custom_fields || {};
+                      const val = customFields[key] || "";
+                      const cellType = def.data_type === "date" ? "date" : def.data_type === "number" ? "number" : def.data_type === "select" ? "select" : def.data_type === "people" ? "people" : undefined;
+                      return (
+                        <TableCell key={key}>
+                          <InlineEditableCell
+                            value={val}
+                            type={cellType as any}
+                            options={def.data_type === "select" ? def.select_options : undefined}
+                            peopleRole={def.data_type === "people" ? (def.people_role as any || undefined) : undefined}
+                            onSave={(v) => updateCustomField.mutate({ tableName: "tpv_items", rowId: item.id, columnKey: key, value: v, projectId })}
+                            readOnly={!canManageTPV}
+                          />
+                        </TableCell>
+                      );
                     }
+                    return null;
+                  })}
+                  <TableCell>
+                    {canManageTPV && (
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
+                        if (selected.size > 1 && selected.has(item.id)) {
+                          setDeleteIds(Array.from(selected));
+                        } else {
+                          setDeleteIds([item.id]);
+                        }
+                      }}>
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {/* Inline add row */}
+              {canManageTPV && (
+                <TableRow className="h-9 hover:bg-muted/30">
+                  <TableCell />
+                  <TableCell colSpan={renderKeys.length + 2}>
+                    {addingInline ? (
+                      <div className="flex items-center gap-2">
+                        <Plus className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                        <Input
+                          ref={inlineRef}
+                          value={inlineName}
+                          onChange={e => setInlineName(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") handleInlineAdd();
+                            if (e.key === "Escape") { setAddingInline(false); setInlineName(""); }
+                          }}
+                          onBlur={handleInlineAdd}
+                          placeholder="Název položky…"
+                          className="h-7 text-sm border-0 shadow-none focus-visible:ring-0 px-0"
+                        />
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setAddingInline(true)}
+                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Přidat položku
+                      </button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
 
       {/* Delete Confirmation */}
       <ConfirmDialog
