@@ -402,7 +402,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
         </button>
 
         {archiveOpen && (
-          <div className="px-2 pb-2 space-y-1.5 overflow-y-auto" style={{ maxHeight: "40vh" }}>
+          <div className="px-2 pb-2 space-y-1.5 overflow-y-auto bg-gray-50" style={{ maxHeight: "40vh" }}>
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3" style={{ color: "#b0bab8" }} />
