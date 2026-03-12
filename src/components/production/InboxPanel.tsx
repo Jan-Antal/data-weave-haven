@@ -805,26 +805,84 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
   );
 }
 
-function DraggableInboxItem({ item, projectName, onContextMenu }: { item: InboxItem; projectName: string; onContextMenu: (e: React.MouseEvent) => void }) {
+function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onToggleCheck, checkedItems, allInboxItemsMap }: {
+  item: InboxItem; projectName: string; onContextMenu: (e: React.MouseEvent) => void;
+  isChecked: boolean; onToggleCheck: (itemId: string) => void;
+  checkedItems: Set<string>;
+  allInboxItemsMap: Map<string, InboxItem & { projectName: string }>;
+}) {
+  const [hovered, setHovered] = useState(false);
   const adhocBadge = getAdhocBadge((item as any).adhoc_reason);
+
+  // Determine drag data: if this item is checked and there are other checked items, drag as batch
+  const otherCheckedCount = checkedItems.size;
+  const isBatchDrag = isChecked && otherCheckedCount >= 2;
+
+  const batchHours = useMemo(() => {
+    if (!isBatchDrag) return item.estimated_hours;
+    let total = 0;
+    for (const id of checkedItems) {
+      const it = allInboxItemsMap.get(id);
+      if (it) total += it.estimated_hours;
+    }
+    return total;
+  }, [isBatchDrag, checkedItems, allInboxItemsMap, item.estimated_hours]);
+
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `inbox-item-${item.id}`,
-    data: {
-      type: "inbox-item", itemId: item.id, itemName: item.item_name, itemCode: item.item_code,
+    id: isBatchDrag ? `inbox-items-${item.id}` : `inbox-item-${item.id}`,
+    data: isBatchDrag ? {
+      type: "inbox-items" as const,
+      itemId: item.id,
+      projectId: item.project_id,
+      projectName,
+      hours: batchHours,
+      itemCount: checkedItems.size,
+      batchItemIds: Array.from(checkedItems),
+    } : {
+      type: "inbox-item" as const, itemId: item.id, itemName: item.item_name, itemCode: item.item_code,
       projectId: item.project_id, projectName, hours: item.estimated_hours, stageId: item.stage_id,
       scheduledCzk: item.estimated_czk,
     },
   });
 
+  const showCheckbox = hovered || isChecked;
+
   return (
     <div ref={setNodeRef} {...attributes} {...listeners}
       className="flex items-center gap-1.5 px-2 py-[5px] rounded-[5px] cursor-grab transition-all"
-      style={{ backgroundColor: "#ffffff", border: "1px solid #ece8e2", opacity: isDragging ? 0.3 : 1 }}
-      onMouseEnter={(e) => { if (!isDragging) { e.currentTarget.style.backgroundColor = "rgba(59,130,246,0.04)"; e.currentTarget.style.borderColor = "#3b82f6"; } }}
-      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "#ffffff"; e.currentTarget.style.borderColor = "#ece8e2"; }}
+      style={{
+        backgroundColor: isChecked ? "rgba(58,138,54,0.06)" : "#ffffff",
+        border: isChecked ? "1px solid rgba(58,138,54,0.25)" : "1px solid #ece8e2",
+        opacity: isDragging ? 0.3 : 1,
+      }}
+      onMouseEnter={(e) => {
+        setHovered(true);
+        if (!isDragging && !isChecked) { e.currentTarget.style.backgroundColor = "rgba(59,130,246,0.04)"; e.currentTarget.style.borderColor = "#3b82f6"; }
+      }}
+      onMouseLeave={(e) => {
+        setHovered(false);
+        if (!isChecked) { e.currentTarget.style.backgroundColor = "#ffffff"; e.currentTarget.style.borderColor = "#ece8e2"; }
+      }}
       onContextMenu={onContextMenu}
     >
-      <GripVertical className="h-3 w-3 shrink-0" style={{ color: "#99a5a3" }} />
+      {/* Checkbox area */}
+      <div
+        className="shrink-0 flex items-center justify-center transition-opacity"
+        style={{ width: 14, height: 14, opacity: showCheckbox ? 1 : 0 }}
+        onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleCheck(item.id); }}
+        onPointerDown={(e) => { if (showCheckbox) { e.stopPropagation(); } }}
+      >
+        <div style={{
+          width: 12, height: 12, borderRadius: 3,
+          border: isChecked ? "none" : "1.5px solid #9ca3af",
+          backgroundColor: isChecked ? "#3a8a36" : "transparent",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: "pointer",
+        }}>
+          {isChecked && <Check className="h-2.5 w-2.5" style={{ color: "#ffffff" }} />}
+        </div>
+      </div>
+      {!showCheckbox && <GripVertical className="h-3 w-3 shrink-0" style={{ color: "#99a5a3", marginLeft: -14 }} />}
       {adhocBadge && (
         <span className="text-[8px] shrink-0" title={adhocBadge.label}>{adhocBadge.emoji}</span>
       )}
