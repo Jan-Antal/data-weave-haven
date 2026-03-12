@@ -238,7 +238,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   let barColor: string;
                   if (past) barColor = "hsl(var(--muted-foreground) / 0.3)";
                   else if (hasCompanyHol) barColor = "#f59e0b";
-                  else if (isManual) barColor = "#4f87c5";
+                  else if (isManual) barColor = "#2d6a4f";
                   else if (hasHoliday) barColor = "#d97706";
                   else barColor = "hsl(var(--primary) / 0.6)";
 
