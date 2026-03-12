@@ -242,26 +242,13 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   else barColor = "hsl(var(--primary) / 0.6)";
 
                   return (
-                    <Popover key={wn} open={editingWeek === wn} onOpenChange={o => setEditingWeek(o ? wn : null)}>
-                      <PopoverTrigger asChild>
-                        <button
-                          className="flex-1 min-w-[12px] rounded-t-sm transition-all hover:opacity-80 relative"
-                          style={{ height: barH, backgroundColor: barColor, outline: isCurrent ? "2px solid hsl(var(--primary))" : "none" }}
-                          title={`T${wn}: ${Math.round(cap)}h · ${week.working_days} dní${week.holiday_name ? ` · ${week.holiday_name}` : ""}${week.company_holiday_name ? ` · ${week.company_holiday_name}` : ""}`}
-                        />
-                      </PopoverTrigger>
-                      <PopoverContent className="w-56 p-3 space-y-2 z-[100]" side="bottom" align="center">
-                        <WeekEditor
-                          week={week}
-                          weekNum={wn}
-                          isPast={past}
-                          standardCapacity={standardCapacity}
-                          onSave={(cap, days) => handleWeekCapacityUpdate(wn, cap, days)}
-                          onReset={() => handleResetWeek(wn)}
-                          onClose={() => setEditingWeek(null)}
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <button
+                      key={wn}
+                      className={`flex-1 min-w-[12px] rounded-t-sm transition-all hover:opacity-80 relative ${editingWeek === wn ? "ring-2 ring-foreground" : ""}`}
+                      style={{ height: barH, backgroundColor: barColor, outline: isCurrent ? "2px solid hsl(var(--primary))" : "none" }}
+                      title={`T${wn}: ${Math.round(cap)}h · ${week.working_days} dní${week.holiday_name ? ` · ${week.holiday_name}` : ""}${week.company_holiday_name ? ` · ${week.company_holiday_name}` : ""}`}
+                      onClick={() => setEditingWeek(editingWeek === wn ? null : wn)}
+                    />
                   );
                 })}
               </div>
