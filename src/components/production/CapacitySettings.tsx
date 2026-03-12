@@ -357,23 +357,24 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             <div>
               <label className="text-xs text-muted-foreground">Kapacita (h/týden)</label>
               <Input
-                type="number"
-                value={standardCapacityInput || String(standardCapacity)}
-                onChange={e => setStandardCapacityInput(e.target.value)}
-                onBlur={() => {
-                  const v = parseInt(standardCapacityInput);
-                  if (v > 0) handleStandardCapacityChange(v);
-                  setStandardCapacityInput("");
+                type="text"
+                inputMode="numeric"
+                value={capacityInputFocused ? standardCapacityInput : String(standardCapacity)}
+                onFocus={() => {
+                  setCapacityInputFocused(true);
+                  setStandardCapacityInput(String(standardCapacity));
                 }}
+                onChange={e => setStandardCapacityInput(e.target.value)}
+                onBlur={commitCapacityInput}
                 onKeyDown={e => {
-                  if (e.key === "Enter") {
-                    const v = parseInt(standardCapacityInput);
-                    if (v > 0) handleStandardCapacityChange(v);
-                    setStandardCapacityInput("");
-                  }
+                  if (e.key === "Enter") { e.preventDefault(); commitCapacityInput(); (e.target as HTMLInputElement).blur(); }
+                  if (e.key === "Escape") { setStandardCapacityInput(String(standardCapacity)); setCapacityInputFocused(false); (e.target as HTMLInputElement).blur(); }
                 }}
                 className="h-8 text-sm font-mono"
               />
+              {capacityInputFocused && isExpr && exprPreview !== null && (
+                <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">= {exprPreview}</div>
+              )}
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Pracovní dny</label>
