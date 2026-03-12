@@ -528,7 +528,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               startDate={week.start} endDate={week.end}
               isCurrent={week.key === currentWeekKey} isPast={week.isPast}
               silo={scheduleData?.get(week.key) || null}
-              weeklyCapacity={getWeekCapacity(week.key)} showCzk={showCzk} hourlyRate={hourlyRate}
+              weeklyCapacity={getWeekCapacity(week.key)} showCzk={showCzk} hourlyRate={hourlyRate} displayMode={displayMode || "hours"}
               isOverTarget={overDroppableId === `silo-week-${week.key}`}
               onBundleContextMenu={(e, bundle, toggleExpand) => handleBundleContextMenu(e, bundle, week.key, week.weekNum, week.start, week.end, toggleExpand)}
               onItemContextMenu={(e, item, bundle) => handleItemContextMenu(e, item, week.key, week.weekNum, week.start, week.end, bundle)}
@@ -600,6 +600,7 @@ interface SiloProps {
   weekKey: string; weekNum: number; startDate: Date; endDate: Date;
   isCurrent: boolean; isPast: boolean; silo: WeekSilo | null;
   weeklyCapacity: number; showCzk: boolean; hourlyRate: number; isOverTarget: boolean;
+  displayMode: DisplayMode;
   onBundleContextMenu: (e: React.MouseEvent, bundle: ScheduleBundle, toggleExpand: () => void) => void;
   onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem, bundle: ScheduleBundle) => void;
   allWeeksData: Map<string, { total_hours: number }>; weekKeys: string[];
@@ -613,7 +614,7 @@ interface SiloProps {
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode }: SiloProps) {
   // Capacity calculation: exclude paused items
   const activeHours = useMemo(() => {
     if (!silo) return 0;
@@ -661,9 +662,19 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             <div className="h-full rounded transition-all duration-300" style={{ width: `${Math.min(pct, 100)}%`, background: barBg }} />
           </div>
           <div className="flex items-baseline justify-between mt-[3px]">
-            <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{Math.round(totalHours)}h</span>
-            <span className="font-mono text-[10px]" style={{ color: "#99a5a3" }}>/ {weeklyCapacity}h</span>
-            <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
+            {displayMode === "czk" ? (
+              <>
+                <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{formatCompactCzk(totalHours * hourlyRate)}</span>
+                <span className="font-mono text-[10px]" style={{ color: "#99a5a3" }}>/ {formatCompactCzk(weeklyCapacity * hourlyRate)}</span>
+                <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
+              </>
+            ) : (
+              <>
+                <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{Math.round(totalHours)}h</span>
+                <span className="font-mono text-[10px]" style={{ color: "#99a5a3" }}>/ {weeklyCapacity}h</span>
+                <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -682,7 +693,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
         )}
         {silo?.bundles.map(bundle => (
           <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey}
-            showCzk={showCzk} hourlyRate={hourlyRate}
+            showCzk={showCzk} hourlyRate={hourlyRate} displayMode={displayMode}
             onBundleContextMenu={onBundleContextMenu} onItemContextMenu={onItemContextMenu}
             projectLookup={projectLookup}
             isSelected={selectedProjectId === bundle.project_id}
@@ -723,8 +734,9 @@ function formatDateShortYY(dateStr: string | null | undefined): string | null {
   return `${dd}.${mm}.${yy}`;
 }
 
-function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleContextMenu, onItemContextMenu, projectLookup, isSelected, onSelectProject }: {
+function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleContextMenu, onItemContextMenu, projectLookup, isSelected, onSelectProject, displayMode }: {
   bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number;
+  displayMode: DisplayMode;
   onBundleContextMenu: (e: React.MouseEvent, bundle: ScheduleBundle, toggleExpand: () => void) => void;
   onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem, bundle: ScheduleBundle) => void;
   projectLookup: ProjectLookup;
@@ -817,8 +829,11 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
               );
             })()}
             {completedCount > 0 && <span className="text-[9px]" style={{ color: "#3a8a36", fontWeight: 600 }}>{completedCount}/{totalCount} ✓</span>}
-            <span className="font-mono text-[11px]" style={{ color: allCompleted ? "#9ca3af" : "#1a1a1a", fontWeight: 700 }}>{Math.round(bundle.total_hours)}h</span>
-            {showCzk && <span className="font-mono text-[9px]" style={{ color: "#6b7a78" }}>{formatCompactCzk(bundle.total_hours * hourlyRate)}</span>}
+            {displayMode === "czk" ? (
+              <span className="font-mono text-[11px]" style={{ color: allCompleted ? "#9ca3af" : "#1a1a1a", fontWeight: 700 }}>{formatCompactCzk(bundle.total_hours * hourlyRate)}</span>
+            ) : (
+              <span className="font-mono text-[11px]" style={{ color: allCompleted ? "#9ca3af" : "#1a1a1a", fontWeight: 700 }}>{Math.round(bundle.total_hours)}h</span>
+            )}
           </div>
         </div>
       </div>
