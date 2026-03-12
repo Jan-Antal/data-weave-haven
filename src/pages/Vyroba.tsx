@@ -237,7 +237,7 @@ export default function Vyroba() {
 
   if (!isOwner) return null;
 
-  const isManagement = roleView === "management";
+  
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: "#f8f7f4" }}>
