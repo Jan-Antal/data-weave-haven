@@ -94,6 +94,11 @@ export default function PlanVyroby() {
   const [mergeState, setMergeState] = useState<MergeState | null>(null);
   const [tpvProjectId, setTpvProjectId] = useState<string | null>(null);
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+
+  const handleSelectProject = useCallback((projectId: string) => {
+    setSelectedProjectId(prev => prev === projectId ? null : projectId);
+  }, []);
   const { data: allProjects = [] } = useProjects();
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
