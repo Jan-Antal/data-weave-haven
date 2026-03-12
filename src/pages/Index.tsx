@@ -27,6 +27,7 @@ import { UserManagement } from "@/components/UserManagement";
 import { AccountSettings } from "@/components/AccountSettings";
 import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDialog";
 import { DataLogPanel } from "@/components/DataLogPanel";
+import { CapacitySettings } from "@/components/production/CapacitySettings";
 import { DataLogHighlightProvider } from "@/components/DataLogHighlightContext";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
