@@ -42,6 +42,64 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const [newHolidayEnd, setNewHolidayEnd] = useState("");
   const [newHolidayCap, setNewHolidayCap] = useState("0");
   const [autoApplyHolidays, setAutoApplyHolidays] = useState(true);
+  const VISIBLE_WEEKS = 12;
+  const SCROLL_STEP = 4;
+  const getDefaultViewStart = useCallback(() => {
+    if (selectedYear === currentYear) return Math.max(1, currentWeek - Math.floor(VISIBLE_WEEKS / 2));
+    return 1;
+  }, [selectedYear, currentYear, currentWeek]);
+  const [viewStart, setViewStart] = useState(() => getDefaultViewStart());
+
+  const scrollLeft = () => setViewStart(v => Math.max(1, v - SCROLL_STEP));
+  const scrollRight = () => setViewStart(v => Math.min(52 - VISIBLE_WEEKS + 1, v + SCROLL_STEP));
+  const jumpToToday = () => {
+    setSelectedYear(currentYear);
+    setViewStart(Math.max(1, currentWeek - Math.floor(VISIBLE_WEEKS / 2)));
+  };
+
+  const CZECH_MONTHS = ["Leden","Únor","Březen","Duben","Květen","Červen","Červenec","Srpen","Září","Říjen","Listopad","Prosinec"];
+
+  // Get month for a week number
+  const getWeekMonth = useCallback((wn: number): number => {
+    const week = weekMap.get(wn);
+    if (!week) return 0;
+    const d = new Date(week.week_start + "T00:00:00");
+    // Use Thursday of the week to determine month
+    d.setDate(d.getDate() + 3);
+    return d.getMonth();
+  }, [weekMap]);
+
+  // Get type label for a week
+  const getWeekTypeLabel = useCallback((week: WeekCapacity, past: boolean): string => {
+    if (past) return "Minulý";
+    if (week.company_holiday_name) return "Firemní dovolená";
+    if (week.is_manual_override && Math.round(week.capacity_hours) !== Math.round(standardCapacity)) return "Ručně upraveno";
+    if (week.holiday_name) return "Svátek";
+    return "Standard";
+  }, [standardCapacity]);
+
+  // Visible month range label
+  const visibleMonthRange = useMemo(() => {
+    const firstMonth = getWeekMonth(viewStart);
+    const lastMonth = getWeekMonth(Math.min(52, viewStart + VISIBLE_WEEKS - 1));
+    if (firstMonth === lastMonth) return `${CZECH_MONTHS[firstMonth]} ${selectedYear}`;
+    return `${CZECH_MONTHS[firstMonth]} – ${CZECH_MONTHS[lastMonth]} ${selectedYear}`;
+  }, [viewStart, selectedYear, getWeekMonth]);
+
+  // Month groups for visible weeks
+  const monthGroups = useMemo(() => {
+    const groups: Array<{ month: number; name: string; count: number }> = [];
+    const end = Math.min(52, viewStart + VISIBLE_WEEKS - 1);
+    for (let wn = viewStart; wn <= end; wn++) {
+      const m = getWeekMonth(wn);
+      if (groups.length > 0 && groups[groups.length - 1].month === m) {
+        groups[groups.length - 1].count++;
+      } else {
+        groups.push({ month: m, name: CZECH_MONTHS[m], count: 1 });
+      }
+    }
+    return groups;
+  }, [viewStart, getWeekMonth]);
 
   const { data: settings } = useProductionSettings();
   const updateSettings = useUpdateProductionSettings();
