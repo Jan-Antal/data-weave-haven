@@ -233,7 +233,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
       result = result.filter(p => p.project_name.toLowerCase().includes(q) || p.project_id.toLowerCase().includes(q));
     }
     return result;
-  }, [progressData, projects]);
+  }, [progressData, projects, searchQuery]);
 
   const allProjectOptions = useMemo(() => {
     const seen = new Set<string>();
