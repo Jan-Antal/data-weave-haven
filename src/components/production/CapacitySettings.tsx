@@ -37,30 +37,28 @@ function lerpColor(a: string, b: string, t: number): string {
   return rgbToHex(r1 + (r2 - r1) * t, g1 + (g2 - g1) * t, b1 + (b2 - b1) * t);
 }
 
-const CAPACITY_COLOR_STOPS: Array<{ pct: number; color: string }> = [
-  { pct: 0,   color: "#b45309" },
-  { pct: 50,  color: "#d97706" },
-  { pct: 75,  color: "#f5a742" },
-  { pct: 90,  color: "#fde8cc" },
-  { pct: 100, color: "#9ca3af" },
-  { pct: 110, color: "#a3c9a8" },
-  { pct: 120, color: "#5a9e6f" },
-  { pct: 130, color: "#2d6a4f" },
-];
+// Below-standard stops (t: 0→1 maps min→standard)
+const BELOW_STOPS = ["#b45309", "#d97706", "#f5a742", "#fde8cc", "#9ca3af"];
+// Above-standard stops (t: 0→1 maps standard→max)
+const ABOVE_STOPS = ["#9ca3af", "#a3c9a8", "#5a9e6f", "#2d6a4f"];
 
-function getCapacityColor(actualHours: number, standardHours: number): string {
-  if (standardHours <= 0) return "#9ca3af";
-  const pct = (actualHours / standardHours) * 100;
-  if (pct <= CAPACITY_COLOR_STOPS[0].pct) return CAPACITY_COLOR_STOPS[0].color;
-  if (pct >= CAPACITY_COLOR_STOPS[CAPACITY_COLOR_STOPS.length - 1].pct) return CAPACITY_COLOR_STOPS[CAPACITY_COLOR_STOPS.length - 1].color;
-  for (let i = 0; i < CAPACITY_COLOR_STOPS.length - 1; i++) {
-    const a = CAPACITY_COLOR_STOPS[i], b = CAPACITY_COLOR_STOPS[i + 1];
-    if (pct >= a.pct && pct <= b.pct) {
-      const t = (pct - a.pct) / (b.pct - a.pct);
-      return lerpColor(a.color, b.color, t);
-    }
+function interpolateStops(stops: string[], t: number): string {
+  const clamped = Math.max(0, Math.min(1, t));
+  const segment = clamped * (stops.length - 1);
+  const i = Math.min(Math.floor(segment), stops.length - 2);
+  return lerpColor(stops[i], stops[i + 1], segment - i);
+}
+
+function getCapacityColorDynamic(hours: number, standard: number, visMin: number, visMax: number): string {
+  if (hours <= standard) {
+    const range = standard - visMin;
+    const t = range > 0 ? (hours - visMin) / range : 1;
+    return interpolateStops(BELOW_STOPS, t);
+  } else {
+    const range = visMax - standard;
+    const t = range > 0 ? (hours - standard) / range : 0;
+    return interpolateStops(ABOVE_STOPS, t);
   }
-  return "#9ca3af";
 }
 
 const PAST_WEEK_COLOR = "#d1d5db";
