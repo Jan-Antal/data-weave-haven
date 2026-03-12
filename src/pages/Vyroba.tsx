@@ -540,6 +540,13 @@ export default function Vyroba() {
       </Dialog>
 
       <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
+      <UserManagement open={userMgmtOpen} onOpenChange={setUserMgmtOpen} />
+      <ExchangeRateSettings open={exchangeRateOpen} onOpenChange={setExchangeRateOpen} />
+      <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />
+      <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
+      <CostBreakdownPresetsDialog open={costPresetsOpen} onOpenChange={setCostPresetsOpen} />
+      <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} />
+      <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
     </div>
   );
 }
