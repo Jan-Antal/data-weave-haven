@@ -1177,6 +1177,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                     <RozpadCeny
                       projectId={project.project_id}
                       prodejniCena={form.prodejni_cena ? Number(form.prodejni_cena) : null}
+                      marze={form.marze ? parseFloat(String(form.marze).replace(",", ".")) : null}
                       costValues={{
                         cost_preset_id: form.cost_preset_id,
                         cost_material_pct: form.cost_material_pct,
