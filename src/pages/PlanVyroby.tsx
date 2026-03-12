@@ -41,7 +41,7 @@ export type DisplayMode = "hours" | "czk" | "percent";
 type ViewTab = "kanban" | "table";
 
 interface ActiveDragData {
-  type: "inbox-item" | "inbox-project" | "silo-item" | "silo-bundle";
+  type: "inbox-item" | "inbox-items" | "inbox-project" | "silo-item" | "silo-bundle";
   itemId?: string;
   itemName?: string;
   itemCode?: string | null;
@@ -54,6 +54,8 @@ interface ActiveDragData {
   scheduledCzk?: number;
   inboxItemId?: string;
   splitGroupId?: string | null;
+  /** For inbox-items: array of item IDs to schedule as a batch */
+  batchItemIds?: string[];
 }
 
 interface AutoSplitState {
