@@ -938,6 +938,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                   <div
                     className="flex cursor-pointer transition-all"
                     onClick={() => toggleProject(proj.projectId)}
+                    onContextMenu={(e) => handleProjectContextMenu(e, proj)}
                     style={{ height: 48, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
                   >
                     <div
