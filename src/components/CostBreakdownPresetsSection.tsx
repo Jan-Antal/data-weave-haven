@@ -171,7 +171,7 @@ export function CostBreakdownPresetsSection({ readOnly = false }: { readOnly?: b
 
   const handleAddPreset = () => {
     upsertPreset.mutate(
-      { name: "Nová šablona", material_pct: 15, overhead_pct: 25, logistics_pct: 15, production_pct: 25, subcontractors_pct: 10, margin_pct: 10, sort_order: presets.length },
+      { name: "Nová šablona", material_pct: 20, overhead_pct: 25, doprava_pct: 5, production_pct: 30, subcontractors_pct: 10, montaz_pct: 10, sort_order: presets.length },
       { onSuccess: () => toast({ title: "Šablona vytvořena" }) }
     );
   };
