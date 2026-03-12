@@ -99,6 +99,13 @@ export default function PlanVyroby() {
   const [tpvProjectId, setTpvProjectId] = useState<string | null>(null);
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [deadlineWarning, setDeadlineWarning] = useState<{
+    projectName: string;
+    deadlineLabel: string;
+    deadlineDate: Date;
+    weekLabel: string;
+  } | null>(null);
+  const pendingDeadlineAction = useRef<(() => Promise<void>) | null>(null);
 
   const handleSelectProject = useCallback((projectId: string) => {
     setSelectedProjectId(projectId);
