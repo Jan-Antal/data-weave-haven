@@ -611,22 +611,6 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
 
       {/* Center: Scope toggle + Stats */}
       <div className="flex items-center gap-2 shrink-0">
-        {/* Scope toggle */}
-        <div className="inline-flex h-6 items-center rounded-md bg-muted border border-border p-0.5">
-          {scopeOptions.map(opt => (
-            <button
-              key={opt.key}
-              onClick={() => handleScopeChange(opt.key)}
-              className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2 py-0.5 text-[10px] font-medium transition-all ${
-                statsScope === opt.key
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
 
         <div className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
           <span>Kapacita <span className="font-semibold text-foreground">{Math.round(capacityHours).toLocaleString("cs-CZ")}h</span></span>
