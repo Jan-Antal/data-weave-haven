@@ -1349,6 +1349,13 @@ function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCe
             }}
             onMouseEnter={(e) => { e.currentTarget.style.filter = "brightness(0.93)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.filter = "none"; }}
+            onContextMenu={(e) => {
+              if (onContextMenu) {
+                e.preventDefault();
+                e.stopPropagation();
+                onContextMenu(e, ids, alloc, item);
+              }
+            }}
           >
             {formatCellValue(alloc.hours, alloc.czk, alloc.status, item.totalHours, alloc.splitPart, alloc.splitTotal)}
           </button>
