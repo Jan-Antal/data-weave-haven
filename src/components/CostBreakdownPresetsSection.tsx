@@ -18,12 +18,12 @@ import {
 } from "@/hooks/useProductionSettings";
 
 const SEGMENT_COLORS = [
-  { key: "material_pct", label: "Mat.", color: "#d97706" },
-  { key: "overhead_pct", label: "Režie", color: "#6b7280" },
-  { key: "logistics_pct", label: "Log.", color: "#3b82f6" },
+  { key: "material_pct", label: "Mat.", color: "#f97316" },
   { key: "production_pct", label: "Výroba", color: "#3a8a36" },
-  { key: "subcontractors_pct", label: "Subdod.", color: "#8b5cf6" },
-  { key: "margin_pct", label: "Marže", color: "#99a5a3" },
+  { key: "subcontractors_pct", label: "Subdod.", color: "#2563eb" },
+  { key: "overhead_pct", label: "Režie", color: "#6b7280" },
+  { key: "doprava_pct", label: "Doprava", color: "#eab308" },
+  { key: "montaz_pct", label: "Montáž", color: "#8b5cf6" },
 ];
 
 function BreakdownBar({ preset }: { preset: CostBreakdownPreset }) {
