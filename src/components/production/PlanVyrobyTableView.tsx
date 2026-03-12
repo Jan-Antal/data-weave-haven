@@ -9,7 +9,7 @@ import { getProjectColor } from "@/lib/projectColors";
 import { exportToExcel } from "@/lib/exportExcel";
 import { buildPrintableHtml } from "@/lib/exportPdf";
 import { parseAppDate } from "@/lib/dateFormat";
-import { format, differenceInDays } from "date-fns";
+import { format, differenceInDays, addDays } from "date-fns";
 import { cs } from "date-fns/locale";
 import { Download, ChevronRight, ChevronDown, Plus, ArrowRight, Inbox, CheckCircle2, XCircle, FileSpreadsheet, FileText, AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -17,6 +17,11 @@ import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PdfPreviewModal } from "@/components/PdfPreviewModal";
 import { CancelItemDialog } from "./CancelItemDialog";
+import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
+import { InboxPlanningDialog, type SchedulePlanEntry, type PlanningItem, type PlanningWeek } from "./InboxPlanningDialog";
+import { DndContext, closestCenter, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 
 type DisplayMode = "hours" | "czk" | "percent";
@@ -25,6 +30,8 @@ type SortMode = "project" | "deadline" | "hours";
 interface Props {
   displayMode: DisplayMode;
   searchQuery?: string;
+  onNavigateToTPV?: (projectId: string) => void;
+  onOpenProjectDetail?: (projectId: string) => void;
 }
 
 function formatCzk(v: number): string {
