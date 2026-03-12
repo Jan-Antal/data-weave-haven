@@ -356,7 +356,52 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
     }
   }, [planningState, qc]);
 
-  const handleSeedData = async () => {
+  const formatWeekLabel = useCallback((weekKey: string): string => {
+    const d = new Date(weekKey);
+    const weekNum = getISOWeekNumber(d);
+    const end = new Date(d);
+    end.setDate(d.getDate() + 6);
+    return `T${weekNum} · ${d.getDate()}.${d.getMonth() + 1}–${end.getDate()}.${end.getMonth() + 1}.${end.getFullYear()}`;
+  }, []);
+
+  const handlePlanConfirm = useCallback(async (plan: SchedulePlanEntry[]) => {
+    if (!planningState) return;
+
+    // Find the latest scheduled week in the plan
+    const latestWeek = plan.reduce((latest, e) => e.scheduledWeek > latest ? e.scheduledWeek : latest, plan[0]?.scheduledWeek || "");
+    if (!latestWeek) { await executePlan(plan); return; }
+
+    const project = allDbProjects.find(p => p.project_id === planningState.projectId);
+    if (!project) { await executePlan(plan); return; }
+
+    const deadline = resolveDeadline(project);
+    const weekStart = new Date(latestWeek);
+    const result = checkDeadlineWarning(deadline, weekStart);
+
+    if (result.level === "hard" && result.deadline) {
+      pendingDeadlineAction.current = async () => { await executePlan(plan); };
+      setDeadlineWarning({
+        projectName: project.project_name,
+        deadlineLabel: result.deadline.fieldLabel,
+        deadlineDate: result.deadline.date,
+        weekLabel: formatWeekLabel(latestWeek),
+      });
+      return;
+    }
+
+    if (result.level === "soft" && result.deadline) {
+      const formattedDate = format(result.deadline.date, "d.M.yyyy");
+      toast({
+        title: `⏰ Blíží se termín: ${project.project_name}`,
+        description: `${result.deadline.fieldLabel} za ${result.daysUntilDeadline} dní (${formattedDate})`,
+        className: "border-amber-400 bg-amber-50 text-amber-900",
+      });
+    }
+
+    await executePlan(plan);
+  }, [planningState, allDbProjects, executePlan, formatWeekLabel]);
+
+
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
