@@ -453,12 +453,11 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
         >
           <div className="flex items-center gap-1.5">
             <span className="text-sm">📁</span>
-            <span className="text-[11px] font-medium text-gray-500">Archiv</span>
-            <span className="text-[9px] text-gray-400">· posledních 30 dní</span>
+            <span style={{ fontSize: 11, fontWeight: 500, color: "#6b7280" }}>Archiv · posledních 30 dní</span>
           </div>
           <div className="flex items-center gap-1.5">
             {archivedProjects.length > 0 && (
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+              <span className="rounded-full" style={{ fontSize: 11, fontWeight: 600, padding: "2px 7px", backgroundColor: "rgba(217,151,6,0.12)", color: "#d97706" }}>
                 {archivedProjects.length}
               </span>
             )}
@@ -605,37 +604,44 @@ function ProjectGroup({
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-1.5">
             <span
-              className="text-[12px] font-semibold truncate"
-              style={{ color: "hsl(var(--foreground))" }}
+              className="truncate"
+              style={{ fontSize: 13, fontWeight: 600, color: isArchive ? "hsl(var(--muted-foreground))" : "#1a1a1a" }}
             >
               {group.project_name}
             </span>
             <span
-              className="text-[11px] font-bold px-1.5 py-0.5 rounded-full shrink-0 text-center"
-              style={isArchive ? {
-                backgroundColor: "hsl(var(--muted))",
-                color: "hsl(var(--muted-foreground))",
-                minWidth: 40,
-              } : {
-                backgroundColor: allDone ? "rgba(22,163,74,0.12)" : "rgba(217,151,6,0.12)",
-                color: allDone ? "#16A34A" : "#d97706",
-                minWidth: 40,
+              className="rounded-full shrink-0 text-center"
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                padding: "2px 7px",
+                ...(isArchive ? {
+                  backgroundColor: "hsl(var(--muted))",
+                  color: "hsl(var(--muted-foreground))",
+                  minWidth: 40,
+                } : {
+                  backgroundColor: allDone ? "rgba(22,163,74,0.12)" : "rgba(217,151,6,0.12)",
+                  color: allDone ? "#16A34A" : "#d97706",
+                  minWidth: 40,
+                }),
               }}
             >
               {completedCount}/{totalCount}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="font-mono text-[9px] text-gray-400">{group.project_id}</span>
+            <span className="font-mono" style={{ fontSize: 11, color: isArchive ? "#9ca3af" : "#6b7280" }}>{group.project_id}</span>
             {isArchive && latestExpedicedStr ? (
-              <span className="text-[9px] text-gray-400">
+              <span style={{ fontSize: 11, color: "#6b7280" }}>
                 Expedováno: {latestExpedicedStr}
               </span>
             ) : expediceStr ? (
-              <span className="text-[9px] font-medium shrink-0" style={{
-                color: expediceDate && expediceDate < new Date() ? "#dc3545"
-                  : expediceDate && differenceInDays(expediceDate, new Date()) <= 7 ? "#D97706"
-                  : "#223937"
+              <span className="shrink-0" style={{
+                fontSize: 11,
+                fontWeight: 500,
+                color: expediceDate && expediceDate < new Date() ? "#dc2626"
+                  : expediceDate && differenceInDays(expediceDate, new Date()) <= 14 ? "#d97706"
+                  : "#6b7280"
               }}>
                 Exp: {expediceStr}
               </span>
@@ -661,7 +667,7 @@ function ProjectGroup({
               ) : (
                 <span
                   className="cursor-pointer hover:underline"
-                  style={{ color: "#D97706" }}
+                  style={{ fontSize: 11, color: "#d97706", fontWeight: 500 }}
                   onClick={() => {
                     if (onNavigateToTPV) onNavigateToTPV(group.project_id);
                   }}
@@ -682,30 +688,30 @@ function ProjectGroup({
                 <div
                   key={item.id}
                   className="rounded px-1 py-[3px] cursor-default transition-colors"
-                  style={{ opacity: isArchive ? 0.8 : (isItemExpediced ? 0.4 : 1) }}
+                  style={{ opacity: isArchive ? 0.75 : (isItemExpediced ? 0.4 : 1) }}
                   onContextMenu={(e) => onItemContextMenu(e, item)}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "hsl(var(--muted))")}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  onMouseEnter={(e) => { if (!isArchive) e.currentTarget.style.backgroundColor = "hsl(var(--muted))"; }}
+                  onMouseLeave={(e) => { if (!isArchive) e.currentTarget.style.backgroundColor = "transparent"; }}
                 >
                   <div className="flex items-center gap-1.5">
                     {isArchive ? (
-                      <span className="text-teal-500 text-[11px] shrink-0">✓</span>
+                      <span className="shrink-0" style={{ fontSize: 12, color: "#9ca3af" }}>✓</span>
                     ) : isItemExpediced ? (
-                      <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0"
-                        style={{ backgroundColor: "rgba(13,148,136,0.12)", color: "#0d9488" }}>
+                      <span className="font-bold px-1 py-[1px] rounded shrink-0"
+                        style={{ fontSize: 8, backgroundColor: "rgba(13,148,136,0.12)", color: "#0d9488" }}>
                         ✓ Exp
                       </span>
                     ) : (
-                      <Check className="shrink-0" style={{ width: 12, height: 12, color: "#16A34A", strokeWidth: 3 }} />
+                      <Check className="shrink-0" style={{ width: 12, height: 12, color: "#3a8a36", strokeWidth: 3 }} />
                     )}
                     {item.item_code && (
-                      <span className={`font-mono text-[10px] shrink-0 ${isArchive ? "text-gray-500" : "text-foreground"}`}>
+                      <span className="font-mono shrink-0" style={{ fontSize: 11, fontWeight: 500, color: isArchive ? "#9ca3af" : "#223937" }}>
                         {item.item_code}
                       </span>
                     )}
                     <span
-                      className={`text-[11px] truncate flex-1 ${isArchive ? "text-gray-600" : "text-muted-foreground"}`}
-                      style={{ textDecoration: (!isArchive && isItemExpediced) ? "line-through" : "none" }}
+                      className="truncate flex-1"
+                      style={{ fontSize: 12, color: isArchive ? "#9ca3af" : "#4b5563", textDecoration: (!isArchive && isItemExpediced) ? "line-through" : "none" }}
                     >
                       {item.item_name}
                     </span>
@@ -713,7 +719,7 @@ function ProjectGroup({
                   {isArchive ? (
                     expedicedCompactStr && (
                       <div className="ml-[18px]">
-                        <span className="text-[10px] font-medium px-1.5 py-[1px] rounded bg-teal-50 text-teal-600 border border-teal-200">
+                        <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, backgroundColor: "#f0fdf4", color: "#3a8a36", border: "1px solid #86efac" }}>
                           ✓ Expedováno {expedicedCompactStr}
                         </span>
                       </div>
@@ -721,7 +727,7 @@ function ProjectGroup({
                   ) : (
                     <div className="ml-[18px] flex flex-col gap-0">
                       {completedStr && (
-                        <span className="text-[8px] text-muted-foreground">
+                        <span style={{ fontSize: 10, color: "#9ca3af" }}>
                           Dokončeno: {completedStr}
                         </span>
                       )}
