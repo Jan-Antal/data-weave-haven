@@ -415,9 +415,14 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
   };
 
   return (
-    <div className="space-y-2">
-      <div className="text-xs font-bold text-foreground">
-        T{weekNum} · {formatDate(weekStart)} – {formatDate(weekEnd)}
+    <div className="border border-border rounded-md p-3 bg-muted/30 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-bold text-foreground">
+          T{weekNum} · {formatDate(weekStart)} – {formatDate(weekEnd)}
+        </div>
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onClose}>
+          <X className="h-3 w-3" />
+        </Button>
       </div>
       {isPast && (
         <div className="text-[10px] text-amber-600 font-medium">⚠ Minulý týden</div>
@@ -428,8 +433,8 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
       {week.company_holiday_name && (
         <div className="text-[10px] text-amber-600">🏖 {week.company_holiday_name}</div>
       )}
-      <div className="grid grid-cols-2 gap-2">
-        <div>
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
           <label className="text-[10px] text-muted-foreground">Kapacita (h)</label>
           <Input
             type="number"
@@ -440,7 +445,7 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
             autoFocus
           />
         </div>
-        <div>
+        <div className="flex-1">
           <label className="text-[10px] text-muted-foreground">Prac. dní</label>
           <Input
             type="number"
@@ -450,14 +455,12 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
             className="h-7 text-xs font-mono"
           />
         </div>
-      </div>
-      <div className="flex gap-2">
-        <Button size="sm" className="h-7 text-[10px] flex-1" onClick={save}>
+        <Button size="sm" className="h-7 text-xs" onClick={save}>
           Uložit
         </Button>
         {week.is_manual_override && (
-          <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1" onClick={() => { onReset(); onClose(); }}>
-            <RotateCcw className="h-3 w-3 mr-1" /> Reset na standard
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { onReset(); onClose(); }}>
+            <RotateCcw className="h-3 w-3 mr-1" /> Reset
           </Button>
         )}
       </div>
