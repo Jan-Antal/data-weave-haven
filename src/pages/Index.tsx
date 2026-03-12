@@ -558,6 +558,7 @@ const Index = () => {
       <UserManagement open={userMgmtOpen} onOpenChange={setUserMgmtOpen} />
       <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
       <CostBreakdownPresetsDialog open={costPresetsOpen} onOpenChange={setCostPresetsOpen} />
+      <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
       <AmiAssistant />
       <AchievementCelebration />
     </div>
