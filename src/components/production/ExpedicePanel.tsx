@@ -338,10 +338,10 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
   );
 
   const handleProjectContextMenu = useCallback(
-    (e: React.MouseEvent, projectId: string) => {
+    (e: React.MouseEvent, projectId: string, isArchive = false) => {
       e.preventDefault();
       e.stopPropagation();
-      setContextMenu({ x: e.clientX, y: e.clientY, actions: buildContextActions(null, projectId) });
+      setContextMenu({ x: e.clientX, y: e.clientY, actions: buildContextActions(null, projectId, isArchive) });
     },
     [buildContextActions]
   );
