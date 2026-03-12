@@ -33,10 +33,15 @@ export function ProductionContextMenu({ x, y, actions, onClose }: ProductionCont
     };
   }, [onClose]);
 
+  const MENU_WIDTH = 220;
+  const MENU_HEIGHT = actions.length * 40;
+  const adjustedLeft = x + MENU_WIDTH > window.innerWidth ? x - MENU_WIDTH : x;
+  const adjustedTop = y + MENU_HEIGHT > window.innerHeight ? y - MENU_HEIGHT : y;
+
   const style: React.CSSProperties = {
     position: "fixed",
-    left: x,
-    top: y,
+    left: adjustedLeft,
+    top: adjustedTop,
     zIndex: 9999,
     backgroundColor: "#ffffff",
     border: "1px solid #e2ddd6",

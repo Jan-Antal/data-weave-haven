@@ -225,6 +225,64 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail }:
     }
   }, [invalidateAll]);
 
+  const unExpediceAll = useCallback(async (projectId: string) => {
+    try {
+      const { data: items, error: fetchErr } = await supabase
+        .from("production_schedule")
+        .select("id")
+        .eq("project_id", projectId)
+        .eq("status", "completed")
+        .not("expediced_at", "is", null);
+      if (fetchErr) throw fetchErr;
+      if (!items || items.length === 0) return;
+      const { error } = await supabase
+        .from("production_schedule")
+        .update({ expediced_at: null } as any)
+        .in("id", items.map(i => i.id));
+      if (error) throw error;
+      invalidateAll();
+      toast({ title: `↩ ${items.length} položek vráceno do Expedice` });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [invalidateAll]);
+
+  const returnAllToProduction = useCallback(async (projectId: string) => {
+    try {
+      const { data: items, error: fetchErr } = await supabase
+        .from("production_schedule")
+        .select("id")
+        .eq("project_id", projectId)
+        .eq("status", "completed");
+      if (fetchErr) throw fetchErr;
+      if (!items || items.length === 0) return;
+      for (const item of items) {
+        await returnToProduction(item.id);
+      }
+      toast({ title: `↩ ${items.length} položek vráceno do výroby` });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [returnToProduction]);
+
+  const returnAllToInbox = useCallback(async (projectId: string) => {
+    try {
+      const { data: items, error: fetchErr } = await supabase
+        .from("production_schedule")
+        .select("id")
+        .eq("project_id", projectId)
+        .eq("status", "completed");
+      if (fetchErr) throw fetchErr;
+      if (!items || items.length === 0) return;
+      for (const item of items) {
+        await moveItemBackToInbox(item.id);
+      }
+      toast({ title: `📥 ${items.length} položek vráceno do Inboxu` });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [moveItemBackToInbox]);
+
   // === CONTEXT MENUS ===
   const buildContextActions = useCallback(
     (item: ScheduleItem | null, projectId: string, isArchive = false) => {
