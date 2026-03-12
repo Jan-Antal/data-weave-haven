@@ -98,9 +98,10 @@ export function ProductionHeader() {
             {isOwner && (
               <button
                 onClick={() => navigate("/vyroba")}
-                className="px-2 py-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors text-xs font-sans"
+                className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+                title="Výroba"
               >
-                Výroba
+                <Factory className="h-5 w-5" />
               </button>
             )}
 
