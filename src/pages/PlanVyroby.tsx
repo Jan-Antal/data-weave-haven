@@ -496,7 +496,28 @@ export default function PlanVyroby() {
         />
       )}
 
-      {tpvProject && (
+      {deadlineWarning && (
+        <DeadlineWarningDialog
+          open={!!deadlineWarning}
+          projectName={deadlineWarning.projectName}
+          deadlineLabel={deadlineWarning.deadlineLabel}
+          deadlineDate={deadlineWarning.deadlineDate}
+          weekLabel={deadlineWarning.weekLabel}
+          onCancel={() => {
+            setDeadlineWarning(null);
+            pendingDeadlineAction.current = null;
+          }}
+          onConfirm={async () => {
+            setDeadlineWarning(null);
+            if (pendingDeadlineAction.current) {
+              await pendingDeadlineAction.current();
+              pendingDeadlineAction.current = null;
+            }
+          }}
+        />
+      )}
+
+
         <Dialog open={!!tpvProjectId} onOpenChange={(open) => { if (!open) setTpvProjectId(null); }}>
           <DialogContent className="max-w-[95vw] w-[95vw] max-h-[90vh] overflow-auto p-0">
             <TPVList
