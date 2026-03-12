@@ -536,7 +536,7 @@ interface ProjectGroupProps {
   inboxProjects: any[];
   isGroupCollapsed: boolean;
   toggleGroup: () => void;
-  onProjectContextMenu: (e: React.MouseEvent, projectId: string) => void;
+  onProjectContextMenu: (e: React.MouseEvent, projectId: string, isArchive?: boolean) => void;
   onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem) => void;
   onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void;
   isArchive: boolean;
