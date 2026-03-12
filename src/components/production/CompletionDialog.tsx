@@ -238,7 +238,7 @@ export function CompletionDialog({
                   ) : isChecked ? (
                     <>
                       <button
-                        className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:underline shrink-0"
+                        className="text-[10px] text-muted-foreground transition-opacity hover:underline shrink-0"
                         onClick={e => {
                           e.stopPropagation();
                           setSplitOpenId(item.id);
