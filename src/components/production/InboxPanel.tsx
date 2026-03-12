@@ -752,8 +752,8 @@ function DraggableInboxItem({ item, projectName, onContextMenu }: { item: InboxI
       {adhocBadge && (
         <span className="text-[8px] shrink-0" title={adhocBadge.label}>{adhocBadge.emoji}</span>
       )}
-      {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
-      <span className="text-[11px] font-medium flex-1 truncate" style={{ color: "#6b7a78" }}>{item.item_name}</span>
+      {item.item_code && <span className="font-mono shrink-0" style={{ fontSize: 11, color: "#223937", fontWeight: 500 }}>{item.item_code}</span>}
+      <span className="flex-1 truncate" style={{ fontSize: 12, color: "#4b5563" }}>{item.item_name}</span>
       <span className="font-mono text-[10px] shrink-0" style={{ color: "#1a1a1a", fontWeight: 700 }}>{item.estimated_hours}h</span>
     </div>
   );
