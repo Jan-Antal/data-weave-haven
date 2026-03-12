@@ -51,9 +51,10 @@ interface ExpedicePanelProps {
   onOpenProjectDetail?: (projectId: string) => void;
   selectedProjectId?: string | null;
   onSelectProject?: (projectId: string) => void;
+  searchQuery?: string;
 }
 
-export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, selectedProjectId, onSelectProject }: ExpedicePanelProps) {
+export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, selectedProjectId, onSelectProject, searchQuery = "" }: ExpedicePanelProps) {
   const { data: projects = [] } = useProductionExpedice();
   const { data: allProjects = [] } = useProjects();
   const { data: scheduleData } = useProductionSchedule();
