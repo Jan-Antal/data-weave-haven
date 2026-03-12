@@ -323,7 +323,77 @@ export default function Vyroba() {
                   Odhlásit se
                 </DropdownMenuItem>
               </DropdownMenuContent>
-            </DropdownMenu>
+              </DropdownMenu>
+
+            {(canAccessSettings || realRole === "owner") && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+                    <Settings className="h-5 w-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {canManageUsers && (
+                    <DropdownMenuItem onClick={() => setUserMgmtOpen(true)}>
+                      Správa uživatelů
+                    </DropdownMenuItem>
+                  )}
+                  {canManagePeople && (
+                    <DropdownMenuItem onClick={openPeopleManagement}>
+                      Správa osob
+                    </DropdownMenuItem>
+                  )}
+                  {canManageExchangeRates && (
+                    <DropdownMenuItem onClick={() => setExchangeRateOpen(true)}>
+                      Kurzovní lístek
+                    </DropdownMenuItem>
+                  )}
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => setCostPresetsOpen(true)}>
+                      Rozpad ceny
+                    </DropdownMenuItem>
+                  )}
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => setCapacitySettingsOpen(true)}>
+                      Kapacita výroby
+                    </DropdownMenuItem>
+                  )}
+                  {canManageStatuses && (
+                    <DropdownMenuItem onClick={() => setStatusMgmtOpen(true)}>
+                      Správa statusů
+                    </DropdownMenuItem>
+                  )}
+                  {canAccessRecycleBin && (
+                    <DropdownMenuItem onClick={() => setRecycleBinOpen(true)}>
+                      Koš
+                    </DropdownMenuItem>
+                  )}
+                  {(isAdmin || role === "pm" || isOwner) && (
+                    <DropdownMenuItem onClick={() => setDataLogOpen(true)}>
+                      Data Log
+                    </DropdownMenuItem>
+                  )}
+                  {realRole === "owner" && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Zobrazit jako</div>
+                      {(["admin", "pm", "konstrukter", "viewer"] as const).map((r) => (
+                        <DropdownMenuItem
+                          key={r}
+                          onClick={() => setSimulatedRole(r === "admin" ? null : r)}
+                          className="flex items-center justify-between"
+                        >
+                          <span>{r === "admin" ? "Admin" : r === "pm" ? "PM" : r === "konstrukter" ? "Konstruktér" : "Viewer"}</span>
+                          {((r === "admin" && !simulatedRole) || simulatedRole === r) && (
+                            <Check className="h-4 w-4 text-green-600" />
+                          )}
+                        </DropdownMenuItem>
+                      ))}
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
       </header>
