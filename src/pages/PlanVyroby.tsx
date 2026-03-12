@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
 import { Search, X } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -32,6 +32,10 @@ import { useProductionSchedule, getISOWeekNumber } from "@/hooks/useProductionSc
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { PlanVyrobyTableView } from "@/components/production/PlanVyrobyTableView";
+import { DeadlineWarningDialog } from "@/components/production/DeadlineWarningDialog";
+import { resolveDeadline, checkDeadlineWarning } from "@/lib/deadlineWarning";
+import { toast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 export type DisplayMode = "hours" | "czk" | "percent";
 type ViewTab = "kanban" | "table";
@@ -95,6 +99,13 @@ export default function PlanVyroby() {
   const [tpvProjectId, setTpvProjectId] = useState<string | null>(null);
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [deadlineWarning, setDeadlineWarning] = useState<{
+    projectName: string;
+    deadlineLabel: string;
+    deadlineDate: Date;
+    weekLabel: string;
+  } | null>(null);
+  const pendingDeadlineAction = useRef<(() => Promise<void>) | null>(null);
 
   const handleSelectProject = useCallback((projectId: string) => {
     setSelectedProjectId(projectId);
@@ -175,6 +186,45 @@ export default function PlanVyroby() {
     }
     return null;
   }, [scheduleData]);
+
+  const formatWeekLabel = useCallback((weekKey: string): string => {
+    const d = new Date(weekKey);
+    const weekNum = getISOWeekNumber(d);
+    const end = new Date(d);
+    end.setDate(d.getDate() + 6);
+    return `T${weekNum} · ${d.getDate()}.${d.getMonth() + 1}–${end.getDate()}.${end.getMonth() + 1}.${end.getFullYear()}`;
+  }, []);
+
+  /** Returns true if action should proceed, false if blocked by hard warning */
+  const checkAndWarnDeadline = useCallback((projectId: string, weekKey: string, action: () => Promise<void>): boolean => {
+    const project = allProjects.find(p => p.project_id === projectId);
+    if (!project) return true;
+    const deadline = resolveDeadline(project);
+    const weekStart = new Date(weekKey);
+    const result = checkDeadlineWarning(deadline, weekStart);
+
+    if (result.level === "hard" && result.deadline) {
+      pendingDeadlineAction.current = action;
+      setDeadlineWarning({
+        projectName: project.project_name,
+        deadlineLabel: result.deadline.fieldLabel,
+        deadlineDate: result.deadline.date,
+        weekLabel: formatWeekLabel(weekKey),
+      });
+      return false;
+    }
+
+    if (result.level === "soft" && result.deadline) {
+      const formattedDate = format(result.deadline.date, "d.M.yyyy");
+      toast({
+        title: `⏰ Blíží se termín: ${project.project_name}`,
+        description: `${result.deadline.fieldLabel} za ${result.daysUntilDeadline} dní (${formattedDate})`,
+        className: "border-amber-400 bg-amber-50 text-amber-900",
+      });
+    }
+
+    return true;
+  }, [allProjects, formatWeekLabel]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current as ActiveDragData | undefined;
@@ -309,13 +359,21 @@ export default function PlanVyroby() {
         }
       }
 
+      const projectId = dragData.projectId || "";
+
       if (dragData.type === "inbox-item" && dragData.itemId) {
-        await moveInboxItemToWeek(dragData.itemId, weekDate);
+        const action = async () => { await moveInboxItemToWeek(dragData.itemId!, weekDate); };
+        if (!checkAndWarnDeadline(projectId, weekDate, action)) return;
+        await action();
       } else if (dragData.type === "inbox-project" && dragData.projectId) {
-        await moveInboxProjectToWeek(dragData.projectId, weekDate);
+        const action = async () => { await moveInboxProjectToWeek(dragData.projectId!, weekDate); };
+        if (!checkAndWarnDeadline(dragData.projectId, weekDate, action)) return;
+        await action();
       } else if (dragData.type === "silo-item" && dragData.itemId) {
         if (dragData.weekDate !== weekDate) {
-          await moveScheduleItemToWeek(dragData.itemId, weekDate);
+          const action = async () => { await moveScheduleItemToWeek(dragData.itemId!, weekDate); };
+          if (!checkAndWarnDeadline(projectId, weekDate, action)) return;
+          await action();
         }
     } else if (dragData.type === "silo-bundle" && dragData.projectId && dragData.weekDate) {
         if (dragData.weekDate !== weekDate) {
@@ -340,12 +398,14 @@ export default function PlanVyroby() {
               return;
             }
           }
-          await moveBundleToWeek(dragData.projectId, dragData.weekDate, weekDate);
+          const action = async () => { await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate); };
+          if (!checkAndWarnDeadline(dragData.projectId, weekDate, action)) return;
+          await action();
         }
       }
   }, [moveInboxItemToWeek, moveInboxProjectToWeek, moveScheduleItemToWeek, moveBundleToWeek,
     moveItemBackToInbox, returnBundleToInbox, scheduleData, weeklyCapacity, hourlyRate,
-    findSpillWeek, findSiblingInWeek, mergeSplitItems, resolveTargetWeek]);
+    findSpillWeek, findSiblingInWeek, mergeSplitItems, resolveTargetWeek, checkAndWarnDeadline]);
 
   if (loading) {
     return (
@@ -433,6 +493,27 @@ export default function PlanVyroby() {
             }
           }}
           onKeepSeparate={mergeState.onKeepSeparate}
+        />
+      )}
+
+      {deadlineWarning && (
+        <DeadlineWarningDialog
+          open={!!deadlineWarning}
+          projectName={deadlineWarning.projectName}
+          deadlineLabel={deadlineWarning.deadlineLabel}
+          deadlineDate={deadlineWarning.deadlineDate}
+          weekLabel={deadlineWarning.weekLabel}
+          onCancel={() => {
+            setDeadlineWarning(null);
+            pendingDeadlineAction.current = null;
+          }}
+          onConfirm={async () => {
+            setDeadlineWarning(null);
+            if (pendingDeadlineAction.current) {
+              await pendingDeadlineAction.current();
+              pendingDeadlineAction.current = null;
+            }
+          }}
         />
       )}
 

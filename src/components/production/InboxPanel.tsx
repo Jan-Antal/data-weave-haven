@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { ChevronRight, ChevronDown, GripVertical, Check, Plus } from "lucide-react";
 import { useProductionInbox, type InboxProject, type InboxItem } from "@/hooks/useProductionInbox";
 import { useProductionProgress, type ProjectProgress } from "@/hooks/useProductionProgress";
@@ -20,6 +20,9 @@ import { InboxPlanningDialog, type SchedulePlanEntry, type PlanningItem, type Pl
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { parseAppDate } from "@/lib/dateFormat";
 import { differenceInDays, isPast, addDays, format } from "date-fns";
+import { resolveDeadline, checkDeadlineWarning } from "@/lib/deadlineWarning";
+import { DeadlineWarningDialog } from "./DeadlineWarningDialog";
+import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -108,6 +111,10 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
   const [addItemState, setAddItemState] = useState<{ projectId?: string; projectName?: string } | null>(null);
   const [cancelState, setCancelState] = useState<CancelState | null>(null);
   const [planningState, setPlanningState] = useState<{ projectId: string; projectName: string; items: PlanningItem[] } | null>(null);
+  const [deadlineWarning, setDeadlineWarning] = useState<{
+    projectName: string; deadlineLabel: string; deadlineDate: Date; weekLabel: string;
+  } | null>(null);
+  const pendingDeadlineAction = useRef<(() => Promise<void>) | null>(null);
 
   const { setNodeRef, isOver } = useDroppable({ id: "inbox-drop-zone", disabled: !!disableDropZone });
 
@@ -256,7 +263,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
     setContextMenu({ x: e.clientX, y: e.clientY, actions });
   };
 
-  const handlePlanConfirm = useCallback(async (plan: SchedulePlanEntry[]) => {
+  const executePlan = useCallback(async (plan: SchedulePlanEntry[]) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
@@ -348,6 +355,51 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
   }, [planningState, qc]);
+
+  const formatWeekLabel = useCallback((weekKey: string): string => {
+    const d = new Date(weekKey);
+    const weekNum = getISOWeekNumber(d);
+    const end = new Date(d);
+    end.setDate(d.getDate() + 6);
+    return `T${weekNum} · ${d.getDate()}.${d.getMonth() + 1}–${end.getDate()}.${end.getMonth() + 1}.${end.getFullYear()}`;
+  }, []);
+
+  const handlePlanConfirm = useCallback(async (plan: SchedulePlanEntry[]) => {
+    if (!planningState) return;
+
+    // Find the latest scheduled week in the plan
+    const latestWeek = plan.reduce((latest, e) => e.scheduledWeek > latest ? e.scheduledWeek : latest, plan[0]?.scheduledWeek || "");
+    if (!latestWeek) { await executePlan(plan); return; }
+
+    const project = allDbProjects.find(p => p.project_id === planningState.projectId);
+    if (!project) { await executePlan(plan); return; }
+
+    const deadline = resolveDeadline(project);
+    const weekStart = new Date(latestWeek);
+    const result = checkDeadlineWarning(deadline, weekStart);
+
+    if (result.level === "hard" && result.deadline) {
+      pendingDeadlineAction.current = async () => { await executePlan(plan); };
+      setDeadlineWarning({
+        projectName: project.project_name,
+        deadlineLabel: result.deadline.fieldLabel,
+        deadlineDate: result.deadline.date,
+        weekLabel: formatWeekLabel(latestWeek),
+      });
+      return;
+    }
+
+    if (result.level === "soft" && result.deadline) {
+      const formattedDate = format(result.deadline.date, "d.M.yyyy");
+      toast({
+        title: `⏰ Blíží se termín: ${project.project_name}`,
+        description: `${result.deadline.fieldLabel} za ${result.daysUntilDeadline} dní (${formattedDate})`,
+        className: "border-amber-400 bg-amber-50 text-amber-900",
+      });
+    }
+
+    await executePlan(plan);
+  }, [planningState, allDbProjects, executePlan, formatWeekLabel]);
 
   const handleSeedData = async () => {
     setLoading(true);
@@ -525,6 +577,26 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
           weeks={planningWeeks}
           weeklyCapacity={weeklyCapacity}
           onConfirm={handlePlanConfirm}
+        />
+      )}
+      {deadlineWarning && (
+        <DeadlineWarningDialog
+          open={!!deadlineWarning}
+          projectName={deadlineWarning.projectName}
+          deadlineLabel={deadlineWarning.deadlineLabel}
+          deadlineDate={deadlineWarning.deadlineDate}
+          weekLabel={deadlineWarning.weekLabel}
+          onCancel={() => {
+            setDeadlineWarning(null);
+            pendingDeadlineAction.current = null;
+          }}
+          onConfirm={async () => {
+            setDeadlineWarning(null);
+            if (pendingDeadlineAction.current) {
+              await pendingDeadlineAction.current();
+              pendingDeadlineAction.current = null;
+            }
+          }}
         />
       )}
     </div>
