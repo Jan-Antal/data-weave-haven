@@ -363,7 +363,20 @@ export default function PlanVyroby() {
 
       const projectId = dragData.projectId || "";
 
-      if (dragData.type === "inbox-item" && dragData.itemId) {
+      if (dragData.type === "inbox-items" && dragData.batchItemIds && dragData.batchItemIds.length > 0) {
+        // Batch schedule all checked items to the same week
+        const action = async () => {
+          for (const itemId of dragData.batchItemIds!) {
+            await moveInboxItemToWeek(itemId, weekDate);
+          }
+          const weekNum = getISOWeekNumber(new Date(weekDate));
+          toast({
+            title: `${dragData.batchItemIds!.length} položek naplánováno do T${weekNum}`,
+          });
+        };
+        if (!checkAndWarnDeadline(projectId, weekDate, action)) return;
+        await action();
+      } else if (dragData.type === "inbox-item" && dragData.itemId) {
         const action = async () => { await moveInboxItemToWeek(dragData.itemId!, weekDate); };
         if (!checkAndWarnDeadline(projectId, weekDate, action)) return;
         await action();
