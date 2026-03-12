@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronLeft, ChevronRight, X, Plus, RotateCcw } from "lucide-react";
 import { useProductionSettings, useUpdateProductionSettings } from "@/hooks/useProductionSettings";
 import {
@@ -243,26 +242,13 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   else barColor = "hsl(var(--primary) / 0.6)";
 
                   return (
-                    <Popover key={wn} open={editingWeek === wn} onOpenChange={o => setEditingWeek(o ? wn : null)}>
-                      <PopoverTrigger asChild>
-                        <button
-                          className="flex-1 min-w-[12px] rounded-t-sm transition-all hover:opacity-80 relative"
-                          style={{ height: barH, backgroundColor: barColor, outline: isCurrent ? "2px solid hsl(var(--primary))" : "none" }}
-                          title={`T${wn}: ${Math.round(cap)}h · ${week.working_days} dní${week.holiday_name ? ` · ${week.holiday_name}` : ""}${week.company_holiday_name ? ` · ${week.company_holiday_name}` : ""}`}
-                        />
-                      </PopoverTrigger>
-                      <PopoverContent className="w-56 p-3 space-y-2">
-                        <WeekEditor
-                          week={week}
-                          weekNum={wn}
-                          isPast={past}
-                          standardCapacity={standardCapacity}
-                          onSave={(cap, days) => handleWeekCapacityUpdate(wn, cap, days)}
-                          onReset={() => handleResetWeek(wn)}
-                          onClose={() => setEditingWeek(null)}
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <button
+                      key={wn}
+                      className={`flex-1 min-w-[12px] rounded-t-sm transition-all hover:opacity-80 relative ${editingWeek === wn ? "ring-2 ring-foreground" : ""}`}
+                      style={{ height: barH, backgroundColor: barColor, outline: isCurrent ? "2px solid hsl(var(--primary))" : "none" }}
+                      title={`T${wn}: ${Math.round(cap)}h · ${week.working_days} dní${week.holiday_name ? ` · ${week.holiday_name}` : ""}${week.company_holiday_name ? ` · ${week.company_holiday_name}` : ""}`}
+                      onClick={() => setEditingWeek(editingWeek === wn ? null : wn)}
+                    />
                   );
                 })}
               </div>
@@ -286,6 +272,24 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(var(--muted-foreground) / 0.3)" }} />Minulé</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />Firemní dovolená</span>
           </div>
+
+          {/* Inline Week Editor */}
+          {editingWeek !== null && weekMap.get(editingWeek) && (() => {
+            const week = weekMap.get(editingWeek)!;
+            const past = isPastWeek(editingWeek);
+            return (
+              <WeekEditor
+                key={editingWeek}
+                week={week}
+                weekNum={editingWeek}
+                isPast={past}
+                standardCapacity={standardCapacity}
+                onSave={(cap, days) => handleWeekCapacityUpdate(editingWeek, cap, days)}
+                onReset={() => handleResetWeek(editingWeek)}
+                onClose={() => setEditingWeek(null)}
+              />
+            );
+          })()}
         </div>
 
         {/* Holiday Summary */}
@@ -411,9 +415,14 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
   };
 
   return (
-    <div className="space-y-2">
-      <div className="text-xs font-bold text-foreground">
-        T{weekNum} · {formatDate(weekStart)} – {formatDate(weekEnd)}
+    <div className="border border-border rounded-md p-3 bg-muted/30 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-bold text-foreground">
+          T{weekNum} · {formatDate(weekStart)} – {formatDate(weekEnd)}
+        </div>
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onClose}>
+          <X className="h-3 w-3" />
+        </Button>
       </div>
       {isPast && (
         <div className="text-[10px] text-amber-600 font-medium">⚠ Minulý týden</div>
@@ -424,8 +433,8 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
       {week.company_holiday_name && (
         <div className="text-[10px] text-amber-600">🏖 {week.company_holiday_name}</div>
       )}
-      <div className="grid grid-cols-2 gap-2">
-        <div>
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
           <label className="text-[10px] text-muted-foreground">Kapacita (h)</label>
           <Input
             type="number"
@@ -436,7 +445,7 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
             autoFocus
           />
         </div>
-        <div>
+        <div className="flex-1">
           <label className="text-[10px] text-muted-foreground">Prac. dní</label>
           <Input
             type="number"
@@ -446,14 +455,12 @@ function WeekEditor({ week, weekNum, isPast, standardCapacity, onSave, onReset, 
             className="h-7 text-xs font-mono"
           />
         </div>
-      </div>
-      <div className="flex gap-2">
-        <Button size="sm" className="h-7 text-[10px] flex-1" onClick={save}>
+        <Button size="sm" className="h-7 text-xs" onClick={save}>
           Uložit
         </Button>
         {week.is_manual_override && (
-          <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1" onClick={() => { onReset(); onClose(); }}>
-            <RotateCcw className="h-3 w-3 mr-1" /> Reset na standard
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { onReset(); onClose(); }}>
+            <RotateCcw className="h-3 w-3 mr-1" /> Reset
           </Button>
         )}
       </div>
