@@ -252,10 +252,10 @@ function defaultForm() {
     cost_preset_id: null as string | null,
     cost_material_pct: null as number | null,
     cost_overhead_pct: null as number | null,
-    cost_logistics_pct: null as number | null,
+    cost_doprava_pct: null as number | null,
     cost_production_pct: null as number | null,
     cost_subcontractors_pct: null as number | null,
-    cost_margin_pct: null as number | null,
+    cost_montaz_pct: null as number | null,
     cost_is_custom: false,
   };
 }
