@@ -773,7 +773,7 @@ function DetailPanel({ bundle, logs, todayDayIndex, onOpenLog, nextWeekNum, next
           <div className="grid grid-cols-5 gap-2">
             {[0, 1, 2, 3, 4].map((di) => (
               <DayCell key={di} dayIndex={di} todayDayIndex={todayDayIndex} cumulative={getCumulativeForDay(di)}
-                isManagement={isManagement} onOpenLog={onOpenLog} bundleColor={bundle.color} />
+                onOpenLog={onOpenLog} bundleColor={bundle.color} />
             ))}
           </div>
         </div>
