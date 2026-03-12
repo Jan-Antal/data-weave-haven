@@ -301,14 +301,29 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
         {/* Year Bar Chart */}
         <div className="border border-border rounded-lg p-4 space-y-3">
+          {/* Header: Year nav + month range + scroll controls */}
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground">Roční přehled kapacity</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-sm font-semibold text-foreground">Kapacita</h3>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setSelectedYear(y => y - 1); setViewStart(1); }}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-bold text-foreground min-w-[50px] text-center">{selectedYear}</span>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setSelectedYear(y => y + 1); setViewStart(1); }}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <span className="text-xs text-muted-foreground">{visibleMonthRange}</span>
+            </div>
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setSelectedYear(y => y - 1)}>
+              <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={jumpToToday}>
+                <CalendarDays className="h-3 w-3 mr-1" /> Dnes
+              </Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={scrollLeft} disabled={viewStart <= 1}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-sm font-bold text-foreground min-w-[50px] text-center">{selectedYear}</span>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setSelectedYear(y => y + 1)}>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={scrollRight} disabled={viewStart >= 52 - VISIBLE_WEEKS + 1}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -316,30 +331,46 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
           <p className="text-[10px] text-muted-foreground">Klikni na bar pro editaci · Ctrl+klik pro výběr více · Shift+klik pro rozsah</p>
 
-          {/* Bar chart */}
-          <div className="overflow-x-auto">
-            <div className="relative" style={{ minWidth: 52 * 16, height: 140 }}>
+          {/* Month labels */}
+          <div className="flex">
+            {monthGroups.map((mg, i) => (
+              <div
+                key={`${mg.month}-${i}`}
+                className="text-center text-[10px] font-medium text-muted-foreground"
+                style={{
+                  flex: mg.count,
+                  borderRight: i < monthGroups.length - 1 ? "1px solid hsl(var(--border))" : "none",
+                }}
+              >
+                {mg.name}
+              </div>
+            ))}
+          </div>
+
+          {/* Bar chart — 12 visible weeks */}
+          <TooltipProvider delayDuration={100}>
+            <div className="relative" style={{ height: 160 }}>
               {/* Reference line */}
               <div
-                className="absolute left-0 right-0 border-t-2 border-dashed"
+                className="absolute left-0 right-0 border-t-2 border-dashed z-10 pointer-events-none"
                 style={{
-                  top: `${Math.max(0, 120 - (standardCapacity / (maxCapacity * 1.1)) * 120)}px`,
+                  top: `${Math.max(0, 140 - (standardCapacity / (maxCapacity * 1.1)) * 140)}px`,
                   borderColor: "hsl(var(--destructive) / 0.4)",
                 }}
               />
 
-              <div className="flex items-end gap-[2px] h-[120px] mt-[10px]">
-                {Array.from({ length: 52 }, (_, i) => i + 1).map(wn => {
+              <div className="flex items-end gap-1 h-[140px]">
+                {Array.from({ length: VISIBLE_WEEKS }, (_, i) => viewStart + i).filter(wn => wn >= 1 && wn <= 52).map(wn => {
                   const week = weekMap.get(wn);
                   if (!week) return null;
                   const cap = week.capacity_hours;
-                  const barH = maxCapacity > 0 ? Math.max(2, (cap / (maxCapacity * 1.1)) * 120) : 2;
+                  const barH = maxCapacity > 0 ? Math.max(4, (cap / (maxCapacity * 1.1)) * 140) : 4;
                   const past = isPastWeek(wn);
                   const isManual = week.is_manual_override && Math.round(week.capacity_hours) !== Math.round(standardCapacity);
                   const hasHoliday = !!week.holiday_name;
                   const hasCompanyHol = !!week.company_holiday_name;
-                  const _isCurrent = selectedYear === currentYear && wn === currentWeek;
                   const isBarSelected = selectedWeeks.has(wn);
+                  const typeLabel = getWeekTypeLabel(week, past);
 
                   const barColor = past ? "hsl(var(--muted-foreground) / 0.3)"
                     : hasCompanyHol ? "#f59e0b"
@@ -347,31 +378,45 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                     : hasHoliday ? "#d97706"
                     : "hsl(var(--primary) / 0.6)";
 
+                  const weekStart = new Date(week.week_start + "T00:00:00");
+                  const weekEnd = new Date(weekStart);
+                  weekEnd.setDate(weekStart.getDate() + 4);
+                  const fmtDate = (d: Date) => `${d.getDate()}.${d.getMonth() + 1}.`;
+
                   return (
-                    <button
-                      key={wn}
-                      className={`flex-1 min-w-[12px] rounded-t-sm transition-all hover:opacity-80 relative ${isBarSelected ? "ring-2 ring-foreground" : ""}`}
-                      style={{
-                        height: barH,
-                        backgroundColor: barColor,
-                      }}
-                      title={`T${wn}: ${Math.round(cap)}h · ${week.working_days} dní${week.holiday_name ? ` · ${week.holiday_name}` : ""}${week.company_holiday_name ? ` · ${week.company_holiday_name}` : ""}`}
-                      onClick={e => handleBarClick(wn, e)}
-                    />
+                    <Tooltip key={wn}>
+                      <TooltipTrigger asChild>
+                        <button
+                          className={`flex-1 rounded-t-sm transition-all hover:opacity-80 cursor-pointer ${isBarSelected ? "ring-2 ring-foreground" : ""}`}
+                          style={{
+                            height: barH,
+                            backgroundColor: barColor,
+                            minWidth: 0,
+                          }}
+                          onClick={e => handleBarClick(wn, e)}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs space-y-0.5 font-mono">
+                        <div className="font-bold">T{wn}</div>
+                        <div>{fmtDate(weekStart)} – {fmtDate(weekEnd)}{selectedYear}</div>
+                        <div>{Math.round(cap)} h</div>
+                        <div className="text-muted-foreground">{typeLabel}{week.holiday_name ? ` · ${week.holiday_name}` : ""}</div>
+                      </TooltipContent>
+                    </Tooltip>
                   );
                 })}
               </div>
 
-              {/* Week labels */}
-              <div className="flex gap-[2px] mt-0.5">
-                {Array.from({ length: 52 }, (_, i) => i + 1).map(wn => (
-                  <div key={wn} className="flex-1 min-w-[12px] text-center text-[6px] font-mono text-muted-foreground">
-                    {wn % 4 === 1 ? `T${wn}` : ""}
+              {/* Week number labels */}
+              <div className="flex gap-1 mt-1">
+                {Array.from({ length: VISIBLE_WEEKS }, (_, i) => viewStart + i).filter(wn => wn >= 1 && wn <= 52).map(wn => (
+                  <div key={wn} className="flex-1 text-center text-[10px] font-mono text-muted-foreground">
+                    T{wn}
                   </div>
                 ))}
               </div>
             </div>
-          </div>
+          </TooltipProvider>
 
           {/* Legend */}
           <div className="flex items-center gap-4 text-[9px] text-muted-foreground">
@@ -380,7 +425,6 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#2d6a4f" }} />Ručně upraveno</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(var(--muted-foreground) / 0.3)" }} />Minulé</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />Firemní dovolená</span>
-            
           </div>
 
           {/* Inline Week Editor */}
