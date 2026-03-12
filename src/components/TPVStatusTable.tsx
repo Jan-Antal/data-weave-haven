@@ -661,13 +661,13 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   });
 
   return (
-    <div>
+    <div className="h-full flex flex-col">
       {editMode && (
-        <div className="bg-accent/10 border border-accent/30 text-accent text-xs font-medium px-3 py-1.5 rounded-t-lg">
+        <div className="bg-accent/10 border border-accent/30 text-accent text-xs font-medium px-3 py-1.5 rounded-t-lg shrink-0">
           Režim úpravy sloupců
         </div>
       )}
-      <div className={cn("rounded-lg border bg-card flex flex-col", editMode && "rounded-t-none border-t-0")} style={{ maxHeight: "calc(100vh - 260px)" }}>
+      <div className={cn("rounded-lg border bg-card flex flex-col flex-1 min-h-0", editMode && "rounded-t-none border-t-0")}>
         {/* FIXED HEADER */}
         <div ref={headerScrollRef} className="flex-shrink-0 overflow-hidden border-b border-border">
           <Table>
