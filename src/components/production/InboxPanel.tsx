@@ -661,7 +661,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
               </span>
             )}
           </div>
-          <div className="font-mono text-[9px]" style={{ color: "#99a5a3" }}>{project.project_id}</div>
+          <div className="font-mono text-[9px]" style={{ color: "#6b7280" }}>{project.project_id}</div>
           {progress && <div className="mt-1"><ProjectProgressBar progress={progress} compact /></div>}
         </div>
         <div className="text-right shrink-0">
