@@ -720,7 +720,7 @@ function DraggableInboxItem({ item, projectName, onContextMenu }: { item: InboxI
       )}
       {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
       <span className="text-[11px] font-medium flex-1 truncate" style={{ color: "#6b7a78" }}>{item.item_name}</span>
-      <span className="font-mono text-[10px] shrink-0" style={{ color: "#6b7a78" }}>{item.estimated_hours}h</span>
+      <span className="font-mono text-[10px] shrink-0" style={{ color: "#1a1a1a", fontWeight: 700 }}>{item.estimated_hours}h</span>
     </div>
   );
 }
