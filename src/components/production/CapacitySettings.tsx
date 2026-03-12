@@ -98,43 +98,43 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     }
   };
 
-  const handleWeekCapacityUpdate = async (wn: number, capacity: number, workingDays: number) => {
-    const week = weekMap.get(wn);
-    if (!week) return;
+  const handleWeekCapacityUpdate = async (weeks: number[], capacity: number, workingDays: number) => {
     try {
-      await upsertWeek.mutateAsync({
-        week_year: selectedYear,
-        week_number: wn,
-        week_start: week.week_start,
-        capacity_hours: capacity,
-        working_days: workingDays,
-        is_manual_override: true,
-        holiday_name: week.holiday_name,
-      });
-      toast({ title: `✓ T${wn} aktualizován` });
+      for (const wn of weeks) {
+        const week = weekMap.get(wn);
+        if (!week) continue;
+        // Only save as manual override if capacity differs from what it would be without override
+        const isActuallyDifferent = capacity !== standardCapacity || week.holiday_name;
+        await upsertWeek.mutateAsync({
+          week_year: selectedYear,
+          week_number: wn,
+          week_start: week.week_start,
+          capacity_hours: capacity,
+          working_days: workingDays,
+          is_manual_override: isActuallyDifferent ? true : false,
+          holiday_name: week.holiday_name,
+        });
+      }
+      toast({ title: `✓ ${weeks.length > 1 ? `${weeks.length} týdnů` : `T${weeks[0]}`} aktualizován` });
     } catch (e: any) {
       toast({ title: "Chyba", description: e.message, variant: "destructive" });
     }
   };
 
-  const handleResetWeek = async (wn: number) => {
+  const handleResetWeeks = async (weeks: number[]) => {
     try {
       const { supabase } = await import("@/integrations/supabase/client");
-      const { error } = await supabase
-        .from("production_capacity")
-        .delete()
-        .eq("week_year", selectedYear)
-        .eq("week_number", wn);
-      if (error) throw error;
-      // Invalidate query to refetch
-      const { QueryClient } = await import("@tanstack/react-query");
-      // Use the global query client by refetching
-      upsertWeek.reset();
-      toast({ title: `✓ T${wn} obnoven na standard` });
-      // Force data refetch by triggering a state change
-      setEditingWeek(null);
-      setSelectedYear(y => y); // trigger re-render
-      window.dispatchEvent(new Event("capacity-reset"));
+      for (const wn of weeks) {
+        const { error } = await supabase
+          .from("production_capacity")
+          .delete()
+          .eq("week_year", selectedYear)
+          .eq("week_number", wn);
+        if (error) throw error;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["production-capacity", selectedYear] });
+      toast({ title: `✓ ${weeks.length > 1 ? `${weeks.length} týdnů` : `T${weeks[0]}`} obnoveno na standard` });
+      setSelectedWeeks(new Set());
     } catch {
       toast({ title: "Chyba při resetování", variant: "destructive" });
     }
