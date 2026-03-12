@@ -111,7 +111,7 @@ const INBOX_W = 100;
 const EXPEDICE_W = 100;
 const LEFT_COL_W = 280;
 
-export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
+export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateToTPV, onOpenProjectDetail }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: expediceData } = useProductionExpedice();
   const { data: inboxProjects = [] } = useProductionInbox();
@@ -119,10 +119,18 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "" }: Props) {
   const { data: allProjects = [] } = useProjects();
   const getWeekCapacity = useWeekCapacityLookup();
   const { moveScheduleItemToWeek, moveItemBackToInbox, completeItems, moveInboxItemToWeek } = useProductionDragDrop();
+  const qc = useQueryClient();
   const [sortMode, setSortMode] = useState<SortMode>("project");
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialScrollDone = useRef(false);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
+
+  // Planning dialog state
+  const [planningState, setPlanningState] = useState<{ projectId: string; projectName: string; items: PlanningItem[] } | null>(null);
+
   // Cancel dialog state
   const [cancelDialog, setCancelDialog] = useState<{
     open: boolean; itemId: string; itemName: string; itemCode?: string | null;
