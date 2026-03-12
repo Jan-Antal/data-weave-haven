@@ -1300,7 +1300,7 @@ function DroppableWeekCell({ droppableId, weekKey, isCurrent, children }: {
 }
 
 /* ─── Filled week cell with popover + draggable ─── */
-function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCellValue, getCellStyle, moveTargetWeeks, getWeekCapacity, weekCapacities, onMoveToWeek, onReturnToInbox, onComplete, onCancel }: {
+function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCellValue, getCellStyle, moveTargetWeeks, getWeekCapacity, weekCapacities, onMoveToWeek, onReturnToInbox, onComplete, onCancel, onContextMenu }: {
   weekKey: string;
   isCurrent: boolean;
   alloc: WeekAlloc;
@@ -1315,6 +1315,7 @@ function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCe
   onReturnToInbox: (ids: string[]) => Promise<void>;
   onComplete: (ids: string[]) => Promise<void>;
   onCancel: (ids: string[]) => void;
+  onContextMenu?: (e: React.MouseEvent, ids: string[], alloc: WeekAlloc, item: ItemRow) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [showMoveList, setShowMoveList] = useState(false);
