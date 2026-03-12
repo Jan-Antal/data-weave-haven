@@ -605,37 +605,44 @@ function ProjectGroup({
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-1.5">
             <span
-              className="text-[12px] font-semibold truncate"
-              style={{ color: "hsl(var(--foreground))" }}
+              className="truncate"
+              style={{ fontSize: 13, fontWeight: 600, color: isArchive ? "hsl(var(--muted-foreground))" : "#1a1a1a" }}
             >
               {group.project_name}
             </span>
             <span
-              className="text-[11px] font-bold px-1.5 py-0.5 rounded-full shrink-0 text-center"
-              style={isArchive ? {
-                backgroundColor: "hsl(var(--muted))",
-                color: "hsl(var(--muted-foreground))",
-                minWidth: 40,
-              } : {
-                backgroundColor: allDone ? "rgba(22,163,74,0.12)" : "rgba(217,151,6,0.12)",
-                color: allDone ? "#16A34A" : "#d97706",
-                minWidth: 40,
+              className="rounded-full shrink-0 text-center"
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                padding: "2px 7px",
+                ...(isArchive ? {
+                  backgroundColor: "hsl(var(--muted))",
+                  color: "hsl(var(--muted-foreground))",
+                  minWidth: 40,
+                } : {
+                  backgroundColor: allDone ? "rgba(22,163,74,0.12)" : "rgba(217,151,6,0.12)",
+                  color: allDone ? "#16A34A" : "#d97706",
+                  minWidth: 40,
+                }),
               }}
             >
               {completedCount}/{totalCount}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="font-mono text-[9px] text-gray-400">{group.project_id}</span>
+            <span className="font-mono" style={{ fontSize: 11, color: isArchive ? "#9ca3af" : "#6b7280" }}>{group.project_id}</span>
             {isArchive && latestExpedicedStr ? (
-              <span className="text-[9px] text-gray-400">
+              <span style={{ fontSize: 11, color: "#6b7280" }}>
                 Expedováno: {latestExpedicedStr}
               </span>
             ) : expediceStr ? (
-              <span className="text-[9px] font-medium shrink-0" style={{
-                color: expediceDate && expediceDate < new Date() ? "#dc3545"
-                  : expediceDate && differenceInDays(expediceDate, new Date()) <= 7 ? "#D97706"
-                  : "#223937"
+              <span className="shrink-0" style={{
+                fontSize: 11,
+                fontWeight: 500,
+                color: expediceDate && expediceDate < new Date() ? "#dc2626"
+                  : expediceDate && differenceInDays(expediceDate, new Date()) <= 14 ? "#d97706"
+                  : "#6b7280"
               }}>
                 Exp: {expediceStr}
               </span>
