@@ -537,8 +537,15 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
 
   // Infinite scroll
   const tableScrollRef = useRef<HTMLDivElement>(null);
+  const headerScrollRef = useRef<HTMLDivElement>(null);
   const scrollResetKey = `${computeKey}|${sortCol}|${sortDir}`;
   const { visible, hasMore } = useInfiniteScroll(sorted, tableScrollRef, scrollResetKey);
+
+  const handleBodyScroll = useCallback(() => {
+    if (tableScrollRef.current && headerScrollRef.current) {
+      headerScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+    }
+  }, []);
 
   const orderedNativeKeys = useMemo(() => getOrderedKeys(TPV_NATIVE), [getOrderedKeys]);
   const orderedAllKeys = useMemo(() => getOrderedKeys(ALL_KEYS), [getOrderedKeys]);
