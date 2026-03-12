@@ -52,10 +52,8 @@ function parseTimeFromFilename(name: string): string | null {
   return null;
 }
 
-const CZECH_MONTHS = ["ledna", "února", "března", "dubna", "května", "června", "července", "srpna", "září", "října", "listopadu", "prosince"];
-
 function formatCzechDate(d: Date): string {
-  return `${d.getDate()}. ${CZECH_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  return `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()}`;
 }
 
 function dateKey(d: Date): string {
@@ -73,12 +71,7 @@ function groupByDate(files: SPFile[], sortNewest: boolean): DateGroup[] {
   const ungrouped: SPFile[] = [];
 
   for (const f of files) {
-    // Try filename first, then lastModified from SharePoint
-    let d = parseDateFromFilename(f.name);
-    if (!d && f.lastModified) {
-      const parsed = new Date(f.lastModified);
-      if (!isNaN(parsed.getTime())) d = parsed;
-    }
+    const d = parseDateFromFilename(f.name);
     if (d) {
       const k = dateKey(d);
       if (!map.has(k)) map.set(k, { date: d, files: [] });
@@ -91,12 +84,7 @@ function groupByDate(files: SPFile[], sortNewest: boolean): DateGroup[] {
   const groups = Array.from(map.entries()).map(([key, val]) => ({
     key,
     date: val.date,
-    files: val.files.sort((a, b) => {
-      // Sort by lastModified descending within group
-      const aTime = new Date(a.lastModified || 0).getTime();
-      const bTime = new Date(b.lastModified || 0).getTime();
-      return bTime - aTime || a.name.localeCompare(b.name);
-    }),
+    files: val.files.sort((a, b) => a.name.localeCompare(b.name)),
   }));
 
   groups.sort((a, b) => sortNewest ? b.date.getTime() - a.date.getTime() : a.date.getTime() - b.date.getTime());
