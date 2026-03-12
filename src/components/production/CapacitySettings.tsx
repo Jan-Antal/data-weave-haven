@@ -111,7 +111,38 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
 
   const standardCapacity = settings?.weekly_capacity_hours ?? 875;
-  const [standardCapacityInput, setStandardCapacityInput] = useState<string>("");
+  const [standardCapacityInput, setStandardCapacityInput] = useState<string>(String(standardCapacity));
+  const [capacityInputFocused, setCapacityInputFocused] = useState(false);
+
+  // Safe math expression evaluator
+  const safeEvalExpr = (expr: string): number | null => {
+    try {
+      if (!/^[\d\s+\-*/().]+$/.test(expr)) return null;
+      const result = Function('"use strict"; return (' + expr + ')')();
+      if (typeof result !== "number" || !isFinite(result) || isNaN(result)) return null;
+      return Math.round(result);
+    } catch { return null; }
+  };
+
+  const isExpr = /[*/()]/.test(standardCapacityInput);
+  const exprPreview = isExpr ? safeEvalExpr(standardCapacityInput) : null;
+
+  const commitCapacityInput = () => {
+    const evaluated = safeEvalExpr(standardCapacityInput);
+    if (evaluated !== null && evaluated > 0) {
+      handleStandardCapacityChange(evaluated);
+      setStandardCapacityInput(String(evaluated));
+    } else {
+      const v = parseInt(standardCapacityInput);
+      if (v > 0) {
+        handleStandardCapacityChange(v);
+        setStandardCapacityInput(String(v));
+      } else {
+        setStandardCapacityInput(String(standardCapacity));
+      }
+    }
+    setCapacityInputFocused(false);
+  };
   const workingDaysPerWeek = 5;
   const calculatedHoursPerDay = workingDaysPerWeek > 0 ? Math.round(standardCapacity / workingDaysPerWeek) : 175;
 
