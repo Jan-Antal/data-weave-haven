@@ -461,6 +461,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                           </div>
                         </TableCell>
                       );
+                    }
                     // remaining columns: sent_date, accepted_date, notes, pocet, cena, custom fields
                     if (key === "sent_date") return <TableCell key={key}><InlineEditableCell value={item.sent_date || ""} type="date" onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>;
                     if (key === "accepted_date") return <TableCell key={key}><InlineEditableCell value={item.accepted_date || ""} type="date" onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>;
