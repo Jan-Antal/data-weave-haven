@@ -668,7 +668,7 @@ function ProjectGroup({
               ) : (
                 <span
                   className="cursor-pointer hover:underline"
-                  style={{ color: "#D97706" }}
+                  style={{ fontSize: 11, color: "#d97706", fontWeight: 500 }}
                   onClick={() => {
                     if (onNavigateToTPV) onNavigateToTPV(group.project_id);
                   }}
