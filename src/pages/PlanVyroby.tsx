@@ -611,27 +611,8 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Right: Search + Display mode */}
+      {/* Right: Display mode + Search */}
       <div className="flex items-center gap-2 shrink-0">
-        <div className="relative w-[200px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={e => onSearchChange(e.target.value)}
-            placeholder="Hledat projekt..."
-            className="w-full h-8 pl-8 pr-8 rounded-md text-sm bg-background border border-input placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 transition-colors"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => onSearchChange("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-
         <div className="inline-flex h-8 items-center rounded-md bg-card border border-border p-0.5">
           {([
             { key: "hours" as DisplayMode, label: "Hodiny" },
@@ -650,6 +631,25 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
               {m.label}
             </button>
           ))}
+        </div>
+
+        <div className="relative w-[200px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => onSearchChange(e.target.value)}
+            placeholder="Hledat projekt..."
+            className="w-full h-8 pl-8 pr-8 rounded-md text-sm bg-background border border-input placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 transition-colors"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => onSearchChange("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
     </div>
