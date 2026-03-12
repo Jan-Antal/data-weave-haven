@@ -32,6 +32,10 @@ import { useProductionSchedule, getISOWeekNumber } from "@/hooks/useProductionSc
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { PlanVyrobyTableView } from "@/components/production/PlanVyrobyTableView";
+import { DeadlineWarningDialog } from "@/components/production/DeadlineWarningDialog";
+import { resolveDeadline, checkDeadlineWarning } from "@/lib/deadlineWarning";
+import { toast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 export type DisplayMode = "hours" | "czk" | "percent";
 type ViewTab = "kanban" | "table";
