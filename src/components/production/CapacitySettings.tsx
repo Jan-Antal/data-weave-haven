@@ -426,7 +426,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   const isBarSelected = selectedWeeks.has(wn);
                   const typeLabel = getWeekTypeLabel(week, past);
 
-                  const barColor = past ? PAST_WEEK_COLOR : getCapacityColor(cap, standardCapacity);
+                  const barColor = past ? PAST_WEEK_COLOR : getCapacityColorDynamic(cap, standardCapacity, visibleRange.min, visibleRange.max);
 
                   const weekStart = new Date(week.week_start + "T00:00:00");
                   const weekEnd = new Date(weekStart);
