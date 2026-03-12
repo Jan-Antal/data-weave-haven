@@ -64,10 +64,10 @@ interface Project {
   cost_preset_id: string | null;
   cost_material_pct: number | null;
   cost_overhead_pct: number | null;
-  cost_logistics_pct: number | null;
+  cost_doprava_pct: number | null;
   cost_production_pct: number | null;
   cost_subcontractors_pct: number | null;
-  cost_margin_pct: number | null;
+  cost_montaz_pct: number | null;
   cost_is_custom: boolean | null;
 }
 
@@ -235,10 +235,10 @@ function buildFormState(p: Project | null) {
     cost_preset_id: p.cost_preset_id || null,
     cost_material_pct: p.cost_material_pct ?? null,
     cost_overhead_pct: p.cost_overhead_pct ?? null,
-    cost_logistics_pct: p.cost_logistics_pct ?? null,
+    cost_doprava_pct: p.cost_doprava_pct ?? null,
     cost_production_pct: p.cost_production_pct ?? null,
     cost_subcontractors_pct: p.cost_subcontractors_pct ?? null,
-    cost_margin_pct: p.cost_margin_pct ?? null,
+    cost_montaz_pct: p.cost_montaz_pct ?? null,
     cost_is_custom: p.cost_is_custom ?? false,
   };
 }
@@ -252,10 +252,10 @@ function defaultForm() {
     cost_preset_id: null as string | null,
     cost_material_pct: null as number | null,
     cost_overhead_pct: null as number | null,
-    cost_logistics_pct: null as number | null,
+    cost_doprava_pct: null as number | null,
     cost_production_pct: null as number | null,
     cost_subcontractors_pct: null as number | null,
-    cost_margin_pct: null as number | null,
+    cost_montaz_pct: null as number | null,
     cost_is_custom: false,
   };
 }
@@ -617,10 +617,10 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       cost_preset_id: form.cost_preset_id || null,
       cost_material_pct: form.cost_material_pct,
       cost_overhead_pct: form.cost_overhead_pct,
-      cost_logistics_pct: form.cost_logistics_pct,
+      cost_doprava_pct: form.cost_doprava_pct,
       cost_production_pct: form.cost_production_pct,
       cost_subcontractors_pct: form.cost_subcontractors_pct,
-      cost_margin_pct: form.cost_margin_pct,
+      cost_montaz_pct: form.cost_montaz_pct,
       cost_is_custom: form.cost_is_custom,
     };
 
@@ -1177,14 +1177,15 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                     <RozpadCeny
                       projectId={project.project_id}
                       prodejniCena={form.prodejni_cena ? Number(form.prodejni_cena) : null}
+                      marze={form.marze ? parseFloat(String(form.marze).replace(",", ".")) : null}
                       costValues={{
                         cost_preset_id: form.cost_preset_id,
                         cost_material_pct: form.cost_material_pct,
                         cost_overhead_pct: form.cost_overhead_pct,
-                        cost_logistics_pct: form.cost_logistics_pct,
+                        cost_doprava_pct: form.cost_doprava_pct,
                         cost_production_pct: form.cost_production_pct,
                         cost_subcontractors_pct: form.cost_subcontractors_pct,
-                        cost_margin_pct: form.cost_margin_pct,
+                        cost_montaz_pct: form.cost_montaz_pct,
                         cost_is_custom: form.cost_is_custom,
                       }}
                       onChange={(updates) => setForm((s) => ({ ...s, ...updates }))}

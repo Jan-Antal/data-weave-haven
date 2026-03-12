@@ -1,35 +1,35 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { useCostBreakdownPresets, type CostBreakdownPreset } from "@/hooks/useCostBreakdownPresets";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 
 const SEGMENT_COLORS = [
-  { key: "material_pct", label: "Mat.", color: "#d97706" },
-  { key: "overhead_pct", label: "Režie", color: "#6b7280" },
-  { key: "logistics_pct", label: "Log.", color: "#3b82f6" },
+  { key: "material_pct", label: "Mat.", color: "#f97316" },
   { key: "production_pct", label: "Výroba", color: "#3a8a36" },
-  { key: "subcontractors_pct", label: "Subdod.", color: "#8b5cf6" },
-  { key: "margin_pct", label: "Marže", color: "#99a5a3" },
+  { key: "subcontractors_pct", label: "Subdod.", color: "#2563eb" },
+  { key: "overhead_pct", label: "Režie", color: "#6b7280" },
+  { key: "doprava_pct", label: "Doprava", color: "#eab308" },
+  { key: "montaz_pct", label: "Montáž", color: "#8b5cf6" },
 ];
 
-interface CostValues {
+export interface CostValues {
   cost_preset_id: string | null;
   cost_material_pct: number | null;
   cost_overhead_pct: number | null;
-  cost_logistics_pct: number | null;
+  cost_doprava_pct: number | null;
   cost_production_pct: number | null;
   cost_subcontractors_pct: number | null;
-  cost_margin_pct: number | null;
+  cost_montaz_pct: number | null;
   cost_is_custom: boolean;
 }
 
 interface RozpadCenyProps {
   projectId: string;
   prodejniCena: number | null;
+  marze: number | null;
   costValues: CostValues;
   onChange: (updates: Partial<CostValues>) => void;
   readOnly?: boolean;
@@ -41,7 +41,7 @@ function BreakdownBar({ values }: { values: Record<string, number> }) {
   return (
     <div className="flex h-2.5 rounded-full overflow-hidden bg-muted w-full">
       {SEGMENT_COLORS.map((seg) => {
-        const val = values[seg.key.replace("cost_", "")] || values[seg.key] || 0;
+        const val = values[seg.key] || 0;
         if (val <= 0) return null;
         return (
           <div
@@ -56,25 +56,37 @@ function BreakdownBar({ values }: { values: Record<string, number> }) {
   );
 }
 
-export function RozpadCeny({ projectId, prodejniCena, costValues, onChange, readOnly, kalkulantSlot }: RozpadCenyProps) {
+export function RozpadCeny({ projectId, prodejniCena, marze, costValues, onChange, readOnly, kalkulantSlot }: RozpadCenyProps) {
   const { data: presets = [] } = useCostBreakdownPresets();
   const { data: settings } = useProductionSettings();
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState<Record<string, string>>({});
 
-  const hasPreset = !!costValues.cost_preset_id;
   const hasValues = costValues.cost_material_pct != null;
 
   const pctValues: Record<string, number> = {
     material_pct: costValues.cost_material_pct ?? 0,
     overhead_pct: costValues.cost_overhead_pct ?? 0,
-    logistics_pct: costValues.cost_logistics_pct ?? 0,
+    doprava_pct: costValues.cost_doprava_pct ?? 0,
     production_pct: costValues.cost_production_pct ?? 0,
     subcontractors_pct: costValues.cost_subcontractors_pct ?? 0,
-    margin_pct: costValues.cost_margin_pct ?? 0,
+    montaz_pct: costValues.cost_montaz_pct ?? 0,
   };
 
   const total = Object.values(pctValues).reduce((s, v) => s + v, 0);
+
+  // Cost and margin calculations
+  const marzeNum = marze ?? 0;
+  const naklady = prodejniCena && prodejniCena > 0 && marzeNum >= 0
+    ? prodejniCena / (1 + marzeNum / 100)
+    : null;
+  const marzeCzk = prodejniCena && naklady ? prodejniCena - naklady : null;
+
+  // Production summary
+  const productionPct = pctValues.production_pct || 0;
+  const productionCzk = naklady ? naklady * productionPct / 100 : 0;
+  const hourlyRate = settings?.hourly_rate ?? 550;
+  const productionHours = hourlyRate > 0 ? productionCzk / hourlyRate : 0;
 
   const handlePresetSelect = (presetId: string) => {
     if (presetId === "__none__") {
@@ -82,10 +94,10 @@ export function RozpadCeny({ projectId, prodejniCena, costValues, onChange, read
         cost_preset_id: null,
         cost_material_pct: null,
         cost_overhead_pct: null,
-        cost_logistics_pct: null,
+        cost_doprava_pct: null,
         cost_production_pct: null,
         cost_subcontractors_pct: null,
-        cost_margin_pct: null,
+        cost_montaz_pct: null,
         cost_is_custom: false,
       });
       return;
@@ -96,10 +108,10 @@ export function RozpadCeny({ projectId, prodejniCena, costValues, onChange, read
       cost_preset_id: preset.id,
       cost_material_pct: preset.material_pct,
       cost_overhead_pct: preset.overhead_pct,
-      cost_logistics_pct: preset.logistics_pct,
+      cost_doprava_pct: preset.doprava_pct,
       cost_production_pct: preset.production_pct,
       cost_subcontractors_pct: preset.subcontractors_pct,
-      cost_margin_pct: preset.margin_pct,
+      cost_montaz_pct: preset.montaz_pct,
       cost_is_custom: false,
     });
   };
@@ -114,7 +126,6 @@ export function RozpadCeny({ projectId, prodejniCena, costValues, onChange, read
     const num = parseFloat(val);
     if (!isNaN(num)) {
       const costKey = `cost_${key}` as keyof CostValues;
-      // Check if values now differ from the selected preset
       const currentPreset = presets.find((p) => p.id === costValues.cost_preset_id);
       let isCustom = costValues.cost_is_custom;
       if (currentPreset) {
@@ -134,12 +145,6 @@ export function RozpadCeny({ projectId, prodejniCena, costValues, onChange, read
     });
   };
 
-  // Compute production summary
-  const productionPct = pctValues.production_pct || 0;
-  const productionCzk = prodejniCena ? prodejniCena * productionPct / 100 : 0;
-  const hourlyRate = settings?.hourly_rate ?? 550;
-  const productionHours = hourlyRate > 0 ? productionCzk / hourlyRate : 0;
-
   const selectedPreset = presets.find((p) => p.id === costValues.cost_preset_id);
   const dropdownLabel = selectedPreset
     ? (costValues.cost_is_custom ? `Vlastní: ${selectedPreset.name}` : selectedPreset.name)
@@ -151,7 +156,7 @@ export function RozpadCeny({ projectId, prodejniCena, costValues, onChange, read
     <div className="col-span-2 space-y-2">
       <div className="grid grid-cols-2 gap-x-3">
         <div>
-          <Label className="text-xs">Rozpad ceny</Label>
+          <Label className="text-xs">Rozpad nákladů</Label>
           {!readOnly ? (
             <Select
               value={costValues.cost_preset_id || "__none__"}
@@ -180,9 +185,9 @@ export function RozpadCeny({ projectId, prodejniCena, costValues, onChange, read
         <>
           <BreakdownBar values={pctValues} />
 
-          {prodejniCena != null && prodejniCena > 0 && productionPct > 0 && (
+          {naklady != null && naklady > 0 && productionPct > 0 && (
             <p className="text-xs text-muted-foreground">
-              Výroba: <span className="font-medium text-foreground">{Math.round(productionCzk).toLocaleString("cs-CZ")} Kč</span>
+              Výroba: <span className="font-medium text-foreground">{Math.round(naklady * productionPct / 100).toLocaleString("cs-CZ")} Kč</span>
               {" · "}
               <span className="font-medium text-foreground">{Math.round(productionHours).toLocaleString("cs-CZ")}h</span>
             </p>
@@ -199,31 +204,59 @@ export function RozpadCeny({ projectId, prodejniCena, costValues, onChange, read
           )}
 
           {(expanded || readOnly) && (
-            <div className="grid grid-cols-6 gap-1">
-              {SEGMENT_COLORS.map((seg) => (
-                <div key={seg.key}>
-                  <Label className="text-[9px] text-muted-foreground block text-center">{seg.label}</Label>
-                  <div className="relative">
-                    <Input
-                      className="h-7 text-xs text-center pr-4 no-spinners"
-                      type={readOnly ? "text" : "number"}
-                      value={readOnly ? `${pctValues[seg.key]}` : (editing[seg.key] ?? String(pctValues[seg.key] ?? 0))}
-                      onChange={(e) => handlePctChange(seg.key, e.target.value)}
-                      onBlur={() => handlePctBlur(seg.key)}
-                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                      disabled={readOnly}
-                    />
-                    <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">%</span>
+            <>
+              <div className="grid grid-cols-6 gap-1">
+                {SEGMENT_COLORS.map((seg) => (
+                  <div key={seg.key}>
+                    <Label className="text-[9px] text-muted-foreground block text-center">{seg.label}</Label>
+                    <div className="relative">
+                      <Input
+                        className="h-7 text-xs text-center pr-4 no-spinners"
+                        type={readOnly ? "text" : "number"}
+                        value={readOnly ? `${pctValues[seg.key]}` : (editing[seg.key] ?? String(pctValues[seg.key] ?? 0))}
+                        onChange={(e) => handlePctChange(seg.key, e.target.value)}
+                        onBlur={() => handlePctBlur(seg.key)}
+                        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                        disabled={readOnly}
+                      />
+                      <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">%</span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+
+              {/* Read-only Marže row from Finance */}
+              <div className="flex items-center gap-2 mt-1">
+                <Lock className="h-3 w-3 text-muted-foreground/50 shrink-0" />
+                <span className="text-[10px] italic text-muted-foreground">Marže</span>
+                <span className="text-[10px] italic text-muted-foreground ml-auto">{marzeNum || 0} %</span>
+                <span className="text-[9px] text-muted-foreground/50">z Finance</span>
+              </div>
+            </>
           )}
 
           {!readOnly && expanded && total !== 100 && (
             <p className="text-[10px] text-destructive font-medium">
               Součet: {total}% (musí být 100%)
             </p>
+          )}
+
+          {/* Cost & Margin totals */}
+          {prodejniCena != null && prodejniCena > 0 && (
+            <div className="border-t border-border pt-1.5 mt-1 space-y-0.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Náklady:</span>
+                <span className="font-medium" style={{ color: "#1a1a1a" }}>
+                  {naklady ? `${Math.round(naklady).toLocaleString("cs-CZ")} Kč` : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Marže:</span>
+                <span className="font-medium" style={{ color: "#3a8a36" }}>
+                  {marzeCzk ? `${Math.round(marzeCzk).toLocaleString("cs-CZ")} Kč` : "—"}
+                </span>
+              </div>
+            </div>
           )}
         </>
       )}

@@ -7,10 +7,10 @@ export interface CostBreakdownPreset {
   description: string | null;
   material_pct: number;
   overhead_pct: number;
-  logistics_pct: number;
+  doprava_pct: number;
   production_pct: number;
   subcontractors_pct: number;
-  margin_pct: number;
+  montaz_pct: number;
   is_default: boolean;
   sort_order: number;
   created_at: string;
