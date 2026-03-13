@@ -28,7 +28,7 @@ import { RecycleBin } from "@/components/RecycleBin";
 import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDialog";
 import { DataLogPanel } from "@/components/DataLogPanel";
 import { CapacitySettings } from "@/components/production/CapacitySettings";
-import { AdminInbox } from "@/components/AdminInbox";
+import { AdminInboxButton } from "@/components/AdminInbox";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { parseAppDate } from "@/lib/dateFormat";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
