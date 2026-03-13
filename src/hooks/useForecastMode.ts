@@ -19,6 +19,7 @@ export interface ForecastBlock {
   source: ForecastSource;
   deadline?: string | null;
   deadline_source?: string;
+  tpv_expected_date?: string | null;
   is_forecast: true;
   selected?: boolean;
 }
