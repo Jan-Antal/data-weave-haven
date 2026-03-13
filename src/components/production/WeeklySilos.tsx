@@ -1074,6 +1074,50 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const toggleExpand = useCallback(() => setExpanded(v => !v), []);
   const isSearchMatch = bundleMatchesSearch(bundle, searchQuery);
 
+  // Blocker card — special rendering (after all hooks)
+  if (isBlockerBundle) {
+    const tpvDate = bundle.items.find(i => i.tpv_expected_date)?.tpv_expected_date;
+    const tpvWeekLabel = tpvDate ? (() => {
+      const d = new Date(tpvDate);
+      if (isNaN(d.getTime())) return null;
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(d);
+      monday.setDate(diff);
+      const weekNum = Math.ceil(((monday.getTime() - new Date(monday.getFullYear(), 0, 1).getTime()) / 86400000 + 1) / 7);
+      return `T${weekNum}`;
+    })() : null;
+
+    return (
+      <div className="rounded-[6px] overflow-hidden relative px-2.5 py-2"
+        style={{
+          background: "#1e2025",
+          border: "2px dashed #4b5563",
+          opacity: 0.85,
+        }}
+        onContextMenu={e => {
+          e.preventDefault();
+          e.stopPropagation();
+          onBundleContextMenu(e, bundle, toggleExpand);
+        }}
+      >
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+          <span className="text-[11px] font-semibold truncate" style={{ color: "#9ca3af" }}>{bundle.project_name}</span>
+        </div>
+        <div className="flex items-center justify-between mt-0.5">
+          <span className="text-[9px] rounded-full px-1.5 py-0.5" style={{ backgroundColor: "#374151", color: "#9ca3af", fontWeight: 600 }}>⏳ Rezerva</span>
+          <span className="font-mono text-[11px] font-bold" style={{ color: "#6b7280" }}>
+            ~{displayMode === "czk" ? formatCompactCzk(bundle.total_hours * hourlyRate) : `${Math.round(bundle.total_hours)}h`}
+          </span>
+        </div>
+        {tpvWeekLabel && (
+          <div className="mt-0.5 text-[10px]" style={{ color: "#6b7280" }}>TPV: {tpvWeekLabel}</div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-[6px] overflow-hidden relative" style={{
       borderTop: forecastDarkMode
