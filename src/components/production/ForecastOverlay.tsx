@@ -206,6 +206,11 @@ function ForecastCard({
             >
               {block.project_id}
             </span>
+            {block.tpv_item_count && block.tpv_item_count > 0 && (
+              <span className="text-[9px]" style={{ color: style.codeColor }}>
+                · {block.tpv_item_count} pol.
+              </span>
+            )}
             <span
               className="text-[9px] px-1 rounded"
               style={{
