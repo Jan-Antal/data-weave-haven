@@ -167,6 +167,10 @@ export function useForecastMode(): UseForecastModeReturn {
     setSelectedBlockIds(new Set(forecastBlocks.map(b => b.id)));
   }, [forecastBlocks]);
 
+  const selectInboxOnly = useCallback(() => {
+    setSelectedBlockIds(new Set(forecastBlocks.filter(b => b.source === "inbox_item").map(b => b.id)));
+  }, [forecastBlocks]);
+
   const deselectAll = useCallback(() => {
     setSelectedBlockIds(new Set());
   }, []);
