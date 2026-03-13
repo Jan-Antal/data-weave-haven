@@ -642,7 +642,7 @@ export default function PlanVyroby() {
         />
 
         {viewTab === "kanban" ? (
-          <div className="flex-1 flex min-h-0" onClick={() => setSelectedProjectId(null)}>
+          <div className={`flex-1 flex min-h-0 ${forecast.forecastActive && forecast.forecastBlocks.length > 0 ? 'pb-14' : ''}`} onClick={() => setSelectedProjectId(null)}>
             {forecast.forecastActive ? (
               <ForecastSafetyNet
                 projects={forecast.safetyNetProjects}
