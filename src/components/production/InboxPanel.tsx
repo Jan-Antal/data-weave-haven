@@ -193,8 +193,8 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
 
   // Map project_id → project info including deadline fields
   const projectInfoMap = useMemo(() => {
-    const m = new Map<string, { datum_smluvni: string | null; status: string | null; expedice: string | null; montaz: string | null }>();
-    for (const p of allDbProjects) m.set(p.project_id, { datum_smluvni: p.datum_smluvni ?? null, status: p.status ?? null, expedice: (p as any).expedice ?? null, montaz: (p as any).montaz ?? null });
+    const m = new Map<string, { datum_smluvni: string | null; status: string | null; expedice: string | null; montaz: string | null; predani: string | null }>();
+    for (const p of allDbProjects) m.set(p.project_id, { datum_smluvni: p.datum_smluvni ?? null, status: p.status ?? null, expedice: (p as any).expedice ?? null, montaz: (p as any).montaz ?? null, predani: (p as any).predani ?? null });
     return m;
   }, [allDbProjects]);
 
