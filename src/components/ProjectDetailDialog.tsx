@@ -655,8 +655,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       }
     }
 
-    const { error } = await supabase.from("projects").update(newValues).eq("id", project.id);
+    const { error } = await supabase.from("projects").update(newValues as any).eq("id", project.id);
     if (error) {
+      console.error("Project save error:", error.code, error.message, error.details, error.hint);
       if (error.code === "23505") {
         toast({ title: "Chyba", description: "Projekt s tímto ID již existuje", variant: "destructive" });
       } else {
