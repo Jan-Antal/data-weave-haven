@@ -533,9 +533,12 @@ export default function PlanVyroby() {
           <ForecastCommitBar
             totalBlocks={forecast.forecastBlocks.length}
             selectedCount={forecast.selectedBlockIds.size}
+            inboxBlockCount={forecast.forecastBlocks.filter(b => b.source === "inbox_item").length}
+            projectBlockCount={forecast.forecastBlocks.filter(b => b.source === "project_estimate").length}
             isGenerating={forecast.isGenerating}
             onCommitAll={() => forecast.commitBlocks(forecast.forecastBlocks.map(b => b.id))}
             onCommitSelected={() => forecast.commitBlocks(Array.from(forecast.selectedBlockIds))}
+            onCommitInboxOnly={() => forecast.commitInboxOnly()}
             onCancel={() => forecast.setForecastActive(false)}
             onSelectAll={forecast.selectAll}
             onDeselectAll={forecast.deselectAll}
