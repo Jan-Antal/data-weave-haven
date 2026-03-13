@@ -646,6 +646,20 @@ export default function PlanVyroby() {
               onSplitForecastBlock={forecast.forecastActive ? forecast.splitForecastBlock : undefined}
               forecastSafetyNet={forecast.forecastActive ? forecast.safetyNetProjects : undefined}
               onRestoreFromSafetyNet={forecast.forecastActive ? forecast.restoreFromSafetyNet : undefined}
+              onConvertReserveToForecast={forecast.forecastActive ? (bundle, weekKey) => {
+                const totalHours = bundle.items.reduce((s, i) => s + i.scheduled_hours, 0);
+                forecast.addForecastBlock({
+                  id: `reserve-converted-${bundle.project_id}-${weekKey}-${Date.now()}`,
+                  project_id: bundle.project_id,
+                  project_name: bundle.project_name,
+                  bundle_description: `Rezerva → Forecast`,
+                  week: weekKey,
+                  estimated_hours: totalHours,
+                  confidence: "low",
+                  source: "project_estimate",
+                  is_forecast: true,
+                });
+              } : undefined}
             />
             {!forecast.forecastActive && (
               <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />

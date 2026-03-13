@@ -89,6 +89,7 @@ interface UseForecastModeReturn {
   commitInboxOnly: () => Promise<void>;
   moveForecastBlock: (blockId: string, newWeek: string) => void;
   removeForecastBlock: (blockId: string) => void;
+  addForecastBlock: (block: ForecastBlock) => void;
   splitForecastBlock: (blockId: string, keepHours: number, splitWeek: string) => void;
   resetAndRegenerate: (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => Promise<void>;
   loadSavedSession: (modeOverride?: ForecastPlanMode) => boolean;
@@ -269,6 +270,10 @@ export function useForecastMode(): UseForecastModeReturn {
     });
   }, []);
 
+  const addForecastBlock = useCallback((block: ForecastBlock) => {
+    setForecastBlocks(prev => [...prev, block]);
+  }, []);
+
   const splitForecastBlock = useCallback((blockId: string, keepHours: number, splitWeek: string) => {
     setForecastBlocks(prev => {
       const block = prev.find(b => b.id === blockId);
@@ -433,6 +438,7 @@ export function useForecastMode(): UseForecastModeReturn {
     commitInboxOnly,
     moveForecastBlock,
     removeForecastBlock,
+    addForecastBlock,
     splitForecastBlock,
     resetAndRegenerate,
     loadSavedSession,

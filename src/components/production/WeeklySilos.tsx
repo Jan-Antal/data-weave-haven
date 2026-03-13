@@ -97,6 +97,7 @@ interface Props {
   onSplitForecastBlock?: (blockId: string, keepHours: number, splitWeek: string) => void;
   forecastSafetyNet?: SafetyNetProject[];
   onRestoreFromSafetyNet?: (projectId: string) => void;
+  onConvertReserveToForecast?: (bundle: ScheduleBundle, weekKey: string) => void;
 }
 
 interface ContextMenuState {
@@ -161,7 +162,7 @@ interface CancelState {
   cancelAll?: boolean;
 }
 
-export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock, onSplitForecastBlock, forecastSafetyNet, onRestoreFromSafetyNet }: Props) {
+export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock, onSplitForecastBlock, forecastSafetyNet, onRestoreFromSafetyNet, onConvertReserveToForecast }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
@@ -406,17 +407,24 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     (e: React.MouseEvent, bundle: ScheduleBundle, weekKey: string, weekNum: number, startDate: Date, endDate: Date, toggleExpand: () => void) => {
       e.preventDefault(); e.stopPropagation();
 
-      // Blocker bundles: only allow "Odstranit rezervu"
+      // Blocker bundles: only allow "Zrušit rezervu"
       const isBlocker = bundle.items.length > 0 && bundle.items.every(i => i.is_blocker);
       if (isBlocker) {
         const actions: ContextMenuAction[] = [{
-          label: "Odstranit rezervu", icon: "🗑",
+          label: "Zrušit rezervu", icon: "🗑",
+          danger: true,
           onClick: async () => {
             const ids = bundle.items.map(i => i.id);
             const { error } = await supabase.from("production_schedule").delete().in("id", ids);
             if (error) { toast({ title: "Chyba", description: error.message, variant: "destructive" }); return; }
             qc.invalidateQueries({ queryKey: ["production-schedule"] });
-            toast({ title: `🗑 Rezerva pro ${bundle.project_name} odstraněna` });
+            // In forecast mode, convert to forecast block at same position
+            if (forecastDarkMode && onConvertReserveToForecast) {
+              onConvertReserveToForecast(bundle, weekKey);
+              toast({ title: `⏳ Rezerva → Forecast: ${bundle.project_name} (T${weekNum})` });
+            } else {
+              toast({ title: `🗑 Rezerva pro ${bundle.project_name} zrušena` });
+            }
           },
         }];
         setContextMenu({ x: Math.min(e.clientX, window.innerWidth - 200), y: Math.min(e.clientY, window.innerHeight - 200), actions });
@@ -536,7 +544,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       }
       setContextMenu({ x: e.clientX, y: e.clientY, actions });
     },
-    [returnBundleToInbox, returnToProduction, onNavigateToTPV, onOpenProjectDetail, handleReleaseItem, mergeSplitItems]
+    [returnBundleToInbox, returnToProduction, onNavigateToTPV, onOpenProjectDetail, handleReleaseItem, mergeSplitItems, forecastDarkMode, onConvertReserveToForecast]
   );
 
   const handleItemContextMenu = useCallback(
