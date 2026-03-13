@@ -1002,7 +1002,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
         files={photos}
         initialIndex={lightboxIndex}
         projectName={projectId}
-        onDelete={(name) => handleDelete(name)}
+        onDelete={(file) => handleDelete(file.name)}
         canDelete
       />
     </div>
