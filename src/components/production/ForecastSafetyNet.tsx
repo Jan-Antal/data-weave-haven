@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { ChevronDown, ChevronRight, AlertTriangle, RotateCcw, GripVertical, Check, CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 import { cs } from "date-fns/locale";
-import { format } from "date-fns";
+import { format, differenceInDays, isPast } from "date-fns";
+import { parseAppDate } from "@/lib/dateFormat";
 
 export interface SafetyNetProject {
   project_id: string;
@@ -33,18 +35,40 @@ interface ForecastSafetyNetProps {
   onViewItems?: (projectId: string) => void;
 }
 
-const sourceBadge: Record<string, { label: string; bg: string }> = {
-  scheduled: { label: "Plán", bg: "#2a3d3a" },
-  inbox: { label: "Inbox", bg: "#14532d" },
-  unplanned: { label: "Bez plánu", bg: "#451a03" },
-};
-
 const statusColors: Record<string, { bg: string; color: string }> = {
   scheduled: { bg: "#2a3d3a", color: "#7aa8a4" },
   in_progress: { bg: "#1e3a5f", color: "#60a5fa" },
   paused: { bg: "#451a03", color: "#fdba74" },
   completed: { bg: "#14532d", color: "#86efac" },
 };
+
+interface DeadlineDisplay {
+  label: string;
+  dateStr: string;
+  color: string;
+}
+
+const DEADLINE_FIELDS: { key: string; label: string }[] = [
+  { key: "expedice", label: "Exp" },
+  { key: "montaz", label: "Mnt" },
+  { key: "predani", label: "Před" },
+  { key: "datum_smluvni", label: "Sml" },
+];
+
+function resolveDeadlineDisplay(info: Record<string, string | null> | undefined): DeadlineDisplay | null {
+  if (!info) return null;
+  for (const f of DEADLINE_FIELDS) {
+    const val = info[f.key];
+    if (!val) continue;
+    const d = parseAppDate(val);
+    if (!d) continue;
+    const dateStr = `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+    const days = differenceInDays(d, new Date());
+    const color = isPast(d) ? "#DC2626" : days <= 14 ? "#D97706" : days <= 30 ? "#2563EB" : "#7aa8a4";
+    return { label: f.label, dateStr, color };
+  }
+  return null;
+}
 
 const DATE_FIELDS = [
   { key: "expedice", label: "Expedice" },
@@ -203,7 +227,7 @@ function DraggableSafetyNetRow({
   isExpanded,
   items,
   isLoading,
-  badge,
+  deadlineInfo,
   isMultiSelected,
   onToggleExpand,
   onClick,
@@ -214,7 +238,7 @@ function DraggableSafetyNetRow({
   isExpanded: boolean;
   items: SafetyNetItem[] | undefined;
   isLoading: boolean;
-  badge: { label: string; bg: string };
+  deadlineInfo: DeadlineDisplay | null;
   isMultiSelected: boolean;
   onToggleExpand: () => void;
   onClick: (e: React.MouseEvent) => void;
@@ -266,12 +290,15 @@ function DraggableSafetyNetRow({
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className="font-mono text-[10px]" style={{ color: "#5c706f" }}>{project.project_id}</span>
-            <span
-              className="px-1 py-0 rounded text-[9px] font-medium"
-              style={{ background: badge.bg, color: "#e5e5e5" }}
-            >
-              {badge.label}
-            </span>
+            {deadlineInfo ? (
+              <span className="text-[9px] font-medium" style={{ color: deadlineInfo.color }}>
+                · {deadlineInfo.label}: {deadlineInfo.dateStr}
+              </span>
+            ) : (
+              <span className="text-[9px] font-medium" style={{ color: "#d97706" }}>
+                ⚠ BEZ TERMÍNU
+              </span>
+            )}
           </div>
         </div>
         <div className="shrink-0 flex items-center gap-1.5">
@@ -357,6 +384,25 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
   // Multi-select state
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
   const [lastClicked, setLastClicked] = useState<string | null>(null);
+
+  // Fetch project deadlines
+  const projectIds = useMemo(() => projects.map(p => p.project_id), [projects]);
+  const { data: deadlineMap } = useQuery({
+    queryKey: ["safety-net-deadlines", projectIds],
+    queryFn: async () => {
+      if (projectIds.length === 0) return new Map<string, DeadlineDisplay | null>();
+      const { data } = await supabase
+        .from("projects")
+        .select("project_id, expedice, montaz, predani, datum_smluvni")
+        .in("project_id", projectIds);
+      const map = new Map<string, DeadlineDisplay | null>();
+      for (const row of data || []) {
+        map.set(row.project_id, resolveDeadlineDisplay(row as any));
+      }
+      return map;
+    },
+    enabled: projectIds.length > 0,
+  });
 
   // Due date dialog state
   const [dueDateDialog, setDueDateDialog] = useState<{ projectId: string; projectName: string } | null>(null);
@@ -594,11 +640,11 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
         )}
 
         {projects.map(p => {
-          const badge = sourceBadge[p.source] || sourceBadge.unplanned;
           const isExpanded = expandedProjects.has(p.project_id);
           const items = projectItems[p.project_id];
           const isLoading = loadingItems.has(p.project_id);
           const isMultiSelected = selectedProjects.has(p.project_id);
+          const dlInfo = deadlineMap?.get(p.project_id) ?? null;
 
           return (
             <DraggableSafetyNetRow
@@ -607,7 +653,7 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
               isExpanded={isExpanded}
               items={items}
               isLoading={isLoading}
-              badge={badge}
+              deadlineInfo={dlInfo}
               isMultiSelected={isMultiSelected}
               onToggleExpand={() => toggleExpand(p.project_id, p.source)}
               onClick={(e) => handleClick(e, p)}
