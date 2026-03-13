@@ -675,6 +675,8 @@ export default function PlanVyroby() {
               selectedProjectId={selectedProjectId}
               onSelectProject={handleSelectProject}
               searchQuery={searchQuery}
+              focusedMatchKey={searchNav.focusedMatchKey}
+              searchMatchWeekKey={searchNav.currentMatch?.weekKey ?? null}
               forecastBlocks={forecast.forecastActive ? forecast.forecastBlocks : undefined}
               forecastSelectedIds={forecast.forecastActive ? forecast.selectedBlockIds : undefined}
               onToggleForecastSelect={forecast.forecastActive ? forecast.toggleBlockSelection : undefined}
