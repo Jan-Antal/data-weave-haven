@@ -868,14 +868,14 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       className="shrink-0 border-b px-6 py-1.5 flex items-center gap-4 transition-colors duration-300"
       style={{
         minHeight: 40,
-        backgroundColor: forecastActive ? "#223937" : "hsl(var(--card))",
-        borderColor: forecastActive ? "#2a4a46" : "hsl(var(--border))",
+        backgroundColor: forecastActive ? "#223937" : "#1f2d26",
+        borderColor: forecastActive ? "#2a4a46" : "#2a3d2a",
       }}
     >
       {/* Left: Tabs */}
       <div className="inline-flex h-8 items-center rounded-md p-0.5 shrink-0" style={{
-        backgroundColor: forecastActive ? "#223937" : "hsl(var(--card))",
-        border: forecastActive ? "1px solid #2a4a46" : "1px solid hsl(var(--border))",
+        backgroundColor: forecastActive ? "#223937" : "#253a2c",
+        border: forecastActive ? "1px solid #2a4a46" : "1px solid #3a5a3a",
       }}>
         <button
           onClick={() => setViewTab("kanban")}
