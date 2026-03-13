@@ -174,7 +174,12 @@ serve(async (req) => {
         processedProjects.add(projectId);
         const proj = projectMap.get(projectId);
         const dl = resolveDeadline(proj || {});
-        if (!dl.date) continue; // skip projects without deadline
+        if (!dl.date) {
+          const inboxH = inboxByProject.get(projectId) || 0;
+          safetyNet.push({ project_id: projectId, project_name: proj?.project_name || projectId, estimated_hours: Math.round(hours + inboxH), source: "scheduled" });
+          if (inboxByProject.has(projectId)) processedProjects.add(projectId);
+          continue;
+        }
         const hasInbox = inboxByProject.has(projectId);
         const inboxHours = inboxByProject.get(projectId) || 0;
         const projTpv = tpvItems.filter(t => t.project_id === projectId);
