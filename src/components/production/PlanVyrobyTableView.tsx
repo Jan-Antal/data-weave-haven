@@ -984,7 +984,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                           const exp = pd?.expedice ? parseAppDate(pd.expedice) : null;
                           const isProjectDone = ["Fakturace", "Dokonceno", "Dokončeno", "Expedice"].includes(pd?.status ?? "");
                           const allItemsDone = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
-                          if (!isProjectDone && !allItemsDone && exp && differenceInDays(exp, new Date()) < 0) return "hsl(0 80% 96%)";
+                          if (!isProjectDone && !allItemsDone && exp && differenceInDays(exp, new Date()) < 0) return "#fde8e8";
                           return "#fff";
                         })(),
                         borderLeft: `4px solid ${proj.color}`,
