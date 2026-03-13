@@ -731,7 +731,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
     : isWarning ? "linear-gradient(90deg, #fcd34d, #d97706)"
     : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
 
-  const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}`, disabled: isPast || !!forecastDarkMode });
+  const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}`, disabled: isPast });
   const highlighted = !isPast && (isOver || isOverTarget);
   const dropBorderColor = highlighted ? (isOverloaded ? "#d97706" : "#3b82f6") : undefined;
   const headerColor = forecastDarkMode
