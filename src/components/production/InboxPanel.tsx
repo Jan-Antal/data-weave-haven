@@ -32,24 +32,36 @@ function formatCompactCzk(v: number): string {
 
 type UrgencyLevel = "overdue" | "urgent" | "upcoming" | "ok";
 
-function getUrgency(info: { expedice?: string | null; montaz?: string | null; datum_smluvni?: string | null; status?: string | null } | undefined): UrgencyLevel {
+/** For urgency, use the EARLIEST (soonest) deadline across all date fields */
+function getEarliestDeadline(info: { expedice?: string | null; montaz?: string | null; predani?: string | null; datum_smluvni?: string | null } | undefined): Date | null {
+  if (!info) return null;
+  let earliest: Date | null = null;
+  for (const val of [info.expedice, info.montaz, info.predani, info.datum_smluvni]) {
+    if (!val) continue;
+    const d = parseAppDate(val);
+    if (d && (!earliest || d < earliest)) earliest = d;
+  }
+  return earliest;
+}
+
+function getUrgency(info: { expedice?: string | null; montaz?: string | null; predani?: string | null; datum_smluvni?: string | null; status?: string | null } | undefined): UrgencyLevel {
   if (!info) return "ok";
   const s = (info.status ?? "").toLowerCase();
   if (s === "fakturace" || s === "dokonceno" || s === "dokončeno") return "ok";
-  const dl = resolveDeadline(info);
-  if (!dl) return "ok";
-  if (isPast(dl.date)) return "overdue";
-  const days = differenceInDays(dl.date, new Date());
+  const d = getEarliestDeadline(info);
+  if (!d) return "ok";
+  if (isPast(d)) return "overdue";
+  const days = differenceInDays(d, new Date());
   if (days <= 14) return "urgent";
   if (days <= 30) return "upcoming";
   return "ok";
 }
 
-function getUrgencyDaysLabel(info: { expedice?: string | null; montaz?: string | null; datum_smluvni?: string | null } | undefined): string | null {
+function getUrgencyDaysLabel(info: { expedice?: string | null; montaz?: string | null; predani?: string | null; datum_smluvni?: string | null } | undefined): string | null {
   if (!info) return null;
-  const dl = resolveDeadline(info);
-  if (!dl) return null;
-  const days = differenceInDays(dl.date, new Date());
+  const d = getEarliestDeadline(info);
+  if (!d) return null;
+  const days = differenceInDays(d, new Date());
   if (days <= 0) return null; // overdue uses badge text
   return `${days} dní`;
 }
