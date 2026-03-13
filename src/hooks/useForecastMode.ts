@@ -223,6 +223,27 @@ export function useForecastMode(): UseForecastModeReturn {
     });
   }, []);
 
+  const splitForecastBlock = useCallback((blockId: string, keepHours: number, splitWeek: string) => {
+    setForecastBlocks(prev => {
+      const block = prev.find(b => b.id === blockId);
+      if (!block) return prev;
+      const splitHours = block.estimated_hours - keepHours;
+      if (splitHours <= 0 || keepHours <= 0) return prev;
+      const newId = crypto.randomUUID();
+      return prev.map(b => b.id === blockId ? { ...b, estimated_hours: keepHours } : b)
+        .concat({
+          ...block,
+          id: newId,
+          week: splitWeek,
+          estimated_hours: splitHours,
+          bundle_description: `${block.bundle_description} (část 2)`,
+        });
+    });
+    // Auto-select the new block
+    setSelectedBlockIds(prev => new Set(prev));
+    toast({ title: "✂ Forecast blok rozdělen" });
+  }, []);
+
   const resetAndRegenerate = useCallback(async (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => {
     const mode = modeOverride ?? planMode;
     clearStorage(mode);
