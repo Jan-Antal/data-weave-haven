@@ -37,6 +37,8 @@ interface Props {
   searchQuery?: string;
   onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void;
   onOpenProjectDetail?: (projectId: string) => void;
+  selectedProjectId?: string | null;
+  onSelectProject?: (projectId: string) => void;
 }
 
 function formatCzk(v: number): string {
