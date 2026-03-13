@@ -746,7 +746,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             ) : (
               <>
                 <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{Math.round(totalHours)}h</span>
-                <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#6b7280" : "#99a5a3" }}>/ {weeklyCapacity}h</span>
+                <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#4a5168" : "#99a5a3" }}>/ {weeklyCapacity}h</span>
                 <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
               </>
             )}
