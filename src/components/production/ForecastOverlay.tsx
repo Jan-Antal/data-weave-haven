@@ -15,7 +15,7 @@ function getSourceStyle(source: ForecastSource, confidence: string) {
   if (source === "inbox_item") {
     return {
       borderColor: "#22c55e",
-      backgroundColor: "#0f1f15",
+      backgroundColor: "#0d1f14",
       nameColor: "#86efac",
       badgeLabel: "INBOX",
       badgeBg: "rgba(34,197,94,0.2)",
