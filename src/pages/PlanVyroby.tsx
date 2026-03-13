@@ -168,6 +168,7 @@ export default function PlanVyroby() {
     forecastPlanMode: forecast.forecastActive ? forecast.planMode : undefined,
     weekKeys: searchWeekKeys,
     projectPmMap,
+    inboxProjects,
   });
   const {
     moveInboxItemToWeek,
