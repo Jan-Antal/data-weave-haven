@@ -121,11 +121,17 @@ serve(async (req) => {
         }
       }
 
-      // Absolute fallback: put remaining in last week
+    // Absolute fallback: spread remaining evenly across all weeks
       if (remaining > 0) {
-        const lastWeek = weekKeys[weekKeys.length - 1];
-        result.push({ week: lastWeek, hours: remaining });
-        usage[lastWeek] = (usage[lastWeek] || 0) + remaining;
+        for (let i = 0; i < weekKeys.length && remaining > 0; i++) {
+          const share = Math.ceil(remaining / (weekKeys.length - i));
+          const alloc = Math.min(remaining, share);
+          const existing = result.find(r => r.week === weekKeys[i]);
+          if (existing) existing.hours += alloc;
+          else result.push({ week: weekKeys[i], hours: alloc });
+          usage[weekKeys[i]] = (usage[weekKeys[i]] || 0) + alloc;
+          remaining -= alloc;
+        }
       }
 
       return result;
