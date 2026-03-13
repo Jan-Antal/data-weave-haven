@@ -834,10 +834,10 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   const isOverCapacity = scheduledHours > capacityHours;
   const displayCzk = scheduledCzk;
 
-  const formatCzk = (v: number) => {
-    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M Kč`;
-    if (v >= 1_000) return `${Math.round(v / 1_000)}K Kč`;
-    return `${v.toLocaleString("cs-CZ")} Kč`;
+  const formatCzk = (v: number, compact = false) => {
+    if (v >= 1_000_000) return compact ? `${(v / 1_000_000).toFixed(1)}M` : `${(v / 1_000_000).toFixed(1)}M Kč`;
+    if (v >= 1_000) return compact ? `${Math.round(v / 1_000)}K` : `${Math.round(v / 1_000)}K Kč`;
+    return compact ? v.toLocaleString("cs-CZ") : `${v.toLocaleString("cs-CZ")} Kč`;
   };
 
   const periodLabel = useMemo(() => {
