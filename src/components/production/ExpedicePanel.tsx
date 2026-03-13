@@ -651,15 +651,15 @@ function ProjectGroup({
               <span style={{ fontSize: 11, color: "#6b7280" }}>
                 Expedováno: {latestExpedicedStr}
               </span>
-            ) : expediceStr ? (
+            ) : deadlineStr ? (
               <span className="shrink-0" style={{
                 fontSize: 11,
                 fontWeight: 500,
-                color: expediceDate && expediceDate < new Date() ? "#dc2626"
-                  : expediceDate && differenceInDays(expediceDate, new Date()) <= 14 ? "#d97706"
+                color: deadlineDate && deadlineDate < new Date() ? "#dc2626"
+                  : deadlineDate && differenceInDays(deadlineDate, new Date()) <= 14 ? "#d97706"
                   : "#6b7280"
               }}>
-                Exp: {expediceStr}
+                {deadlineLabel}: {deadlineStr}
               </span>
             ) : null}
           </div>
