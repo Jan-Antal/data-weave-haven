@@ -277,6 +277,37 @@ export default function Vyroba() {
     toast.success(`${ids.length} položek → T${nextWeekNum}`);
   }
 
+  /* ── Check if all bundle items completed → move to Expedice ── */
+  async function checkAndMoveToExpedice(projectId: string, projectName: string) {
+    // Re-fetch all schedule items for this project in current week
+    const { data: items } = await supabase
+      .from("production_schedule")
+      .select("id, status")
+      .eq("project_id", projectId)
+      .eq("scheduled_week", weekKey)
+      .not("status", "eq", "cancelled");
+
+    if (!items || items.length === 0) return;
+
+    const allCompleted = items.every(i => i.status === "completed");
+    if (!allCompleted) return;
+
+    // Update project status to Expedice
+    const { error } = await supabase
+      .from("projects")
+      .update({ status: "Expedice" })
+      .eq("project_id", projectId);
+
+    if (error) {
+      console.warn("Failed to update project status:", error.message);
+      return;
+    }
+
+    qc.invalidateQueries({ queryKey: ["projects"] });
+    qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
+    toast.success(`${projectName} dokončeno — přesunuto do Expedice`, { duration: 4000 });
+  }
+
   /* ── Complete all items ── */
   async function handleCompleteAll() {
     if (!selectedProject) return;
@@ -289,11 +320,14 @@ export default function Vyroba() {
     }).in("id", ids);
     if (error) { toast.error(error.message); return; }
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
-    toast.success(`✓ ${ids.length} položek dokončeno`);
+
+    // All items now completed → move to Expedice
+    await checkAndMoveToExpedice(selectedProject.projectId, selectedProject.projectName);
   }
 
   /* ── Toggle single item complete ── */
   async function toggleItemComplete(itemId: string, currentStatus: string) {
+    if (!selectedProject) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (currentStatus === "completed") {
       const { error } = await supabase.from("production_schedule").update({ status: "scheduled", completed_at: null, completed_by: null }).eq("id", itemId);
@@ -305,6 +339,12 @@ export default function Vyroba() {
       if (error) { toast.error(error.message); return; }
     }
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
+
+    // After toggling to completed, check if all are now done
+    if (currentStatus !== "completed") {
+      // Small delay to let the invalidation propagate, then check
+      setTimeout(() => checkAndMoveToExpedice(selectedProject.projectId, selectedProject.projectName), 300);
+    }
   }
 
   function handleSelectProject(pid: string) {
