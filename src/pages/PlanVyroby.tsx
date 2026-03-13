@@ -468,7 +468,7 @@ export default function PlanVyroby() {
     >
       <div
         className="h-screen flex flex-col overflow-hidden transition-colors duration-300"
-        style={{ backgroundColor: forecast.forecastActive ? "#0f1117" : "#f4f2f0" }}
+        style={{ backgroundColor: forecast.forecastActive ? "#111318" : "#f4f2f0" }}
       >
         {profile?.email === "alfred@ami-test.cz" && (
           <div className="bg-orange-500 text-white px-6 flex items-center justify-center gap-2 font-bold tracking-wide shrink-0" style={{ height: 32 }}>
@@ -735,14 +735,14 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       className="shrink-0 border-b px-6 py-1.5 flex items-center gap-4 transition-colors duration-300"
       style={{
         minHeight: 40,
-        backgroundColor: forecastActive ? "#1a1d2e" : "hsl(var(--card))",
-        borderColor: forecastActive ? "#2a2d3e" : "hsl(var(--border))",
+        backgroundColor: forecastActive ? "#1c2333" : "hsl(var(--card))",
+        borderColor: forecastActive ? "#2a2f3d" : "hsl(var(--border))",
       }}
     >
       {/* Left: Tabs */}
       <div className="inline-flex h-8 items-center rounded-md p-0.5 shrink-0" style={{
-        backgroundColor: forecastActive ? "#0f1117" : "hsl(var(--card))",
-        border: forecastActive ? "1px solid #2a2d3e" : "1px solid hsl(var(--border))",
+        backgroundColor: forecastActive ? "#111318" : "hsl(var(--card))",
+        border: forecastActive ? "1px solid #2a2f3d" : "1px solid hsl(var(--border))",
       }}>
         <button
           onClick={() => setViewTab("kanban")}
@@ -777,7 +777,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
 
       {/* Forecast plan mode toggle */}
       {forecastActive && (
-        <div className="inline-flex h-7 items-center rounded-md p-0.5 shrink-0" style={{ backgroundColor: "#0f1117", border: "1px solid #2a2d3e" }}>
+        <div className="inline-flex h-7 items-center rounded-md p-0.5 shrink-0" style={{ backgroundColor: "#111318", border: "1px solid #2a2f3d" }}>
           <button
             onClick={() => onForecastPlanModeChange("respect_plan")}
             className={`px-2 py-0.5 text-[11px] font-medium rounded-sm transition-all ${
@@ -819,8 +819,8 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       {/* Right: Display mode + Search + Forecast toggle */}
       <div className="flex items-center gap-2 shrink-0">
         <div className="inline-flex h-8 items-center rounded-md p-0.5" style={{
-          backgroundColor: forecastActive ? "#0f1117" : "hsl(var(--card))",
-          border: forecastActive ? "1px solid #2a2d3e" : "1px solid hsl(var(--border))",
+          backgroundColor: forecastActive ? "#111318" : "hsl(var(--card))",
+          border: forecastActive ? "1px solid #2a2f3d" : "1px solid hsl(var(--border))",
         }}>
           {([
             { key: "hours" as DisplayMode, label: "Hodiny" },
@@ -850,8 +850,8 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
             placeholder="Hledat projekt..."
             className="w-full h-8 pl-8 pr-8 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 transition-colors"
             style={{
-              backgroundColor: forecastActive ? "#0f1117" : "hsl(var(--background))",
-              border: forecastActive ? "1px solid #2a2d3e" : "1px solid hsl(var(--input))",
+              backgroundColor: forecastActive ? "#111318" : "hsl(var(--background))",
+              border: forecastActive ? "1px solid #2a2f3d" : "1px solid hsl(var(--input))",
               color: forecastActive ? "#e5e7eb" : undefined,
             }}
           />
@@ -868,7 +868,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
 
         {/* Forecast toggle — owner only */}
         {isOwner && (
-          <div className="flex items-center gap-1.5 ml-2 pl-2" style={{ borderLeft: forecastActive ? "1px solid #2a2d3e" : "1px solid hsl(var(--border))" }}>
+          <div className="flex items-center gap-1.5 ml-2 pl-2" style={{ borderLeft: forecastActive ? "1px solid #2a2f3d" : "1px solid hsl(var(--border))" }}>
             <Sparkles className="h-3.5 w-3.5" style={{ color: forecastActive ? "#f59e0b" : "#9ca3af" }} />
             <span className="text-[12px] font-medium" style={{ color: forecastActive ? "#f59e0b" : "#6b7280" }}>Forecast</span>
             <Switch

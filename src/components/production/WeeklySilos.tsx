@@ -568,11 +568,11 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   return (
     <div className="flex-1 flex flex-col min-w-0">
       {/* Toolbar */}
-      <div className="px-3 py-[6px] flex items-center justify-between shrink-0" style={{ borderBottom: forecastDarkMode ? "1px solid #2a2f3d" : "1px solid #ece8e2" }}>
+      <div className="px-3 py-[6px] flex items-center justify-between shrink-0" style={{ borderBottom: forecastDarkMode ? "1px solid #2a2f3d" : "1px solid #ece8e2", backgroundColor: forecastDarkMode ? "#111318" : undefined }}>
         <button
           onClick={() => { const el = scrollContainerRef.current; if (el) el.scrollTo({ left: 4 * 259, behavior: "smooth" }); }}
           className="px-2 py-[3px] text-[10px] font-medium rounded transition-colors"
-          style={{ backgroundColor: forecastDarkMode ? "#1a1d2e" : "#ffffff", color: forecastDarkMode ? "#9ca3af" : "#6b7a78", border: forecastDarkMode ? "1px solid #2a2f3d" : "1px solid #e2ddd6", cursor: "pointer" }}
+          style={{ backgroundColor: forecastDarkMode ? "#1c1f26" : "#ffffff", color: forecastDarkMode ? "#9aa5be" : "#6b7a78", border: forecastDarkMode ? "1px solid #2a2f3d" : "1px solid #e2ddd6", cursor: "pointer" }}
         >
           Tento týden
         </button>
@@ -708,19 +708,19 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
   const highlighted = !isPast && (isOver || isOverTarget);
   const dropBorderColor = highlighted ? (isOverloaded ? "#d97706" : "#3b82f6") : undefined;
   const headerColor = forecastDarkMode
-    ? (isPast ? "#6b7280" : isCurrent ? "#f59e0b" : "#e5e7eb")
+    ? (isPast ? "#6b7280" : isCurrent ? "#7eb8ff" : "#9aa5be")
     : (isPast ? "#9ca3af" : isCurrent ? "#223937" : "#1a1a1a");
   const headerWeight = isCurrent ? 700 : isPast ? 500 : 600;
-  const dateRangeColor = forecastDarkMode ? "#6b7280" : (isPast ? "#b0b7c3" : "#6b7280");
+  const dateRangeColor = forecastDarkMode ? "#4a5168" : (isPast ? "#b0b7c3" : "#6b7280");
 
   const combinedRef = useCallback((el: HTMLDivElement | null) => { setNodeRef(el); registerRef(weekKey, el); }, [setNodeRef, registerRef, weekKey]);
 
   return (
     <div ref={combinedRef} data-week-key={weekKey} className="w-[252px] shrink-0 flex flex-col transition-all"
       style={{
-        backgroundColor: forecastDarkMode ? "#141720" : "#ffffff", borderRadius: 9,
+        backgroundColor: forecastDarkMode ? "#1c1f26" : "#ffffff", borderRadius: 9,
         border: highlighted ? `2px solid ${dropBorderColor}`
-          : isCurrent ? (forecastDarkMode ? "2px solid #f59e0b" : "2px solid #3a8a36")
+          : isCurrent ? (forecastDarkMode ? "2px solid #4f8ef7" : "2px solid #3a8a36")
           : isOverloaded && !isPast ? (forecastDarkMode ? "1px solid rgba(220,53,69,0.5)" : "1px solid rgba(220,53,69,0.4)")
           : forecastDarkMode ? "1px solid #2a2f3d" : "1px solid #ece8e2",
       }}
@@ -733,20 +733,20 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
         </div>
         <div className="text-[9px] mt-0.5" style={{ color: dateRangeColor }}>{formatDateShort(startDate)} – {formatDateShort(endDate)}</div>
         <div className="mt-1.5" style={{ opacity: isPast ? 0.6 : 1 }}>
-          <div className="h-[7px] rounded" style={{ backgroundColor: forecastDarkMode ? "#2a2f3d" : "#f0eee9", overflow: "hidden" }}>
+          <div className="h-[7px] rounded" style={{ backgroundColor: forecastDarkMode ? "#2a2f3d" : "#f0eee9", overflow: "hidden" }}> 
             <div className="h-full rounded transition-all duration-300" style={{ width: `${Math.min(pct, 100)}%`, background: barBg }} />
           </div>
            <div className="flex items-baseline justify-between mt-[3px]">
             {displayMode === "czk" ? (
               <>
                 <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{formatCompactCzk(totalHours * hourlyRate)}</span>
-                <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#6b7280" : "#99a5a3" }}>/ {formatCompactCzk(weeklyCapacity * hourlyRate)}</span>
+                <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#4a5168" : "#99a5a3" }}>/ {formatCompactCzk(weeklyCapacity * hourlyRate)}</span>
                 <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
               </>
             ) : (
               <>
                 <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{Math.round(totalHours)}h</span>
-                <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#6b7280" : "#99a5a3" }}>/ {weeklyCapacity}h</span>
+                <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#4a5168" : "#99a5a3" }}>/ {weeklyCapacity}h</span>
                 <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
               </>
             )}
@@ -757,13 +757,13 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       {/* Items */}
       <div className="flex-1 overflow-y-auto p-1.5" style={{ display: "flex", flexDirection: "column", gap: 3, opacity: isPast ? 0.7 : 1 }}>
         {(!silo || silo.bundles.length === 0) && !isPast && (
-          <div className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all" style={{ border: forecastDarkMode ? "1.5px dashed #2a2f3d" : "1.5px dashed #e2ddd6" }}>
-            <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4b5563" : "#99a5a3" }}>Přetáhni sem z Inboxu</span>
+          <div className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all" style={{ border: forecastDarkMode ? "1.5px dashed #3d4558" : "1.5px dashed #e2ddd6" }}>
+            <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5168" : "#99a5a3" }}>Přetáhni sem z Inboxu</span>
           </div>
         )}
         {(!silo || silo.bundles.length === 0) && isPast && (
           <div className="flex-1 flex items-center justify-center px-2 py-[14px]">
-            <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#374151" : "#c4ccc9" }}>Prázdný týden</span>
+            <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5168" : "#c4ccc9" }}>Prázdný týden</span>
           </div>
         )}
         {silo?.bundles
@@ -889,24 +889,24 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
   return (
     <div className="rounded-[6px] overflow-hidden relative" style={{
       borderTop: forecastDarkMode
-        ? (isSelected ? "2px solid #d97706" : "0.5px solid #3a4a6a")
+        ? (isSelected ? "2px solid #d97706" : "1px solid #3d4558")
         : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2"),
       borderRight: forecastDarkMode
-        ? (isSelected ? "2px solid #d97706" : "0.5px solid #3a4a6a")
+        ? (isSelected ? "2px solid #d97706" : "1px solid #3d4558")
         : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2"),
       borderBottom: forecastDarkMode
-        ? (isSelected ? "2px solid #d97706" : "0.5px solid #3a4a6a")
+        ? (isSelected ? "2px solid #d97706" : "1px solid #3d4558")
         : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2"),
       borderLeft: `4px solid ${borderLeftColor}`,
       backgroundColor: forecastDarkMode
-        ? (isSelected ? "rgba(217,119,6,0.08)" : "#1a1f2e")
+        ? (isSelected ? "rgba(217,119,6,0.08)" : "#252a35")
         : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : isSelected ? "rgba(217,119,6,0.05)" : isSearchMatch ? "rgba(254,240,138,0.15)" : "#ffffff"),
       opacity: isDragging ? 0.3 : 1,
       boxShadow: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "inset 0 0 0 1px hsl(0 60% 86%)" : isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : isSearchMatch ? "0 0 0 2px rgba(250,204,21,0.25)" : undefined),
       transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, box-shadow 150ms",
     }}>
 
-      <div className="flex" style={{ borderBottom: expanded ? (forecastDarkMode ? "1px solid #2a2f3d" : "1px solid #ece8e2") : "none", backgroundColor: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : undefined) }}>
+      <div className="flex" style={{ borderBottom: expanded ? (forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2") : "none", backgroundColor: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : undefined) }}>
         {/* Left strip: expand/collapse toggle — NOT draggable */}
         <div
           className="shrink-0 flex items-center justify-center cursor-pointer select-none"
@@ -927,9 +927,9 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onBundleContextMenu(e, bundle, toggleExpand); }}
         >
           <div className="flex-1 min-w-0">
-            <div className="text-[11px] truncate" style={{ color: forecastDarkMode ? (allCompleted ? "#6b7280" : "#e5e7eb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: allCompleted ? 500 : 600 }}>{highlightMatch(bundle.project_name, searchQuery)}</div>
+            <div className="text-[11px] truncate" style={{ color: forecastDarkMode ? (allCompleted ? "#5a6480" : "#c8d0e0") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: allCompleted ? 500 : 600 }}>{highlightMatch(bundle.project_name, searchQuery)}</div>
             <div className="flex items-center gap-1.5">
-              <span className="font-mono text-xs" style={{ color: forecastDarkMode ? "#6b7280" : (allCompleted ? "#b0b7c3" : "#6b7280") }}>{bundle.project_id}</span>
+              <span className="font-mono text-xs" style={{ color: forecastDarkMode ? "#5a6480" : (allCompleted ? "#b0b7c3" : "#6b7280") }}>{bundle.project_id}</span>
               {expDate && !allCompleted && (
                 <span className="text-xs truncate" style={{ color: expSeverity === "overdue" ? "#dc2626" : expSeverity === "urgent" ? "#d97706" : daysUntilExp !== null && daysUntilExp <= 14 ? "#d97706" : "#6b7280" }}>
                   Exp: {expDate}
@@ -954,9 +954,9 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
             })()}
             {completedCount > 0 && <span className="text-[9px]" style={{ color: "#3a8a36", fontWeight: 600 }}>{completedCount}/{totalCount} ✓</span>}
             {displayMode === "czk" ? (
-              <span className="font-mono text-[11px]" style={{ color: forecastDarkMode ? (allCompleted ? "#4b5563" : "#e5e7eb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 700 }}>{formatCompactCzk(bundle.total_hours * hourlyRate)}</span>
+              <span className="font-mono text-[11px]" style={{ color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 700 }}>{formatCompactCzk(bundle.total_hours * hourlyRate)}</span>
             ) : (
-              <span className="font-mono text-[11px]" style={{ color: forecastDarkMode ? (allCompleted ? "#4b5563" : "#e5e7eb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 700 }}>{Math.round(bundle.total_hours)}h</span>
+              <span className="font-mono text-[11px]" style={{ color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 700 }}>{Math.round(bundle.total_hours)}h</span>
             )}
           </div>
         </div>
