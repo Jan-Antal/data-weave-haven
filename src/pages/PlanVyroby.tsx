@@ -534,6 +534,11 @@ export default function PlanVyroby() {
           }}
           isOwner={isOwner}
           isGenerating={forecast.isGenerating}
+          forecastBlockCounts={forecast.forecastActive ? {
+            real: forecast.forecastBlocks.filter(b => b.source === "existing_plan").length,
+            inbox: forecast.forecastBlocks.filter(b => b.source === "inbox_item").length,
+            ai: forecast.forecastBlocks.filter(b => b.source === "project_estimate").length,
+          } : undefined}
         />
 
         {viewTab === "kanban" ? (
