@@ -1270,20 +1270,22 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
     <div className="rounded-[6px] overflow-hidden relative" style={{
       borderTop: forecastDarkMode
         ? (isSelected ? "2px solid #d97706" : "1px solid #3d4558")
-        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2"),
+        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : "1px solid #ece8e2"),
       borderRight: forecastDarkMode
         ? (isSelected ? "2px solid #d97706" : "1px solid #3d4558")
-        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2"),
+        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : "1px solid #ece8e2"),
       borderBottom: forecastDarkMode
         ? (isSelected ? "2px solid #d97706" : "1px solid #3d4558")
-        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2"),
-      borderLeft: isSelected ? "4px solid #d97706" : isSearchMatch ? "4px solid #facc15" : `4px solid ${borderLeftColor}`,
+        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : "1px solid #ece8e2"),
+      borderLeft: isSelected ? "4px solid #d97706" : isSearchMatch ? "2px solid #f59e0b" : `4px solid ${borderLeftColor}`,
       backgroundColor: forecastDarkMode
         ? (isSelected ? "rgba(217,119,6,0.08)" : "#252a35")
-        : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : isSelected ? "rgba(217,119,6,0.05)" : isSearchMatch ? "rgba(254,240,138,0.15)" : "#ffffff"),
+        : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : isSelected ? "rgba(217,119,6,0.05)" : "#ffffff"),
       opacity: isDragging ? 0.3 : 1,
-      boxShadow: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "inset 0 0 0 1px hsl(0 60% 86%)" : isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : isSearchMatch ? "0 0 0 2px rgba(250,204,21,0.25)" : undefined),
-      transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, box-shadow 150ms",
+      outline: isFocusedMatch ? "2px solid #f59e0b" : undefined,
+      outlineOffset: isFocusedMatch ? "2px" : undefined,
+      boxShadow: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "inset 0 0 0 1px hsl(0 60% 86%)" : isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined),
+      transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, box-shadow 150ms, outline 300ms",
     }}>
 
       <div className="flex" style={{ borderBottom: expanded ? (forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2") : "none", backgroundColor: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : undefined) }}>
