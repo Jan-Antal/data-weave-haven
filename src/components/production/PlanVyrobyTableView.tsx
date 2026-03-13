@@ -1437,6 +1437,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                           {hasAnyExpedice && (
                             <div
                               className="shrink-0 flex items-center justify-center px-1 sticky right-0 z-20"
+                              onContextMenu={(e) => { if (item.expediceHours > 0) { e.stopPropagation(); handleExpediceItemContextMenu(e, item.projectId, item.itemName); } }}
                               style={{ width: EXPEDICE_W, backgroundColor: "#f0fdf4" }}
                             >
                               {item.expediceHours > 0 && (
