@@ -308,6 +308,7 @@ function ForecastCard({
         opacity: isDragging ? 0.3 : isSelected ? 1 : 0.55,
         boxShadow: isSelected ? `0 0 0 1px ${style.borderColor}40` : undefined,
       }}
+      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu?.(e); }}
     >
       {/* Badge top-right — only for inbox and AI cards */}
       {style.badgeLabel && (
