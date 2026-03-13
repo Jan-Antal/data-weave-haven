@@ -360,6 +360,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         {/* FIXED HEADER — never scrolls */}
         <div ref={tpvHeaderScrollRef} className="flex-shrink-0 overflow-hidden rounded-t-lg">
           <Table style={{ tableLayout: "fixed" }}>
+            {renderColGroup()}
             <TableHeader className="sticky-off">
               <TableRow className="bg-primary/5">
                 <TableHead className="w-10">
@@ -388,6 +389,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         {/* SCROLLABLE BODY */}
         <div ref={tpvBodyScrollRef} className="flex-1 overflow-auto always-scrollbar" onScroll={handleTpvBodyScroll}>
           <Table style={{ tableLayout: "fixed" }}>
+            {renderColGroup()}
             <TableBody>
               {isLoading ? (
                 <TableRow><TableCell colSpan={visibleColCount} className="text-center text-muted-foreground">Načítání...</TableCell></TableRow>
@@ -395,8 +397,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                 <TableRow><TableCell colSpan={visibleColCount} className="text-center text-muted-foreground">Žádné položky</TableCell></TableRow>
               ) : sortedItems.map(item => (
                 <TableRow key={item.id} className={`hover:bg-muted/50 transition-colors h-9 ${selected.has(item.id) ? "bg-primary/5" : ""}`}>
-                  {canManageTPV && <TableCell><Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} /></TableCell>}
-                  {!canManageTPV && <TableCell />}
+                  <TableCell>{canManageTPV && <Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} />}</TableCell>
                   {renderKeys.map(key => {
                     const cellStyle = getTPVListColumnStyle(key, getWidth(key));
                     if (key === "item_name") return (
