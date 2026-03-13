@@ -361,6 +361,7 @@ serve(async (req) => {
             source: "project_estimate",
             deadline: dl.date,
             deadline_source: dl.source,
+            tpv_expected_date: proj.datum_tpv || null,
             is_forecast: true,
           });
         }
