@@ -606,7 +606,15 @@ export default function PlanVyroby() {
       </div>
 
       <DragOverlay dropAnimation={null}>
-        {activeDrag ? <DragOverlayContent data={activeDrag} /> : null}
+        {activeDrag ? (
+          (activeDrag as any).type === "forecast-block" ? (
+            <div className="rounded-lg px-3 py-2" style={{ backgroundColor: "#1a1200", border: "2px dashed #f59e0b", color: "#fcd34d", fontSize: 12, fontWeight: 600, opacity: 0.9 }}>
+              {(activeDrag as any).projectName} · {(activeDrag as any).hours}h
+            </div>
+          ) : (
+            <DragOverlayContent data={activeDrag as any} />
+          )
+        ) : null}
       </DragOverlay>
 
       {autoSplitState && (
