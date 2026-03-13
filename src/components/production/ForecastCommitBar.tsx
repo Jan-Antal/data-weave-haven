@@ -1,12 +1,15 @@
-import { Sparkles, Check, X } from "lucide-react";
+import { Sparkles, Check, X, Inbox } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ForecastCommitBarProps {
   totalBlocks: number;
   selectedCount: number;
+  inboxBlockCount: number;
+  projectBlockCount: number;
   isGenerating: boolean;
   onCommitAll: () => void;
   onCommitSelected: () => void;
+  onCommitInboxOnly: () => void;
   onCancel: () => void;
   onSelectAll: () => void;
   onDeselectAll: () => void;
@@ -15,9 +18,12 @@ interface ForecastCommitBarProps {
 export function ForecastCommitBar({
   totalBlocks,
   selectedCount,
+  inboxBlockCount,
+  projectBlockCount,
   isGenerating,
   onCommitAll,
   onCommitSelected,
+  onCommitInboxOnly,
   onCancel,
   onSelectAll,
   onDeselectAll,
@@ -41,7 +47,13 @@ export function ForecastCommitBar({
           ) : (
             <>
               <span className="font-bold" style={{ color: "#f59e0b" }}>{totalBlocks}</span>
-              {" "}forecast bloků připraveno
+              {" "}bloků připraveno ke commitu
+              {inboxBlockCount > 0 && (
+                <span style={{ color: "#22c55e" }}> · {inboxBlockCount} inbox</span>
+              )}
+              {projectBlockCount > 0 && (
+                <span style={{ color: "#f59e0b" }}> · {projectBlockCount} projekt</span>
+              )}
               {selectedCount < totalBlocks && selectedCount > 0 && (
                 <span style={{ color: "#9ca3af" }}>
                   {" "}· {selectedCount} vybráno
@@ -77,6 +89,18 @@ export function ForecastCommitBar({
       <div className="flex items-center gap-2">
         {totalBlocks > 0 && (
           <>
+            {inboxBlockCount > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onCommitInboxOnly}
+                className="text-xs border-green-600 text-green-400 hover:bg-green-900/30 hover:text-green-300"
+                style={{ backgroundColor: "transparent" }}
+              >
+                <Inbox className="h-3 w-3 mr-1" />
+                Pouze Inbox ({inboxBlockCount})
+              </Button>
+            )}
             <Button
               size="sm"
               variant="outline"
@@ -86,7 +110,7 @@ export function ForecastCommitBar({
               style={{ backgroundColor: "transparent" }}
             >
               <Check className="h-3 w-3 mr-1" />
-              Potvrdit vybrané ({selectedCount})
+              Commit vybrané ({selectedCount})
             </Button>
             <Button
               size="sm"
@@ -95,7 +119,7 @@ export function ForecastCommitBar({
               style={{ backgroundColor: "#f59e0b", color: "#1a1a1a" }}
             >
               <Check className="h-3 w-3 mr-1" />
-              Potvrdit vše do Inboxu
+              Commit vše do plánu
             </Button>
           </>
         )}
