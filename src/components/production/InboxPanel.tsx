@@ -821,8 +821,11 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
               onToggleCheck={onToggleCheck}
               checkedItems={checkedItems}
               allInboxItemsMap={allInboxItemsMap}
+              displayMode={displayMode}
+              hourlyRate={hourlyRate}
             />
           ))}
+
           {/* Checked items footer bar */}
           {(() => {
             const checkedInProject = project.items.filter(i => checkedItems.has(i.id));
