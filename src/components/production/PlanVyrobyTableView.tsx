@@ -1004,7 +1004,6 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                         borderTop: `1px solid ${isOverdueProject ? "hsl(0 60% 82%)" : "#e5e2dd"}`,
                         borderBottom: `1px solid ${isOverdueProject ? "hsl(0 60% 82%)" : "#e5e2dd"}`,
                         borderRadius: "6px 0 0 6px",
-                        borderRadius: "6px 0 0 6px",
                       }}
                     >
                       {isExpanded
