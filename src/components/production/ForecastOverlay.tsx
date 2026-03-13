@@ -1,8 +1,9 @@
-import { useMemo } from "react";
-import { Sparkles, Inbox } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Sparkles, Inbox, ChevronRight } from "lucide-react";
 import type { ForecastBlock, ForecastSource } from "@/hooks/useForecastMode";
 import { getProjectColor } from "@/lib/projectColors";
 import { useDraggable } from "@dnd-kit/core";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ForecastOverlayProps {
   blocks: ForecastBlock[];
@@ -110,18 +111,104 @@ function ForecastWeekBlocks({
   );
 }
 
+/** Fetched item for expand view */
+interface ForecastSubItem {
+  id: string;
+  item_name: string;
+  item_code: string | null;
+  hours: number;
+  source: "schedule" | "inbox" | "tpv";
+}
+
 function ForecastCard({
   block,
   isSelected,
   onToggleSelect,
   onContextMenu,
+  onToggleExpand,
+  isExpanded,
 }: {
   block: ForecastBlock;
   isSelected: boolean;
   onToggleSelect: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
+  onToggleExpand?: () => void;
+  isExpanded?: boolean;
 }) {
   const style = getSourceStyle(block.source, block.confidence);
+  const [expanded, setExpanded] = useState(false);
+  const [subItems, setSubItems] = useState<ForecastSubItem[]>([]);
+  const [loadingItems, setLoadingItems] = useState(false);
+
+  const actualExpanded = isExpanded ?? expanded;
+  const toggleExpand = onToggleExpand ?? (() => setExpanded(v => !v));
+
+  // Fetch sub-items when expanded
+  useEffect(() => {
+    if (!actualExpanded || subItems.length > 0) return;
+    let cancelled = false;
+    setLoadingItems(true);
+
+    (async () => {
+      const items: ForecastSubItem[] = [];
+
+      // Try production_schedule first (for existing_plan blocks)
+      if (block.source === "existing_plan") {
+        const { data } = await supabase
+          .from("production_schedule")
+          .select("id, item_name, item_code, scheduled_hours")
+          .eq("project_id", block.project_id)
+          .eq("scheduled_week", block.week)
+          .not("status", "in", '("cancelled")');
+        if (data) {
+          for (const row of data) {
+            items.push({ id: row.id, item_name: row.item_name, item_code: row.item_code, hours: row.scheduled_hours, source: "schedule" });
+          }
+        }
+      }
+
+      // Try production_inbox (for inbox_item blocks)
+      if (block.source === "inbox_item") {
+        const { data } = await supabase
+          .from("production_inbox")
+          .select("id, item_name, item_code, estimated_hours")
+          .eq("project_id", block.project_id)
+          .eq("status", "pending");
+        if (data) {
+          for (const row of data) {
+            items.push({ id: row.id, item_name: row.item_name, item_code: row.item_code, hours: row.estimated_hours, source: "inbox" });
+          }
+        }
+      }
+
+      // For project_estimate or if no items found, try tpv_items
+      if (block.source === "project_estimate" || items.length === 0) {
+        const { data } = await supabase
+          .from("tpv_items")
+          .select("id, item_name, item_type, cena")
+          .eq("project_id", block.project_id)
+          .is("deleted_at", null);
+        if (data && data.length > 0 && items.length === 0) {
+          for (const row of data) {
+            items.push({
+              id: row.id,
+              item_name: row.item_type || row.item_name,
+              item_code: row.item_name,
+              hours: row.cena ? Math.round(row.cena / 550) : 0,
+              source: "tpv",
+            });
+          }
+        }
+      }
+
+      if (!cancelled) {
+        setSubItems(items);
+        setLoadingItems(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [actualExpanded, block.project_id, block.source, block.week, subItems.length]);
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `forecast-block-${block.id}`,
@@ -137,12 +224,7 @@ function ForecastCard({
 
   return (
     <div
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
-      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu?.(e); }}
-      className="rounded-lg px-2.5 py-2 cursor-grab transition-all relative"
+      className="rounded-lg overflow-hidden transition-all relative"
       style={{
         backgroundColor: style.backgroundColor,
         borderWidth: style.borderWidth,
@@ -156,7 +238,7 @@ function ForecastCard({
       {style.badgeLabel && (
         <div
           className="absolute top-1.5 right-1.5 flex items-center gap-0.5 rounded-full px-1.5 py-0.5"
-          style={{ backgroundColor: style.badgeBg, fontSize: 10, color: style.badgeColor, fontWeight: 600 }}
+          style={{ backgroundColor: style.badgeBg, fontSize: 10, color: style.badgeColor, fontWeight: 600, zIndex: 2 }}
         >
           {style.badgeIcon === "sparkles" && <Sparkles className="h-2.5 w-2.5" />}
           {style.badgeIcon === "inbox" && <Inbox className="h-2.5 w-2.5" />}
@@ -164,69 +246,130 @@ function ForecastCard({
         </div>
       )}
 
-      {/* Checkbox + content */}
-      <div className="flex items-start gap-2">
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={onToggleSelect}
-          className="mt-0.5"
-          style={{ accentColor: style.borderColor }}
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-        />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <div
-              className="w-2 h-2 rounded-full shrink-0"
-              style={{ backgroundColor: getProjectColor(block.project_id) }}
+      <div className="flex">
+        {/* Left: expand/collapse toggle */}
+        <div
+          className="shrink-0 flex items-center justify-center cursor-pointer select-none"
+          style={{ width: 24 }}
+          onClick={(e) => { e.stopPropagation(); toggleExpand(); }}
+          onMouseDown={e => e.stopPropagation()}
+          onPointerDown={e => e.stopPropagation()}
+        >
+          <ChevronRight
+            className="shrink-0 transition-transform duration-150"
+            style={{ width: 10, height: 10, color: style.codeColor, transform: actualExpanded ? "rotate(90deg)" : "rotate(0deg)" }}
+          />
+        </div>
+
+        {/* Right: draggable area */}
+        <div
+          ref={setNodeRef}
+          {...attributes}
+          {...listeners}
+          className="flex-1 min-w-0 px-1.5 py-2 cursor-grab"
+          onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu?.(e); }}
+        >
+          {/* Checkbox + content */}
+          <div className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={onToggleSelect}
+              className="mt-0.5"
+              style={{ accentColor: style.borderColor }}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
             />
-            <span
-              className="text-[13px] font-semibold truncate"
-              style={{ color: style.nameColor }}
-            >
-              {block.project_name}
-            </span>
-          </div>
-          <div className="flex items-center justify-between mt-0.5">
-            <span className="text-[11px] truncate" style={{ color: style.codeColor }}>
-              {block.bundle_description}
-            </span>
-            <span
-              className="text-[13px] font-bold shrink-0 ml-2"
-              style={{ color: style.hoursColor }}
-            >
-              {style.hoursPrefix}{block.estimated_hours}h
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <span
-              className="text-[9px] font-mono"
-              style={{ color: style.codeColor }}
-            >
-              {block.project_id}
-            </span>
-            {block.tpv_item_count && block.tpv_item_count > 0 && (
-              <span className="text-[9px]" style={{ color: style.codeColor }}>
-                · {block.tpv_item_count} pol.
-              </span>
-            )}
-            <span
-              className="text-[9px] px-1 rounded"
-              style={{
-                backgroundColor: block.confidence === "high" ? "rgba(34,197,94,0.15)"
-                  : block.confidence === "medium" ? "rgba(249,115,22,0.15)"
-                  : "rgba(239,68,68,0.15)",
-                color: block.confidence === "high" ? "#22c55e"
-                  : block.confidence === "medium" ? "#f97316"
-                  : "#ef4444",
-              }}
-            >
-              {block.confidence === "high" ? "vysoká" : block.confidence === "medium" ? "střední" : "nízká"}
-            </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <div
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: getProjectColor(block.project_id) }}
+                />
+                <span
+                  className="text-[13px] font-semibold truncate"
+                  style={{ color: style.nameColor }}
+                >
+                  {block.project_name}
+                </span>
+              </div>
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="text-[11px] truncate" style={{ color: style.codeColor }}>
+                  {block.bundle_description}
+                </span>
+                <span
+                  className="text-[13px] font-bold shrink-0 ml-2"
+                  style={{ color: style.hoursColor }}
+                >
+                  {style.hoursPrefix}{block.estimated_hours}h
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span
+                  className="text-[9px] font-mono"
+                  style={{ color: style.codeColor }}
+                >
+                  {block.project_id}
+                </span>
+                {block.tpv_item_count && block.tpv_item_count > 0 && (
+                  <span className="text-[9px]" style={{ color: style.codeColor }}>
+                    · {block.tpv_item_count} pol.
+                  </span>
+                )}
+                <span
+                  className="text-[9px] px-1 rounded"
+                  style={{
+                    backgroundColor: block.confidence === "high" ? "rgba(34,197,94,0.15)"
+                      : block.confidence === "medium" ? "rgba(249,115,22,0.15)"
+                      : "rgba(239,68,68,0.15)",
+                    color: block.confidence === "high" ? "#22c55e"
+                      : block.confidence === "medium" ? "#f97316"
+                      : "#ef4444",
+                  }}
+                >
+                  {block.confidence === "high" ? "vysoká" : block.confidence === "medium" ? "střední" : "nízká"}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Expanded items list */}
+      {actualExpanded && (
+        <div className="px-1.5 py-1" style={{ borderTop: `1px solid ${style.borderColor}40` }}>
+          {loadingItems ? (
+            <div className="text-[9px] text-center py-1" style={{ color: style.codeColor }}>Načítání...</div>
+          ) : subItems.length === 0 ? (
+            <div className="text-[9px] text-center py-1" style={{ color: style.codeColor }}>Žádné položky</div>
+          ) : (
+            subItems.map(item => (
+              <div
+                key={item.id}
+                className="flex items-center gap-[3px] px-[6px] py-[3px] rounded transition-colors"
+                style={{ cursor: "default" }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${style.borderColor}15`; }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
+              >
+                {item.item_code && (
+                  <span className="font-mono text-[9px] font-bold shrink-0" style={{ color: style.codeColor }}>
+                    {item.item_code}
+                  </span>
+                )}
+                <span className="text-[10px] flex-1 truncate" style={{ color: style.nameColor, opacity: 0.8 }}>
+                  {item.item_name}
+                </span>
+                {item.hours > 0 && (
+                  <span className="font-mono text-[9px] shrink-0" style={{ color: style.hoursColor, opacity: 0.7 }}>
+                    {item.hours}h
+                  </span>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
