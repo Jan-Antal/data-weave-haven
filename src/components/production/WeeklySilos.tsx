@@ -828,7 +828,7 @@ function formatDateShortYY(dateStr: string | null | undefined): string | null {
   return `${dd}.${mm}.${yy}`;
 }
 
-function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleContextMenu, onItemContextMenu, projectLookup, isSelected, onSelectProject, displayMode, searchQuery = "" }: {
+function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleContextMenu, onItemContextMenu, projectLookup, isSelected, onSelectProject, displayMode, searchQuery = "", forecastDarkMode }: {
   bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number;
   displayMode: DisplayMode;
   onBundleContextMenu: (e: React.MouseEvent, bundle: ScheduleBundle, toggleExpand: () => void) => void;
@@ -837,6 +837,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
   isSelected?: boolean;
   onSelectProject?: (projectId: string) => void;
   searchQuery?: string;
+  forecastDarkMode?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const color = getProjectColor(bundle.project_id);
