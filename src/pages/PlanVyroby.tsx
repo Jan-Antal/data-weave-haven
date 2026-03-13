@@ -279,12 +279,24 @@ export default function PlanVyroby() {
     setActiveDrag(null);
     setOverDroppableId(null);
 
+    if (!active.data.current) return;
+    const dragData = active.data.current as any;
+
+    // Handle forecast block drags — updates forecastBlocks only, never Supabase
+    if (dragData.type === "forecast-block" && forecast.forecastActive) {
+      if (!over) return;
+      const targetId = over.id.toString();
+      if (targetId.startsWith("silo-week-")) {
+        const weekKey = targetId.replace("silo-week-", "");
+        if (weekKey !== dragData.week) {
+          forecast.moveForecastBlock(dragData.blockId, weekKey);
+        }
+      }
+      return;
+    }
+
     // Block all real data modifications during forecast mode
     if (forecast.forecastActive) return;
-
-    if (!active.data.current) return;
-
-    const dragData = active.data.current as ActiveDragData;
 
     if (!over) {
       if (dragData.type === "silo-item" && dragData.splitGroupId && dragData.itemId && dragData.weekDate) {
