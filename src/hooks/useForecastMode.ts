@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -19,6 +19,40 @@ export interface ForecastBlock {
   selected?: boolean;
 }
 
+const STORAGE_KEYS: Record<ForecastPlanMode, string> = {
+  respect_plan: "ami_forecast_session",
+  from_scratch: "ami_forecast_session_scratch",
+};
+
+function saveToStorage(mode: ForecastPlanMode, blocks: ForecastBlock[], selectedIds: Set<string>) {
+  try {
+    localStorage.setItem(STORAGE_KEYS[mode], JSON.stringify({
+      blocks,
+      selectedBlockIds: Array.from(selectedIds),
+      timestamp: Date.now(),
+    }));
+  } catch { /* ignore */ }
+}
+
+function loadFromStorage(mode: ForecastPlanMode): { blocks: ForecastBlock[]; selectedIds: Set<string> } | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS[mode]);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data.blocks) || data.blocks.length === 0) return null;
+    return {
+      blocks: data.blocks,
+      selectedIds: new Set<string>(data.selectedBlockIds || []),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function clearStorage(mode: ForecastPlanMode) {
+  try { localStorage.removeItem(STORAGE_KEYS[mode]); } catch { /* ignore */ }
+}
+
 interface UseForecastModeReturn {
   forecastActive: boolean;
   setForecastActive: (v: boolean) => void;
@@ -34,15 +68,26 @@ interface UseForecastModeReturn {
   clearForecast: () => void;
   commitBlocks: (blockIds?: string[]) => Promise<void>;
   commitInboxOnly: () => Promise<void>;
+  moveForecastBlock: (blockId: string, newWeek: string) => void;
+  removeForecastBlock: (blockId: string) => void;
+  resetAndRegenerate: (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => Promise<void>;
+  loadSavedSession: (modeOverride?: ForecastPlanMode) => boolean;
 }
 
 export function useForecastMode(): UseForecastModeReturn {
   const [forecastActive, setForecastActiveRaw] = useState(false);
-  const [planMode, setPlanMode] = useState<ForecastPlanMode>("respect_plan");
+  const [planMode, setPlanModeRaw] = useState<ForecastPlanMode>("respect_plan");
   const [forecastBlocks, setForecastBlocks] = useState<ForecastBlock[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
   const generationTokenRef = useRef(0);
+
+  // Persist to localStorage whenever blocks or selection changes
+  useEffect(() => {
+    if (forecastActive && forecastBlocks.length > 0) {
+      saveToStorage(planMode, forecastBlocks, selectedBlockIds);
+    }
+  }, [forecastBlocks, selectedBlockIds, planMode, forecastActive]);
 
   const resetForecastState = useCallback(() => {
     setForecastBlocks([]);
@@ -50,9 +95,25 @@ export function useForecastMode(): UseForecastModeReturn {
     setIsGenerating(false);
   }, []);
 
+  const loadSavedSession = useCallback((modeOverride?: ForecastPlanMode): boolean => {
+    const mode = modeOverride ?? planMode;
+    const saved = loadFromStorage(mode);
+    if (saved) {
+      setForecastBlocks(saved.blocks);
+      setSelectedBlockIds(saved.selectedIds);
+      return true;
+    }
+    return false;
+  }, [planMode]);
+
+  const setPlanMode = useCallback((m: ForecastPlanMode) => {
+    setPlanModeRaw(m);
+  }, []);
+
   const setForecastActive = useCallback((v: boolean) => {
     setForecastActiveRaw(v);
     if (!v) {
+      // Keep localStorage intact so it loads next time
       generationTokenRef.current += 1;
       resetForecastState();
     }
@@ -121,6 +182,26 @@ export function useForecastMode(): UseForecastModeReturn {
     }
   }, [planMode]);
 
+  const moveForecastBlock = useCallback((blockId: string, newWeek: string) => {
+    setForecastBlocks(prev => prev.map(b => b.id === blockId ? { ...b, week: newWeek } : b));
+  }, []);
+
+  const removeForecastBlock = useCallback((blockId: string) => {
+    setForecastBlocks(prev => prev.filter(b => b.id !== blockId));
+    setSelectedBlockIds(prev => {
+      const next = new Set(prev);
+      next.delete(blockId);
+      return next;
+    });
+  }, []);
+
+  const resetAndRegenerate = useCallback(async (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => {
+    const mode = modeOverride ?? planMode;
+    clearStorage(mode);
+    resetForecastState();
+    await generateForecast(weeklyCapacityHours, mode);
+  }, [planMode, resetForecastState, generateForecast]);
+
   const commitBlocks = useCallback(async (blockIds?: string[]) => {
     const toCommit = blockIds
       ? forecastBlocks.filter(b => blockIds.includes(b.id))
@@ -152,6 +233,8 @@ export function useForecastMode(): UseForecastModeReturn {
         if (error) throw error;
       }
 
+      // Clear localStorage for this mode on commit
+      clearStorage(planMode);
       generationTokenRef.current += 1;
       setForecastActiveRaw(false);
       resetForecastState();
@@ -159,7 +242,7 @@ export function useForecastMode(): UseForecastModeReturn {
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
-  }, [forecastBlocks, selectedBlockIds, resetForecastState]);
+  }, [forecastBlocks, selectedBlockIds, resetForecastState, planMode]);
 
   const commitInboxOnly = useCallback(async () => {
     const inboxBlocks = forecastBlocks.filter(b => b.source === "inbox_item" && selectedBlockIds.has(b.id));
@@ -185,5 +268,9 @@ export function useForecastMode(): UseForecastModeReturn {
     clearForecast,
     commitBlocks,
     commitInboxOnly,
+    moveForecastBlock,
+    removeForecastBlock,
+    resetAndRegenerate,
+    loadSavedSession,
   };
 }

@@ -241,9 +241,9 @@ export default function PlanVyroby() {
   }, [allProjects, formatWeekLabel]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    // Block drag start during forecast mode
-    if (forecast.forecastActive) return;
-    const data = event.active.data.current as ActiveDragData | undefined;
+    const data = event.active.data.current as any;
+    // Allow forecast block drags even in forecast mode
+    if (forecast.forecastActive && data?.type !== "forecast-block") return;
     if (data) setActiveDrag(data);
   }, [forecast.forecastActive]);
 
@@ -279,12 +279,24 @@ export default function PlanVyroby() {
     setActiveDrag(null);
     setOverDroppableId(null);
 
+    if (!active.data.current) return;
+    const dragData = active.data.current as any;
+
+    // Handle forecast block drags — updates forecastBlocks only, never Supabase
+    if (dragData.type === "forecast-block" && forecast.forecastActive) {
+      if (!over) return;
+      const targetId = over.id.toString();
+      if (targetId.startsWith("silo-week-")) {
+        const weekKey = targetId.replace("silo-week-", "");
+        if (weekKey !== dragData.week) {
+          forecast.moveForecastBlock(dragData.blockId, weekKey);
+        }
+      }
+      return;
+    }
+
     // Block all real data modifications during forecast mode
     if (forecast.forecastActive) return;
-
-    if (!active.data.current) return;
-
-    const dragData = active.data.current as ActiveDragData;
 
     if (!over) {
       if (dragData.type === "silo-item" && dragData.splitGroupId && dragData.itemId && dragData.weekDate) {
@@ -494,7 +506,12 @@ export default function PlanVyroby() {
           onForecastToggle={async (v) => {
             forecast.setForecastActive(v);
             if (v) {
-              await forecast.generateForecast(weeklyCapacity);
+              const loaded = forecast.loadSavedSession();
+              if (loaded) {
+                toast({ title: "Obnoveno z poslední relace" });
+              } else {
+                await forecast.generateForecast(weeklyCapacity);
+              }
             }
           }}
           forecastPlanMode={forecast.planMode}
@@ -502,7 +519,17 @@ export default function PlanVyroby() {
             forecast.setPlanMode(m);
             if (forecast.forecastActive) {
               forecast.clearForecast();
-              await forecast.generateForecast(weeklyCapacity, m);
+              const loaded = forecast.loadSavedSession(m);
+              if (loaded) {
+                toast({ title: "Obnoveno z poslední relace" });
+              } else {
+                await forecast.generateForecast(weeklyCapacity, m);
+              }
+            }
+          }}
+          onResetForecast={async () => {
+            if (window.confirm("Smazat uložený forecast a začít znovu?")) {
+              await forecast.resetAndRegenerate(weeklyCapacity);
             }
           }}
           isOwner={isOwner}
@@ -511,7 +538,13 @@ export default function PlanVyroby() {
 
         {viewTab === "kanban" ? (
           <div className="flex-1 flex min-h-0" onClick={() => setSelectedProjectId(null)}>
-            {!forecast.forecastActive && (
+            {forecast.forecastActive ? (
+              <div className="w-[300px] shrink-0 flex flex-col" style={{ backgroundColor: "#1c1f26", borderRight: "1px solid #2a2f3d" }}>
+                <div className="flex-1 flex items-center justify-center">
+                  <span className="text-sm italic" style={{ color: "#4a5168" }}>Vše naplánováno</span>
+                </div>
+              </div>
+            ) : (
               <InboxPanel
                 overDroppableId={overDroppableId}
                 showCzk={showCzk}
@@ -539,6 +572,8 @@ export default function PlanVyroby() {
               onToggleForecastSelect={forecast.forecastActive ? forecast.toggleBlockSelection : undefined}
               forecastDarkMode={forecast.forecastActive}
               forecastPlanMode={forecast.forecastActive ? forecast.planMode : undefined}
+              onMoveForecastBlock={forecast.forecastActive ? forecast.moveForecastBlock : undefined}
+              onRemoveForecastBlock={forecast.forecastActive ? forecast.removeForecastBlock : undefined}
             />
             <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />
           </div>
@@ -571,7 +606,15 @@ export default function PlanVyroby() {
       </div>
 
       <DragOverlay dropAnimation={null}>
-        {activeDrag ? <DragOverlayContent data={activeDrag} /> : null}
+        {activeDrag ? (
+          (activeDrag as any).type === "forecast-block" ? (
+            <div className="rounded-lg px-3 py-2" style={{ backgroundColor: "#1a1200", border: "2px dashed #f59e0b", color: "#fcd34d", fontSize: 12, fontWeight: 600, opacity: 0.9 }}>
+              {(activeDrag as any).projectName} · {(activeDrag as any).hours}h
+            </div>
+          ) : (
+            <DragOverlayContent data={activeDrag as any} />
+          )
+        ) : null}
       </DragOverlay>
 
       {autoSplitState && (
@@ -642,7 +685,7 @@ export default function PlanVyroby() {
 }
 
 
-function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating }: {
+function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast }: {
   viewTab: "kanban" | "table";
   setViewTab: (v: "kanban" | "table") => void;
   displayMode: DisplayMode;
@@ -655,6 +698,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   onForecastPlanModeChange: (m: "respect_plan" | "from_scratch") => void;
   isOwner: boolean;
   isGenerating: boolean;
+  onResetForecast?: () => void;
 }) {
   const { data: settings } = useProductionSettings();
   const { data: scheduleData } = useProductionSchedule();
@@ -799,24 +843,33 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
         </div>
       )}
 
-      {/* Forecast plan mode toggle */}
+      {/* Forecast plan mode toggle + Reset */}
       {forecastActive && (
-        <div className="inline-flex h-7 items-center rounded-md p-0.5 shrink-0" style={{ backgroundColor: "#111318", border: "1px solid #2a2f3d" }}>
+        <div className="flex items-center gap-1.5">
+          <div className="inline-flex h-7 items-center rounded-md p-0.5 shrink-0" style={{ backgroundColor: "#111318", border: "1px solid #2a2f3d" }}>
+            <button
+              onClick={() => onForecastPlanModeChange("respect_plan")}
+              className={`px-2 py-0.5 text-[11px] font-medium rounded-sm transition-all ${
+                forecastPlanMode === "respect_plan" ? "bg-amber-600 text-white" : "text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              Kolem plánu
+            </button>
+            <button
+              onClick={() => onForecastPlanModeChange("from_scratch")}
+              className={`px-2 py-0.5 text-[11px] font-medium rounded-sm transition-all ${
+                forecastPlanMode === "from_scratch" ? "bg-amber-600 text-white" : "text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              Od začátku
+            </button>
+          </div>
           <button
-            onClick={() => onForecastPlanModeChange("respect_plan")}
-            className={`px-2 py-0.5 text-[11px] font-medium rounded-sm transition-all ${
-              forecastPlanMode === "respect_plan" ? "bg-amber-600 text-white" : "text-gray-400 hover:text-gray-200"
-            }`}
+            onClick={onResetForecast}
+            className="px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors text-gray-400 hover:text-amber-400 hover:bg-amber-900/20"
+            title="Smazat uložený forecast a začít znovu"
           >
-            Respektovat plán
-          </button>
-          <button
-            onClick={() => onForecastPlanModeChange("from_scratch")}
-            className={`px-2 py-0.5 text-[11px] font-medium rounded-sm transition-all ${
-              forecastPlanMode === "from_scratch" ? "bg-amber-600 text-white" : "text-gray-400 hover:text-gray-200"
-            }`}
-          >
-            Od začátku
+            ↺ Reset
           </button>
         </div>
       )}

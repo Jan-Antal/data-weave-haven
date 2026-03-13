@@ -83,6 +83,8 @@ interface Props {
   onToggleForecastSelect?: (id: string) => void;
   forecastDarkMode?: boolean;
   forecastPlanMode?: "respect_plan" | "from_scratch";
+  onMoveForecastBlock?: (blockId: string, newWeek: string) => void;
+  onRemoveForecastBlock?: (blockId: string) => void;
 }
 
 interface ContextMenuState {
@@ -147,7 +149,7 @@ interface CancelState {
   cancelAll?: boolean;
 }
 
-export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode }: Props) {
+export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
@@ -566,6 +568,29 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     [moveItemBackToInbox, returnToProduction, mergeSplitItems, findSameWeekSiblings, onNavigateToTPV, onOpenProjectDetail, handleReleaseItem]
   );
 
+  // Forecast card context menu — move between weeks or remove
+  const handleForecastContextMenu = useCallback((e: React.MouseEvent, block: ForecastBlock) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const futureWeeks = weeks.filter(w => !w.isPast && w.key !== block.week);
+    const actions: ContextMenuAction[] = [];
+    for (const w of futureWeeks.slice(0, 10)) {
+      actions.push({
+        label: `Přesunout do T${w.weekNum} (${formatDateShort(w.start)})`,
+        icon: "→",
+        onClick: () => onMoveForecastBlock?.(block.id, w.key),
+      });
+    }
+    actions.push({
+      label: "Odstranit z forecastu",
+      icon: "✕",
+      danger: true,
+      dividerBefore: true,
+      onClick: () => onRemoveForecastBlock?.(block.id),
+    });
+    setContextMenu({ x: e.clientX, y: e.clientY, actions });
+  }, [weeks, onMoveForecastBlock, onRemoveForecastBlock]);
+
   return (
     <div className="flex-1 flex flex-col min-w-0">
       {/* Toolbar */}
@@ -606,12 +631,13 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               onToggleForecastSelect={onToggleForecastSelect}
               forecastDarkMode={forecastDarkMode}
               forecastPlanMode={forecastPlanMode}
+              onForecastContextMenu={forecastDarkMode ? handleForecastContextMenu : undefined}
             />
           ))}
         </div>
       </div>
 
-      {contextMenu && <ProductionContextMenu x={contextMenu.x} y={contextMenu.y} actions={contextMenu.actions} onClose={() => setContextMenu(null)} />}
+      {contextMenu && <ProductionContextMenu x={contextMenu.x} y={contextMenu.y} actions={contextMenu.actions} onClose={() => setContextMenu(null)} darkMode={forecastDarkMode} />}
 
       {completionState && (
         <CompletionDialog open={!!completionState} onOpenChange={open => !open && setCompletionState(null)} {...completionState} hourlyRate={hourlyRate} />
@@ -684,10 +710,11 @@ interface SiloProps {
   onToggleForecastSelect?: (id: string) => void;
   forecastDarkMode?: boolean;
   forecastPlanMode?: "respect_plan" | "from_scratch";
+  onForecastContextMenu?: (e: React.MouseEvent, block: ForecastBlock) => void;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu }: SiloProps) {
   // Capacity calculation: exclude paused items
   const activeHours = useMemo(() => {
     if (!silo) return 0;
@@ -728,7 +755,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
     : isWarning ? "linear-gradient(90deg, #fcd34d, #d97706)"
     : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
 
-  const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}`, disabled: isPast || !!forecastDarkMode });
+  const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}`, disabled: isPast });
   const highlighted = !isPast && (isOver || isOverTarget);
   const dropBorderColor = highlighted ? (isOverloaded ? "#d97706" : "#3b82f6") : undefined;
   const headerColor = forecastDarkMode
@@ -802,12 +829,13 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             forecastDarkMode={forecastDarkMode} />
         ))}
 
-        {/* Forecast blocks */}
+        {/* Forecast blocks — separate render pass, isolated from real data */}
         {forecastDarkMode && forecastSelectedIds && onToggleForecastSelect && weekForecastBlocks.length > 0 && (
           <ForecastWeekContent
             blocks={weekForecastBlocks}
             selectedBlockIds={forecastSelectedIds}
             onToggleSelect={onToggleForecastSelect}
+            onForecastContextMenu={onForecastContextMenu}
           />
         )}
       </div>

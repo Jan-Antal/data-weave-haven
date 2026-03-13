@@ -13,9 +13,10 @@ interface ProductionContextMenuProps {
   y: number;
   actions: ContextMenuAction[];
   onClose: () => void;
+  darkMode?: boolean;
 }
 
-export function ProductionContextMenu({ x, y, actions, onClose }: ProductionContextMenuProps) {
+export function ProductionContextMenu({ x, y, actions, onClose, darkMode }: ProductionContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,10 +44,10 @@ export function ProductionContextMenu({ x, y, actions, onClose }: ProductionCont
     left: adjustedLeft,
     top: adjustedTop,
     zIndex: 9999,
-    backgroundColor: "#ffffff",
-    border: "1px solid #e2ddd6",
+    backgroundColor: darkMode ? "#1c1f26" : "#ffffff",
+    border: darkMode ? "1px solid #3d4558" : "1px solid #e2ddd6",
     borderRadius: 6,
-    boxShadow: "0 4px 16px rgba(34,57,55,0.12)",
+    boxShadow: darkMode ? "0 4px 16px rgba(0,0,0,0.4)" : "0 4px 16px rgba(34,57,55,0.12)",
     padding: "4px 0",
     minWidth: 200,
   };
@@ -56,12 +57,12 @@ export function ProductionContextMenu({ x, y, actions, onClose }: ProductionCont
       {actions.map((action, i) => (
         <div key={i}>
           {action.dividerBefore && (
-            <div className="mx-2 my-1" style={{ borderTop: "1px solid #ece8e2" }} />
+            <div className="mx-2 my-1" style={{ borderTop: darkMode ? "1px solid #3d4558" : "1px solid #ece8e2" }} />
           )}
           <button
             className="w-full flex items-center gap-2 px-3 py-[6px] text-left transition-colors"
-            style={{ fontSize: 11, color: action.danger ? "#dc3545" : "#223937" }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = action.danger ? "rgba(220,53,69,0.04)" : "#f0eee9")}
+            style={{ fontSize: 11, color: action.danger ? "#dc3545" : darkMode ? "#c8d0e0" : "#223937" }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = action.danger ? "rgba(220,53,69,0.08)" : darkMode ? "#252a35" : "#f0eee9")}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             onClick={() => {
               action.onClick();
