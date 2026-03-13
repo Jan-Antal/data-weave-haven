@@ -907,3 +907,104 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor }
     </div>
   );
 }
+
+/* ═══════════════════════════════════════ */
+/* PHOTO TAB                               */
+/* ═══════════════════════════════════════ */
+
+function VyrobaPhotoTab({ projectId }: { projectId: string }) {
+  const { filesByCategory, listFiles, uploadFile, deleteFile, uploading } = useSharePointDocs(projectId);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load fotky on mount
+  useEffect(() => {
+    if (projectId) listFiles("fotky");
+  }, [projectId, listFiles]);
+
+  const photos = useMemo(() => {
+    const all = filesByCategory["fotky"] || [];
+    return all.filter(f => isImageFile(f.name));
+  }, [filesByCategory]);
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    for (const file of Array.from(files)) {
+      try {
+        await uploadFile("fotky", file);
+        toast.success(`✓ ${file.name} nahráno`);
+      } catch (err: any) {
+        toast.error(err.message || "Upload selhal");
+      }
+    }
+    // Refresh list
+    listFiles("fotky", true);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function handleDelete(fileName: string) {
+    try {
+      await deleteFile("fotky", fileName);
+      toast.success("Foto smazáno");
+    } catch {
+      toast.error("Smazání selhalo");
+    }
+  }
+
+  return (
+    <div>
+      {/* Upload button */}
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px]" style={{ color: "#99a5a3" }}>{photos.length} fotek</span>
+        <label className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium cursor-pointer transition-colors"
+          style={{ background: "rgba(58,138,54,0.08)", color: "#3a8a36", border: "1px solid rgba(58,138,54,0.2)" }}>
+          {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+          Přidat foto
+          <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} disabled={uploading} />
+        </label>
+      </div>
+
+      {/* Photo grid */}
+      {photos.length === 0 ? (
+        <div className="h-16 rounded-md flex items-center justify-center text-xs" style={{ border: "1px dashed #e5e2dd", color: "#99a5a3" }}>
+          Žádné fotky
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-1.5" style={{ maxHeight: 200, overflowY: "auto" }}>
+          {photos.map((photo, idx) => (
+            <div key={photo.itemId || photo.name} className="relative aspect-square rounded-md overflow-hidden group cursor-pointer"
+              style={{ background: "#f0eeea" }}
+              onClick={() => { setLightboxIndex(idx); setLightboxOpen(true); }}>
+              <img
+                src={photo.thumbnailUrl || photo.downloadUrl || ""}
+                alt={photo.name}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+              {/* Delete button on hover */}
+              <button
+                onClick={(e) => { e.stopPropagation(); handleDelete(photo.name); }}
+                className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{ background: "rgba(0,0,0,0.6)" }}>
+                <X className="h-3 w-3 text-white" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Lightbox */}
+      <PhotoLightbox
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        files={photos}
+        initialIndex={lightboxIndex}
+        projectName={projectId}
+        onDelete={(name) => handleDelete(name)}
+        canDelete
+      />
+    </div>
+  );
+}
