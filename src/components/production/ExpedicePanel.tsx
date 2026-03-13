@@ -432,7 +432,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
           <ProjectGroup
             key={group.project_id}
             group={group}
-            projectExpediceMap={projectExpediceMap}
+            projectDeadlineMap={projectDeadlineMap}
             projectTotalItems={projectTotalItems}
             scheduleData={scheduleData}
             inboxProjects={inboxProjects}
