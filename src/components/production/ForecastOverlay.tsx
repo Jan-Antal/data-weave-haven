@@ -208,7 +208,8 @@ function ForecastCard({
   hourlyRate?: number;
   weeklyCapacity?: number;
 }) {
-  const style = getSourceStyle(block.source, block.confidence);
+  const isMoved = block.source === "existing_plan" && !!block.originalWeek && block.week !== block.originalWeek;
+  const style = getSourceStyle(block.source, block.confidence, isMoved);
   const [expanded, setExpanded] = useState(false);
   const [subItems, setSubItems] = useState<ForecastSubItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
