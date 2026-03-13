@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { GripVertical, ChevronRight, AlertTriangle } from "lucide-react";
+import type { ForecastBlock } from "@/hooks/useForecastMode";
 import { differenceInDays, format } from "date-fns";
 import { useProductionSchedule, getISOWeekNumber, type WeekSilo, type ScheduleBundle, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
