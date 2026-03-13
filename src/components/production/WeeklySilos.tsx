@@ -672,10 +672,14 @@ interface SiloProps {
   selectedProjectId?: string | null;
   onSelectProject?: (projectId: string) => void;
   searchQuery?: string;
+  forecastBlocks?: ForecastBlock[];
+  forecastSelectedIds?: Set<string>;
+  onToggleForecastSelect?: (id: string) => void;
+  forecastDarkMode?: boolean;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "" }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode }: SiloProps) {
   // Capacity calculation: exclude paused items
   const activeHours = useMemo(() => {
     if (!silo) return 0;
