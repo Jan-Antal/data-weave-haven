@@ -32,11 +32,13 @@ function formatCompactCzk(v: number): string {
 
 type UrgencyLevel = "overdue" | "urgent" | "upcoming" | "ok";
 
-function getUrgency(datumSmluvni: string | null | undefined, status: string | null | undefined): UrgencyLevel {
-  if (!datumSmluvni) return "ok";
-  const s = (status ?? "").toLowerCase();
+function getUrgency(info: { expedice?: string | null; montaz?: string | null; datum_smluvni?: string | null; status?: string | null } | undefined): UrgencyLevel {
+  if (!info) return "ok";
+  const s = (info.status ?? "").toLowerCase();
   if (s === "fakturace" || s === "dokonceno" || s === "dokončeno") return "ok";
-  const d = parseAppDate(datumSmluvni);
+  const dl = resolveDeadline(info);
+  if (!dl) return "ok";
+  const d = parseAppDate(dl.date);
   if (!d) return "ok";
   if (isPast(d)) return "overdue";
   const days = differenceInDays(d, new Date());
@@ -45,9 +47,11 @@ function getUrgency(datumSmluvni: string | null | undefined, status: string | nu
   return "ok";
 }
 
-function getUrgencyDaysLabel(datumSmluvni: string | null | undefined): string | null {
-  if (!datumSmluvni) return null;
-  const d = parseAppDate(datumSmluvni);
+function getUrgencyDaysLabel(info: { expedice?: string | null; montaz?: string | null; datum_smluvni?: string | null } | undefined): string | null {
+  if (!info) return null;
+  const dl = resolveDeadline(info);
+  if (!dl) return null;
+  const d = parseAppDate(dl.date);
   if (!d) return null;
   const days = differenceInDays(d, new Date());
   if (days <= 0) return null; // overdue uses badge text
