@@ -1560,27 +1560,6 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                 </div>
               );
             })}
-
-            {blockerRows.length > 0 && (
-              <>
-                <div className="flex items-center gap-2 mt-4 mb-2 px-2">
-                  <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
-                  <span className="px-2 whitespace-nowrap" style={{ fontSize: 11, color: "#6b7280" }}>
-                    ⏳ Rezerva kapacit ({blockerRows.length})
-                  </span>
-                  <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
-                </div>
-                {blockerRows.map(proj => {
-                  const isExpanded = expandedProjects.has(proj.projectId);
-                  return (
-                    <div key={`blocker-${proj.projectId}`} className="flex flex-col" style={{ opacity: 0.7 }}>
-                      {/* Reuse same row rendering as regular but with dashed style */}
-                      {renderProjectRow(proj, isExpanded)}
-                    </div>
-                  );
-                })}
-              </>
-            )}
           </div>
 
           {filteredRows.length === 0 && (
