@@ -438,6 +438,7 @@ export function useForecastMode(): UseForecastModeReturn {
     commitInboxOnly,
     moveForecastBlock,
     removeForecastBlock,
+    addForecastBlock,
     splitForecastBlock,
     resetAndRegenerate,
     loadSavedSession,
