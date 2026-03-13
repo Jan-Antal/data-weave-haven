@@ -45,6 +45,8 @@ export function useProductionProgress() {
       const scheduledByProject = new Map<string, number>();
       const completedByProject = new Map<string, number>();
       const pausedByProject = new Map<string, number>();
+      const blockerCountByProject = new Map<string, number>();
+      const nonBlockerCountByProject = new Map<string, number>();
       const scheduledItemsByProject = new Map<string, ProjectProgress["scheduled_items"]>();
       const projectNames = new Map<string, string>();
 
