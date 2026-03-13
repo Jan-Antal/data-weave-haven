@@ -387,7 +387,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
 
         {/* SCROLLABLE BODY */}
         <div ref={tpvBodyScrollRef} className="flex-1 overflow-auto always-scrollbar" onScroll={handleTpvBodyScroll}>
-          <Table>
+          <Table style={{ tableLayout: "fixed" }}>
             <TableBody>
               {isLoading ? (
                 <TableRow><TableCell colSpan={visibleColCount} className="text-center text-muted-foreground">Načítání...</TableCell></TableRow>
