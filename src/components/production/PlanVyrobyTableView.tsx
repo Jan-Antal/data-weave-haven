@@ -35,7 +35,7 @@ type SortMode = "project" | "deadline" | "hours";
 interface Props {
   displayMode: DisplayMode;
   searchQuery?: string;
-  onNavigateToTPV?: (projectId: string) => void;
+  onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void;
   onOpenProjectDetail?: (projectId: string) => void;
 }
 
