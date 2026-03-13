@@ -47,7 +47,7 @@ export function ForecastCommitBar({
           ) : (
             <>
               <span className="font-bold" style={{ color: "#f59e0b" }}>{totalBlocks}</span>
-              {" "}bloků připraveno ke commitu
+              {" "}bloků připraveno k zápisu
               {inboxBlockCount > 0 && (
                 <span style={{ color: "#22c55e" }}> · {inboxBlockCount} inbox</span>
               )}
@@ -110,7 +110,7 @@ export function ForecastCommitBar({
               style={{ backgroundColor: "transparent", color: "#f59e0b", borderColor: "#2a4a46" }}
             >
               <Check className="h-3 w-3 mr-1" />
-              Commit vybrané ({selectedCount})
+              Zapsat vybrané ({selectedCount})
             </Button>
             <Button
               size="sm"
@@ -119,7 +119,7 @@ export function ForecastCommitBar({
               style={{ backgroundColor: "#3d7a74", color: "#ffffff" }}
             >
               <Check className="h-3 w-3 mr-1" />
-              Commit vše do plánu
+              Zapsat vše do plánu
             </Button>
           </>
         )}
