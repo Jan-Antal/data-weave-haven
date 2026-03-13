@@ -621,6 +621,8 @@ export default function PlanVyroby() {
                 selectedProjectId={selectedProjectId}
                 onSelectProject={handleSelectProject}
                 searchQuery={searchQuery}
+                width={inboxWidth}
+                onWidthChange={handleInboxWidthChange}
               />
             )}
             <WeeklySilos
