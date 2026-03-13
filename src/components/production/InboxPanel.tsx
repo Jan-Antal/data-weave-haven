@@ -782,7 +782,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
       <button
         onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); onSelectProject?.(project.project_id); }}
         onContextMenu={e => onProjectContextMenu(e, project)}
-        className="w-full flex items-center gap-1.5 px-2.5 py-2 text-left transition-colors"
+        className="w-full flex items-center gap-1.5 px-2.5 py-[5px] text-left transition-colors"
         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
       >
