@@ -222,7 +222,24 @@ export function useForecastMode(): UseForecastModeReturn {
   }, []);
 
   const removeForecastBlock = useCallback((blockId: string) => {
-    setForecastBlocks(prev => prev.filter(b => b.id !== blockId));
+    setForecastBlocks(prev => {
+      const block = prev.find(b => b.id === blockId);
+      if (block && block.source === "project_estimate") {
+        // Move to safety net instead of deleting
+        setSafetyNetProjects(sn => {
+          // Avoid duplicates
+          if (sn.some(p => p.project_id === block.project_id)) return sn;
+          return [...sn, {
+            project_id: block.project_id,
+            project_name: block.project_name,
+            estimated_hours: block.estimated_hours,
+            source: "unplanned" as const,
+          }];
+        });
+        toast({ title: `🛡 ${block.project_name} přesunuto do Záchranné sítě` });
+      }
+      return prev.filter(b => b.id !== blockId);
+    });
     setSelectedBlockIds(prev => {
       const next = new Set(prev);
       next.delete(blockId);
