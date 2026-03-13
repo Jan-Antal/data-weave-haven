@@ -94,6 +94,7 @@ interface UseForecastModeReturn {
   addRealBundleOverride: (projectId: string, projectName: string, originalWeek: string, newWeek: string, hours: number, itemCount: number) => void;
   /** Commit real bundle overrides to Supabase via moveBundleToWeek */
   commitRealBundleOverrides: (moveBundleToWeek: (projectId: string, sourceWeek: string, targetWeek: string) => Promise<void>) => Promise<void>;
+  safetyNetProjects: SafetyNetProject[];
 }
 
 export function useForecastMode(): UseForecastModeReturn {
