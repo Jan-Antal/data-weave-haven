@@ -1187,7 +1187,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
                 return null;
               })()}
               {expDate && !allCompleted && (
-                <span className="text-xs truncate" style={{ color: expSeverity === "overdue" ? "#dc2626" : expSeverity === "urgent" ? "#d97706" : daysUntilExp !== null && daysUntilExp <= 14 ? "#d97706" : "#6b7280" }}>
+                <span className="text-xs truncate" style={{ color: daysUntilExp !== null && daysUntilExp < 0 ? "#dc2626" : daysUntilExp !== null && daysUntilExp <= 14 ? "#d97706" : "#6b7280" }}>
                   Exp: {expDate}
                 </span>
               )}
