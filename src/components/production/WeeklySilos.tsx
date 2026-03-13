@@ -24,7 +24,7 @@ import { parseAppDate } from "@/lib/dateFormat";
 import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
 import { resolveDeadline } from "@/lib/deadlineWarning";
 import { ForecastWeekContent, ForecastSplitDialog } from "./ForecastOverlay";
-import { ForecastSafetyNet, type SafetyNetProject } from "./ForecastSafetyNet";
+import { type SafetyNetProject } from "./ForecastSafetyNet";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
