@@ -980,9 +980,9 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
           <>
             {realBundles.length > 0 && (
               <div className="flex items-center gap-1.5 my-1">
-                <div className="flex-1" style={{ borderTop: "1px solid #2a2f3d" }} />
-                <span className="text-[9px] font-semibold tracking-wider shrink-0" style={{ color: "#4a5168" }}>FORECAST</span>
-                <div className="flex-1" style={{ borderTop: "1px solid #2a2f3d" }} />
+                <div className="flex-1" style={{ borderTop: "1px solid #2a3d3a" }} />
+                <span className="text-[9px] font-semibold tracking-wider shrink-0" style={{ color: "#4a5a58" }}>FORECAST</span>
+                <div className="flex-1" style={{ borderTop: "1px solid #2a3d3a" }} />
               </div>
             )}
             <ForecastWeekContent
