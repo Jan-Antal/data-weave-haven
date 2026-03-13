@@ -747,7 +747,15 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             <span className="text-[9px] text-center" style={{ color: "#c4ccc9" }}>Prázdný týden</span>
           </div>
         )}
-        {silo?.bundles.map(bundle => (
+        {silo?.bundles
+          .slice()
+          .sort((a, b) => {
+            const aDone = a.items.length > 0 && a.items.every(i => i.status === "completed");
+            const bDone = b.items.length > 0 && b.items.every(i => i.status === "completed");
+            if (aDone === bDone) return 0;
+            return aDone ? 1 : -1;
+          })
+          .map(bundle => (
           <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey}
             showCzk={showCzk} hourlyRate={hourlyRate} displayMode={displayMode}
             onBundleContextMenu={onBundleContextMenu} onItemContextMenu={onItemContextMenu}
