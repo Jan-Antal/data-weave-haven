@@ -192,14 +192,17 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const defaultWeeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
 
-  // Initial scroll — show last week (index 3) as first visible column
+  // Initial scroll — defer until weeks are rendered
   useEffect(() => {
     if (initialScrollDone.current) return;
     const el = scrollContainerRef.current;
     if (!el) return;
-    el.scrollLeft = 3 * 259;
+    // Scroll so that 1 past week is visible before current week
+    const pastCount = pastWeeksLoaded;
+    const scrollTarget = Math.max(0, (pastCount - 1)) * 259;
+    el.scrollLeft = scrollTarget;
     initialScrollDone.current = true;
-  }, []);
+  }, [pastWeeksLoaded]);
 
   // Auto-scroll silo container during drag when pointer near edges
   useEffect(() => {
