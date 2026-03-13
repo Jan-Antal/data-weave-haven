@@ -140,7 +140,32 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   const [cancelDialog, setCancelDialog] = useState<{
     open: boolean; itemId: string; itemName: string; itemCode?: string | null;
     hours: number; projectName: string; projectId: string;
-    splitGroupId?: string | null;
+    splitGroupId?: string | null; cancelAll?: boolean;
+  } | null>(null);
+
+  // Completion dialog state
+  const [completionState, setCompletionState] = useState<{
+    projectName: string; projectId: string; weekLabel: string; weekKey: string;
+    items: ScheduleItem[]; preCheckedIds?: string[];
+  } | null>(null);
+
+  // Split item dialog state
+  const [splitState, setSplitState] = useState<{
+    itemId: string; itemName: string; itemCode: string | null;
+    totalHours: number; projectId: string; stageId: string | null;
+    scheduledCzk: number; source: "schedule" | "inbox";
+    currentWeekKey?: string; splitGroupId?: string | null;
+  } | null>(null);
+
+  // Bundle split dialog state
+  const [bundleSplitState, setBundleSplitState] = useState<{
+    bundleName: string; currentWeekKey: string;
+    items: Array<{ id: string; item_name: string; item_code: string | null; project_id: string; stage_id: string | null; scheduled_hours: number; scheduled_czk: number; split_group_id: string | null; }>;
+  } | null>(null);
+
+  // Pause dialog state
+  const [pauseState, setPauseState] = useState<{
+    itemId: string; itemName: string; itemCode: string | null; source: "schedule" | "inbox";
   } | null>(null);
 
   const projectDateLookup = useMemo(() => {
