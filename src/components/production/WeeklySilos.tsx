@@ -378,6 +378,24 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const handleBundleContextMenu = useCallback(
     (e: React.MouseEvent, bundle: ScheduleBundle, weekKey: string, weekNum: number, startDate: Date, endDate: Date, toggleExpand: () => void) => {
       e.preventDefault(); e.stopPropagation();
+
+      // Blocker bundles: only allow "Odstranit rezervu"
+      const isBlocker = bundle.items.length > 0 && bundle.items.every(i => i.is_blocker);
+      if (isBlocker) {
+        const actions: ContextMenuAction[] = [{
+          label: "Odstranit rezervu", icon: "🗑",
+          onClick: async () => {
+            const ids = bundle.items.map(i => i.id);
+            const { error } = await supabase.from("production_schedule").delete().in("id", ids);
+            if (error) { toast({ title: "Chyba", description: error.message, variant: "destructive" }); return; }
+            qc.invalidateQueries({ queryKey: ["production-schedule"] });
+            toast({ title: `🗑 Rezerva pro ${bundle.project_name} odstraněna` });
+          },
+        }];
+        setContextMenu({ x: Math.min(e.clientX, window.innerWidth - 200), y: Math.min(e.clientY, window.innerHeight - 200), actions });
+        return;
+      }
+
       const activeItems = bundle.items.filter(i => i.status !== "completed" && i.status !== "paused" && i.status !== "cancelled");
       const hasUncompleted = activeItems.length > 0;
       const completedItems = bundle.items.filter(i => i.status === "completed");
