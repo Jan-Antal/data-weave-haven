@@ -732,6 +732,46 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   );
 }
 
+function InboxResizeHandle({ onWidthChange, containerWidth }: { onWidthChange?: (w: number) => void; containerWidth: number }) {
+  const dragRef = useRef(false);
+  const startX = useRef(0);
+  const startW = useRef(0);
+
+  const onDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragRef.current = true;
+    startX.current = e.clientX;
+    startW.current = containerWidth;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return;
+      const newW = Math.max(180, Math.min(500, startW.current + ev.clientX - startX.current));
+      onWidthChange?.(newW);
+    };
+    const onUp = () => {
+      dragRef.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [containerWidth, onWidthChange]);
+
+  return (
+    <div
+      onMouseDown={onDown}
+      className="absolute top-0 right-0 w-[4px] h-full cursor-col-resize z-10 group"
+    >
+      <div className="w-[2px] h-full mx-auto opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: "#7aa8a4" }} />
+    </div>
+  );
+}
+
 function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode = "hours", progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel, isSelected, onSelectProject, projectInfo, checkedItems, onToggleCheck, onClearChecked, allInboxItemsMap, searchQuery = "" }: {
   project: InboxProject; hourlyRate: number; defaultExpanded: boolean; displayMode?: DisplayMode;
   progress?: ProjectProgress; onNavigateToTPV?: (projectId: string) => void;
