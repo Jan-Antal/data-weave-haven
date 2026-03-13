@@ -491,18 +491,19 @@ export default function PlanVyroby() {
           searchQuery={searchInput}
           onSearchChange={handleSearchChange}
           forecastActive={forecast.forecastActive}
-          onForecastToggle={(v) => {
+          onForecastToggle={async (v) => {
             forecast.setForecastActive(v);
             if (v) {
-              forecast.generateForecast(weeklyCapacity);
+              await forecast.generateForecast(weeklyCapacity);
             }
           }}
           forecastPlanMode={forecast.planMode}
-          onForecastPlanModeChange={(m) => {
+          onForecastPlanModeChange={async (m) => {
             forecast.setPlanMode(m);
-            // Re-generate with new mode
-            forecast.clearForecast();
-            setTimeout(() => forecast.generateForecast(weeklyCapacity), 100);
+            if (forecast.forecastActive) {
+              forecast.clearForecast();
+              await forecast.generateForecast(weeklyCapacity, m);
+            }
           }}
           isOwner={isOwner}
           isGenerating={forecast.isGenerating}
@@ -510,7 +511,18 @@ export default function PlanVyroby() {
 
         {viewTab === "kanban" ? (
           <div className="flex-1 flex min-h-0" onClick={() => setSelectedProjectId(null)}>
-            <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} disableDropZone={isDraggingFromInbox} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} forecastActive={forecast.forecastActive} />
+            {!forecast.forecastActive && (
+              <InboxPanel
+                overDroppableId={overDroppableId}
+                showCzk={showCzk}
+                onNavigateToTPV={handleNavigateToTPV}
+                onOpenProjectDetail={handleOpenProjectDetail}
+                disableDropZone={isDraggingFromInbox}
+                selectedProjectId={selectedProjectId}
+                onSelectProject={handleSelectProject}
+                searchQuery={searchQuery}
+              />
+            )}
             <WeeklySilos
               showCzk={showCzk}
               onToggleCzk={(v) => setDisplayMode(v ? "czk" : "hours")}
@@ -542,9 +554,15 @@ export default function PlanVyroby() {
             inboxBlockCount={forecast.forecastBlocks.filter(b => b.source === "inbox_item").length}
             projectBlockCount={forecast.forecastBlocks.filter(b => b.source === "project_estimate").length}
             isGenerating={forecast.isGenerating}
-            onCommitAll={() => forecast.commitBlocks(forecast.forecastBlocks.map(b => b.id))}
-            onCommitSelected={() => forecast.commitBlocks(Array.from(forecast.selectedBlockIds))}
-            onCommitInboxOnly={() => forecast.commitInboxOnly()}
+            onCommitAll={async () => {
+              await forecast.commitBlocks(forecast.forecastBlocks.map(b => b.id));
+            }}
+            onCommitSelected={async () => {
+              await forecast.commitBlocks(Array.from(forecast.selectedBlockIds));
+            }}
+            onCommitInboxOnly={async () => {
+              await forecast.commitInboxOnly();
+            }}
             onCancel={() => forecast.setForecastActive(false)}
             onSelectAll={forecast.selectAll}
             onDeselectAll={forecast.deselectAll}
