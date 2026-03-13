@@ -500,7 +500,7 @@ export function ForecastSplitDialog({ open, onOpenChange, blockName, totalHours,
               </SelectTrigger>
               <SelectContent className="bg-[#1C1F26] border-[#2a2d35]">
                 {availableWeeks.map(w => (
-                  <SelectItem key={w.value} value={w.value} className="text-gray-200">{w.label}</SelectItem>
+                  <SelectItem key={w.key} value={w.key} className="text-gray-200">{w.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
