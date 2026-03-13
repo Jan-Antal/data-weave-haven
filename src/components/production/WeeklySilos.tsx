@@ -568,7 +568,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   return (
     <div className="flex-1 flex flex-col min-w-0">
       {/* Toolbar */}
-      <div className="px-3 py-[6px] flex items-center justify-between shrink-0" style={{ borderBottom: forecastDarkMode ? "1px solid #2a2f3d" : "1px solid #ece8e2" }}>
+      <div className="px-3 py-[6px] flex items-center justify-between shrink-0" style={{ borderBottom: forecastDarkMode ? "1px solid #2a2f3d" : "1px solid #ece8e2", backgroundColor: forecastDarkMode ? "#111318" : undefined }}>
         <button
           onClick={() => { const el = scrollContainerRef.current; if (el) el.scrollTo({ left: 4 * 259, behavior: "smooth" }); }}
           className="px-2 py-[3px] text-[10px] font-medium rounded transition-colors"
