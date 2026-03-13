@@ -470,7 +470,7 @@ export function ForecastSplitDialog({ open, onOpenChange, blockName, totalHours,
   }, [open, totalHours]);
 
   const splitHours = totalHours - keepHours;
-  const availableWeeks = weeks.filter(w => w.value !== currentWeek);
+  const availableWeeks = weeks.filter(w => w.key !== currentWeek);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
