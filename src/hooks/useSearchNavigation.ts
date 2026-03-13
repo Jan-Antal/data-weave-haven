@@ -93,8 +93,6 @@ export function useSearchNavigation({ query, scheduleData, forecastBlocks, forec
     if (!match) return;
     setCurrentIndex(index);
     setFocusedMatchKey(match.matchKey);
-    clearTimeout(fadeTimerRef.current);
-    fadeTimerRef.current = setTimeout(() => setFocusedMatchKey(null), 1500);
   }, [matches]);
 
   const goNext = useCallback(() => {
