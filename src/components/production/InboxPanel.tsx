@@ -863,11 +863,13 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
   );
 }
 
-function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onToggleCheck, checkedItems, allInboxItemsMap }: {
+function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onToggleCheck, checkedItems, allInboxItemsMap, displayMode = "hours", hourlyRate = 550 }: {
   item: InboxItem; projectName: string; onContextMenu: (e: React.MouseEvent) => void;
   isChecked: boolean; onToggleCheck: (itemId: string) => void;
   checkedItems: Set<string>;
   allInboxItemsMap: Map<string, InboxItem & { projectName: string }>;
+  displayMode?: DisplayMode;
+  hourlyRate?: number;
 }) {
   const [hovered, setHovered] = useState(false);
   const adhocBadge = getAdhocBadge((item as any).adhoc_reason);
