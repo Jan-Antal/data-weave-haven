@@ -77,7 +77,7 @@ export function useSearchNavigation({ query, scheduleData, forecastBlocks, forec
       }
     }
     return result;
-  }, [query, scheduleData, forecastBlocks, forecastActive, forecastPlanMode, weekKeys]);
+  }, [query, scheduleData, forecastBlocks, forecastActive, forecastPlanMode, weekKeys, projectPmMap]);
 
   // Reset index when matches change
   useEffect(() => {
