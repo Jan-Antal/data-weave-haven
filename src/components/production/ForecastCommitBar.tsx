@@ -34,7 +34,7 @@ export function ForecastCommitBar({
     <div
       className="fixed bottom-0 left-0 right-0 z-[9999] flex items-center justify-between px-6 py-3"
       style={{
-        backgroundColor: "#1a1d2e",
+        backgroundColor: "#1c1f26",
         borderTop: "2px solid #f59e0b",
         boxShadow: "0 -4px 20px rgba(0,0,0,0.4)",
       }}
