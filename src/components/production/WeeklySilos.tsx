@@ -1062,7 +1062,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
                 projectLookup={projectLookup}
                 isSelected={selectedProjectId === bundle.project_id}
                 onSelectProject={onSelectProject} searchQuery={searchQuery}
-                forecastDarkMode={forecastDarkMode} />
+                forecastDarkMode={forecastDarkMode}
+                isFocusedMatch={focusedMatchKey === `${weekKey}::${bundle.project_id}`} />
             ))}
           </>
         )}
