@@ -979,7 +979,14 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                       className="shrink-0 flex items-center gap-2.5 px-3 sticky left-0 z-20"
                       style={{
                         width: LEFT_COL_W,
-                        backgroundColor: "#fff",
+                        backgroundColor: (() => {
+                          const pd = projectDateLookup.get(proj.projectId);
+                          const exp = pd?.expedice ? parseAppDate(pd.expedice) : null;
+                          const isProjectDone = ["Fakturace", "Dokonceno", "Dokončeno", "Expedice"].includes(pd?.status ?? "");
+                          const allItemsDone = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
+                          if (!isProjectDone && !allItemsDone && exp && differenceInDays(exp, new Date()) < 0) return "hsl(0 80% 96%)";
+                          return "#fff";
+                        })(),
                         borderLeft: `4px solid ${proj.color}`,
                         borderRight: "1px solid #e5e2dd",
                         borderTop: "1px solid #e5e2dd",
