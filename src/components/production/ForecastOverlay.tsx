@@ -193,6 +193,7 @@ function ForecastCard({
   isExpanded,
   displayMode = "hours",
   hourlyRate = 550,
+  weeklyCapacity = 0,
 }: {
   block: ForecastBlock;
   isSelected: boolean;
@@ -202,6 +203,7 @@ function ForecastCard({
   isExpanded?: boolean;
   displayMode?: DisplayMode;
   hourlyRate?: number;
+  weeklyCapacity?: number;
 }) {
   const style = getSourceStyle(block.source, block.confidence);
   const [expanded, setExpanded] = useState(false);
