@@ -673,18 +673,7 @@ export default function PlanVyroby() {
               await forecast.commitBlocks(Array.from(forecast.selectedBlockIds));
             }}
             onCancel={() => forecast.setForecastActive(false)}
-            onToggleInboxSelect={() => {
-              const inboxIds = forecast.forecastBlocks.filter(b => b.source === "inbox_item").map(b => b.id);
-              const allSelected = inboxIds.length > 0 && inboxIds.every(id => forecast.selectedBlockIds.has(id));
-              if (allSelected) {
-                // Deselect all inbox blocks
-                const next = new Set(forecast.selectedBlockIds);
-                inboxIds.forEach(id => next.delete(id));
-                forecast.setSelectedBlockIds(next);
-              } else {
-                forecast.selectInboxOnly();
-              }
-            }}
+            onToggleInboxSelect={forecast.toggleInboxSelection}
           />
         )}
       </div>

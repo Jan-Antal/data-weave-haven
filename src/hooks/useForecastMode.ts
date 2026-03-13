@@ -425,6 +425,7 @@ export function useForecastMode(): UseForecastModeReturn {
     toggleBlockSelection,
     selectAll,
     selectInboxOnly,
+    toggleInboxSelection,
     deselectAll,
     generateForecast,
     clearForecast,
