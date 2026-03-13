@@ -82,6 +82,7 @@ interface Props {
   forecastSelectedIds?: Set<string>;
   onToggleForecastSelect?: (id: string) => void;
   forecastDarkMode?: boolean;
+  forecastPlanMode?: "respect_plan" | "from_scratch";
 }
 
 interface ContextMenuState {
@@ -146,7 +147,7 @@ interface CancelState {
   cancelAll?: boolean;
 }
 
-export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode }: Props) {
+export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
@@ -604,6 +605,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               forecastSelectedIds={forecastSelectedIds}
               onToggleForecastSelect={onToggleForecastSelect}
               forecastDarkMode={forecastDarkMode}
+              forecastPlanMode={forecastPlanMode}
             />
           ))}
         </div>
@@ -681,10 +683,11 @@ interface SiloProps {
   forecastSelectedIds?: Set<string>;
   onToggleForecastSelect?: (id: string) => void;
   forecastDarkMode?: boolean;
+  forecastPlanMode?: "respect_plan" | "from_scratch";
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode }: SiloProps) {
   // Capacity calculation: exclude paused items
   const activeHours = useMemo(() => {
     if (!silo) return 0;
@@ -692,11 +695,20 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       sum + b.items.reduce((s, i) => s + (i.status === "paused" ? 0 : i.scheduled_hours), 0), 0);
   }, [silo]);
 
-  const totalHours = activeHours;
+  // Forecast hours for this week (for capacity bar)
+  const forecastHoursForWeek = useMemo(() => {
+    if (!forecastBlocks || !forecastDarkMode) return 0;
+    return forecastBlocks.filter(b => b.week === weekKey).reduce((sum, b) => sum + b.estimated_hours, 0);
+  }, [forecastBlocks, forecastDarkMode, weekKey]);
+
+  const totalHours = activeHours + (forecastDarkMode ? forecastHoursForWeek : 0);
   const pct = weeklyCapacity > 0 ? (totalHours / weeklyCapacity) * 100 : 0;
   const isOverloaded = pct > 120;
   const isWarning = pct > 100 && pct <= 120;
   const overloadHours = totalHours - weeklyCapacity;
+
+  // In "from_scratch" mode, hide real plan cards
+  const hideRealCards = forecastDarkMode && forecastPlanMode === "from_scratch";
 
   const barColor = isPast ? "#b0bab8" : isOverloaded ? "#dc3545" : isWarning ? "#d97706" : "#3a8a36";
   const barBg = isPast ? "linear-gradient(90deg, #d0d7d5, #b0bab8)"
@@ -704,7 +716,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
     : isWarning ? "linear-gradient(90deg, #fcd34d, #d97706)"
     : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
 
-  const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}`, disabled: isPast });
+  const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}`, disabled: isPast || !!forecastDarkMode });
   const highlighted = !isPast && (isOver || isOverTarget);
   const dropBorderColor = highlighted ? (isOverloaded ? "#d97706" : "#3b82f6") : undefined;
   const headerColor = forecastDarkMode
@@ -756,17 +768,17 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
 
       {/* Items */}
       <div className="flex-1 overflow-y-auto p-1.5" style={{ display: "flex", flexDirection: "column", gap: 3, opacity: isPast ? 0.7 : 1 }}>
-        {(!silo || silo.bundles.length === 0) && !isPast && (
+        {(!silo || silo.bundles.length === 0 || hideRealCards) && !isPast && !(forecastBlocks && forecastBlocks.some(b => b.week === weekKey)) && (
           <div className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all" style={{ border: forecastDarkMode ? "1.5px dashed #3d4558" : "1.5px dashed #e2ddd6" }}>
-            <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5168" : "#99a5a3" }}>Přetáhni sem z Inboxu</span>
+            <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5168" : "#99a5a3" }}>{forecastDarkMode ? "Žádný forecast" : "Přetáhni sem z Inboxu"}</span>
           </div>
         )}
-        {(!silo || silo.bundles.length === 0) && isPast && (
+        {(!silo || silo.bundles.length === 0 || hideRealCards) && isPast && !(forecastBlocks && forecastBlocks.some(b => b.week === weekKey)) && (
           <div className="flex-1 flex items-center justify-center px-2 py-[14px]">
             <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5168" : "#c4ccc9" }}>Prázdný týden</span>
           </div>
         )}
-        {silo?.bundles
+        {!hideRealCards && silo?.bundles
           .slice()
           .sort((a, b) => {
             const aDone = a.items.length > 0 && a.items.every(i => i.status === "completed");
@@ -777,7 +789,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
           .map(bundle => (
           <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey}
             showCzk={showCzk} hourlyRate={hourlyRate} displayMode={displayMode}
-            onBundleContextMenu={onBundleContextMenu} onItemContextMenu={onItemContextMenu}
+            onBundleContextMenu={forecastDarkMode ? (() => {}) as any : onBundleContextMenu}
+            onItemContextMenu={forecastDarkMode ? (() => {}) as any : onItemContextMenu}
             projectLookup={projectLookup}
             isSelected={selectedProjectId === bundle.project_id}
             onSelectProject={onSelectProject} searchQuery={searchQuery}
@@ -881,7 +894,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: `silo-bundle-${bundle.project_id}-${weekKey}`,
     data: { type: "silo-bundle", projectId: bundle.project_id, projectName: bundle.project_name, weekDate: weekKey, hours: bundle.total_hours, itemCount: bundle.items.length },
-    disabled: allCompleted,
+    disabled: allCompleted || !!forecastDarkMode,
   });
   const toggleExpand = useCallback(() => setExpanded(v => !v), []);
   const isSearchMatch = bundleMatchesSearch(bundle, searchQuery);

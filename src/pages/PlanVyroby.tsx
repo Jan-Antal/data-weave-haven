@@ -241,9 +241,11 @@ export default function PlanVyroby() {
   }, [allProjects, formatWeekLabel]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
+    // Block drag start during forecast mode
+    if (forecast.forecastActive) return;
     const data = event.active.data.current as ActiveDragData | undefined;
     if (data) setActiveDrag(data);
-  }, []);
+  }, [forecast.forecastActive]);
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
     setOverDroppableId(event.over?.id?.toString() ?? null);
@@ -276,6 +278,9 @@ export default function PlanVyroby() {
     const { active, over } = event;
     setActiveDrag(null);
     setOverDroppableId(null);
+
+    // Block all real data modifications during forecast mode
+    if (forecast.forecastActive) return;
 
     if (!active.data.current) return;
 
@@ -505,7 +510,7 @@ export default function PlanVyroby() {
 
         {viewTab === "kanban" ? (
           <div className="flex-1 flex min-h-0" onClick={() => setSelectedProjectId(null)}>
-            <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} disableDropZone={isDraggingFromInbox} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />
+            <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} disableDropZone={isDraggingFromInbox} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} forecastActive={forecast.forecastActive} />
             <WeeklySilos
               showCzk={showCzk}
               onToggleCzk={(v) => setDisplayMode(v ? "czk" : "hours")}
@@ -521,6 +526,7 @@ export default function PlanVyroby() {
               forecastSelectedIds={forecast.forecastActive ? forecast.selectedBlockIds : undefined}
               onToggleForecastSelect={forecast.forecastActive ? forecast.toggleBlockSelection : undefined}
               forecastDarkMode={forecast.forecastActive}
+              forecastPlanMode={forecast.forecastActive ? forecast.planMode : undefined}
             />
             <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />
           </div>
