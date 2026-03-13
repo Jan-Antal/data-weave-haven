@@ -51,7 +51,7 @@ function saveToStorage(mode: ForecastPlanMode, blocks: ForecastBlock[], selected
   } catch { /* ignore */ }
 }
 
-function loadFromStorage(mode: ForecastPlanMode): { blocks: ForecastBlock[]; selectedIds: Set<string>; overrides: RealBundleOverride[] } | null {
+function loadFromStorage(mode: ForecastPlanMode): { blocks: ForecastBlock[]; selectedIds: Set<string>; overrides: RealBundleOverride[]; safetyNet: SafetyNetProject[] } | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS[mode]);
     if (!raw) return null;
@@ -60,7 +60,8 @@ function loadFromStorage(mode: ForecastPlanMode): { blocks: ForecastBlock[]; sel
     return {
       blocks: data.blocks,
       selectedIds: new Set<string>(data.selectedBlockIds || []),
-      overrides: Array.isArray(data.realBundleOverrides) ? data.realBundleOverrides : [],
+      overrides: Array.from(data.realBundleOverrides || []),
+      safetyNet: Array.isArray(data.safetyNetProjects) ? data.safetyNetProjects : [],
     };
   } catch {
     return null;
