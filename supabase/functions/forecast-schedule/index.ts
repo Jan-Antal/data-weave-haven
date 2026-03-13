@@ -167,6 +167,7 @@ serve(async (req) => {
         deadlineSource: string;
         tpvCount: number;
         confidence: string;
+        originalWeeks?: Set<string>;
       }
 
       const allWork: ProjectWork[] = [];
