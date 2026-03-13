@@ -701,15 +701,15 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   return (
     <div className="flex-1 flex flex-col min-w-0">
       {/* Toolbar */}
-      <div className="px-3 py-[6px] flex items-center justify-between shrink-0" style={{ borderBottom: forecastDarkMode ? "1px solid #2a2f3d" : "1px solid #ece8e2", backgroundColor: forecastDarkMode ? "#111318" : undefined }}>
+      <div className="px-3 py-[6px] flex items-center justify-between shrink-0" style={{ borderBottom: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #ece8e2", backgroundColor: forecastDarkMode ? "#223937" : undefined }}>
         <button
           onClick={() => { const el = scrollContainerRef.current; if (el) el.scrollTo({ left: 4 * 259, behavior: "smooth" }); }}
           className="px-2 py-[3px] text-[10px] font-medium rounded transition-colors"
-          style={{ backgroundColor: forecastDarkMode ? "#1c1f26" : "#ffffff", color: forecastDarkMode ? "#9aa5be" : "#6b7a78", border: forecastDarkMode ? "1px solid #2a2f3d" : "1px solid #e2ddd6", cursor: "pointer" }}
+          style={{ backgroundColor: forecastDarkMode ? "#1f2e2c" : "#ffffff", color: forecastDarkMode ? "#a8c5c2" : "#6b7a78", border: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #e2ddd6", cursor: "pointer" }}
         >
           Tento týden
         </button>
-        <span className="text-[9px] font-medium" style={{ color: forecastDarkMode ? "#6b7280" : "#99a5a3" }}>{visiblePeriodLabel}</span>
+        <span className="text-[9px] font-medium" style={{ color: forecastDarkMode ? "#7aa8a4" : "#99a5a3" }}>{visiblePeriodLabel}</span>
       </div>
 
       {/* Safety net panel */}
@@ -893,42 +893,42 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       });
   }, [silo, hideRealCards]);
 
-  const barColor = isPast ? "#b0bab8" : isOverloaded ? "#dc3545" : isWarning ? "#d97706" : "#3a8a36";
+  const barColor = isPast ? "#b0bab8" : isOverloaded ? "#c0392b" : isWarning ? "#d97706" : forecastDarkMode ? "#3d7a74" : "#3a8a36";
   const barBg = isPast ? "linear-gradient(90deg, #d0d7d5, #b0bab8)"
-    : isOverloaded ? "linear-gradient(90deg, #fca5a5, #dc3545)"
+    : isOverloaded ? "linear-gradient(90deg, #fca5a5, #c0392b)"
     : isWarning ? "linear-gradient(90deg, #fcd34d, #d97706)"
-    : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
+    : forecastDarkMode ? "linear-gradient(90deg, #6abfb5, #3d7a74)" : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
 
   const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}`, disabled: isPast });
   const highlighted = !isPast && (isOver || isOverTarget);
   const dropBorderColor = highlighted ? (isOverloaded ? "#d97706" : "#3b82f6") : undefined;
   const headerColor = forecastDarkMode
-    ? (isPast ? "#6b7280" : isCurrent ? "#7eb8ff" : "#9aa5be")
+    ? (isPast ? "#4a5a58" : isCurrent ? "#4a9e96" : "#7aa8a4")
     : (isPast ? "#9ca3af" : isCurrent ? "#223937" : "#1a1a1a");
   const headerWeight = isCurrent ? 700 : isPast ? 500 : 600;
-  const dateRangeColor = forecastDarkMode ? "#4a5168" : (isPast ? "#b0b7c3" : "#6b7280");
+  const dateRangeColor = forecastDarkMode ? "#4a5a58" : (isPast ? "#b0b7c3" : "#6b7280");
 
   const combinedRef = useCallback((el: HTMLDivElement | null) => { setNodeRef(el); registerRef(weekKey, el); }, [setNodeRef, registerRef, weekKey]);
 
   return (
     <div ref={combinedRef} data-week-key={weekKey} className="w-[252px] shrink-0 flex flex-col transition-all"
       style={{
-        backgroundColor: forecastDarkMode ? "#1c1f26" : "#ffffff", borderRadius: 9,
+        backgroundColor: forecastDarkMode ? "#1f2e2c" : "#ffffff", borderRadius: 9,
         border: highlighted ? `2px solid ${dropBorderColor}`
-          : isCurrent ? (forecastDarkMode ? "2px solid #4f8ef7" : "2px solid #3a8a36")
-          : isOverloaded && !isPast ? (forecastDarkMode ? "1px solid rgba(220,53,69,0.5)" : "1px solid rgba(220,53,69,0.4)")
-          : forecastDarkMode ? "1px solid #2a2f3d" : "1px solid #ece8e2",
+          : isCurrent ? (forecastDarkMode ? "2px solid #4a9e96" : "2px solid #3a8a36")
+          : isOverloaded && !isPast ? (forecastDarkMode ? "1px solid rgba(192,57,43,0.5)" : "1px solid rgba(220,53,69,0.4)")
+          : forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #ece8e2",
       }}
     >
       {/* Header */}
-      <div className="px-2.5 py-1.5 text-center" style={{ borderBottom: forecastDarkMode ? "1px solid #2a2f3d" : "1px solid #ece8e2" }}>
+      <div className="px-2.5 py-1.5 text-center" style={{ borderBottom: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #ece8e2" }}>
         <div className="flex items-center justify-center gap-1.5">
           <span className="font-mono text-[14px]" style={{ color: headerColor, fontWeight: headerWeight }}>T{weekNum}</span>
-          {isCurrent && <span className="w-[5px] h-[5px] rounded-full" style={{ backgroundColor: "#3a8a36" }} />}
+          {isCurrent && <span className="w-[5px] h-[5px] rounded-full" style={{ backgroundColor: forecastDarkMode ? "#4a9e96" : "#3a8a36" }} />}
         </div>
         <div className="text-[9px] mt-0.5" style={{ color: dateRangeColor }}>{formatDateShort(startDate)} – {formatDateShort(endDate)}</div>
         <div className="mt-1.5" style={{ opacity: isPast ? 0.6 : 1 }}>
-          <div className="h-[7px] rounded" style={{ backgroundColor: forecastDarkMode ? "#2a2f3d" : "#f0eee9", overflow: "hidden" }}>
+          <div className="h-[7px] rounded" style={{ backgroundColor: forecastDarkMode ? "#2a3d3a" : "#f0eee9", overflow: "hidden" }}>
             <div className="h-full rounded transition-all duration-300" style={{ width: `${Math.min(pct, 100)}%`, background: barBg }} />
           </div>
            <div className="flex items-baseline justify-between mt-[3px]">
@@ -936,14 +936,14 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
               <>
                 <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{formatCompactCzk(activeHours * hourlyRate)}</span>
                 {blockerHours > 0 && <span className="font-mono text-[9px]" style={{ color: "#6b7280" }}>+~{formatCompactCzk(blockerHours * hourlyRate)}</span>}
-                <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#4a5168" : "#99a5a3" }}>/ {formatCompactCzk(weeklyCapacity * hourlyRate)}</span>
+                <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }}>/ {formatCompactCzk(weeklyCapacity * hourlyRate)}</span>
                 <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
               </>
             ) : (
               <>
                 <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{Math.round(activeHours)}h</span>
                 {blockerHours > 0 && <span className="font-mono text-[9px]" style={{ color: "#6b7280" }}>+~{Math.round(blockerHours)}h</span>}
-                <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#4a5168" : "#99a5a3" }}>/ {weeklyCapacity}h</span>
+                <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }}>/ {weeklyCapacity}h</span>
                 <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
               </>
             )}
@@ -954,13 +954,13 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       {/* Items */}
       <div className="flex-1 overflow-y-auto p-1.5" style={{ display: "flex", flexDirection: "column", gap: 3, opacity: isPast ? 0.7 : 1 }}>
         {(realBundles.length === 0) && !isPast && weekForecastBlocks.length === 0 && (
-          <div className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all" style={{ border: forecastDarkMode ? "1.5px dashed #3d4558" : "1.5px dashed #e2ddd6" }}>
-            <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5168" : "#99a5a3" }}>{forecastDarkMode ? "Žádný forecast" : "Přetáhni sem z Inboxu"}</span>
+          <div className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all" style={{ border: forecastDarkMode ? "1.5px dashed #2a3d3a" : "1.5px dashed #e2ddd6" }}>
+            <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }}>{forecastDarkMode ? "Žádný forecast" : "Přetáhni sem z Inboxu"}</span>
           </div>
         )}
         {(realBundles.length === 0) && isPast && weekForecastBlocks.length === 0 && (
           <div className="flex-1 flex items-center justify-center px-2 py-[14px]">
-            <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5168" : "#c4ccc9" }}>Prázdný týden</span>
+            <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5a58" : "#c4ccc9" }}>Prázdný týden</span>
           </div>
         )}
 
@@ -980,9 +980,9 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
           <>
             {realBundles.length > 0 && (
               <div className="flex items-center gap-1.5 my-1">
-                <div className="flex-1" style={{ borderTop: "1px solid #2a2f3d" }} />
-                <span className="text-[9px] font-semibold tracking-wider shrink-0" style={{ color: "#4a5168" }}>FORECAST</span>
-                <div className="flex-1" style={{ borderTop: "1px solid #2a2f3d" }} />
+                <div className="flex-1" style={{ borderTop: "1px solid #2a3d3a" }} />
+                <span className="text-[9px] font-semibold tracking-wider shrink-0" style={{ color: "#4a5a58" }}>FORECAST</span>
+                <div className="flex-1" style={{ borderTop: "1px solid #2a3d3a" }} />
               </div>
             )}
             <ForecastWeekContent

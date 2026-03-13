@@ -34,14 +34,14 @@ export function ForecastCommitBar({
     <div
       className="fixed bottom-0 left-0 right-0 z-[9999] flex items-center justify-between px-6 py-3"
       style={{
-        backgroundColor: "#1c1f26",
-        borderTop: "2px solid #f59e0b",
+        backgroundColor: "#223937",
+        borderTop: "1px solid #2a4a46",
         boxShadow: "0 -4px 20px rgba(0,0,0,0.4)",
       }}
     >
       <div className="flex items-center gap-3">
         <Sparkles className="h-4 w-4" style={{ color: "#f59e0b" }} />
-        <span className="text-sm font-medium" style={{ color: "#e5e7eb" }}>
+        <span className="text-sm font-medium" style={{ color: "#a8c5c2" }}>
           {isGenerating ? (
             "Generuji forecast..."
           ) : (
@@ -55,7 +55,7 @@ export function ForecastCommitBar({
                 <span style={{ color: "#f59e0b" }}> · {projectBlockCount} projekt</span>
               )}
               {selectedCount < totalBlocks && selectedCount > 0 && (
-                <span style={{ color: "#9ca3af" }}>
+                <span style={{ color: "#7aa8a4" }}>
                   {" "}· {selectedCount} vybráno
                 </span>
               )}
@@ -67,7 +67,7 @@ export function ForecastCommitBar({
             <button
               onClick={onSelectAll}
               className="text-[11px] px-2 py-0.5 rounded transition-colors"
-              style={{ color: "#9ca3af", backgroundColor: "rgba(255,255,255,0.05)" }}
+              style={{ color: "#a8c5c2", backgroundColor: "rgba(255,255,255,0.05)" }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)")}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)")}
             >
@@ -76,7 +76,7 @@ export function ForecastCommitBar({
             <button
               onClick={onDeselectAll}
               className="text-[11px] px-2 py-0.5 rounded transition-colors"
-              style={{ color: "#9ca3af", backgroundColor: "rgba(255,255,255,0.05)" }}
+              style={{ color: "#a8c5c2", backgroundColor: "rgba(255,255,255,0.05)" }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)")}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)")}
             >
@@ -94,8 +94,8 @@ export function ForecastCommitBar({
                 size="sm"
                 variant="outline"
                 onClick={onCommitInboxOnly}
-                className="text-xs border-green-600 text-green-400 hover:bg-green-900/30 hover:text-green-300"
-                style={{ backgroundColor: "transparent" }}
+                className="text-xs hover:bg-green-900/30 hover:text-green-300"
+                style={{ backgroundColor: "transparent", color: "#22c55e", borderColor: "#2a4a46" }}
               >
                 <Inbox className="h-3 w-3 mr-1" />
                 Pouze Inbox ({inboxBlockCount})
@@ -106,8 +106,8 @@ export function ForecastCommitBar({
               variant="outline"
               disabled={selectedCount === 0}
               onClick={onCommitSelected}
-              className="text-xs border-amber-600 text-amber-400 hover:bg-amber-900/30 hover:text-amber-300"
-              style={{ backgroundColor: "transparent" }}
+              className="text-xs hover:bg-amber-900/30 hover:text-amber-300"
+              style={{ backgroundColor: "transparent", color: "#f59e0b", borderColor: "#2a4a46" }}
             >
               <Check className="h-3 w-3 mr-1" />
               Commit vybrané ({selectedCount})
@@ -116,7 +116,7 @@ export function ForecastCommitBar({
               size="sm"
               onClick={onCommitAll}
               className="text-xs font-semibold"
-              style={{ backgroundColor: "#f59e0b", color: "#1a1a1a" }}
+              style={{ backgroundColor: "#3d7a74", color: "#ffffff" }}
             >
               <Check className="h-3 w-3 mr-1" />
               Commit vše do plánu
@@ -127,7 +127,8 @@ export function ForecastCommitBar({
           size="sm"
           variant="ghost"
           onClick={onCancel}
-          className="text-xs text-gray-400 hover:text-white hover:bg-white/10"
+          className="text-xs hover:bg-white/10"
+          style={{ color: "#7aa8a4", backgroundColor: "transparent", border: "1px solid #2a4a46" }}
         >
           <X className="h-3 w-3 mr-1" />
           Zrušit

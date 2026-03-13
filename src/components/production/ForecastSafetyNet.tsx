@@ -13,7 +13,7 @@ interface ForecastSafetyNetProps {
 }
 
 const sourceBadge: Record<string, { label: string; bg: string }> = {
-  scheduled: { label: "Plán", bg: "#3d4558" },
+  scheduled: { label: "Plán", bg: "#2a3d3a" },
   inbox: { label: "Inbox", bg: "#14532d" },
   unplanned: { label: "Bez plánu", bg: "#451a03" },
 };
@@ -26,8 +26,8 @@ export function ForecastSafetyNet({ projects }: ForecastSafetyNetProps) {
   return (
     <div
       style={{
-        background: "#1a1f2e",
-        border: "1px solid #f59e0b",
+        background: "#1a2422",
+        border: "1px solid #c4860a",
         borderRadius: 8,
         marginBottom: 12,
         overflow: "hidden",
@@ -55,14 +55,14 @@ export function ForecastSafetyNet({ projects }: ForecastSafetyNetProps) {
               >
                 <span
                   className="px-1.5 py-0.5 rounded font-mono text-[10px]"
-                  style={{ background: "#2a2f3d", color: "#8899bb" }}
+                  style={{ background: "#2a3d3a", color: "#7aa8a4" }}
                 >
                   {p.project_id}
                 </span>
-                <span className="flex-1 truncate" style={{ color: "#c8d0e0" }}>
+                <span className="flex-1 truncate" style={{ color: "#a8c5c2" }}>
                   {p.project_name}
                 </span>
-                <span style={{ color: "#8899bb" }}>~{p.estimated_hours}h</span>
+                <span style={{ color: "#7aa8a4" }}>~{p.estimated_hours}h</span>
                 <span
                   className="px-1.5 py-0.5 rounded text-[10px] font-medium"
                   style={{ background: badge.bg, color: "#e5e5e5" }}

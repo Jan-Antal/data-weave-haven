@@ -525,7 +525,7 @@ export default function PlanVyroby() {
     >
       <div
         className="h-screen flex flex-col overflow-hidden transition-colors duration-300"
-        style={{ backgroundColor: forecast.forecastActive ? "#111318" : "#f4f2f0" }}
+        style={{ backgroundColor: forecast.forecastActive ? "#1a2422" : "#f4f2f0" }}
       >
         {profile?.email === "alfred@ami-test.cz" && (
           <div className="bg-orange-500 text-white px-6 flex items-center justify-center gap-2 font-bold tracking-wide shrink-0" style={{ height: 32 }}>
@@ -596,9 +596,9 @@ export default function PlanVyroby() {
         {viewTab === "kanban" ? (
           <div className="flex-1 flex min-h-0" onClick={() => setSelectedProjectId(null)}>
             {forecast.forecastActive ? (
-              <div className="w-[300px] shrink-0 flex flex-col" style={{ backgroundColor: "#1c1f26", borderRight: "1px solid #2a2f3d" }}>
+              <div className="w-[300px] shrink-0 flex flex-col" style={{ backgroundColor: "#1f2e2c", borderRight: "1px solid #2a3d3a" }}>
                 <div className="flex-1 flex items-center justify-center">
-                  <span className="text-sm italic" style={{ color: "#4a5168" }}>Vše naplánováno</span>
+                  <span className="text-sm italic" style={{ color: "#4a5a58" }}>Vše naplánováno</span>
                 </div>
               </div>
             ) : (
@@ -867,21 +867,21 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       className="shrink-0 border-b px-6 py-1.5 flex items-center gap-4 transition-colors duration-300"
       style={{
         minHeight: 40,
-        backgroundColor: forecastActive ? "#1c2333" : "hsl(var(--card))",
-        borderColor: forecastActive ? "#2a2f3d" : "hsl(var(--border))",
+        backgroundColor: forecastActive ? "#223937" : "hsl(var(--card))",
+        borderColor: forecastActive ? "#2a4a46" : "hsl(var(--border))",
       }}
     >
       {/* Left: Tabs */}
       <div className="inline-flex h-8 items-center rounded-md p-0.5 shrink-0" style={{
-        backgroundColor: forecastActive ? "#111318" : "hsl(var(--card))",
-        border: forecastActive ? "1px solid #2a2f3d" : "1px solid hsl(var(--border))",
+        backgroundColor: forecastActive ? "#223937" : "hsl(var(--card))",
+        border: forecastActive ? "1px solid #2a4a46" : "1px solid hsl(var(--border))",
       }}>
         <button
           onClick={() => setViewTab("kanban")}
           className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-[13px] font-medium transition-all ${
             viewTab === "kanban"
               ? forecastActive ? "bg-amber-600 text-white shadow-sm" : "bg-primary text-primary-foreground shadow-sm"
-              : forecastActive ? "text-gray-400 hover:text-gray-200" : "text-muted-foreground hover:text-foreground"
+              : forecastActive ? "text-[#a8c5c2] hover:text-white" : "text-muted-foreground hover:text-foreground"
           }`}
         >
           Kanban
@@ -890,7 +890,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
           onClick={() => !forecastActive && setViewTab("table")}
           disabled={forecastActive}
           className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-[13px] font-medium transition-all ${
-            forecastActive ? "text-gray-600 cursor-not-allowed opacity-40"
+            forecastActive ? "text-[#4a5a58] cursor-not-allowed opacity-40"
               : viewTab === "table"
               ? "bg-primary text-primary-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
@@ -913,11 +913,11 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       {/* Forecast plan mode toggle + Reset */}
       {forecastActive && (
         <div className="flex items-center gap-1.5">
-          <div className="inline-flex h-7 items-center rounded-md p-0.5 shrink-0" style={{ backgroundColor: "#111318", border: "1px solid #2a2f3d" }}>
+          <div className="inline-flex h-7 items-center rounded-md p-0.5 shrink-0" style={{ backgroundColor: "#223937", border: "1px solid #2a4a46" }}>
             <button
               onClick={() => onForecastPlanModeChange("respect_plan")}
               className={`px-2 py-0.5 text-[11px] font-medium rounded-sm transition-all ${
-                forecastPlanMode === "respect_plan" ? "bg-amber-600 text-white" : "text-gray-400 hover:text-gray-200"
+                forecastPlanMode === "respect_plan" ? "bg-amber-600 text-white" : "text-[#a8c5c2] hover:text-white"
               }`}
             >
               Kolem plánu
@@ -925,7 +925,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
             <button
               onClick={() => onForecastPlanModeChange("from_scratch")}
               className={`px-2 py-0.5 text-[11px] font-medium rounded-sm transition-all ${
-                forecastPlanMode === "from_scratch" ? "bg-amber-600 text-white" : "text-gray-400 hover:text-gray-200"
+                forecastPlanMode === "from_scratch" ? "bg-amber-600 text-white" : "text-[#a8c5c2] hover:text-white"
               }`}
             >
               Od začátku
@@ -933,7 +933,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
           </div>
           <button
             onClick={onResetForecast}
-            className="px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors text-gray-400 hover:text-amber-400 hover:bg-amber-900/20"
+            className="px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors text-[#a8c5c2] hover:text-amber-400 hover:bg-amber-900/20"
             title="Smazat uložený forecast a začít znovu"
           >
             ↺ Reset
@@ -946,13 +946,13 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
 
       {/* Center: Stats */}
       <div className="flex items-center gap-2 shrink-0">
-        <div className="flex items-center gap-1 text-xs font-mono" style={{ color: forecastActive ? "#9ca3af" : undefined }}>
+        <div className="flex items-center gap-1 text-xs font-mono" style={{ color: forecastActive ? "#a8c5c2" : undefined }}>
           <span>Kapacita <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{Math.round(capacityHours).toLocaleString("cs-CZ")}h</span></span>
-          <span style={{ color: forecastActive ? "#4b5563" : undefined }}>·</span>
+          <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
           <span>CZK <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{formatCzk(displayCzk)}</span></span>
-          <span style={{ color: forecastActive ? "#4b5563" : undefined }}>·</span>
+          <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
           <span>Naplánováno <span style={{ fontWeight: 600, color: isOverCapacity ? "hsl(var(--destructive))" : "hsl(142 76% 36%)" }}>{Math.round(scheduledHours).toLocaleString("cs-CZ")}h</span></span>
-          <span style={{ color: forecastActive ? "#4b5563" : undefined }}>·</span>
+          <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
           <span>V Inboxu <span style={{ fontWeight: 600, color: "#d97706" }}>{Math.round(inboxHours).toLocaleString("cs-CZ")}h</span></span>
         </div>
       </div>
@@ -963,8 +963,8 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       {/* Right: Display mode + Search + Forecast toggle */}
       <div className="flex items-center gap-2 shrink-0">
         <div className="inline-flex h-8 items-center rounded-md p-0.5" style={{
-          backgroundColor: forecastActive ? "#111318" : "hsl(var(--card))",
-          border: forecastActive ? "1px solid #2a2f3d" : "1px solid hsl(var(--border))",
+          backgroundColor: forecastActive ? "#223937" : "hsl(var(--card))",
+          border: forecastActive ? "1px solid #2a4a46" : "1px solid hsl(var(--border))",
         }}>
           {([
             { key: "hours" as DisplayMode, label: "Hodiny" },
@@ -977,7 +977,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
               className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-[13px] font-medium transition-all ${
                 displayMode === m.key
                   ? forecastActive ? "bg-amber-600 text-white shadow-sm" : "bg-primary text-primary-foreground shadow-sm"
-                  : forecastActive ? "text-gray-400 hover:text-gray-200" : "text-muted-foreground hover:text-foreground"
+                  : forecastActive ? "text-[#a8c5c2] hover:text-white" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {m.label}
@@ -986,7 +986,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
         </div>
 
         <div className="relative w-[200px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: forecastActive ? "#6b7280" : undefined }} />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: forecastActive ? "#7aa8a4" : undefined }} />
           <input
             type="text"
             value={searchQuery}
@@ -994,9 +994,9 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
             placeholder="Hledat projekt..."
             className="w-full h-8 pl-8 pr-8 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 transition-colors"
             style={{
-              backgroundColor: forecastActive ? "#111318" : "hsl(var(--background))",
-              border: forecastActive ? "1px solid #2a2f3d" : "1px solid hsl(var(--input))",
-              color: forecastActive ? "#e5e7eb" : undefined,
+              backgroundColor: forecastActive ? "#223937" : "hsl(var(--background))",
+              border: forecastActive ? "1px solid #2a4a46" : "1px solid hsl(var(--input))",
+              color: forecastActive ? "#a8c5c2" : undefined,
             }}
           />
           {searchQuery && (
