@@ -907,6 +907,7 @@ interface SiloProps {
   onForecastContextMenu?: (e: React.MouseEvent, block: ForecastBlock) => void;
   forecastExpandedIds?: Set<string>;
   onToggleForecastExpand?: (blockId: string) => void;
+  focusedMatchKey?: string | null;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
