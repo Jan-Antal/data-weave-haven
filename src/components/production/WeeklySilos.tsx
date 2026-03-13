@@ -97,6 +97,7 @@ interface Props {
   onSplitForecastBlock?: (blockId: string, keepHours: number, splitWeek: string) => void;
   forecastSafetyNet?: SafetyNetProject[];
   onRestoreFromSafetyNet?: (projectId: string) => void;
+  onConvertReserveToForecast?: (bundle: ScheduleBundle, weekKey: string) => void;
 }
 
 interface ContextMenuState {
