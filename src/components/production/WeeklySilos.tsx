@@ -1049,9 +1049,27 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const isBlockerBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_blocker);
 
   const project = projectLookup.get(bundle.project_id);
-  const expDate = formatDateShortYY(project?.expedice);
-  const expParsed = project?.expedice ? parseAppDate(project.expedice) : null;
-  const daysUntilExp = expParsed ? differenceInDays(expParsed, new Date()) : null;
+  // Deadline fallback chain: expedice → montaz → datum_smluvni
+  const deadlineInfo = useMemo(() => {
+    const fields: { key: string; label: string; value: string | null | undefined }[] = [
+      { key: "expedice", label: "Exp", value: project?.expedice },
+      { key: "montaz", label: "Mnt", value: project?.montaz },
+      { key: "datum_smluvni", label: "Sml", value: project?.datum_smluvni },
+    ];
+    for (const f of fields) {
+      if (f.value) {
+        const parsed = parseAppDate(f.value);
+        const formatted = formatDateShortYY(f.value);
+        if (parsed && formatted) {
+          return { label: f.label, dateStr: formatted, parsed, days: differenceInDays(parsed, new Date()) };
+        }
+      }
+    }
+    return null;
+  }, [project]);
+  const expDate = deadlineInfo?.dateStr ?? null;
+  const daysUntilExp = deadlineInfo?.days ?? null;
+  const deadlineLabel = deadlineInfo?.label ?? "Exp";
   const isProjectDone = ["Fakturace", "Dokonceno", "Dokončeno", "Expedice"].includes(project?.status ?? "");
   const expSeverity: "overdue" | "urgent" | null = (!isProjectDone && !allCompleted && daysUntilExp !== null)
     ? (daysUntilExp < 0 ? "overdue" : daysUntilExp <= 3 ? "urgent" : null)
