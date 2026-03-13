@@ -1280,6 +1280,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                         <div
                           key={week.key}
                           className="shrink-0 flex items-center justify-center px-1.5"
+                          onContextMenu={(e) => { if (wt && wt.hours > 0) { e.stopPropagation(); handleBundleContextMenu(e, proj.projectId, week.key, false); } }}
                           style={{
                             width: CELL_W,
                             backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : "#fff",
