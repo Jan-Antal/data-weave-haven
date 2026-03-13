@@ -686,7 +686,7 @@ interface SiloProps {
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode }: SiloProps) {
   // Capacity calculation: exclude paused items
   const activeHours = useMemo(() => {
     if (!silo) return 0;
@@ -694,11 +694,20 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       sum + b.items.reduce((s, i) => s + (i.status === "paused" ? 0 : i.scheduled_hours), 0), 0);
   }, [silo]);
 
-  const totalHours = activeHours;
+  // Forecast hours for this week (for capacity bar)
+  const forecastHoursForWeek = useMemo(() => {
+    if (!forecastBlocks || !forecastDarkMode) return 0;
+    return forecastBlocks.filter(b => b.week === weekKey).reduce((sum, b) => sum + b.estimated_hours, 0);
+  }, [forecastBlocks, forecastDarkMode, weekKey]);
+
+  const totalHours = activeHours + (forecastDarkMode ? forecastHoursForWeek : 0);
   const pct = weeklyCapacity > 0 ? (totalHours / weeklyCapacity) * 100 : 0;
   const isOverloaded = pct > 120;
   const isWarning = pct > 100 && pct <= 120;
   const overloadHours = totalHours - weeklyCapacity;
+
+  // In "from_scratch" mode, hide real plan cards
+  const hideRealCards = forecastDarkMode && forecastPlanMode === "from_scratch";
 
   const barColor = isPast ? "#b0bab8" : isOverloaded ? "#dc3545" : isWarning ? "#d97706" : "#3a8a36";
   const barBg = isPast ? "linear-gradient(90deg, #d0d7d5, #b0bab8)"
