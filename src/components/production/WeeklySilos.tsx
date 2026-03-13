@@ -176,7 +176,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const getWeekCapacity = useWeekCapacityLookup();
 
   const projectLookup = useMemo(() => {
-    const map = new Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null }>();
+    const map = new Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null }>();
     for (const p of allProjects) map.set(p.project_id, p);
     return map;
   }, [allProjects]);
