@@ -169,6 +169,8 @@ export function useProductionExpedice() {
           pause_reason: null, pause_expected_date: null,
           adhoc_reason: (row as any).adhoc_reason ?? null,
           cancel_reason: null,
+          is_blocker: (row as any).is_blocker ?? false,
+          tpv_expected_date: (row as any).tpv_expected_date ?? null,
         });
         g.count++;
       }
