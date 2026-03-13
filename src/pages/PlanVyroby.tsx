@@ -242,8 +242,8 @@ export default function PlanVyroby() {
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current as any;
-    // Allow forecast block drags even in forecast mode
-    if (forecast.forecastActive && data?.type !== "forecast-block") return;
+    // In forecast mode, allow forecast-block AND silo-bundle drags (real bundles can be moved as overrides)
+    if (forecast.forecastActive && data?.type !== "forecast-block" && data?.type !== "silo-bundle") return;
     if (data) setActiveDrag(data);
   }, [forecast.forecastActive]);
 
