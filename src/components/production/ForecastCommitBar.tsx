@@ -7,10 +7,10 @@ interface ForecastCommitBarProps {
   inboxBlockCount: number;
   projectBlockCount: number;
   isGenerating: boolean;
+  allInboxSelected: boolean;
   onCommitSelected: () => void;
   onCancel: () => void;
-  onSelectAll: () => void;
-  onSelectInboxOnly: () => void;
+  onToggleInboxSelect: () => void;
 }
 
 export function ForecastCommitBar({
