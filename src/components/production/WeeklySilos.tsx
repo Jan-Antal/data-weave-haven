@@ -834,7 +834,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
       borderRight: isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2",
       borderBottom: isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2",
       borderLeft: `4px solid ${borderLeftColor}`,
-      backgroundColor: isSelected ? "rgba(217,119,6,0.05)" : isSearchMatch ? "rgba(254,240,138,0.15)" : expSeverity === "overdue" ? "#fde8e8" : "#ffffff", opacity: isDragging ? 0.3 : 1,
+      backgroundColor: isSelected ? "rgba(217,119,6,0.05)" : isSearchMatch ? "rgba(254,240,138,0.15)" : expSeverity === "overdue" ? "#FEE2E2" : "#ffffff", opacity: isDragging ? 0.3 : 1,
       boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : isSearchMatch ? "0 0 0 2px rgba(250,204,21,0.25)" : undefined,
       transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, box-shadow 150ms",
     }}>
