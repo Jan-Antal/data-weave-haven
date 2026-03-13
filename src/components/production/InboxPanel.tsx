@@ -539,12 +539,22 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
           <span className="text-sm">📥</span>
           <span className="text-[13px] font-semibold" style={{ color: "#223937" }}>Inbox</span>
           {totalItemCount > 0 && (
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(217,151,6,0.12)", color: "#d97706" }}>
-              {totalItemCount}
-              {urgentItemCount > 0 && (
-                <span className="ml-1">· 🔴 {urgentItemCount}</span>
-              )}
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full cursor-default" style={{ backgroundColor: "rgba(217,151,6,0.12)", color: "#d97706" }}>
+                  {totalItemCount}
+                  {urgentItemCount > 0 && (
+                    <span className="ml-1">· 🔴 {urgentItemCount}</span>
+                  )}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                <p>{totalItemCount} položek čeká na naplánování</p>
+                {urgentItemCount > 0 && (
+                  <p className="mt-0.5">🔴 {urgentItemCount} s blížícím se nebo prošlým termínem</p>
+                )}
+              </TooltipContent>
+            </Tooltip>
           )}
         </div>
         <div className="flex items-center gap-1.5">
