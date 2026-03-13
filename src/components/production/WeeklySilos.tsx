@@ -936,7 +936,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
 
         {realBundles.map(bundle => (
           <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey}
-            showCzk={showCzk} hourlyRate={hourlyRate} displayMode={displayMode}
+            showCzk={showCzk} hourlyRate={hourlyRate} weeklyCapacity={weeklyCapacity} displayMode={displayMode}
             onBundleContextMenu={onBundleContextMenu}
             onItemContextMenu={onItemContextMenu}
             projectLookup={projectLookup}
