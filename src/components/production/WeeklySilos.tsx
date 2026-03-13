@@ -1049,11 +1049,12 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const isBlockerBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_blocker);
 
   const project = projectLookup.get(bundle.project_id);
-  // Deadline fallback chain: expedice → montaz → datum_smluvni
+  // Deadline fallback chain: expedice → montáž → předání → smluvní
   const deadlineInfo = useMemo(() => {
     const fields: { key: string; label: string; value: string | null | undefined }[] = [
       { key: "expedice", label: "Exp", value: project?.expedice },
       { key: "montaz", label: "Mnt", value: project?.montaz },
+      { key: "predani", label: "Před", value: project?.predani },
       { key: "datum_smluvni", label: "Sml", value: project?.datum_smluvni },
     ];
     for (const f of fields) {
