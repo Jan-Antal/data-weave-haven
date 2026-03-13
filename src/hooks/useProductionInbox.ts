@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { toast } from "@/hooks/use-toast";
 
 export interface InboxItem {
   id: string;
@@ -74,4 +75,56 @@ export function useProductionInbox() {
       return Array.from(grouped.values());
     },
   });
+}
+
+/** Auto-reduce blocker rows when new inbox items arrive for the same project */
+export function useBlockerAutoReduce(inboxProjects: InboxProject[] | undefined) {
+  const qc = useQueryClient();
+  const prevProjectIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!inboxProjects || inboxProjects.length === 0) return;
+
+    const currentIds = new Set(inboxProjects.map(p => p.project_id));
+    const newProjects = inboxProjects.filter(p => !prevProjectIds.current.has(p.project_id));
+    prevProjectIds.current = currentIds;
+
+    if (newProjects.length === 0) return;
+
+    (async () => {
+      for (const project of newProjects) {
+        // Check if there are blocker rows for this project
+        const { data: blockers } = await supabase
+          .from("production_schedule")
+          .select("id, scheduled_hours, scheduled_week")
+          .eq("project_id", project.project_id)
+          .eq("is_blocker", true)
+          .in("status", ["scheduled", "in_progress"])
+          .order("scheduled_week", { ascending: true });
+
+        if (!blockers || blockers.length === 0) continue;
+
+        const totalBlockerHours = blockers.reduce((s, b) => s + Number(b.scheduled_hours), 0);
+        const inboxHours = project.total_hours;
+
+        if (inboxHours >= totalBlockerHours) {
+          // Delete all blocker rows
+          const ids = blockers.map(b => b.id);
+          await supabase.from("production_schedule").delete().in("id", ids);
+          toast({ title: `${project.project_name}: Rezerva nahrazena reálnými položkami` });
+        } else {
+          // Reduce lowest-week blocker
+          const lowest = blockers[0];
+          const newHours = Number(lowest.scheduled_hours) - inboxHours;
+          if (newHours <= 0) {
+            await supabase.from("production_schedule").delete().eq("id", lowest.id);
+          } else {
+            await supabase.from("production_schedule").update({ scheduled_hours: newHours } as any).eq("id", lowest.id);
+          }
+          toast({ title: `${project.project_name}: Rezerva snížena na ${Math.round(newHours > 0 ? newHours : totalBlockerHours - inboxHours)}h` });
+        }
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      }
+    })();
+  }, [inboxProjects, qc]);
 }

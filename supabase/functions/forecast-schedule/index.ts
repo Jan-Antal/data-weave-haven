@@ -20,7 +20,7 @@ serve(async (req) => {
     // 1. Fetch all data in parallel
     const [projectsRes, tpvRes, scheduleRes, inboxRes] = await Promise.all([
       sb.from("projects")
-        .select("project_id, project_name, status, expedice, montaz, predani, datum_smluvni, prodejni_cena")
+        .select("project_id, project_name, status, expedice, montaz, predani, datum_smluvni, prodejni_cena, datum_tpv")
         .is("deleted_at", null)
         .not("status", "in", '("Fakturace","Dokončeno")'),
       sb.from("tpv_items")
@@ -262,6 +262,7 @@ serve(async (req) => {
         const weekAllocs = distributeHours(work.totalHours, trackUsage, work.deadline, 0);
 
         for (const alloc of weekAllocs) {
+          const proj = projectMap.get(work.projectId);
           blocks.push({
             id: `forecast-${Date.now()}-${blockIdx++}`,
             project_id: work.projectId,
@@ -275,6 +276,7 @@ serve(async (req) => {
             source: work.source,
             deadline: work.deadline,
             deadline_source: work.deadlineSource,
+            tpv_expected_date: work.source === "project_estimate" ? (proj?.datum_tpv || null) : null,
             is_forecast: true,
           });
         }
@@ -359,6 +361,7 @@ serve(async (req) => {
             source: "project_estimate",
             deadline: dl.date,
             deadline_source: dl.source,
+            tpv_expected_date: proj.datum_tpv || null,
             is_forecast: true,
           });
         }

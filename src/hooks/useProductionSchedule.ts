@@ -24,6 +24,8 @@ export interface ScheduleItem {
   pause_expected_date: string | null;
   adhoc_reason: string | null;
   cancel_reason: string | null;
+  is_blocker: boolean;
+  tpv_expected_date: string | null;
 }
 
 export interface ScheduleBundle {
@@ -101,6 +103,8 @@ export function useProductionSchedule() {
           pause_expected_date: (row as any).pause_expected_date ?? null,
           adhoc_reason: (row as any).adhoc_reason ?? null,
           cancel_reason: (row as any).cancel_reason ?? null,
+          is_blocker: (row as any).is_blocker ?? false,
+          tpv_expected_date: (row as any).tpv_expected_date ?? null,
         });
         bundle.total_hours += row.scheduled_hours;
       }
@@ -165,6 +169,8 @@ export function useProductionExpedice() {
           pause_reason: null, pause_expected_date: null,
           adhoc_reason: (row as any).adhoc_reason ?? null,
           cancel_reason: null,
+          is_blocker: (row as any).is_blocker ?? false,
+          tpv_expected_date: (row as any).tpv_expected_date ?? null,
         });
         g.count++;
       }

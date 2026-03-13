@@ -378,6 +378,24 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const handleBundleContextMenu = useCallback(
     (e: React.MouseEvent, bundle: ScheduleBundle, weekKey: string, weekNum: number, startDate: Date, endDate: Date, toggleExpand: () => void) => {
       e.preventDefault(); e.stopPropagation();
+
+      // Blocker bundles: only allow "Odstranit rezervu"
+      const isBlocker = bundle.items.length > 0 && bundle.items.every(i => i.is_blocker);
+      if (isBlocker) {
+        const actions: ContextMenuAction[] = [{
+          label: "Odstranit rezervu", icon: "🗑",
+          onClick: async () => {
+            const ids = bundle.items.map(i => i.id);
+            const { error } = await supabase.from("production_schedule").delete().in("id", ids);
+            if (error) { toast({ title: "Chyba", description: error.message, variant: "destructive" }); return; }
+            qc.invalidateQueries({ queryKey: ["production-schedule"] });
+            toast({ title: `🗑 Rezerva pro ${bundle.project_name} odstraněna` });
+          },
+        }];
+        setContextMenu({ x: Math.min(e.clientX, window.innerWidth - 200), y: Math.min(e.clientY, window.innerHeight - 200), actions });
+        return;
+      }
+
       const activeItems = bundle.items.filter(i => i.status !== "completed" && i.status !== "paused" && i.status !== "cancelled");
       const hasUncompleted = activeItems.length > 0;
       const completedItems = bundle.items.filter(i => i.status === "completed");
@@ -832,10 +850,19 @@ interface SiloProps {
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
   showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand }: SiloProps) {
   // Capacity calculation: exclude paused items
-  const activeHours = useMemo(() => {
-    if (!silo) return 0;
-    return silo.bundles.reduce((sum, b) =>
-      sum + b.items.reduce((s, i) => s + (i.status === "paused" ? 0 : i.scheduled_hours), 0), 0);
+  // Active hours (excl. paused), split into blocker and non-blocker
+  const { activeHours, blockerHours } = useMemo(() => {
+    if (!silo) return { activeHours: 0, blockerHours: 0 };
+    let active = 0;
+    let blocker = 0;
+    for (const b of silo.bundles) {
+      for (const i of b.items) {
+        if (i.status === "paused") continue;
+        if (i.is_blocker) blocker += i.scheduled_hours;
+        else active += i.scheduled_hours;
+      }
+    }
+    return { activeHours: active, blockerHours: blocker };
   }, [silo]);
 
   // Forecast layer is isolated and read-only, rendered separately per week
@@ -844,7 +871,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
     return forecastBlocks.filter(block => block.week === weekKey);
   }, [forecastDarkMode, forecastBlocks, weekKey]);
 
-  const totalHours = activeHours + (forecastDarkMode ? weekForecastBlocks.reduce((sum, block) => sum + block.estimated_hours, 0) : 0);
+  // totalHours includes blockers for capacity bar; displayHours excludes them for header
+  const totalHours = activeHours + blockerHours + (forecastDarkMode ? weekForecastBlocks.reduce((sum, block) => sum + block.estimated_hours, 0) : 0);
   const pct = weeklyCapacity > 0 ? (totalHours / weeklyCapacity) * 100 : 0;
   const isOverloaded = pct > 120;
   const isWarning = pct > 100 && pct <= 120;
@@ -906,13 +934,15 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
            <div className="flex items-baseline justify-between mt-[3px]">
             {displayMode === "czk" ? (
               <>
-                <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{formatCompactCzk(totalHours * hourlyRate)}</span>
+                <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{formatCompactCzk(activeHours * hourlyRate)}</span>
+                {blockerHours > 0 && <span className="font-mono text-[9px]" style={{ color: "#6b7280" }}>+~{formatCompactCzk(blockerHours * hourlyRate)}</span>}
                 <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#4a5168" : "#99a5a3" }}>/ {formatCompactCzk(weeklyCapacity * hourlyRate)}</span>
                 <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
               </>
             ) : (
               <>
-                <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{Math.round(totalHours)}h</span>
+                <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{Math.round(activeHours)}h</span>
+                {blockerHours > 0 && <span className="font-mono text-[9px]" style={{ color: "#6b7280" }}>+~{Math.round(blockerHours)}h</span>}
                 <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#4a5168" : "#99a5a3" }}>/ {weeklyCapacity}h</span>
                 <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
               </>
@@ -1020,6 +1050,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const totalCount = bundle.items.length;
   const allCompleted = completedCount === totalCount && totalCount > 0;
   const hasUncompleted = completedCount < totalCount;
+  const isBlockerBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_blocker);
 
   const project = projectLookup.get(bundle.project_id);
   const expDate = formatDateShortYY(project?.expedice);
@@ -1060,6 +1091,50 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   });
   const toggleExpand = useCallback(() => setExpanded(v => !v), []);
   const isSearchMatch = bundleMatchesSearch(bundle, searchQuery);
+
+  // Blocker card — special rendering (after all hooks)
+  if (isBlockerBundle) {
+    const tpvDate = bundle.items.find(i => i.tpv_expected_date)?.tpv_expected_date;
+    const tpvWeekLabel = tpvDate ? (() => {
+      const d = new Date(tpvDate);
+      if (isNaN(d.getTime())) return null;
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(d);
+      monday.setDate(diff);
+      const weekNum = Math.ceil(((monday.getTime() - new Date(monday.getFullYear(), 0, 1).getTime()) / 86400000 + 1) / 7);
+      return `T${weekNum}`;
+    })() : null;
+
+    return (
+      <div className="rounded-[6px] overflow-hidden relative px-2.5 py-2"
+        style={{
+          background: "#1e2025",
+          border: "2px dashed #4b5563",
+          opacity: 0.85,
+        }}
+        onContextMenu={e => {
+          e.preventDefault();
+          e.stopPropagation();
+          onBundleContextMenu(e, bundle, toggleExpand);
+        }}
+      >
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+          <span className="text-[11px] font-semibold truncate" style={{ color: "#9ca3af" }}>{bundle.project_name}</span>
+        </div>
+        <div className="flex items-center justify-between mt-0.5">
+          <span className="text-[9px] rounded-full px-1.5 py-0.5" style={{ backgroundColor: "#374151", color: "#9ca3af", fontWeight: 600 }}>⏳ Rezerva</span>
+          <span className="font-mono text-[11px] font-bold" style={{ color: "#6b7280" }}>
+            ~{displayMode === "czk" ? formatCompactCzk(bundle.total_hours * hourlyRate) : `${Math.round(bundle.total_hours)}h`}
+          </span>
+        </div>
+        {tpvWeekLabel && (
+          <div className="mt-0.5 text-[10px]" style={{ color: "#6b7280" }}>TPV: {tpvWeekLabel}</div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-[6px] overflow-hidden relative" style={{

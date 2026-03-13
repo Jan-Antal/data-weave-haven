@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { ChevronRight, ChevronDown, GripVertical, Check, Plus, X } from "lucide-react";
-import { useProductionInbox, type InboxProject, type InboxItem } from "@/hooks/useProductionInbox";
+import { useProductionInbox, useBlockerAutoReduce, type InboxProject, type InboxItem } from "@/hooks/useProductionInbox";
 import { useProductionProgress, type ProjectProgress } from "@/hooks/useProductionProgress";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useProductionSchedule } from "@/hooks/useProductionSchedule";
@@ -116,6 +116,7 @@ interface CancelState {
 export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeProp, onNavigateToTPV, onOpenProjectDetail, disableDropZone, selectedProjectId, onSelectProject, searchQuery = "", forecastActive }: InboxPanelProps) {
   const displayMode: DisplayMode = displayModeProp ?? (showCzk ? "czk" : "hours");
   const { data: projects = [], isLoading } = useProductionInbox();
+  useBlockerAutoReduce(projects.length > 0 ? projects : undefined);
   const { data: progressData } = useProductionProgress();
   const { data: settings } = useProductionSettings();
   const { data: allDbProjects = [] } = useProjects();
