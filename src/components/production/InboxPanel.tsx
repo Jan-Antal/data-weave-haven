@@ -240,10 +240,13 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
 
   const totalItemCount = projects.reduce((s, p) => s + p.items.length, 0);
 
-  const completedProjects = useMemo(() => {
-    if (!progressData) return [];
+  const { completedProjects, reserveProjects } = useMemo(() => {
+    if (!progressData) return { completedProjects: [], reserveProjects: [] };
     const activeProjectIds = new Set(projects.map(p => p.project_id));
-    return Array.from(progressData.values()).filter(p => p.is_complete && !activeProjectIds.has(p.project_id));
+    const allCompleted = Array.from(progressData.values()).filter(p => (p.is_complete || p.is_blocker_only) && !activeProjectIds.has(p.project_id));
+    const regular = allCompleted.filter(p => !p.is_blocker_only);
+    const reserve = allCompleted.filter(p => p.is_blocker_only);
+    return { completedProjects: regular, reserveProjects: reserve };
   }, [progressData, projects]);
 
   const allProjectOptions = useMemo(() => {
