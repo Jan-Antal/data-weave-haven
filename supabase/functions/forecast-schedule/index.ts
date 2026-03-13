@@ -47,8 +47,19 @@ serve(async (req) => {
     currentMonday.setDate(today.getDate() + mondayOffset);
     currentMonday.setHours(0, 0, 0, 0);
 
+    // Determine how many weeks to generate: at least 16, or deadline+8
+    let maxWeekCount = 16;
+    for (const proj of (projectsRes.data || [])) {
+      const dl = proj.expedice || proj.montaz || proj.predani || proj.datum_smluvni;
+      if (dl) {
+        const dlDate = new Date(dl);
+        const diffWeeks = Math.ceil((dlDate.getTime() - currentMonday.getTime()) / (7 * 86400000));
+        if (diffWeeks + 8 > maxWeekCount) maxWeekCount = diffWeeks + 8;
+      }
+    }
+
     const weekKeys: string[] = [];
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < maxWeekCount; i++) {
       const d = new Date(currentMonday);
       d.setDate(currentMonday.getDate() + i * 7);
       const y = d.getFullYear();
@@ -121,11 +132,17 @@ serve(async (req) => {
         }
       }
 
-      // Absolute fallback: put remaining in last week
+    // Absolute fallback: spread remaining evenly across all weeks
       if (remaining > 0) {
-        const lastWeek = weekKeys[weekKeys.length - 1];
-        result.push({ week: lastWeek, hours: remaining });
-        usage[lastWeek] = (usage[lastWeek] || 0) + remaining;
+        for (let i = 0; i < weekKeys.length && remaining > 0; i++) {
+          const share = Math.ceil(remaining / (weekKeys.length - i));
+          const alloc = Math.min(remaining, share);
+          const existing = result.find(r => r.week === weekKeys[i]);
+          if (existing) existing.hours += alloc;
+          else result.push({ week: weekKeys[i], hours: alloc });
+          usage[weekKeys[i]] = (usage[weekKeys[i]] || 0) + alloc;
+          remaining -= alloc;
+        }
       }
 
       return result;
