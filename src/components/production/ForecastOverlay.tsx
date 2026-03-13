@@ -231,6 +231,36 @@ function ForecastCard({
   );
 }
 
+/** Merge multiple blocks for the same project into one — mirrors real Kanban bundle grouping */
+function mergeBlocksByProject(blocks: ForecastBlock[]): ForecastBlock[] {
+  const byProject = new Map<string, ForecastBlock[]>();
+  for (const b of blocks) {
+    if (!byProject.has(b.project_id)) byProject.set(b.project_id, []);
+    byProject.get(b.project_id)!.push(b);
+  }
+  const merged: ForecastBlock[] = [];
+  for (const [, projectBlocks] of byProject) {
+    if (projectBlocks.length === 1) {
+      merged.push(projectBlocks[0]);
+      continue;
+    }
+    // Determine dominant source: inbox_item > project_estimate > existing_plan
+    let source: ForecastSource = "existing_plan";
+    if (projectBlocks.some(b => b.source === "inbox_item")) source = "inbox_item";
+    else if (projectBlocks.some(b => b.source === "project_estimate")) source = "project_estimate";
+
+    const first = projectBlocks[0];
+    merged.push({
+      ...first,
+      estimated_hours: projectBlocks.reduce((s, b) => s + b.estimated_hours, 0),
+      tpv_item_count: projectBlocks.reduce((s, b) => s + (b.tpv_item_count ?? 0), 0),
+      source,
+      bundle_description: projectBlocks.map(b => b.bundle_description).filter((v, i, a) => a.indexOf(v) === i).join(" + "),
+    });
+  }
+  return merged;
+}
+
 /** Standalone component to render already-filtered forecast blocks for one week silo */
 export function ForecastWeekContent({
   blocks,
@@ -243,11 +273,13 @@ export function ForecastWeekContent({
   onToggleSelect: (id: string) => void;
   onForecastContextMenu?: (e: React.MouseEvent, block: ForecastBlock) => void;
 }) {
-  if (blocks.length === 0) return null;
+  const mergedBlocks = useMemo(() => mergeBlocksByProject(blocks), [blocks]);
+
+  if (mergedBlocks.length === 0) return null;
 
   return (
     <div className="space-y-1.5 mt-1">
-      {blocks.map(block => (
+      {mergedBlocks.map(block => (
         <ForecastCard
           key={block.id}
           block={block}
