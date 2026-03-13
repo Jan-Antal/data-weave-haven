@@ -550,7 +550,7 @@ export default function PlanVyroby() {
               setViewTab("kanban");
               const loaded = forecast.loadSavedSession();
               if (loaded) {
-                toast({ title: "Obnoveno z poslední relace" });
+                // session restored silently
               } else {
                 await forecast.generateForecast(weeklyCapacity);
               }
@@ -563,7 +563,7 @@ export default function PlanVyroby() {
               forecast.clearForecast();
               const loaded = forecast.loadSavedSession(m);
               if (loaded) {
-                toast({ title: "Obnoveno z poslední relace" });
+                // session restored silently
               } else {
                 await forecast.generateForecast(weeklyCapacity, m);
               }
