@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList,
   User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange,
-  Circle, CheckCircle2, X, Mail
+  Circle, CheckCircle2, X, Mail, Plus, Trash2, Loader2
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { renumberSiblings } from "@/components/production/SplitItemDialog";
@@ -32,6 +32,8 @@ import { AdminInboxButton } from "@/components/AdminInbox";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { parseAppDate } from "@/lib/dateFormat";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { useSharePointDocs, type SPFile } from "@/hooks/useSharePointDocs";
+import { PhotoLightbox, isImageFile } from "@/components/PhotoLightbox";
 
 /* ═══ helpers ═══ */
 function getMonday(d: Date): Date {
