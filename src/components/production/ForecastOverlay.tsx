@@ -338,8 +338,7 @@ function ForecastCard({
           {...attributes}
           {...listeners}
           className="flex-1 min-w-0 px-1.5 py-2 cursor-grab"
-          onClick={(e) => {e.stopPropagation();onToggleSelect();}}
-          onContextMenu={(e) => {e.preventDefault();e.stopPropagation();onContextMenu?.(e);}}>
+          onClick={(e) => {e.stopPropagation();onToggleSelect();}}>
           
           {/* Checkbox + content */}
           <div className="flex items-start gap-2">
