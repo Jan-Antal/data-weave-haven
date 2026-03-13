@@ -717,6 +717,8 @@ export default function PlanVyroby() {
             selectedCount={forecast.selectedBlockIds.size}
             inboxBlockCount={forecast.forecastBlocks.filter(b => b.source === "inbox_item").length}
             projectBlockCount={forecast.forecastBlocks.filter(b => b.source === "project_estimate").length}
+            selectedInboxCount={forecast.forecastBlocks.filter(b => b.source === "inbox_item" && forecast.selectedBlockIds.has(b.id)).length}
+            selectedProjectCount={forecast.forecastBlocks.filter(b => b.source === "project_estimate" && forecast.selectedBlockIds.has(b.id)).length}
             isGenerating={forecast.isGenerating}
             allInboxSelected={(() => {
               const inboxIds = forecast.forecastBlocks.filter(b => b.source === "inbox_item").map(b => b.id);
@@ -729,6 +731,14 @@ export default function PlanVyroby() {
             }}
             onCancel={() => forecast.setForecastActive(false)}
             onToggleInboxSelect={forecast.toggleInboxSelection}
+            onDeselectProjects={() => {
+              const projectIds = forecast.forecastBlocks
+                .filter(b => b.source === "project_estimate" && forecast.selectedBlockIds.has(b.id))
+                .map(b => b.id);
+              for (const id of projectIds) {
+                forecast.toggleBlockSelection(id);
+              }
+            }}
           />
         )}
       </div>
