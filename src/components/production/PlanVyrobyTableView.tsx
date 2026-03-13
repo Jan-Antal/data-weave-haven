@@ -109,6 +109,7 @@ interface ProjectRow {
   inboxTotalCzk: number;
   expediceTotalHours: number;
   expediceTotalCzk: number;
+  isBlockerOnly: boolean;
 }
 
 function getCollapsedCellStyle(proj: ProjectRow, weekKey: string): { bg: string; text: string; border: string } {
