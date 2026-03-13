@@ -1242,7 +1242,10 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                         : <ChevronRight className="h-4 w-4 shrink-0" style={{ color: proj.items.length > 0 ? "#ea580c" : "#99a5a3" }} />
                       }
                       <div className="min-w-0 flex-1">
-                        <div className="text-[14px] font-semibold truncate text-foreground leading-tight">{proj.projectName}</div>
+                        <div className="text-[14px] truncate leading-tight" style={{
+                          color: (proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0)) ? "#9ca3af" : "#1a1a1a",
+                          fontWeight: (proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0)) ? 400 : 500,
+                        }}>{proj.projectName}</div>
                         <div className="flex items-center gap-1.5">
                           <span className="text-[10px] text-muted-foreground font-mono leading-tight">{proj.projectId}</span>
                           {(() => {
