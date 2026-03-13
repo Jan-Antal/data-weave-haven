@@ -259,10 +259,27 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     };
   }, []);
 
+  // Calculate future range based on latest project deadline
+  const futureWeekCount = useMemo(() => {
+    let maxDate = new Date();
+    for (const p of allProjects) {
+      if (!p.is_active || p.deleted_at) continue;
+      const status = p.status?.toLowerCase();
+      if (status === "fakturace" || status === "dokončeno" || status === "expedice") continue;
+      const deadline = resolveDeadline(p);
+      if (deadline && deadline.date.getTime() > maxDate.getTime()) {
+        maxDate = deadline.date;
+      }
+    }
+    const monday = getMonday(new Date());
+    const diffWeeks = Math.ceil((maxDate.getTime() - monday.getTime()) / (7 * 86400000));
+    return Math.max(12, diffWeeks + 2); // at least 12 future weeks, or deadline + 2
+  }, [allProjects]);
+
   const weeks = useMemo(() => {
     const monday = getMonday(new Date());
     const result: { start: Date; end: Date; weekNum: number; key: string; isPast: boolean }[] = [];
-    for (let i = -4; i < 12; i++) {
+    for (let i = -pastWeeksLoaded; i < futureWeekCount; i++) {
       const start = new Date(monday);
       start.setDate(monday.getDate() + i * 7);
       const end = new Date(start);
@@ -270,7 +287,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       result.push({ start, end, weekNum: getISOWeekNumber(start), key: toLocalDateStr(start), isPast: i < 0 });
     }
     return result;
-  }, []);
+  }, [pastWeeksLoaded, futureWeekCount]);
 
   const weekKeys = useMemo(() => weeks.map(w => w.key), [weeks]);
 
