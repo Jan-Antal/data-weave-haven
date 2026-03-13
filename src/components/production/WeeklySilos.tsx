@@ -21,6 +21,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { parseAppDate } from "@/lib/dateFormat";
 import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
+import { resolveDeadline } from "@/lib/deadlineWarning";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
