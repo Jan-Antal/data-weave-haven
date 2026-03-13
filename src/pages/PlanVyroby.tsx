@@ -843,24 +843,33 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
         </div>
       )}
 
-      {/* Forecast plan mode toggle */}
+      {/* Forecast plan mode toggle + Reset */}
       {forecastActive && (
-        <div className="inline-flex h-7 items-center rounded-md p-0.5 shrink-0" style={{ backgroundColor: "#111318", border: "1px solid #2a2f3d" }}>
+        <div className="flex items-center gap-1.5">
+          <div className="inline-flex h-7 items-center rounded-md p-0.5 shrink-0" style={{ backgroundColor: "#111318", border: "1px solid #2a2f3d" }}>
+            <button
+              onClick={() => onForecastPlanModeChange("respect_plan")}
+              className={`px-2 py-0.5 text-[11px] font-medium rounded-sm transition-all ${
+                forecastPlanMode === "respect_plan" ? "bg-amber-600 text-white" : "text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              Kolem plánu
+            </button>
+            <button
+              onClick={() => onForecastPlanModeChange("from_scratch")}
+              className={`px-2 py-0.5 text-[11px] font-medium rounded-sm transition-all ${
+                forecastPlanMode === "from_scratch" ? "bg-amber-600 text-white" : "text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              Od začátku
+            </button>
+          </div>
           <button
-            onClick={() => onForecastPlanModeChange("respect_plan")}
-            className={`px-2 py-0.5 text-[11px] font-medium rounded-sm transition-all ${
-              forecastPlanMode === "respect_plan" ? "bg-amber-600 text-white" : "text-gray-400 hover:text-gray-200"
-            }`}
+            onClick={onResetForecast}
+            className="px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors text-gray-400 hover:text-amber-400 hover:bg-amber-900/20"
+            title="Smazat uložený forecast a začít znovu"
           >
-            Respektovat plán
-          </button>
-          <button
-            onClick={() => onForecastPlanModeChange("from_scratch")}
-            className={`px-2 py-0.5 text-[11px] font-medium rounded-sm transition-all ${
-              forecastPlanMode === "from_scratch" ? "bg-amber-600 text-white" : "text-gray-400 hover:text-gray-200"
-            }`}
-          >
-            Od začátku
+            ↺ Reset
           </button>
         </div>
       )}
