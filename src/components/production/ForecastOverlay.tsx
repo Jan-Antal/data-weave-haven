@@ -302,8 +302,9 @@ function ForecastCard({
       style={{
         backgroundColor: style.backgroundColor,
         borderWidth: style.borderWidth,
-        borderStyle: block.source === "existing_plan" ? "solid" : "dashed",
+        borderStyle: block.source === "existing_plan" && !isMoved ? "solid" : "dashed",
         borderColor: style.borderColor,
+        borderLeft: style.leftBorder || undefined,
         opacity: isDragging ? 0.3 : isSelected ? 1 : 0.55,
         boxShadow: isSelected ? `0 0 0 1px ${style.borderColor}40` : undefined,
       }}
