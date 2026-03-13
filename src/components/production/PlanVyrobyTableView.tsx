@@ -1287,14 +1287,17 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                             borderBottom: "1px solid #e5e2dd",
                           }}
                         >
-                          {!isExpanded && wt && wt.hours > 0 && (
-                            <div
-                              className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-bold"
-                              style={{ backgroundColor: proj.color + "18", color: proj.color }}
-                            >
-                              {formatWeekTotal(wt.hours, wt.czk)}
-                            </div>
-                          )}
+                          {!isExpanded && wt && wt.hours > 0 && (() => {
+                            const cellStyle = getCollapsedCellStyle(proj, week.key);
+                            return (
+                              <div
+                                className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-bold"
+                                style={{ backgroundColor: cellStyle.bg, color: cellStyle.text, border: `1px solid ${cellStyle.border}` }}
+                              >
+                                {formatWeekTotal(wt.hours, wt.czk)}
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })}
