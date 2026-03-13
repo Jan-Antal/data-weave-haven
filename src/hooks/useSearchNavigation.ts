@@ -13,10 +13,11 @@ function normalize(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-function matchesQuery(bundle: { project_name: string; project_id: string; items: Array<{ item_name?: string; item_code?: string | null }> }, q: string): boolean {
+function matchesQuery(bundle: { project_name: string; project_id: string; items: Array<{ item_name?: string; item_code?: string | null }> }, q: string, pm?: string | null): boolean {
   const nq = normalize(q);
   if (normalize(bundle.project_name).includes(nq)) return true;
   if (normalize(bundle.project_id).includes(nq)) return true;
+  if (pm && normalize(pm).includes(nq)) return true;
   for (const i of bundle.items) {
     if (i.item_name && normalize(i.item_name).includes(nq)) return true;
     if (i.item_code && normalize(i.item_code).includes(nq)) return true;
