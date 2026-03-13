@@ -177,13 +177,13 @@ export function useForecastMode(): UseForecastModeReturn {
     setSelectedBlockIds(prev => {
       const allSelected = inboxIds.length > 0 && inboxIds.every(id => prev.has(id));
       if (allSelected) {
+        // Deselect all inbox items
         const next = new Set(prev);
         inboxIds.forEach(id => next.delete(id));
         return next;
       } else {
-        const next = new Set(prev);
-        inboxIds.forEach(id => next.add(id));
-        return next;
+        // Select only inbox items, deselect everything else
+        return new Set(inboxIds);
       }
     });
   }, [forecastBlocks]);
