@@ -973,14 +973,23 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                 const isProjectDone = ["Fakturace", "Dokonceno", "Dokončeno", "Expedice"].includes(pd?.status ?? "");
                 const allItemsDone = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
                 if (isProjectDone || allItemsDone) return false;
+
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                const expediceDate = pd?.expedice ? parseAppDate(pd.expedice) : null;
+                if (expediceDate) {
+                  const exp = new Date(expediceDate);
+                  exp.setHours(0, 0, 0, 0);
+                  if (exp < today) return true;
+                }
+
                 const deadline = resolveDeadline({
                   expedice: pd?.expedice ?? null,
                   montaz: pd?.montaz ?? null,
                   datum_smluvni: pd?.datum_smluvni ?? null,
                 });
                 if (!deadline) return false;
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
                 const dl = new Date(deadline.date);
                 dl.setHours(0, 0, 0, 0);
                 return dl < today;
