@@ -936,7 +936,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
               <>
                 <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{formatCompactCzk(activeHours * hourlyRate)}</span>
                 {blockerHours > 0 && <span className="font-mono text-[9px]" style={{ color: "#6b7280" }}>+~{formatCompactCzk(blockerHours * hourlyRate)}</span>}
-                <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#4a5168" : "#99a5a3" }}>/ {formatCompactCzk(weeklyCapacity * hourlyRate)}</span>
+                <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }}>/ {formatCompactCzk(weeklyCapacity * hourlyRate)}</span>
                 <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
               </>
             ) : (
