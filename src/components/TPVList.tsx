@@ -253,6 +253,13 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       const visKeys = selectedKeys ?? renderKeys;
       const headers = visKeys.map(k => getLabel(k, TPV_LIST_LABEL_MAP[k] || k));
       const rows = sortedItems.map(item => visKeys.map(k => {
+        if (k === "vyroba_status") {
+          const itemKey = (item as any).item_name || (item as any).item_type;
+          const statuses = productionStatusMap.get(itemKey);
+          if (!statuses || statuses.length === 0) return "Neodesláno";
+          return statuses.map((s: any) => s.label).join(", ");
+        }
+        if (k === "cena") return formatCurrency((item as any).cena, currency);
         if (k.startsWith("custom_")) {
           const cf = (item as any).custom_fields || {};
           return cf[k] ?? "";
@@ -263,10 +270,10 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       return { headers, rows };
     },
     groups: [
-      { label: "TPV List", keys: TPV_LIST_COLUMNS.map(c => c.key), getLabel: (k: string) => getLabel(k, TPV_LIST_LABEL_MAP[k] || k) },
+      { label: "TPV List", keys: renderKeys, getLabel: (k: string) => getLabel(k, TPV_LIST_LABEL_MAP[k] || k) },
     ],
     defaultVisibleKeys: renderKeys,
-  }), [renderKeys, sortedItems, getLabel]);
+  }), [renderKeys, sortedItems, getLabel, productionStatusMap, currency]);
 
   useEffect(() => {
     registerExport("tpv-list", tpvExportMeta);
