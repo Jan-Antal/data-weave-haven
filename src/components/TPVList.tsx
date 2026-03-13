@@ -314,6 +314,18 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     );
   }
 
+  const renderColGroup = () => (
+    <colgroup>
+      <col style={{ width: 40, minWidth: 40 }} />
+      {renderKeys.map(key => {
+        const s = getTPVListColumnStyle(key, getWidth(key));
+        const w = s.width || s.minWidth || 120;
+        return <col key={key} style={{ width: w, minWidth: w }} />;
+      })}
+      <col style={{ width: 40, minWidth: 40 }} />
+    </colgroup>
+  );
+
   return (
     <div className="w-full min-w-0 h-full flex flex-col">
       {/* Toolbar */}
