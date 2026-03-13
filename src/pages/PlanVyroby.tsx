@@ -526,6 +526,7 @@ export default function PlanVyroby() {
               forecastSelectedIds={forecast.forecastActive ? forecast.selectedBlockIds : undefined}
               onToggleForecastSelect={forecast.forecastActive ? forecast.toggleBlockSelection : undefined}
               forecastDarkMode={forecast.forecastActive}
+              forecastPlanMode={forecast.forecastActive ? forecast.planMode : undefined}
             />
             <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />
           </div>
