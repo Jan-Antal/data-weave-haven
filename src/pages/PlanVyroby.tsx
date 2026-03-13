@@ -468,7 +468,7 @@ export default function PlanVyroby() {
     >
       <div
         className="h-screen flex flex-col overflow-hidden transition-colors duration-300"
-        style={{ backgroundColor: forecast.forecastActive ? "#0f1117" : "#f4f2f0" }}
+        style={{ backgroundColor: forecast.forecastActive ? "#111318" : "#f4f2f0" }}
       >
         {profile?.email === "alfred@ami-test.cz" && (
           <div className="bg-orange-500 text-white px-6 flex items-center justify-center gap-2 font-bold tracking-wide shrink-0" style={{ height: 32 }}>
