@@ -733,7 +733,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
         </div>
         <div className="text-[9px] mt-0.5" style={{ color: dateRangeColor }}>{formatDateShort(startDate)} – {formatDateShort(endDate)}</div>
         <div className="mt-1.5" style={{ opacity: isPast ? 0.6 : 1 }}>
-          <div className="h-[7px] rounded" style={{ backgroundColor: forecastDarkMode ? "#2a2f3d" : "#f0eee9", overflow: "hidden" }}>
+          <div className="h-[7px] rounded" style={{ backgroundColor: forecastDarkMode ? "#2a2f3d" : "#f0eee9", overflow: "hidden" }}> 
             <div className="h-full rounded transition-all duration-300" style={{ width: `${Math.min(pct, 100)}%`, background: barBg }} />
           </div>
            <div className="flex items-baseline justify-between mt-[3px]">
