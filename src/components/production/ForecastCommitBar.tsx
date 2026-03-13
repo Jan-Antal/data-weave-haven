@@ -110,7 +110,7 @@ export function ForecastCommitBar({
               style={{ backgroundColor: "transparent", color: "#f59e0b", borderColor: "#2a4a46" }}
             >
               <Check className="h-3 w-3 mr-1" />
-              Commit vybrané ({selectedCount})
+              Zapsat vybrané ({selectedCount})
             </Button>
             <Button
               size="sm"
