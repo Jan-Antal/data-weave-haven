@@ -93,6 +93,7 @@ interface Props {
   forecastPlanMode?: "respect_plan" | "from_scratch";
   onMoveForecastBlock?: (blockId: string, newWeek: string) => void;
   onRemoveForecastBlock?: (blockId: string) => void;
+  onSplitForecastBlock?: (blockId: string, keepHours: number, splitWeek: string) => void;
 }
 
 interface ContextMenuState {
