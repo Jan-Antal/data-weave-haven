@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, isPast, isFuture, differenceInDays } from "date-fns";
 import { Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { getProjectColor } from "@/lib/projectColors";
+import { resolveDeadline } from "@/lib/deadlineWarning";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
 import { toast } from "@/hooks/use-toast";
 
