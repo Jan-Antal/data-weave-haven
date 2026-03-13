@@ -96,6 +96,8 @@ export function ProductionHeader({ forecastActive }: { forecastActive?: boolean 
 
             <span className="w-px h-5 bg-primary-foreground/20 mx-1" />
 
+            <AdminInboxButton />
+
             {isOwner && (
               <button
                 onClick={() => navigate("/vyroba")}
