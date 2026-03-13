@@ -661,10 +661,9 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
         </div>
       )}
       <div className={cn("rounded-lg border bg-card flex flex-col flex-1 min-h-0", editMode && "rounded-t-none border-t-0")}>
-        {/* FIXED HEADER */}
-        <div ref={headerScrollRef} className="flex-shrink-0 overflow-hidden rounded-t-lg">
+        <div ref={tableScrollRef} className="flex-1 overflow-auto always-scrollbar rounded-t-lg">
           <Table>
-            <TableHeader className="sticky-off">
+            <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow className="bg-primary/5">
                 {/* Col 1 — Icon slot */}
                 <TableHead style={COL_ICON_STYLE} className="text-center px-0">
@@ -691,11 +690,6 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                 <ColumnVisibilityToggle tabKey="tpvStatus" editMode={editMode} onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined} onCancelEditMode={canEditColumns ? handleCancelEditMode : undefined} />
               </TableRow>
             </TableHeader>
-          </Table>
-        </div>
-        {/* SCROLLABLE BODY */}
-        <div ref={tableScrollRef} className="flex-1 overflow-auto always-scrollbar" onScroll={handleBodyScroll}>
-          <Table>
             <TableBody>
               {visible.map((p) => (
                 <Fragment key={p.id}>
