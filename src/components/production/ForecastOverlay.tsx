@@ -440,3 +440,83 @@ export function ForecastWeekContent({
     </div>
   );
 }
+
+// ─── Forecast Split Dialog ───
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+interface ForecastSplitDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  blockName: string;
+  totalHours: number;
+  currentWeek: string;
+  weeks: { key: string; label: string }[];
+  onSplit: (keepHours: number, targetWeek: string) => void;
+}
+
+export function ForecastSplitDialog({ open, onOpenChange, blockName, totalHours, currentWeek, weeks, onSplit }: ForecastSplitDialogProps) {
+  const [keepHours, setKeepHours] = useState(Math.round(totalHours / 2));
+  const [targetWeek, setTargetWeek] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setKeepHours(Math.round(totalHours / 2));
+      setTargetWeek("");
+    }
+  }, [open, totalHours]);
+
+  const splitHours = totalHours - keepHours;
+  const availableWeeks = weeks.filter(w => w.key !== currentWeek);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md" style={{ backgroundColor: "#1C1F26", borderColor: "#2a2d35", color: "#e5e5e5" }}>
+        <DialogHeader>
+          <DialogTitle className="text-amber-400">Rozdělit forecast blok</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <p className="text-sm text-gray-400">{blockName} — celkem {totalHours}h</p>
+          <div className="space-y-2">
+            <Label className="text-gray-300">Ponechat v tomto týdnu (h)</Label>
+            <Input
+              type="number"
+              min={1}
+              max={totalHours - 1}
+              value={keepHours}
+              onChange={e => setKeepHours(Math.max(1, Math.min(totalHours - 1, Number(e.target.value))))}
+              className="bg-[#111318] border-[#2a2d35] text-white"
+            />
+          </div>
+          <p className="text-xs text-gray-500">Přesunout: {splitHours}h</p>
+          <div className="space-y-2">
+            <Label className="text-gray-300">Cílový týden</Label>
+            <Select value={targetWeek} onValueChange={setTargetWeek}>
+              <SelectTrigger className="bg-[#111318] border-[#2a2d35] text-white">
+                <SelectValue placeholder="Vyberte týden…" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1C1F26] border-[#2a2d35]">
+                {availableWeeks.map(w => (
+                  <SelectItem key={w.key} value={w.key} className="text-gray-200">{w.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="border-[#2a2d35] text-gray-400">Zrušit</Button>
+          <Button
+            disabled={!targetWeek || splitHours <= 0}
+            onClick={() => { onSplit(keepHours, targetWeek); onOpenChange(false); }}
+            className="bg-amber-600 hover:bg-amber-700 text-white"
+          >
+            Rozdělit
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
