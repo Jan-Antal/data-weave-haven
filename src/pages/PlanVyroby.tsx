@@ -963,8 +963,8 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       {/* Right: Display mode + Search + Forecast toggle */}
       <div className="flex items-center gap-2 shrink-0">
         <div className="inline-flex h-8 items-center rounded-md p-0.5" style={{
-          backgroundColor: forecastActive ? "#111318" : "hsl(var(--card))",
-          border: forecastActive ? "1px solid #2a2f3d" : "1px solid hsl(var(--border))",
+          backgroundColor: forecastActive ? "#223937" : "hsl(var(--card))",
+          border: forecastActive ? "1px solid #2a4a46" : "1px solid hsl(var(--border))",
         }}>
           {([
             { key: "hours" as DisplayMode, label: "Hodiny" },
