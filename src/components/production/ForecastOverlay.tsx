@@ -308,6 +308,7 @@ function ForecastCard({
         opacity: isDragging ? 0.3 : isSelected ? 1 : 0.55,
         boxShadow: isSelected ? `0 0 0 1px ${style.borderColor}40` : undefined,
       }}
+      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu?.(e); }}
     >
       {/* Badge top-right — only for inbox and AI cards */}
       {style.badgeLabel && (
@@ -343,7 +344,6 @@ function ForecastCard({
           {...listeners}
           className="flex-1 min-w-0 px-1.5 py-2 cursor-grab"
           onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
-          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu?.(e); }}
         >
           {/* Checkbox + content */}
           <div className="flex items-start gap-2">
