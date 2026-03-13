@@ -889,17 +889,17 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
   return (
     <div className="rounded-[6px] overflow-hidden relative" style={{
       borderTop: forecastDarkMode
-        ? (isSelected ? "2px solid #d97706" : "0.5px solid #3a4a6a")
+        ? (isSelected ? "2px solid #d97706" : "1px solid #3d4558")
         : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2"),
       borderRight: forecastDarkMode
-        ? (isSelected ? "2px solid #d97706" : "0.5px solid #3a4a6a")
+        ? (isSelected ? "2px solid #d97706" : "1px solid #3d4558")
         : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2"),
       borderBottom: forecastDarkMode
-        ? (isSelected ? "2px solid #d97706" : "0.5px solid #3a4a6a")
+        ? (isSelected ? "2px solid #d97706" : "1px solid #3d4558")
         : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2"),
       borderLeft: `4px solid ${borderLeftColor}`,
       backgroundColor: forecastDarkMode
-        ? (isSelected ? "rgba(217,119,6,0.08)" : "#1a1f2e")
+        ? (isSelected ? "rgba(217,119,6,0.08)" : "#252a35")
         : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : isSelected ? "rgba(217,119,6,0.05)" : isSearchMatch ? "rgba(254,240,138,0.15)" : "#ffffff"),
       opacity: isDragging ? 0.3 : 1,
       boxShadow: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "inset 0 0 0 1px hsl(0 60% 86%)" : isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : isSearchMatch ? "0 0 0 2px rgba(250,204,21,0.25)" : undefined),
