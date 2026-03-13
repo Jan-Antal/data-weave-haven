@@ -182,48 +182,17 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
           const isLoading = loadingItems.has(p.project_id);
 
           return (
-            <div key={p.project_id}>
-              {/* Project row */}
-              <div
-                className="flex items-center gap-1.5 py-1.5 px-1.5 rounded cursor-pointer transition-colors"
-                style={{ backgroundColor: isExpanded ? "#253533" : "transparent" }}
-                onClick={() => toggleExpand(p.project_id, p.source)}
-                onContextMenu={(e) => handleContextMenu(e, p)}
-              >
-                {isExpanded
-                  ? <ChevronDown className="w-3 h-3 shrink-0" style={{ color: "#7aa8a4" }} />
-                  : <ChevronRight className="w-3 h-3 shrink-0" style={{ color: "#4a5a58" }} />}
-                <div className="flex-1 min-w-0">
-                  <div className="truncate" style={{ fontSize: 12, fontWeight: 500, color: "#a8c5c2" }}>
-                    {p.project_name}
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="font-mono text-[10px]" style={{ color: "#5c706f" }}>{p.project_id}</span>
-                    <span
-                      className="px-1 py-0 rounded text-[9px] font-medium"
-                      style={{ background: badge.bg, color: "#e5e5e5" }}
-                    >
-                      {badge.label}
-                    </span>
-                  </div>
-                </div>
-                <div className="shrink-0 flex flex-col items-end gap-0.5">
-                  <span className="font-mono text-[11px] font-semibold" style={{ color: "#7aa8a4" }}>
-                    ~{p.estimated_hours}h
-                  </span>
-                  {onRestoreToForecast && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onRestoreToForecast(p.project_id); }}
-                      className="flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-medium hover:opacity-80 transition-opacity"
-                      style={{ background: "#2a4a46", color: "#7aa8a4" }}
-                      title="Vrátit do forecastu"
-                    >
-                      <RotateCcw className="w-2.5 h-2.5" />
-                      Vrátit
-                    </button>
-                  )}
-                </div>
-              </div>
+            <DraggableSafetyNetRow
+              key={p.project_id}
+              project={p}
+              isExpanded={isExpanded}
+              items={items}
+              isLoading={isLoading}
+              badge={badge}
+              onToggleExpand={() => toggleExpand(p.project_id, p.source)}
+              onContextMenu={(e) => handleContextMenu(e, p)}
+              onRestore={onRestoreToForecast}
+            />
 
               {/* Expanded items */}
               {isExpanded && (
