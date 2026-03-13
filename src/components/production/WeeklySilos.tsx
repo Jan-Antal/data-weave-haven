@@ -776,6 +776,16 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             isSelected={selectedProjectId === bundle.project_id}
             onSelectProject={onSelectProject} searchQuery={searchQuery} />
         ))}
+
+        {/* Forecast blocks */}
+        {forecastBlocks && forecastSelectedIds && onToggleForecastSelect && (
+          <ForecastWeekContent
+            weekKey={weekKey}
+            blocks={forecastBlocks}
+            selectedBlockIds={forecastSelectedIds}
+            onToggleSelect={onToggleForecastSelect}
+          />
+        )}
       </div>
 
       {isOverloaded && !isPast && silo && !spillDismissed && (
