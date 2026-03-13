@@ -780,7 +780,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             onBundleContextMenu={onBundleContextMenu} onItemContextMenu={onItemContextMenu}
             projectLookup={projectLookup}
             isSelected={selectedProjectId === bundle.project_id}
-            onSelectProject={onSelectProject} searchQuery={searchQuery} />
+            onSelectProject={onSelectProject} searchQuery={searchQuery}
+            forecastDarkMode={forecastDarkMode} />
         ))}
 
         {/* Forecast blocks */}
