@@ -830,7 +830,7 @@ export default function PlanVyroby() {
 }
 
 
-function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchMatchCount = 0, searchCurrentIndex = 0, onSearchPrev, onSearchNext }: {
+function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchMatchCount = 0 }: {
   viewTab: "kanban" | "table";
   setViewTab: (v: "kanban" | "table") => void;
   displayMode: DisplayMode;
@@ -846,9 +846,6 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   onResetForecast?: () => void;
   forecastBlockCounts?: { real: number; inbox: number; ai: number };
   searchMatchCount?: number;
-  searchCurrentIndex?: number;
-  onSearchPrev?: () => void;
-  onSearchNext?: () => void;
 }) {
   const { data: settings } = useProductionSettings();
   const { data: scheduleData } = useProductionSchedule();
