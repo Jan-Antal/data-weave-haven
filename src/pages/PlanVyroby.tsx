@@ -291,6 +291,17 @@ export default function PlanVyroby() {
     if (!active.data.current) return;
     const dragData = active.data.current as any;
 
+    // Handle safety net project drags — drop onto a week silo to restore as forecast block
+    if (dragData.type === "safety-net-project" && forecast.forecastActive) {
+      if (!over) return;
+      const targetId = over.id.toString();
+      if (targetId.startsWith("silo-week-")) {
+        const weekKey = targetId.replace("silo-week-", "");
+        forecast.restoreToWeek(dragData.projectId, weekKey);
+      }
+      return;
+    }
+
     // Handle forecast block drags — updates forecastBlocks only, never Supabase
     if (dragData.type === "forecast-block" && forecast.forecastActive) {
       if (!over) return;
