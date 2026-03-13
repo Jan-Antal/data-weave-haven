@@ -105,6 +105,14 @@ export default function PlanVyroby() {
     searchTimerRef.current = setTimeout(() => setSearchQuery(v), 300);
   }, []);
   useEffect(() => () => clearTimeout(searchTimerRef.current), []);
+  const [inboxWidth, setInboxWidth] = useState(() => {
+    const saved = localStorage.getItem("inbox-panel-width");
+    return saved ? Math.max(180, Math.min(500, Number(saved))) : 252;
+  });
+  const handleInboxWidthChange = useCallback((w: number) => {
+    setInboxWidth(w);
+    localStorage.setItem("inbox-panel-width", String(w));
+  }, []);
   const showCzk = displayMode === "czk";
   const [activeDrag, setActiveDrag] = useState<ActiveDragData | null>(null);
   const isDraggingFromInbox = activeDrag?.type === "inbox-item" || activeDrag?.type === "inbox-items" || activeDrag?.type === "inbox-project";
