@@ -889,11 +889,11 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       });
   }, [silo, hideRealCards]);
 
-  const barColor = isPast ? "#b0bab8" : isOverloaded ? "#c0392b" : isWarning ? "#d97706" : forecastDarkMode ? "#3d7a74" : "#3a8a36";
+  const barColor = isPast ? "#b0bab8" : isOverloaded ? "#c0392b" : isWarning ? "#d97706" : forecastDarkMode ? "#3d7a74" : "#223937";
   const barBg = isPast ? "linear-gradient(90deg, #d0d7d5, #b0bab8)"
     : isOverloaded ? "linear-gradient(90deg, #fca5a5, #c0392b)"
     : isWarning ? "linear-gradient(90deg, #fcd34d, #d97706)"
-    : forecastDarkMode ? "linear-gradient(90deg, #6abfb5, #3d7a74)" : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
+    : forecastDarkMode ? "linear-gradient(90deg, #6abfb5, #3d7a74)" : "linear-gradient(90deg, #7ab8a4, #223937)";
 
   const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}`, disabled: isPast });
   const highlighted = !isPast && (isOver || isOverTarget);
