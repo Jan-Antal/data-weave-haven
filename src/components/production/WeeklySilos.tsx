@@ -186,6 +186,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const siloRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [visiblePeriodLabel, setVisiblePeriodLabel] = useState("");
   const initialScrollDone = useRef(false);
+  const [pastWeeksLoaded, setPastWeeksLoaded] = useState(4);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const defaultWeeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
