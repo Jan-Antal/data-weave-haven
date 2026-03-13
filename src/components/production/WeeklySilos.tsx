@@ -1242,11 +1242,11 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
             <div style={{ fontSize: 11, color: "#5c706f", marginTop: 1 }}>{bundle.items.length} položek</div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            {expSeverity && !allCompleted && expParsed && (() => {
+            {expSeverity && !allCompleted && deadlineInfo?.parsed && (() => {
               const warnColor = expSeverity === "overdue" ? "#dc3545" : "#d97706";
               const tooltipText = expSeverity === "overdue"
-                ? `Expedice ${format(expParsed, "dd.MM.yyyy")} — po termínu o ${differenceInDays(new Date(), expParsed)} dní`
-                : `Expedice za ${differenceInDays(expParsed, new Date())} dní (${format(expParsed, "dd.MM.yyyy")})`;
+                ? `${deadlineLabel} ${format(deadlineInfo.parsed, "dd.MM.yyyy")} — po termínu o ${differenceInDays(new Date(), deadlineInfo.parsed)} dní`
+                : `${deadlineLabel} za ${differenceInDays(deadlineInfo.parsed, new Date())} dní (${format(deadlineInfo.parsed, "dd.MM.yyyy")})`;
               return (
                 <Tooltip>
                   <TooltipTrigger asChild>
