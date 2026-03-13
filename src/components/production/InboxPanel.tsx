@@ -674,8 +674,9 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
               </span>
               <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
             </div>
-            {reserveProjects.map(p => {
+            {reserveProjects.map((p, idx) => {
               const isReserveSelected = selectedProjectId === p.project_id;
+              const isMultiSelected = selectedReserves.has(p.project_id);
               const reserveColor = getProjectColor(p.project_id);
               const reserveInfo = projectInfoMap.get(p.project_id);
               const reserveDeadline = resolveDeadline({ expedice: reserveInfo?.expedice, montaz: reserveInfo?.montaz, datum_smluvni: reserveInfo?.datum_smluvni });
@@ -689,17 +690,94 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
               }
               return (
               <div key={p.project_id} className="flex items-center gap-1.5 px-2 py-[4px] rounded-[5px] cursor-pointer"
-                onClick={(e) => { e.stopPropagation(); onSelectProject?.(p.project_id); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Multi-select with Ctrl/Shift
+                  if (e.ctrlKey || e.metaKey) {
+                    setSelectedReserves(prev => {
+                      const next = new Set(prev);
+                      if (next.has(p.project_id)) next.delete(p.project_id);
+                      else next.add(p.project_id);
+                      return next;
+                    });
+                    setLastClickedReserve(p.project_id);
+                    return;
+                  }
+                  if (e.shiftKey && lastClickedReserve) {
+                    const ids = reserveProjects.map(r => r.project_id);
+                    const startIdx = ids.indexOf(lastClickedReserve);
+                    const endIdx = ids.indexOf(p.project_id);
+                    if (startIdx !== -1 && endIdx !== -1) {
+                      const [from, to] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+                      setSelectedReserves(prev => {
+                        const next = new Set(prev);
+                        for (let i = from; i <= to; i++) next.add(ids[i]);
+                        return next;
+                      });
+                    }
+                    setLastClickedReserve(p.project_id);
+                    return;
+                  }
+                  // Normal click: select project + clear multi-select
+                  setSelectedReserves(new Set());
+                  setLastClickedReserve(p.project_id);
+                  onSelectProject?.(p.project_id);
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  // If right-clicked item is not in selection, select only it
+                  let targetIds: string[];
+                  if (selectedReserves.size > 0 && selectedReserves.has(p.project_id)) {
+                    targetIds = Array.from(selectedReserves);
+                  } else {
+                    targetIds = [p.project_id];
+                    setSelectedReserves(new Set([p.project_id]));
+                  }
+                  const targetNames = targetIds.map(id => {
+                    const rp = reserveProjects.find(r => r.project_id === id);
+                    return rp?.project_name || id;
+                  });
+                  const label = targetIds.length === 1
+                    ? `Zrušit rezervu`
+                    : `Zrušit ${targetIds.length} rezerv`;
+                  const actions: ContextMenuAction[] = [{
+                    label, icon: "🗑", danger: true,
+                    onClick: async () => {
+                      // Delete all blocker schedule items for selected projects
+                      for (const pid of targetIds) {
+                        const { error } = await supabase
+                          .from("production_schedule")
+                          .delete()
+                          .eq("project_id", pid)
+                          .eq("is_blocker", true);
+                        if (error) {
+                          toast({ title: "Chyba", description: error.message, variant: "destructive" });
+                          return;
+                        }
+                      }
+                      qc.invalidateQueries({ queryKey: ["production-schedule"] });
+                      qc.invalidateQueries({ queryKey: ["production-progress"] });
+                      toast({ title: `🗑 ${targetIds.length === 1 ? `Rezerva pro ${targetNames[0]} zrušena` : `${targetIds.length} rezerv zrušeno`}` });
+                      setSelectedReserves(new Set());
+                    },
+                  }];
+                  setContextMenu({
+                    x: Math.min(e.clientX, window.innerWidth - 200),
+                    y: Math.min(e.clientY, window.innerHeight - 200),
+                    actions,
+                  });
+                }}
                 style={{
-                  backgroundColor: isReserveSelected ? "rgba(217,119,6,0.05)" : "#f5f3f0",
-                  borderTop: isReserveSelected ? "2px solid #d97706" : "1px dashed #d5d0c8",
-                  borderRight: isReserveSelected ? "2px solid #d97706" : "1px dashed #d5d0c8",
-                  borderBottom: isReserveSelected ? "2px solid #d97706" : "1px dashed #d5d0c8",
+                  backgroundColor: isMultiSelected ? "rgba(217,119,6,0.08)" : isReserveSelected ? "rgba(217,119,6,0.05)" : "#f5f3f0",
+                  borderTop: isMultiSelected ? "2px solid #d97706" : isReserveSelected ? "2px solid #d97706" : "1px dashed #d5d0c8",
+                  borderRight: isMultiSelected ? "2px solid #d97706" : isReserveSelected ? "2px solid #d97706" : "1px dashed #d5d0c8",
+                  borderBottom: isMultiSelected ? "2px solid #d97706" : isReserveSelected ? "2px solid #d97706" : "1px dashed #d5d0c8",
                   borderLeft: `4px dashed ${reserveColor}80`,
-                  boxShadow: isReserveSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
+                  boxShadow: (isMultiSelected || isReserveSelected) ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
                 }}>
                 <div className="flex-1 min-w-0">
-                  <div className="truncate" style={{ fontSize: 12, fontWeight: 500, color: "#6b7280" }}>{p.project_name}</div>
+                  <div className="truncate" style={{ fontSize: 12, fontWeight: 500, color: isMultiSelected ? "#92400e" : "#6b7280" }}>{p.project_name}</div>
                   <div className="flex items-center gap-1.5">
                     <span className="font-mono" style={{ fontSize: 10, color: "#9ca3af" }}>{p.project_id}</span>
                     {reserveDeadlineDisplay && (
@@ -707,6 +785,9 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
                     )}
                   </div>
                 </div>
+                {isMultiSelected && (
+                  <Check className="h-3 w-3 flex-shrink-0" style={{ color: "#d97706" }} />
+                )}
               </div>
               );
             })}
