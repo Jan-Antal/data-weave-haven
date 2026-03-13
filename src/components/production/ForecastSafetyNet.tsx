@@ -180,7 +180,7 @@ function DueDateDialog({
                     {dates[f.key] ? format(dates[f.key]!, "d. M. yyyy") : "Nezadáno"}
                   </button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0 z-[99999]" align="start" sideOffset={4}>
                   <Calendar
                     mode="single"
                     selected={dates[f.key]}
@@ -188,6 +188,7 @@ function DueDateDialog({
                     locale={cs}
                     weekStartsOn={1}
                     initialFocus
+                    className="p-3 pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
