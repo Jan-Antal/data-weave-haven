@@ -89,6 +89,7 @@ interface UseForecastModeReturn {
   commitInboxOnly: () => Promise<void>;
   moveForecastBlock: (blockId: string, newWeek: string) => void;
   removeForecastBlock: (blockId: string) => void;
+  addForecastBlock: (block: ForecastBlock) => void;
   splitForecastBlock: (blockId: string, keepHours: number, splitWeek: string) => void;
   resetAndRegenerate: (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => Promise<void>;
   loadSavedSession: (modeOverride?: ForecastPlanMode) => boolean;
