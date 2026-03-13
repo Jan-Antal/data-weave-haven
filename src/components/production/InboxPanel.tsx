@@ -526,7 +526,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   // Forecast mode: show empty state
   if (forecastActive) {
     return (
-      <div className="w-[270px] shrink-0 flex flex-col" style={{ borderRight: "1px solid #2a2f3d", backgroundColor: "#1c1f26" }}>
+      <div className="w-[252px] shrink-0 flex flex-col" style={{ borderRight: "1px solid #2a2f3d", backgroundColor: "#1c1f26" }}>
         <div className="px-3 py-2 flex items-center gap-2" style={{ borderBottom: "1px solid #2a2f3d" }}>
           <span className="text-sm">📥</span>
           <span className="text-[13px] font-semibold" style={{ color: "#4a5168" }}>Inbox</span>
