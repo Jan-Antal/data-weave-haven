@@ -653,20 +653,11 @@ export default function PlanVyroby() {
             inboxBlockCount={forecast.forecastBlocks.filter(b => b.source === "inbox_item").length}
             projectBlockCount={forecast.forecastBlocks.filter(b => b.source === "project_estimate").length}
             isGenerating={forecast.isGenerating}
-            onCommitAll={async () => {
-              await forecast.commitRealBundleOverrides(moveBundleToWeek);
-              await forecast.commitBlocks(forecast.forecastBlocks.map(b => b.id));
-            }}
             onCommitSelected={async () => {
               await forecast.commitRealBundleOverrides(moveBundleToWeek);
               await forecast.commitBlocks(Array.from(forecast.selectedBlockIds));
             }}
-            onCommitInboxOnly={async () => {
-              await forecast.commitInboxOnly();
-            }}
             onCancel={() => forecast.setForecastActive(false)}
-            onSelectAll={forecast.selectAll}
-            onDeselectAll={forecast.deselectAll}
           />
         )}
       </div>
