@@ -967,6 +967,24 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
           <div className="flex flex-col" style={{ gap: 6, paddingTop: 6 }}>
             {filteredRows.map(proj => {
               const isExpanded = expandedProjects.has(proj.projectId);
+              const isOverdueProject = (() => {
+                const pd = projectDateLookup.get(proj.projectId);
+                if (!pd) return false;
+                const isProjectDone = ["Fakturace", "Dokonceno", "Dokončeno", "Expedice"].includes(pd?.status ?? "");
+                const allItemsDone = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
+                if (isProjectDone || allItemsDone) return false;
+                const deadline = resolveDeadline({
+                  expedice: pd?.expedice ?? null,
+                  montaz: pd?.montaz ?? null,
+                  datum_smluvni: pd?.datum_smluvni ?? null,
+                });
+                if (!deadline) return false;
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const dl = new Date(deadline.date);
+                dl.setHours(0, 0, 0, 0);
+                return dl < today;
+              })();
               return (
                 <div key={proj.projectId} style={{ marginLeft: 4, marginRight: 4 }}>
                   {/* Project header row */}

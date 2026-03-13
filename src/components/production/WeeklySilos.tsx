@@ -833,7 +833,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
   }, [project, isProjectDone, allCompleted]);
 
   const borderLeftColor = allCompleted ? "#3a8a36"
-    : expSeverity === "overdue" ? "#dc3545"
+    : isOverdueProject ? "hsl(0 70% 50%)"
     : expSeverity === "urgent" ? "#d97706"
     : color;
 
