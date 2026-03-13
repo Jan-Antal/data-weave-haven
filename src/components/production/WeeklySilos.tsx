@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { GripVertical, ChevronRight, AlertTriangle } from "lucide-react";
+import type { ForecastBlock } from "@/hooks/useForecastMode";
 import { differenceInDays, format } from "date-fns";
 import { useProductionSchedule, getISOWeekNumber, type WeekSilo, type ScheduleBundle, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
@@ -22,6 +23,7 @@ import { toast } from "@/hooks/use-toast";
 import { parseAppDate } from "@/lib/dateFormat";
 import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
 import { resolveDeadline } from "@/lib/deadlineWarning";
+import { ForecastWeekContent } from "./ForecastOverlay";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -76,6 +78,10 @@ interface Props {
   selectedProjectId?: string | null;
   onSelectProject?: (projectId: string) => void;
   searchQuery?: string;
+  forecastBlocks?: ForecastBlock[];
+  forecastSelectedIds?: Set<string>;
+  onToggleForecastSelect?: (id: string) => void;
+  forecastDarkMode?: boolean;
 }
 
 interface ContextMenuState {
@@ -140,7 +146,7 @@ interface CancelState {
   cancelAll?: boolean;
 }
 
-export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "" }: Props) {
+export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
@@ -594,6 +600,10 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               selectedProjectId={selectedProjectId}
               onSelectProject={onSelectProject}
               searchQuery={searchQuery}
+              forecastBlocks={forecastBlocks}
+              forecastSelectedIds={forecastSelectedIds}
+              onToggleForecastSelect={onToggleForecastSelect}
+              forecastDarkMode={forecastDarkMode}
             />
           ))}
         </div>
@@ -667,10 +677,14 @@ interface SiloProps {
   selectedProjectId?: string | null;
   onSelectProject?: (projectId: string) => void;
   searchQuery?: string;
+  forecastBlocks?: ForecastBlock[];
+  forecastSelectedIds?: Set<string>;
+  onToggleForecastSelect?: (id: string) => void;
+  forecastDarkMode?: boolean;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "" }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode }: SiloProps) {
   // Capacity calculation: exclude paused items
   const activeHours = useMemo(() => {
     if (!silo) return 0;
@@ -763,6 +777,16 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             isSelected={selectedProjectId === bundle.project_id}
             onSelectProject={onSelectProject} searchQuery={searchQuery} />
         ))}
+
+        {/* Forecast blocks */}
+        {forecastBlocks && forecastSelectedIds && onToggleForecastSelect && (
+          <ForecastWeekContent
+            weekKey={weekKey}
+            blocks={forecastBlocks}
+            selectedBlockIds={forecastSelectedIds}
+            onToggleSelect={onToggleForecastSelect}
+          />
+        )}
       </div>
 
       {isOverloaded && !isPast && silo && !spillDismissed && (
