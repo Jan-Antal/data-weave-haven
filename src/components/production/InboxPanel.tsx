@@ -146,6 +146,8 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   const [cancelState, setCancelState] = useState<CancelState | null>(null);
   const [planningState, setPlanningState] = useState<{ projectId: string; projectName: string; items: PlanningItem[] } | null>(null);
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
+  const [selectedReserves, setSelectedReserves] = useState<Set<string>>(new Set());
+  const [lastClickedReserve, setLastClickedReserve] = useState<string | null>(null);
   const [deadlineWarning, setDeadlineWarning] = useState<{
     projectName: string; deadlineLabel: string; deadlineDate: Date; weekLabel: string;
   } | null>(null);
