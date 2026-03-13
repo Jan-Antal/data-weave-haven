@@ -564,9 +564,6 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
         <div className="flex items-center gap-1.5">
           {projects.length > 0 && (
             <>
-              <span className="text-[9px] font-mono font-medium" style={{ color: "#6b7a78" }}>
-                {displayMode === "czk" ? formatCompactCzk(totalHours * hourlyRate) : `${Math.round(totalHours).toLocaleString("cs-CZ")}h`}
-              </span>
               <button
                 onClick={allExpanded ? handleCollapseAll : handleExpandAll}
                 className="hover:text-gray-600 transition-colors"
