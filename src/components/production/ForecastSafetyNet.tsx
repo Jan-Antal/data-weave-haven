@@ -290,12 +290,15 @@ function DraggableSafetyNetRow({
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className="font-mono text-[10px]" style={{ color: "#5c706f" }}>{project.project_id}</span>
-            <span
-              className="px-1 py-0 rounded text-[9px] font-medium"
-              style={{ background: badge.bg, color: "#e5e5e5" }}
-            >
-              {badge.label}
-            </span>
+            {deadlineInfo ? (
+              <span className="text-[9px] font-medium" style={{ color: deadlineInfo.color }}>
+                · {deadlineInfo.label}: {deadlineInfo.dateStr}
+              </span>
+            ) : (
+              <span className="text-[9px] font-medium" style={{ color: "#d97706" }}>
+                ⚠ BEZ TERMÍNU
+              </span>
+            )}
           </div>
         </div>
         <div className="shrink-0 flex items-center gap-1.5">
