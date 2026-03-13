@@ -402,17 +402,6 @@ function ForecastCard({
                   {style.hoursPrefix}{displayMode === "czk" ? formatCompactCzk(block.estimated_hours * hourlyRate) : displayMode === "percent" ? `${weeklyCapacity > 0 ? Math.round(block.estimated_hours / weeklyCapacity * 100) : 0}%` : `${block.estimated_hours}h`}
                 </span>
               </div>
-                {block.tpv_item_count && block.tpv_item_count > 0
-
-
-
-                }
-                
-
-
-
-
-
 
 
 
