@@ -903,10 +903,10 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
   const highlighted = !isPast && (isOver || isOverTarget);
   const dropBorderColor = highlighted ? (isOverloaded ? "#d97706" : "#3b82f6") : undefined;
   const headerColor = forecastDarkMode
-    ? (isPast ? "#6b7280" : isCurrent ? "#7eb8ff" : "#9aa5be")
+    ? (isPast ? "#4a5a58" : isCurrent ? "#4a9e96" : "#7aa8a4")
     : (isPast ? "#9ca3af" : isCurrent ? "#223937" : "#1a1a1a");
   const headerWeight = isCurrent ? 700 : isPast ? 500 : 600;
-  const dateRangeColor = forecastDarkMode ? "#4a5168" : (isPast ? "#b0b7c3" : "#6b7280");
+  const dateRangeColor = forecastDarkMode ? "#4a5a58" : (isPast ? "#b0b7c3" : "#6b7280");
 
   const combinedRef = useCallback((el: HTMLDivElement | null) => { setNodeRef(el); registerRef(weekKey, el); }, [setNodeRef, registerRef, weekKey]);
 
