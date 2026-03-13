@@ -38,10 +38,8 @@ function getUrgency(info: { expedice?: string | null; montaz?: string | null; da
   if (s === "fakturace" || s === "dokonceno" || s === "dokončeno") return "ok";
   const dl = resolveDeadline(info);
   if (!dl) return "ok";
-  const d = parseAppDate(dl.date);
-  if (!d) return "ok";
-  if (isPast(d)) return "overdue";
-  const days = differenceInDays(d, new Date());
+  if (isPast(dl.date)) return "overdue";
+  const days = differenceInDays(dl.date, new Date());
   if (days <= 14) return "urgent";
   if (days <= 30) return "upcoming";
   return "ok";
@@ -51,9 +49,7 @@ function getUrgencyDaysLabel(info: { expedice?: string | null; montaz?: string |
   if (!info) return null;
   const dl = resolveDeadline(info);
   if (!dl) return null;
-  const d = parseAppDate(dl.date);
-  if (!d) return null;
-  const days = differenceInDays(d, new Date());
+  const days = differenceInDays(dl.date, new Date());
   if (days <= 0) return null; // overdue uses badge text
   return `${days} dní`;
 }
