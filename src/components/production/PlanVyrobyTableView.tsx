@@ -1320,7 +1320,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                                 className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-bold"
                                 style={{ backgroundColor: cellStyle.bg, color: cellStyle.text, border: `1px solid ${cellStyle.border}` }}
                               >
-                                {formatWeekTotal(wt.hours, wt.czk)}
+                                {formatWeekTotal(wt.hours, wt.czk, week.key)}
                               </div>
                             );
                           })()}
