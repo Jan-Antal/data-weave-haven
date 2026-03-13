@@ -1270,22 +1270,22 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   return (
     <div className="rounded-[6px] overflow-hidden relative" style={{
       borderTop: forecastDarkMode
-        ? (isSelected ? "2px solid #d97706" : "1px solid #3d4558")
-        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : "1px solid #ece8e2"),
+        ? ((isSelected || isSearchMatch) ? "2px solid #d97706" : "1px solid #3d4558")
+        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : (isSelected || isSearchMatch) ? "2px solid #d97706" : "1px solid #ece8e2"),
       borderRight: forecastDarkMode
-        ? (isSelected ? "2px solid #d97706" : "1px solid #3d4558")
-        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : "1px solid #ece8e2"),
+        ? ((isSelected || isSearchMatch) ? "2px solid #d97706" : "1px solid #3d4558")
+        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : (isSelected || isSearchMatch) ? "2px solid #d97706" : "1px solid #ece8e2"),
       borderBottom: forecastDarkMode
-        ? (isSelected ? "2px solid #d97706" : "1px solid #3d4558")
-        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : "1px solid #ece8e2"),
-      borderLeft: isSelected ? "4px solid #d97706" : isSearchMatch ? "2px solid #f59e0b" : `4px solid ${borderLeftColor}`,
+        ? ((isSelected || isSearchMatch) ? "2px solid #d97706" : "1px solid #3d4558")
+        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : (isSelected || isSearchMatch) ? "2px solid #d97706" : "1px solid #ece8e2"),
+      borderLeft: (isSelected || isSearchMatch) ? "4px solid #d97706" : `4px solid ${borderLeftColor}`,
       backgroundColor: forecastDarkMode
-        ? (isSelected ? "rgba(217,119,6,0.08)" : "#252a35")
-        : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : isSelected ? "rgba(217,119,6,0.05)" : "#ffffff"),
+        ? ((isSelected || isSearchMatch) ? "rgba(217,119,6,0.08)" : "#252a35")
+        : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : (isSelected || isSearchMatch) ? "rgba(217,119,6,0.05)" : "#ffffff"),
       opacity: isDragging ? 0.3 : 1,
-      outline: isFocusedMatch ? "2px solid #f59e0b" : undefined,
+      outline: isFocusedMatch ? "2px solid #d97706" : undefined,
       outlineOffset: isFocusedMatch ? "2px" : undefined,
-      boxShadow: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "inset 0 0 0 1px hsl(0 60% 86%)" : isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined),
+      boxShadow: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "inset 0 0 0 1px hsl(0 60% 86%)" : (isSelected || isSearchMatch) ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined),
       transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, box-shadow 150ms, outline 300ms",
     }}>
 
