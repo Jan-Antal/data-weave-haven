@@ -89,11 +89,12 @@ interface MergeState {
 }
 
 export default function PlanVyroby() {
-  const { isAdmin, loading, profile } = useAuth();
+  const { isAdmin, isOwner, loading, profile } = useAuth();
   const navigate = useNavigate();
   const { setCurrentPage } = useUndoRedo();
   const [displayMode, setDisplayMode] = useState<DisplayMode>("hours");
   const [viewTab, setViewTab] = useState<ViewTab>("kanban");
+  const forecast = useForecastMode();
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
