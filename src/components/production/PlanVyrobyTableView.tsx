@@ -109,6 +109,7 @@ interface ProjectRow {
   inboxTotalCzk: number;
   expediceTotalHours: number;
   expediceTotalCzk: number;
+  isBlockerOnly: boolean;
 }
 
 function getCollapsedCellStyle(proj: ProjectRow, weekKey: string): { bg: string; text: string; border: string } {
@@ -422,6 +423,23 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
         }
       }
 
+      // Check if all schedule items for this project are blockers
+      let allBlocker = false;
+      if (proj && !inbox) {
+        const allItems = Array.from(proj.items.values());
+        const scheduleItems: ScheduleItem[] = [];
+        if (scheduleData) {
+          for (const [, silo] of scheduleData) {
+            for (const bundle of silo.bundles) {
+              if (bundle.project_id === pid) {
+                scheduleItems.push(...bundle.items);
+              }
+            }
+          }
+        }
+        allBlocker = scheduleItems.length > 0 && scheduleItems.every(i => i.is_blocker);
+      }
+
       rows.push({
         projectId: pid, projectName: realName, color: getProjectColor(pid),
         totalHours: visibleItems.reduce((s, i) => s + i.totalHours, 0),
@@ -429,6 +447,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
         items: visibleItems, weekTotals,
         inboxTotalHours: inbox?.totalHours ?? 0, inboxTotalCzk: inbox?.totalCzk ?? 0,
         expediceTotalHours: expedice?.totalHours ?? 0, expediceTotalCzk: expedice?.totalCzk ?? 0,
+        isBlockerOnly: allBlocker,
       });
     }
 
@@ -459,6 +478,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
       });
     });
   }, [projectRows, searchQuery]);
+
+  const regularRows = useMemo(() => filteredRows.filter(r => !r.isBlockerOnly), [filteredRows]);
+  const blockerRows = useMemo(() => filteredRows.filter(r => r.isBlockerOnly), [filteredRows]);
 
   const totalProjects = filteredRows.length;
   const totalItems = filteredRows.reduce((s, p) => s + p.items.length, 0);
@@ -1190,7 +1212,27 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
 
           {/* Project rows */}
           <div className="flex flex-col" style={{ gap: 6, paddingTop: 6 }}>
-            {filteredRows.map(proj => {
+            {(() => {
+              const regular = filteredRows.filter(r => !r.isBlockerOnly);
+              const blockers = filteredRows.filter(r => r.isBlockerOnly);
+              const combined = [...regular];
+              if (blockers.length > 0) {
+                combined.push({ __separator: true, count: blockers.length } as any);
+                combined.push(...blockers);
+              }
+              return combined;
+            })().map((proj: any) => {
+              if (proj.__separator) {
+                return (
+                  <div key="blocker-separator" className="flex items-center gap-2 mt-3 mb-1 px-2">
+                    <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+                    <span className="px-2 whitespace-nowrap" style={{ fontSize: 11, color: "#6b7280" }}>
+                      ⏳ Rezerva kapacit ({proj.count})
+                    </span>
+                    <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+                  </div>
+                );
+              }
               const isExpanded = expandedProjects.has(proj.projectId);
               const isOverdueProject = (() => {
                 const pd = projectDateLookup.get(proj.projectId);

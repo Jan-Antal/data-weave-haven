@@ -12,6 +12,7 @@ export interface ProjectProgress {
   paused: number;
   missing: number;
   is_complete: boolean;
+  is_blocker_only: boolean;
   scheduled_items: { id: string; item_name: string; item_code: string | null; week_label: string; status: string }[];
 }
 
@@ -22,7 +23,7 @@ export function useProductionProgress() {
       const [tpvRes, inboxRes, scheduleRes] = await Promise.all([
         supabase.from("tpv_items").select("project_id, id, item_name, item_type").is("deleted_at", null),
         supabase.from("production_inbox").select("project_id, id, item_name, item_code, status"),
-        supabase.from("production_schedule").select("project_id, id, item_name, item_code, status, scheduled_week, projects!production_schedule_project_id_fkey(project_name)"),
+        supabase.from("production_schedule").select("project_id, id, item_name, item_code, status, scheduled_week, is_blocker, projects!production_schedule_project_id_fkey(project_name)"),
       ]);
 
       if (tpvRes.error) throw tpvRes.error;
@@ -44,6 +45,8 @@ export function useProductionProgress() {
       const scheduledByProject = new Map<string, number>();
       const completedByProject = new Map<string, number>();
       const pausedByProject = new Map<string, number>();
+      const blockerCountByProject = new Map<string, number>();
+      const nonBlockerCountByProject = new Map<string, number>();
       const scheduledItemsByProject = new Map<string, ProjectProgress["scheduled_items"]>();
       const projectNames = new Map<string, string>();
 
@@ -51,6 +54,12 @@ export function useProductionProgress() {
         const pid = row.project_id;
         const pName = (row as any).projects?.project_name;
         if (pName && !projectNames.has(pid)) projectNames.set(pid, pName);
+        const isBlocker = !!(row as any).is_blocker;
+        if (isBlocker) {
+          blockerCountByProject.set(pid, (blockerCountByProject.get(pid) || 0) + 1);
+        } else {
+          nonBlockerCountByProject.set(pid, (nonBlockerCountByProject.get(pid) || 0) + 1);
+        }
         if (row.status === "completed") {
           completedByProject.set(pid, (completedByProject.get(pid) || 0) + 1);
         } else if (row.status === "paused") {
@@ -88,10 +97,15 @@ export function useProductionProgress() {
         const accountedFor = inInbox + scheduled + completed + paused;
         const missing = Math.max(0, totalTpv - accountedFor);
         
+        const blockerCount = blockerCountByProject.get(pid) || 0;
+        const nonBlockerCount = nonBlockerCountByProject.get(pid) || 0;
+        const isBlockerOnly = blockerCount > 0 && nonBlockerCount === 0 && inInbox === 0;
+        
         result.set(pid, {
           project_id: pid, project_name: projectNames.get(pid) || pid, total_tpv: totalTpv,
           in_inbox: inInbox, scheduled, completed, paused, missing,
           is_complete: missing === 0 && inInbox === 0 && paused === 0 && (scheduled + completed) > 0,
+          is_blocker_only: isBlockerOnly,
           scheduled_items: scheduledItemsByProject.get(pid) || [],
         });
       }

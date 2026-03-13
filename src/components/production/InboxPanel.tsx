@@ -240,10 +240,13 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
 
   const totalItemCount = projects.reduce((s, p) => s + p.items.length, 0);
 
-  const completedProjects = useMemo(() => {
-    if (!progressData) return [];
+  const { completedProjects, reserveProjects } = useMemo(() => {
+    if (!progressData) return { completedProjects: [], reserveProjects: [] };
     const activeProjectIds = new Set(projects.map(p => p.project_id));
-    return Array.from(progressData.values()).filter(p => p.is_complete && !activeProjectIds.has(p.project_id));
+    const allCompleted = Array.from(progressData.values()).filter(p => (p.is_complete || p.is_blocker_only) && !activeProjectIds.has(p.project_id));
+    const regular = allCompleted.filter(p => !p.is_blocker_only);
+    const reserve = allCompleted.filter(p => p.is_blocker_only);
+    return { completedProjects: regular, reserveProjects: reserve };
   }, [progressData, projects]);
 
   const allProjectOptions = useMemo(() => {
@@ -582,7 +585,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
 
       {/* Items */}
       <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5">
-        {projects.length === 0 && completedProjects.length === 0 && !isLoading && (
+        {projects.length === 0 && completedProjects.length === 0 && reserveProjects.length === 0 && !isLoading && (
           <div className="text-center py-8">
             <p className="text-[10px] mb-3" style={{ color: "#99a5a3" }}>Inbox je prázdný</p>
           </div>
@@ -651,6 +654,54 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
                     <span className="font-mono" style={{ fontSize: 10, color: "#9ca3af" }}>{p.project_id}</span>
                     {completedDeadlineDisplay && (
                       <span style={{ fontSize: 10, color: completedDeadlineDisplay.color }}>· {completedDeadlineDisplay.label}: {completedDeadlineDisplay.dateStr}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              );
+            })}
+          </div>
+        )}
+
+        {reserveProjects.length > 0 && (
+          <div className="mt-3 space-y-[2px]">
+            <div className="flex items-center gap-0 mb-1.5">
+              <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+              <span className="px-2" style={{ fontSize: 11, color: "#6b7280", backgroundColor: "#f8f7f4" }}>
+                ⏳ Rezerva kapacit ({reserveProjects.length})
+              </span>
+              <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+            </div>
+            {reserveProjects.map(p => {
+              const isReserveSelected = selectedProjectId === p.project_id;
+              const reserveColor = getProjectColor(p.project_id);
+              const reserveInfo = projectInfoMap.get(p.project_id);
+              const reserveDeadline = resolveDeadline({ expedice: reserveInfo?.expedice, montaz: reserveInfo?.montaz, datum_smluvni: reserveInfo?.datum_smluvni });
+              let reserveDeadlineDisplay: { label: string; dateStr: string; color: string } | null = null;
+              if (reserveDeadline) {
+                const days = differenceInDays(reserveDeadline.date, new Date());
+                const dateStr = `${reserveDeadline.date.getDate()}.${reserveDeadline.date.getMonth() + 1}.${reserveDeadline.date.getFullYear()}`;
+                const dlLabel = reserveDeadline.fieldName === "expedice" ? "Exp" : reserveDeadline.fieldName === "montaz" ? "Montáž" : "Sml";
+                const dlColor = days < 0 ? "#dc2626" : days <= 14 ? "#d97706" : "#6b7280";
+                reserveDeadlineDisplay = { label: dlLabel, dateStr, color: dlColor };
+              }
+              return (
+              <div key={p.project_id} className="flex items-center gap-1.5 px-2 py-[4px] rounded-[5px] cursor-pointer"
+                onClick={(e) => { e.stopPropagation(); onSelectProject?.(p.project_id); }}
+                style={{
+                  backgroundColor: isReserveSelected ? "rgba(217,119,6,0.05)" : "#f5f3f0",
+                  borderTop: isReserveSelected ? "2px solid #d97706" : "1px dashed #d5d0c8",
+                  borderRight: isReserveSelected ? "2px solid #d97706" : "1px dashed #d5d0c8",
+                  borderBottom: isReserveSelected ? "2px solid #d97706" : "1px dashed #d5d0c8",
+                  borderLeft: `4px dashed ${reserveColor}80`,
+                  boxShadow: isReserveSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
+                }}>
+                <div className="flex-1 min-w-0">
+                  <div className="truncate" style={{ fontSize: 12, fontWeight: 500, color: "#6b7280" }}>{p.project_name}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono" style={{ fontSize: 10, color: "#9ca3af" }}>{p.project_id}</span>
+                    {reserveDeadlineDisplay && (
+                      <span style={{ fontSize: 10, color: reserveDeadlineDisplay.color }}>· {reserveDeadlineDisplay.label}: {reserveDeadlineDisplay.dateStr}</span>
                     )}
                   </div>
                 </div>
