@@ -982,11 +982,21 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                         width: LEFT_COL_W,
                         backgroundColor: (() => {
                           const pd = projectDateLookup.get(proj.projectId);
-                          const exp = pd?.expedice ? parseAppDate(pd.expedice) : null;
+                          if (!pd) return "#fff";
                           const isProjectDone = ["Fakturace", "Dokonceno", "Dokončeno", "Expedice"].includes(pd?.status ?? "");
                           const allItemsDone = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
-                          if (!isProjectDone && !allItemsDone && exp && differenceInDays(exp, new Date()) < 0) return "#fde8e8";
-                          return "#fff";
+                          if (isProjectDone || allItemsDone) return "#fff";
+                          const deadline = resolveDeadline({
+                            expedice: pd?.expedice ?? null,
+                            montaz: pd?.montaz ?? null,
+                            datum_smluvni: pd?.datum_smluvni ?? null,
+                          });
+                          if (!deadline) return "#fff";
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          const dl = new Date(deadline.date);
+                          dl.setHours(0, 0, 0, 0);
+                          return dl < today ? "#FEE2E2" : "#fff";
                         })(),
                         borderLeft: `4px solid ${proj.color}`,
                         borderRight: "1px solid #e5e2dd",
