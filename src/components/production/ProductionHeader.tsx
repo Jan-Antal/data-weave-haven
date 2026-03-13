@@ -23,7 +23,7 @@ const ROLE_LABELS: Record<string, string> = {
   viewer: "Viewer",
 };
 
-export function ProductionHeader() {
+export function ProductionHeader({ forecastActive }: { forecastActive?: boolean }) {
   const navigate = useNavigate();
   const { data: settings } = useProductionSettings();
   const { canAccessSettings, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, profile, signOut } = useAuth();
