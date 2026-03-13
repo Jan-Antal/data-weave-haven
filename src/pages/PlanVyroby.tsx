@@ -987,7 +987,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
         </div>
 
         <div className="relative w-[200px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: forecastActive ? "#7aa8a4" : undefined }} />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: forecastActive ? "#7aa8a4" : "#7aaa7a" }} />
           <input
             type="text"
             value={searchQuery}
@@ -995,9 +995,9 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
             placeholder="Hledat projekt..."
             className="w-full h-8 pl-8 pr-8 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 transition-colors"
             style={{
-              backgroundColor: forecastActive ? "#223937" : "hsl(var(--background))",
-              border: forecastActive ? "1px solid #2a4a46" : "1px solid hsl(var(--input))",
-              color: forecastActive ? "#a8c5c2" : undefined,
+              backgroundColor: forecastActive ? "#223937" : "#253a2c",
+              border: forecastActive ? "1px solid #2a4a46" : "1px solid #3a5a3a",
+              color: forecastActive ? "#a8c5c2" : "#a8c5a8",
             }}
           />
           {searchQuery && (
