@@ -975,15 +975,15 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
            <div className="flex items-baseline justify-between mt-[3px]">
             {displayMode === "czk" ? (
               <>
-                <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{formatCompactCzk(activeHours * hourlyRate)}</span>
-                {blockerHours > 0 && <span className="font-mono text-[9px]" style={{ color: "#6b7280" }}>+~{formatCompactCzk(blockerHours * hourlyRate)}</span>}
+                <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{formatCompactCzk((forecastDarkMode ? totalHours : activeHours) * hourlyRate)}</span>
+                {!forecastDarkMode && blockerHours > 0 && <span className="font-mono text-[9px]" style={{ color: "#6b7280" }}>+~{formatCompactCzk(blockerHours * hourlyRate)}</span>}
                 <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }}>/ {formatCompactCzk(weeklyCapacity * hourlyRate)}</span>
                 <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
               </>
             ) : (
               <>
-                <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{Math.round(activeHours)}h</span>
-                {blockerHours > 0 && <span className="font-mono text-[9px]" style={{ color: "#6b7280" }}>+~{Math.round(blockerHours)}h</span>}
+                <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{Math.round(forecastDarkMode ? totalHours : activeHours)}h</span>
+                {!forecastDarkMode && blockerHours > 0 && <span className="font-mono text-[9px]" style={{ color: "#6b7280" }}>+~{Math.round(blockerHours)}h</span>}
                 <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }}>/ {weeklyCapacity}h</span>
                 <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
               </>
