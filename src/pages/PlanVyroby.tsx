@@ -295,6 +295,23 @@ export default function PlanVyroby() {
       return;
     }
 
+    // Handle real bundle drags in forecast mode — store as override, never write to Supabase
+    if (forecast.forecastActive && dragData.type === "silo-bundle" && dragData.projectId && dragData.weekDate) {
+      if (!over) return;
+      const targetId = over.id.toString();
+      const weekKey = resolveTargetWeek(targetId, dragData);
+      if (weekKey && weekKey !== dragData.weekDate) {
+        // Calculate hours from the source silo
+        const sourceSilo = scheduleData?.get(dragData.weekDate);
+        const sourceBundle = sourceSilo?.bundles.find(b => b.project_id === dragData.projectId);
+        const hours = sourceBundle?.total_hours ?? 0;
+        const itemCount = sourceBundle?.items.length ?? 0;
+        const projectName = sourceBundle?.project_name ?? dragData.projectName ?? dragData.projectId;
+        forecast.addRealBundleOverride(dragData.projectId, projectName, dragData.weekDate, weekKey, hours, itemCount);
+      }
+      return;
+    }
+
     // Block all real data modifications during forecast mode
     if (forecast.forecastActive) return;
 
