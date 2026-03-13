@@ -695,13 +695,13 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       sum + b.items.reduce((s, i) => s + (i.status === "paused" ? 0 : i.scheduled_hours), 0), 0);
   }, [silo]);
 
-  // Forecast hours for this week (for capacity bar)
-  const forecastHoursForWeek = useMemo(() => {
-    if (!forecastBlocks || !forecastDarkMode) return 0;
-    return forecastBlocks.filter(b => b.week === weekKey).reduce((sum, b) => sum + b.estimated_hours, 0);
-  }, [forecastBlocks, forecastDarkMode, weekKey]);
+  // Forecast layer is isolated and read-only, rendered separately per week
+  const weekForecastBlocks = useMemo(() => {
+    if (!forecastDarkMode || !forecastBlocks) return [];
+    return forecastBlocks.filter(block => block.week === weekKey);
+  }, [forecastDarkMode, forecastBlocks, weekKey]);
 
-  const totalHours = activeHours + (forecastDarkMode ? forecastHoursForWeek : 0);
+  const totalHours = activeHours + (forecastDarkMode ? weekForecastBlocks.reduce((sum, block) => sum + block.estimated_hours, 0) : 0);
   const pct = weeklyCapacity > 0 ? (totalHours / weeklyCapacity) * 100 : 0;
   const isOverloaded = pct > 120;
   const isWarning = pct > 100 && pct <= 120;
@@ -709,6 +709,18 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
 
   // In "from_scratch" mode, hide real plan cards
   const hideRealCards = forecastDarkMode && forecastPlanMode === "from_scratch";
+
+  const realBundles = useMemo(() => {
+    if (!silo || hideRealCards) return [];
+    return silo.bundles
+      .slice()
+      .sort((a, b) => {
+        const aDone = a.items.length > 0 && a.items.every(i => i.status === "completed");
+        const bDone = b.items.length > 0 && b.items.every(i => i.status === "completed");
+        if (aDone === bDone) return 0;
+        return aDone ? 1 : -1;
+      });
+  }, [silo, hideRealCards]);
 
   const barColor = isPast ? "#b0bab8" : isOverloaded ? "#dc3545" : isWarning ? "#d97706" : "#3a8a36";
   const barBg = isPast ? "linear-gradient(90deg, #d0d7d5, #b0bab8)"
@@ -745,7 +757,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
         </div>
         <div className="text-[9px] mt-0.5" style={{ color: dateRangeColor }}>{formatDateShort(startDate)} – {formatDateShort(endDate)}</div>
         <div className="mt-1.5" style={{ opacity: isPast ? 0.6 : 1 }}>
-          <div className="h-[7px] rounded" style={{ backgroundColor: forecastDarkMode ? "#2a2f3d" : "#f0eee9", overflow: "hidden" }}> 
+          <div className="h-[7px] rounded" style={{ backgroundColor: forecastDarkMode ? "#2a2f3d" : "#f0eee9", overflow: "hidden" }}>
             <div className="h-full rounded transition-all duration-300" style={{ width: `${Math.min(pct, 100)}%`, background: barBg }} />
           </div>
            <div className="flex items-baseline justify-between mt-[3px]">
@@ -768,25 +780,18 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
 
       {/* Items */}
       <div className="flex-1 overflow-y-auto p-1.5" style={{ display: "flex", flexDirection: "column", gap: 3, opacity: isPast ? 0.7 : 1 }}>
-        {(!silo || silo.bundles.length === 0 || hideRealCards) && !isPast && !(forecastBlocks && forecastBlocks.some(b => b.week === weekKey)) && (
+        {(realBundles.length === 0) && !isPast && weekForecastBlocks.length === 0 && (
           <div className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all" style={{ border: forecastDarkMode ? "1.5px dashed #3d4558" : "1.5px dashed #e2ddd6" }}>
             <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5168" : "#99a5a3" }}>{forecastDarkMode ? "Žádný forecast" : "Přetáhni sem z Inboxu"}</span>
           </div>
         )}
-        {(!silo || silo.bundles.length === 0 || hideRealCards) && isPast && !(forecastBlocks && forecastBlocks.some(b => b.week === weekKey)) && (
+        {(realBundles.length === 0) && isPast && weekForecastBlocks.length === 0 && (
           <div className="flex-1 flex items-center justify-center px-2 py-[14px]">
             <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5168" : "#c4ccc9" }}>Prázdný týden</span>
           </div>
         )}
-        {!hideRealCards && silo?.bundles
-          .slice()
-          .sort((a, b) => {
-            const aDone = a.items.length > 0 && a.items.every(i => i.status === "completed");
-            const bDone = b.items.length > 0 && b.items.every(i => i.status === "completed");
-            if (aDone === bDone) return 0;
-            return aDone ? 1 : -1;
-          })
-          .map(bundle => (
+
+        {realBundles.map(bundle => (
           <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey}
             showCzk={showCzk} hourlyRate={hourlyRate} displayMode={displayMode}
             onBundleContextMenu={forecastDarkMode ? (() => {}) as any : onBundleContextMenu}
@@ -798,10 +803,9 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
         ))}
 
         {/* Forecast blocks */}
-        {forecastBlocks && forecastSelectedIds && onToggleForecastSelect && (
+        {forecastDarkMode && forecastSelectedIds && onToggleForecastSelect && weekForecastBlocks.length > 0 && (
           <ForecastWeekContent
-            weekKey={weekKey}
-            blocks={forecastBlocks}
+            blocks={weekForecastBlocks}
             selectedBlockIds={forecastSelectedIds}
             onToggleSelect={onToggleForecastSelect}
           />
