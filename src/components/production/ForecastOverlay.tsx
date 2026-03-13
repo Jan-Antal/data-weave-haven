@@ -364,6 +364,29 @@ function ForecastCard({
                   {block.project_name}
                 </span>
               </div>
+              {/* Deadline row */}
+              {(() => {
+                const srcMap: Record<string, string> = { expedice: "Exp", montaz: "Mnt", predani: "Před", smluvni: "Sml" };
+                if (!block.deadline) {
+                  return (
+                    <div className="text-[9px] font-medium mt-0.5" style={{ color: "#d97706" }}>
+                      ⚠ BEZ TERMÍNU
+                    </div>
+                  );
+                }
+                const d = new Date(block.deadline);
+                if (isNaN(d.getTime())) return null;
+                const label = srcMap[block.deadline_source ?? ""] ?? "Termín";
+                const formatted = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getFullYear()).slice(2)}`;
+                const now = new Date(); now.setHours(0, 0, 0, 0);
+                const diffDays = Math.ceil((d.getTime() - now.getTime()) / 86400000);
+                const color = diffDays < 0 ? "#DC2626" : diffDays <= 14 ? "#D97706" : "#7aa8a4";
+                return (
+                  <div className="text-[9px] font-medium mt-0.5" style={{ color }}>
+                    {label}: {formatted}
+                  </div>
+                );
+              })()}
               <div className="flex items-center justify-between mt-0.5">
                 <span className="text-[11px] truncate" style={{ color: style.codeColor }}>
                   {block.bundle_description}
