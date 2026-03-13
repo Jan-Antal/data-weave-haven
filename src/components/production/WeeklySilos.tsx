@@ -850,14 +850,23 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             forecastDarkMode={forecastDarkMode} />
         ))}
 
-        {/* Forecast blocks — separate render pass, isolated from real data */}
+        {/* Forecast divider + blocks — visually separated from real bundles */}
         {forecastDarkMode && forecastSelectedIds && onToggleForecastSelect && weekForecastBlocks.length > 0 && (
-          <ForecastWeekContent
-            blocks={weekForecastBlocks}
-            selectedBlockIds={forecastSelectedIds}
-            onToggleSelect={onToggleForecastSelect}
-            onForecastContextMenu={onForecastContextMenu}
-          />
+          <>
+            {realBundles.length > 0 && (
+              <div className="flex items-center gap-1.5 my-1">
+                <div className="flex-1" style={{ borderTop: "1px solid #2a2f3d" }} />
+                <span className="text-[9px] font-semibold tracking-wider shrink-0" style={{ color: "#4a5168" }}>FORECAST</span>
+                <div className="flex-1" style={{ borderTop: "1px solid #2a2f3d" }} />
+              </div>
+            )}
+            <ForecastWeekContent
+              blocks={weekForecastBlocks}
+              selectedBlockIds={forecastSelectedIds}
+              onToggleSelect={onToggleForecastSelect}
+              onForecastContextMenu={onForecastContextMenu}
+            />
+          </>
         )}
       </div>
 
