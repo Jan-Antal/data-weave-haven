@@ -268,6 +268,12 @@ serve(async (req) => {
 
         for (const alloc of weekAllocs) {
           const proj = projectMap.get(work.projectId);
+          // Determine originalWeek: if this week was in the project's original schedule, use it; otherwise use earliest original
+          const origWeeks = work.originalWeeks;
+          let originalWeek: string | undefined;
+          if (work.source === "existing_plan" && origWeeks && origWeeks.size > 0) {
+            originalWeek = origWeeks.has(alloc.week) ? alloc.week : [...origWeeks].sort()[0];
+          }
           blocks.push({
             id: `forecast-${Date.now()}-${blockIdx++}`,
             project_id: work.projectId,
@@ -283,6 +289,7 @@ serve(async (req) => {
             deadline_source: work.deadlineSource,
             tpv_expected_date: work.source === "project_estimate" ? (proj?.datum_tpv || null) : null,
             is_forecast: true,
+            ...(originalWeek ? { originalWeek } : {}),
           });
         }
       }
