@@ -308,9 +308,8 @@ export function useForecastMode(): UseForecastModeReturn {
   }, [realBundleOverrides]);
 
   const commitBlocks = useCallback(async (blockIds?: string[]) => {
-    const toCommit = blockIds
-      ? forecastBlocks.filter(b => blockIds.includes(b.id))
-      : forecastBlocks.filter(b => selectedBlockIds.has(b.id));
+    if (!blockIds || blockIds.length === 0) return;
+    const toCommit = forecastBlocks.filter(b => blockIds.includes(b.id));
 
     const committable = toCommit.filter(b => b.source === "inbox_item" || b.source === "project_estimate");
 
