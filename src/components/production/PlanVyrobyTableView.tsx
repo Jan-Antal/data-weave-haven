@@ -1233,7 +1233,6 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                   </div>
                 );
               }
-              {
               const isExpanded = expandedProjects.has(proj.projectId);
               const isOverdueProject = (() => {
                 const pd = projectDateLookup.get(proj.projectId);
