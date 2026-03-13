@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Sparkles, Inbox } from "lucide-react";
 import type { ForecastBlock, ForecastSource } from "@/hooks/useForecastMode";
 import { getProjectColor } from "@/lib/projectColors";
+import { useDraggable } from "@dnd-kit/core";
 
 interface ForecastOverlayProps {
   blocks: ForecastBlock[];
@@ -10,7 +11,7 @@ interface ForecastOverlayProps {
   planMode: "respect_plan" | "from_scratch";
 }
 
-/** Source-based styling config */
+/** Source-based styling config — exact colors per spec */
 function getSourceStyle(source: ForecastSource, _confidence: string) {
   if (source === "inbox_item") {
     return {
@@ -28,8 +29,6 @@ function getSourceStyle(source: ForecastSource, _confidence: string) {
     };
   }
   if (source === "existing_plan") {
-    // Type 1 — real planned cards should NOT render as forecast cards
-    // but if they do appear here, use neutral styling
     return {
       borderColor: "#3d4558",
       borderWidth: 1,
@@ -115,23 +114,41 @@ function ForecastCard({
   block,
   isSelected,
   onToggleSelect,
+  onContextMenu,
 }: {
   block: ForecastBlock;
   isSelected: boolean;
   onToggleSelect: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   const style = getSourceStyle(block.source, block.confidence);
 
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `forecast-block-${block.id}`,
+    data: {
+      type: "forecast-block",
+      blockId: block.id,
+      projectName: block.project_name,
+      hours: block.estimated_hours,
+      week: block.week,
+      source: block.source,
+    },
+  });
+
   return (
     <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
       onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
-      className="rounded-lg px-2.5 py-2 cursor-pointer transition-all relative"
+      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu?.(e); }}
+      className="rounded-lg px-2.5 py-2 cursor-grab transition-all relative"
       style={{
         backgroundColor: style.backgroundColor,
         borderWidth: style.borderWidth,
         borderStyle: block.source === "existing_plan" ? "solid" : "dashed",
         borderColor: style.borderColor,
-        opacity: isSelected ? 1 : 0.55,
+        opacity: isDragging ? 0.3 : isSelected ? 1 : 0.55,
         boxShadow: isSelected ? `0 0 0 1px ${style.borderColor}40` : undefined,
       }}
     >
@@ -156,6 +173,7 @@ function ForecastCard({
           className="mt-0.5"
           style={{ accentColor: style.borderColor }}
           onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
@@ -213,10 +231,12 @@ export function ForecastWeekContent({
   blocks,
   selectedBlockIds,
   onToggleSelect,
+  onForecastContextMenu,
 }: {
   blocks: ForecastBlock[];
   selectedBlockIds: Set<string>;
   onToggleSelect: (id: string) => void;
+  onForecastContextMenu?: (e: React.MouseEvent, block: ForecastBlock) => void;
 }) {
   if (blocks.length === 0) return null;
 
@@ -228,6 +248,7 @@ export function ForecastWeekContent({
           block={block}
           isSelected={selectedBlockIds.has(block.id)}
           onToggleSelect={() => onToggleSelect(block.id)}
+          onContextMenu={onForecastContextMenu ? (e) => onForecastContextMenu(e, block) : undefined}
         />
       ))}
     </div>
