@@ -66,7 +66,7 @@ export function ForecastCommitBar({
                 <span style={{ color: "#22c55e" }}> · {inboxBlockCount} inbox</span>
               )}
               {projectBlockCount > 0 && (
-                <span style={{ color: "#f59e0b" }}> · {projectBlockCount} projekt</span>
+                <span style={{ color: "#f59e0b" }}> · {projectBlockCount} plánované</span>
               )}
             </>
           )}
