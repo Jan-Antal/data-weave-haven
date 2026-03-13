@@ -1250,16 +1250,36 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                           <span className="text-[10px] text-muted-foreground font-mono leading-tight">{proj.projectId}</span>
                           {(() => {
                             const pd = projectDateLookup.get(proj.projectId);
-                            const exp = pd?.expedice ? parseAppDate(pd.expedice) : null;
-                            if (!exp) return null;
-                            const fmtD = (d: Date) => `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getFullYear()).slice(-2)}`;
-                            const days = differenceInDays(exp, new Date());
-                            const clr = days < 0 ? "#dc2626" : days <= 3 ? "#d97706" : days <= 14 ? "#d97706" : "#6b7280";
-                            return (
-                              <span className="text-[10px] truncate" style={{ color: clr }}>
-                                Exp: {fmtD(exp)}
-                              </span>
-                            );
+                            if (!pd) return null;
+                            const allShipped = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
+                            const isProjectDone = ["Fakturace", "Dokonceno", "Dokončeno", "Expedice"].includes(pd?.status ?? "");
+                            const fields: { label: string; value: string | null | undefined }[] = [
+                              { label: "Exp", value: pd.expedice },
+                              { label: "Mnt", value: pd.montaz },
+                              { label: "Před", value: pd.predani },
+                              { label: "Sml", value: pd.datum_smluvni },
+                            ];
+                            for (const f of fields) {
+                              if (!f.value) continue;
+                              const parsed = parseAppDate(f.value);
+                              if (!parsed) continue;
+                              const fmtD = (d: Date) => `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getFullYear()).slice(-2)}`;
+                              const days = differenceInDays(parsed, new Date());
+                              const clr = !allShipped && !isProjectDone && days < 0 ? "#dc2626" : !allShipped && !isProjectDone && days <= 14 ? "#d97706" : "#7aa8a4";
+                              return (
+                                <span className="text-[10px] truncate" style={{ color: clr }}>
+                                  · {f.label}: {fmtD(parsed)}
+                                </span>
+                              );
+                            }
+                            if (!allShipped && !isProjectDone) {
+                              return (
+                                <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.1)", color: "#D97706" }}>
+                                  ⚠ BEZ TERMÍNU
+                                </span>
+                              );
+                            }
+                            return null;
                           })()}
                         </div>
                       </div>
