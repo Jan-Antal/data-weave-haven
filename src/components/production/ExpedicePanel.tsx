@@ -542,7 +542,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
 // === PROJECT GROUP COMPONENT ===
 interface ProjectGroupProps {
   group: { project_id: string; project_name: string; items: ScheduleItem[]; count: number };
-  projectExpediceMap: Map<string, string | null>;
+  projectDeadlineMap: Map<string, { expedice?: string | null; montaz?: string | null; predani?: string | null; datum_smluvni?: string | null }>;
   projectTotalItems: Map<string, { total: number; nonCompleted: ScheduleItem[] }>;
   scheduleData: any;
   inboxProjects: any[];
@@ -556,15 +556,24 @@ interface ProjectGroupProps {
   onSelectProject?: (projectId: string) => void;
 }
 
+const DEADLINE_SHORT_LABELS: Record<string, string> = {
+  expedice: "Exp",
+  montaz: "Mnt",
+  predani: "Před",
+  datum_smluvni: "Sml",
+};
+
 function ProjectGroup({
-  group, projectExpediceMap, projectTotalItems,
+  group, projectDeadlineMap, projectTotalItems,
   isGroupCollapsed, toggleGroup,
   onProjectContextMenu, onItemContextMenu, onNavigateToTPV,
   isArchive, isSelected, onSelectProject,
 }: ProjectGroupProps) {
-  const expediceRaw = projectExpediceMap.get(group.project_id);
-  const expediceDate = parseDate(expediceRaw);
-  const expediceStr = formatShortDate(expediceRaw);
+  const deadlineFields = projectDeadlineMap.get(group.project_id);
+  const resolved = deadlineFields ? resolveDeadline(deadlineFields) : null;
+  const deadlineDate = resolved?.date ?? null;
+  const deadlineStr = deadlineDate ? formatShortDate(deadlineDate.toISOString()) : null;
+  const deadlineLabel = resolved ? (DEADLINE_SHORT_LABELS[resolved.fieldName] ?? "Exp") : "Exp";
 
   const totals = projectTotalItems.get(group.project_id);
   const completedCount = group.count;
