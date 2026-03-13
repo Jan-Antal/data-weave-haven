@@ -1,8 +1,15 @@
 import { useState, useCallback, useEffect } from "react";
-import { ChevronDown, ChevronRight, AlertTriangle, RotateCcw, GripVertical, Check } from "lucide-react";
+import { ChevronDown, ChevronRight, AlertTriangle, RotateCcw, GripVertical, Check, CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
 import { useDraggable } from "@dnd-kit/core";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { toast } from "@/hooks/use-toast";
+import { cs } from "date-fns/locale";
+import { format } from "date-fns";
 
 export interface SafetyNetProject {
   project_id: string;
@@ -38,6 +45,157 @@ const statusColors: Record<string, { bg: string; color: string }> = {
   paused: { bg: "#451a03", color: "#fdba74" },
   completed: { bg: "#14532d", color: "#86efac" },
 };
+
+const DATE_FIELDS = [
+  { key: "expedice", label: "Expedice" },
+  { key: "montaz", label: "Montáž" },
+  { key: "predani", label: "Předání" },
+  { key: "datum_smluvni", label: "Datum smluvní" },
+] as const;
+
+type DateFieldKey = typeof DATE_FIELDS[number]["key"];
+
+function localDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${day}.${m}.${y}`;
+}
+
+function parseLocalDate(s: string): Date | undefined {
+  if (!s) return undefined;
+  // Handle dd.mm.yyyy
+  const parts = s.split(".");
+  if (parts.length === 3) {
+    const d = parseInt(parts[0]), m = parseInt(parts[1]) - 1, y = parseInt(parts[2]);
+    if (!isNaN(d) && !isNaN(m) && !isNaN(y)) return new Date(y, m, d);
+  }
+  // ISO fallback
+  const dt = new Date(s);
+  return isNaN(dt.getTime()) ? undefined : dt;
+}
+
+/** Due date dialog for projects missing deadlines */
+function DueDateDialog({
+  open,
+  onOpenChange,
+  projectName,
+  projectId,
+  onSaveAndRestore,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  projectName: string;
+  projectId: string;
+  onSaveAndRestore: (projectId: string) => void;
+}) {
+  const [dates, setDates] = useState<Record<DateFieldKey, Date | undefined>>({
+    expedice: undefined,
+    montaz: undefined,
+    predani: undefined,
+    datum_smluvni: undefined,
+  });
+  const [saving, setSaving] = useState(false);
+
+  const hasAnyDate = Object.values(dates).some(d => d !== undefined);
+
+  const handleSave = async () => {
+    if (!hasAnyDate) return;
+    setSaving(true);
+    const update: Record<string, string | null> = {};
+    for (const f of DATE_FIELDS) {
+      if (dates[f.key]) {
+        update[f.key] = localDateStr(dates[f.key]!);
+      }
+    }
+    const { error } = await supabase
+      .from("projects")
+      .update(update)
+      .eq("project_id", projectId);
+
+    if (error) {
+      toast({ title: "Chyba", description: error.message, variant: "destructive" });
+      setSaving(false);
+      return;
+    }
+    setSaving(false);
+    onOpenChange(false);
+    onSaveAndRestore(projectId);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[420px]" style={{ backgroundColor: "#1a2422", border: "1px solid #2a3d3a", color: "#a8c5c2" }}>
+        <DialogHeader>
+          <DialogTitle style={{ color: "#f59e0b", fontSize: 15 }}>
+            ⚠ Chybí termín — {projectName}
+          </DialogTitle>
+          <p style={{ fontSize: 12, color: "#5c706f", marginTop: 4 }}>
+            Pro vrácení do forecastu je nutné zadat alespoň jeden termín.
+          </p>
+        </DialogHeader>
+
+        <div className="space-y-3 py-2">
+          {DATE_FIELDS.map(f => (
+            <div key={f.key} className="flex items-center gap-3">
+              <span className="w-[100px] text-right shrink-0" style={{ fontSize: 12, fontWeight: 500, color: "#7aa8a4" }}>
+                {f.label}
+              </span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    className="flex items-center gap-2 px-3 py-1.5 rounded text-left flex-1"
+                    style={{
+                      backgroundColor: "#253533",
+                      border: "1px solid #2a3d3a",
+                      color: dates[f.key] ? "#a8c5c2" : "#4a5a58",
+                      fontSize: 12,
+                    }}
+                  >
+                    <CalendarIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "#4a5a58" }} />
+                    {dates[f.key] ? format(dates[f.key]!, "d. M. yyyy") : "Nezadáno"}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dates[f.key]}
+                    onSelect={(d) => setDates(prev => ({ ...prev, [f.key]: d || undefined }))}
+                    locale={cs}
+                    weekStartsOn={1}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          ))}
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            style={{ color: "#5c706f" }}
+            size="sm"
+          >
+            Zrušit
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={!hasAnyDate || saving}
+            size="sm"
+            style={{
+              backgroundColor: hasAnyDate ? "#d97706" : "#2a3d3a",
+              color: hasAnyDate ? "#ffffff" : "#4a5a58",
+            }}
+          >
+            {saving ? "Ukládám..." : "Uložit a vrátit"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 /** Draggable row for a safety net project */
 function DraggableSafetyNetRow({
@@ -196,9 +354,12 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
   const [loadingItems, setLoadingItems] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
 
-  // Multi-select state (same pattern as Inbox reserve)
+  // Multi-select state
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
   const [lastClicked, setLastClicked] = useState<string | null>(null);
+
+  // Due date dialog state
+  const [dueDateDialog, setDueDateDialog] = useState<{ projectId: string; projectName: string } | null>(null);
 
   // Escape clears multi-select
   useEffect(() => {
@@ -209,6 +370,31 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [selectedProjects.size]);
+
+  /** Check if project has any deadline, if not show dialog */
+  const attemptRestore = useCallback(async (projectId: string) => {
+    const project = projects.find(p => p.project_id === projectId);
+    if (!project) return;
+
+    // Check DB for dates
+    const { data } = await supabase
+      .from("projects")
+      .select("expedice, montaz, predani, datum_smluvni")
+      .eq("project_id", projectId)
+      .single();
+
+    const hasDueDate = data && (data.expedice || data.montaz || data.predani || data.datum_smluvni);
+
+    if (hasDueDate) {
+      onRestoreToForecast?.(projectId);
+    } else {
+      setDueDateDialog({ projectId, projectName: project.project_name });
+    }
+  }, [projects, onRestoreToForecast]);
+
+  const handleSaveAndRestore = useCallback((projectId: string) => {
+    onRestoreToForecast?.(projectId);
+  }, [onRestoreToForecast]);
 
   const toggleExpand = useCallback(async (projectId: string, source: string) => {
     setExpandedProjects(prev => {
@@ -275,7 +461,6 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
   const handleClick = (e: React.MouseEvent, project: SafetyNetProject) => {
     e.stopPropagation();
 
-    // Ctrl/Cmd multi-select
     if (e.ctrlKey || e.metaKey) {
       setSelectedProjects(prev => {
         const next = new Set(prev);
@@ -287,7 +472,6 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
       return;
     }
 
-    // Shift range-select
     if (e.shiftKey && lastClicked) {
       const ids = projects.map(p => p.project_id);
       const startIdx = ids.indexOf(lastClicked);
@@ -304,7 +488,6 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
       return;
     }
 
-    // Normal click: clear multi-select, toggle expand
     setSelectedProjects(new Set());
     setLastClicked(project.project_id);
     toggleExpand(project.project_id, project.source);
@@ -314,7 +497,6 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
     e.preventDefault();
     e.stopPropagation();
 
-    // Determine targets: if right-clicked item is in multi-select, use all; otherwise just this one
     let targetIds: string[];
     if (selectedProjects.size > 0 && selectedProjects.has(project.project_id)) {
       targetIds = Array.from(selectedProjects);
@@ -326,7 +508,6 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
     const isExpanded = expandedProjects.has(project.project_id);
     const actions: ContextMenuAction[] = [];
 
-    // Single-item actions only when one target
     if (targetIds.length === 1) {
       actions.push({
         label: isExpanded ? "Sbalit" : "Rozbalit",
@@ -359,8 +540,13 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
         label,
         icon: "↩",
         onClick: () => {
-          for (const id of targetIds) {
-            onRestoreToForecast(id);
+          if (targetIds.length === 1) {
+            attemptRestore(targetIds[0]);
+          } else {
+            // For batch, restore all (skip date check for simplicity — batch restores are intentional)
+            for (const id of targetIds) {
+              attemptRestore(id);
+            }
           }
           setSelectedProjects(new Set());
         },
@@ -426,7 +612,7 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
               onToggleExpand={() => toggleExpand(p.project_id, p.source)}
               onClick={(e) => handleClick(e, p)}
               onContextMenu={(e) => handleContextMenu(e, p)}
-              onRestore={onRestoreToForecast}
+              onRestore={(pid) => attemptRestore(pid)}
             />
           );
         })}
@@ -442,9 +628,9 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
             ✓ {selectedCount} vybráno · ~{Math.round(selectedHours)}h
           </span>
           <button
-            onClick={() => {
+            onClick={async () => {
               for (const id of selectedProjects) {
-                onRestoreToForecast(id);
+                await attemptRestore(id);
               }
               setSelectedProjects(new Set());
             }}
@@ -457,7 +643,18 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
         </div>
       )}
 
-      {/* Context menu — uses shared ProductionContextMenu */}
+      {/* Due date dialog */}
+      {dueDateDialog && (
+        <DueDateDialog
+          open={!!dueDateDialog}
+          onOpenChange={(open) => { if (!open) setDueDateDialog(null); }}
+          projectId={dueDateDialog.projectId}
+          projectName={dueDateDialog.projectName}
+          onSaveAndRestore={handleSaveAndRestore}
+        />
+      )}
+
+      {/* Context menu */}
       {contextMenu && (
         <ProductionContextMenu
           x={contextMenu.x}
