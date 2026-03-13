@@ -40,6 +40,8 @@ import { format } from "date-fns";
 import { useForecastMode } from "@/hooks/useForecastMode";
 import { ForecastCommitBar } from "@/components/production/ForecastCommitBar";
 import { Switch } from "@/components/ui/switch";
+import { useSearchNavigation } from "@/hooks/useSearchNavigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export type DisplayMode = "hours" | "czk" | "percent";
 type ViewTab = "kanban" | "table";
@@ -105,6 +107,7 @@ export default function PlanVyroby() {
     searchTimerRef.current = setTimeout(() => setSearchQuery(v), 300);
   }, []);
   useEffect(() => () => clearTimeout(searchTimerRef.current), []);
+
   const [inboxWidth, setInboxWidth] = useState(() => {
     const saved = localStorage.getItem("inbox-panel-width");
     return saved ? Math.max(180, Math.min(500, Number(saved))) : 252;
@@ -136,6 +139,27 @@ export default function PlanVyroby() {
   const { data: allProjects = [] } = useProjects();
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
+
+  // Compute weekKeys for search navigation
+  const searchWeekKeys = useMemo(() => {
+    const keys = new Set<string>();
+    if (scheduleData) {
+      for (const k of scheduleData.keys()) keys.add(k);
+    }
+    if (forecast.forecastActive && forecast.forecastBlocks) {
+      for (const b of forecast.forecastBlocks) keys.add(b.week);
+    }
+    return Array.from(keys).sort();
+  }, [scheduleData, forecast.forecastActive, forecast.forecastBlocks]);
+
+  const searchNav = useSearchNavigation({
+    query: searchQuery,
+    scheduleData,
+    forecastBlocks: forecast.forecastActive ? forecast.forecastBlocks : undefined,
+    forecastActive: forecast.forecastActive,
+    forecastPlanMode: forecast.forecastActive ? forecast.planMode : undefined,
+    weekKeys: searchWeekKeys,
+  });
   const {
     moveInboxItemToWeek,
     moveInboxProjectToWeek,
@@ -563,6 +587,10 @@ export default function PlanVyroby() {
           searchQuery={searchInput}
           onSearchChange={handleSearchChange}
           forecastActive={forecast.forecastActive}
+          searchMatchCount={searchNav.totalCount}
+          searchCurrentIndex={searchNav.currentIndex}
+          onSearchPrev={searchNav.goPrev}
+          onSearchNext={searchNav.goNext}
           onForecastToggle={async (v) => {
             forecast.setForecastActive(v);
             if (v) {
@@ -647,6 +675,8 @@ export default function PlanVyroby() {
               selectedProjectId={selectedProjectId}
               onSelectProject={handleSelectProject}
               searchQuery={searchQuery}
+              focusedMatchKey={searchNav.focusedMatchKey}
+              searchMatchWeekKey={searchNav.currentMatch?.weekKey ?? null}
               forecastBlocks={forecast.forecastActive ? forecast.forecastBlocks : undefined}
               forecastSelectedIds={forecast.forecastActive ? forecast.selectedBlockIds : undefined}
               onToggleForecastSelect={forecast.forecastActive ? forecast.toggleBlockSelection : undefined}
@@ -783,7 +813,7 @@ export default function PlanVyroby() {
 }
 
 
-function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts }: {
+function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchMatchCount = 0, searchCurrentIndex = 0, onSearchPrev, onSearchNext }: {
   viewTab: "kanban" | "table";
   setViewTab: (v: "kanban" | "table") => void;
   displayMode: DisplayMode;
@@ -798,6 +828,10 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   isGenerating: boolean;
   onResetForecast?: () => void;
   forecastBlockCounts?: { real: number; inbox: number; ai: number };
+  searchMatchCount?: number;
+  searchCurrentIndex?: number;
+  onSearchPrev?: () => void;
+  onSearchNext?: () => void;
 }) {
   const { data: settings } = useProductionSettings();
   const { data: scheduleData } = useProductionSchedule();
@@ -1011,28 +1045,61 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
           ))}
         </div>
 
-        <div className="relative w-[200px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: forecastActive ? "#7aa8a4" : undefined }} />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={e => onSearchChange(e.target.value)}
-            placeholder="Hledat projekt..."
-            className="w-full h-8 pl-8 pr-8 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 transition-colors"
-            style={{
-              backgroundColor: forecastActive ? "#223937" : "hsl(var(--background))",
-              border: forecastActive ? "1px solid #2a4a46" : "1px solid hsl(var(--input))",
-              color: forecastActive ? "#a8c5c2" : undefined,
-            }}
-          />
+        <div className="relative flex items-center gap-0.5">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: forecastActive ? "#7aa8a4" : undefined }} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => onSearchChange(e.target.value)}
+              placeholder="Hledat projekt..."
+              className="w-[200px] h-8 pl-8 pr-8 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 transition-colors"
+              style={{
+                backgroundColor: forecastActive ? "#223937" : "hsl(var(--background))",
+                border: forecastActive ? "1px solid #2a4a46" : "1px solid hsl(var(--input))",
+                color: forecastActive ? "#a8c5c2" : undefined,
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => onSearchChange("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors"
+                style={{ color: forecastActive ? "#6b7280" : undefined }}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
           {searchQuery && (
-            <button
-              onClick={() => onSearchChange("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors"
-              style={{ color: forecastActive ? "#6b7280" : undefined }}
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
+            <div className="flex items-center gap-0.5 ml-1">
+              <span className="text-[11px] font-mono whitespace-nowrap" style={{
+                color: searchMatchCount === 0
+                  ? "hsl(0 70% 55%)"
+                  : forecastActive ? "#a8c5c2" : "hsl(var(--muted-foreground))",
+              }}>
+                {searchMatchCount === 0
+                  ? "0 výsledků"
+                  : `${searchCurrentIndex + 1} / ${searchMatchCount}`}
+              </span>
+              {searchMatchCount > 0 && (
+                <>
+                  <button
+                    onClick={onSearchPrev}
+                    className="p-0.5 rounded transition-colors hover:bg-accent"
+                    style={{ color: forecastActive ? "#a8c5c2" : undefined }}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={onSearchNext}
+                    className="p-0.5 rounded transition-colors hover:bg-accent"
+                    style={{ color: forecastActive ? "#a8c5c2" : undefined }}
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
+            </div>
           )}
         </div>
 

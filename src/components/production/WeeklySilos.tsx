@@ -98,6 +98,10 @@ interface Props {
   forecastSafetyNet?: SafetyNetProject[];
   onRestoreFromSafetyNet?: (projectId: string) => void;
   onConvertReserveToForecast?: (bundle: ScheduleBundle, weekKey: string) => void;
+  /** Currently focused search match key (weekKey::projectId) for scroll + ring highlight */
+  focusedMatchKey?: string | null;
+  /** Week key of the current search match — triggers scroll */
+  searchMatchWeekKey?: string | null;
 }
 
 interface ContextMenuState {
@@ -162,7 +166,7 @@ interface CancelState {
   cancelAll?: boolean;
 }
 
-export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock, onSplitForecastBlock, forecastSafetyNet, onRestoreFromSafetyNet, onConvertReserveToForecast }: Props) {
+export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock, onSplitForecastBlock, forecastSafetyNet, onRestoreFromSafetyNet, onConvertReserveToForecast, focusedMatchKey, searchMatchWeekKey }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
@@ -337,6 +341,15 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const registerSiloRef = useCallback((key: string, el: HTMLDivElement | null) => {
     if (el) siloRefs.current.set(key, el); else siloRefs.current.delete(key);
   }, []);
+
+  // Scroll to matching silo when search nav changes
+  useEffect(() => {
+    if (!searchMatchWeekKey) return;
+    const el = siloRefs.current.get(searchMatchWeekKey);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }
+  }, [searchMatchWeekKey, focusedMatchKey]);
 
   const currentWeekKey = useMemo(() => getMonday(new Date()).toISOString().split("T")[0], []);
 
@@ -797,6 +810,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               onForecastContextMenu={forecastDarkMode ? handleForecastContextMenu : undefined}
               forecastExpandedIds={forecastExpandedIds}
               onToggleForecastExpand={toggleForecastExpand}
+              focusedMatchKey={focusedMatchKey}
             />
           ))}
         </div>
@@ -894,10 +908,11 @@ interface SiloProps {
   onForecastContextMenu?: (e: React.MouseEvent, block: ForecastBlock) => void;
   forecastExpandedIds?: Set<string>;
   onToggleForecastExpand?: (blockId: string) => void;
+  focusedMatchKey?: string | null;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey }: SiloProps) {
   // Capacity calculation: exclude paused items
   // Active hours (excl. paused), split into blocker and non-blocker
   const { activeHours, blockerHours } = useMemo(() => {
@@ -1027,7 +1042,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             projectLookup={projectLookup}
             isSelected={selectedProjectId === bundle.project_id}
             onSelectProject={onSelectProject} searchQuery={searchQuery}
-            forecastDarkMode={forecastDarkMode} />
+            forecastDarkMode={forecastDarkMode}
+            isFocusedMatch={focusedMatchKey === `${weekKey}::${bundle.project_id}`} />
         ))}
 
         {/* Rezerva kapacit section — blocker bundles separated */}
@@ -1046,7 +1062,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
                 projectLookup={projectLookup}
                 isSelected={selectedProjectId === bundle.project_id}
                 onSelectProject={onSelectProject} searchQuery={searchQuery}
-                forecastDarkMode={forecastDarkMode} />
+                forecastDarkMode={forecastDarkMode}
+                isFocusedMatch={focusedMatchKey === `${weekKey}::${bundle.project_id}`} />
             ))}
           </>
         )}
@@ -1109,7 +1126,7 @@ function formatDateShortYY(dateStr: string | null | undefined): string | null {
   return `${dd}.${mm}.${yy}`;
 }
 
-function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCapacity, onBundleContextMenu, onItemContextMenu, projectLookup, isSelected, onSelectProject, displayMode, searchQuery = "", forecastDarkMode }: {
+function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCapacity, onBundleContextMenu, onItemContextMenu, projectLookup, isSelected, onSelectProject, displayMode, searchQuery = "", forecastDarkMode, isFocusedMatch }: {
   bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number; weeklyCapacity: number;
   displayMode: DisplayMode;
   onBundleContextMenu: (e: React.MouseEvent, bundle: ScheduleBundle, toggleExpand: () => void) => void;
@@ -1119,6 +1136,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   onSelectProject?: (projectId: string) => void;
   searchQuery?: string;
   forecastDarkMode?: boolean;
+  isFocusedMatch?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const color = getProjectColor(bundle.project_id);
@@ -1252,20 +1270,22 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
     <div className="rounded-[6px] overflow-hidden relative" style={{
       borderTop: forecastDarkMode
         ? (isSelected ? "2px solid #d97706" : "1px solid #3d4558")
-        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2"),
+        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : "1px solid #ece8e2"),
       borderRight: forecastDarkMode
         ? (isSelected ? "2px solid #d97706" : "1px solid #3d4558")
-        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2"),
+        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : "1px solid #ece8e2"),
       borderBottom: forecastDarkMode
         ? (isSelected ? "2px solid #d97706" : "1px solid #3d4558")
-        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2"),
-      borderLeft: isSelected ? "4px solid #d97706" : isSearchMatch ? "4px solid #facc15" : `4px solid ${borderLeftColor}`,
+        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : "1px solid #ece8e2"),
+      borderLeft: isSelected ? "4px solid #d97706" : isSearchMatch ? "2px solid #f59e0b" : `4px solid ${borderLeftColor}`,
       backgroundColor: forecastDarkMode
         ? (isSelected ? "rgba(217,119,6,0.08)" : "#252a35")
-        : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : isSelected ? "rgba(217,119,6,0.05)" : isSearchMatch ? "rgba(254,240,138,0.15)" : "#ffffff"),
+        : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : isSelected ? "rgba(217,119,6,0.05)" : "#ffffff"),
       opacity: isDragging ? 0.3 : 1,
-      boxShadow: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "inset 0 0 0 1px hsl(0 60% 86%)" : isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : isSearchMatch ? "0 0 0 2px rgba(250,204,21,0.25)" : undefined),
-      transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, box-shadow 150ms",
+      outline: isFocusedMatch ? "2px solid #f59e0b" : undefined,
+      outlineOffset: isFocusedMatch ? "2px" : undefined,
+      boxShadow: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "inset 0 0 0 1px hsl(0 60% 86%)" : isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined),
+      transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, box-shadow 150ms, outline 300ms",
     }}>
 
       <div className="flex" style={{ borderBottom: expanded ? (forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2") : "none", backgroundColor: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : undefined) }}>
