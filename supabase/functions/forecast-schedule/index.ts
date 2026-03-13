@@ -132,16 +132,25 @@ serve(async (req) => {
         }
       }
 
-    // Absolute fallback: spread remaining evenly across all weeks
+    // Dynamic week extension: spread remaining into future weeks beyond the window
       if (remaining > 0) {
-        for (let i = 0; i < weekKeys.length && remaining > 0; i++) {
-          const share = Math.ceil(remaining / (weekKeys.length - i));
-          const alloc = Math.min(remaining, share);
-          const existing = result.find(r => r.week === weekKeys[i]);
-          if (existing) existing.hours += alloc;
-          else result.push({ week: weekKeys[i], hours: alloc });
-          usage[weekKeys[i]] = (usage[weekKeys[i]] || 0) + alloc;
-          remaining -= alloc;
+        const lastDate = new Date(weekKeys[weekKeys.length - 1]);
+        let extraWeek = 1;
+        while (remaining > 0 && extraWeek <= 20) {
+          const d = new Date(lastDate);
+          d.setDate(d.getDate() + extraWeek * 7);
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          const wk = `${y}-${m}-${dd}`;
+          const avail = capacity - (usage[wk] || 0);
+          if (avail > 0) {
+            const alloc = Math.min(remaining, avail);
+            result.push({ week: wk, hours: alloc });
+            usage[wk] = (usage[wk] || 0) + alloc;
+            remaining -= alloc;
+          }
+          extraWeek++;
         }
       }
 
