@@ -112,12 +112,14 @@ function ForecastWeekBlocks({
 }
 
 /** Fetched item for expand view */
-interface ForecastSubItem {
+export interface ForecastSubItem {
   id: string;
   item_name: string;
   item_code: string | null;
   hours: number;
   source: "schedule" | "inbox" | "tpv";
+  project_id?: string;
+  project_name?: string;
 }
 
 function ForecastCard({
