@@ -504,6 +504,27 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
     setLoading(false);
   };
 
+  // Forecast mode: show empty state
+  if (forecastActive) {
+    return (
+      <div className="w-[270px] shrink-0 flex flex-col" style={{ borderRight: "1px solid #2a2f3d", backgroundColor: "#1c1f26" }}>
+        <div className="px-3 py-2 flex items-center gap-2" style={{ borderBottom: "1px solid #2a2f3d" }}>
+          <span className="text-sm">📥</span>
+          <span className="text-[13px] font-semibold" style={{ color: "#4a5168" }}>Inbox</span>
+          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(74,81,104,0.15)", color: "#4a5168" }}>
+            0
+          </span>
+        </div>
+        <div className="flex-1 flex items-center justify-center px-4">
+          <div className="text-center">
+            <p className="text-[12px] font-medium italic" style={{ color: "#4a5168" }}>0 položek</p>
+            <p className="text-[10px] mt-1" style={{ color: "#3d4558" }}>Vše naplánováno ve forecastu</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div ref={setNodeRef} className="w-[270px] shrink-0 flex flex-col transition-colors"
       style={{ borderRight: "1px solid #ece8e2", backgroundColor: isHighlighted ? "rgba(59,130,246,0.04)" : "#ffffff", boxShadow: isHighlighted ? "inset 0 0 0 2px #3b82f6" : undefined }}>
