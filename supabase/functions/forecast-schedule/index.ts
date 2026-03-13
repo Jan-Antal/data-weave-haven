@@ -17,7 +17,7 @@ serve(async (req) => {
     const { mode, weeklyCapacityHours } = await req.json();
     const capacity = Number(weeklyCapacityHours) || 875;
 
-    // 1. Fetch data
+    // 1. Fetch all data in parallel
     const [projectsRes, tpvRes, scheduleRes, inboxRes] = await Promise.all([
       sb.from("projects")
         .select("project_id, project_name, status, expedice, montaz, predani, datum_smluvni, prodejni_cena")
@@ -54,7 +54,7 @@ serve(async (req) => {
       weekKeys.push(d.toISOString().slice(0, 10));
     }
 
-    // 3. Calculate existing usage per week
+    // 3. Calculate existing usage per week from real schedule
     const weekUsage: Record<string, number> = {};
     for (const wk of weekKeys) weekUsage[wk] = 0;
     for (const si of scheduleItems) {
@@ -63,82 +63,159 @@ serve(async (req) => {
       }
     }
 
-    // Helper: find first week with enough capacity, starting from startIdx
-    function findAvailableWeek(hours: number, usage: Record<string, number>, startIdx = 0): string {
-      for (let i = startIdx; i < weekKeys.length; i++) {
-        const remaining = capacity - (usage[weekKeys[i]] || 0);
-        if (remaining >= Math.min(hours, 1)) return weekKeys[i];
-      }
-      return weekKeys[weekKeys.length - 1]; // fallback to last week
+    // Mutable copy for tracking forecast allocation
+    const trackUsage = { ...weekUsage };
+
+    // Helper: resolve deadline with source label
+    function resolveDeadline(proj: any): { date: string | null; source: string } {
+      if (proj.expedice) return { date: proj.expedice, source: "expedice" };
+      if (proj.montaz) return { date: proj.montaz, source: "montaz" };
+      if (proj.predani) return { date: proj.predani, source: "predani" };
+      if (proj.datum_smluvni) return { date: proj.datum_smluvni, source: "smluvni" };
+      return { date: null, source: "none" };
     }
 
-    // Helper: find week working backwards from deadline
-    function findWeekBeforeDeadline(hours: number, deadlineStr: string, usage: Record<string, number>): string {
-      const deadline = new Date(deadlineStr);
-      // Find the last week that starts before the deadline
-      let targetIdx = 0;
-      for (let i = weekKeys.length - 1; i >= 0; i--) {
-        if (new Date(weekKeys[i]) <= deadline) {
-          targetIdx = i;
-          break;
+    // Helper: distribute totalHours across weeks, returns array of { week, hours }
+    function distributeHours(
+      totalHours: number,
+      usage: Record<string, number>,
+      deadlineStr: string | null,
+      startFromIdx = 0,
+    ): { week: string; hours: number }[] {
+      const result: { week: string; hours: number }[] = [];
+      let remaining = totalHours;
+
+      // Determine target index (work backwards from deadline or forward)
+      let startIdx = startFromIdx;
+      if (deadlineStr) {
+        const deadline = new Date(deadlineStr);
+        // Find latest week starting before deadline
+        for (let i = weekKeys.length - 1; i >= 0; i--) {
+          if (new Date(weekKeys[i]) <= deadline) {
+            startIdx = i;
+            break;
+          }
+        }
+        // Try to fill backwards from deadline
+        for (let i = startIdx; i >= 0 && remaining > 0; i--) {
+          const avail = capacity - (usage[weekKeys[i]] || 0);
+          if (avail > 0) {
+            const alloc = Math.min(remaining, avail);
+            result.push({ week: weekKeys[i], hours: alloc });
+            usage[weekKeys[i]] = (usage[weekKeys[i]] || 0) + alloc;
+            remaining -= alloc;
+          }
         }
       }
-      // Work backwards from deadline to find capacity
-      for (let i = targetIdx; i >= 0; i--) {
-        const remaining = capacity - (usage[weekKeys[i]] || 0);
-        if (remaining >= Math.min(hours, 1)) return weekKeys[i];
+
+      // Fill forward for whatever remains
+      for (let i = 0; i < weekKeys.length && remaining > 0; i++) {
+        // Skip weeks we already allocated to in backward pass
+        if (result.some(r => r.week === weekKeys[i])) continue;
+        const avail = capacity - (usage[weekKeys[i]] || 0);
+        if (avail > 0) {
+          const alloc = Math.min(remaining, avail);
+          result.push({ week: weekKeys[i], hours: alloc });
+          usage[weekKeys[i]] = (usage[weekKeys[i]] || 0) + alloc;
+          remaining -= alloc;
+        }
       }
-      // Fallback: find any available week forward
-      return findAvailableWeek(hours, usage);
+
+      // Absolute fallback: put remaining in last week
+      if (remaining > 0) {
+        const lastWeek = weekKeys[weekKeys.length - 1];
+        result.push({ week: lastWeek, hours: remaining });
+        usage[lastWeek] = (usage[lastWeek] || 0) + remaining;
+      }
+
+      return result;
     }
 
     const blocks: any[] = [];
     let blockIdx = 0;
-    // Track usage for scheduling (copy so we can accumulate)
-    const trackUsage = { ...weekUsage };
 
-    // ─── TYPE 1: existing_plan (only in from_scratch mode) ───
+    const projectMap = new Map(projects.map(p => [p.project_id, p]));
+
+    // ─── TYPE 1: existing_plan — bundle per project per week (only in from_scratch) ───
     if (mode === "from_scratch") {
+      // Group schedule items by project+week
+      const existingBundles = new Map<string, { projectId: string; week: string; totalHours: number; itemCount: number }>();
       for (const si of scheduleItems) {
         if (si.status === "cancelled") continue;
-        const proj = projects.find(p => p.project_id === si.project_id);
+        const key = `${si.project_id}::${si.scheduled_week}`;
+        const existing = existingBundles.get(key);
+        if (existing) {
+          existing.totalHours += Number(si.scheduled_hours);
+          existing.itemCount += 1;
+        } else {
+          existingBundles.set(key, {
+            projectId: si.project_id,
+            week: si.scheduled_week,
+            totalHours: Number(si.scheduled_hours),
+            itemCount: 1,
+          });
+        }
+      }
+
+      for (const [, bundle] of existingBundles) {
+        const proj = projectMap.get(bundle.projectId);
+        const dl = resolveDeadline(proj || {});
         blocks.push({
           id: `forecast-${Date.now()}-${blockIdx++}`,
-          project_id: si.project_id,
-          project_name: proj?.project_name || si.project_id,
-          bundle_description: si.item_name,
-          week: si.scheduled_week,
-          estimated_hours: Number(si.scheduled_hours),
+          project_id: bundle.projectId,
+          project_name: proj?.project_name || bundle.projectId,
+          bundle_description: `Plán — ${bundle.itemCount} položek`,
+          week: bundle.week,
+          estimated_hours: Math.round(bundle.totalHours),
+          tpv_item_count: bundle.itemCount,
           confidence: "high",
           source: "existing_plan",
+          deadline: dl.date,
+          deadline_source: dl.source,
           is_forecast: true,
         });
       }
     }
 
-    // ─── TYPE 2: inbox_item ───
-    // All pending inbox items → schedule into first available week
+    // ─── TYPE 2: inbox_item — bundle per project (group all inbox items for same project) ───
+    const inboxByProject = new Map<string, { items: typeof inboxItems; totalHours: number }>();
     for (const item of inboxItems) {
+      const existing = inboxByProject.get(item.project_id);
       const hours = Number(item.estimated_hours) || 8;
-      const week = findAvailableWeek(hours, trackUsage);
-      trackUsage[week] = (trackUsage[week] || 0) + hours;
-
-      const proj = projects.find(p => p.project_id === item.project_id);
-      blocks.push({
-        id: `forecast-${Date.now()}-${blockIdx++}`,
-        project_id: item.project_id,
-        project_name: proj?.project_name || item.project_id,
-        bundle_description: item.item_name,
-        week,
-        estimated_hours: hours,
-        confidence: "high",
-        source: "inbox_item",
-        is_forecast: true,
-      });
+      if (existing) {
+        existing.items.push(item);
+        existing.totalHours += hours;
+      } else {
+        inboxByProject.set(item.project_id, { items: [item], totalHours: hours });
+      }
     }
 
-    // ─── TYPE 3: project_estimate ───
-    // Projects with NO production_schedule bundles at all (completely unplanned)
+    for (const [projectId, group] of inboxByProject) {
+      const proj = projectMap.get(projectId);
+      const dl = resolveDeadline(proj || {});
+
+      // Distribute this project's inbox hours across weeks
+      const weekAllocs = distributeHours(group.totalHours, trackUsage, dl.date);
+
+      for (const alloc of weekAllocs) {
+        blocks.push({
+          id: `forecast-${Date.now()}-${blockIdx++}`,
+          project_id: projectId,
+          project_name: proj?.project_name || projectId,
+          bundle_description: `Inbox — ${group.items.length} položek`,
+          week: alloc.week,
+          estimated_hours: Math.round(alloc.hours),
+          tpv_item_count: group.items.length,
+          confidence: "high",
+          source: "inbox_item",
+          deadline: dl.date,
+          deadline_source: dl.source,
+          is_forecast: true,
+        });
+      }
+    }
+
+    // ─── TYPE 3: project_estimate — completely unplanned projects ───
     const projectsWithSchedule = new Set(scheduleItems.map(s => s.project_id));
     const projectsWithInbox = new Set(inboxItems.map(i => i.project_id));
 
@@ -146,61 +223,41 @@ serve(async (req) => {
       if (projectsWithSchedule.has(proj.project_id)) continue;
       if (projectsWithInbox.has(proj.project_id)) continue;
 
-      // Resolve deadline
-      const deadlineStr = proj.expedice || proj.montaz || proj.predani || proj.datum_smluvni;
+      const dl = resolveDeadline(proj);
 
-      // Estimate hours from TPV or price proxy
+      // Estimate total hours: sum TPV pocet, or price / 500, or 40h fallback
       const projTpv = tpvItems.filter(t => t.project_id === proj.project_id);
       const tpvHours = projTpv.reduce((s, t) => s + (Number(t.pocet) || 0), 0);
-      const tpvCost = projTpv.reduce((s, t) => s + (Number(t.cena) || 0), 0);
-      let estimatedHours = tpvHours > 0 ? tpvHours : (proj.prodejni_cena ? Math.round(Number(proj.prodejni_cena) / 500) : 0);
-      if (estimatedHours <= 0) estimatedHours = 40; // minimum fallback
+      let estimatedHours = tpvHours > 0
+        ? tpvHours
+        : (proj.prodejni_cena ? Math.round(Number(proj.prodejni_cena) / 500) : 0);
+      if (estimatedHours <= 0) estimatedHours = 40;
 
       const confidence = tpvHours > 0 ? "medium" : "low";
+      const tpvCount = projTpv.length || 1;
 
-      // Place working backwards from deadline, or forward from current week
-      let week: string;
-      if (deadlineStr) {
-        week = findWeekBeforeDeadline(estimatedHours, deadlineStr, trackUsage);
-      } else {
-        week = findAvailableWeek(estimatedHours, trackUsage);
-      }
-      trackUsage[week] = (trackUsage[week] || 0) + estimatedHours;
+      // Distribute across weeks
+      const weekAllocs = distributeHours(estimatedHours, trackUsage, dl.date);
 
-      // Split large estimates across weeks if needed
-      if (estimatedHours > capacity * 0.5) {
-        const parts = Math.ceil(estimatedHours / (capacity * 0.4));
-        const hoursPerPart = Math.round(estimatedHours / parts);
-        for (let p = 0; p < parts; p++) {
-          const partHours = p === parts - 1 ? estimatedHours - hoursPerPart * (parts - 1) : hoursPerPart;
-          const partWeek = findAvailableWeek(partHours, trackUsage, 0);
-          trackUsage[partWeek] = (trackUsage[partWeek] || 0) + partHours;
-          blocks.push({
-            id: `forecast-${Date.now()}-${blockIdx++}`,
-            project_id: proj.project_id,
-            project_name: proj.project_name,
-            bundle_description: `~Výroba — etapa ${p + 1}/${parts}`,
-            week: partWeek,
-            estimated_hours: partHours,
-            confidence,
-            source: "project_estimate",
-            is_forecast: true,
-          });
-        }
-      } else {
+      for (const alloc of weekAllocs) {
         blocks.push({
           id: `forecast-${Date.now()}-${blockIdx++}`,
           project_id: proj.project_id,
           project_name: proj.project_name,
           bundle_description: `~Výroba — odhad`,
-          week,
-          estimated_hours: estimatedHours,
+          week: alloc.week,
+          estimated_hours: Math.round(alloc.hours),
+          tpv_item_count: tpvCount,
           confidence,
           source: "project_estimate",
+          deadline: dl.date,
+          deadline_source: dl.source,
           is_forecast: true,
         });
       }
     }
+
+    console.log(`Forecast generated: ${blocks.length} blocks (${blocks.filter(b => b.source === "existing_plan").length} real, ${blocks.filter(b => b.source === "inbox_item").length} inbox, ${blocks.filter(b => b.source === "project_estimate").length} AI)`);
 
     return new Response(JSON.stringify({ blocks, weekKeys, weekUsage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

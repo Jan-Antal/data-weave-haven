@@ -13,8 +13,11 @@ export interface ForecastBlock {
   bundle_description: string;
   week: string;
   estimated_hours: number;
+  tpv_item_count?: number;
   confidence: ForecastConfidence;
   source: ForecastSource;
+  deadline?: string | null;
+  deadline_source?: string;
   is_forecast: true;
   selected?: boolean;
 }
