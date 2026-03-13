@@ -922,16 +922,22 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
   // In "from_scratch" mode, hide real plan cards
   const hideRealCards = forecastDarkMode && forecastPlanMode === "from_scratch";
 
-  const realBundles = useMemo(() => {
-    if (!silo || hideRealCards) return [];
-    return silo.bundles
-      .slice()
-      .sort((a, b) => {
-        const aDone = a.items.length > 0 && a.items.every(i => i.status === "completed");
-        const bDone = b.items.length > 0 && b.items.every(i => i.status === "completed");
-        if (aDone === bDone) return 0;
-        return aDone ? 1 : -1;
-      });
+  const { realBundles, blockerBundles } = useMemo(() => {
+    if (!silo || hideRealCards) return { realBundles: [], blockerBundles: [] };
+    const regular: ScheduleBundle[] = [];
+    const blockers: ScheduleBundle[] = [];
+    for (const b of silo.bundles) {
+      const isBlocker = b.items.length > 0 && b.items.every(i => i.is_blocker);
+      if (isBlocker) blockers.push(b);
+      else regular.push(b);
+    }
+    regular.sort((a, b) => {
+      const aDone = a.items.length > 0 && a.items.every(i => i.status === "completed");
+      const bDone = b.items.length > 0 && b.items.every(i => i.status === "completed");
+      if (aDone === bDone) return 0;
+      return aDone ? 1 : -1;
+    });
+    return { realBundles: regular, blockerBundles: blockers };
   }, [silo, hideRealCards]);
 
   const barColor = isPast ? "#b0bab8" : isOverloaded ? "#c0392b" : isWarning ? "#d97706" : "#3a8a36";
@@ -994,12 +1000,12 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
 
       {/* Items */}
       <div className="flex-1 overflow-y-auto p-1.5" style={{ display: "flex", flexDirection: "column", gap: 3, opacity: isPast ? 0.7 : 1 }}>
-        {(realBundles.length === 0) && !isPast && weekForecastBlocks.length === 0 && (
+        {(realBundles.length === 0 && blockerBundles.length === 0) && !isPast && weekForecastBlocks.length === 0 && (
           <div className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all" style={{ border: forecastDarkMode ? "1.5px dashed #2a3d3a" : "1.5px dashed #e2ddd6" }}>
             <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }}>{forecastDarkMode ? "Žádný forecast" : "Přetáhni sem z Inboxu"}</span>
           </div>
         )}
-        {(realBundles.length === 0) && isPast && weekForecastBlocks.length === 0 && (
+        {(realBundles.length === 0 && blockerBundles.length === 0) && isPast && weekForecastBlocks.length === 0 && (
           <div className="flex-1 flex items-center justify-center px-2 py-[14px]">
             <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5a58" : "#c4ccc9" }}>Prázdný týden</span>
           </div>
@@ -1015,6 +1021,27 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             onSelectProject={onSelectProject} searchQuery={searchQuery}
             forecastDarkMode={forecastDarkMode} />
         ))}
+
+        {/* Rezerva kapacit section — blocker bundles separated */}
+        {blockerBundles.length > 0 && (
+          <>
+            <div className="flex items-center gap-1.5 my-1">
+              <div className="flex-1" style={{ borderTop: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #e2ddd6" }} />
+              <span className="text-[9px] font-semibold tracking-wider shrink-0" style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }}>REZERVA KAPACIT</span>
+              <div className="flex-1" style={{ borderTop: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #e2ddd6" }} />
+            </div>
+            {blockerBundles.map(bundle => (
+              <CollapsibleBundleCard key={`blocker-${bundle.project_id}`} bundle={bundle} weekKey={weekKey}
+                showCzk={showCzk} hourlyRate={hourlyRate} weeklyCapacity={weeklyCapacity} displayMode={displayMode}
+                onBundleContextMenu={onBundleContextMenu}
+                onItemContextMenu={onItemContextMenu}
+                projectLookup={projectLookup}
+                isSelected={selectedProjectId === bundle.project_id}
+                onSelectProject={onSelectProject} searchQuery={searchQuery}
+                forecastDarkMode={forecastDarkMode} />
+            ))}
+          </>
+        )}
 
         {/* Forecast divider + blocks — visually separated from real bundles */}
         {forecastDarkMode && forecastSelectedIds && onToggleForecastSelect && weekForecastBlocks.length > 0 && (
