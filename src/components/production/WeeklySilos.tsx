@@ -1210,7 +1210,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
         >
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="truncate" style={{ fontSize: 13, color: forecastDarkMode ? (allCompleted ? "#5a6480" : urgencyInfo?.type === "overdue" ? "#DC2626" : urgencyInfo?.type === "urgent" ? "#D97706" : "#c8d0e0") : (allCompleted ? "#9ca3af" : urgencyInfo?.type === "overdue" ? "#DC2626" : urgencyInfo?.type === "urgent" ? "#D97706" : "#1a1a1a"), fontWeight: allCompleted ? 400 : 600 }}>{highlightMatch(bundle.project_name, searchQuery)}</span>
+              <span className="truncate" style={{ fontSize: 14, color: forecastDarkMode ? (allCompleted ? "#5a6480" : urgencyInfo?.type === "overdue" ? "#DC2626" : urgencyInfo?.type === "urgent" ? "#D97706" : "#c8d0e0") : (allCompleted ? "#9ca3af" : urgencyInfo?.type === "overdue" ? "#DC2626" : urgencyInfo?.type === "urgent" ? "#D97706" : "#1a1a1a"), fontWeight: allCompleted ? 400 : 500 }}>{highlightMatch(bundle.project_name, searchQuery)}</span>
               {urgencyInfo?.type === "overdue" && (
                 <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: forecastDarkMode ? "rgba(220,38,38,0.2)" : "rgba(220,38,38,0.1)", color: "#DC2626" }}>
                   PO TERMÍNU
@@ -1223,7 +1223,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
               )}
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="font-mono text-xs" style={{ color: forecastDarkMode ? "#5a6480" : (allCompleted ? "#b0b7c3" : "#6b7280") }}>{bundle.project_id}</span>
+              <span className="font-mono" style={{ fontSize: 11, color: forecastDarkMode ? "#5a6480" : (allCompleted ? "#b0b7c3" : "#6b7280") }}>{bundle.project_id}</span>
               {(() => {
                 const proj = projectLookup.get(bundle.project_id);
                 const risk = proj?.risk;
@@ -1235,7 +1235,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
                 return null;
               })()}
               {expDate ? (
-                <span className="text-xs truncate" style={{ color: !allCompleted && daysUntilExp !== null && daysUntilExp < 0 ? "#dc2626" : !allCompleted && daysUntilExp !== null && daysUntilExp <= 14 ? "#d97706" : forecastDarkMode ? "#5a7a76" : "#7aa8a4" }}>
+                <span className="truncate" style={{ fontSize: 11, color: !allCompleted && daysUntilExp !== null && daysUntilExp < 0 ? "#dc2626" : !allCompleted && daysUntilExp !== null && daysUntilExp <= 14 ? "#d97706" : forecastDarkMode ? "#5a7a76" : "#7aa8a4" }}>
                   {deadlineLabel}: {expDate}
                 </span>
               ) : !allCompleted && !isProjectDone && (

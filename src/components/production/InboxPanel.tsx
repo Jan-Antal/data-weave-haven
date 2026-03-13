@@ -782,7 +782,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
       <button
         onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); onSelectProject?.(project.project_id); }}
         onContextMenu={e => onProjectContextMenu(e, project)}
-        className="w-full flex items-center gap-1.5 px-2.5 py-2 text-left transition-colors"
+        className="w-full flex items-center gap-1.5 px-2.5 py-[5px] text-left transition-colors"
         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
       >
@@ -790,7 +790,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
           style={{ color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="truncate" style={{ fontSize: 13, color: urgency === "ok" ? "#1a1a1a" : uColors.text, fontWeight: 600 }}>{highlightMatch(project.project_name, searchQuery || "")}</span>
+            <span className="truncate" style={{ fontSize: 14, color: urgency === "ok" ? "#1a1a1a" : uColors.text, fontWeight: 500 }}>{highlightMatch(project.project_name, searchQuery || "")}</span>
             {urgency === "overdue" && (
               <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(220,38,38,0.1)", color: "#DC2626" }}>
                 PO TERMÍNU
