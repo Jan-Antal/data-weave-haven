@@ -39,18 +39,19 @@ const STORAGE_KEYS: Record<ForecastPlanMode, string> = {
   from_scratch: "ami_forecast_session_scratch",
 };
 
-function saveToStorage(mode: ForecastPlanMode, blocks: ForecastBlock[], selectedIds: Set<string>, overrides: RealBundleOverride[]) {
+function saveToStorage(mode: ForecastPlanMode, blocks: ForecastBlock[], selectedIds: Set<string>, overrides: RealBundleOverride[], safetyNet: SafetyNetProject[]) {
   try {
     localStorage.setItem(STORAGE_KEYS[mode], JSON.stringify({
       blocks,
       selectedBlockIds: Array.from(selectedIds),
       realBundleOverrides: overrides,
+      safetyNetProjects: safetyNet,
       timestamp: Date.now(),
     }));
   } catch { /* ignore */ }
 }
 
-function loadFromStorage(mode: ForecastPlanMode): { blocks: ForecastBlock[]; selectedIds: Set<string>; overrides: RealBundleOverride[] } | null {
+function loadFromStorage(mode: ForecastPlanMode): { blocks: ForecastBlock[]; selectedIds: Set<string>; overrides: RealBundleOverride[]; safetyNet: SafetyNetProject[] } | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS[mode]);
     if (!raw) return null;
@@ -59,7 +60,8 @@ function loadFromStorage(mode: ForecastPlanMode): { blocks: ForecastBlock[]; sel
     return {
       blocks: data.blocks,
       selectedIds: new Set<string>(data.selectedBlockIds || []),
-      overrides: Array.isArray(data.realBundleOverrides) ? data.realBundleOverrides : [],
+      overrides: Array.from(data.realBundleOverrides || []),
+      safetyNet: Array.isArray(data.safetyNetProjects) ? data.safetyNetProjects : [],
     };
   } catch {
     return null;
@@ -116,9 +118,9 @@ export function useForecastMode(): UseForecastModeReturn {
   // Persist to localStorage whenever blocks or selection changes
   useEffect(() => {
     if (forecastActive && forecastBlocks.length > 0) {
-      saveToStorage(planMode, forecastBlocks, selectedBlockIds, realBundleOverrides);
+      saveToStorage(planMode, forecastBlocks, selectedBlockIds, realBundleOverrides, safetyNetProjects);
     }
-  }, [forecastBlocks, selectedBlockIds, planMode, forecastActive, realBundleOverrides]);
+  }, [forecastBlocks, selectedBlockIds, planMode, forecastActive, realBundleOverrides, safetyNetProjects]);
 
   const resetForecastState = useCallback(() => {
     setForecastBlocks([]);
@@ -135,6 +137,7 @@ export function useForecastMode(): UseForecastModeReturn {
       setForecastBlocks(saved.blocks);
       setSelectedBlockIds(saved.selectedIds);
       setRealBundleOverrides(saved.overrides);
+      setSafetyNetProjects(saved.safetyNet);
       return true;
     }
     return false;
