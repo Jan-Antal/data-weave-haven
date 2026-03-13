@@ -122,6 +122,60 @@ export interface ForecastSubItem {
   project_name?: string;
 }
 
+/** Draggable sub-item inside an expanded forecast card */
+function DraggableForecastSubItem({
+  item,
+  parentBlock,
+  style: s,
+}: {
+  item: ForecastSubItem;
+  parentBlock: ForecastBlock;
+  style: ReturnType<typeof getSourceStyle>;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `forecast-subitem-${item.id}`,
+    data: {
+      type: "forecast-subitem",
+      subItemId: item.id,
+      itemName: item.item_name,
+      itemCode: item.item_code,
+      hours: item.hours,
+      subItemSource: item.source,
+      projectId: item.project_id || parentBlock.project_id,
+      projectName: item.project_name || parentBlock.project_name,
+      parentBlockId: parentBlock.id,
+      parentWeek: parentBlock.week,
+    },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className="flex items-center gap-[3px] px-[6px] py-[3px] rounded transition-colors cursor-grab group"
+      style={{ opacity: isDragging ? 0.3 : 1 }}
+      onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${s.borderColor}15`; }}
+      onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
+    >
+      <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: s.codeColor }} />
+      {item.item_code && (
+        <span className="font-mono text-[9px] font-bold shrink-0" style={{ color: s.codeColor }}>
+          {item.item_code}
+        </span>
+      )}
+      <span className="text-[10px] flex-1 truncate" style={{ color: s.nameColor, opacity: 0.8 }}>
+        {item.item_name}
+      </span>
+      {item.hours > 0 && (
+        <span className="font-mono text-[9px] shrink-0" style={{ color: s.hoursColor, opacity: 0.7 }}>
+          {item.hours}h
+        </span>
+      )}
+    </div>
+  );
+}
+
 function ForecastCard({
   block,
   isSelected,
