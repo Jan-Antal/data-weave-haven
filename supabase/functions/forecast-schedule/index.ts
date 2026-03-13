@@ -360,9 +360,9 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Forecast generated: ${blocks.length} blocks (${blocks.filter(b => b.source === "existing_plan").length} real, ${blocks.filter(b => b.source === "inbox_item").length} inbox, ${blocks.filter(b => b.source === "project_estimate").length} AI)`);
+    console.log(`Forecast generated: ${blocks.length} blocks (${blocks.filter(b => b.source === "existing_plan").length} real, ${blocks.filter(b => b.source === "inbox_item").length} inbox, ${blocks.filter(b => b.source === "project_estimate").length} AI), safetyNet: ${safetyNet.length}`);
 
-    return new Response(JSON.stringify({ blocks, weekKeys, weekUsage }), {
+    return new Response(JSON.stringify({ blocks, weekKeys, weekUsage, safetyNet }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
