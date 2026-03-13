@@ -728,6 +728,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
           }}
         />
       )}
+      <InboxResizeHandle onWidthChange={onWidthChange} containerWidth={width} />
     </div>
   );
 }
