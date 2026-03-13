@@ -922,16 +922,22 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
   // In "from_scratch" mode, hide real plan cards
   const hideRealCards = forecastDarkMode && forecastPlanMode === "from_scratch";
 
-  const realBundles = useMemo(() => {
-    if (!silo || hideRealCards) return [];
-    return silo.bundles
-      .slice()
-      .sort((a, b) => {
-        const aDone = a.items.length > 0 && a.items.every(i => i.status === "completed");
-        const bDone = b.items.length > 0 && b.items.every(i => i.status === "completed");
-        if (aDone === bDone) return 0;
-        return aDone ? 1 : -1;
-      });
+  const { realBundles, blockerBundles } = useMemo(() => {
+    if (!silo || hideRealCards) return { realBundles: [], blockerBundles: [] };
+    const regular: ScheduleBundle[] = [];
+    const blockers: ScheduleBundle[] = [];
+    for (const b of silo.bundles) {
+      const isBlocker = b.items.length > 0 && b.items.every(i => i.is_blocker);
+      if (isBlocker) blockers.push(b);
+      else regular.push(b);
+    }
+    regular.sort((a, b) => {
+      const aDone = a.items.length > 0 && a.items.every(i => i.status === "completed");
+      const bDone = b.items.length > 0 && b.items.every(i => i.status === "completed");
+      if (aDone === bDone) return 0;
+      return aDone ? 1 : -1;
+    });
+    return { realBundles: regular, blockerBundles: blockers };
   }, [silo, hideRealCards]);
 
   const barColor = isPast ? "#b0bab8" : isOverloaded ? "#c0392b" : isWarning ? "#d97706" : "#3a8a36";
