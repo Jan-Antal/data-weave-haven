@@ -176,6 +176,14 @@ function DraggableForecastSubItem({
   );
 }
 
+function formatCompactCzk(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${Math.round(v / 1_000)}K`;
+  return `${Math.round(v)}`;
+}
+
+type DisplayMode = "hours" | "czk" | "percent";
+
 function ForecastCard({
   block,
   isSelected,
@@ -183,6 +191,8 @@ function ForecastCard({
   onContextMenu,
   onToggleExpand,
   isExpanded,
+  displayMode = "hours",
+  hourlyRate = 550,
 }: {
   block: ForecastBlock;
   isSelected: boolean;
@@ -190,6 +200,8 @@ function ForecastCard({
   onContextMenu?: (e: React.MouseEvent) => void;
   onToggleExpand?: () => void;
   isExpanded?: boolean;
+  displayMode?: DisplayMode;
+  hourlyRate?: number;
 }) {
   const style = getSourceStyle(block.source, block.confidence);
   const [expanded, setExpanded] = useState(false);
@@ -358,7 +370,7 @@ function ForecastCard({
                   className="text-[13px] font-bold shrink-0 ml-2"
                   style={{ color: style.hoursColor }}
                 >
-                  {style.hoursPrefix}{block.estimated_hours}h
+                  {style.hoursPrefix}{displayMode === "czk" ? formatCompactCzk(block.estimated_hours * hourlyRate) : `${block.estimated_hours}h`}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
@@ -453,6 +465,8 @@ export function ForecastWeekContent({
   onForecastContextMenu,
   expandedIds,
   onToggleExpand,
+  displayMode,
+  hourlyRate,
 }: {
   blocks: ForecastBlock[];
   selectedBlockIds: Set<string>;
@@ -460,6 +474,8 @@ export function ForecastWeekContent({
   onForecastContextMenu?: (e: React.MouseEvent, block: ForecastBlock) => void;
   expandedIds?: Set<string>;
   onToggleExpand?: (blockId: string) => void;
+  displayMode?: DisplayMode;
+  hourlyRate?: number;
 }) {
   const mergedBlocks = useMemo(() => mergeBlocksByProject(blocks), [blocks]);
 
@@ -476,6 +492,8 @@ export function ForecastWeekContent({
           onContextMenu={onForecastContextMenu ? (e) => onForecastContextMenu(e, block) : undefined}
           isExpanded={expandedIds?.has(block.id)}
           onToggleExpand={onToggleExpand ? () => onToggleExpand(block.id) : undefined}
+          displayMode={displayMode}
+          hourlyRate={hourlyRate}
         />
       ))}
     </div>
