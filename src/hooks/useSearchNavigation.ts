@@ -66,7 +66,7 @@ export function useSearchNavigation({ query, scheduleData, forecastBlocks, forec
             project_id: block.project_id,
             items: [{ item_name: block.bundle_description }],
           };
-          if (matchesQuery(fakeBundle, query)) {
+          if (matchesQuery(fakeBundle, query, projectPmMap?.get(block.project_id))) {
             // Avoid duplicate if real bundle already matched same project in same week
             const key = `${weekKey}::${block.project_id}`;
             if (!result.some(m => m.matchKey === key)) {
