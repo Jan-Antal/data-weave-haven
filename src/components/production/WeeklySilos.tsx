@@ -933,6 +933,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
               selectedBlockIds={forecastSelectedIds}
               onToggleSelect={onToggleForecastSelect}
               onForecastContextMenu={onForecastContextMenu}
+              expandedIds={forecastExpandedIds}
+              onToggleExpand={onToggleForecastExpand}
             />
           </>
         )}
