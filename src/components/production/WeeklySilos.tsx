@@ -1143,7 +1143,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
       borderBottom: forecastDarkMode
         ? (isSelected ? "2px solid #d97706" : "1px solid #3d4558")
         : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2"),
-      borderLeft: `4px solid ${borderLeftColor}`,
+      borderLeft: isSelected ? "4px solid #d97706" : isSearchMatch ? "4px solid #facc15" : `4px solid ${borderLeftColor}`,
       backgroundColor: forecastDarkMode
         ? (isSelected ? "rgba(217,119,6,0.08)" : "#252a35")
         : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : isSelected ? "rgba(217,119,6,0.05)" : isSearchMatch ? "rgba(254,240,138,0.15)" : "#ffffff"),
