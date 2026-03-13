@@ -754,6 +754,22 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       {cancelState && (
         <CancelItemDialog open={!!cancelState} onOpenChange={open => !open && setCancelState(null)} {...cancelState} itemCode={cancelState.itemCode} />
       )}
+
+      {/* Forecast split dialog */}
+      {forecastSplitState && onSplitForecastBlock && (
+        <ForecastSplitDialog
+          open={!!forecastSplitState}
+          onOpenChange={open => !open && setForecastSplitState(null)}
+          blockName={forecastSplitState.blockName}
+          totalHours={forecastSplitState.totalHours}
+          currentWeek={forecastSplitState.currentWeek}
+          weeks={weekOptions}
+          onSplit={(keepHours, targetWeek) => {
+            onSplitForecastBlock(forecastSplitState.blockId, keepHours, targetWeek);
+            setForecastSplitState(null);
+          }}
+        />
+      )}
     </div>
   );
 }
