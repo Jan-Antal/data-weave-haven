@@ -13,7 +13,7 @@ interface ForecastOverlayProps {
 }
 
 /** Source-based styling config — exact colors per spec */
-function getSourceStyle(source: ForecastSource, _confidence: string) {
+function getSourceStyle(source: ForecastSource, _confidence: string, isMoved = false) {
   if (source === "inbox_item") {
     return {
       borderColor: "#22c55e",
@@ -27,21 +27,23 @@ function getSourceStyle(source: ForecastSource, _confidence: string) {
       badgeIcon: "inbox" as const,
       hoursColor: "#4ade80",
       hoursPrefix: "",
+      leftBorder: undefined as string | undefined,
     };
   }
   if (source === "existing_plan") {
     return {
-      borderColor: "#3d4558",
-      borderWidth: 1,
-      backgroundColor: "#252a35",
-      nameColor: "#c8d0e0",
-      codeColor: "#5a6480",
-      badgeLabel: "",
-      badgeBg: "transparent",
-      badgeColor: "transparent",
-      badgeIcon: null,
-      hoursColor: "#8899bb",
+      borderColor: isMoved ? "#f59e0b" : "#3d4558",
+      borderWidth: isMoved ? 2 : 1,
+      backgroundColor: isMoved ? "#1a1708" : "#252a35",
+      nameColor: isMoved ? "#fcd34d" : "#c8d0e0",
+      codeColor: isMoved ? "#7a5a00" : "#5a6480",
+      badgeLabel: isMoved ? "PŘESUNUTO" : "",
+      badgeBg: isMoved ? "#451a03" : "transparent",
+      badgeColor: isMoved ? "#fcd34d" : "transparent",
+      badgeIcon: isMoved ? ("sparkles" as const) : null,
+      hoursColor: isMoved ? "#fbbf24" : "#8899bb",
       hoursPrefix: "",
+      leftBorder: isMoved ? "3px solid #f59e0b" : undefined,
     };
   }
   // project_estimate (amber/AI) — Type 3
@@ -57,6 +59,7 @@ function getSourceStyle(source: ForecastSource, _confidence: string) {
     badgeIcon: "sparkles" as const,
     hoursColor: "#fbbf24",
     hoursPrefix: "~",
+    leftBorder: undefined as string | undefined,
   };
 }
 
