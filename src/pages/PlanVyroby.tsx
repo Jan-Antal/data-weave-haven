@@ -946,13 +946,13 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
 
       {/* Center: Stats */}
       <div className="flex items-center gap-2 shrink-0">
-        <div className="flex items-center gap-1 text-xs font-mono" style={{ color: forecastActive ? "#9ca3af" : undefined }}>
+        <div className="flex items-center gap-1 text-xs font-mono" style={{ color: forecastActive ? "#a8c5c2" : undefined }}>
           <span>Kapacita <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{Math.round(capacityHours).toLocaleString("cs-CZ")}h</span></span>
-          <span style={{ color: forecastActive ? "#4b5563" : undefined }}>·</span>
+          <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
           <span>CZK <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{formatCzk(displayCzk)}</span></span>
-          <span style={{ color: forecastActive ? "#4b5563" : undefined }}>·</span>
+          <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
           <span>Naplánováno <span style={{ fontWeight: 600, color: isOverCapacity ? "hsl(var(--destructive))" : "hsl(142 76% 36%)" }}>{Math.round(scheduledHours).toLocaleString("cs-CZ")}h</span></span>
-          <span style={{ color: forecastActive ? "#4b5563" : undefined }}>·</span>
+          <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
           <span>V Inboxu <span style={{ fontWeight: 600, color: "#d97706" }}>{Math.round(inboxHours).toLocaleString("cs-CZ")}h</span></span>
         </div>
       </div>
