@@ -555,15 +555,8 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
 
   // Infinite scroll
   const tableScrollRef = useRef<HTMLDivElement>(null);
-  const headerScrollRef = useRef<HTMLDivElement>(null);
   const scrollResetKey = `${computeKey}|${sortCol}|${sortDir}`;
   const { visible, hasMore } = useInfiniteScroll(sorted, tableScrollRef, scrollResetKey);
-
-  const handleBodyScroll = useCallback(() => {
-    if (tableScrollRef.current && headerScrollRef.current) {
-      headerScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
-    }
-  }, []);
 
   // Persisted group order from DB (for side panel)
   const orderedNativeKeys = useMemo(() => getOrderedKeys(PROJECT_INFO_NATIVE), [getOrderedKeys]);
