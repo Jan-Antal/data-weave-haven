@@ -682,6 +682,7 @@ interface SiloProps {
   forecastSelectedIds?: Set<string>;
   onToggleForecastSelect?: (id: string) => void;
   forecastDarkMode?: boolean;
+  forecastPlanMode?: "respect_plan" | "from_scratch";
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
