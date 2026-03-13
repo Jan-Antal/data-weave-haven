@@ -598,9 +598,6 @@ export default function PlanVyroby() {
           onSearchChange={handleSearchChange}
           forecastActive={forecast.forecastActive}
           searchMatchCount={searchNav.totalCount}
-          searchCurrentIndex={searchNav.currentIndex}
-          onSearchPrev={searchNav.goPrev}
-          onSearchNext={searchNav.goNext}
           onForecastToggle={async (v) => {
             forecast.setForecastActive(v);
             if (v) {
