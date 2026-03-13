@@ -713,12 +713,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
         <span className="text-[9px] font-medium" style={{ color: forecastDarkMode ? "#7aa8a4" : "#99a5a3" }}>{visiblePeriodLabel}</span>
       </div>
 
-      {/* Safety net panel */}
-      {forecastDarkMode && forecastSafetyNet && forecastSafetyNet.length > 0 && (
-        <div className="px-2 pt-2">
-          <ForecastSafetyNet projects={forecastSafetyNet} onRestoreToForecast={onRestoreFromSafetyNet} />
-        </div>
-      )}
+
 
       {/* Silos */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden" ref={scrollContainerRef}>

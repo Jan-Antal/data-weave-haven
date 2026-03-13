@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ProductionHeader } from "@/components/production/ProductionHeader";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { InboxPanel } from "@/components/production/InboxPanel";
+import { ForecastSafetyNet } from "@/components/production/ForecastSafetyNet";
 import { WeeklySilos } from "@/components/production/WeeklySilos";
 import { ExpedicePanel } from "@/components/production/ExpedicePanel";
 import { DragOverlayContent } from "@/components/production/DragOverlayContent";

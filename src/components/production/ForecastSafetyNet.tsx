@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ChevronDown, ChevronRight, AlertTriangle, RotateCcw } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface SafetyNetProject {
   project_id: string;
@@ -8,9 +9,19 @@ export interface SafetyNetProject {
   source: "scheduled" | "inbox" | "unplanned";
 }
 
+interface SafetyNetItem {
+  id: string;
+  item_name: string;
+  item_code?: string | null;
+  hours?: number;
+  status?: string | null;
+}
+
 interface ForecastSafetyNetProps {
   projects: SafetyNetProject[];
   onRestoreToForecast?: (projectId: string) => void;
+  onViewDetail?: (projectId: string) => void;
+  onViewItems?: (projectId: string) => void;
 }
 
 const sourceBadge: Record<string, { label: string; bg: string }> = {
@@ -19,71 +30,273 @@ const sourceBadge: Record<string, { label: string; bg: string }> = {
   unplanned: { label: "Bez plánu", bg: "#451a03" },
 };
 
-export function ForecastSafetyNet({ projects, onRestoreToForecast }: ForecastSafetyNetProps) {
-  const [expanded, setExpanded] = useState(false);
+const statusColors: Record<string, { bg: string; color: string }> = {
+  scheduled: { bg: "#2a3d3a", color: "#7aa8a4" },
+  in_progress: { bg: "#1e3a5f", color: "#60a5fa" },
+  paused: { bg: "#451a03", color: "#fdba74" },
+  completed: { bg: "#14532d", color: "#86efac" },
+};
 
-  if (projects.length === 0) return null;
+export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail, onViewItems }: ForecastSafetyNetProps) {
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [projectItems, setProjectItems] = useState<Record<string, SafetyNetItem[]>>({});
+  const [loadingItems, setLoadingItems] = useState<Set<string>>(new Set());
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; projectId: string } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close context menu on click outside
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handler = () => setContextMenu(null);
+    window.addEventListener("click", handler);
+    return () => window.removeEventListener("click", handler);
+  }, [contextMenu]);
+
+  const toggleExpand = useCallback(async (projectId: string, source: string) => {
+    setExpandedProjects(prev => {
+      const next = new Set(prev);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+        // Fetch items if not cached
+        if (!projectItems[projectId] && !loadingItems.has(projectId)) {
+          fetchItems(projectId, source);
+        }
+      }
+      return next;
+    });
+  }, [projectItems, loadingItems]);
+
+  const fetchItems = async (projectId: string, source: string) => {
+    setLoadingItems(prev => new Set(prev).add(projectId));
+    try {
+      let items: SafetyNetItem[] = [];
+      if (source === "unplanned") {
+        // Fetch from tpv_items
+        const { data } = await supabase
+          .from("tpv_items")
+          .select("id, item_name, item_type, status")
+          .eq("project_id", projectId)
+          .is("deleted_at", null)
+          .limit(50);
+        if (data) {
+          items = data.map(d => ({
+            id: d.id,
+            item_name: d.item_name,
+            item_code: d.item_type,
+            status: d.status,
+          }));
+        }
+      } else {
+        // Fetch from production_schedule
+        const { data } = await supabase
+          .from("production_schedule")
+          .select("id, item_name, item_code, scheduled_hours, status")
+          .eq("project_id", projectId)
+          .neq("status", "completed")
+          .limit(50);
+        if (data) {
+          items = data.map(d => ({
+            id: d.id,
+            item_name: d.item_name,
+            item_code: d.item_code,
+            hours: Number(d.scheduled_hours),
+            status: d.status,
+          }));
+        }
+      }
+      setProjectItems(prev => ({ ...prev, [projectId]: items }));
+    } catch {
+      setProjectItems(prev => ({ ...prev, [projectId]: [] }));
+    }
+    setLoadingItems(prev => {
+      const next = new Set(prev);
+      next.delete(projectId);
+      return next;
+    });
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, projectId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let x = e.clientX;
+    let y = e.clientY;
+    if (x + 180 > vw) x = vw - 185;
+    if (y + 80 > vh) y = vh - 85;
+    setContextMenu({ x, y, projectId });
+  };
 
   return (
     <div
-      style={{
-        background: "#1a2422",
-        border: "1px solid #c4860a",
-        borderRadius: 8,
-        marginBottom: 12,
-        overflow: "hidden",
-      }}
+      className="w-[252px] shrink-0 flex flex-col"
+      style={{ backgroundColor: "#1f2e2c", borderRight: "1px solid #2a3d3a" }}
     >
-      <button
-        onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left"
-        style={{ color: "#f59e0b", fontSize: 12, fontWeight: 600 }}
+      {/* Header */}
+      <div
+        className="px-3 py-2 flex items-center gap-2 shrink-0"
+        style={{ borderBottom: "1px solid #2a3d3a" }}
       >
-        {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-        <AlertTriangle className="w-3.5 h-3.5" />
-        <span>Záchranná síť — {projects.length} projektů bez termínu</span>
-      </button>
+        <AlertTriangle className="w-3.5 h-3.5" style={{ color: "#f59e0b" }} />
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#f59e0b" }}>Záchranná síť</span>
+        <span
+          className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+          style={{ backgroundColor: "rgba(245,158,11,0.15)", color: "#f59e0b" }}
+        >
+          {projects.length}
+        </span>
+      </div>
 
-      {expanded && (
-        <div className="px-3 pb-2 space-y-1">
-          {projects.map(p => {
-            const badge = sourceBadge[p.source] || sourceBadge.unplanned;
-            return (
+      {/* Scrollable project list */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        {projects.length === 0 && (
+          <div className="flex-1 flex items-center justify-center py-8">
+            <span className="text-[10px] italic" style={{ color: "#4a5a58" }}>Žádné projekty v záchranné síti</span>
+          </div>
+        )}
+
+        {projects.map(p => {
+          const badge = sourceBadge[p.source] || sourceBadge.unplanned;
+          const isExpanded = expandedProjects.has(p.project_id);
+          const items = projectItems[p.project_id];
+          const isLoading = loadingItems.has(p.project_id);
+
+          return (
+            <div key={p.project_id}>
+              {/* Project row */}
               <div
-                key={p.project_id}
-                className="flex items-center gap-2 py-1"
-                style={{ fontSize: 11 }}
+                className="flex items-center gap-1.5 py-1.5 px-1.5 rounded cursor-pointer transition-colors"
+                style={{ backgroundColor: isExpanded ? "#253533" : "transparent" }}
+                onClick={() => toggleExpand(p.project_id, p.source)}
+                onContextMenu={(e) => handleContextMenu(e, p.project_id)}
               >
-                <span
-                  className="px-1.5 py-0.5 rounded font-mono text-[10px]"
-                  style={{ background: "#2a3d3a", color: "#7aa8a4" }}
-                >
-                  {p.project_id}
-                </span>
-                <span className="flex-1 truncate" style={{ color: "#a8c5c2" }}>
-                  {p.project_name}
-                </span>
-                <span style={{ color: "#7aa8a4" }}>~{p.estimated_hours}h</span>
-                <span
-                  className="px-1.5 py-0.5 rounded text-[10px] font-medium"
-                  style={{ background: badge.bg, color: "#e5e5e5" }}
-                >
-                  {badge.label}
-                </span>
-                {onRestoreToForecast && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onRestoreToForecast(p.project_id); }}
-                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium hover:opacity-80 transition-opacity"
-                    style={{ background: "#2a4a46", color: "#7aa8a4", border: "1px solid #2a4a46" }}
-                    title="Vrátit do forecastu"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    Vrátit
-                  </button>
-                )}
+                {isExpanded
+                  ? <ChevronDown className="w-3 h-3 shrink-0" style={{ color: "#7aa8a4" }} />
+                  : <ChevronRight className="w-3 h-3 shrink-0" style={{ color: "#4a5a58" }} />}
+                <div className="flex-1 min-w-0">
+                  <div className="truncate" style={{ fontSize: 12, fontWeight: 500, color: "#a8c5c2" }}>
+                    {p.project_name}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="font-mono text-[10px]" style={{ color: "#5c706f" }}>{p.project_id}</span>
+                    <span
+                      className="px-1 py-0 rounded text-[9px] font-medium"
+                      style={{ background: badge.bg, color: "#e5e5e5" }}
+                    >
+                      {badge.label}
+                    </span>
+                  </div>
+                </div>
+                <div className="shrink-0 flex flex-col items-end gap-0.5">
+                  <span className="font-mono text-[11px] font-semibold" style={{ color: "#7aa8a4" }}>
+                    ~{p.estimated_hours}h
+                  </span>
+                  {onRestoreToForecast && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onRestoreToForecast(p.project_id); }}
+                      className="flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-medium hover:opacity-80 transition-opacity"
+                      style={{ background: "#2a4a46", color: "#7aa8a4" }}
+                      title="Vrátit do forecastu"
+                    >
+                      <RotateCcw className="w-2.5 h-2.5" />
+                      Vrátit
+                    </button>
+                  )}
+                </div>
               </div>
-            );
-          })}
+
+              {/* Expanded items */}
+              {isExpanded && (
+                <div className="mt-0.5 mb-1">
+                  {isLoading ? (
+                    <div className="pl-4 py-1">
+                      <span className="text-[10px] italic" style={{ color: "#4a5a58" }}>Načítám...</span>
+                    </div>
+                  ) : items && items.length > 0 ? (
+                    items.map(item => {
+                      const sc = statusColors[item.status || ""] || { bg: "#2a3d3a", color: "#7aa8a4" };
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex items-center gap-1.5 py-[3px]"
+                          style={{ paddingLeft: 16, borderLeft: "1px solid #2a3d3a", marginLeft: 8, fontSize: 11 }}
+                        >
+                          {item.item_code && (
+                            <span className="font-mono shrink-0" style={{ color: "#5c706f", fontSize: 10 }}>
+                              {item.item_code}
+                            </span>
+                          )}
+                          <span className="flex-1 truncate" style={{ color: "#7aa8a4" }}>
+                            {item.item_name}
+                          </span>
+                          {item.hours != null && (
+                            <span className="font-mono shrink-0" style={{ color: "#5c706f", fontSize: 10 }}>
+                              {Math.round(item.hours)}h
+                            </span>
+                          )}
+                          {item.status && (
+                            <span
+                              className="px-1 py-0 rounded text-[9px]"
+                              style={{ backgroundColor: sc.bg, color: sc.color }}
+                            >
+                              {item.status}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="pl-4 py-1">
+                      <span className="text-[10px] italic" style={{ color: "#4a5a58" }}>Žádné položky</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="fixed z-[9999]"
+          style={{
+            top: contextMenu.y,
+            left: contextMenu.x,
+            minWidth: 180,
+            backgroundColor: "#1f2e2c",
+            border: "1px solid #2a4a46",
+            borderRadius: 6,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+            padding: 4,
+          }}
+        >
+          {onViewDetail && (
+            <button
+              className="w-full text-left px-3 py-1.5 rounded text-[11px] transition-colors"
+              style={{ color: "#a8c5c2" }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#2a4a46")}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+              onClick={() => { onViewDetail(contextMenu.projectId); setContextMenu(null); }}
+            >
+              Zobrazit detail projektu
+            </button>
+          )}
+          {onViewItems && (
+            <button
+              className="w-full text-left px-3 py-1.5 rounded text-[11px] transition-colors"
+              style={{ color: "#a8c5c2" }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#2a4a46")}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+              onClick={() => { onViewItems(contextMenu.projectId); setContextMenu(null); }}
+            >
+              Zobrazit položky
+            </button>
+          )}
         </div>
       )}
     </div>
