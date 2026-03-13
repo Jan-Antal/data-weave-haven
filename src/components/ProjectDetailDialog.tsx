@@ -248,7 +248,8 @@ function buildFormState(p: Project | null) {
 
 function defaultForm() {
   return {
-    project_id: "", project_name: "", klient: "", location: "", pm: "", konstrukter: "", kalkulant: "", architekt: "",
+    project_id: "", project_name: "", klient: "", location: "", contact_person: "", contact_email: "", contact_tel: "",
+    pm: "", konstrukter: "", kalkulant: "", architekt: "",
     status: "", datum_smluvni: "", datum_objednavky: "", prodejni_cena: "", currency: "CZK", marze: "",
     risk: "", zamereni: "", tpv_date: "", expedice: "", montaz: "", predani: "", van_date: "", pm_poznamka: "",
     narocnost: "", hodiny_tpv: "", percent_tpv: "", tpv_poznamka: "",
