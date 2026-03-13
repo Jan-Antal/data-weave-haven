@@ -262,6 +262,7 @@ serve(async (req) => {
         const weekAllocs = distributeHours(work.totalHours, trackUsage, work.deadline, 0);
 
         for (const alloc of weekAllocs) {
+          const proj = projectMap.get(work.projectId);
           blocks.push({
             id: `forecast-${Date.now()}-${blockIdx++}`,
             project_id: work.projectId,
@@ -275,6 +276,7 @@ serve(async (req) => {
             source: work.source,
             deadline: work.deadline,
             deadline_source: work.deadlineSource,
+            tpv_expected_date: work.source === "project_estimate" ? (proj?.datum_tpv || null) : null,
             is_forecast: true,
           });
         }
