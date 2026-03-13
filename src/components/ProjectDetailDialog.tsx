@@ -553,7 +553,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     if (!open) setMobileDragY(0);
   }, [open]);
 
-  if (!project) return null;
+  // moved early return below all hooks
 
   const handleSave = async () => {
     if (idExists) return;
@@ -817,6 +817,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       handleMoveFiles(openCategory, destCategoryKey, selectedFiles);
     }
   }, [openCategory, sp.filesByCategory, fileSelection, handleMoveFiles]);
+
+  if (!project) return null;
 
   // ── Read-only style helper ──────────────────────────────────
   const roClass = "bg-[#f3f4f6] text-muted-foreground cursor-not-allowed opacity-70";
