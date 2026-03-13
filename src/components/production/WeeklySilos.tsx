@@ -805,12 +805,13 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             forecastDarkMode={forecastDarkMode} />
         ))}
 
-        {/* Forecast blocks */}
+        {/* Forecast blocks — separate render pass, isolated from real data */}
         {forecastDarkMode && forecastSelectedIds && onToggleForecastSelect && weekForecastBlocks.length > 0 && (
           <ForecastWeekContent
             blocks={weekForecastBlocks}
             selectedBlockIds={forecastSelectedIds}
             onToggleSelect={onToggleForecastSelect}
+            onForecastContextMenu={onForecastContextMenu}
           />
         )}
       </div>
