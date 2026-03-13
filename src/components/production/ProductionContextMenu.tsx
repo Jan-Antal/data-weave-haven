@@ -56,9 +56,6 @@ export function ProductionContextMenu({ x, y, actions, onClose, darkMode }: Prod
     <div ref={ref} style={style}>
       {actions.map((action, i) => (
         <div key={i}>
-          {action.dividerBefore && (
-            <div className="mx-2 my-1" style={{ borderTop: darkMode ? "1px solid #3d4558" : "1px solid #ece8e2" }} />
-          )}
           <button
             className="w-full flex items-center gap-2 px-3 py-[6px] text-left transition-colors"
             style={{ fontSize: 11, color: action.danger ? "#dc3545" : darkMode ? "#c8d0e0" : "#223937" }}
