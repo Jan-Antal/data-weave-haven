@@ -137,6 +137,7 @@ export function useForecastMode(): UseForecastModeReturn {
       setForecastBlocks(saved.blocks);
       setSelectedBlockIds(saved.selectedIds);
       setRealBundleOverrides(saved.overrides);
+      setSafetyNetProjects(saved.safetyNet);
       return true;
     }
     return false;
