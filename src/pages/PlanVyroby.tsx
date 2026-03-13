@@ -466,7 +466,8 @@ export default function PlanVyroby() {
       }
   }, [moveInboxItemToWeek, moveInboxProjectToWeek, moveScheduleItemToWeek, moveBundleToWeek,
     moveItemBackToInbox, returnBundleToInbox, scheduleData, weeklyCapacity, hourlyRate,
-    findSpillWeek, findSiblingInWeek, mergeSplitItems, resolveTargetWeek, checkAndWarnDeadline]);
+    findSpillWeek, findSiblingInWeek, mergeSplitItems, resolveTargetWeek, checkAndWarnDeadline,
+    forecast]);
 
   if (loading) {
     return (
