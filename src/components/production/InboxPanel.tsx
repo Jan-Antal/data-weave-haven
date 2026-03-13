@@ -97,6 +97,7 @@ interface InboxPanelProps {
   selectedProjectId?: string | null;
   onSelectProject?: (projectId: string) => void;
   searchQuery?: string;
+  forecastActive?: boolean;
 }
 
 interface ContextMenuState {
