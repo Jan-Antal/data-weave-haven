@@ -223,7 +223,14 @@ serve(async (req) => {
       for (const proj of projects) {
         if (processedProjects.has(proj.project_id)) continue;
         const dl = resolveDeadline(proj);
-        if (!dl.date) continue;
+        if (!dl.date) {
+          const projTpvEst = tpvItems.filter(t => t.project_id === proj.project_id);
+          const tpvH = projTpvEst.reduce((s, t) => s + (Number(t.pocet) || 0), 0);
+          let estH = tpvH > 0 ? tpvH : (proj.prodejni_cena ? Math.round(Number(proj.prodejni_cena) / 500) : 0);
+          if (estH <= 0) estH = 40;
+          safetyNet.push({ project_id: proj.project_id, project_name: proj.project_name, estimated_hours: estH, source: "unplanned" });
+          continue;
+        }
         const projTpv = tpvItems.filter(t => t.project_id === proj.project_id);
         const tpvHours = projTpv.reduce((s, t) => s + (Number(t.pocet) || 0), 0);
         let estimatedHours = tpvHours > 0
