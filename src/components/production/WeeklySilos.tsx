@@ -832,8 +832,10 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
     return dl < today;
   }, [project, isProjectDone, allCompleted]);
 
+  const shouldHighlightOverdue = (daysUntilExp !== null && daysUntilExp < 0) || isOverdueProject;
+
   const borderLeftColor = allCompleted ? "#3a8a36"
-    : expSeverity === "overdue" ? "#dc3545"
+    : shouldHighlightOverdue ? "hsl(0 70% 50%)"
     : expSeverity === "urgent" ? "#d97706"
     : color;
 
@@ -847,16 +849,16 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
 
   return (
     <div className="rounded-[6px] overflow-hidden relative" style={{
-      borderTop: isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2",
-      borderRight: isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2",
-      borderBottom: isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2",
+      borderTop: shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2",
+      borderRight: shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2",
+      borderBottom: shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2",
       borderLeft: `4px solid ${borderLeftColor}`,
-      backgroundColor: isSelected ? "rgba(217,119,6,0.05)" : isSearchMatch ? "rgba(254,240,138,0.15)" : isOverdueProject ? "#FEE2E2" : "#ffffff", opacity: isDragging ? 0.3 : 1,
-      boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : isSearchMatch ? "0 0 0 2px rgba(250,204,21,0.25)" : undefined,
+      backgroundColor: shouldHighlightOverdue ? "hsl(0 75% 93%)" : isSelected ? "rgba(217,119,6,0.05)" : isSearchMatch ? "rgba(254,240,138,0.15)" : "#ffffff", opacity: isDragging ? 0.3 : 1,
+      boxShadow: shouldHighlightOverdue ? "inset 0 0 0 1px hsl(0 60% 86%)" : isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : isSearchMatch ? "0 0 0 2px rgba(250,204,21,0.25)" : undefined,
       transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, box-shadow 150ms",
     }}>
 
-      <div className="flex" style={{ borderBottom: expanded ? "1px solid #ece8e2" : "none" }}>
+      <div className="flex" style={{ borderBottom: expanded ? "1px solid #ece8e2" : "none", backgroundColor: shouldHighlightOverdue ? "hsl(0 75% 93%)" : undefined }}>
         {/* Left strip: expand/collapse toggle — NOT draggable */}
         <div
           className="shrink-0 flex items-center justify-center cursor-pointer select-none"

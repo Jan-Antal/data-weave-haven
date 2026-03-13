@@ -967,6 +967,30 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
           <div className="flex flex-col" style={{ gap: 6, paddingTop: 6 }}>
             {filteredRows.map(proj => {
               const isExpanded = expandedProjects.has(proj.projectId);
+              const isOverdueProject = (() => {
+                const pd = projectDateLookup.get(proj.projectId);
+                if (!pd) return false;
+
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                const expediceDate = pd?.expedice ? parseAppDate(pd.expedice) : null;
+                if (expediceDate) {
+                  const exp = new Date(expediceDate);
+                  exp.setHours(0, 0, 0, 0);
+                  if (exp < today) return true;
+                }
+
+                const deadline = resolveDeadline({
+                  expedice: pd?.expedice ?? null,
+                  montaz: pd?.montaz ?? null,
+                  datum_smluvni: pd?.datum_smluvni ?? null,
+                });
+                if (!deadline) return false;
+                const dl = new Date(deadline.date);
+                dl.setHours(0, 0, 0, 0);
+                return dl < today;
+              })();
               return (
                 <div key={proj.projectId} style={{ marginLeft: 4, marginRight: 4 }}>
                   {/* Project header row */}
@@ -980,28 +1004,11 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                       className="shrink-0 flex items-center gap-2.5 px-3 sticky left-0 z-20"
                       style={{
                         width: LEFT_COL_W,
-                        backgroundColor: (() => {
-                          const pd = projectDateLookup.get(proj.projectId);
-                          if (!pd) return "#fff";
-                          const isProjectDone = ["Fakturace", "Dokonceno", "Dokončeno", "Expedice"].includes(pd?.status ?? "");
-                          const allItemsDone = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
-                          if (isProjectDone || allItemsDone) return "#fff";
-                          const deadline = resolveDeadline({
-                            expedice: pd?.expedice ?? null,
-                            montaz: pd?.montaz ?? null,
-                            datum_smluvni: pd?.datum_smluvni ?? null,
-                          });
-                          if (!deadline) return "#fff";
-                          const today = new Date();
-                          today.setHours(0, 0, 0, 0);
-                          const dl = new Date(deadline.date);
-                          dl.setHours(0, 0, 0, 0);
-                          return dl < today ? "#FEE2E2" : "#fff";
-                        })(),
-                        borderLeft: `4px solid ${proj.color}`,
-                        borderRight: "1px solid #e5e2dd",
-                        borderTop: "1px solid #e5e2dd",
-                        borderBottom: "1px solid #e5e2dd",
+                        backgroundColor: isOverdueProject ? "hsl(0 75% 93%)" : "#fff",
+                        borderLeft: `4px solid ${isOverdueProject ? "hsl(0 70% 50%)" : proj.color}`,
+                        borderRight: `1px solid ${isOverdueProject ? "hsl(0 60% 82%)" : "#e5e2dd"}`,
+                        borderTop: `1px solid ${isOverdueProject ? "hsl(0 60% 82%)" : "#e5e2dd"}`,
+                        borderBottom: `1px solid ${isOverdueProject ? "hsl(0 60% 82%)" : "#e5e2dd"}`,
                         borderRadius: "6px 0 0 6px",
                       }}
                     >
