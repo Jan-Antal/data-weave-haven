@@ -32,24 +32,24 @@ function formatCompactCzk(v: number): string {
 
 type UrgencyLevel = "overdue" | "urgent" | "upcoming" | "ok";
 
-function getUrgency(datumSmluvni: string | null | undefined, status: string | null | undefined): UrgencyLevel {
-  if (!datumSmluvni) return "ok";
-  const s = (status ?? "").toLowerCase();
+function getUrgency(info: { expedice?: string | null; montaz?: string | null; datum_smluvni?: string | null; status?: string | null } | undefined): UrgencyLevel {
+  if (!info) return "ok";
+  const s = (info.status ?? "").toLowerCase();
   if (s === "fakturace" || s === "dokonceno" || s === "dokončeno") return "ok";
-  const d = parseAppDate(datumSmluvni);
-  if (!d) return "ok";
-  if (isPast(d)) return "overdue";
-  const days = differenceInDays(d, new Date());
+  const dl = resolveDeadline(info);
+  if (!dl) return "ok";
+  if (isPast(dl.date)) return "overdue";
+  const days = differenceInDays(dl.date, new Date());
   if (days <= 14) return "urgent";
   if (days <= 30) return "upcoming";
   return "ok";
 }
 
-function getUrgencyDaysLabel(datumSmluvni: string | null | undefined): string | null {
-  if (!datumSmluvni) return null;
-  const d = parseAppDate(datumSmluvni);
-  if (!d) return null;
-  const days = differenceInDays(d, new Date());
+function getUrgencyDaysLabel(info: { expedice?: string | null; montaz?: string | null; datum_smluvni?: string | null } | undefined): string | null {
+  if (!info) return null;
+  const dl = resolveDeadline(info);
+  if (!dl) return null;
+  const days = differenceInDays(dl.date, new Date());
   if (days <= 0) return null; // overdue uses badge text
   return `${days} dní`;
 }
@@ -193,8 +193,8 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
 
   // Map project_id → project info including deadline fields
   const projectInfoMap = useMemo(() => {
-    const m = new Map<string, { datum_smluvni: string | null; status: string | null; expedice: string | null; montaz: string | null }>();
-    for (const p of allDbProjects) m.set(p.project_id, { datum_smluvni: p.datum_smluvni ?? null, status: p.status ?? null, expedice: (p as any).expedice ?? null, montaz: (p as any).montaz ?? null });
+    const m = new Map<string, { datum_smluvni: string | null; status: string | null; expedice: string | null; montaz: string | null; predani: string | null }>();
+    for (const p of allDbProjects) m.set(p.project_id, { datum_smluvni: p.datum_smluvni ?? null, status: p.status ?? null, expedice: (p as any).expedice ?? null, montaz: (p as any).montaz ?? null, predani: (p as any).predani ?? null });
     return m;
   }, [allDbProjects]);
 
@@ -203,11 +203,13 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     return [...projects].sort((a, b) => {
       const infoA = projectInfoMap.get(a.project_id);
       const infoB = projectInfoMap.get(b.project_id);
-      const uA = getUrgency(infoA?.datum_smluvni, infoA?.status);
-      const uB = getUrgency(infoB?.datum_smluvni, infoB?.status);
+      const uA = getUrgency(infoA);
+      const uB = getUrgency(infoB);
       if (URGENCY_ORDER[uA] !== URGENCY_ORDER[uB]) return URGENCY_ORDER[uA] - URGENCY_ORDER[uB];
-      const dA = infoA?.datum_smluvni ? parseAppDate(infoA.datum_smluvni)?.getTime() ?? Infinity : Infinity;
-      const dB = infoB?.datum_smluvni ? parseAppDate(infoB.datum_smluvni)?.getTime() ?? Infinity : Infinity;
+      const dlA = resolveDeadline(infoA || {});
+      const dlB = resolveDeadline(infoB || {});
+      const dA = dlA ? dlA.date.getTime() : Infinity;
+      const dB = dlB ? dlB.date.getTime() : Infinity;
       return dA - dB;
     });
   }, [projects, projectInfoMap]);
@@ -217,7 +219,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     let count = 0;
     for (const p of projects) {
       const info = projectInfoMap.get(p.project_id);
-      const u = getUrgency(info?.datum_smluvni, info?.status);
+      const u = getUrgency(info);
       if (u === "overdue" || u === "urgent") count += p.items.length;
     }
     return count;
@@ -586,7 +588,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
         )}
         {sortedProjects.map((project) => {
           const info = projectInfoMap.get(project.project_id);
-          const urgency = getUrgency(info?.datum_smluvni, info?.status);
+          const urgency = getUrgency(info);
           return (
             <InboxProjectGroup key={`${project.project_id}-${expandKey}`} project={project} hourlyRate={hourlyRate}
               defaultExpanded={allExpanded} displayMode={displayMode} progress={progressData?.get(project.project_id)}
@@ -595,7 +597,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
               onProjectContextMenu={handleProjectContextMenu}
               onItemContextMenu={handleItemContextMenu}
               urgency={urgency}
-              daysLabel={getUrgencyDaysLabel(info?.datum_smluvni)}
+              daysLabel={getUrgencyDaysLabel(info)}
               isSelected={selectedProjectId === project.project_id}
               onSelectProject={onSelectProject}
               projectInfo={info}
