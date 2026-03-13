@@ -1,8 +1,7 @@
 import { useMemo } from "react";
-import { Sparkles } from "lucide-react";
-import type { ForecastBlock } from "@/hooks/useForecastMode";
+import { Sparkles, Inbox } from "lucide-react";
+import type { ForecastBlock, ForecastSource } from "@/hooks/useForecastMode";
 import { getProjectColor } from "@/lib/projectColors";
-import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
 
 interface ForecastOverlayProps {
   blocks: ForecastBlock[];
@@ -11,14 +10,49 @@ interface ForecastOverlayProps {
   planMode: "respect_plan" | "from_scratch";
 }
 
-const CONFIDENCE_BORDER: Record<string, string> = {
-  high: "#f59e0b",
-  medium: "#f97316",
-  low: "#ef4444",
-};
+/** Source-based styling config */
+function getSourceStyle(source: ForecastSource, confidence: string) {
+  if (source === "inbox_item") {
+    return {
+      borderColor: "#22c55e",
+      backgroundColor: "#0f1f15",
+      nameColor: "#86efac",
+      badgeLabel: "INBOX",
+      badgeBg: "rgba(34,197,94,0.2)",
+      badgeColor: "#22c55e",
+      badgeIcon: "inbox" as const,
+      hoursColor: "#22c55e",
+      hoursPrefix: "",
+    };
+  }
+  if (source === "existing_plan") {
+    return {
+      borderColor: "#3b82f6",
+      backgroundColor: "#0f1520",
+      nameColor: "#93c5fd",
+      badgeLabel: "PLÁN",
+      badgeBg: "rgba(59,130,246,0.2)",
+      badgeColor: "#3b82f6",
+      badgeIcon: null,
+      hoursColor: "#3b82f6",
+      hoursPrefix: "",
+    };
+  }
+  // project_estimate (amber/AI)
+  return {
+    borderColor: confidence === "low" ? "#ef4444" : confidence === "medium" ? "#f97316" : "#f59e0b",
+    backgroundColor: "#1a1500",
+    nameColor: "#fcd34d",
+    badgeLabel: "AI",
+    badgeBg: "rgba(245,158,11,0.2)",
+    badgeColor: "#f59e0b",
+    badgeIcon: "sparkles" as const,
+    hoursColor: "#f59e0b",
+    hoursPrefix: "~",
+  };
+}
 
-export function ForecastOverlay({ blocks, selectedBlockIds, onToggleSelect, planMode }: ForecastOverlayProps) {
-  // Group blocks by week
+export function ForecastOverlay({ blocks, selectedBlockIds, onToggleSelect }: ForecastOverlayProps) {
   const blocksByWeek = useMemo(() => {
     const map = new Map<string, ForecastBlock[]>();
     for (const b of blocks) {
@@ -46,7 +80,6 @@ export function ForecastOverlay({ blocks, selectedBlockIds, onToggleSelect, plan
 }
 
 function ForecastWeekBlocks({
-  weekKey,
   blocks,
   selectedBlockIds,
   onToggleSelect,
@@ -79,39 +112,39 @@ function ForecastCard({
   isSelected: boolean;
   onToggleSelect: () => void;
 }) {
-  const borderColor = CONFIDENCE_BORDER[block.confidence] || "#f59e0b";
+  const style = getSourceStyle(block.source, block.confidence);
 
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
       className="rounded-lg px-2.5 py-2 cursor-pointer transition-all relative"
       style={{
-        backgroundColor: "#141a2a",
-        borderWidth: 2,
+        backgroundColor: style.backgroundColor,
+        borderWidth: 1.5,
         borderStyle: "dashed",
-        borderColor,
+        borderColor: style.borderColor,
         opacity: isSelected ? 1 : 0.6,
-        boxShadow: isSelected ? `0 0 0 1px ${borderColor}40` : undefined,
+        boxShadow: isSelected ? `0 0 0 1px ${style.borderColor}40` : undefined,
       }}
     >
-      {/* AI badge */}
-      {block.source === "ai_generated" && (
-        <div
-          className="absolute top-1.5 right-1.5 flex items-center gap-0.5 rounded px-1 py-0.5"
-          style={{ backgroundColor: "rgba(245,158,11,0.2)", fontSize: 9, color: "#f59e0b", fontWeight: 600 }}
-        >
-          <Sparkles className="h-2.5 w-2.5" />
-          AI
-        </div>
-      )}
+      {/* Badge top-right */}
+      <div
+        className="absolute top-1.5 right-1.5 flex items-center gap-0.5 rounded px-1 py-0.5"
+        style={{ backgroundColor: style.badgeBg, fontSize: 9, color: style.badgeColor, fontWeight: 600 }}
+      >
+        {style.badgeIcon === "sparkles" && <Sparkles className="h-2.5 w-2.5" />}
+        {style.badgeIcon === "inbox" && <Inbox className="h-2.5 w-2.5" />}
+        {style.badgeLabel}
+      </div>
 
-      {/* Checkbox */}
+      {/* Checkbox + content */}
       <div className="flex items-start gap-2">
         <input
           type="checkbox"
           checked={isSelected}
           onChange={onToggleSelect}
-          className="mt-0.5 accent-amber-500"
+          className="mt-0.5"
+          style={{ accentColor: style.borderColor }}
           onClick={(e) => e.stopPropagation()}
         />
         <div className="flex-1 min-w-0">
@@ -122,7 +155,7 @@ function ForecastCard({
             />
             <span
               className="text-[13px] font-semibold truncate"
-              style={{ color: "#f0c060" }}
+              style={{ color: style.nameColor }}
             >
               {block.project_name}
             </span>
@@ -133,9 +166,9 @@ function ForecastCard({
             </span>
             <span
               className="text-[13px] font-bold shrink-0 ml-2"
-              style={{ color: "#f59e0b" }}
+              style={{ color: style.hoursColor }}
             >
-              {block.estimated_hours}h
+              {style.hoursPrefix}{block.estimated_hours}h
             </span>
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
@@ -148,10 +181,12 @@ function ForecastCard({
             <span
               className="text-[9px] px-1 rounded"
               style={{
-                backgroundColor: block.confidence === "high" ? "rgba(245,158,11,0.15)"
+                backgroundColor: block.confidence === "high" ? "rgba(34,197,94,0.15)"
                   : block.confidence === "medium" ? "rgba(249,115,22,0.15)"
                   : "rgba(239,68,68,0.15)",
-                color: CONFIDENCE_BORDER[block.confidence],
+                color: block.confidence === "high" ? "#22c55e"
+                  : block.confidence === "medium" ? "#f97316"
+                  : "#ef4444",
               }}
             >
               {block.confidence === "high" ? "vysoká" : block.confidence === "medium" ? "střední" : "nízká"}

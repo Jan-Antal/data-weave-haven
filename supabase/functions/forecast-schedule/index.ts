@@ -18,7 +18,6 @@ serve(async (req) => {
     const sb = createClient(supabaseUrl, supabaseKey);
 
     const { mode, weeklyCapacityHours } = await req.json();
-    // mode: "respect_plan" | "from_scratch"
 
     // 1. Fetch active projects with milestone dates
     const { data: projects } = await sb
@@ -72,52 +71,87 @@ serve(async (req) => {
       }
     }
 
-    // Build project summaries
+    // Build project summaries with source categorization
     const projectSummaries = (projects || []).map(p => {
       const deadline = p.expedice || p.montaz || p.predani || p.datum_smluvni || "none";
       const tpv = (tpvItems || []).filter(t => t.project_id === p.project_id);
       const totalTpvHours = tpv.reduce((s, t) => s + (t.pocet || 0), 0);
+      const totalTpvCost = tpv.reduce((s, t) => s + (t.cena || 0), 0);
       const scheduled = (scheduleItems || []).filter(s => s.project_id === p.project_id && s.status !== "cancelled");
       const scheduledHours = scheduled.reduce((s, i) => s + i.scheduled_hours, 0);
       const inbox = (inboxItems || []).filter(i => i.project_id === p.project_id);
       const inboxHours = inbox.reduce((s, i) => s + i.estimated_hours, 0);
+
+      // Estimate hours if TPV incomplete: use project price / 500
+      const estimatedProjectHours = totalTpvHours > 0 
+        ? totalTpvHours 
+        : (p.prodejni_cena ? Math.round(p.prodejni_cena / 500) : 0);
+
+      const hasScheduledBundles = scheduled.length > 0;
+      const hasInboxItems = inbox.length > 0;
+      const hasNoPlanAtAll = !hasScheduledBundles && !hasInboxItems;
+
       return {
         id: p.project_id,
         name: p.project_name,
         deadline,
         status: p.status,
         totalTpvHours,
+        totalTpvCost,
+        estimatedProjectHours,
         scheduledHours,
         inboxHours,
-        unplannedHours: Math.max(0, inboxHours),
         price: p.prodejni_cena,
         inboxItemCount: inbox.length,
         scheduledItemCount: scheduled.length,
+        hasScheduledBundles,
+        hasInboxItems,
+        hasNoPlanAtAll,
+        // Tell AI which source type to use
+        inboxItemNames: inbox.map(i => ({ name: i.item_name, hours: i.estimated_hours, id: i.id })),
       };
-    }).filter(p => mode === "from_scratch" || p.unplannedHours > 0 || p.inboxItemCount > 0);
+    });
+
+    // Filter based on mode
+    const relevantProjects = projectSummaries.filter(p => {
+      if (mode === "from_scratch") return true;
+      // respect_plan: include projects with inbox items OR projects with no plan at all
+      return p.hasInboxItems || p.hasNoPlanAtAll;
+    });
 
     const systemPrompt = `You are a production scheduling AI for a furniture manufacturing company.
 You must return ONLY a valid JSON array of forecast blocks. No markdown, no explanation.
 
+CRITICAL: There are THREE types of forecast blocks based on source:
+1. "inbox_item" — items currently in the production inbox that need scheduling into weeks
+2. "project_estimate" — projects that have deadlines but NO plan bundles yet; estimate production time based on deadline and estimated hours
+3. "existing_plan" — ONLY used in "from_scratch" mode to represent where existing planned items would be rescheduled
+
 Rules:
-- Each block: { "project_id": string, "project_name": string, "bundle_description": string, "week": string (week key like "2026-03-16"), "estimated_hours": number, "confidence": "high"|"medium"|"low" }
+- Each block: { "project_id": string, "project_name": string, "bundle_description": string, "week": string (YYYY-MM-DD format), "estimated_hours": number, "confidence": "high"|"medium"|"low", "source": "inbox_item"|"project_estimate"|"existing_plan" }
 - Respect weekly capacity of ${weeklyCapacityHours} hours per week
 - Available weeks: ${JSON.stringify(weekKeys)}
-- Schedule projects with earlier deadlines first
+- Schedule projects with earlier deadlines first, working backwards from deadline
 - Split large projects across multiple weeks if needed
-- Each bundle_description should be descriptive (e.g. "Výroba — etapa 1")
+- For inbox_item: use the actual item names and hours from inbox
+- For project_estimate: create descriptive bundles like "Výroba — etapa 1", use "~" prefix on description to indicate estimate
+- Confidence: "high" for inbox items with exact hours, "medium" for projects with TPV data, "low" for projects estimated from price
 ${mode === "respect_plan" 
   ? `- Existing schedule usage per week: ${JSON.stringify(weekUsage)}
-- Only schedule UNPLANNED items (inbox items). Do NOT reschedule existing planned items.
-- Available capacity per week = ${weeklyCapacityHours} - existing_usage`
-  : `- Ignore existing schedule positions. Reschedule ALL items optimally from scratch.
-- Total hours to schedule include both existing scheduled hours and inbox hours.`
+- Only schedule UNPLANNED items (inbox + no-plan projects). Do NOT reschedule existing planned items.
+- Available capacity per week = ${weeklyCapacityHours} - existing_usage
+- Use source "inbox_item" for inbox items, "project_estimate" for projects with no plan`
+  : `- Ignore existing schedule. Reschedule ALL items optimally.
+- Existing planned items become source "existing_plan"
+- Inbox items become source "inbox_item"  
+- Projects with no bundles become source "project_estimate"
+- Total hours include existing + inbox + estimate hours`
 }
 - Return an empty array [] if there's nothing to schedule.`;
 
     const userPrompt = `Schedule the following projects into production weeks:
 
-${JSON.stringify(projectSummaries, null, 2)}
+${JSON.stringify(relevantProjects, null, 2)}
 
 Return ONLY a JSON array of forecast blocks.`;
 
@@ -159,7 +193,6 @@ Return ONLY a JSON array of forecast blocks.`;
     const aiData = await aiResponse.json();
     const content = aiData.choices?.[0]?.message?.content || "[]";
     
-    // Extract JSON from response (handle markdown code blocks)
     let jsonStr = content.trim();
     if (jsonStr.startsWith("```")) {
       jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
@@ -173,7 +206,7 @@ Return ONLY a JSON array of forecast blocks.`;
       blocks = [];
     }
 
-    // Validate and enrich blocks
+    const validSources = ["inbox_item", "project_estimate", "existing_plan"];
     const validBlocks = (Array.isArray(blocks) ? blocks : []).map((b: any, i: number) => ({
       id: `forecast-${Date.now()}-${i}`,
       project_id: b.project_id || "",
@@ -182,7 +215,7 @@ Return ONLY a JSON array of forecast blocks.`;
       week: b.week || weekKeys[0],
       estimated_hours: Number(b.estimated_hours) || 0,
       confidence: ["high", "medium", "low"].includes(b.confidence) ? b.confidence : "medium",
-      source: "ai_generated" as const,
+      source: validSources.includes(b.source) ? b.source : "project_estimate",
       is_forecast: true,
     }));
 

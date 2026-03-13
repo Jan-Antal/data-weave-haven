@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 export type ForecastConfidence = "high" | "medium" | "low";
-export type ForecastSource = "existing_plan" | "ai_generated";
+export type ForecastSource = "existing_plan" | "inbox_item" | "project_estimate";
 export type ForecastPlanMode = "respect_plan" | "from_scratch";
 
 export interface ForecastBlock {
@@ -33,6 +33,7 @@ interface UseForecastModeReturn {
   generateForecast: (weeklyCapacityHours: number) => Promise<void>;
   clearForecast: () => void;
   commitBlocks: (blockIds?: string[]) => Promise<void>;
+  commitInboxOnly: () => Promise<void>;
 }
 
 export function useForecastMode(): UseForecastModeReturn {
@@ -45,7 +46,6 @@ export function useForecastMode(): UseForecastModeReturn {
   const setForecastActive = useCallback((v: boolean) => {
     setForecastActiveRaw(v);
     if (!v) {
-      // Clear everything on deactivation
       setForecastBlocks([]);
       setSelectedBlockIds(new Set());
     }
@@ -93,7 +93,9 @@ export function useForecastMode(): UseForecastModeReturn {
       if (blocks.length === 0) {
         toast({ title: "Forecast", description: "Žádné položky k naplánování." });
       } else {
-        toast({ title: "Forecast vygenerován", description: `${blocks.length} bloků naplánováno.` });
+        const inboxCount = blocks.filter(b => b.source === "inbox_item").length;
+        const projectCount = blocks.filter(b => b.source === "project_estimate").length;
+        toast({ title: "Forecast vygenerován", description: `${inboxCount} inbox + ${projectCount} projekt bloků naplánováno.` });
       }
     } catch (err: any) {
       console.error("Forecast error:", err);
@@ -108,14 +110,16 @@ export function useForecastMode(): UseForecastModeReturn {
       ? forecastBlocks.filter(b => blockIds.includes(b.id))
       : forecastBlocks.filter(b => selectedBlockIds.has(b.id));
 
-    if (toCommit.length === 0) {
+    // Only commit inbox_item and project_estimate blocks
+    const committable = toCommit.filter(b => b.source === "inbox_item" || b.source === "project_estimate");
+
+    if (committable.length === 0) {
       toast({ title: "Žádné bloky k potvrzení" });
       return;
     }
 
     try {
-      // Insert each forecast block as a production_inbox item
-      for (const block of toCommit) {
+      for (const block of committable) {
         const { error } = await supabase.from("production_inbox").insert({
           project_id: block.project_id,
           item_name: block.bundle_description,
@@ -127,19 +131,27 @@ export function useForecastMode(): UseForecastModeReturn {
         if (error) throw error;
       }
 
-      toast({ title: `✅ ${toCommit.length} bloků přidáno do Inboxu` });
+      toast({ title: `✅ ${committable.length} bloků přidáno do Inboxu` });
       
-      // Remove committed blocks
-      setForecastBlocks(prev => prev.filter(b => !toCommit.find(c => c.id === b.id)));
+      setForecastBlocks(prev => prev.filter(b => !committable.find(c => c.id === b.id)));
       setSelectedBlockIds(prev => {
         const next = new Set(prev);
-        toCommit.forEach(b => next.delete(b.id));
+        committable.forEach(b => next.delete(b.id));
         return next;
       });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
   }, [forecastBlocks, selectedBlockIds]);
+
+  const commitInboxOnly = useCallback(async () => {
+    const inboxBlocks = forecastBlocks.filter(b => b.source === "inbox_item" && selectedBlockIds.has(b.id));
+    if (inboxBlocks.length === 0) {
+      toast({ title: "Žádné inbox bloky k potvrzení" });
+      return;
+    }
+    await commitBlocks(inboxBlocks.map(b => b.id));
+  }, [forecastBlocks, selectedBlockIds, commitBlocks]);
 
   return {
     forecastActive,
@@ -155,5 +167,6 @@ export function useForecastMode(): UseForecastModeReturn {
     generateForecast,
     clearForecast,
     commitBlocks,
+    commitInboxOnly,
   };
 }
