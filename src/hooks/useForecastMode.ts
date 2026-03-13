@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -30,7 +30,7 @@ interface UseForecastModeReturn {
   toggleBlockSelection: (id: string) => void;
   selectAll: () => void;
   deselectAll: () => void;
-  generateForecast: (weeklyCapacityHours: number) => Promise<void>;
+  generateForecast: (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => Promise<void>;
   clearForecast: () => void;
   commitBlocks: (blockIds?: string[]) => Promise<void>;
   commitInboxOnly: () => Promise<void>;
@@ -42,19 +42,26 @@ export function useForecastMode(): UseForecastModeReturn {
   const [forecastBlocks, setForecastBlocks] = useState<ForecastBlock[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
+  const generationTokenRef = useRef(0);
+
+  const resetForecastState = useCallback(() => {
+    setForecastBlocks([]);
+    setSelectedBlockIds(new Set());
+    setIsGenerating(false);
+  }, []);
 
   const setForecastActive = useCallback((v: boolean) => {
     setForecastActiveRaw(v);
     if (!v) {
-      setForecastBlocks([]);
-      setSelectedBlockIds(new Set());
+      generationTokenRef.current += 1;
+      resetForecastState();
     }
-  }, []);
+  }, [resetForecastState]);
 
   const clearForecast = useCallback(() => {
-    setForecastBlocks([]);
-    setSelectedBlockIds(new Set());
-  }, []);
+    generationTokenRef.current += 1;
+    resetForecastState();
+  }, [resetForecastState]);
 
   const toggleBlockSelection = useCallback((id: string) => {
     setSelectedBlockIds(prev => {
@@ -73,12 +80,17 @@ export function useForecastMode(): UseForecastModeReturn {
     setSelectedBlockIds(new Set());
   }, []);
 
-  const generateForecast = useCallback(async (weeklyCapacityHours: number) => {
+  const generateForecast = useCallback(async (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => {
+    const generationToken = ++generationTokenRef.current;
     setIsGenerating(true);
+
     try {
+      const mode = modeOverride ?? planMode;
       const { data, error } = await supabase.functions.invoke("forecast-schedule", {
-        body: { mode: planMode, weeklyCapacityHours },
+        body: { mode, weeklyCapacityHours },
       });
+
+      if (generationToken !== generationTokenRef.current) return;
 
       if (error) throw error;
       if (data?.error) {
@@ -86,7 +98,8 @@ export function useForecastMode(): UseForecastModeReturn {
         return;
       }
 
-      const blocks: ForecastBlock[] = data?.blocks || [];
+      const rawBlocks: ForecastBlock[] = Array.isArray(data?.blocks) ? data.blocks : [];
+      const blocks = rawBlocks.map(block => ({ ...block }));
       setForecastBlocks(blocks);
       setSelectedBlockIds(new Set(blocks.map(b => b.id)));
 
@@ -98,10 +111,13 @@ export function useForecastMode(): UseForecastModeReturn {
         toast({ title: "Forecast vygenerován", description: `${inboxCount} inbox + ${projectCount} projekt bloků naplánováno.` });
       }
     } catch (err: any) {
+      if (generationToken !== generationTokenRef.current) return;
       console.error("Forecast error:", err);
       toast({ title: "Chyba forecastu", description: err.message || "Neznámá chyba", variant: "destructive" });
     } finally {
-      setIsGenerating(false);
+      if (generationToken === generationTokenRef.current) {
+        setIsGenerating(false);
+      }
     }
   }, [planMode]);
 
@@ -110,7 +126,6 @@ export function useForecastMode(): UseForecastModeReturn {
       ? forecastBlocks.filter(b => blockIds.includes(b.id))
       : forecastBlocks.filter(b => selectedBlockIds.has(b.id));
 
-    // Only commit inbox_item and project_estimate blocks (never existing_plan)
     const committable = toCommit.filter(b => b.source === "inbox_item" || b.source === "project_estimate");
 
     if (committable.length === 0) {
@@ -124,7 +139,6 @@ export function useForecastMode(): UseForecastModeReturn {
       const hourlyRate = 550;
 
       for (const block of committable) {
-        // Create actual production_schedule entries in the target week
         const { error } = await supabase.from("production_schedule").insert({
           project_id: block.project_id,
           item_name: block.bundle_description,
@@ -138,19 +152,14 @@ export function useForecastMode(): UseForecastModeReturn {
         if (error) throw error;
       }
 
+      generationTokenRef.current += 1;
+      setForecastActiveRaw(false);
+      resetForecastState();
       toast({ title: `✅ ${committable.length} bloků naplánováno` });
-      
-      // Remove committed blocks from forecast state
-      setForecastBlocks(prev => prev.filter(b => !committable.find(c => c.id === b.id)));
-      setSelectedBlockIds(prev => {
-        const next = new Set(prev);
-        committable.forEach(b => next.delete(b.id));
-        return next;
-      });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
-  }, [forecastBlocks, selectedBlockIds]);
+  }, [forecastBlocks, selectedBlockIds, resetForecastState]);
 
   const commitInboxOnly = useCallback(async () => {
     const inboxBlocks = forecastBlocks.filter(b => b.source === "inbox_item" && selectedBlockIds.has(b.id));

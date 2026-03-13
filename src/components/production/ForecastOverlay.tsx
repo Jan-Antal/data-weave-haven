@@ -198,28 +198,21 @@ function ForecastCard({
   );
 }
 
-/** Standalone component to render forecast blocks within a specific week silo */
+/** Standalone component to render already-filtered forecast blocks for one week silo */
 export function ForecastWeekContent({
-  weekKey,
   blocks,
   selectedBlockIds,
   onToggleSelect,
 }: {
-  weekKey: string;
   blocks: ForecastBlock[];
   selectedBlockIds: Set<string>;
   onToggleSelect: (id: string) => void;
 }) {
-  const weekBlocks = useMemo(
-    () => blocks.filter(b => b.week === weekKey),
-    [blocks, weekKey]
-  );
-
-  if (weekBlocks.length === 0) return null;
+  if (blocks.length === 0) return null;
 
   return (
     <div className="space-y-1.5 mt-1">
-      {weekBlocks.map(block => (
+      {blocks.map(block => (
         <ForecastCard
           key={block.id}
           block={block}
