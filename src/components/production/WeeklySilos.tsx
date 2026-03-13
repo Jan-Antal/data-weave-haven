@@ -98,6 +98,10 @@ interface Props {
   forecastSafetyNet?: SafetyNetProject[];
   onRestoreFromSafetyNet?: (projectId: string) => void;
   onConvertReserveToForecast?: (bundle: ScheduleBundle, weekKey: string) => void;
+  /** Currently focused search match key (weekKey::projectId) for scroll + ring highlight */
+  focusedMatchKey?: string | null;
+  /** Week key of the current search match — triggers scroll */
+  searchMatchWeekKey?: string | null;
 }
 
 interface ContextMenuState {
