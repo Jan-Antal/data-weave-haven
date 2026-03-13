@@ -96,6 +96,7 @@ interface Props {
   onRemoveForecastBlock?: (blockId: string) => void;
   onSplitForecastBlock?: (blockId: string, keepHours: number, splitWeek: string) => void;
   forecastSafetyNet?: SafetyNetProject[];
+  onRestoreFromSafetyNet?: (projectId: string) => void;
 }
 
 interface ContextMenuState {
@@ -160,7 +161,7 @@ interface CancelState {
   cancelAll?: boolean;
 }
 
-export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock, onSplitForecastBlock, forecastSafetyNet }: Props) {
+export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock, onSplitForecastBlock, forecastSafetyNet, onRestoreFromSafetyNet }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
@@ -715,7 +716,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       {/* Safety net panel */}
       {forecastDarkMode && forecastSafetyNet && forecastSafetyNet.length > 0 && (
         <div className="px-2 pt-2">
-          <ForecastSafetyNet projects={forecastSafetyNet} />
+          <ForecastSafetyNet projects={forecastSafetyNet} onRestoreToForecast={onRestoreFromSafetyNet} />
         </div>
       )}
 

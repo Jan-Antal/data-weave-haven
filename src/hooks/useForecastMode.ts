@@ -96,6 +96,7 @@ interface UseForecastModeReturn {
   /** Commit real bundle overrides to Supabase via moveBundleToWeek */
   commitRealBundleOverrides: (moveBundleToWeek: (projectId: string, sourceWeek: string, targetWeek: string) => Promise<void>) => Promise<void>;
   safetyNetProjects: SafetyNetProject[];
+  restoreFromSafetyNet: (projectId: string) => void;
 }
 
 export function useForecastMode(): UseForecastModeReturn {
@@ -221,7 +222,24 @@ export function useForecastMode(): UseForecastModeReturn {
   }, []);
 
   const removeForecastBlock = useCallback((blockId: string) => {
-    setForecastBlocks(prev => prev.filter(b => b.id !== blockId));
+    setForecastBlocks(prev => {
+      const block = prev.find(b => b.id === blockId);
+      if (block && block.source === "project_estimate") {
+        // Move to safety net instead of deleting
+        setSafetyNetProjects(sn => {
+          // Avoid duplicates
+          if (sn.some(p => p.project_id === block.project_id)) return sn;
+          return [...sn, {
+            project_id: block.project_id,
+            project_name: block.project_name,
+            estimated_hours: block.estimated_hours,
+            source: "unplanned" as const,
+          }];
+        });
+        toast({ title: `🛡 ${block.project_name} přesunuto do Záchranné sítě` });
+      }
+      return prev.filter(b => b.id !== blockId);
+    });
     setSelectedBlockIds(prev => {
       const next = new Set(prev);
       next.delete(blockId);
@@ -349,6 +367,32 @@ export function useForecastMode(): UseForecastModeReturn {
     await commitBlocks(inboxBlocks.map(b => b.id));
   }, [forecastBlocks, selectedBlockIds, commitBlocks]);
 
+  const restoreFromSafetyNet = useCallback((projectId: string) => {
+    setSafetyNetProjects(prev => {
+      const project = prev.find(p => p.project_id === projectId);
+      if (!project) return prev;
+      // Find the next available week (latest week in forecastBlocks + 1, or current week)
+      const existingWeeks = forecastBlocks.map(b => b.week).sort();
+      const targetWeek = existingWeeks.length > 0 ? existingWeeks[existingWeeks.length - 1] : new Date().toISOString().split("T")[0];
+      const newBlock: ForecastBlock = {
+        id: crypto.randomUUID(),
+        project_id: project.project_id,
+        project_name: project.project_name,
+        bundle_description: `${project.project_name} — Rezerva kapacity`,
+        week: targetWeek,
+        estimated_hours: project.estimated_hours,
+        confidence: "low",
+        source: "project_estimate",
+        is_forecast: true,
+        selected: true,
+      };
+      setForecastBlocks(fb => [...fb, newBlock]);
+      setSelectedBlockIds(sel => new Set(sel).add(newBlock.id));
+      toast({ title: `🔄 ${project.project_name} vráceno do forecastu` });
+      return prev.filter(p => p.project_id !== projectId);
+    });
+  }, [forecastBlocks]);
+
   return {
     forecastActive,
     setForecastActive,
@@ -373,5 +417,6 @@ export function useForecastMode(): UseForecastModeReturn {
     addRealBundleOverride,
     commitRealBundleOverrides,
     safetyNetProjects,
+    restoreFromSafetyNet,
   };
 }
