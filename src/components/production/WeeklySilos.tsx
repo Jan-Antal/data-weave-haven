@@ -1022,6 +1022,27 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             forecastDarkMode={forecastDarkMode} />
         ))}
 
+        {/* Rezerva kapacit section — blocker bundles separated */}
+        {blockerBundles.length > 0 && (
+          <>
+            <div className="flex items-center gap-1.5 my-1">
+              <div className="flex-1" style={{ borderTop: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #e2ddd6" }} />
+              <span className="text-[9px] font-semibold tracking-wider shrink-0" style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }}>REZERVA KAPACIT</span>
+              <div className="flex-1" style={{ borderTop: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #e2ddd6" }} />
+            </div>
+            {blockerBundles.map(bundle => (
+              <CollapsibleBundleCard key={`blocker-${bundle.project_id}`} bundle={bundle} weekKey={weekKey}
+                showCzk={showCzk} hourlyRate={hourlyRate} weeklyCapacity={weeklyCapacity} displayMode={displayMode}
+                onBundleContextMenu={onBundleContextMenu}
+                onItemContextMenu={onItemContextMenu}
+                projectLookup={projectLookup}
+                isSelected={selectedProjectId === bundle.project_id}
+                onSelectProject={onSelectProject} searchQuery={searchQuery}
+                forecastDarkMode={forecastDarkMode} />
+            ))}
+          </>
+        )}
+
         {/* Forecast divider + blocks — visually separated from real bundles */}
         {forecastDarkMode && forecastSelectedIds && onToggleForecastSelect && weekForecastBlocks.length > 0 && (
           <>
