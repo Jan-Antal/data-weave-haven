@@ -445,6 +445,7 @@ export type Database = {
           expediced_at: string | null
           id: string
           inbox_item_id: string | null
+          is_blocker: boolean
           item_code: string | null
           item_name: string
           pause_expected_date: string | null
@@ -459,6 +460,7 @@ export type Database = {
           split_total: number | null
           stage_id: string | null
           status: string
+          tpv_expected_date: string | null
         }
         Insert: {
           adhoc_reason?: string | null
@@ -470,6 +472,7 @@ export type Database = {
           expediced_at?: string | null
           id?: string
           inbox_item_id?: string | null
+          is_blocker?: boolean
           item_code?: string | null
           item_name: string
           pause_expected_date?: string | null
@@ -484,6 +487,7 @@ export type Database = {
           split_total?: number | null
           stage_id?: string | null
           status?: string
+          tpv_expected_date?: string | null
         }
         Update: {
           adhoc_reason?: string | null
@@ -495,6 +499,7 @@ export type Database = {
           expediced_at?: string | null
           id?: string
           inbox_item_id?: string | null
+          is_blocker?: boolean
           item_code?: string | null
           item_name?: string
           pause_expected_date?: string | null
@@ -509,6 +514,7 @@ export type Database = {
           split_total?: number | null
           stage_id?: string | null
           status?: string
+          tpv_expected_date?: string | null
         }
         Relationships: [
           {
