@@ -109,7 +109,7 @@ function ExpandArrow({ isExpanded, stageCount }: { isExpanded: boolean; stageCou
   if (isExpanded) {
     return <ChevronDown className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent" : "text-muted-foreground"}`} />;
   }
-  return <ChevronRight className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent fill-accent/20" : "text-muted-foreground/50"}`} />;
+  return <ChevronRight className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent" : "text-muted-foreground/50"}`} />;
 }
 
 // ── Stage row ───────────────────────────────────────────────────────
