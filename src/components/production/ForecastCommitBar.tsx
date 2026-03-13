@@ -65,25 +65,24 @@ export function ForecastCommitBar({
             </>
           )}
         </span>
-        {totalBlocks > 0 && (
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={onSelectAll}
-              style={selBtnStyle}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = "rgba(122,168,164,0.1)")}
-              onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
-            >
-              ☐ Vše
-            </button>
-            <button
-              onClick={onSelectInboxOnly}
-              style={selBtnStyle}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = "rgba(122,168,164,0.1)")}
-              onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
-            >
-              📥 Inbox
-            </button>
-          </div>
+        {totalBlocks > 0 && inboxBlockCount > 0 && (
+          <button
+            onClick={onToggleInboxSelect}
+            style={{
+              ...selBtnStyle,
+              backgroundColor: allInboxSelected ? "rgba(34,197,94,0.15)" : "transparent",
+              borderColor: allInboxSelected ? "#22c55e" : "#2a4a46",
+              color: allInboxSelected ? "#22c55e" : "#7aa8a4",
+            }}
+            onMouseEnter={e => {
+              if (!allInboxSelected) e.currentTarget.style.backgroundColor = "rgba(122,168,164,0.1)";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.backgroundColor = allInboxSelected ? "rgba(34,197,94,0.15)" : "transparent";
+            }}
+          >
+            {allInboxSelected ? "✓" : "☐"} Inbox ({inboxBlockCount})
+          </button>
         )}
       </div>
 
