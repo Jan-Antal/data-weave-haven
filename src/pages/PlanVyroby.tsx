@@ -466,7 +466,10 @@ export default function PlanVyroby() {
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="h-screen flex flex-col overflow-hidden" style={{ backgroundColor: "#f4f2f0" }}>
+      <div
+        className="h-screen flex flex-col overflow-hidden transition-colors duration-300"
+        style={{ backgroundColor: forecast.forecastActive ? "#0f1117" : "#f4f2f0" }}
+      >
         {profile?.email === "alfred@ami-test.cz" && (
           <div className="bg-orange-500 text-white px-6 flex items-center justify-center gap-2 font-bold tracking-wide shrink-0" style={{ height: 32 }}>
             <span>⚠ TEST MODE — Testovací prostředí — data nejsou produkční</span>
@@ -474,7 +477,7 @@ export default function PlanVyroby() {
         )}
         <ProductionHeader />
 
-        {/* Row 2: Tabs + Search + Display mode + Stats + Period */}
+        {/* Row 2: Tabs + Search + Display mode + Stats + Period + Forecast toggle */}
         <ToolbarRow2
           viewTab={viewTab}
           setViewTab={setViewTab}
@@ -482,16 +485,61 @@ export default function PlanVyroby() {
           onDisplayModeChange={setDisplayMode}
           searchQuery={searchInput}
           onSearchChange={handleSearchChange}
+          forecastActive={forecast.forecastActive}
+          onForecastToggle={(v) => {
+            forecast.setForecastActive(v);
+            if (v) {
+              forecast.generateForecast(weeklyCapacity);
+            }
+          }}
+          forecastPlanMode={forecast.planMode}
+          onForecastPlanModeChange={(m) => {
+            forecast.setPlanMode(m);
+            // Re-generate with new mode
+            forecast.clearForecast();
+            setTimeout(() => forecast.generateForecast(weeklyCapacity), 100);
+          }}
+          isOwner={isOwner}
+          isGenerating={forecast.isGenerating}
         />
 
         {viewTab === "kanban" ? (
           <div className="flex-1 flex min-h-0" onClick={() => setSelectedProjectId(null)}>
             <InboxPanel overDroppableId={overDroppableId} showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} disableDropZone={isDraggingFromInbox} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />
-            <WeeklySilos showCzk={showCzk} onToggleCzk={(v) => setDisplayMode(v ? "czk" : "hours")} overDroppableId={overDroppableId} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} displayMode={displayMode} onDisplayModeChange={setDisplayMode} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />
+            <WeeklySilos
+              showCzk={showCzk}
+              onToggleCzk={(v) => setDisplayMode(v ? "czk" : "hours")}
+              overDroppableId={overDroppableId}
+              onNavigateToTPV={handleNavigateToTPV}
+              onOpenProjectDetail={handleOpenProjectDetail}
+              displayMode={displayMode}
+              onDisplayModeChange={setDisplayMode}
+              selectedProjectId={selectedProjectId}
+              onSelectProject={handleSelectProject}
+              searchQuery={searchQuery}
+              forecastBlocks={forecast.forecastActive ? forecast.forecastBlocks : undefined}
+              forecastSelectedIds={forecast.forecastActive ? forecast.selectedBlockIds : undefined}
+              onToggleForecastSelect={forecast.forecastActive ? forecast.toggleBlockSelection : undefined}
+              forecastDarkMode={forecast.forecastActive}
+            />
             <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />
           </div>
         ) : (
           <PlanVyrobyTableView displayMode={displayMode} searchQuery={searchQuery} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} />
+        )}
+
+        {/* Forecast commit bar */}
+        {forecast.forecastActive && (
+          <ForecastCommitBar
+            totalBlocks={forecast.forecastBlocks.length}
+            selectedCount={forecast.selectedBlockIds.size}
+            isGenerating={forecast.isGenerating}
+            onCommitAll={() => forecast.commitBlocks(forecast.forecastBlocks.map(b => b.id))}
+            onCommitSelected={() => forecast.commitBlocks(Array.from(forecast.selectedBlockIds))}
+            onCancel={() => forecast.setForecastActive(false)}
+            onSelectAll={forecast.selectAll}
+            onDeselectAll={forecast.deselectAll}
+          />
         )}
       </div>
 
