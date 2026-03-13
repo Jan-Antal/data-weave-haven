@@ -345,6 +345,7 @@ export function useForecastMode(): UseForecastModeReturn {
     commitInboxOnly,
     moveForecastBlock,
     removeForecastBlock,
+    splitForecastBlock,
     resetAndRegenerate,
     loadSavedSession,
     realBundleOverrides,
