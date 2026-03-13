@@ -907,15 +907,6 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
         </button>
       </div>
 
-      {forecastActive && (
-        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(245,158,11,0.15)" }}>
-          <Sparkles className="h-3 w-3" style={{ color: "#f59e0b" }} />
-          <span className="text-[11px] font-bold" style={{ color: "#f59e0b" }}>
-            FORECAST MODE{forecastBlockCounts ? ` · ${forecastBlockCounts.real} real · ${forecastBlockCounts.inbox} inbox · ${forecastBlockCounts.ai} AI` : ""}
-          </span>
-          {isGenerating && <Loader2 className="h-3 w-3 animate-spin" style={{ color: "#f59e0b" }} />}
-        </div>
-      )}
 
       {/* Forecast plan mode toggle + Reset */}
       {forecastActive && (
