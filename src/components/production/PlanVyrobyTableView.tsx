@@ -479,6 +479,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     });
   }, [projectRows, searchQuery]);
 
+  const regularRows = useMemo(() => filteredRows.filter(r => !r.isBlockerOnly), [filteredRows]);
+  const blockerRows = useMemo(() => filteredRows.filter(r => r.isBlockerOnly), [filteredRows]);
+
   const totalProjects = filteredRows.length;
   const totalItems = filteredRows.reduce((s, p) => s + p.items.length, 0);
 
