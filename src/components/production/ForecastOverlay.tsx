@@ -26,7 +26,7 @@ function getSourceStyle(source: ForecastSource, _confidence: string) {
       badgeColor: "#86efac",
       badgeIcon: "inbox" as const,
       hoursColor: "#4ade80",
-      hoursPrefix: "",
+      hoursPrefix: ""
     };
   }
   if (source === "existing_plan") {
@@ -41,7 +41,7 @@ function getSourceStyle(source: ForecastSource, _confidence: string) {
       badgeColor: "transparent",
       badgeIcon: null,
       hoursColor: "#8899bb",
-      hoursPrefix: "",
+      hoursPrefix: ""
     };
   }
   // project_estimate (amber/AI) — Type 3
@@ -56,7 +56,7 @@ function getSourceStyle(source: ForecastSource, _confidence: string) {
     badgeColor: "#fcd34d",
     badgeIcon: "sparkles" as const,
     hoursColor: "#fbbf24",
-    hoursPrefix: "~",
+    hoursPrefix: "~"
   };
 }
 
@@ -74,41 +74,41 @@ export function ForecastOverlay({ blocks, selectedBlockIds, onToggleSelect }: Fo
 
   return (
     <>
-      {Array.from(blocksByWeek.entries()).map(([weekKey, weekBlocks]) => (
-        <ForecastWeekBlocks
-          key={weekKey}
-          weekKey={weekKey}
-          blocks={weekBlocks}
-          selectedBlockIds={selectedBlockIds}
-          onToggleSelect={onToggleSelect}
-        />
-      ))}
-    </>
-  );
+      {Array.from(blocksByWeek.entries()).map(([weekKey, weekBlocks]) =>
+      <ForecastWeekBlocks
+        key={weekKey}
+        weekKey={weekKey}
+        blocks={weekBlocks}
+        selectedBlockIds={selectedBlockIds}
+        onToggleSelect={onToggleSelect} />
+
+      )}
+    </>);
+
 }
 
 function ForecastWeekBlocks({
   blocks,
   selectedBlockIds,
-  onToggleSelect,
-}: {
-  weekKey: string;
-  blocks: ForecastBlock[];
-  selectedBlockIds: Set<string>;
-  onToggleSelect: (id: string) => void;
-}) {
+  onToggleSelect
+
+
+
+
+
+}: {weekKey: string;blocks: ForecastBlock[];selectedBlockIds: Set<string>;onToggleSelect: (id: string) => void;}) {
   return (
     <div className="space-y-1.5 mt-2">
-      {blocks.map(block => (
-        <ForecastCard
-          key={block.id}
-          block={block}
-          isSelected={selectedBlockIds.has(block.id)}
-          onToggleSelect={() => onToggleSelect(block.id)}
-        />
-      ))}
-    </div>
-  );
+      {blocks.map((block) =>
+      <ForecastCard
+        key={block.id}
+        block={block}
+        isSelected={selectedBlockIds.has(block.id)}
+        onToggleSelect={() => onToggleSelect(block.id)} />
+
+      )}
+    </div>);
+
 }
 
 /** Fetched item for expand view */
@@ -126,12 +126,12 @@ export interface ForecastSubItem {
 function DraggableForecastSubItem({
   item,
   parentBlock,
-  style: s,
-}: {
-  item: ForecastSubItem;
-  parentBlock: ForecastBlock;
-  style: ReturnType<typeof getSourceStyle>;
-}) {
+  style: s
+
+
+
+
+}: {item: ForecastSubItem;parentBlock: ForecastBlock;style: ReturnType<typeof getSourceStyle>;}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `forecast-subitem-${item.id}`,
     data: {
@@ -144,8 +144,8 @@ function DraggableForecastSubItem({
       projectId: item.project_id || parentBlock.project_id,
       projectName: item.project_name || parentBlock.project_name,
       parentBlockId: parentBlock.id,
-      parentWeek: parentBlock.week,
-    },
+      parentWeek: parentBlock.week
+    }
   });
 
   return (
@@ -155,25 +155,25 @@ function DraggableForecastSubItem({
       {...listeners}
       className="flex items-center gap-[3px] px-[6px] py-[3px] rounded transition-colors cursor-grab group"
       style={{ opacity: isDragging ? 0.3 : 1 }}
-      onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${s.borderColor}15`; }}
-      onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
-    >
+      onMouseEnter={(e) => {e.currentTarget.style.backgroundColor = `${s.borderColor}15`;}}
+      onMouseLeave={(e) => {e.currentTarget.style.backgroundColor = "transparent";}}>
+      
       <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: s.codeColor }} />
-      {item.item_code && (
-        <span className="font-mono text-[9px] font-bold shrink-0" style={{ color: s.codeColor }}>
+      {item.item_code &&
+      <span className="font-mono text-[9px] font-bold shrink-0" style={{ color: s.codeColor }}>
           {item.item_code}
         </span>
-      )}
+      }
       <span className="text-[10px] flex-1 truncate" style={{ color: s.nameColor, opacity: 0.8 }}>
         {item.item_name}
       </span>
-      {item.hours > 0 && (
-        <span className="font-mono text-[9px] shrink-0" style={{ color: s.hoursColor, opacity: 0.7 }}>
+      {item.hours > 0 &&
+      <span className="font-mono text-[9px] shrink-0" style={{ color: s.hoursColor, opacity: 0.7 }}>
           {item.hours}h
         </span>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 }
 
 function formatCompactCzk(v: number): string {
@@ -193,25 +193,25 @@ function ForecastCard({
   isExpanded,
   displayMode = "hours",
   hourlyRate = 550,
-  weeklyCapacity = 0,
-}: {
-  block: ForecastBlock;
-  isSelected: boolean;
-  onToggleSelect: () => void;
-  onContextMenu?: (e: React.MouseEvent) => void;
-  onToggleExpand?: () => void;
-  isExpanded?: boolean;
-  displayMode?: DisplayMode;
-  hourlyRate?: number;
-  weeklyCapacity?: number;
-}) {
+  weeklyCapacity = 0
+
+
+
+
+
+
+
+
+
+
+}: {block: ForecastBlock;isSelected: boolean;onToggleSelect: () => void;onContextMenu?: (e: React.MouseEvent) => void;onToggleExpand?: () => void;isExpanded?: boolean;displayMode?: DisplayMode;hourlyRate?: number;weeklyCapacity?: number;}) {
   const style = getSourceStyle(block.source, block.confidence);
   const [expanded, setExpanded] = useState(false);
   const [subItems, setSubItems] = useState<ForecastSubItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
 
   const actualExpanded = isExpanded ?? expanded;
-  const toggleExpand = onToggleExpand ?? (() => setExpanded(v => !v));
+  const toggleExpand = onToggleExpand ?? (() => setExpanded((v) => !v));
 
   // Fetch sub-items when expanded
   useEffect(() => {
@@ -224,12 +224,12 @@ function ForecastCard({
 
       // Try production_schedule first (for existing_plan blocks)
       if (block.source === "existing_plan") {
-        const { data } = await supabase
-          .from("production_schedule")
-          .select("id, item_name, item_code, scheduled_hours")
-          .eq("project_id", block.project_id)
-          .eq("scheduled_week", block.week)
-          .not("status", "in", '("cancelled")');
+        const { data } = await supabase.
+        from("production_schedule").
+        select("id, item_name, item_code, scheduled_hours").
+        eq("project_id", block.project_id).
+        eq("scheduled_week", block.week).
+        not("status", "in", '("cancelled")');
         if (data) {
           for (const row of data) {
             items.push({ id: row.id, item_name: row.item_name, item_code: row.item_code, hours: row.scheduled_hours, source: "schedule" });
@@ -239,11 +239,11 @@ function ForecastCard({
 
       // Try production_inbox (for inbox_item blocks)
       if (block.source === "inbox_item") {
-        const { data } = await supabase
-          .from("production_inbox")
-          .select("id, item_name, item_code, estimated_hours")
-          .eq("project_id", block.project_id)
-          .eq("status", "pending");
+        const { data } = await supabase.
+        from("production_inbox").
+        select("id, item_name, item_code, estimated_hours").
+        eq("project_id", block.project_id).
+        eq("status", "pending");
         if (data) {
           for (const row of data) {
             items.push({ id: row.id, item_name: row.item_name, item_code: row.item_code, hours: row.estimated_hours, source: "inbox" });
@@ -253,11 +253,11 @@ function ForecastCard({
 
       // For project_estimate or if no items found, try tpv_items
       if (block.source === "project_estimate" || items.length === 0) {
-        const { data } = await supabase
-          .from("tpv_items")
-          .select("id, item_name, item_type, cena")
-          .eq("project_id", block.project_id)
-          .is("deleted_at", null);
+        const { data } = await supabase.
+        from("tpv_items").
+        select("id, item_name, item_type, cena").
+        eq("project_id", block.project_id).
+        is("deleted_at", null);
         if (data && data.length > 0 && items.length === 0) {
           for (const row of data) {
             items.push({
@@ -265,7 +265,7 @@ function ForecastCard({
               item_name: row.item_type || row.item_name,
               item_code: row.item_name,
               hours: row.cena ? Math.round(row.cena / 550) : 0,
-              source: "tpv",
+              source: "tpv"
             });
           }
         }
@@ -277,7 +277,7 @@ function ForecastCard({
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {cancelled = true;};
   }, [actualExpanded, block.project_id, block.source, block.week, subItems.length]);
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -288,8 +288,8 @@ function ForecastCard({
       projectName: block.project_name,
       hours: block.estimated_hours,
       week: block.week,
-      source: block.source,
-    },
+      source: block.source
+    }
   });
 
   return (
@@ -301,34 +301,34 @@ function ForecastCard({
         borderStyle: block.source === "existing_plan" ? "solid" : "dashed",
         borderColor: style.borderColor,
         opacity: isDragging ? 0.3 : 1,
-        boxShadow: isSelected ? `0 0 0 2px ${style.borderColor}, 0 0 8px ${style.borderColor}30` : undefined,
-      }}
-    >
+        boxShadow: isSelected ? `0 0 0 2px ${style.borderColor}, 0 0 8px ${style.borderColor}30` : undefined
+      }}>
+      
       {/* Badge top-right — only for inbox and AI cards */}
-      {style.badgeLabel && (
-        <div
-          className="absolute top-1.5 right-1.5 flex items-center gap-0.5 rounded-full px-1.5 py-0.5"
-          style={{ backgroundColor: style.badgeBg, fontSize: 10, color: style.badgeColor, fontWeight: 600, zIndex: 2 }}
-        >
+      {style.badgeLabel &&
+      <div
+        className="absolute top-1.5 right-1.5 flex items-center gap-0.5 rounded-full px-1.5 py-0.5"
+        style={{ backgroundColor: style.badgeBg, fontSize: 10, color: style.badgeColor, fontWeight: 600, zIndex: 2 }}>
+        
           {style.badgeIcon === "sparkles" && <Sparkles className="h-2.5 w-2.5" />}
           {style.badgeIcon === "inbox" && <Inbox className="h-2.5 w-2.5" />}
           {style.badgeLabel}
         </div>
-      )}
+      }
 
       <div className="flex">
         {/* Left: expand/collapse toggle */}
         <div
           className="shrink-0 flex items-center justify-center cursor-pointer select-none"
           style={{ width: 24 }}
-          onClick={(e) => { e.stopPropagation(); toggleExpand(); }}
-          onMouseDown={e => e.stopPropagation()}
-          onPointerDown={e => e.stopPropagation()}
-        >
+          onClick={(e) => {e.stopPropagation();toggleExpand();}}
+          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}>
+          
           <ChevronRight
             className="shrink-0 transition-transform duration-150"
-            style={{ width: 10, height: 10, color: style.codeColor, transform: actualExpanded ? "rotate(90deg)" : "rotate(0deg)" }}
-          />
+            style={{ width: 10, height: 10, color: style.codeColor, transform: actualExpanded ? "rotate(90deg)" : "rotate(0deg)" }} />
+          
         </div>
 
         {/* Right: draggable area */}
@@ -337,9 +337,9 @@ function ForecastCard({
           {...attributes}
           {...listeners}
           className="flex-1 min-w-0 px-1.5 py-2 cursor-grab"
-          onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
-          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu?.(e); }}
-        >
+          onClick={(e) => {e.stopPropagation();onToggleSelect();}}
+          onContextMenu={(e) => {e.preventDefault();e.stopPropagation();onContextMenu?.(e);}}>
+          
           {/* Checkbox + content */}
           <div className="flex items-start gap-2">
             <input
@@ -349,18 +349,18 @@ function ForecastCard({
               className="mt-0.5"
               style={{ accentColor: style.borderColor }}
               onClick={(e) => e.stopPropagation()}
-              onPointerDown={(e) => e.stopPropagation()}
-            />
+              onPointerDown={(e) => e.stopPropagation()} />
+            
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <div
                   className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: getProjectColor(block.project_id) }}
-                />
+                  style={{ backgroundColor: getProjectColor(block.project_id) }} />
+                
                 <span
                   className="text-[13px] font-semibold truncate"
-                  style={{ color: style.nameColor }}
-                >
+                  style={{ color: style.nameColor }}>
+                  
                   {block.project_name}
                 </span>
               </div>
@@ -371,21 +371,21 @@ function ForecastCard({
                   return (
                     <div className="text-[9px] font-medium mt-0.5" style={{ color: "#d97706" }}>
                       ⚠ BEZ TERMÍNU
-                    </div>
-                  );
+                    </div>);
+
                 }
                 const d = new Date(block.deadline);
                 if (isNaN(d.getTime())) return null;
                 const label = srcMap[block.deadline_source ?? ""] ?? "Termín";
                 const formatted = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getFullYear()).slice(2)}`;
-                const now = new Date(); now.setHours(0, 0, 0, 0);
+                const now = new Date();now.setHours(0, 0, 0, 0);
                 const diffDays = Math.ceil((d.getTime() - now.getTime()) / 86400000);
                 const color = diffDays < 0 ? "#DC2626" : diffDays <= 14 ? "#D97706" : "#7aa8a4";
                 return (
                   <div className="text-[9px] font-medium mt-0.5" style={{ color }}>
                     {label}: {formatted}
-                  </div>
-                );
+                  </div>);
+
               })()}
               <div className="flex items-center justify-between mt-0.5">
                 <span className="text-[11px] truncate" style={{ color: style.codeColor }}>
@@ -393,34 +393,34 @@ function ForecastCard({
                 </span>
                 <span
                   className="text-[13px] font-bold shrink-0 ml-2"
-                  style={{ color: style.hoursColor }}
-                >
-                  {style.hoursPrefix}{displayMode === "czk" ? formatCompactCzk(block.estimated_hours * hourlyRate) : displayMode === "percent" ? `${weeklyCapacity > 0 ? Math.round((block.estimated_hours / weeklyCapacity) * 100) : 0}%` : `${block.estimated_hours}h`}
+                  style={{ color: style.hoursColor }}>
+                  
+                  {style.hoursPrefix}{displayMode === "czk" ? formatCompactCzk(block.estimated_hours * hourlyRate) : displayMode === "percent" ? `${weeklyCapacity > 0 ? Math.round(block.estimated_hours / weeklyCapacity * 100) : 0}%` : `${block.estimated_hours}h`}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span
                   className="text-[9px] font-mono"
-                  style={{ color: style.codeColor }}
-                >
+                  style={{ color: style.codeColor }}>
+                  
                   {block.project_id}
                 </span>
-                {block.tpv_item_count && block.tpv_item_count > 0 && (
-                  <span className="text-[9px]" style={{ color: style.codeColor }}>
-                    · {block.tpv_item_count} pol.
-                  </span>
-                )}
+                {block.tpv_item_count && block.tpv_item_count > 0
+
+
+
+                }
                 <span
                   className="text-[9px] px-1 rounded"
                   style={{
-                    backgroundColor: block.confidence === "high" ? "rgba(239,68,68,0.15)"
-                      : block.confidence === "medium" ? "rgba(249,115,22,0.15)"
-                      : "rgba(34,197,94,0.15)",
-                    color: block.confidence === "high" ? "#ef4444"
-                      : block.confidence === "medium" ? "#f97316"
-                      : "#22c55e",
-                  }}
-                >
+                    backgroundColor: block.confidence === "high" ? "rgba(239,68,68,0.15)" :
+                    block.confidence === "medium" ? "rgba(249,115,22,0.15)" :
+                    "rgba(34,197,94,0.15)",
+                    color: block.confidence === "high" ? "#ef4444" :
+                    block.confidence === "medium" ? "#f97316" :
+                    "#22c55e"
+                  }}>
+                  
                   {block.confidence === "high" ? "vysoká" : block.confidence === "medium" ? "střední" : "nízká"}
                 </span>
               </div>
@@ -430,26 +430,26 @@ function ForecastCard({
       </div>
 
       {/* Expanded items list */}
-      {actualExpanded && (
-        <div className="px-1.5 py-1" style={{ borderTop: `1px solid ${style.borderColor}40` }}>
-          {loadingItems ? (
-            <div className="text-[9px] text-center py-1" style={{ color: style.codeColor }}>Načítání...</div>
-          ) : subItems.length === 0 ? (
-            <div className="text-[9px] text-center py-1" style={{ color: style.codeColor }}>Žádné položky</div>
-          ) : (
-            subItems.map(item => (
-              <DraggableForecastSubItem
-                key={item.id}
-                item={{ ...item, project_id: block.project_id, project_name: block.project_name }}
-                parentBlock={block}
-                style={style}
-              />
-            ))
-          )}
+      {actualExpanded &&
+      <div className="px-1.5 py-1" style={{ borderTop: `1px solid ${style.borderColor}40` }}>
+          {loadingItems ?
+        <div className="text-[9px] text-center py-1" style={{ color: style.codeColor }}>Načítání...</div> :
+        subItems.length === 0 ?
+        <div className="text-[9px] text-center py-1" style={{ color: style.codeColor }}>Žádné položky</div> :
+
+        subItems.map((item) =>
+        <DraggableForecastSubItem
+          key={item.id}
+          item={{ ...item, project_id: block.project_id, project_name: block.project_name }}
+          parentBlock={block}
+          style={style} />
+
+        )
+        }
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 }
 
 /** Merge multiple blocks for the same project into one — mirrors real Kanban bundle grouping */
@@ -467,8 +467,8 @@ function mergeBlocksByProject(blocks: ForecastBlock[]): ForecastBlock[] {
     }
     // Determine dominant source: inbox_item > project_estimate > existing_plan
     let source: ForecastSource = "existing_plan";
-    if (projectBlocks.some(b => b.source === "inbox_item")) source = "inbox_item";
-    else if (projectBlocks.some(b => b.source === "project_estimate")) source = "project_estimate";
+    if (projectBlocks.some((b) => b.source === "inbox_item")) source = "inbox_item";else
+    if (projectBlocks.some((b) => b.source === "project_estimate")) source = "project_estimate";
 
     const first = projectBlocks[0];
     merged.push({
@@ -476,7 +476,7 @@ function mergeBlocksByProject(blocks: ForecastBlock[]): ForecastBlock[] {
       estimated_hours: projectBlocks.reduce((s, b) => s + b.estimated_hours, 0),
       tpv_item_count: projectBlocks.reduce((s, b) => s + (b.tpv_item_count ?? 0), 0),
       source,
-      bundle_description: projectBlocks.map(b => b.bundle_description).filter((v, i, a) => a.indexOf(v) === i).join(" + "),
+      bundle_description: projectBlocks.map((b) => b.bundle_description).filter((v, i, a) => a.indexOf(v) === i).join(" + ")
     });
   }
   return merged;
@@ -492,40 +492,40 @@ export function ForecastWeekContent({
   onToggleExpand,
   displayMode,
   hourlyRate,
-  weeklyCapacity,
-}: {
-  blocks: ForecastBlock[];
-  selectedBlockIds: Set<string>;
-  onToggleSelect: (id: string) => void;
-  onForecastContextMenu?: (e: React.MouseEvent, block: ForecastBlock) => void;
-  expandedIds?: Set<string>;
-  onToggleExpand?: (blockId: string) => void;
-  displayMode?: DisplayMode;
-  hourlyRate?: number;
-  weeklyCapacity?: number;
-}) {
+  weeklyCapacity
+
+
+
+
+
+
+
+
+
+
+}: {blocks: ForecastBlock[];selectedBlockIds: Set<string>;onToggleSelect: (id: string) => void;onForecastContextMenu?: (e: React.MouseEvent, block: ForecastBlock) => void;expandedIds?: Set<string>;onToggleExpand?: (blockId: string) => void;displayMode?: DisplayMode;hourlyRate?: number;weeklyCapacity?: number;}) {
   const mergedBlocks = useMemo(() => mergeBlocksByProject(blocks), [blocks]);
 
   if (mergedBlocks.length === 0) return null;
 
   return (
     <div className="space-y-1.5 mt-1">
-      {mergedBlocks.map(block => (
-        <ForecastCard
-          key={block.id}
-          block={block}
-          isSelected={selectedBlockIds.has(block.id)}
-          onToggleSelect={() => onToggleSelect(block.id)}
-          onContextMenu={onForecastContextMenu ? (e) => onForecastContextMenu(e, block) : undefined}
-          isExpanded={expandedIds?.has(block.id)}
-          onToggleExpand={onToggleExpand ? () => onToggleExpand(block.id) : undefined}
-          displayMode={displayMode}
-          hourlyRate={hourlyRate}
-          weeklyCapacity={weeklyCapacity}
-        />
-      ))}
-    </div>
-  );
+      {mergedBlocks.map((block) =>
+      <ForecastCard
+        key={block.id}
+        block={block}
+        isSelected={selectedBlockIds.has(block.id)}
+        onToggleSelect={() => onToggleSelect(block.id)}
+        onContextMenu={onForecastContextMenu ? (e) => onForecastContextMenu(e, block) : undefined}
+        isExpanded={expandedIds?.has(block.id)}
+        onToggleExpand={onToggleExpand ? () => onToggleExpand(block.id) : undefined}
+        displayMode={displayMode}
+        hourlyRate={hourlyRate}
+        weeklyCapacity={weeklyCapacity} />
+
+      )}
+    </div>);
+
 }
 
 // ─── Forecast Split Dialog ───
@@ -541,7 +541,7 @@ interface ForecastSplitDialogProps {
   blockName: string;
   totalHours: number;
   currentWeek: string;
-  weeks: { key: string; label: string }[];
+  weeks: {key: string;label: string;}[];
   onSplit: (keepHours: number, targetWeek: string) => void;
 }
 
@@ -557,7 +557,7 @@ export function ForecastSplitDialog({ open, onOpenChange, blockName, totalHours,
   }, [open, totalHours]);
 
   const splitHours = totalHours - keepHours;
-  const availableWeeks = weeks.filter(w => w.key !== currentWeek);
+  const availableWeeks = weeks.filter((w) => w.key !== currentWeek);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -574,9 +574,9 @@ export function ForecastSplitDialog({ open, onOpenChange, blockName, totalHours,
               min={1}
               max={totalHours - 1}
               value={keepHours}
-              onChange={e => setKeepHours(Math.max(1, Math.min(totalHours - 1, Number(e.target.value))))}
-              className="bg-[#111318] border-[#2a2d35] text-white"
-            />
+              onChange={(e) => setKeepHours(Math.max(1, Math.min(totalHours - 1, Number(e.target.value))))}
+              className="bg-[#111318] border-[#2a2d35] text-white" />
+            
           </div>
           <p className="text-xs text-gray-500">Přesunout: {splitHours}h</p>
           <div className="space-y-2">
@@ -586,9 +586,9 @@ export function ForecastSplitDialog({ open, onOpenChange, blockName, totalHours,
                 <SelectValue placeholder="Vyberte týden…" />
               </SelectTrigger>
               <SelectContent className="bg-[#1C1F26] border-[#2a2d35]">
-                {availableWeeks.map(w => (
-                  <SelectItem key={w.key} value={w.key} className="text-gray-200">{w.label}</SelectItem>
-                ))}
+                {availableWeeks.map((w) =>
+                <SelectItem key={w.key} value={w.key} className="text-gray-200">{w.label}</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -597,13 +597,13 @@ export function ForecastSplitDialog({ open, onOpenChange, blockName, totalHours,
           <Button variant="outline" onClick={() => onOpenChange(false)} className="border-[#2a2d35] text-gray-400">Zrušit</Button>
           <Button
             disabled={!targetWeek || splitHours <= 0}
-            onClick={() => { onSplit(keepHours, targetWeek); onOpenChange(false); }}
-            className="bg-amber-600 hover:bg-amber-700 text-white"
-          >
+            onClick={() => {onSplit(keepHours, targetWeek);onOpenChange(false);}}
+            className="bg-amber-600 hover:bg-amber-700 text-white">
+            
             Rozdělit
           </Button>
         </DialogFooter>
       </DialogContent>
-    </Dialog>
-  );
+    </Dialog>);
+
 }
