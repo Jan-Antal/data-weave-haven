@@ -921,7 +921,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       }}
     >
       {/* Header */}
-      <div className="px-2.5 py-1.5 text-center" style={{ borderBottom: forecastDarkMode ? "1px solid #2a2f3d" : "1px solid #ece8e2" }}>
+      <div className="px-2.5 py-1.5 text-center" style={{ borderBottom: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #ece8e2" }}>
         <div className="flex items-center justify-center gap-1.5">
           <span className="font-mono text-[14px]" style={{ color: headerColor, fontWeight: headerWeight }}>T{weekNum}</span>
           {isCurrent && <span className="w-[5px] h-[5px] rounded-full" style={{ backgroundColor: "#3a8a36" }} />}
