@@ -82,6 +82,7 @@ interface Props {
   forecastSelectedIds?: Set<string>;
   onToggleForecastSelect?: (id: string) => void;
   forecastDarkMode?: boolean;
+  forecastPlanMode?: "respect_plan" | "from_scratch";
 }
 
 interface ContextMenuState {
