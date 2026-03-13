@@ -19,10 +19,10 @@ export function ForecastCommitBar({
   inboxBlockCount,
   projectBlockCount,
   isGenerating,
+  allInboxSelected,
   onCommitSelected,
   onCancel,
-  onSelectAll,
-  onSelectInboxOnly,
+  onToggleInboxSelect,
 }: ForecastCommitBarProps) {
   if (totalBlocks === 0 && !isGenerating) return null;
 
