@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
-import { Search, X } from "lucide-react";
+import { Search, X, Sparkles, Loader2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -36,6 +36,9 @@ import { DeadlineWarningDialog } from "@/components/production/DeadlineWarningDi
 import { resolveDeadline, checkDeadlineWarning } from "@/lib/deadlineWarning";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { useForecastMode } from "@/hooks/useForecastMode";
+import { ForecastCommitBar } from "@/components/production/ForecastCommitBar";
+import { Switch } from "@/components/ui/switch";
 
 export type DisplayMode = "hours" | "czk" | "percent";
 type ViewTab = "kanban" | "table";
