@@ -525,7 +525,7 @@ export default function PlanVyroby() {
     >
       <div
         className="h-screen flex flex-col overflow-hidden transition-colors duration-300"
-        style={{ backgroundColor: forecast.forecastActive ? "#1a2422" : "#1f2d26" }}
+        style={{ backgroundColor: forecast.forecastActive ? "#1a2422" : "#f4f2f0" }}
       >
         {profile?.email === "alfred@ami-test.cz" && (
           <div className="bg-orange-500 text-white px-6 flex items-center justify-center gap-2 font-bold tracking-wide shrink-0" style={{ height: 32 }}>
@@ -868,21 +868,21 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       className="shrink-0 border-b px-6 py-1.5 flex items-center gap-4 transition-colors duration-300"
       style={{
         minHeight: 40,
-        backgroundColor: forecastActive ? "#223937" : "#1f2d26",
-        borderColor: forecastActive ? "#2a4a46" : "#2a3d2a",
+        backgroundColor: forecastActive ? "#223937" : "hsl(var(--card))",
+        borderColor: forecastActive ? "#2a4a46" : "hsl(var(--border))",
       }}
     >
       {/* Left: Tabs */}
       <div className="inline-flex h-8 items-center rounded-md p-0.5 shrink-0" style={{
-        backgroundColor: forecastActive ? "#223937" : "#253a2c",
-        border: forecastActive ? "1px solid #2a4a46" : "1px solid #3a5a3a",
+        backgroundColor: forecastActive ? "#223937" : "hsl(var(--card))",
+        border: forecastActive ? "1px solid #2a4a46" : "1px solid hsl(var(--border))",
       }}>
         <button
           onClick={() => setViewTab("kanban")}
           className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-[13px] font-medium transition-all ${
             viewTab === "kanban"
-              ? forecastActive ? "bg-amber-600 text-white shadow-sm" : "bg-[#3d7a4a] text-white shadow-sm"
-              : forecastActive ? "text-[#a8c5c2] hover:text-white" : "text-[#a8c5a8] hover:text-white"
+              ? forecastActive ? "bg-amber-600 text-white shadow-sm" : "bg-primary text-primary-foreground shadow-sm"
+              : forecastActive ? "text-[#a8c5c2] hover:text-white" : "text-muted-foreground hover:text-foreground"
           }`}
         >
           Kanban
@@ -891,10 +891,10 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
           onClick={() => !forecastActive && setViewTab("table")}
           disabled={forecastActive}
           className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-[13px] font-medium transition-all ${
-             forecastActive ? "text-[#4a5a58] cursor-not-allowed opacity-40"
+            forecastActive ? "text-[#4a5a58] cursor-not-allowed opacity-40"
               : viewTab === "table"
-              ? "bg-[#3d7a4a] text-white shadow-sm"
-              : "text-[#a8c5a8] hover:text-white"
+              ? "bg-primary text-primary-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
           Tabulka
@@ -947,13 +947,13 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
 
       {/* Center: Stats */}
       <div className="flex items-center gap-2 shrink-0">
-        <div className="flex items-center gap-1 text-xs font-mono" style={{ color: forecastActive ? "#a8c5c2" : "#a8c5a8" }}>
-          <span>Kapacita <span className="font-semibold" style={{ color: "#e5e7eb" }}>{Math.round(capacityHours).toLocaleString("cs-CZ")}h</span></span>
-          <span style={{ color: forecastActive ? "#2a4a46" : "#3a5a3a" }}>·</span>
-          <span>CZK <span className="font-semibold" style={{ color: "#e5e7eb" }}>{formatCzk(displayCzk)}</span></span>
-          <span style={{ color: forecastActive ? "#2a4a46" : "#3a5a3a" }}>·</span>
+        <div className="flex items-center gap-1 text-xs font-mono" style={{ color: forecastActive ? "#a8c5c2" : undefined }}>
+          <span>Kapacita <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{Math.round(capacityHours).toLocaleString("cs-CZ")}h</span></span>
+          <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
+          <span>CZK <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{formatCzk(displayCzk)}</span></span>
+          <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
           <span>Naplánováno <span style={{ fontWeight: 600, color: isOverCapacity ? "hsl(var(--destructive))" : "hsl(142 76% 36%)" }}>{Math.round(scheduledHours).toLocaleString("cs-CZ")}h</span></span>
-          <span style={{ color: forecastActive ? "#2a4a46" : "#3a5a3a" }}>·</span>
+          <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
           <span>V Inboxu <span style={{ fontWeight: 600, color: "#d97706" }}>{Math.round(inboxHours).toLocaleString("cs-CZ")}h</span></span>
         </div>
       </div>
@@ -964,8 +964,8 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       {/* Right: Display mode + Search + Forecast toggle */}
       <div className="flex items-center gap-2 shrink-0">
         <div className="inline-flex h-8 items-center rounded-md p-0.5" style={{
-          backgroundColor: forecastActive ? "#223937" : "#253a2c",
-          border: forecastActive ? "1px solid #2a4a46" : "1px solid #3a5a3a",
+          backgroundColor: forecastActive ? "#223937" : "hsl(var(--card))",
+          border: forecastActive ? "1px solid #2a4a46" : "1px solid hsl(var(--border))",
         }}>
           {([
             { key: "hours" as DisplayMode, label: "Hodiny" },
@@ -977,8 +977,8 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
               onClick={() => onDisplayModeChange(m.key)}
               className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-[13px] font-medium transition-all ${
                 displayMode === m.key
-                  ? forecastActive ? "bg-amber-600 text-white shadow-sm" : "bg-[#3d7a4a] text-white shadow-sm"
-                  : forecastActive ? "text-[#a8c5c2] hover:text-white" : "text-[#a8c5a8] hover:text-white"
+                  ? forecastActive ? "bg-amber-600 text-white shadow-sm" : "bg-primary text-primary-foreground shadow-sm"
+                  : forecastActive ? "text-[#a8c5c2] hover:text-white" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {m.label}
@@ -987,7 +987,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
         </div>
 
         <div className="relative w-[200px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: forecastActive ? "#7aa8a4" : "#7aaa7a" }} />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: forecastActive ? "#7aa8a4" : undefined }} />
           <input
             type="text"
             value={searchQuery}
@@ -995,9 +995,9 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
             placeholder="Hledat projekt..."
             className="w-full h-8 pl-8 pr-8 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 transition-colors"
             style={{
-              backgroundColor: forecastActive ? "#223937" : "#253a2c",
-              border: forecastActive ? "1px solid #2a4a46" : "1px solid #3a5a3a",
-              color: forecastActive ? "#a8c5c2" : "#a8c5a8",
+              backgroundColor: forecastActive ? "#223937" : "hsl(var(--background))",
+              border: forecastActive ? "1px solid #2a4a46" : "1px solid hsl(var(--input))",
+              color: forecastActive ? "#a8c5c2" : undefined,
             }}
           />
           {searchQuery && (
