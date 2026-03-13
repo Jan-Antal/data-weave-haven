@@ -423,6 +423,23 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
         }
       }
 
+      // Check if all schedule items for this project are blockers
+      let allBlocker = false;
+      if (proj && !inbox) {
+        const allItems = Array.from(proj.items.values());
+        const scheduleItems: ScheduleItem[] = [];
+        if (scheduleData) {
+          for (const [, silo] of scheduleData) {
+            for (const bundle of silo.bundles) {
+              if (bundle.project_id === pid) {
+                scheduleItems.push(...bundle.items);
+              }
+            }
+          }
+        }
+        allBlocker = scheduleItems.length > 0 && scheduleItems.every(i => i.is_blocker);
+      }
+
       rows.push({
         projectId: pid, projectName: realName, color: getProjectColor(pid),
         totalHours: visibleItems.reduce((s, i) => s + i.totalHours, 0),
@@ -430,6 +447,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
         items: visibleItems, weekTotals,
         inboxTotalHours: inbox?.totalHours ?? 0, inboxTotalCzk: inbox?.totalCzk ?? 0,
         expediceTotalHours: expedice?.totalHours ?? 0, expediceTotalCzk: expedice?.totalCzk ?? 0,
+        isBlockerOnly: allBlocker,
       });
     }
 
