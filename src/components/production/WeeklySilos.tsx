@@ -95,6 +95,7 @@ interface Props {
   onMoveForecastBlock?: (blockId: string, newWeek: string) => void;
   onRemoveForecastBlock?: (blockId: string) => void;
   onSplitForecastBlock?: (blockId: string, keepHours: number, splitWeek: string) => void;
+  forecastSafetyNet?: SafetyNetProject[];
 }
 
 interface ContextMenuState {
