@@ -1071,8 +1071,8 @@ function PausedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onContext
   );
 }
 
-function DraggableSiloItem({ item, weekKey, showCzk, onContextMenu }: {
-  item: ScheduleItem; weekKey: string; showCzk: boolean; onContextMenu: (e: React.MouseEvent) => void;
+function DraggableSiloItem({ item, weekKey, showCzk, onContextMenu, disabled = false }: {
+  item: ScheduleItem; weekKey: string; showCzk: boolean; onContextMenu: (e: React.MouseEvent) => void; disabled?: boolean;
 }) {
   const isSplit = !!item.split_group_id;
   const adhocReason = (item as any).adhoc_reason;
@@ -1084,6 +1084,7 @@ function DraggableSiloItem({ item, weekKey, showCzk, onContextMenu }: {
       hours: item.scheduled_hours, stageId: item.stage_id, scheduledCzk: item.scheduled_czk,
       splitGroupId: item.split_group_id,
     },
+    disabled,
   });
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
