@@ -347,27 +347,12 @@ function ForecastCard({
             <div className="text-[9px] text-center py-1" style={{ color: style.codeColor }}>Žádné položky</div>
           ) : (
             subItems.map(item => (
-              <div
+              <DraggableForecastSubItem
                 key={item.id}
-                className="flex items-center gap-[3px] px-[6px] py-[3px] rounded transition-colors"
-                style={{ cursor: "default" }}
-                onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${style.borderColor}15`; }}
-                onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
-              >
-                {item.item_code && (
-                  <span className="font-mono text-[9px] font-bold shrink-0" style={{ color: style.codeColor }}>
-                    {item.item_code}
-                  </span>
-                )}
-                <span className="text-[10px] flex-1 truncate" style={{ color: style.nameColor, opacity: 0.8 }}>
-                  {item.item_name}
-                </span>
-                {item.hours > 0 && (
-                  <span className="font-mono text-[9px] shrink-0" style={{ color: style.hoursColor, opacity: 0.7 }}>
-                    {item.hours}h
-                  </span>
-                )}
-              </div>
+                item={{ ...item, project_id: block.project_id, project_name: block.project_name }}
+                parentBlock={block}
+                style={style}
+              />
             ))
           )}
         </div>
