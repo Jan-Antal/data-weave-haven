@@ -51,7 +51,7 @@ export function useSearchNavigation({ query, scheduleData, forecastBlocks, forec
         const silo = scheduleData.get(weekKey);
         if (silo) {
           for (const bundle of silo.bundles) {
-            if (matchesQuery(bundle, query)) {
+            if (matchesQuery(bundle, query, projectPmMap?.get(bundle.project_id))) {
               result.push({ weekKey, projectId: bundle.project_id, matchKey: `${weekKey}::${bundle.project_id}` });
             }
           }
