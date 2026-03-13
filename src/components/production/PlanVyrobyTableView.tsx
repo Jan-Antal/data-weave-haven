@@ -1212,7 +1212,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
 
           {/* Project rows */}
           <div className="flex flex-col" style={{ gap: 6, paddingTop: 6 }}>
-            {regularRows.map(proj => {
+            {filteredRows.filter(r => !r.isBlockerOnly).map(proj => {
               const isExpanded = expandedProjects.has(proj.projectId);
               const isOverdueProject = (() => {
                 const pd = projectDateLookup.get(proj.projectId);
