@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ChevronDown, ChevronRight, AlertTriangle, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronRight, AlertTriangle, RotateCcw, GripVertical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
+import { useDraggable } from "@dnd-kit/core";
 
 export interface SafetyNetProject {
   project_id: string;
