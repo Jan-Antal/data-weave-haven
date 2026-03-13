@@ -798,6 +798,8 @@ interface SiloProps {
   forecastDarkMode?: boolean;
   forecastPlanMode?: "respect_plan" | "from_scratch";
   onForecastContextMenu?: (e: React.MouseEvent, block: ForecastBlock) => void;
+  forecastExpandedIds?: Set<string>;
+  onToggleForecastExpand?: (blockId: string) => void;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
