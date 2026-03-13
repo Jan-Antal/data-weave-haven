@@ -241,9 +241,11 @@ export default function PlanVyroby() {
   }, [allProjects, formatWeekLabel]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
+    // Block drag start during forecast mode
+    if (forecast.forecastActive) return;
     const data = event.active.data.current as ActiveDragData | undefined;
     if (data) setActiveDrag(data);
-  }, []);
+  }, [forecast.forecastActive]);
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
     setOverDroppableId(event.over?.id?.toString() ?? null);
