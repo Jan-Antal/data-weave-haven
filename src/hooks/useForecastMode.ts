@@ -118,9 +118,9 @@ export function useForecastMode(): UseForecastModeReturn {
   // Persist to localStorage whenever blocks or selection changes
   useEffect(() => {
     if (forecastActive && forecastBlocks.length > 0) {
-      saveToStorage(planMode, forecastBlocks, selectedBlockIds, realBundleOverrides);
+      saveToStorage(planMode, forecastBlocks, selectedBlockIds, realBundleOverrides, safetyNetProjects);
     }
-  }, [forecastBlocks, selectedBlockIds, planMode, forecastActive, realBundleOverrides]);
+  }, [forecastBlocks, selectedBlockIds, planMode, forecastActive, realBundleOverrides, safetyNetProjects]);
 
   const resetForecastState = useCallback(() => {
     setForecastBlocks([]);
