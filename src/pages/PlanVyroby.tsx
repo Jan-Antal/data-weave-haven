@@ -242,8 +242,8 @@ export default function PlanVyroby() {
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current as any;
-    // Allow forecast block drags even in forecast mode
-    if (forecast.forecastActive && data?.type !== "forecast-block") return;
+    // In forecast mode, allow forecast-block AND silo-bundle drags (real bundles can be moved as overrides)
+    if (forecast.forecastActive && data?.type !== "forecast-block" && data?.type !== "silo-bundle") return;
     if (data) setActiveDrag(data);
   }, [forecast.forecastActive]);
 
@@ -291,6 +291,23 @@ export default function PlanVyroby() {
         if (weekKey !== dragData.week) {
           forecast.moveForecastBlock(dragData.blockId, weekKey);
         }
+      }
+      return;
+    }
+
+    // Handle real bundle drags in forecast mode — store as override, never write to Supabase
+    if (forecast.forecastActive && dragData.type === "silo-bundle" && dragData.projectId && dragData.weekDate) {
+      if (!over) return;
+      const targetId = over.id.toString();
+      const weekKey = resolveTargetWeek(targetId, dragData);
+      if (weekKey && weekKey !== dragData.weekDate) {
+        // Calculate hours from the source silo
+        const sourceSilo = scheduleData?.get(dragData.weekDate);
+        const sourceBundle = sourceSilo?.bundles.find(b => b.project_id === dragData.projectId);
+        const hours = sourceBundle?.total_hours ?? 0;
+        const itemCount = sourceBundle?.items.length ?? 0;
+        const projectName = sourceBundle?.project_name ?? dragData.projectName ?? dragData.projectId;
+        forecast.addRealBundleOverride(dragData.projectId, projectName, dragData.weekDate, weekKey, hours, itemCount);
       }
       return;
     }
@@ -449,7 +466,8 @@ export default function PlanVyroby() {
       }
   }, [moveInboxItemToWeek, moveInboxProjectToWeek, moveScheduleItemToWeek, moveBundleToWeek,
     moveItemBackToInbox, returnBundleToInbox, scheduleData, weeklyCapacity, hourlyRate,
-    findSpillWeek, findSiblingInWeek, mergeSplitItems, resolveTargetWeek, checkAndWarnDeadline]);
+    findSpillWeek, findSiblingInWeek, mergeSplitItems, resolveTargetWeek, checkAndWarnDeadline,
+    forecast]);
 
   if (loading) {
     return (
@@ -608,9 +626,11 @@ export default function PlanVyroby() {
             projectBlockCount={forecast.forecastBlocks.filter(b => b.source === "project_estimate").length}
             isGenerating={forecast.isGenerating}
             onCommitAll={async () => {
+              await forecast.commitRealBundleOverrides(moveBundleToWeek);
               await forecast.commitBlocks(forecast.forecastBlocks.map(b => b.id));
             }}
             onCommitSelected={async () => {
+              await forecast.commitRealBundleOverrides(moveBundleToWeek);
               await forecast.commitBlocks(Array.from(forecast.selectedBlockIds));
             }}
             onCommitInboxOnly={async () => {

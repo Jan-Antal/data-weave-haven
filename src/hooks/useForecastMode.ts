@@ -22,22 +22,33 @@ export interface ForecastBlock {
   selected?: boolean;
 }
 
+/** Tracks a real bundle move that only lives in forecast state */
+export interface RealBundleOverride {
+  projectId: string;
+  projectName: string;
+  originalWeek: string;
+  newWeek: string;
+  hours: number;
+  itemCount: number;
+}
+
 const STORAGE_KEYS: Record<ForecastPlanMode, string> = {
   respect_plan: "ami_forecast_session",
   from_scratch: "ami_forecast_session_scratch",
 };
 
-function saveToStorage(mode: ForecastPlanMode, blocks: ForecastBlock[], selectedIds: Set<string>) {
+function saveToStorage(mode: ForecastPlanMode, blocks: ForecastBlock[], selectedIds: Set<string>, overrides: RealBundleOverride[]) {
   try {
     localStorage.setItem(STORAGE_KEYS[mode], JSON.stringify({
       blocks,
       selectedBlockIds: Array.from(selectedIds),
+      realBundleOverrides: overrides,
       timestamp: Date.now(),
     }));
   } catch { /* ignore */ }
 }
 
-function loadFromStorage(mode: ForecastPlanMode): { blocks: ForecastBlock[]; selectedIds: Set<string> } | null {
+function loadFromStorage(mode: ForecastPlanMode): { blocks: ForecastBlock[]; selectedIds: Set<string>; overrides: RealBundleOverride[] } | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS[mode]);
     if (!raw) return null;
@@ -46,6 +57,7 @@ function loadFromStorage(mode: ForecastPlanMode): { blocks: ForecastBlock[]; sel
     return {
       blocks: data.blocks,
       selectedIds: new Set<string>(data.selectedBlockIds || []),
+      overrides: Array.isArray(data.realBundleOverrides) ? data.realBundleOverrides : [],
     };
   } catch {
     return null;
@@ -75,6 +87,11 @@ interface UseForecastModeReturn {
   removeForecastBlock: (blockId: string) => void;
   resetAndRegenerate: (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => Promise<void>;
   loadSavedSession: (modeOverride?: ForecastPlanMode) => boolean;
+  /** Track a real bundle drag as a forecast-only override */
+  realBundleOverrides: RealBundleOverride[];
+  addRealBundleOverride: (projectId: string, projectName: string, originalWeek: string, newWeek: string, hours: number, itemCount: number) => void;
+  /** Commit real bundle overrides to Supabase via moveBundleToWeek */
+  commitRealBundleOverrides: (moveBundleToWeek: (projectId: string, sourceWeek: string, targetWeek: string) => Promise<void>) => Promise<void>;
 }
 
 export function useForecastMode(): UseForecastModeReturn {
@@ -83,18 +100,20 @@ export function useForecastMode(): UseForecastModeReturn {
   const [forecastBlocks, setForecastBlocks] = useState<ForecastBlock[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
+  const [realBundleOverrides, setRealBundleOverrides] = useState<RealBundleOverride[]>([]);
   const generationTokenRef = useRef(0);
 
   // Persist to localStorage whenever blocks or selection changes
   useEffect(() => {
     if (forecastActive && forecastBlocks.length > 0) {
-      saveToStorage(planMode, forecastBlocks, selectedBlockIds);
+      saveToStorage(planMode, forecastBlocks, selectedBlockIds, realBundleOverrides);
     }
-  }, [forecastBlocks, selectedBlockIds, planMode, forecastActive]);
+  }, [forecastBlocks, selectedBlockIds, planMode, forecastActive, realBundleOverrides]);
 
   const resetForecastState = useCallback(() => {
     setForecastBlocks([]);
     setSelectedBlockIds(new Set());
+    setRealBundleOverrides([]);
     setIsGenerating(false);
   }, []);
 
@@ -104,6 +123,7 @@ export function useForecastMode(): UseForecastModeReturn {
     if (saved) {
       setForecastBlocks(saved.blocks);
       setSelectedBlockIds(saved.selectedIds);
+      setRealBundleOverrides(saved.overrides);
       return true;
     }
     return false;
@@ -116,7 +136,6 @@ export function useForecastMode(): UseForecastModeReturn {
   const setForecastActive = useCallback((v: boolean) => {
     setForecastActiveRaw(v);
     if (!v) {
-      // Keep localStorage intact so it loads next time
       generationTokenRef.current += 1;
       resetForecastState();
     }
@@ -165,7 +184,6 @@ export function useForecastMode(): UseForecastModeReturn {
       const rawBlocks: ForecastBlock[] = Array.isArray(data?.blocks) ? data.blocks : [];
       const blocks = rawBlocks.map(block => ({ ...block }));
 
-      // Debug: log week distribution
       const weekSet = new Set(blocks.map(b => b.week));
       console.log(`[Forecast] Generated ${blocks.length} blocks across weeks:`, Array.from(weekSet).sort());
       console.log(`[Forecast] By source: existing_plan=${blocks.filter(b=>b.source==="existing_plan").length}, inbox_item=${blocks.filter(b=>b.source==="inbox_item").length}, project_estimate=${blocks.filter(b=>b.source==="project_estimate").length}`);
@@ -211,6 +229,33 @@ export function useForecastMode(): UseForecastModeReturn {
     await generateForecast(weeklyCapacityHours, mode);
   }, [planMode, resetForecastState, generateForecast]);
 
+  // --- Real bundle override logic ---
+  const addRealBundleOverride = useCallback((projectId: string, projectName: string, originalWeek: string, newWeek: string, hours: number, itemCount: number) => {
+    setRealBundleOverrides(prev => {
+      // Check if there's already an override for this project — update it or chain it
+      const existing = prev.find(o => o.projectId === projectId && o.newWeek === originalWeek);
+      if (existing) {
+        // The bundle was already overridden to originalWeek; update its newWeek
+        return prev.map(o => o === existing ? { ...o, newWeek } : o);
+      }
+      return [...prev, { projectId, projectName, originalWeek, newWeek, hours, itemCount }];
+    });
+    toast({ title: `📋 ${projectName} přesunut do nového týdne (forecast)` });
+  }, []);
+
+  const commitRealBundleOverrides = useCallback(async (moveBundleToWeek: (projectId: string, sourceWeek: string, targetWeek: string) => Promise<void>) => {
+    if (realBundleOverrides.length === 0) return;
+    try {
+      for (const override of realBundleOverrides) {
+        await moveBundleToWeek(override.projectId, override.originalWeek, override.newWeek);
+      }
+      toast({ title: `✅ ${realBundleOverrides.length} přesunů bundlů zapsáno` });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  }, [realBundleOverrides]);
+
   const commitBlocks = useCallback(async (blockIds?: string[]) => {
     const toCommit = blockIds
       ? forecastBlocks.filter(b => blockIds.includes(b.id))
@@ -218,7 +263,7 @@ export function useForecastMode(): UseForecastModeReturn {
 
     const committable = toCommit.filter(b => b.source === "inbox_item" || b.source === "project_estimate");
 
-    if (committable.length === 0) {
+    if (committable.length === 0 && realBundleOverrides.length === 0) {
       toast({ title: "Žádné bloky k potvrzení" });
       return;
     }
@@ -242,7 +287,6 @@ export function useForecastMode(): UseForecastModeReturn {
         if (error) throw error;
       }
 
-      // Clear localStorage for this mode on commit
       clearStorage(planMode);
       generationTokenRef.current += 1;
       setForecastActiveRaw(false);
@@ -251,7 +295,7 @@ export function useForecastMode(): UseForecastModeReturn {
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
-  }, [forecastBlocks, selectedBlockIds, resetForecastState, planMode]);
+  }, [forecastBlocks, selectedBlockIds, resetForecastState, planMode, realBundleOverrides]);
 
   const commitInboxOnly = useCallback(async () => {
     const inboxBlocks = forecastBlocks.filter(b => b.source === "inbox_item" && selectedBlockIds.has(b.id));
@@ -281,5 +325,8 @@ export function useForecastMode(): UseForecastModeReturn {
     removeForecastBlock,
     resetAndRegenerate,
     loadSavedSession,
+    realBundleOverrides,
+    addRealBundleOverride,
+    commitRealBundleOverrides,
   };
 }
