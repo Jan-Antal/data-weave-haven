@@ -116,6 +116,7 @@ interface CancelState {
 export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeProp, onNavigateToTPV, onOpenProjectDetail, disableDropZone, selectedProjectId, onSelectProject, searchQuery = "", forecastActive }: InboxPanelProps) {
   const displayMode: DisplayMode = displayModeProp ?? (showCzk ? "czk" : "hours");
   const { data: projects = [], isLoading } = useProductionInbox();
+  useBlockerAutoReduce(projects.length > 0 ? projects : undefined);
   const { data: progressData } = useProductionProgress();
   const { data: settings } = useProductionSettings();
   const { data: allDbProjects = [] } = useProjects();
