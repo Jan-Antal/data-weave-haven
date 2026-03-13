@@ -420,6 +420,29 @@ export function useForecastMode(): UseForecastModeReturn {
     });
   }, [forecastBlocks]);
 
+  const restoreToWeek = useCallback((projectId: string, targetWeek: string) => {
+    setSafetyNetProjects(prev => {
+      const project = prev.find(p => p.project_id === projectId);
+      if (!project) return prev;
+      const newBlock: ForecastBlock = {
+        id: crypto.randomUUID(),
+        project_id: project.project_id,
+        project_name: project.project_name,
+        bundle_description: `${project.project_name} — Rezerva kapacity`,
+        week: targetWeek,
+        estimated_hours: project.estimated_hours,
+        confidence: "low",
+        source: "project_estimate",
+        is_forecast: true,
+        selected: true,
+      };
+      setForecastBlocks(fb => [...fb, newBlock]);
+      setSelectedBlockIds(sel => new Set(sel).add(newBlock.id));
+      toast({ title: `🔄 ${project.project_name} → T${targetWeek.slice(5)}` });
+      return prev.filter(p => p.project_id !== projectId);
+    });
+  }, []);
+
   return {
     forecastActive,
     setForecastActive,
@@ -448,5 +471,6 @@ export function useForecastMode(): UseForecastModeReturn {
     commitRealBundleOverrides,
     safetyNetProjects,
     restoreFromSafetyNet,
+    restoreToWeek,
   };
 }
