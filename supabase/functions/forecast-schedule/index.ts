@@ -47,8 +47,19 @@ serve(async (req) => {
     currentMonday.setDate(today.getDate() + mondayOffset);
     currentMonday.setHours(0, 0, 0, 0);
 
+    // Determine how many weeks to generate: at least 16, or deadline+8
+    let maxWeekCount = 16;
+    for (const proj of (projectsRes.data || [])) {
+      const dl = proj.expedice || proj.montaz || proj.predani || proj.datum_smluvni;
+      if (dl) {
+        const dlDate = new Date(dl);
+        const diffWeeks = Math.ceil((dlDate.getTime() - currentMonday.getTime()) / (7 * 86400000));
+        if (diffWeeks + 8 > maxWeekCount) maxWeekCount = diffWeeks + 8;
+      }
+    }
+
     const weekKeys: string[] = [];
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < maxWeekCount; i++) {
       const d = new Date(currentMonday);
       d.setDate(currentMonday.getDate() + i * 7);
       const y = d.getFullYear();
