@@ -139,6 +139,7 @@ export default function PlanVyroby() {
   const { data: allProjects = [] } = useProjects();
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
+  const { data: inboxProjects = [] } = useProductionInbox();
 
   // Build PM lookup for search
   const projectPmMap = useMemo(() => {
