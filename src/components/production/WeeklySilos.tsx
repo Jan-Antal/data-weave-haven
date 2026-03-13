@@ -599,6 +599,10 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               selectedProjectId={selectedProjectId}
               onSelectProject={onSelectProject}
               searchQuery={searchQuery}
+              forecastBlocks={forecastBlocks}
+              forecastSelectedIds={forecastSelectedIds}
+              onToggleForecastSelect={onToggleForecastSelect}
+              forecastDarkMode={forecastDarkMode}
             />
           ))}
         </div>
