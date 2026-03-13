@@ -132,6 +132,7 @@ serve(async (req) => {
     }
 
     const blocks: any[] = [];
+    const safetyNet: any[] = [];
     let blockIdx = 0;
     const projectMap = new Map(projects.map(p => [p.project_id, p]));
 
@@ -173,7 +174,12 @@ serve(async (req) => {
         processedProjects.add(projectId);
         const proj = projectMap.get(projectId);
         const dl = resolveDeadline(proj || {});
-        if (!dl.date) continue; // skip projects without deadline
+        if (!dl.date) {
+          const inboxH = inboxByProject.get(projectId) || 0;
+          safetyNet.push({ project_id: projectId, project_name: proj?.project_name || projectId, estimated_hours: Math.round(hours + inboxH), source: "scheduled" });
+          if (inboxByProject.has(projectId)) processedProjects.add(projectId);
+          continue;
+        }
         const hasInbox = inboxByProject.has(projectId);
         const inboxHours = inboxByProject.get(projectId) || 0;
         const projTpv = tpvItems.filter(t => t.project_id === projectId);
@@ -196,7 +202,10 @@ serve(async (req) => {
         processedProjects.add(projectId);
         const proj = projectMap.get(projectId);
         const dl = resolveDeadline(proj || {});
-        if (!dl.date) continue;
+        if (!dl.date) {
+          safetyNet.push({ project_id: projectId, project_name: proj?.project_name || projectId, estimated_hours: Math.round(hours), source: "inbox" });
+          continue;
+        }
         const projTpv = tpvItems.filter(t => t.project_id === projectId);
         allWork.push({
           projectId,
@@ -214,7 +223,14 @@ serve(async (req) => {
       for (const proj of projects) {
         if (processedProjects.has(proj.project_id)) continue;
         const dl = resolveDeadline(proj);
-        if (!dl.date) continue;
+        if (!dl.date) {
+          const projTpvEst = tpvItems.filter(t => t.project_id === proj.project_id);
+          const tpvH = projTpvEst.reduce((s, t) => s + (Number(t.pocet) || 0), 0);
+          let estH = tpvH > 0 ? tpvH : (proj.prodejni_cena ? Math.round(Number(proj.prodejni_cena) / 500) : 0);
+          if (estH <= 0) estH = 40;
+          safetyNet.push({ project_id: proj.project_id, project_name: proj.project_name, estimated_hours: estH, source: "unplanned" });
+          continue;
+        }
         const projTpv = tpvItems.filter(t => t.project_id === proj.project_id);
         const tpvHours = projTpv.reduce((s, t) => s + (Number(t.pocet) || 0), 0);
         let estimatedHours = tpvHours > 0
@@ -321,6 +337,11 @@ serve(async (req) => {
           : (proj.prodejni_cena ? Math.round(Number(proj.prodejni_cena) / 500) : 0);
         if (estimatedHours <= 0) estimatedHours = 40;
 
+        if (!dl.date) {
+          safetyNet.push({ project_id: proj.project_id, project_name: proj.project_name, estimated_hours: estimatedHours, source: "unplanned" });
+          continue;
+        }
+
         const confidence = tpvHours > 0 ? "medium" : "low";
         const tpvCount = projTpv.length || 1;
         const weekAllocs = distributeHours(estimatedHours, trackUsage, dl.date);
@@ -344,9 +365,9 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Forecast generated: ${blocks.length} blocks (${blocks.filter(b => b.source === "existing_plan").length} real, ${blocks.filter(b => b.source === "inbox_item").length} inbox, ${blocks.filter(b => b.source === "project_estimate").length} AI)`);
+    console.log(`Forecast generated: ${blocks.length} blocks (${blocks.filter(b => b.source === "existing_plan").length} real, ${blocks.filter(b => b.source === "inbox_item").length} inbox, ${blocks.filter(b => b.source === "project_estimate").length} AI), safetyNet: ${safetyNet.length}`);
 
-    return new Response(JSON.stringify({ blocks, weekKeys, weekUsage }), {
+    return new Response(JSON.stringify({ blocks, weekKeys, weekUsage, safetyNet }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

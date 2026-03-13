@@ -24,6 +24,7 @@ import { parseAppDate } from "@/lib/dateFormat";
 import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
 import { resolveDeadline } from "@/lib/deadlineWarning";
 import { ForecastWeekContent, ForecastSplitDialog } from "./ForecastOverlay";
+import { ForecastSafetyNet, type SafetyNetProject } from "./ForecastSafetyNet";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -94,6 +95,7 @@ interface Props {
   onMoveForecastBlock?: (blockId: string, newWeek: string) => void;
   onRemoveForecastBlock?: (blockId: string) => void;
   onSplitForecastBlock?: (blockId: string, keepHours: number, splitWeek: string) => void;
+  forecastSafetyNet?: SafetyNetProject[];
 }
 
 interface ContextMenuState {
@@ -158,7 +160,7 @@ interface CancelState {
   cancelAll?: boolean;
 }
 
-export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock, onSplitForecastBlock }: Props) {
+export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock, onSplitForecastBlock, forecastSafetyNet }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
@@ -691,6 +693,13 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
         </button>
         <span className="text-[9px] font-medium" style={{ color: forecastDarkMode ? "#6b7280" : "#99a5a3" }}>{visiblePeriodLabel}</span>
       </div>
+
+      {/* Safety net panel */}
+      {forecastDarkMode && forecastSafetyNet && forecastSafetyNet.length > 0 && (
+        <div className="px-2 pt-2">
+          <ForecastSafetyNet projects={forecastSafetyNet} />
+        </div>
+      )}
 
       {/* Silos */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden" ref={scrollContainerRef}>

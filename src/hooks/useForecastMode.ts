@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import type { SafetyNetProject } from "@/components/production/ForecastSafetyNet";
 
 export type ForecastConfidence = "high" | "medium" | "low";
 export type ForecastSource = "existing_plan" | "inbox_item" | "project_estimate";
@@ -93,6 +94,7 @@ interface UseForecastModeReturn {
   addRealBundleOverride: (projectId: string, projectName: string, originalWeek: string, newWeek: string, hours: number, itemCount: number) => void;
   /** Commit real bundle overrides to Supabase via moveBundleToWeek */
   commitRealBundleOverrides: (moveBundleToWeek: (projectId: string, sourceWeek: string, targetWeek: string) => Promise<void>) => Promise<void>;
+  safetyNetProjects: SafetyNetProject[];
 }
 
 export function useForecastMode(): UseForecastModeReturn {
@@ -102,6 +104,7 @@ export function useForecastMode(): UseForecastModeReturn {
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
   const [realBundleOverrides, setRealBundleOverrides] = useState<RealBundleOverride[]>([]);
+  const [safetyNetProjects, setSafetyNetProjects] = useState<SafetyNetProject[]>([]);
   const generationTokenRef = useRef(0);
 
   // Persist to localStorage whenever blocks or selection changes
@@ -115,6 +118,7 @@ export function useForecastMode(): UseForecastModeReturn {
     setForecastBlocks([]);
     setSelectedBlockIds(new Set());
     setRealBundleOverrides([]);
+    setSafetyNetProjects([]);
     setIsGenerating(false);
   }, []);
 
@@ -191,6 +195,7 @@ export function useForecastMode(): UseForecastModeReturn {
 
       setForecastBlocks(blocks);
       setSelectedBlockIds(new Set(blocks.map(b => b.id)));
+      setSafetyNetProjects(Array.isArray(data?.safetyNet) ? data.safetyNet : []);
 
       if (blocks.length === 0) {
         toast({ title: "Forecast", description: "Žádné položky k naplánování." });
@@ -351,5 +356,6 @@ export function useForecastMode(): UseForecastModeReturn {
     realBundleOverrides,
     addRealBundleOverride,
     commitRealBundleOverrides,
+    safetyNetProjects,
   };
 }
