@@ -977,7 +977,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
               className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-[13px] font-medium transition-all ${
                 displayMode === m.key
                   ? forecastActive ? "bg-amber-600 text-white shadow-sm" : "bg-primary text-primary-foreground shadow-sm"
-                  : forecastActive ? "text-gray-400 hover:text-gray-200" : "text-muted-foreground hover:text-foreground"
+                  : forecastActive ? "text-[#a8c5c2] hover:text-white" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {m.label}
