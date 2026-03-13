@@ -31,6 +31,14 @@ function formatCompactCzk(v: number): string {
   return `${Math.round(v)}`;
 }
 
+/** Timezone-safe YYYY-MM-DD from local Date */
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function getMonday(date: Date): Date {
   const d = new Date(date);
   const day = d.getDay();
