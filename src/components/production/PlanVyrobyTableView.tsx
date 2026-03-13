@@ -1212,7 +1212,28 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
 
           {/* Project rows */}
           <div className="flex flex-col" style={{ gap: 6, paddingTop: 6 }}>
-            {filteredRows.filter(r => !r.isBlockerOnly).map(proj => {
+            {(() => {
+              const regular = filteredRows.filter(r => !r.isBlockerOnly);
+              const blockers = filteredRows.filter(r => r.isBlockerOnly);
+              const combined = [...regular];
+              if (blockers.length > 0) {
+                combined.push({ __separator: true, count: blockers.length } as any);
+                combined.push(...blockers);
+              }
+              return combined;
+            })().map((proj: any) => {
+              if (proj.__separator) {
+                return (
+                  <div key="blocker-separator" className="flex items-center gap-2 mt-3 mb-1 px-2">
+                    <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+                    <span className="px-2 whitespace-nowrap" style={{ fontSize: 11, color: "#6b7280" }}>
+                      ⏳ Rezerva kapacit ({proj.count})
+                    </span>
+                    <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+                  </div>
+                );
+              }
+            {
               const isExpanded = expandedProjects.has(proj.projectId);
               const isOverdueProject = (() => {
                 const pd = projectDateLookup.get(proj.projectId);
