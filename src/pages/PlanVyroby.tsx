@@ -615,13 +615,19 @@ export default function PlanVyroby() {
 }
 
 
-function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange }: {
+function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating }: {
   viewTab: "kanban" | "table";
   setViewTab: (v: "kanban" | "table") => void;
   displayMode: DisplayMode;
   onDisplayModeChange: (m: DisplayMode) => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
+  forecastActive: boolean;
+  onForecastToggle: (v: boolean) => void;
+  forecastPlanMode: "respect_plan" | "from_scratch";
+  onForecastPlanModeChange: (m: "respect_plan" | "from_scratch") => void;
+  isOwner: boolean;
+  isGenerating: boolean;
 }) {
   const { data: settings } = useProductionSettings();
   const { data: scheduleData } = useProductionSchedule();
