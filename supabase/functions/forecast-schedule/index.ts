@@ -132,6 +132,7 @@ serve(async (req) => {
     }
 
     const blocks: any[] = [];
+    const safetyNet: any[] = [];
     let blockIdx = 0;
     const projectMap = new Map(projects.map(p => [p.project_id, p]));
 
