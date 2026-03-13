@@ -54,6 +54,12 @@ export function useProductionProgress() {
         const pid = row.project_id;
         const pName = (row as any).projects?.project_name;
         if (pName && !projectNames.has(pid)) projectNames.set(pid, pName);
+        const isBlocker = !!(row as any).is_blocker;
+        if (isBlocker) {
+          blockerCountByProject.set(pid, (blockerCountByProject.get(pid) || 0) + 1);
+        } else {
+          nonBlockerCountByProject.set(pid, (nonBlockerCountByProject.get(pid) || 0) + 1);
+        }
         if (row.status === "completed") {
           completedByProject.set(pid, (completedByProject.get(pid) || 0) + 1);
         } else if (row.status === "paused") {
