@@ -208,8 +208,8 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
       if (URGENCY_ORDER[uA] !== URGENCY_ORDER[uB]) return URGENCY_ORDER[uA] - URGENCY_ORDER[uB];
       const dlA = resolveDeadline(infoA || {});
       const dlB = resolveDeadline(infoB || {});
-      const dA = dlA ? parseAppDate(dlA.date)?.getTime() ?? Infinity : Infinity;
-      const dB = dlB ? parseAppDate(dlB.date)?.getTime() ?? Infinity : Infinity;
+      const dA = dlA ? dlA.date.getTime() : Infinity;
+      const dB = dlB ? dlB.date.getTime() : Infinity;
       return dA - dB;
     });
   }, [projects, projectInfoMap]);
