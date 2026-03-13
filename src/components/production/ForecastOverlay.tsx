@@ -128,22 +128,24 @@ function ForecastCard({
       className="rounded-lg px-2.5 py-2 cursor-pointer transition-all relative"
       style={{
         backgroundColor: style.backgroundColor,
-        borderWidth: 1.5,
-        borderStyle: "dashed",
+        borderWidth: style.borderWidth,
+        borderStyle: block.source === "existing_plan" ? "solid" : "dashed",
         borderColor: style.borderColor,
-        opacity: isSelected ? 1 : 0.6,
+        opacity: isSelected ? 1 : 0.55,
         boxShadow: isSelected ? `0 0 0 1px ${style.borderColor}40` : undefined,
       }}
     >
-      {/* Badge top-right */}
-      <div
-        className="absolute top-1.5 right-1.5 flex items-center gap-0.5 rounded px-1 py-0.5"
-        style={{ backgroundColor: style.badgeBg, fontSize: 9, color: style.badgeColor, fontWeight: 600 }}
-      >
-        {style.badgeIcon === "sparkles" && <Sparkles className="h-2.5 w-2.5" />}
-        {style.badgeIcon === "inbox" && <Inbox className="h-2.5 w-2.5" />}
-        {style.badgeLabel}
-      </div>
+      {/* Badge top-right — only for inbox and AI cards */}
+      {style.badgeLabel && (
+        <div
+          className="absolute top-1.5 right-1.5 flex items-center gap-0.5 rounded-full px-1.5 py-0.5"
+          style={{ backgroundColor: style.badgeBg, fontSize: 10, color: style.badgeColor, fontWeight: 600 }}
+        >
+          {style.badgeIcon === "sparkles" && <Sparkles className="h-2.5 w-2.5" />}
+          {style.badgeIcon === "inbox" && <Inbox className="h-2.5 w-2.5" />}
+          {style.badgeLabel}
+        </div>
+      )}
 
       {/* Checkbox + content */}
       <div className="flex items-start gap-2">
@@ -169,7 +171,7 @@ function ForecastCard({
             </span>
           </div>
           <div className="flex items-center justify-between mt-0.5">
-            <span className="text-[11px] truncate" style={{ color: "#9ca3af" }}>
+            <span className="text-[11px] truncate" style={{ color: style.codeColor }}>
               {block.bundle_description}
             </span>
             <span
@@ -182,7 +184,7 @@ function ForecastCard({
           <div className="flex items-center gap-1.5 mt-0.5">
             <span
               className="text-[9px] font-mono"
-              style={{ color: "#6b7280" }}
+              style={{ color: style.codeColor }}
             >
               {block.project_id}
             </span>
