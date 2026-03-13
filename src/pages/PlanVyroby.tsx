@@ -887,11 +887,13 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
           Kanban
         </button>
         <button
-          onClick={() => setViewTab("table")}
+          onClick={() => !forecastActive && setViewTab("table")}
+          disabled={forecastActive}
           className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-[13px] font-medium transition-all ${
-            viewTab === "table"
-              ? forecastActive ? "bg-amber-600 text-white shadow-sm" : "bg-primary text-primary-foreground shadow-sm"
-              : forecastActive ? "text-gray-400 hover:text-gray-200" : "text-muted-foreground hover:text-foreground"
+            forecastActive ? "text-gray-600 cursor-not-allowed opacity-40"
+              : viewTab === "table"
+              ? "bg-primary text-primary-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
           Tabulka
