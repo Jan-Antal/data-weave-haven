@@ -538,7 +538,13 @@ export default function PlanVyroby() {
 
         {viewTab === "kanban" ? (
           <div className="flex-1 flex min-h-0" onClick={() => setSelectedProjectId(null)}>
-            {!forecast.forecastActive && (
+            {forecast.forecastActive ? (
+              <div className="w-[300px] shrink-0 flex flex-col" style={{ backgroundColor: "#1c1f26", borderRight: "1px solid #2a2f3d" }}>
+                <div className="flex-1 flex items-center justify-center">
+                  <span className="text-sm italic" style={{ color: "#4a5168" }}>Vše naplánováno</span>
+                </div>
+              </div>
+            ) : (
               <InboxPanel
                 overDroppableId={overDroppableId}
                 showCzk={showCzk}
@@ -566,6 +572,8 @@ export default function PlanVyroby() {
               onToggleForecastSelect={forecast.forecastActive ? forecast.toggleBlockSelection : undefined}
               forecastDarkMode={forecast.forecastActive}
               forecastPlanMode={forecast.forecastActive ? forecast.planMode : undefined}
+              onMoveForecastBlock={forecast.forecastActive ? forecast.moveForecastBlock : undefined}
+              onRemoveForecastBlock={forecast.forecastActive ? forecast.removeForecastBlock : undefined}
             />
             <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />
           </div>
