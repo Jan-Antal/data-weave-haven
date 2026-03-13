@@ -398,18 +398,19 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                   {canManageTPV && <TableCell><Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} /></TableCell>}
                   {!canManageTPV && <TableCell />}
                   {renderKeys.map(key => {
+                    const cellStyle = getTPVListColumnStyle(key, getWidth(key));
                     if (key === "item_name") return (
-                      <TableCell key={key}>
+                      <TableCell key={key} style={cellStyle}>
                         <InlineEditableCell value={item.item_name || ""} onSave={(v) => saveField(item.id, "item_name", v, item.item_name || "")} className="font-mono text-xs" readOnly={!canManageTPV} />
                       </TableCell>
                     );
                     if (key === "item_type") return (
-                      <TableCell key={key}>
+                      <TableCell key={key} style={cellStyle}>
                         <InlineEditableCell value={item.item_type || ""} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} className="font-semibold" readOnly={!canManageTPV} />
                       </TableCell>
                     );
                     if (key === "nazev_prvku") return (
-                      <TableCell key={key}>
+                      <TableCell key={key} style={cellStyle}>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="max-w-[300px] truncate">
@@ -423,7 +424,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                       </TableCell>
                     );
                     if (key === "konstrukter") return (
-                      <TableCell key={key}>
+                      <TableCell key={key} style={cellStyle}>
                         <InlineEditableCell value={item.konstrukter || ""} type="people" peopleRole="Konstruktér" onSave={(v) => saveField(item.id, "konstrukter", v, item.konstrukter || "")} readOnly={!canManageTPV} />
                       </TableCell>
                     );
@@ -435,14 +436,14 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                           {item.status}
                         </span>
                       ) : undefined;
-                      return <TableCell key={key}><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} displayValue={statusDisplay} onSave={(v) => saveField(item.id, "status", v, item.status || "")} readOnly={!canManageTPV} /></TableCell>;
+                      return <TableCell key={key} style={cellStyle}><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} displayValue={statusDisplay} onSave={(v) => saveField(item.id, "status", v, item.status || "")} readOnly={!canManageTPV} /></TableCell>;
                     }
                     if (key === "vyroba_status") {
                       const itemKey = item.item_name || item.item_type;
                       const statuses = productionStatusMap.get(itemKey);
                       if (!statuses || statuses.length === 0) {
                         return (
-                          <TableCell key={key}>
+                          <TableCell key={key} style={cellStyle}>
                             <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: "#f0eee9", color: "#99a5a3", borderColor: "#e2ddd6" }}>
                               Neodesláno
                             </span>
@@ -450,7 +451,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                         );
                       }
                       return (
-                        <TableCell key={key}>
+                        <TableCell key={key} style={cellStyle}>
                           <div className="flex flex-wrap gap-0.5">
                             {statuses.map((s, idx) => (
                               <span
@@ -471,11 +472,11 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                       );
                     }
                     // remaining columns: sent_date, accepted_date, notes, pocet, cena, custom fields
-                    if (key === "sent_date") return <TableCell key={key}><InlineEditableCell value={item.sent_date || ""} type="date" onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>;
-                    if (key === "accepted_date") return <TableCell key={key}><InlineEditableCell value={item.accepted_date || ""} type="date" onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>;
-                    if (key === "notes") return <TableCell key={key}><InlineEditableCell value={item.notes || ""} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} readOnly={!canManageTPV} /></TableCell>;
-                    if (key === "pocet") return <TableCell key={key}><InlineEditableCell value={String(item.pocet ?? "")} type="number" onSave={(v) => saveField(item.id, "pocet", v, String(item.pocet ?? ""))} readOnly={!canManageTPV} /></TableCell>;
-                    if (key === "cena") return <TableCell key={key} className="text-right"><span className="text-xs font-mono">{formatCurrency(item.cena, currency)}</span></TableCell>;
+                    if (key === "sent_date") return <TableCell key={key} style={cellStyle}><InlineEditableCell value={item.sent_date || ""} type="date" onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>;
+                    if (key === "accepted_date") return <TableCell key={key} style={cellStyle}><InlineEditableCell value={item.accepted_date || ""} type="date" onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>;
+                    if (key === "notes") return <TableCell key={key} style={cellStyle}><InlineEditableCell value={item.notes || ""} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} readOnly={!canManageTPV} /></TableCell>;
+                    if (key === "pocet") return <TableCell key={key} style={cellStyle}><InlineEditableCell value={String(item.pocet ?? "")} type="number" onSave={(v) => saveField(item.id, "pocet", v, String(item.pocet ?? ""))} readOnly={!canManageTPV} /></TableCell>;
+                    if (key === "cena") return <TableCell key={key} style={cellStyle} className="text-right"><span className="text-xs font-mono">{formatCurrency(item.cena, currency)}</span></TableCell>;
                     // Custom columns
                     if (key.startsWith("custom_") && customColumns) {
                       const def = customColumns.find(c => c.column_key === key);
