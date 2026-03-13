@@ -554,6 +554,12 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
 
   const formatItemTotal = (item: ItemRow) => {
     if (displayMode === "czk") return formatCzkShort(Math.round(item.totalCzk)) + " Kč";
+    if (displayMode === "percent") {
+      const totalProjectHours = item.totalHours;
+      // Show as % of total weekly capacity across all weeks
+      const totalCap = weeks.reduce((s, w) => s + getWeekCapacity(w.key), 0);
+      return `${totalCap > 0 ? Math.round((totalProjectHours / totalCap) * 100) : 0}%`;
+    }
     return `${Math.round(item.totalHours)}h`;
   };
 
