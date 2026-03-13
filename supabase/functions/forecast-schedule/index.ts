@@ -196,6 +196,7 @@ serve(async (req) => {
           deadlineSource: dl.source,
           tpvCount: projTpv.length || 1,
           confidence: "high",
+          originalWeeks: originalWeeksByProject.get(projectId),
         });
         if (hasInbox) processedProjects.add(projectId);
       }
