@@ -227,7 +227,7 @@ function DraggableSafetyNetRow({
   isExpanded,
   items,
   isLoading,
-  badge,
+  deadlineInfo,
   isMultiSelected,
   onToggleExpand,
   onClick,
