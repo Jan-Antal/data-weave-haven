@@ -97,10 +97,15 @@ export function useProductionProgress() {
         const accountedFor = inInbox + scheduled + completed + paused;
         const missing = Math.max(0, totalTpv - accountedFor);
         
+        const blockerCount = blockerCountByProject.get(pid) || 0;
+        const nonBlockerCount = nonBlockerCountByProject.get(pid) || 0;
+        const isBlockerOnly = blockerCount > 0 && nonBlockerCount === 0 && inInbox === 0;
+        
         result.set(pid, {
           project_id: pid, project_name: projectNames.get(pid) || pid, total_tpv: totalTpv,
           in_inbox: inInbox, scheduled, completed, paused, missing,
           is_complete: missing === 0 && inInbox === 0 && paused === 0 && (scheduled + completed) > 0,
+          is_blocker_only: isBlockerOnly,
           scheduled_items: scheduledItemsByProject.get(pid) || [],
         });
       }
