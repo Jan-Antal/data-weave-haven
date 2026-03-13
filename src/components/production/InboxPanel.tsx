@@ -578,7 +578,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
           const urgency = getUrgency(info?.datum_smluvni, info?.status);
           return (
             <InboxProjectGroup key={`${project.project_id}-${expandKey}`} project={project} hourlyRate={hourlyRate}
-              defaultExpanded={allExpanded} showCzk={showCzk} progress={progressData?.get(project.project_id)}
+              defaultExpanded={allExpanded} displayMode={displayMode} progress={progressData?.get(project.project_id)}
               onNavigateToTPV={onNavigateToTPV}
               onOpenProjectDetail={onOpenProjectDetail}
               onProjectContextMenu={handleProjectContextMenu}
