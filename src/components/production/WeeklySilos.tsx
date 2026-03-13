@@ -572,7 +572,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
         <button
           onClick={() => { const el = scrollContainerRef.current; if (el) el.scrollTo({ left: 4 * 259, behavior: "smooth" }); }}
           className="px-2 py-[3px] text-[10px] font-medium rounded transition-colors"
-          style={{ backgroundColor: "#ffffff", color: "#6b7a78", border: "1px solid #e2ddd6", cursor: "pointer" }}
+          style={{ backgroundColor: forecastDarkMode ? "#1a1d2e" : "#ffffff", color: forecastDarkMode ? "#9ca3af" : "#6b7a78", border: forecastDarkMode ? "1px solid #2a2f3d" : "1px solid #e2ddd6", cursor: "pointer" }}
         >
           Tento týden
         </button>
