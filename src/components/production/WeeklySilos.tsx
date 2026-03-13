@@ -906,7 +906,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
       transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, box-shadow 150ms",
     }}>
 
-      <div className="flex" style={{ borderBottom: expanded ? (forecastDarkMode ? "1px solid #2a2f3d" : "1px solid #ece8e2") : "none", backgroundColor: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : undefined) }}>
+      <div className="flex" style={{ borderBottom: expanded ? (forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2") : "none", backgroundColor: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : undefined) }}>
         {/* Left strip: expand/collapse toggle — NOT draggable */}
         <div
           className="shrink-0 flex items-center justify-center cursor-pointer select-none"

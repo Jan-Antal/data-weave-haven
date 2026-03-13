@@ -868,7 +868,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
 
         {/* Forecast toggle — owner only */}
         {isOwner && (
-          <div className="flex items-center gap-1.5 ml-2 pl-2" style={{ borderLeft: forecastActive ? "1px solid #2a2d3e" : "1px solid hsl(var(--border))" }}>
+          <div className="flex items-center gap-1.5 ml-2 pl-2" style={{ borderLeft: forecastActive ? "1px solid #2a2f3d" : "1px solid hsl(var(--border))" }}>
             <Sparkles className="h-3.5 w-3.5" style={{ color: forecastActive ? "#f59e0b" : "#9ca3af" }} />
             <span className="text-[12px] font-medium" style={{ color: forecastActive ? "#f59e0b" : "#6b7280" }}>Forecast</span>
             <Switch

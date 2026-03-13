@@ -41,7 +41,7 @@ function getSourceStyle(source: ForecastSource, confidence: string) {
   // project_estimate (amber/AI)
   return {
     borderColor: confidence === "low" ? "#ef4444" : confidence === "medium" ? "#f97316" : "#f59e0b",
-    backgroundColor: "#1a1500",
+    backgroundColor: "#1a1400",
     nameColor: "#fcd34d",
     badgeLabel: "AI",
     badgeBg: "rgba(245,158,11,0.2)",
