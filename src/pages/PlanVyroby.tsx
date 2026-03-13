@@ -139,6 +139,27 @@ export default function PlanVyroby() {
   const { data: allProjects = [] } = useProjects();
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
+
+  // Compute weekKeys for search navigation
+  const searchWeekKeys = useMemo(() => {
+    const keys = new Set<string>();
+    if (scheduleData) {
+      for (const k of scheduleData.keys()) keys.add(k);
+    }
+    if (forecast.forecastActive && forecast.forecastBlocks) {
+      for (const b of forecast.forecastBlocks) keys.add(b.week);
+    }
+    return Array.from(keys).sort();
+  }, [scheduleData, forecast.forecastActive, forecast.forecastBlocks]);
+
+  const searchNav = useSearchNavigation({
+    query: searchQuery,
+    scheduleData,
+    forecastBlocks: forecast.forecastActive ? forecast.forecastBlocks : undefined,
+    forecastActive: forecast.forecastActive,
+    forecastPlanMode: forecast.forecastActive ? forecast.planMode : undefined,
+    weekKeys: searchWeekKeys,
+  });
   const {
     moveInboxItemToWeek,
     moveInboxProjectToWeek,
