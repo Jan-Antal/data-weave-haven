@@ -270,6 +270,10 @@ export function useForecastMode(): UseForecastModeReturn {
     });
   }, []);
 
+  const addForecastBlock = useCallback((block: ForecastBlock) => {
+    setForecastBlocks(prev => [...prev, block]);
+  }, []);
+
   const splitForecastBlock = useCallback((blockId: string, keepHours: number, splitWeek: string) => {
     setForecastBlocks(prev => {
       const block = prev.find(b => b.id === blockId);
