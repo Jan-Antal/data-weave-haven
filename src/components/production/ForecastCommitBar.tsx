@@ -9,6 +9,8 @@ interface ForecastCommitBarProps {
   isGenerating: boolean;
   onCommitSelected: () => void;
   onCancel: () => void;
+  onSelectAll: () => void;
+  onSelectInboxOnly: () => void;
 }
 
 export function ForecastCommitBar({
@@ -19,8 +21,22 @@ export function ForecastCommitBar({
   isGenerating,
   onCommitSelected,
   onCancel,
+  onSelectAll,
+  onSelectInboxOnly,
 }: ForecastCommitBarProps) {
   if (totalBlocks === 0 && !isGenerating) return null;
+
+  const selBtnStyle: React.CSSProperties = {
+    backgroundColor: "transparent",
+    border: "1px solid #2a4a46",
+    color: "#7aa8a4",
+    fontSize: 11,
+    padding: "2px 8px",
+    borderRadius: 3,
+    cursor: "pointer",
+    lineHeight: "18px",
+    whiteSpace: "nowrap",
+  };
 
   return (
     <div
@@ -49,6 +65,26 @@ export function ForecastCommitBar({
             </>
           )}
         </span>
+        {totalBlocks > 0 && (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={onSelectAll}
+              style={selBtnStyle}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = "rgba(122,168,164,0.1)")}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+            >
+              ☐ Vše
+            </button>
+            <button
+              onClick={onSelectInboxOnly}
+              style={selBtnStyle}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = "rgba(122,168,164,0.1)")}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+            >
+              📥 Inbox
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
@@ -58,7 +94,7 @@ export function ForecastCommitBar({
             disabled={selectedCount === 0}
             onClick={onCommitSelected}
             className="text-xs font-semibold"
-            style={{ backgroundColor: "#3d7a74", color: "#ffffff" }}
+            style={{ backgroundColor: selectedCount === 0 ? "#2a3d3a" : "#3d7a74", color: selectedCount === 0 ? "#4a5a58" : "#ffffff" }}
           >
             <Check className="h-3 w-3 mr-1" />
             Zapsat vybrané ({selectedCount})
