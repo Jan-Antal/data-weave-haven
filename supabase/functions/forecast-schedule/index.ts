@@ -142,11 +142,14 @@ serve(async (req) => {
       const trackUsage: Record<string, number> = {};
       for (const wk of weekKeys) trackUsage[wk] = 0;
 
-      // Collect per-project data
+      // Collect per-project data and original weeks
       const scheduleByProject = new Map<string, number>();
+      const originalWeeksByProject = new Map<string, Set<string>>();
       for (const si of scheduleItems) {
         if (si.status === "cancelled") continue;
         scheduleByProject.set(si.project_id, (scheduleByProject.get(si.project_id) || 0) + Number(si.scheduled_hours));
+        if (!originalWeeksByProject.has(si.project_id)) originalWeeksByProject.set(si.project_id, new Set());
+        originalWeeksByProject.get(si.project_id)!.add(si.scheduled_week);
       }
 
       const inboxByProject = new Map<string, number>();
@@ -164,6 +167,7 @@ serve(async (req) => {
         deadlineSource: string;
         tpvCount: number;
         confidence: string;
+        originalWeeks?: Set<string>;
       }
 
       const allWork: ProjectWork[] = [];
@@ -192,6 +196,7 @@ serve(async (req) => {
           deadlineSource: dl.source,
           tpvCount: projTpv.length || 1,
           confidence: "high",
+          originalWeeks: originalWeeksByProject.get(projectId),
         });
         if (hasInbox) processedProjects.add(projectId);
       }
@@ -263,6 +268,12 @@ serve(async (req) => {
 
         for (const alloc of weekAllocs) {
           const proj = projectMap.get(work.projectId);
+          // Determine originalWeek: if this week was in the project's original schedule, use it; otherwise use earliest original
+          const origWeeks = work.originalWeeks;
+          let originalWeek: string | undefined;
+          if (work.source === "existing_plan" && origWeeks && origWeeks.size > 0) {
+            originalWeek = origWeeks.has(alloc.week) ? alloc.week : [...origWeeks].sort()[0];
+          }
           blocks.push({
             id: `forecast-${Date.now()}-${blockIdx++}`,
             project_id: work.projectId,
@@ -278,6 +289,7 @@ serve(async (req) => {
             deadline_source: work.deadlineSource,
             tpv_expected_date: work.source === "project_estimate" ? (proj?.datum_tpv || null) : null,
             is_forecast: true,
+            ...(originalWeek ? { originalWeek } : {}),
           });
         }
       }
