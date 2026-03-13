@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { ChevronDown, ChevronRight, AlertTriangle, RotateCcw, GripVertical, Check, CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 import { cs } from "date-fns/locale";
-import { format } from "date-fns";
+import { format, differenceInDays, isPast } from "date-fns";
+import { parseAppDate } from "@/lib/dateFormat";
 
 export interface SafetyNetProject {
   project_id: string;
