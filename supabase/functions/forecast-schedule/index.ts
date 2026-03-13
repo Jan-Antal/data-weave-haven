@@ -337,6 +337,11 @@ serve(async (req) => {
           : (proj.prodejni_cena ? Math.round(Number(proj.prodejni_cena) / 500) : 0);
         if (estimatedHours <= 0) estimatedHours = 40;
 
+        if (!dl.date) {
+          safetyNet.push({ project_id: proj.project_id, project_name: proj.project_name, estimated_hours: estimatedHours, source: "unplanned" });
+          continue;
+        }
+
         const confidence = tpvHours > 0 ? "medium" : "low";
         const tpvCount = projTpv.length || 1;
         const weekAllocs = distributeHours(estimatedHours, trackUsage, dl.date);
