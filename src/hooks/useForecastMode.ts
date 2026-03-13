@@ -171,6 +171,22 @@ export function useForecastMode(): UseForecastModeReturn {
     setSelectedBlockIds(new Set(forecastBlocks.filter(b => b.source === "inbox_item").map(b => b.id)));
   }, [forecastBlocks]);
 
+  const toggleInboxSelection = useCallback(() => {
+    const inboxIds = forecastBlocks.filter(b => b.source === "inbox_item").map(b => b.id);
+    setSelectedBlockIds(prev => {
+      const allSelected = inboxIds.length > 0 && inboxIds.every(id => prev.has(id));
+      if (allSelected) {
+        const next = new Set(prev);
+        inboxIds.forEach(id => next.delete(id));
+        return next;
+      } else {
+        const next = new Set(prev);
+        inboxIds.forEach(id => next.add(id));
+        return next;
+      }
+    });
+  }, [forecastBlocks]);
+
   const deselectAll = useCallback(() => {
     setSelectedBlockIds(new Set());
   }, []);
