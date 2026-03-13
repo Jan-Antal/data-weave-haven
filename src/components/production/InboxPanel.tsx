@@ -166,6 +166,16 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     });
   }, [projects]);
 
+  // Escape to clear reserve multi-select
+  useEffect(() => {
+    if (selectedReserves.size === 0) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setSelectedReserves(new Set()); setLastClickedReserve(null); }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [selectedReserves.size]);
+
   const { setNodeRef, isOver } = useDroppable({ id: "inbox-drop-zone", disabled: !!disableDropZone });
 
   const totalHours = useMemo(() => projects.reduce((s, p) => s + p.total_hours, 0), [projects]);
