@@ -534,11 +534,22 @@ export default function PlanVyroby() {
           }}
           isOwner={isOwner}
           isGenerating={forecast.isGenerating}
-          forecastBlockCounts={forecast.forecastActive ? {
-            real: forecast.forecastBlocks.filter(b => b.source === "existing_plan").length,
-            inbox: forecast.forecastBlocks.filter(b => b.source === "inbox_item").length,
-            ai: forecast.forecastBlocks.filter(b => b.source === "project_estimate").length,
-          } : undefined}
+          forecastBlockCounts={forecast.forecastActive ? (() => {
+            // Count real bundles from schedule data (not from forecastBlocks which only has existing_plan in from_scratch mode)
+            let realCount = 0;
+            if (scheduleData) {
+              for (const [, silo] of scheduleData) {
+                realCount += silo.bundles.length;
+              }
+            }
+            return {
+              real: forecast.planMode === "from_scratch"
+                ? forecast.forecastBlocks.filter(b => b.source === "existing_plan").length
+                : realCount,
+              inbox: forecast.forecastBlocks.filter(b => b.source === "inbox_item").length,
+              ai: forecast.forecastBlocks.filter(b => b.source === "project_estimate").length,
+            };
+          })() : undefined}
         />
 
         {viewTab === "kanban" ? (
