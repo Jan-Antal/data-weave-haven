@@ -702,15 +702,15 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   return (
     <div className="flex-1 flex flex-col min-w-0">
       {/* Toolbar */}
-      <div className="px-3 py-[6px] flex items-center justify-between shrink-0" style={{ borderBottom: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #ece8e2", backgroundColor: forecastDarkMode ? "#223937" : undefined }}>
+      <div className="px-3 py-[6px] flex items-center justify-between shrink-0" style={{ borderBottom: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #2a3d2a", backgroundColor: forecastDarkMode ? "#223937" : "#1f2d26" }}>
         <button
           onClick={() => { const el = scrollContainerRef.current; if (el) el.scrollTo({ left: 4 * 259, behavior: "smooth" }); }}
           className="px-2 py-[3px] text-[10px] font-medium rounded transition-colors"
-          style={{ backgroundColor: forecastDarkMode ? "#1f2e2c" : "#ffffff", color: forecastDarkMode ? "#a8c5c2" : "#6b7a78", border: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #e2ddd6", cursor: "pointer" }}
+          style={{ backgroundColor: forecastDarkMode ? "#1f2e2c" : "#2a3d2a", color: forecastDarkMode ? "#a8c5c2" : "#a8c5a8", border: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #3a5a3a", cursor: "pointer" }}
         >
           Tento týden
         </button>
-        <span className="text-[9px] font-medium" style={{ color: forecastDarkMode ? "#7aa8a4" : "#99a5a3" }}>{visiblePeriodLabel}</span>
+        <span className="text-[9px] font-medium" style={{ color: forecastDarkMode ? "#7aa8a4" : "#8aaa8a" }}>{visiblePeriodLabel}</span>
       </div>
 
       {/* Safety net panel */}
