@@ -933,7 +933,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
           </div>
           <button
             onClick={onResetForecast}
-            className="px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors text-gray-400 hover:text-amber-400 hover:bg-amber-900/20"
+            className="px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors text-[#a8c5c2] hover:text-amber-400 hover:bg-amber-900/20"
             title="Smazat uložený forecast a začít znovu"
           >
             ↺ Reset
