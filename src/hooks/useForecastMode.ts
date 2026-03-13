@@ -22,7 +22,6 @@ export interface ForecastBlock {
   tpv_expected_date?: string | null;
   is_forecast: true;
   selected?: boolean;
-  originalWeek?: string;
 }
 
 /** Tracks a real bundle move that only lives in forecast state */

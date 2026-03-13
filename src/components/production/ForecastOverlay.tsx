@@ -13,7 +13,7 @@ interface ForecastOverlayProps {
 }
 
 /** Source-based styling config — exact colors per spec */
-function getSourceStyle(source: ForecastSource, _confidence: string, isMoved = false) {
+function getSourceStyle(source: ForecastSource, _confidence: string) {
   if (source === "inbox_item") {
     return {
       borderColor: "#22c55e",
@@ -27,23 +27,21 @@ function getSourceStyle(source: ForecastSource, _confidence: string, isMoved = f
       badgeIcon: "inbox" as const,
       hoursColor: "#4ade80",
       hoursPrefix: "",
-      leftBorder: undefined as string | undefined,
     };
   }
   if (source === "existing_plan") {
     return {
-      borderColor: isMoved ? "#f59e0b" : "#3d4558",
-      borderWidth: isMoved ? 2 : 1,
-      backgroundColor: isMoved ? "#1a1708" : "#252a35",
-      nameColor: isMoved ? "#fcd34d" : "#c8d0e0",
-      codeColor: isMoved ? "#7a5a00" : "#5a6480",
-      badgeLabel: isMoved ? "PŘESUNUTO" : "",
-      badgeBg: isMoved ? "#451a03" : "transparent",
-      badgeColor: isMoved ? "#fcd34d" : "transparent",
-      badgeIcon: isMoved ? ("sparkles" as const) : null,
-      hoursColor: isMoved ? "#fbbf24" : "#8899bb",
+      borderColor: "#3d4558",
+      borderWidth: 1,
+      backgroundColor: "#252a35",
+      nameColor: "#c8d0e0",
+      codeColor: "#5a6480",
+      badgeLabel: "",
+      badgeBg: "transparent",
+      badgeColor: "transparent",
+      badgeIcon: null,
+      hoursColor: "#8899bb",
       hoursPrefix: "",
-      leftBorder: isMoved ? "3px solid #f59e0b" : undefined,
     };
   }
   // project_estimate (amber/AI) — Type 3
@@ -59,7 +57,6 @@ function getSourceStyle(source: ForecastSource, _confidence: string, isMoved = f
     badgeIcon: "sparkles" as const,
     hoursColor: "#fbbf24",
     hoursPrefix: "~",
-    leftBorder: undefined as string | undefined,
   };
 }
 
@@ -208,8 +205,7 @@ function ForecastCard({
   hourlyRate?: number;
   weeklyCapacity?: number;
 }) {
-  const isMoved = block.source === "existing_plan" && !!block.originalWeek && block.week !== block.originalWeek;
-  const style = getSourceStyle(block.source, block.confidence, isMoved);
+  const style = getSourceStyle(block.source, block.confidence);
   const [expanded, setExpanded] = useState(false);
   const [subItems, setSubItems] = useState<ForecastSubItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -302,9 +298,8 @@ function ForecastCard({
       style={{
         backgroundColor: style.backgroundColor,
         borderWidth: style.borderWidth,
-        borderStyle: block.source === "existing_plan" && !isMoved ? "solid" : "dashed",
+        borderStyle: block.source === "existing_plan" ? "solid" : "dashed",
         borderColor: style.borderColor,
-        borderLeft: style.leftBorder || undefined,
         opacity: isDragging ? 0.3 : isSelected ? 1 : 0.55,
         boxShadow: isSelected ? `0 0 0 1px ${style.borderColor}40` : undefined,
       }}
