@@ -799,8 +799,9 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
           {progress && <div className="mt-1"><ProjectProgressBar progress={progress} compact /></div>}
         </div>
         <div className="text-right shrink-0">
-          <span className="font-mono" style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 700 }}>{Math.round(project.total_hours)}h</span>
-          {showCzk && <span className="font-mono text-[9px] ml-1" style={{ color: "#6b7a78" }}>{formatCompactCzk(project.total_hours * hourlyRate)}</span>}
+          <span className="font-mono" style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 700 }}>
+            {displayMode === "czk" ? formatCompactCzk(project.total_hours * hourlyRate) : `${Math.round(project.total_hours)}h`}
+          </span>
         </div>
       </button>
     {expanded && (
