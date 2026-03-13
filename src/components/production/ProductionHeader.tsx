@@ -4,7 +4,7 @@ import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
-import { LayoutDashboard, Factory, Settings, Check, User, UserCog, LogOut, Undo2, Redo2 } from "lucide-react";
+import { LayoutDashboard, Factory, CalendarRange, Settings, Check, User, UserCog, LogOut, Undo2, Redo2 } from "lucide-react";
 import { AdminInboxButton } from "@/components/AdminInbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";

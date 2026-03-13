@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList,
-  User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange,
+  User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange, Factory,
   Circle, CheckCircle2, X, Mail, Plus, Trash2, Loader2
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
