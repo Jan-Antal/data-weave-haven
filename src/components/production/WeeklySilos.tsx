@@ -186,18 +186,23 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const siloRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [visiblePeriodLabel, setVisiblePeriodLabel] = useState("");
   const initialScrollDone = useRef(false);
+  const [pastWeeksLoaded, setPastWeeksLoaded] = useState(4);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const defaultWeeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
 
-  // Initial scroll — show last week (index 3) as first visible column
+  // Initial scroll — defer until weeks are rendered
   useEffect(() => {
     if (initialScrollDone.current) return;
     const el = scrollContainerRef.current;
     if (!el) return;
-    el.scrollLeft = 3 * 259;
+    // Scroll so that 1 past week is visible before current week
+    const pastCount = pastWeeksLoaded;
+    const scrollTarget = Math.max(0, (pastCount - 1)) * 259;
+    el.scrollLeft = scrollTarget;
     initialScrollDone.current = true;
-  }, []);
+  }, [pastWeeksLoaded]);
 
   // Auto-scroll silo container during drag when pointer near edges
   useEffect(() => {
@@ -254,10 +259,27 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     };
   }, []);
 
+  // Calculate future range based on latest project deadline
+  const futureWeekCount = useMemo(() => {
+    let maxDate = new Date();
+    for (const p of allProjects) {
+      if (!p.is_active || p.deleted_at) continue;
+      const status = p.status?.toLowerCase();
+      if (status === "fakturace" || status === "dokončeno" || status === "expedice") continue;
+      const deadline = resolveDeadline(p);
+      if (deadline && deadline.date.getTime() > maxDate.getTime()) {
+        maxDate = deadline.date;
+      }
+    }
+    const monday = getMonday(new Date());
+    const diffWeeks = Math.ceil((maxDate.getTime() - monday.getTime()) / (7 * 86400000));
+    return Math.max(12, diffWeeks + 2); // at least 12 future weeks, or deadline + 2
+  }, [allProjects]);
+
   const weeks = useMemo(() => {
     const monday = getMonday(new Date());
     const result: { start: Date; end: Date; weekNum: number; key: string; isPast: boolean }[] = [];
-    for (let i = -4; i < 12; i++) {
+    for (let i = -pastWeeksLoaded; i < futureWeekCount; i++) {
       const start = new Date(monday);
       start.setDate(monday.getDate() + i * 7);
       const end = new Date(start);
@@ -265,7 +287,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       result.push({ start, end, weekNum: getISOWeekNumber(start), key: toLocalDateStr(start), isPast: i < 0 });
     }
     return result;
-  }, []);
+  }, [pastWeeksLoaded, futureWeekCount]);
 
   const weekKeys = useMemo(() => weeks.map(w => w.key), [weeks]);
 
@@ -695,7 +717,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       {/* Toolbar */}
       <div className="px-3 py-[6px] flex items-center justify-between shrink-0" style={{ borderBottom: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #ece8e2", backgroundColor: forecastDarkMode ? "#1a2422" : undefined }}>
         <button
-          onClick={() => { const el = scrollContainerRef.current; if (el) el.scrollTo({ left: 4 * 259, behavior: "smooth" }); }}
+          onClick={() => { const el = scrollContainerRef.current; if (el) el.scrollTo({ left: pastWeeksLoaded * 259, behavior: "smooth" }); }}
           className="px-2 py-[3px] text-[10px] font-medium rounded transition-colors"
           style={{ backgroundColor: forecastDarkMode ? "#1f2e2c" : "#ffffff", color: forecastDarkMode ? "#a8c5c2" : "#6b7a78", border: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #e2ddd6", cursor: "pointer" }}
         >
@@ -708,7 +730,39 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
 
       {/* Silos */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden" ref={scrollContainerRef}>
-        <div className="flex gap-[6px] p-2 h-full" style={{ minWidth: `${weeks.length * 259}px` }}>
+        <div className="flex gap-[6px] p-2 h-full" style={{ minWidth: `${(weeks.length + 1) * 259}px` }}>
+          {/* History load button */}
+          <div
+            className="shrink-0 flex flex-col items-center justify-center rounded-lg cursor-pointer select-none transition-colors"
+            style={{
+              width: 252,
+              minHeight: 120,
+              backgroundColor: forecastDarkMode ? "#1a2422" : "#f8f6f3",
+              border: forecastDarkMode ? "1px dashed #2a3d3a" : "1px dashed #d5cfc6",
+              color: forecastDarkMode ? "#7aa8a4" : "#6b7280",
+            }}
+            onClick={() => {
+              if (historyLoading) return;
+              setHistoryLoading(true);
+              const el = scrollContainerRef.current;
+              const prevScrollLeft = el?.scrollLeft ?? 0;
+              setPastWeeksLoaded(prev => prev + 4);
+              // After state update + render, restore scroll position offset by new columns
+              requestAnimationFrame(() => {
+                if (el) el.scrollLeft = prevScrollLeft + 4 * 259;
+                setHistoryLoading(false);
+              });
+            }}
+          >
+            {historyLoading ? (
+              <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
+            ) : (
+              <>
+                <span className="text-[11px] font-medium">← Historie</span>
+                <span className="text-[9px] mt-1 opacity-60">Načíst 4 starší týdny</span>
+              </>
+            )}
+          </div>
           {weeks.map(week => (
             <SiloColumn
               key={week.key} weekKey={week.key} weekNum={week.weekNum}
