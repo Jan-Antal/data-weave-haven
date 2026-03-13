@@ -29,9 +29,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useProductionStatuses } from "@/hooks/useProductionStatuses";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
-  { key: "item_name", label: "Kód Prvku" },
-  { key: "item_type", label: "Název Prvku" },
-  { key: "nazev_prvku", label: "Popis" },
+  { key: "item_name", label: "Kód prvku" },
+  { key: "item_type", label: "Název prvku" },
+  { key: "nazev_prvku", label: "Popis prvku" },
   { key: "konstrukter", label: "Konstruktér" },
   { key: "status", label: "Status" },
   { key: "vyroba_status", label: "Výroba" },
@@ -116,11 +116,10 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     updateVisibility(key, !isColVisible(key));
   }, [isColVisible, updateVisibility]);
 
-  const orderedAll = useMemo(() => getOrderedKeys(TPV_LIST_ALL_KEYS), [getOrderedKeys]);
+  // Always use TPV_LIST_COLUMNS definition order as source of truth
   const allVisibleKeys = useMemo(() => {
-    const vis = orderedAll.filter(k => isColVisible(k));
-    return getDisplayOrderedKeys(vis);
-  }, [orderedAll, isColVisible, getDisplayOrderedKeys]);
+    return TPV_LIST_ALL_KEYS.filter(k => isColVisible(k));
+  }, [isColVisible]);
 
   const [editMode, setEditMode] = useState(false);
   const [localOrder, setLocalOrder] = useState<string[]>(allVisibleKeys);
