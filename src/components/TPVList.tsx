@@ -147,8 +147,8 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const renderKeys = editMode ? localOrder : allVisibleKeys;
 
   // ── Sort state ──────────────────────────────────────────────────
-  const [sortCol, setSortCol] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc" | null>(null);
+  const [sortCol, setSortCol] = useState<string | null>("item_name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc" | null>("asc");
   const toggleSort = (col: string) => {
     if (sortCol === col) {
       if (sortDir === "asc") setSortDir("desc");
