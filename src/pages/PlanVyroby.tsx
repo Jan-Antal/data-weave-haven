@@ -890,7 +890,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
           onClick={() => !forecastActive && setViewTab("table")}
           disabled={forecastActive}
           className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-[13px] font-medium transition-all ${
-            forecastActive ? "text-gray-600 cursor-not-allowed opacity-40"
+            forecastActive ? "text-[#4a5a58] cursor-not-allowed opacity-40"
               : viewTab === "table"
               ? "bg-primary text-primary-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
