@@ -352,7 +352,7 @@ function ForecastCard({
               onPointerDown={(e) => e.stopPropagation()} />
             
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 pr-10 min-w-0">
                 <div
                   className="w-2 h-2 rounded-full shrink-0"
                   style={{ backgroundColor: getProjectColor(block.project_id) }} />
