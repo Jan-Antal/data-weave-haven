@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ChevronDown, ChevronRight, AlertTriangle, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
 
 export interface SafetyNetProject {
   project_id: string;
@@ -41,16 +42,7 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [projectItems, setProjectItems] = useState<Record<string, SafetyNetItem[]>>({});
   const [loadingItems, setLoadingItems] = useState<Set<string>>(new Set());
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; projectId: string } | null>(null);
-  const contextMenuRef = useRef<HTMLDivElement>(null);
-
-  // Close context menu on click outside
-  useEffect(() => {
-    if (!contextMenu) return;
-    const handler = () => setContextMenu(null);
-    window.addEventListener("click", handler);
-    return () => window.removeEventListener("click", handler);
-  }, [contextMenu]);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
 
   const toggleExpand = useCallback(async (projectId: string, source: string) => {
     setExpandedProjects(prev => {
@@ -59,7 +51,6 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
         next.delete(projectId);
       } else {
         next.add(projectId);
-        // Fetch items if not cached
         if (!projectItems[projectId] && !loadingItems.has(projectId)) {
           fetchItems(projectId, source);
         }
@@ -73,7 +64,6 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
     try {
       let items: SafetyNetItem[] = [];
       if (source === "unplanned") {
-        // Fetch from tpv_items
         const { data } = await supabase
           .from("tpv_items")
           .select("id, item_name, item_type, status")
@@ -89,7 +79,6 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
           }));
         }
       } else {
-        // Fetch from production_schedule
         const { data } = await supabase
           .from("production_schedule")
           .select("id, item_name, item_code, scheduled_hours, status")
@@ -117,16 +106,44 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
     });
   };
 
-  const handleContextMenu = (e: React.MouseEvent, projectId: string) => {
+  const handleContextMenu = (e: React.MouseEvent, project: SafetyNetProject) => {
     e.preventDefault();
     e.stopPropagation();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    let x = e.clientX;
-    let y = e.clientY;
-    if (x + 180 > vw) x = vw - 185;
-    if (y + 80 > vh) y = vh - 85;
-    setContextMenu({ x, y, projectId });
+
+    const isExpanded = expandedProjects.has(project.project_id);
+    const actions: ContextMenuAction[] = [];
+
+    actions.push({
+      label: isExpanded ? "Sbalit" : "Rozbalit",
+      icon: "⇅",
+      onClick: () => toggleExpand(project.project_id, project.source),
+    });
+
+    if (onViewItems) {
+      actions.push({
+        label: "Zobrazit položky",
+        icon: "📋",
+        onClick: () => onViewItems(project.project_id),
+      });
+    }
+
+    if (onViewDetail) {
+      actions.push({
+        label: "Zobrazit detail projektu",
+        icon: "🏗",
+        onClick: () => onViewDetail(project.project_id),
+      });
+    }
+
+    if (onRestoreToForecast) {
+      actions.push({
+        label: "Vrátit do forecastu",
+        icon: "↩",
+        onClick: () => onRestoreToForecast(project.project_id),
+      });
+    }
+
+    setContextMenu({ x: e.clientX, y: e.clientY, actions });
   };
 
   return (
@@ -170,7 +187,7 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
                 className="flex items-center gap-1.5 py-1.5 px-1.5 rounded cursor-pointer transition-colors"
                 style={{ backgroundColor: isExpanded ? "#253533" : "transparent" }}
                 onClick={() => toggleExpand(p.project_id, p.source)}
-                onContextMenu={(e) => handleContextMenu(e, p.project_id)}
+                onContextMenu={(e) => handleContextMenu(e, p)}
               >
                 {isExpanded
                   ? <ChevronDown className="w-3 h-3 shrink-0" style={{ color: "#7aa8a4" }} />
@@ -259,45 +276,15 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
         })}
       </div>
 
-      {/* Context menu */}
+      {/* Context menu — uses shared ProductionContextMenu */}
       {contextMenu && (
-        <div
-          ref={contextMenuRef}
-          className="fixed z-[9999]"
-          style={{
-            top: contextMenu.y,
-            left: contextMenu.x,
-            minWidth: 180,
-            backgroundColor: "#1f2e2c",
-            border: "1px solid #2a4a46",
-            borderRadius: 6,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-            padding: 4,
-          }}
-        >
-          {onViewDetail && (
-            <button
-              className="w-full text-left px-3 py-1.5 rounded text-[11px] transition-colors"
-              style={{ color: "#a8c5c2" }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#2a4a46")}
-              onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
-              onClick={() => { onViewDetail(contextMenu.projectId); setContextMenu(null); }}
-            >
-              Zobrazit detail projektu
-            </button>
-          )}
-          {onViewItems && (
-            <button
-              className="w-full text-left px-3 py-1.5 rounded text-[11px] transition-colors"
-              style={{ color: "#a8c5c2" }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#2a4a46")}
-              onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
-              onClick={() => { onViewItems(contextMenu.projectId); setContextMenu(null); }}
-            >
-              Zobrazit položky
-            </button>
-          )}
-        </div>
+        <ProductionContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          actions={contextMenu.actions}
+          onClose={() => setContextMenu(null)}
+          darkMode
+        />
       )}
     </div>
   );
