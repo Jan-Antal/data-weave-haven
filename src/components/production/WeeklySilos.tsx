@@ -31,6 +31,14 @@ function formatCompactCzk(v: number): string {
   return `${Math.round(v)}`;
 }
 
+/** Timezone-safe YYYY-MM-DD from local Date */
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function getMonday(date: Date): Date {
   const d = new Date(date);
   const day = d.getDay();
@@ -246,12 +254,25 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       start.setDate(monday.getDate() + i * 7);
       const end = new Date(start);
       end.setDate(start.getDate() + 6);
-      result.push({ start, end, weekNum: getISOWeekNumber(start), key: start.toISOString().split("T")[0], isPast: i < 0 });
+      result.push({ start, end, weekNum: getISOWeekNumber(start), key: toLocalDateStr(start), isPast: i < 0 });
     }
     return result;
   }, []);
 
   const weekKeys = useMemo(() => weeks.map(w => w.key), [weeks]);
+
+  // Debug: log week key comparison when forecast is active
+  useEffect(() => {
+    if (forecastDarkMode && forecastBlocks && forecastBlocks.length > 0) {
+      const siloKeys = weeks.map(w => w.key);
+      const forecastWeeks = [...new Set(forecastBlocks.map(b => b.week))].sort();
+      const matching = forecastWeeks.filter(fw => siloKeys.includes(fw));
+      const missing = forecastWeeks.filter(fw => !siloKeys.includes(fw));
+      console.log(`[WeeklySilos] Silo week keys:`, siloKeys);
+      console.log(`[WeeklySilos] Forecast block weeks:`, forecastWeeks);
+      console.log(`[WeeklySilos] Matching: ${matching.length}, Missing: ${missing.length}`, missing.length > 0 ? missing : "");
+    }
+  }, [forecastDarkMode, forecastBlocks, weeks]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;

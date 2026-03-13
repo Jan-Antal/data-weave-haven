@@ -164,6 +164,12 @@ export function useForecastMode(): UseForecastModeReturn {
 
       const rawBlocks: ForecastBlock[] = Array.isArray(data?.blocks) ? data.blocks : [];
       const blocks = rawBlocks.map(block => ({ ...block }));
+
+      // Debug: log week distribution
+      const weekSet = new Set(blocks.map(b => b.week));
+      console.log(`[Forecast] Generated ${blocks.length} blocks across weeks:`, Array.from(weekSet).sort());
+      console.log(`[Forecast] By source: existing_plan=${blocks.filter(b=>b.source==="existing_plan").length}, inbox_item=${blocks.filter(b=>b.source==="inbox_item").length}, project_estimate=${blocks.filter(b=>b.source==="project_estimate").length}`);
+
       setForecastBlocks(blocks);
       setSelectedBlockIds(new Set(blocks.map(b => b.id)));
 
