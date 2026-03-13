@@ -699,7 +699,8 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
                 reserveDeadlineDisplay = { label: dlLabel, dateStr, color: dlColor };
               }
               return (
-              <div key={p.project_id} className="flex items-center gap-1.5 px-2 py-[4px] rounded-[5px] cursor-pointer"
+              <div key={p.project_id} className="flex items-center gap-1.5 px-2 py-[4px] rounded-[5px] cursor-pointer select-none"
+                onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
                 onClick={(e) => {
                   e.stopPropagation();
                   // Multi-select with Ctrl/Shift
