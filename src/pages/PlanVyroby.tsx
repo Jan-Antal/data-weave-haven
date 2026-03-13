@@ -596,9 +596,9 @@ export default function PlanVyroby() {
         {viewTab === "kanban" ? (
           <div className="flex-1 flex min-h-0" onClick={() => setSelectedProjectId(null)}>
             {forecast.forecastActive ? (
-              <div className="w-[300px] shrink-0 flex flex-col" style={{ backgroundColor: "#1c1f26", borderRight: "1px solid #2a2f3d" }}>
+              <div className="w-[300px] shrink-0 flex flex-col" style={{ backgroundColor: "#1f2e2c", borderRight: "1px solid #2a3d3a" }}>
                 <div className="flex-1 flex items-center justify-center">
-                  <span className="text-sm italic" style={{ color: "#4a5168" }}>Vše naplánováno</span>
+                  <span className="text-sm italic" style={{ color: "#4a5a58" }}>Vše naplánováno</span>
                 </div>
               </div>
             ) : (
