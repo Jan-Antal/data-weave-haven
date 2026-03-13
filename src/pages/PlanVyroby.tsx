@@ -546,6 +546,7 @@ export default function PlanVyroby() {
           onForecastToggle={async (v) => {
             forecast.setForecastActive(v);
             if (v) {
+              setViewTab("kanban");
               const loaded = forecast.loadSavedSession();
               if (loaded) {
                 toast({ title: "Obnoveno z poslední relace" });
