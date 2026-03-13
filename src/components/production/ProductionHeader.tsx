@@ -23,7 +23,7 @@ const ROLE_LABELS: Record<string, string> = {
   viewer: "Viewer",
 };
 
-export function ProductionHeader() {
+export function ProductionHeader({ forecastActive }: { forecastActive?: boolean }) {
   const navigate = useNavigate();
   const { data: settings } = useProductionSettings();
   const { canAccessSettings, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, profile, signOut } = useAuth();
@@ -48,7 +48,7 @@ export function ProductionHeader() {
 
   return (
     <>
-      <header className="border-b bg-primary px-6 py-4 shrink-0 z-50">
+      <header className="border-b bg-primary px-6 py-4 shrink-0 z-50" style={forecastActive ? { borderColor: "#2a3d3a" } : undefined}>
         <div className="flex items-center justify-between">
           {/* Left: Logo */}
           <div className="flex items-center gap-3 shrink-0">

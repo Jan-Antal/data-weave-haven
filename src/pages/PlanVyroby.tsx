@@ -532,7 +532,7 @@ export default function PlanVyroby() {
             <span>⚠ TEST MODE — Testovací prostředí — data nejsou produkční</span>
           </div>
         )}
-        <ProductionHeader />
+        <ProductionHeader forecastActive={forecast.forecastActive} />
 
         {/* Row 2: Tabs + Search + Display mode + Stats + Period + Forecast toggle */}
         <ToolbarRow2
