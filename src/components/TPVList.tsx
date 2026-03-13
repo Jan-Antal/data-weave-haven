@@ -29,9 +29,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useProductionStatuses } from "@/hooks/useProductionStatuses";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
-  { key: "item_name", label: "Kód Prvku" },
-  { key: "item_type", label: "Název Prvku" },
-  { key: "nazev_prvku", label: "Popis" },
+  { key: "item_name", label: "Kód prvku" },
+  { key: "item_type", label: "Název prvku" },
+  { key: "nazev_prvku", label: "Popis prvku" },
   { key: "konstrukter", label: "Konstruktér" },
   { key: "status", label: "Status" },
   { key: "vyroba_status", label: "Výroba" },
