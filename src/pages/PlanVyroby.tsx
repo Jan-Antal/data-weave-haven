@@ -295,6 +295,28 @@ export default function PlanVyroby() {
       return;
     }
 
+    // Handle forecast sub-item drags — split from parent block into a new block at target week
+    if (dragData.type === "forecast-subitem" && forecast.forecastActive) {
+      if (!over) return;
+      const targetId = over.id.toString();
+      if (!targetId.startsWith("silo-week-")) return;
+      const targetWeek = targetId.replace("silo-week-", "");
+      if (targetWeek === dragData.parentWeek) return; // dropped back on same week
+
+      // Split: reduce parent block hours, create new block in target week
+      const parentBlock = forecast.forecastBlocks.find(b => b.id === dragData.parentBlockId);
+      if (!parentBlock) return;
+
+      const itemHours = Number(dragData.hours) || 0;
+      if (itemHours > 0 && itemHours < parentBlock.estimated_hours) {
+        forecast.splitForecastBlock(dragData.parentBlockId, parentBlock.estimated_hours - itemHours, targetWeek);
+      } else {
+        // Move the entire block if item has all the hours
+        forecast.moveForecastBlock(dragData.parentBlockId, targetWeek);
+      }
+      return;
+    }
+
     // Handle real bundle drags in forecast mode — store as override, never write to Supabase
     if (forecast.forecastActive && dragData.type === "silo-bundle" && dragData.projectId && dragData.weekDate) {
       if (!over) return;
