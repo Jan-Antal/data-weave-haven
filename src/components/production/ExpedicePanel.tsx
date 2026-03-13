@@ -77,10 +77,15 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     qc.invalidateQueries({ queryKey: ["production-progress"] });
   }, [qc]);
 
-  // Map project_id → expedice field
-  const projectExpediceMap = useMemo(() => {
-    const m = new Map<string, string | null>();
-    for (const p of allProjects) m.set(p.project_id, p.expedice ?? null);
+  // Map project_id → deadline fields for resolveDeadline
+  const projectDeadlineMap = useMemo(() => {
+    const m = new Map<string, { expedice?: string | null; montaz?: string | null; predani?: string | null; datum_smluvni?: string | null }>();
+    for (const p of allProjects) m.set(p.project_id, {
+      expedice: p.expedice ?? null,
+      montaz: p.montaz ?? null,
+      predani: p.predani ?? null,
+      datum_smluvni: p.datum_smluvni ?? null,
+    });
     return m;
   }, [allProjects]);
 
