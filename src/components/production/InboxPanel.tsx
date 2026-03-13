@@ -203,48 +203,6 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     }
     return result;
   }, [getWeekCapacity, scheduleData]);
-function InboxResizeHandle({ onWidthChange, containerWidth }: { onWidthChange?: (w: number) => void; containerWidth: number }) {
-  const isDragging = useRef(false);
-  const startX = useRef(0);
-  const startWidth = useRef(0);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    isDragging.current = true;
-    startX.current = e.clientX;
-    startWidth.current = containerWidth;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const handleMouseMove = (ev: MouseEvent) => {
-      if (!isDragging.current) return;
-      const delta = ev.clientX - startX.current;
-      const newWidth = Math.max(180, Math.min(500, startWidth.current + delta));
-      onWidthChange?.(newWidth);
-    };
-    const handleMouseUp = () => {
-      isDragging.current = false;
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-  }, [containerWidth, onWidthChange]);
-
-  return (
-    <div
-      onMouseDown={handleMouseDown}
-      className="absolute top-0 right-0 w-[4px] h-full cursor-col-resize z-10 group"
-      style={{ backgroundColor: "transparent" }}
-    >
-      <div className="w-[2px] h-full mx-auto opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: "#7aa8a4" }} />
-    </div>
-  );
-}
-
 
   // Map project_id → project info including deadline fields
   const projectInfoMap = useMemo(() => {
