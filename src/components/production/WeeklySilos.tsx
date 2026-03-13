@@ -661,19 +661,6 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       });
     }
 
-    // Move to week submenu
-    actions.push({ label: "", icon: "", onClick: () => {}, dividerBefore: true });
-    // Remove the empty divider action and add real ones with divider on first
-    actions.pop();
-    for (let i = 0; i < Math.min(futureWeeks.length, 10); i++) {
-      const w = futureWeeks[i];
-      actions.push({
-        label: `Přesunout do T${w.weekNum} (${formatDateShort(w.start)})`,
-        icon: "→",
-        dividerBefore: i === 0,
-        onClick: () => onMoveForecastBlock?.(block.id, w.key),
-      });
-    }
 
     // Project navigation actions (same as real plan)
     if (onNavigateToTPV) {
