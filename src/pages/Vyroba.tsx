@@ -60,7 +60,10 @@ function fmtDateFull(d: Date): string {
 }
 
 function weekKeyStr(d: Date): string {
-  return d.toISOString().split("T")[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 const DAY_NAMES = ["Pondělí", "Úterý", "Středa", "Čtvrtek", "Pátek"];
@@ -122,6 +125,7 @@ export default function Vyroba() {
   const projects = useMemo<VyrobaProject[]>(() => {
     if (!scheduleData) return [];
     const silo = scheduleData.get(weekKey);
+    console.log('[Vyroba] query week:', weekKey, 'results:', silo?.bundles?.length ?? 0, 'all keys:', Array.from(scheduleData.keys()));
     if (!silo) return [];
     return silo.bundles
       .filter(b => b.items.some(i => i.status === "scheduled" || i.status === "in_progress"))
