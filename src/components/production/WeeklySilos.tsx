@@ -716,7 +716,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       {/* Safety net panel */}
       {forecastDarkMode && forecastSafetyNet && forecastSafetyNet.length > 0 && (
         <div className="px-2 pt-2">
-          <ForecastSafetyNet projects={forecastSafetyNet} />
+          <ForecastSafetyNet projects={forecastSafetyNet} onRestoreToForecast={onRestoreFromSafetyNet} />
         </div>
       )}
 

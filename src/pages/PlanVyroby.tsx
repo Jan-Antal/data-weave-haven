@@ -633,6 +633,7 @@ export default function PlanVyroby() {
               onRemoveForecastBlock={forecast.forecastActive ? forecast.removeForecastBlock : undefined}
               onSplitForecastBlock={forecast.forecastActive ? forecast.splitForecastBlock : undefined}
               forecastSafetyNet={forecast.forecastActive ? forecast.safetyNetProjects : undefined}
+              onRestoreFromSafetyNet={forecast.forecastActive ? forecast.restoreFromSafetyNet : undefined}
             />
             {!forecast.forecastActive && (
               <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />

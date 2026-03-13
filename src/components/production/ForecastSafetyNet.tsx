@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
+import { ChevronDown, ChevronRight, AlertTriangle, RotateCcw } from "lucide-react";
 
 export interface SafetyNetProject {
   project_id: string;
@@ -10,6 +10,7 @@ export interface SafetyNetProject {
 
 interface ForecastSafetyNetProps {
   projects: SafetyNetProject[];
+  onRestoreToForecast?: (projectId: string) => void;
 }
 
 const sourceBadge: Record<string, { label: string; bg: string }> = {
@@ -18,7 +19,7 @@ const sourceBadge: Record<string, { label: string; bg: string }> = {
   unplanned: { label: "Bez plánu", bg: "#451a03" },
 };
 
-export function ForecastSafetyNet({ projects }: ForecastSafetyNetProps) {
+export function ForecastSafetyNet({ projects, onRestoreToForecast }: ForecastSafetyNetProps) {
   const [expanded, setExpanded] = useState(false);
 
   if (projects.length === 0) return null;
@@ -69,6 +70,17 @@ export function ForecastSafetyNet({ projects }: ForecastSafetyNetProps) {
                 >
                   {badge.label}
                 </span>
+                {onRestoreToForecast && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onRestoreToForecast(p.project_id); }}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium hover:opacity-80 transition-opacity"
+                    style={{ background: "#2a4a46", color: "#7aa8a4", border: "1px solid #2a4a46" }}
+                    title="Vrátit do forecastu"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Vrátit
+                  </button>
+                )}
               </div>
             );
           })}
