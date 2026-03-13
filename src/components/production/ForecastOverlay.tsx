@@ -11,43 +11,51 @@ interface ForecastOverlayProps {
 }
 
 /** Source-based styling config */
-function getSourceStyle(source: ForecastSource, confidence: string) {
+function getSourceStyle(source: ForecastSource, _confidence: string) {
   if (source === "inbox_item") {
     return {
       borderColor: "#22c55e",
-      backgroundColor: "#0d1f14",
+      borderWidth: 2,
+      backgroundColor: "#0a1f10",
       nameColor: "#86efac",
+      codeColor: "#3a7a4a",
       badgeLabel: "INBOX",
-      badgeBg: "rgba(34,197,94,0.2)",
-      badgeColor: "#22c55e",
+      badgeBg: "#14532d",
+      badgeColor: "#86efac",
       badgeIcon: "inbox" as const,
-      hoursColor: "#22c55e",
+      hoursColor: "#4ade80",
       hoursPrefix: "",
     };
   }
   if (source === "existing_plan") {
+    // Type 1 — real planned cards should NOT render as forecast cards
+    // but if they do appear here, use neutral styling
     return {
-      borderColor: "#3b82f6",
-      backgroundColor: "#0f1520",
-      nameColor: "#93c5fd",
-      badgeLabel: "PLÁN",
-      badgeBg: "rgba(59,130,246,0.2)",
-      badgeColor: "#3b82f6",
+      borderColor: "#3d4558",
+      borderWidth: 1,
+      backgroundColor: "#252a35",
+      nameColor: "#c8d0e0",
+      codeColor: "#5a6480",
+      badgeLabel: "",
+      badgeBg: "transparent",
+      badgeColor: "transparent",
       badgeIcon: null,
-      hoursColor: "#3b82f6",
+      hoursColor: "#8899bb",
       hoursPrefix: "",
     };
   }
-  // project_estimate (amber/AI)
+  // project_estimate (amber/AI) — Type 3
   return {
-    borderColor: confidence === "low" ? "#ef4444" : confidence === "medium" ? "#f97316" : "#f59e0b",
-    backgroundColor: "#1a1400",
+    borderColor: "#f59e0b",
+    borderWidth: 2,
+    backgroundColor: "#1a1200",
     nameColor: "#fcd34d",
+    codeColor: "#7a5a00",
     badgeLabel: "AI",
-    badgeBg: "rgba(245,158,11,0.2)",
-    badgeColor: "#f59e0b",
+    badgeBg: "#451a03",
+    badgeColor: "#fcd34d",
     badgeIcon: "sparkles" as const,
-    hoursColor: "#f59e0b",
+    hoursColor: "#fbbf24",
     hoursPrefix: "~",
   };
 }
