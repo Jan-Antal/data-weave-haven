@@ -100,6 +100,7 @@ interface UseForecastModeReturn {
   commitRealBundleOverrides: (moveBundleToWeek: (projectId: string, sourceWeek: string, targetWeek: string) => Promise<void>) => Promise<void>;
   safetyNetProjects: SafetyNetProject[];
   restoreFromSafetyNet: (projectId: string) => void;
+  restoreToWeek: (projectId: string, targetWeek: string) => void;
 }
 
 export function useForecastMode(): UseForecastModeReturn {
