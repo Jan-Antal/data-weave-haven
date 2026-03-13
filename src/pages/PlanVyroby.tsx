@@ -834,10 +834,10 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   const isOverCapacity = scheduledHours > capacityHours;
   const displayCzk = scheduledCzk;
 
-  const formatCzk = (v: number) => {
-    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M Kč`;
-    if (v >= 1_000) return `${Math.round(v / 1_000)}K Kč`;
-    return `${v.toLocaleString("cs-CZ")} Kč`;
+  const formatCzk = (v: number, compact = false) => {
+    if (v >= 1_000_000) return compact ? `${(v / 1_000_000).toFixed(1)}M` : `${(v / 1_000_000).toFixed(1)}M Kč`;
+    if (v >= 1_000) return compact ? `${Math.round(v / 1_000)}K` : `${Math.round(v / 1_000)}K Kč`;
+    return compact ? v.toLocaleString("cs-CZ") : `${v.toLocaleString("cs-CZ")} Kč`;
   };
 
   const periodLabel = useMemo(() => {
@@ -858,7 +858,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
 
   return (
     <div
-      className="shrink-0 border-b border-[#2a3d3a] px-6 py-1.5 flex items-center gap-4 transition-colors duration-300"
+      className="shrink-0 border-b border-[#2a3d3a] px-6 py-1.5 flex items-center gap-4 transition-colors duration-300 flex-nowrap overflow-hidden"
       style={{
         minHeight: 40,
         backgroundColor: forecastActive ? "#1a2422" : "hsl(var(--card))",
@@ -939,15 +939,15 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       <div className="flex-1" />
 
       {/* Center: Stats */}
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="flex items-center gap-1 text-xs font-mono" style={{ color: forecastActive ? "#a8c5c2" : undefined }}>
-          <span>Kapacita <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{Math.round(capacityHours).toLocaleString("cs-CZ")}h</span></span>
+      <div className="flex items-center gap-2 min-w-0 shrink">
+        <div className="flex items-center gap-1 text-xs font-mono whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: forecastActive ? "#a8c5c2" : undefined }}>
+          <span>{forecastActive ? "Kap." : "Kapacita"} <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{Math.round(capacityHours).toLocaleString("cs-CZ")}h</span></span>
           <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
-          <span>CZK <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{formatCzk(displayCzk)}</span></span>
+          <span>{forecastActive ? "CZK" : "CZK"} <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{formatCzk(displayCzk, forecastActive)}</span></span>
           <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
-          <span>Naplánováno <span style={{ fontWeight: 600, color: isOverCapacity ? "hsl(var(--destructive))" : "hsl(142 76% 36%)" }}>{Math.round(scheduledHours).toLocaleString("cs-CZ")}h</span></span>
+          <span>{forecastActive ? "Nap." : "Naplánováno"} <span style={{ fontWeight: 600, color: isOverCapacity ? "hsl(var(--destructive))" : "hsl(142 76% 36%)" }}>{Math.round(scheduledHours).toLocaleString("cs-CZ")}h</span></span>
           <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
-          <span>V Inboxu <span style={{ fontWeight: 600, color: "#d97706" }}>{Math.round(inboxHours).toLocaleString("cs-CZ")}h</span></span>
+          <span>{forecastActive ? "Inbox" : "V Inboxu"} <span style={{ fontWeight: 600, color: "#d97706" }}>{Math.round(inboxHours).toLocaleString("cs-CZ")}h</span></span>
         </div>
       </div>
 
