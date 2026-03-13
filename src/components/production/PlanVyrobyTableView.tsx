@@ -123,7 +123,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   const { data: settings } = useProductionSettings();
   const { data: allProjects = [] } = useProjects();
   const getWeekCapacity = useWeekCapacityLookup();
-  const { moveScheduleItemToWeek, moveItemBackToInbox, completeItems, moveInboxItemToWeek } = useProductionDragDrop();
+  const { moveScheduleItemToWeek, moveItemBackToInbox, completeItems, moveInboxItemToWeek, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
   const qc = useQueryClient();
   const [sortMode, setSortMode] = useState<SortMode>("project");
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
