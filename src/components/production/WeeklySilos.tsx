@@ -1215,8 +1215,8 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
                 if (r === "nízká") return <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 3, marginLeft: 4, backgroundColor: "#14532d", color: "#86efac" }}>{risk}</span>;
                 return null;
               })()}
-              {expDate && !allCompleted && (
-                <span className="text-xs truncate" style={{ color: daysUntilExp !== null && daysUntilExp < 0 ? "#dc2626" : daysUntilExp !== null && daysUntilExp <= 14 ? "#d97706" : "#6b7280" }}>
+              {expDate && (
+                <span className="text-xs truncate" style={{ color: !allCompleted && daysUntilExp !== null && daysUntilExp < 0 ? "#dc2626" : !allCompleted && daysUntilExp !== null && daysUntilExp <= 14 ? "#d97706" : forecastDarkMode ? "#5a7a76" : "#7aa8a4" }}>
                   Exp: {expDate}
                 </span>
               )}
