@@ -1078,48 +1078,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                   {/* Collapsible location row */}
                    <div className={cn("col-span-2 overflow-hidden transition-all duration-300 ease-in-out", showLocation ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0")}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-1">
-                      <div className="relative">
-                        <Label className="text-xs">Lokace</Label>
-                        <Input
-                          ref={locInputRef}
-                          value={form.location}
-                          onChange={(e) => handleLocationInput(e.target.value)}
-                          onKeyDown={handleLocationKeyDown}
-                          onBlur={() => setTimeout(() => setShowLocDropdown(false), 200)}
-                          onFocus={() => { if (locSuggestions.length > 0) setShowLocDropdown(true); }}
-                          placeholder="Zadejte adresu..."
-                          className="mt-1"
-                        />
-                        {showLocDropdown && locSuggestions.length > 0 && (
-                          <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-md border border-border bg-popover shadow-lg max-h-48 overflow-y-auto">
-                            {locSuggestions.map((s, i) => (
-                              <button key={i} type="button" className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors truncate" onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(s); }}>
-                                {s.display_name}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-col md:-mx-0 -mx-4">
-                        <Label className="text-xs opacity-0 hidden md:block">Mapa</Label>
-                        <div className="md:mt-1 md:rounded-lg rounded-none border border-input bg-muted/50 overflow-hidden relative" style={{ height: '200px' }}>
-                          {form.location ? (
-                            <iframe
-                              title="Map preview"
-                              className="w-full border-0 absolute inset-0 pointer-events-none"
-                              style={{ height: 'calc(100% + 240px)', marginTop: '-120px' }}
-                              src={`https://maps.google.com/maps?q=${encodeURIComponent(form.location)}&z=15&t=m&hl=cs&output=embed`}
-                              loading="lazy"
-                              referrerPolicy="no-referrer-when-downgrade"
-                            />
-                          ) : (
-                            <div className="flex items-center justify-center h-full text-xs text-muted-foreground">Zadejte adresu</div>
-                          )}
-                        </div>
-                      </div>
-
                       {/* ── KONTAKT sub-section ── */}
-                      <div className="col-span-1 md:col-span-2 mt-2">
+                      <div className="col-span-1 md:col-span-2">
                         <div className="relative flex items-center mb-2">
                           <div className="absolute inset-0 flex items-center" aria-hidden="true">
                             <div className="w-full border-t border-border" />
@@ -1158,6 +1118,57 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                           disabled={isSectionReadOnly("basic")}
                           className={cn("mt-1", isSectionReadOnly("basic") && roClass)}
                         />
+                      </div>
+
+                      {/* ── LOKACE sub-section ── */}
+                      <div className="col-span-1 md:col-span-2 mt-2">
+                        <div className="relative flex items-center mb-2">
+                          <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                            <div className="w-full border-t border-border" />
+                          </div>
+                          <span className="relative bg-background pr-2 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                            Lokace
+                          </span>
+                        </div>
+                      </div>
+                      <div className="relative">
+                        <Label className="text-xs">Adresa</Label>
+                        <Input
+                          ref={locInputRef}
+                          value={form.location}
+                          onChange={(e) => handleLocationInput(e.target.value)}
+                          onKeyDown={handleLocationKeyDown}
+                          onBlur={() => setTimeout(() => setShowLocDropdown(false), 200)}
+                          onFocus={() => { if (locSuggestions.length > 0) setShowLocDropdown(true); }}
+                          placeholder="Zadejte adresu..."
+                          className="mt-1"
+                        />
+                        {showLocDropdown && locSuggestions.length > 0 && (
+                          <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-md border border-border bg-popover shadow-lg max-h-48 overflow-y-auto">
+                            {locSuggestions.map((s, i) => (
+                              <button key={i} type="button" className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors truncate" onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(s); }}>
+                                {s.display_name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col md:-mx-0 -mx-4">
+                        <Label className="text-xs opacity-0 hidden md:block">Mapa</Label>
+                        <div className="md:mt-1 md:rounded-lg rounded-none border border-input bg-muted/50 overflow-hidden relative" style={{ height: '200px' }}>
+                          {form.location ? (
+                            <iframe
+                              title="Map preview"
+                              className="w-full border-0 absolute inset-0 pointer-events-none"
+                              style={{ height: 'calc(100% + 240px)', marginTop: '-120px' }}
+                              src={`https://maps.google.com/maps?q=${encodeURIComponent(form.location)}&z=15&t=m&hl=cs&output=embed`}
+                              loading="lazy"
+                              referrerPolicy="no-referrer-when-downgrade"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center h-full text-xs text-muted-foreground">Zadejte adresu</div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
