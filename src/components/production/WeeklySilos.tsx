@@ -70,9 +70,10 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   );
 }
 
-function bundleMatchesSearch(bundle: { project_name: string; project_id: string; items: Array<{ item_code: string | null }> }, query: string): boolean {
+function bundleMatchesSearch(bundle: { project_name: string; project_id: string; items: Array<{ item_code: string | null }> }, query: string, pm?: string | null): boolean {
   if (!query) return false;
   const q = query.toLowerCase();
+  if (pm && pm.toLowerCase().includes(q)) return true;
   return bundle.project_name.toLowerCase().includes(q) || bundle.project_id.toLowerCase().includes(q) || bundle.items.some(i => i.item_code?.toLowerCase().includes(q));
 }
 
@@ -175,7 +176,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const getWeekCapacity = useWeekCapacityLookup();
 
   const projectLookup = useMemo(() => {
-    const map = new Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null }>();
+    const map = new Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null }>();
     for (const p of allProjects) map.set(p.project_id, p);
     return map;
   }, [allProjects]);
@@ -882,7 +883,7 @@ function ToolbarButton({ active, disabled, label, onClick }: { active?: boolean;
   );
 }
 
-type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null }>;
+type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null }>;
 
 interface SiloProps {
   weekKey: string; weekNum: number; startDate: Date; endDate: Date;
@@ -1220,7 +1221,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
     disabled: allCompleted || !!forecastDarkMode,
   });
   const toggleExpand = useCallback(() => setExpanded(v => !v), []);
-  const isSearchMatch = bundleMatchesSearch(bundle, searchQuery);
+  const isSearchMatch = bundleMatchesSearch(bundle, searchQuery, projectLookup.get(bundle.project_id)?.pm);
 
   // Blocker card — special rendering (after all hooks)
   if (isBlockerBundle) {

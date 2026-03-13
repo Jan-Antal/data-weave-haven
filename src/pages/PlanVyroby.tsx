@@ -140,6 +140,13 @@ export default function PlanVyroby() {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
 
+  // Build PM lookup for search
+  const projectPmMap = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const p of allProjects) m.set(p.project_id, p.pm ?? null);
+    return m;
+  }, [allProjects]);
+
   // Compute weekKeys for search navigation
   const searchWeekKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -159,6 +166,7 @@ export default function PlanVyroby() {
     forecastActive: forecast.forecastActive,
     forecastPlanMode: forecast.forecastActive ? forecast.planMode : undefined,
     weekKeys: searchWeekKeys,
+    projectPmMap,
   });
   const {
     moveInboxItemToWeek,

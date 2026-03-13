@@ -13,10 +13,11 @@ function normalize(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-function matchesQuery(bundle: { project_name: string; project_id: string; items: Array<{ item_name?: string; item_code?: string | null }> }, q: string): boolean {
+function matchesQuery(bundle: { project_name: string; project_id: string; items: Array<{ item_name?: string; item_code?: string | null }> }, q: string, pm?: string | null): boolean {
   const nq = normalize(q);
   if (normalize(bundle.project_name).includes(nq)) return true;
   if (normalize(bundle.project_id).includes(nq)) return true;
+  if (pm && normalize(pm).includes(nq)) return true;
   for (const i of bundle.items) {
     if (i.item_name && normalize(i.item_name).includes(nq)) return true;
     if (i.item_code && normalize(i.item_code).includes(nq)) return true;
@@ -31,9 +32,10 @@ interface UseSearchNavigationOptions {
   forecastActive?: boolean;
   forecastPlanMode?: "respect_plan" | "from_scratch";
   weekKeys: string[];
+  projectPmMap?: Map<string, string | null>;
 }
 
-export function useSearchNavigation({ query, scheduleData, forecastBlocks, forecastActive, forecastPlanMode, weekKeys }: UseSearchNavigationOptions) {
+export function useSearchNavigation({ query, scheduleData, forecastBlocks, forecastActive, forecastPlanMode, weekKeys, projectPmMap }: UseSearchNavigationOptions) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [focusedMatchKey, setFocusedMatchKey] = useState<string | null>(null);
   const fadeTimerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -49,7 +51,7 @@ export function useSearchNavigation({ query, scheduleData, forecastBlocks, forec
         const silo = scheduleData.get(weekKey);
         if (silo) {
           for (const bundle of silo.bundles) {
-            if (matchesQuery(bundle, query)) {
+            if (matchesQuery(bundle, query, projectPmMap?.get(bundle.project_id))) {
               result.push({ weekKey, projectId: bundle.project_id, matchKey: `${weekKey}::${bundle.project_id}` });
             }
           }
@@ -64,7 +66,7 @@ export function useSearchNavigation({ query, scheduleData, forecastBlocks, forec
             project_id: block.project_id,
             items: [{ item_name: block.bundle_description }],
           };
-          if (matchesQuery(fakeBundle, query)) {
+          if (matchesQuery(fakeBundle, query, projectPmMap?.get(block.project_id))) {
             // Avoid duplicate if real bundle already matched same project in same week
             const key = `${weekKey}::${block.project_id}`;
             if (!result.some(m => m.matchKey === key)) {
@@ -75,7 +77,7 @@ export function useSearchNavigation({ query, scheduleData, forecastBlocks, forec
       }
     }
     return result;
-  }, [query, scheduleData, forecastBlocks, forecastActive, forecastPlanMode, weekKeys]);
+  }, [query, scheduleData, forecastBlocks, forecastActive, forecastPlanMode, weekKeys, projectPmMap]);
 
   // Reset index when matches change
   useEffect(() => {
