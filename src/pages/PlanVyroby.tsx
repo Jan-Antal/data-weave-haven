@@ -41,7 +41,7 @@ import { useForecastMode } from "@/hooks/useForecastMode";
 import { ForecastCommitBar } from "@/components/production/ForecastCommitBar";
 import { Switch } from "@/components/ui/switch";
 import { useSearchNavigation } from "@/hooks/useSearchNavigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+
 
 export type DisplayMode = "hours" | "czk" | "percent";
 type ViewTab = "kanban" | "table";
@@ -139,6 +139,7 @@ export default function PlanVyroby() {
   const { data: allProjects = [] } = useProjects();
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
+  const { data: inboxProjects = [] } = useProductionInbox();
 
   // Build PM lookup for search
   const projectPmMap = useMemo(() => {
@@ -167,6 +168,7 @@ export default function PlanVyroby() {
     forecastPlanMode: forecast.forecastActive ? forecast.planMode : undefined,
     weekKeys: searchWeekKeys,
     projectPmMap,
+    inboxProjects,
   });
   const {
     moveInboxItemToWeek,
@@ -596,9 +598,6 @@ export default function PlanVyroby() {
           onSearchChange={handleSearchChange}
           forecastActive={forecast.forecastActive}
           searchMatchCount={searchNav.totalCount}
-          searchCurrentIndex={searchNav.currentIndex}
-          onSearchPrev={searchNav.goPrev}
-          onSearchNext={searchNav.goNext}
           onForecastToggle={async (v) => {
             forecast.setForecastActive(v);
             if (v) {
@@ -831,7 +830,7 @@ export default function PlanVyroby() {
 }
 
 
-function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchMatchCount = 0, searchCurrentIndex = 0, onSearchPrev, onSearchNext }: {
+function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchMatchCount = 0 }: {
   viewTab: "kanban" | "table";
   setViewTab: (v: "kanban" | "table") => void;
   displayMode: DisplayMode;
@@ -847,9 +846,6 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   onResetForecast?: () => void;
   forecastBlockCounts?: { real: number; inbox: number; ai: number };
   searchMatchCount?: number;
-  searchCurrentIndex?: number;
-  onSearchPrev?: () => void;
-  onSearchNext?: () => void;
 }) {
   const { data: settings } = useProductionSettings();
   const { data: scheduleData } = useProductionSchedule();
@@ -1097,26 +1093,8 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
               }}>
                 {searchMatchCount === 0
                   ? "0 výsledků"
-                  : `${searchCurrentIndex + 1} / ${searchMatchCount}`}
+                  : `${searchMatchCount} ${searchMatchCount === 1 ? "projekt" : searchMatchCount < 5 ? "projekty" : "projektů"}`}
               </span>
-              {searchMatchCount > 0 && (
-                <>
-                  <button
-                    onClick={onSearchPrev}
-                    className="p-0.5 rounded transition-colors hover:bg-accent"
-                    style={{ color: forecastActive ? "#a8c5c2" : undefined }}
-                  >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={onSearchNext}
-                    className="p-0.5 rounded transition-colors hover:bg-accent"
-                    style={{ color: forecastActive ? "#a8c5c2" : undefined }}
-                  >
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </button>
-                </>
-              )}
             </div>
           )}
         </div>
