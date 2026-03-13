@@ -32,6 +32,7 @@ interface UseSearchNavigationOptions {
   forecastActive?: boolean;
   forecastPlanMode?: "respect_plan" | "from_scratch";
   weekKeys: string[];
+  projectPmMap?: Map<string, string | null>;
 }
 
 export function useSearchNavigation({ query, scheduleData, forecastBlocks, forecastActive, forecastPlanMode, weekKeys }: UseSearchNavigationOptions) {
