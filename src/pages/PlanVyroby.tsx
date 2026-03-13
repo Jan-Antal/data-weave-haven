@@ -108,26 +108,6 @@ export default function PlanVyroby() {
   }, []);
   useEffect(() => () => clearTimeout(searchTimerRef.current), []);
 
-  // Compute weekKeys for search navigation
-  const searchWeekKeys = useMemo(() => {
-    const keys = new Set<string>();
-    if (scheduleData) {
-      for (const k of scheduleData.keys()) keys.add(k);
-    }
-    if (forecast.forecastActive && forecast.forecastBlocks) {
-      for (const b of forecast.forecastBlocks) keys.add(b.week);
-    }
-    return Array.from(keys).sort();
-  }, [scheduleData, forecast.forecastActive, forecast.forecastBlocks]);
-
-  const searchNav = useSearchNavigation({
-    query: searchQuery,
-    scheduleData,
-    forecastBlocks: forecast.forecastActive ? forecast.forecastBlocks : undefined,
-    forecastActive: forecast.forecastActive,
-    forecastPlanMode: forecast.forecastActive ? forecast.planMode : undefined,
-    weekKeys: searchWeekKeys,
-  });
   const [inboxWidth, setInboxWidth] = useState(() => {
     const saved = localStorage.getItem("inbox-panel-width");
     return saved ? Math.max(180, Math.min(500, Number(saved))) : 252;
