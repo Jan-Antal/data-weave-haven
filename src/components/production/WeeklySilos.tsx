@@ -1223,7 +1223,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
               )}
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="font-mono text-xs" style={{ color: forecastDarkMode ? "#5a6480" : (allCompleted ? "#b0b7c3" : "#6b7280") }}>{bundle.project_id}</span>
+              <span className="font-mono" style={{ fontSize: 11, color: forecastDarkMode ? "#5a6480" : (allCompleted ? "#b0b7c3" : "#6b7280") }}>{bundle.project_id}</span>
               {(() => {
                 const proj = projectLookup.get(bundle.project_id);
                 const risk = proj?.risk;
