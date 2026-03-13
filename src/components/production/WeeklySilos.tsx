@@ -815,7 +815,7 @@ function ToolbarButton({ active, disabled, label, onClick }: { active?: boolean;
   );
 }
 
-type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; status?: string | null; risk?: string | null }>;
+type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null }>;
 
 interface SiloProps {
   weekKey: string; weekNum: number; startDate: Date; endDate: Date;
