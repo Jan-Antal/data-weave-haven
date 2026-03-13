@@ -193,6 +193,7 @@ function ForecastCard({
   isExpanded,
   displayMode = "hours",
   hourlyRate = 550,
+  weeklyCapacity = 0,
 }: {
   block: ForecastBlock;
   isSelected: boolean;
@@ -202,6 +203,7 @@ function ForecastCard({
   isExpanded?: boolean;
   displayMode?: DisplayMode;
   hourlyRate?: number;
+  weeklyCapacity?: number;
 }) {
   const style = getSourceStyle(block.source, block.confidence);
   const [expanded, setExpanded] = useState(false);
@@ -370,7 +372,7 @@ function ForecastCard({
                   className="text-[13px] font-bold shrink-0 ml-2"
                   style={{ color: style.hoursColor }}
                 >
-                  {style.hoursPrefix}{displayMode === "czk" ? formatCompactCzk(block.estimated_hours * hourlyRate) : `${block.estimated_hours}h`}
+                  {style.hoursPrefix}{displayMode === "czk" ? formatCompactCzk(block.estimated_hours * hourlyRate) : displayMode === "percent" ? `${weeklyCapacity > 0 ? Math.round((block.estimated_hours / weeklyCapacity) * 100) : 0}%` : `${block.estimated_hours}h`}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
@@ -467,6 +469,7 @@ export function ForecastWeekContent({
   onToggleExpand,
   displayMode,
   hourlyRate,
+  weeklyCapacity,
 }: {
   blocks: ForecastBlock[];
   selectedBlockIds: Set<string>;
@@ -476,6 +479,7 @@ export function ForecastWeekContent({
   onToggleExpand?: (blockId: string) => void;
   displayMode?: DisplayMode;
   hourlyRate?: number;
+  weeklyCapacity?: number;
 }) {
   const mergedBlocks = useMemo(() => mergeBlocksByProject(blocks), [blocks]);
 
@@ -494,6 +498,7 @@ export function ForecastWeekContent({
           onToggleExpand={onToggleExpand ? () => onToggleExpand(block.id) : undefined}
           displayMode={displayMode}
           hourlyRate={hourlyRate}
+          weeklyCapacity={weeklyCapacity}
         />
       ))}
     </div>
