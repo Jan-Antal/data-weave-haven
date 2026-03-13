@@ -10,6 +10,7 @@ import { exportToExcel } from "@/lib/exportExcel";
 import { buildPrintableHtml } from "@/lib/exportPdf";
 import { parseAppDate } from "@/lib/dateFormat";
 import { format, differenceInDays, addDays } from "date-fns";
+import { resolveDeadline } from "@/lib/deadlineWarning";
 import { cs } from "date-fns/locale";
 import { Download, ChevronRight, ChevronDown, Plus, ArrowRight, Inbox, CheckCircle2, XCircle, FileSpreadsheet, FileText, AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
