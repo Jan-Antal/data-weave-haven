@@ -927,7 +927,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onBundleContextMenu(e, bundle, toggleExpand); }}
         >
           <div className="flex-1 min-w-0">
-            <div className="text-[11px] truncate" style={{ color: forecastDarkMode ? (allCompleted ? "#6b7280" : "#e5e7eb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: allCompleted ? 500 : 600 }}>{highlightMatch(bundle.project_name, searchQuery)}</div>
+            <div className="text-[11px] truncate" style={{ color: forecastDarkMode ? (allCompleted ? "#5a6480" : "#c8d0e0") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: allCompleted ? 500 : 600 }}>{highlightMatch(bundle.project_name, searchQuery)}</div>
             <div className="flex items-center gap-1.5">
               <span className="font-mono text-xs" style={{ color: forecastDarkMode ? "#6b7280" : (allCompleted ? "#b0b7c3" : "#6b7280") }}>{bundle.project_id}</span>
               {expDate && !allCompleted && (
