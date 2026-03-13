@@ -733,81 +733,217 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     setPlanningState(null);
   }, [qc]);
 
-  // Context menu: project header row
-  const handleProjectContextMenu = useCallback((e: React.MouseEvent, proj: ProjectRow) => {
+  // Context menu: bundle in week (matching Kanban CollapsibleBundleCard)
+  const handleBundleContextMenu = useCallback((e: React.MouseEvent, projectId: string, weekKey: string, _isAllCompleted: boolean) => {
+    e.preventDefault(); e.stopPropagation();
+    const bundle = getBundleForWeek(projectId, weekKey);
+    if (!bundle) return;
+    const week = weeks.find(w => w.key === weekKey);
+    const weekNum = week?.weekNum ?? 0;
+    const startDate = week?.start ?? new Date();
+    const endDate = week?.end ?? new Date();
+    const activeItems = bundle.items.filter(i => i.status !== "completed" && i.status !== "paused" && i.status !== "cancelled");
+    const completedItems = bundle.items.filter(i => i.status === "completed");
+    const pausedItems = bundle.items.filter(i => i.status === "paused");
+    const allCompleted = completedItems.length > 0 && activeItems.length === 0 && pausedItems.length === 0;
+    const actions: ContextMenuAction[] = [];
+
+    if (!allCompleted && activeItems.length > 0) {
+      actions.push({
+        label: "Dokončit položky → Expedice", icon: "✓",
+        onClick: () => setCompletionState({ projectName: bundle.project_name, projectId, weekLabel: `Výroba T${weekNum} · ${formatDateShort(startDate)} – ${formatDateShort(endDate)}`, weekKey, items: bundle.items }),
+      });
+      actions.push({
+        label: `Rozdělit bundle (${activeItems.length})`, icon: "✂",
+        onClick: () => setBundleSplitState({ bundleName: bundle.project_name, currentWeekKey: weekKey, items: activeItems.map(i => ({ id: i.id, item_name: i.item_name, item_code: i.item_code, project_id: i.project_id, stage_id: i.stage_id, scheduled_hours: i.scheduled_hours, scheduled_czk: i.scheduled_czk, split_group_id: i.split_group_id })) }),
+      });
+      actions.push({
+        label: `Pozastavit vše (${activeItems.length})`, icon: "⏸",
+        onClick: () => setPauseState({ itemId: activeItems.map(i => i.id).join(","), itemName: `${bundle.project_name} — ${activeItems.length} položek`, itemCode: null, source: "schedule" }),
+      });
+    }
+    if (pausedItems.length > 0) {
+      actions.push({ label: `Uvolnit vše (${pausedItems.length})`, icon: "▶", onClick: async () => { for (const item of pausedItems) await handleReleaseItem(item.id); } });
+    }
+    if (activeItems.length > 0 || pausedItems.length > 0) {
+      actions.push({ label: "Vrátit do Inboxu", icon: "←", onClick: () => returnBundleToInbox(projectId, weekKey) });
+    }
+    // Merge option
+    const splitGroupIds = new Set<string>();
+    for (const item of bundle.items) {
+      if (item.split_group_id && item.status !== "completed" && item.status !== "cancelled") splitGroupIds.add(item.split_group_id);
+    }
+    const mergeableSplitGroups = Array.from(splitGroupIds).filter(sgId => bundle.items.filter(i => i.split_group_id === sgId && i.status !== "completed" && i.status !== "cancelled").length >= 2);
+    if (mergeableSplitGroups.length > 0) {
+      actions.push({ label: `Spojit části (${mergeableSplitGroups.length} skupin)`, icon: "🔗", onClick: async () => { for (const sgId of mergeableSplitGroups) await mergeSplitItems(sgId); } });
+    }
+    if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(projectId) });
+    if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(projectId) });
+
+    if (allCompleted) {
+      actions.push({ label: "Vrátit do výroby", icon: "↩", dividerBefore: true, onClick: async () => { try { for (const ci of completedItems) await returnToProduction(ci.id); toast({ title: `↩ ${completedItems.length} položek vráceno do výroby` }); } catch (err: any) { toast({ title: "Chyba", description: err.message, variant: "destructive" }); } } });
+      actions.push({ label: "Zrušit", icon: "✕", danger: true, onClick: () => setCancelDialog({ open: true, itemId: completedItems.map(i => i.id).join(","), itemName: `${bundle.project_name} — ${completedItems.length} položek`, itemCode: null, hours: completedItems.reduce((s, i) => s + i.scheduled_hours, 0), projectName: bundle.project_name, projectId, splitGroupId: null, cancelAll: true }) });
+    }
+    if (!allCompleted && activeItems.length > 0) {
+      actions.push({ label: `Zrušit vše (${activeItems.length})`, icon: "✕", danger: true, dividerBefore: true, onClick: () => setCancelDialog({ open: true, itemId: activeItems.map(i => i.id).join(","), itemName: `${bundle.project_name} — ${activeItems.length} položek`, itemCode: null, hours: activeItems.reduce((s, i) => s + i.scheduled_hours, 0), projectName: bundle.project_name, projectId, splitGroupId: null, cancelAll: true }) });
+    }
+    if (actions.length > 0) setContextMenu({ x: e.clientX, y: e.clientY, actions });
+  }, [scheduleData, weeks, getBundleForWeek, returnBundleToInbox, returnToProduction, mergeSplitItems, handleReleaseItem, onNavigateToTPV, onOpenProjectDetail]);
+
+  // Context menu: scheduled item in week cell (matching Kanban DraggableSiloItem)
+  const handleScheduleItemContextMenu = useCallback((e: React.MouseEvent, scheduleItemId: string, weekKey: string, projectId: string) => {
+    e.preventDefault(); e.stopPropagation();
+    const bundle = getBundleForWeek(projectId, weekKey);
+    if (!bundle) return;
+    const item = bundle.items.find(i => i.id === scheduleItemId);
+    if (!item) return;
+    const week = weeks.find(w => w.key === weekKey);
+    const weekNum = week?.weekNum ?? 0;
+    const startDate = week?.start ?? new Date();
+    const endDate = week?.end ?? new Date();
+    const isCompleted = item.status === "completed";
+    const isPaused = item.status === "paused";
+    const actions: ContextMenuAction[] = [];
+
+    if (isCompleted) {
+      if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(item.project_id, item.item_code) });
+      if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(item.project_id) });
+      actions.push({ label: "Vrátit do výroby", icon: "↩", dividerBefore: true, onClick: () => returnToProduction(item.id) });
+    } else if (isPaused) {
+      actions.push({ label: "Uvolnit položku", icon: "▶", onClick: () => handleReleaseItem(item.id) });
+      actions.push({ label: "Vrátit do Inboxu", icon: "←", onClick: () => moveItemBackToInbox(item.id) });
+    } else {
+      actions.push({
+        label: "Dokončit → Expedice", icon: "✓",
+        onClick: () => setCompletionState({ projectName: bundle.project_name, projectId, weekLabel: `Výroba T${weekNum} · ${formatDateShort(startDate)} – ${formatDateShort(endDate)}`, weekKey, items: bundle.items, preCheckedIds: [item.id] }),
+      });
+      actions.push({
+        label: "Rozdělit položku", icon: "✂",
+        onClick: () => setSplitState({ itemId: item.id, itemName: item.item_name, itemCode: item.item_code, totalHours: item.scheduled_hours, projectId: item.project_id, stageId: item.stage_id, scheduledCzk: item.scheduled_czk, source: "schedule", currentWeekKey: weekKey, splitGroupId: item.split_group_id }),
+      });
+      if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(item.project_id, item.item_code) });
+      if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(item.project_id) });
+      actions.push({ label: "Vrátit do Inboxu", icon: "←", onClick: () => moveItemBackToInbox(item.id) });
+      actions.push({ label: "Pozastavit", icon: "⏸", onClick: () => setPauseState({ itemId: item.id, itemName: item.item_name, itemCode: item.item_code, source: "schedule" }) });
+      if (item.split_group_id) {
+        const sameWeekSiblings = findSameWeekSiblings(item, weekKey);
+        if (sameWeekSiblings.length > 0) actions.push({ label: `Spojit s ostatními v T${weekNum}`, icon: "🔗", onClick: () => mergeSplitItems(item.split_group_id!) });
+        actions.push({ label: "Spojit všechny části", icon: "🔗", onClick: () => mergeSplitItems(item.split_group_id!) });
+      }
+    }
+    actions.push({ label: "Zrušit položku", icon: "✕", danger: true, dividerBefore: true, onClick: () => setCancelDialog({ open: true, itemId: item.id, itemName: item.item_name, itemCode: item.item_code, hours: item.scheduled_hours, projectName: bundle.project_name, projectId: item.project_id, splitGroupId: item.split_group_id }) });
+    if (item.split_group_id) {
+      actions.push({ label: "Zrušit všechny části", icon: "✕", danger: true, onClick: () => setCancelDialog({ open: true, itemId: item.id, itemName: item.item_name, itemCode: item.item_code, hours: item.scheduled_hours, projectName: bundle.project_name, projectId: item.project_id, splitGroupId: item.split_group_id, cancelAll: true }) });
+    }
+    setContextMenu({ x: e.clientX, y: e.clientY, actions });
+  }, [scheduleData, weeks, getBundleForWeek, moveItemBackToInbox, returnToProduction, mergeSplitItems, findSameWeekSiblings, handleReleaseItem, onNavigateToTPV, onOpenProjectDetail]);
+
+  // Context menu: inbox project header
+  const handleInboxProjectContextMenu = useCallback((e: React.MouseEvent, proj: ProjectRow) => {
     e.preventDefault(); e.stopPropagation();
     const inbox = inboxByProject.get(proj.projectId);
     const actions: ContextMenuAction[] = [];
     if (inbox && inbox.totalHours > 0) {
-      const planItems: PlanningItem[] = inbox.items.map(i => ({
-        id: i.id, item_name: i.name, item_code: i.code,
-        estimated_hours: i.hours, estimated_czk: i.czk, stage_id: i.stageId,
-      }));
-      actions.push({ label: "Naplánovat výrobu…", icon: "📋", onClick: () => setPlanningState({ projectId: proj.projectId, projectName: proj.projectName, items: planItems }) });
+      const planItems: PlanningItem[] = inbox.items.map(i => ({ id: i.id, item_name: i.name, item_code: i.code, estimated_hours: i.hours, estimated_czk: i.czk, stage_id: i.stageId }));
+      actions.push({ label: "Naplánovat výrobu…", icon: "📅", onClick: () => setPlanningState({ projectId: proj.projectId, projectName: proj.projectName, items: planItems }) });
     }
-    if (onNavigateToTPV) {
-      actions.push({ label: "Zobrazit položky", icon: "📦", onClick: () => onNavigateToTPV(proj.projectId) });
-    }
-    if (onOpenProjectDetail) {
-      actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(proj.projectId) });
-    }
+    if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(proj.projectId) });
+    if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(proj.projectId) });
     if (actions.length > 0) setContextMenu({ x: e.clientX, y: e.clientY, actions });
   }, [inboxByProject, onNavigateToTPV, onOpenProjectDetail]);
 
-  // Context menu: item left-column cell
+  // Context menu: inbox cell item
+  const handleInboxItemContextMenu = useCallback((e: React.MouseEvent, item: ItemRow) => {
+    e.preventDefault(); e.stopPropagation();
+    if (item.inboxItemIds.length === 0) return;
+    const actions: ContextMenuAction[] = [];
+    const planItems: PlanningItem[] = item.inboxItemIds.map(() => ({ id: item.inboxItemIds[0], item_name: item.itemName, item_code: item.itemCode, estimated_hours: item.inboxHours / item.inboxItemIds.length, estimated_czk: item.inboxCzk / item.inboxItemIds.length, stage_id: item.stageId }));
+    actions.push({ label: "Naplánovat…", icon: "📅", onClick: () => setPlanningState({ projectId: item.projectId, projectName: item.projectName, items: planItems.map((p, i) => ({ ...p, id: item.inboxItemIds[i] })) }) });
+    if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(item.projectId) });
+    if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(item.projectId) });
+    if (actions.length > 0) setContextMenu({ x: e.clientX, y: e.clientY, actions });
+  }, [onNavigateToTPV, onOpenProjectDetail]);
+
+  // Context menu: expedice cell item
+  const handleExpediceItemContextMenu = useCallback((e: React.MouseEvent, projectId: string, itemName?: string) => {
+    e.preventDefault(); e.stopPropagation();
+    const actions: ContextMenuAction[] = [];
+    if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(projectId) });
+    if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(projectId) });
+    const expGroup = expediceData?.find(g => g.project_id === projectId);
+    if (expGroup) {
+      const expItems = itemName ? expGroup.items.filter(i => cleanSplitName(i.item_name) === itemName) : expGroup.items;
+      if (expItems.length > 0) {
+        actions.push({ label: "Vrátit do výroby", icon: "↩", dividerBefore: true, onClick: async () => { for (const i of expItems) await returnToProduction(i.id); toast({ title: `↩ ${expItems.length} položek vráceno do výroby` }); } });
+        actions.push({ label: "Zrušit", icon: "✕", danger: true, onClick: () => setCancelDialog({ open: true, itemId: expItems.map(i => i.id).join(","), itemName: itemName || projectId, itemCode: null, hours: expItems.reduce((s, i) => s + i.scheduled_hours, 0), projectName: expGroup.project_name, projectId, splitGroupId: null, cancelAll: expItems.length > 1 }) });
+      }
+    }
+    if (actions.length > 0) setContextMenu({ x: e.clientX, y: e.clientY, actions });
+  }, [expediceData, returnToProduction, onNavigateToTPV, onOpenProjectDetail]);
+
+  // Context menu: project header row
+  const handleProjectContextMenu = useCallback((e: React.MouseEvent, proj: ProjectRow) => {
+    e.preventDefault(); e.stopPropagation();
+    const actions: ContextMenuAction[] = [];
+    const inbox = inboxByProject.get(proj.projectId);
+    if (inbox && inbox.totalHours > 0) {
+      const planItems: PlanningItem[] = inbox.items.map(i => ({ id: i.id, item_name: i.name, item_code: i.code, estimated_hours: i.hours, estimated_czk: i.czk, stage_id: i.stageId }));
+      actions.push({ label: "Naplánovat výrobu…", icon: "📅", onClick: () => setPlanningState({ projectId: proj.projectId, projectName: proj.projectName, items: planItems }) });
+    }
+    if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(proj.projectId) });
+    if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(proj.projectId) });
+    if (actions.length > 0) setContextMenu({ x: e.clientX, y: e.clientY, actions });
+  }, [inboxByProject, onNavigateToTPV, onOpenProjectDetail]);
+
+  // Context menu: item left-column cell (enriched)
   const handleItemContextMenu = useCallback((e: React.MouseEvent, item: ItemRow) => {
     e.preventDefault(); e.stopPropagation();
     const allIds = [...item.weekAllocations.values()].flatMap(a => a.scheduleItemIds);
     const actions: ContextMenuAction[] = [];
 
     if (item.weekAllocations.size > 0) {
-      // Scheduled item actions
+      actions.push({ label: "Dokončit → Expedice", icon: "✓", onClick: () => handleComplete(allIds) });
       actions.push({
         label: "Přesunout do týdne…", icon: "➡️",
         onClick: () => {
-          // Show submenu via a secondary context menu with week targets
-          const weekActions: ContextMenuAction[] = moveTargetWeeks.map(tw => ({
-            label: tw.label, icon: "📅",
-            onClick: () => handleMoveToWeek(allIds, tw.key),
-          }));
+          const weekActions: ContextMenuAction[] = moveTargetWeeks.map(tw => ({ label: tw.label, icon: "📅", onClick: () => handleMoveToWeek(allIds, tw.key) }));
           setContextMenu({ x: e.clientX, y: e.clientY, actions: weekActions });
         },
       });
       actions.push({ label: "Vrátit do Inboxu", icon: "📥", onClick: () => handleReturnToInbox(allIds) });
-      actions.push({ label: "Dokončit → Expedice", icon: "✓", onClick: () => handleComplete(allIds) });
+      if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(item.projectId) });
+      if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(item.projectId) });
       actions.push({
         label: "Zrušit", icon: "✕", danger: true, dividerBefore: true,
-        onClick: () => setCancelDialog({
-          open: true, itemId: allIds[0], itemName: item.itemName, itemCode: item.itemCode,
-          hours: item.totalHours, projectName: item.projectName, projectId: item.projectId,
-        }),
+        onClick: () => setCancelDialog({ open: true, itemId: allIds[0], itemName: item.itemName, itemCode: item.itemCode, hours: item.totalHours, projectName: item.projectName, projectId: item.projectId }),
       });
     } else if (item.inboxHours > 0 && item.inboxItemIds.length > 0) {
-      // Inbox-only item: schedule submenu
-      const weekActions: ContextMenuAction[] = moveTargetWeeks.map(tw => ({
-        label: tw.label, icon: "📅",
-        onClick: () => handleScheduleFromInbox(item.inboxItemIds[0], tw.key),
-      }));
-      actions.push({
-        label: "Naplánovat…", icon: "📋",
-        onClick: () => setContextMenu({ x: e.clientX, y: e.clientY, actions: weekActions }),
-      });
+      handleInboxItemContextMenu(e, item);
+      return;
     }
 
     if (actions.length > 0) setContextMenu({ x: e.clientX, y: e.clientY, actions });
-  }, [moveTargetWeeks, handleMoveToWeek, handleReturnToInbox, handleComplete, handleScheduleFromInbox]);
+  }, [moveTargetWeeks, handleMoveToWeek, handleReturnToInbox, handleComplete, handleInboxItemContextMenu, onNavigateToTPV, onOpenProjectDetail]);
 
-  // Context menu: week cell (right-click on a scheduled item in a week)
+  // Context menu: week cell
   const handleWeekCellContextMenu = useCallback((e: React.MouseEvent, ids: string[], alloc: { hours: number; czk: number; status: string; splitPart?: number; splitTotal?: number }, item: ItemRow) => {
     e.preventDefault(); e.stopPropagation();
+    // Find the weekKey from alloc
+    let weekKey = "";
+    for (const [wk, a] of item.weekAllocations) {
+      if (a.scheduleItemIds.some(id => ids.includes(id))) { weekKey = wk; break; }
+    }
+    // Delegate to full schedule item context menu if we have the data
+    if (weekKey && ids.length === 1) {
+      handleScheduleItemContextMenu(e, ids[0], weekKey, item.projectId);
+      return;
+    }
+    // Fallback for multi-id cells
     const actions: ContextMenuAction[] = [];
     actions.push({
       label: "Přesunout do týdne…", icon: "➡️",
       onClick: () => {
-        const weekActions: ContextMenuAction[] = moveTargetWeeks.map(tw => ({
-          label: tw.label, icon: "📅",
-          onClick: () => handleMoveToWeek(ids, tw.key),
-        }));
+        const weekActions: ContextMenuAction[] = moveTargetWeeks.map(tw => ({ label: tw.label, icon: "📅", onClick: () => handleMoveToWeek(ids, tw.key) }));
         setContextMenu({ x: e.clientX, y: e.clientY, actions: weekActions });
       },
     });
@@ -815,21 +951,14 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     if (alloc.status !== "completed") {
       actions.push({ label: "Dokončit → Expedice", icon: "✓", onClick: () => handleComplete(ids) });
     }
+    if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📦", dividerBefore: true, onClick: () => onNavigateToTPV(item.projectId) });
+    if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(item.projectId) });
     actions.push({
       label: "Zrušit", icon: "✕", danger: true, dividerBefore: true,
-      onClick: () => setCancelDialog({
-        open: true, itemId: ids[0], itemName: item.itemName, itemCode: item.itemCode,
-        hours: alloc.hours, projectName: item.projectName, projectId: item.projectId,
-      }),
+      onClick: () => setCancelDialog({ open: true, itemId: ids[0], itemName: item.itemName, itemCode: item.itemCode, hours: alloc.hours, projectName: item.projectName, projectId: item.projectId }),
     });
-    if (onNavigateToTPV) {
-      actions.push({ label: "Zobrazit položky", icon: "📦", dividerBefore: true, onClick: () => onNavigateToTPV(item.projectId) });
-    }
-    if (onOpenProjectDetail) {
-      actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(item.projectId) });
-    }
     setContextMenu({ x: e.clientX, y: e.clientY, actions });
-  }, [moveTargetWeeks, handleMoveToWeek, handleReturnToInbox, handleComplete, onNavigateToTPV, onOpenProjectDetail]);
+  }, [moveTargetWeeks, handleMoveToWeek, handleReturnToInbox, handleComplete, handleScheduleItemContextMenu, onNavigateToTPV, onOpenProjectDetail]);
 
   // Drag & Drop handler
   const handleTableDragEnd = useCallback(async (event: DragEndEvent) => {
