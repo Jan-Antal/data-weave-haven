@@ -202,7 +202,10 @@ serve(async (req) => {
         processedProjects.add(projectId);
         const proj = projectMap.get(projectId);
         const dl = resolveDeadline(proj || {});
-        if (!dl.date) continue;
+        if (!dl.date) {
+          safetyNet.push({ project_id: projectId, project_name: proj?.project_name || projectId, estimated_hours: Math.round(hours), source: "inbox" });
+          continue;
+        }
         const projTpv = tpvItems.filter(t => t.project_id === projectId);
         allWork.push({
           projectId,
