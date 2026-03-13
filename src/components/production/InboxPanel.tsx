@@ -542,6 +542,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
             <p className="text-[10px] mt-1" style={{ color: "#3d4558" }}>Vše naplánováno ve forecastu</p>
           </div>
         </div>
+        <InboxResizeHandle onWidthChange={onWidthChange} containerWidth={width} />
       </div>
     );
   }
