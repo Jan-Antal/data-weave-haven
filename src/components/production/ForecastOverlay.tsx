@@ -469,6 +469,7 @@ export function ForecastWeekContent({
   onToggleExpand,
   displayMode,
   hourlyRate,
+  weeklyCapacity,
 }: {
   blocks: ForecastBlock[];
   selectedBlockIds: Set<string>;
@@ -478,6 +479,7 @@ export function ForecastWeekContent({
   onToggleExpand?: (blockId: string) => void;
   displayMode?: DisplayMode;
   hourlyRate?: number;
+  weeklyCapacity?: number;
 }) {
   const mergedBlocks = useMemo(() => mergeBlocksByProject(blocks), [blocks]);
 
@@ -496,6 +498,7 @@ export function ForecastWeekContent({
           onToggleExpand={onToggleExpand ? () => onToggleExpand(block.id) : undefined}
           displayMode={displayMode}
           hourlyRate={hourlyRate}
+          weeklyCapacity={weeklyCapacity}
         />
       ))}
     </div>
