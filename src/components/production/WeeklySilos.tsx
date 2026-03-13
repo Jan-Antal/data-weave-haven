@@ -613,7 +613,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
         </div>
       </div>
 
-      {contextMenu && <ProductionContextMenu x={contextMenu.x} y={contextMenu.y} actions={contextMenu.actions} onClose={() => setContextMenu(null)} />}
+      {contextMenu && <ProductionContextMenu x={contextMenu.x} y={contextMenu.y} actions={contextMenu.actions} onClose={() => setContextMenu(null)} darkMode={forecastDarkMode} />}
 
       {completionState && (
         <CompletionDialog open={!!completionState} onOpenChange={open => !open && setCompletionState(null)} {...completionState} hourlyRate={hourlyRate} />
