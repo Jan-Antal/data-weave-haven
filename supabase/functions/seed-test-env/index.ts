@@ -450,6 +450,29 @@ Deno.serve(async (req) => {
       }
     }
 
+    // 8. Seed production schedule
+    const monday = getCurrentMonday();
+    const scheduleItems = generateProductionSchedule(monday);
+    for (const si of scheduleItems) {
+      const { data: exists } = await adminClient
+        .from("production_schedule")
+        .select("id")
+        .eq("project_id", si.project_id)
+        .eq("item_code", si.item_code)
+        .eq("scheduled_week", si.scheduled_week)
+        .single();
+
+      if (!exists) {
+        await adminClient.from("production_schedule").insert({
+          ...si,
+          created_by: testUserId,
+        });
+        steps.push(`Schedule ${si.project_id} ${si.item_code} → ${si.scheduled_week} created`);
+      } else {
+        steps.push(`Schedule ${si.project_id} ${si.item_code} → ${si.scheduled_week} exists, skipped`);
+      }
+    }
+
     return new Response(JSON.stringify({ success: true, steps }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
