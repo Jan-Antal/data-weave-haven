@@ -970,9 +970,6 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
               const isOverdueProject = (() => {
                 const pd = projectDateLookup.get(proj.projectId);
                 if (!pd) return false;
-                const isProjectDone = ["Fakturace", "Dokonceno", "Dokončeno", "Expedice"].includes(pd?.status ?? "");
-                const allItemsDone = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
-                if (isProjectDone || allItemsDone) return false;
 
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);

@@ -832,7 +832,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
     return dl < today;
   }, [project, isProjectDone, allCompleted]);
 
-  const shouldHighlightOverdue = expSeverity === "overdue" || isOverdueProject;
+  const shouldHighlightOverdue = (daysUntilExp !== null && daysUntilExp < 0) || isOverdueProject;
 
   const borderLeftColor = allCompleted ? "#3a8a36"
     : shouldHighlightOverdue ? "hsl(0 70% 50%)"
