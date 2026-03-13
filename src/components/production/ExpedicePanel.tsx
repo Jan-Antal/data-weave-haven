@@ -313,8 +313,10 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
         actions.push({ label: `Vrátit do výroby (T${weekNum})`, icon: "↩", onClick: () => returnToProduction(item.id) });
         actions.push({ label: "Vrátit do Inboxu", icon: "↩", onClick: () => moveItemBackToInbox(item.id) });
       } else {
-        // Active project header context menu
+        // Active project header context menu — same scope as item actions
         actions.push({ label: "Expedovat vše", icon: "📦", onClick: () => markAllAsExpediced(projectId) });
+        actions.push({ label: "Vrátit do Výroby", icon: "↩", onClick: () => returnAllToProduction(projectId) });
+        actions.push({ label: "Vrátit do Inboxu", icon: "📥", onClick: () => returnAllToInbox(projectId) });
       }
 
       if (onNavigateToTPV) {
