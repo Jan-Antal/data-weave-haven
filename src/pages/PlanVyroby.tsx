@@ -575,7 +575,9 @@ export default function PlanVyroby() {
               onMoveForecastBlock={forecast.forecastActive ? forecast.moveForecastBlock : undefined}
               onRemoveForecastBlock={forecast.forecastActive ? forecast.removeForecastBlock : undefined}
             />
-            <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />
+            {!forecast.forecastActive && (
+              <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />
+            )}
           </div>
         ) : (
           <PlanVyrobyTableView displayMode={displayMode} searchQuery={searchQuery} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} />
