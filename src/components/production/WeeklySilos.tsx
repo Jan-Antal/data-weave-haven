@@ -962,6 +962,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
               onForecastContextMenu={onForecastContextMenu}
               expandedIds={forecastExpandedIds}
               onToggleExpand={onToggleForecastExpand}
+              displayMode={displayMode}
+              hourlyRate={hourlyRate}
             />
           </>
         )}

@@ -465,6 +465,8 @@ export function ForecastWeekContent({
   onForecastContextMenu,
   expandedIds,
   onToggleExpand,
+  displayMode,
+  hourlyRate,
 }: {
   blocks: ForecastBlock[];
   selectedBlockIds: Set<string>;
@@ -472,6 +474,8 @@ export function ForecastWeekContent({
   onForecastContextMenu?: (e: React.MouseEvent, block: ForecastBlock) => void;
   expandedIds?: Set<string>;
   onToggleExpand?: (blockId: string) => void;
+  displayMode?: DisplayMode;
+  hourlyRate?: number;
 }) {
   const mergedBlocks = useMemo(() => mergeBlocksByProject(blocks), [blocks]);
 
@@ -488,6 +492,8 @@ export function ForecastWeekContent({
           onContextMenu={onForecastContextMenu ? (e) => onForecastContextMenu(e, block) : undefined}
           isExpanded={expandedIds?.has(block.id)}
           onToggleExpand={onToggleExpand ? () => onToggleExpand(block.id) : undefined}
+          displayMode={displayMode}
+          hourlyRate={hourlyRate}
         />
       ))}
     </div>
