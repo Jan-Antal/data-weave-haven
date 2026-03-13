@@ -487,7 +487,7 @@ export default function Vyroba() {
               const pct = getLatestPercent(p.projectId);
               const phase = getLatestPhase(p.projectId);
               const isSelected = selectedProjectId === p.projectId;
-              const borderColor = statusColors[status];
+              const borderColor = p.color;
               return (
                 <button
                   key={p.projectId}
