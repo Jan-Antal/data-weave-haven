@@ -88,9 +88,12 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   );
 }
 
+type DisplayMode = "hours" | "czk" | "percent";
+
 interface InboxPanelProps {
   overDroppableId?: string | null;
   showCzk?: boolean;
+  displayMode?: DisplayMode;
   onNavigateToTPV?: (projectId: string) => void;
   onOpenProjectDetail?: (projectId: string) => void;
   disableDropZone?: boolean;
