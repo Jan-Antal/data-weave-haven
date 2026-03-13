@@ -277,6 +277,9 @@ export default function PlanVyroby() {
     setActiveDrag(null);
     setOverDroppableId(null);
 
+    // Block all real data modifications during forecast mode
+    if (forecast.forecastActive) return;
+
     if (!active.data.current) return;
 
     const dragData = active.data.current as ActiveDragData;
