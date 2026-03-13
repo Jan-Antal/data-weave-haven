@@ -663,14 +663,28 @@ export default function PlanVyroby() {
             inboxBlockCount={forecast.forecastBlocks.filter(b => b.source === "inbox_item").length}
             projectBlockCount={forecast.forecastBlocks.filter(b => b.source === "project_estimate").length}
             isGenerating={forecast.isGenerating}
+            allInboxSelected={(() => {
+              const inboxIds = forecast.forecastBlocks.filter(b => b.source === "inbox_item").map(b => b.id);
+              return inboxIds.length > 0 && inboxIds.every(id => forecast.selectedBlockIds.has(id));
+            })()}
             onCommitSelected={async () => {
               if (forecast.selectedBlockIds.size === 0) return;
               await forecast.commitRealBundleOverrides(moveBundleToWeek);
               await forecast.commitBlocks(Array.from(forecast.selectedBlockIds));
             }}
             onCancel={() => forecast.setForecastActive(false)}
-            onSelectAll={forecast.selectAll}
-            onSelectInboxOnly={forecast.selectInboxOnly}
+            onToggleInboxSelect={() => {
+              const inboxIds = forecast.forecastBlocks.filter(b => b.source === "inbox_item").map(b => b.id);
+              const allSelected = inboxIds.length > 0 && inboxIds.every(id => forecast.selectedBlockIds.has(id));
+              if (allSelected) {
+                // Deselect all inbox blocks
+                const next = new Set(forecast.selectedBlockIds);
+                inboxIds.forEach(id => next.delete(id));
+                forecast.setSelectedBlockIds(next);
+              } else {
+                forecast.selectInboxOnly();
+              }
+            }}
           />
         )}
       </div>
