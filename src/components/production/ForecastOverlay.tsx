@@ -385,7 +385,7 @@ function ForecastCard({
                   const formatted = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getFullYear()).slice(2)}`;
                   const now = new Date(); now.setHours(0, 0, 0, 0);
                   const diffDays = Math.ceil((d.getTime() - now.getTime()) / 86400000);
-                  const color = diffDays < 0 ? "#DC2626" : diffDays <= 14 ? "#D97706" : "#7aa8a4";
+                  const color = diffDays < 0 ? "#DC2626" : diffDays <= 14 ? "#D97706" : diffDays <= 30 ? "#2563EB" : "#7aa8a4";
                   return (
                     <span className="text-[9px] font-medium" style={{ color }}>
                       {label}: {formatted}
