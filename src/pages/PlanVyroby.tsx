@@ -41,7 +41,7 @@ import { useForecastMode } from "@/hooks/useForecastMode";
 import { ForecastCommitBar } from "@/components/production/ForecastCommitBar";
 import { Switch } from "@/components/ui/switch";
 import { useSearchNavigation } from "@/hooks/useSearchNavigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+
 
 export type DisplayMode = "hours" | "czk" | "percent";
 type ViewTab = "kanban" | "table";
