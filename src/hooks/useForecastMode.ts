@@ -80,6 +80,7 @@ interface UseForecastModeReturn {
   selectedBlockIds: Set<string>;
   toggleBlockSelection: (id: string) => void;
   selectAll: () => void;
+  selectInboxOnly: () => void;
   deselectAll: () => void;
   generateForecast: (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => Promise<void>;
   clearForecast: () => void;
@@ -164,6 +165,10 @@ export function useForecastMode(): UseForecastModeReturn {
 
   const selectAll = useCallback(() => {
     setSelectedBlockIds(new Set(forecastBlocks.map(b => b.id)));
+  }, [forecastBlocks]);
+
+  const selectInboxOnly = useCallback(() => {
+    setSelectedBlockIds(new Set(forecastBlocks.filter(b => b.source === "inbox_item").map(b => b.id)));
   }, [forecastBlocks]);
 
   const deselectAll = useCallback(() => {
@@ -403,6 +408,7 @@ export function useForecastMode(): UseForecastModeReturn {
     selectedBlockIds,
     toggleBlockSelection,
     selectAll,
+    selectInboxOnly,
     deselectAll,
     generateForecast,
     clearForecast,
