@@ -1251,7 +1251,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                             if (!exp) return null;
                             const fmtD = (d: Date) => `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getFullYear()).slice(-2)}`;
                             const days = differenceInDays(exp, new Date());
-                            const clr = days < 0 ? "#dc3545" : days <= 3 ? "#d97706" : "#99a5a3";
+                            const clr = days < 0 ? "#dc2626" : days <= 3 ? "#d97706" : days <= 14 ? "#d97706" : "#6b7280";
                             return (
                               <span className="text-[10px] truncate" style={{ color: clr }}>
                                 Exp: {fmtD(exp)}
