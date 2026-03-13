@@ -768,17 +768,17 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
 
       {/* Items */}
       <div className="flex-1 overflow-y-auto p-1.5" style={{ display: "flex", flexDirection: "column", gap: 3, opacity: isPast ? 0.7 : 1 }}>
-        {(!silo || silo.bundles.length === 0) && !isPast && (
+        {(!silo || silo.bundles.length === 0 || hideRealCards) && !isPast && !(forecastBlocks && forecastBlocks.some(b => b.week === weekKey)) && (
           <div className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all" style={{ border: forecastDarkMode ? "1.5px dashed #3d4558" : "1.5px dashed #e2ddd6" }}>
-            <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5168" : "#99a5a3" }}>Přetáhni sem z Inboxu</span>
+            <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5168" : "#99a5a3" }}>{forecastDarkMode ? "Žádný forecast" : "Přetáhni sem z Inboxu"}</span>
           </div>
         )}
-        {(!silo || silo.bundles.length === 0) && isPast && (
+        {(!silo || silo.bundles.length === 0 || hideRealCards) && isPast && !(forecastBlocks && forecastBlocks.some(b => b.week === weekKey)) && (
           <div className="flex-1 flex items-center justify-center px-2 py-[14px]">
             <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5168" : "#c4ccc9" }}>Prázdný týden</span>
           </div>
         )}
-        {silo?.bundles
+        {!hideRealCards && silo?.bundles
           .slice()
           .sort((a, b) => {
             const aDone = a.items.length > 0 && a.items.every(i => i.status === "completed");
@@ -789,7 +789,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
           .map(bundle => (
           <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey}
             showCzk={showCzk} hourlyRate={hourlyRate} displayMode={displayMode}
-            onBundleContextMenu={onBundleContextMenu} onItemContextMenu={onItemContextMenu}
+            onBundleContextMenu={forecastDarkMode ? (() => {}) as any : onBundleContextMenu}
+            onItemContextMenu={forecastDarkMode ? (() => {}) as any : onItemContextMenu}
             projectLookup={projectLookup}
             isSelected={selectedProjectId === bundle.project_id}
             onSelectProject={onSelectProject} searchQuery={searchQuery}

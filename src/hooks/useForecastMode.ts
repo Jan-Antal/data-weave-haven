@@ -110,7 +110,7 @@ export function useForecastMode(): UseForecastModeReturn {
       ? forecastBlocks.filter(b => blockIds.includes(b.id))
       : forecastBlocks.filter(b => selectedBlockIds.has(b.id));
 
-    // Only commit inbox_item and project_estimate blocks
+    // Only commit inbox_item and project_estimate blocks (never existing_plan)
     const committable = toCommit.filter(b => b.source === "inbox_item" || b.source === "project_estimate");
 
     if (committable.length === 0) {
@@ -119,20 +119,28 @@ export function useForecastMode(): UseForecastModeReturn {
     }
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || "forecast-ai";
+      const hourlyRate = 550;
+
       for (const block of committable) {
-        const { error } = await supabase.from("production_inbox").insert({
+        // Create actual production_schedule entries in the target week
+        const { error } = await supabase.from("production_schedule").insert({
           project_id: block.project_id,
           item_name: block.bundle_description,
-          estimated_hours: block.estimated_hours,
-          estimated_czk: block.estimated_hours * 550,
-          sent_by: "forecast-ai",
-          status: "pending",
+          scheduled_week: block.week,
+          scheduled_hours: block.estimated_hours,
+          scheduled_czk: block.estimated_hours * hourlyRate,
+          position: 999,
+          status: "scheduled",
+          created_by: userId,
         });
         if (error) throw error;
       }
 
-      toast({ title: `✅ ${committable.length} bloků přidáno do Inboxu` });
+      toast({ title: `✅ ${committable.length} bloků naplánováno` });
       
+      // Remove committed blocks from forecast state
       setForecastBlocks(prev => prev.filter(b => !committable.find(c => c.id === b.id)));
       setSelectedBlockIds(prev => {
         const next = new Set(prev);
