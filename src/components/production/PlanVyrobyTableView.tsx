@@ -1031,42 +1031,6 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
         </div>
       </div>
 
-  const handleReleaseItem = useCallback(async (itemId: string) => {
-    try {
-      const { error } = await supabase.from("production_schedule").update({
-        status: "scheduled", pause_reason: null, pause_expected_date: null,
-      }).eq("id", itemId);
-      if (error) throw error;
-      qc.invalidateQueries({ queryKey: ["production-schedule"] });
-      qc.invalidateQueries({ queryKey: ["production-progress"] });
-      toast({ title: "▶ Položka uvolněna" });
-    } catch (err: any) {
-      toast({ title: "Chyba", description: err.message, variant: "destructive" });
-    }
-  }, [qc]);
-
-  const findSameWeekSiblings = useCallback((item: ScheduleItem, weekKey: string): ScheduleItem[] => {
-    if (!item.split_group_id) return [];
-    const silo = scheduleData?.get(weekKey);
-    if (!silo) return [];
-    return silo.bundles.flatMap(b => b.items).filter(i => i.id !== item.id && i.split_group_id === item.split_group_id);
-  }, [scheduleData]);
-
-  const splitWeekOptions = useMemo(() => {
-    return weeks.map(w => {
-      const siloData = scheduleData?.get(w.key);
-      const usedHours = siloData?.total_hours ?? 0;
-      const cap = getWeekCapacity(w.key);
-      return { key: w.key, weekNum: w.weekNum, label: `${formatDateShort(w.start)}–${formatDateShort(w.end)}`, remainingCapacity: cap - usedHours };
-    });
-  }, [weeks, scheduleData, getWeekCapacity]);
-
-  const getBundleForWeek = useCallback((projectId: string, weekKey: string): ScheduleBundle | null => {
-    const silo = scheduleData?.get(weekKey);
-    if (!silo) return null;
-    return silo.bundles.find(b => b.project_id === projectId) ?? null;
-  }, [scheduleData]);
-
 
       {/* Table */}
       <div className="flex-1 overflow-auto bg-muted/30" ref={scrollRef} style={{ padding: "0 0 8px 0" }}>
