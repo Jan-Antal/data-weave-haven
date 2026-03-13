@@ -195,6 +195,7 @@ export function useForecastMode(): UseForecastModeReturn {
 
       setForecastBlocks(blocks);
       setSelectedBlockIds(new Set(blocks.map(b => b.id)));
+      setSafetyNetProjects(Array.isArray(data?.safetyNet) ? data.safetyNet : []);
 
       if (blocks.length === 0) {
         toast({ title: "Forecast", description: "Žádné položky k naplánování." });
