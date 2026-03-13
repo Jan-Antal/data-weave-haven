@@ -717,8 +717,8 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   );
 }
 
-function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel, isSelected, onSelectProject, projectInfo, checkedItems, onToggleCheck, onClearChecked, allInboxItemsMap, searchQuery = "" }: {
-  project: InboxProject; hourlyRate: number; defaultExpanded: boolean; showCzk?: boolean;
+function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode = "hours", progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel, isSelected, onSelectProject, projectInfo, checkedItems, onToggleCheck, onClearChecked, allInboxItemsMap, searchQuery = "" }: {
+  project: InboxProject; hourlyRate: number; defaultExpanded: boolean; displayMode?: DisplayMode;
   progress?: ProjectProgress; onNavigateToTPV?: (projectId: string) => void;
   onOpenProjectDetail?: (projectId: string) => void;
   onProjectContextMenu: (e: React.MouseEvent, project: InboxProject) => void;
