@@ -244,24 +244,26 @@ const Index = () => {
             <span className="text-primary-foreground/70 text-sm font-sans">Project Info 2026</span>
           </div>
           <div className="flex items-center gap-1">
-            {isOwner && (
-              <button
-                onClick={() => navigate("/vyroba")}
-                className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
-                title="Výroba"
-              >
-                <Factory className="h-5 w-5" />
-              </button>
-            )}
-            {isAdmin && (
-              <button
-                onClick={() => navigate("/plan-vyroby")}
-                className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
-                title="Plán Výroby"
-              >
-                <CalendarRange className="h-5 w-5" />
-              </button>
-            )}
+            <button
+              onClick={() => navigate("/vyroba")}
+              className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+              title="Výroba"
+            >
+              <Factory className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => navigate("/plan-vyroby")}
+              className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+              title="Plán Výroby"
+            >
+              <CalendarRange className="h-5 w-5" />
+            </button>
+            <button
+              className="p-2 rounded-md text-primary-foreground bg-primary-foreground/10 transition-colors cursor-default"
+              title="Přehled projektů"
+            >
+              <LayoutDashboard className="h-5 w-5" />
+            </button>
             {canAccessSettings && <AdminInboxButton />}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
