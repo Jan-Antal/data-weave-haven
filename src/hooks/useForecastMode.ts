@@ -81,6 +81,7 @@ interface UseForecastModeReturn {
   toggleBlockSelection: (id: string) => void;
   selectAll: () => void;
   selectInboxOnly: () => void;
+  toggleInboxSelection: () => void;
   deselectAll: () => void;
   generateForecast: (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => Promise<void>;
   clearForecast: () => void;
