@@ -454,7 +454,7 @@ interface ForecastSplitDialogProps {
   blockName: string;
   totalHours: number;
   currentWeek: string;
-  weeks: { value: string; label: string }[];
+  weeks: { key: string; label: string }[];
   onSplit: (keepHours: number, targetWeek: string) => void;
 }
 
