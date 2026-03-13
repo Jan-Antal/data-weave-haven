@@ -254,7 +254,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       start.setDate(monday.getDate() + i * 7);
       const end = new Date(start);
       end.setDate(start.getDate() + 6);
-      result.push({ start, end, weekNum: getISOWeekNumber(start), key: start.toISOString().split("T")[0], isPast: i < 0 });
+      result.push({ start, end, weekNum: getISOWeekNumber(start), key: toLocalDateStr(start), isPast: i < 0 });
     }
     return result;
   }, []);
