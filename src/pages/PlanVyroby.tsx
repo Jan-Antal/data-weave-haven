@@ -777,7 +777,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
 
       {/* Forecast plan mode toggle */}
       {forecastActive && (
-        <div className="inline-flex h-7 items-center rounded-md p-0.5 shrink-0" style={{ backgroundColor: "#0f1117", border: "1px solid #2a2d3e" }}>
+        <div className="inline-flex h-7 items-center rounded-md p-0.5 shrink-0" style={{ backgroundColor: "#111318", border: "1px solid #2a2f3d" }}>
           <button
             onClick={() => onForecastPlanModeChange("respect_plan")}
             className={`px-2 py-0.5 text-[11px] font-medium rounded-sm transition-all ${
