@@ -1096,7 +1096,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const urgencyInfo = useMemo(() => {
     if (isProjectDone || allCompleted) return null;
     if (!project) return null;
-    const dates = [project.expedice, project.montaz, project.datum_smluvni].filter(Boolean);
+    const dates = [project.expedice, project.montaz, project.predani, project.datum_smluvni].filter(Boolean);
     let earliest: Date | null = null;
     for (const val of dates) {
       const d = parseAppDate(val as string);
