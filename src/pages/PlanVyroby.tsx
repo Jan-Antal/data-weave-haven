@@ -604,7 +604,7 @@ export default function PlanVyroby() {
             ) : (
               <InboxPanel
                 overDroppableId={overDroppableId}
-                showCzk={showCzk}
+                displayMode={displayMode}
                 onNavigateToTPV={handleNavigateToTPV}
                 onOpenProjectDetail={handleOpenProjectDetail}
                 disableDropZone={isDraggingFromInbox}

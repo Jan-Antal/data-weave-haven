@@ -88,9 +88,12 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   );
 }
 
+type DisplayMode = "hours" | "czk" | "percent";
+
 interface InboxPanelProps {
   overDroppableId?: string | null;
   showCzk?: boolean;
+  displayMode?: DisplayMode;
   onNavigateToTPV?: (projectId: string) => void;
   onOpenProjectDetail?: (projectId: string) => void;
   disableDropZone?: boolean;
@@ -110,7 +113,8 @@ interface CancelState {
   source: "schedule" | "inbox"; splitGroupId: string | null;
 }
 
-export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenProjectDetail, disableDropZone, selectedProjectId, onSelectProject, searchQuery = "", forecastActive }: InboxPanelProps) {
+export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeProp, onNavigateToTPV, onOpenProjectDetail, disableDropZone, selectedProjectId, onSelectProject, searchQuery = "", forecastActive }: InboxPanelProps) {
+  const displayMode: DisplayMode = displayModeProp ?? (showCzk ? "czk" : "hours");
   const { data: projects = [], isLoading } = useProductionInbox();
   const { data: progressData } = useProductionProgress();
   const { data: settings } = useProductionSettings();
@@ -546,8 +550,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
           {projects.length > 0 && (
             <>
               <span className="text-[9px] font-mono font-medium" style={{ color: "#6b7a78" }}>
-                {Math.round(totalHours).toLocaleString("cs-CZ")}h
-                {showCzk && ` ${formatCompactCzk(totalHours * hourlyRate)}`}
+                {displayMode === "czk" ? formatCompactCzk(totalHours * hourlyRate) : `${Math.round(totalHours).toLocaleString("cs-CZ")}h`}
               </span>
               <button
                 onClick={allExpanded ? handleCollapseAll : handleExpandAll}
@@ -575,7 +578,7 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
           const urgency = getUrgency(info?.datum_smluvni, info?.status);
           return (
             <InboxProjectGroup key={`${project.project_id}-${expandKey}`} project={project} hourlyRate={hourlyRate}
-              defaultExpanded={allExpanded} showCzk={showCzk} progress={progressData?.get(project.project_id)}
+              defaultExpanded={allExpanded} displayMode={displayMode} progress={progressData?.get(project.project_id)}
               onNavigateToTPV={onNavigateToTPV}
               onOpenProjectDetail={onOpenProjectDetail}
               onProjectContextMenu={handleProjectContextMenu}
@@ -714,8 +717,8 @@ export function InboxPanel({ overDroppableId, showCzk, onNavigateToTPV, onOpenPr
   );
 }
 
-function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel, isSelected, onSelectProject, projectInfo, checkedItems, onToggleCheck, onClearChecked, allInboxItemsMap, searchQuery = "" }: {
-  project: InboxProject; hourlyRate: number; defaultExpanded: boolean; showCzk?: boolean;
+function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode = "hours", progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel, isSelected, onSelectProject, projectInfo, checkedItems, onToggleCheck, onClearChecked, allInboxItemsMap, searchQuery = "" }: {
+  project: InboxProject; hourlyRate: number; defaultExpanded: boolean; displayMode?: DisplayMode;
   progress?: ProjectProgress; onNavigateToTPV?: (projectId: string) => void;
   onOpenProjectDetail?: (projectId: string) => void;
   onProjectContextMenu: (e: React.MouseEvent, project: InboxProject) => void;
@@ -796,8 +799,9 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
           {progress && <div className="mt-1"><ProjectProgressBar progress={progress} compact /></div>}
         </div>
         <div className="text-right shrink-0">
-          <span className="font-mono" style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 700 }}>{Math.round(project.total_hours)}h</span>
-          {showCzk && <span className="font-mono text-[9px] ml-1" style={{ color: "#6b7a78" }}>{formatCompactCzk(project.total_hours * hourlyRate)}</span>}
+          <span className="font-mono" style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 700 }}>
+            {displayMode === "czk" ? formatCompactCzk(project.total_hours * hourlyRate) : `${Math.round(project.total_hours)}h`}
+          </span>
         </div>
       </button>
     {expanded && (
@@ -817,8 +821,11 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
               onToggleCheck={onToggleCheck}
               checkedItems={checkedItems}
               allInboxItemsMap={allInboxItemsMap}
+              displayMode={displayMode}
+              hourlyRate={hourlyRate}
             />
           ))}
+
           {/* Checked items footer bar */}
           {(() => {
             const checkedInProject = project.items.filter(i => checkedItems.has(i.id));
@@ -856,11 +863,13 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, showCzk, prog
   );
 }
 
-function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onToggleCheck, checkedItems, allInboxItemsMap }: {
+function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onToggleCheck, checkedItems, allInboxItemsMap, displayMode = "hours", hourlyRate = 550 }: {
   item: InboxItem; projectName: string; onContextMenu: (e: React.MouseEvent) => void;
   isChecked: boolean; onToggleCheck: (itemId: string) => void;
   checkedItems: Set<string>;
   allInboxItemsMap: Map<string, InboxItem & { projectName: string }>;
+  displayMode?: DisplayMode;
+  hourlyRate?: number;
 }) {
   const [hovered, setHovered] = useState(false);
   const adhocBadge = getAdhocBadge((item as any).adhoc_reason);
@@ -942,7 +951,7 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
       )}
       {item.item_code && <span className="font-mono shrink-0" style={{ fontSize: 11, color: "#223937", fontWeight: 500 }}>{item.item_code}</span>}
       <span className="flex-1 truncate" style={{ fontSize: 12, color: "#4b5563" }}>{item.item_name}</span>
-      <span className="font-mono text-[10px] shrink-0" style={{ color: "#1a1a1a", fontWeight: 700 }}>{item.estimated_hours}h</span>
+      <span className="font-mono text-[10px] shrink-0" style={{ color: "#1a1a1a", fontWeight: 700 }}>{displayMode === "czk" ? formatCompactCzk(item.estimated_hours * hourlyRate) : `${item.estimated_hours}h`}</span>
     </div>
   );
 }
