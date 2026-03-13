@@ -118,6 +118,7 @@ export function useForecastMode(): UseForecastModeReturn {
     setForecastBlocks([]);
     setSelectedBlockIds(new Set());
     setRealBundleOverrides([]);
+    setSafetyNetProjects([]);
     setIsGenerating(false);
   }, []);
 
