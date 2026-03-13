@@ -342,6 +342,15 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     if (el) siloRefs.current.set(key, el); else siloRefs.current.delete(key);
   }, []);
 
+  // Scroll to matching silo when search nav changes
+  useEffect(() => {
+    if (!searchMatchWeekKey) return;
+    const el = siloRefs.current.get(searchMatchWeekKey);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }
+  }, [searchMatchWeekKey, focusedMatchKey]);
+
   const currentWeekKey = useMemo(() => getMonday(new Date()).toISOString().split("T")[0], []);
 
   const weekOptions = useMemo(() => {
