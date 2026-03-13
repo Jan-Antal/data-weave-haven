@@ -140,7 +140,7 @@ const INBOX_W = 100;
 const EXPEDICE_W = 100;
 const LEFT_COL_W = 280;
 
-export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateToTPV, onOpenProjectDetail }: Props) {
+export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateToTPV, onOpenProjectDetail, selectedProjectId, onSelectProject }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: expediceData } = useProductionExpedice();
   const { data: inboxProjects = [] } = useProductionInbox();
