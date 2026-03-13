@@ -176,6 +176,14 @@ function DraggableForecastSubItem({
   );
 }
 
+function formatCompactCzk(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${Math.round(v / 1_000)}K`;
+  return `${Math.round(v)}`;
+}
+
+type DisplayMode = "hours" | "czk" | "percent";
+
 function ForecastCard({
   block,
   isSelected,
@@ -183,6 +191,8 @@ function ForecastCard({
   onContextMenu,
   onToggleExpand,
   isExpanded,
+  displayMode = "hours",
+  hourlyRate = 550,
 }: {
   block: ForecastBlock;
   isSelected: boolean;
@@ -190,6 +200,8 @@ function ForecastCard({
   onContextMenu?: (e: React.MouseEvent) => void;
   onToggleExpand?: () => void;
   isExpanded?: boolean;
+  displayMode?: DisplayMode;
+  hourlyRate?: number;
 }) {
   const style = getSourceStyle(block.source, block.confidence);
   const [expanded, setExpanded] = useState(false);
