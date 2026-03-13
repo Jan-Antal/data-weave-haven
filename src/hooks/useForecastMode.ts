@@ -39,12 +39,13 @@ const STORAGE_KEYS: Record<ForecastPlanMode, string> = {
   from_scratch: "ami_forecast_session_scratch",
 };
 
-function saveToStorage(mode: ForecastPlanMode, blocks: ForecastBlock[], selectedIds: Set<string>, overrides: RealBundleOverride[]) {
+function saveToStorage(mode: ForecastPlanMode, blocks: ForecastBlock[], selectedIds: Set<string>, overrides: RealBundleOverride[], safetyNet: SafetyNetProject[]) {
   try {
     localStorage.setItem(STORAGE_KEYS[mode], JSON.stringify({
       blocks,
       selectedBlockIds: Array.from(selectedIds),
       realBundleOverrides: overrides,
+      safetyNetProjects: safetyNet,
       timestamp: Date.now(),
     }));
   } catch { /* ignore */ }
