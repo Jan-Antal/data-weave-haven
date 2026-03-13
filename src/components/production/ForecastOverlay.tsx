@@ -410,19 +410,19 @@ function ForecastCard({
 
 
                 }
-                <span
-                  className="text-[9px] px-1 rounded"
-                  style={{
-                    backgroundColor: block.confidence === "high" ? "rgba(239,68,68,0.15)" :
-                    block.confidence === "medium" ? "rgba(249,115,22,0.15)" :
-                    "rgba(34,197,94,0.15)",
-                    color: block.confidence === "high" ? "#ef4444" :
-                    block.confidence === "medium" ? "#f97316" :
-                    "#22c55e"
-                  }}>
-                  
-                  {block.confidence === "high" ? "vysoká" : block.confidence === "medium" ? "střední" : "nízká"}
-                </span>
+                
+
+
+
+
+
+
+
+
+
+
+
+                
               </div>
             </div>
           </div>
