@@ -24,6 +24,8 @@ export interface ScheduleItem {
   pause_expected_date: string | null;
   adhoc_reason: string | null;
   cancel_reason: string | null;
+  is_blocker: boolean;
+  tpv_expected_date: string | null;
 }
 
 export interface ScheduleBundle {
