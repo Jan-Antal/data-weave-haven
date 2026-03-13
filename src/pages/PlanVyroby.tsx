@@ -850,8 +850,8 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
             placeholder="Hledat projekt..."
             className="w-full h-8 pl-8 pr-8 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 transition-colors"
             style={{
-              backgroundColor: forecastActive ? "#0f1117" : "hsl(var(--background))",
-              border: forecastActive ? "1px solid #2a2d3e" : "1px solid hsl(var(--input))",
+              backgroundColor: forecastActive ? "#111318" : "hsl(var(--background))",
+              border: forecastActive ? "1px solid #2a2f3d" : "1px solid hsl(var(--input))",
               color: forecastActive ? "#e5e7eb" : undefined,
             }}
           />
