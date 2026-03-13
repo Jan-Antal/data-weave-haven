@@ -1099,26 +1099,8 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
               }}>
                 {searchMatchCount === 0
                   ? "0 výsledků"
-                  : `${searchCurrentIndex + 1} / ${searchMatchCount}`}
+                  : `${searchMatchCount} ${searchMatchCount === 1 ? "projekt" : searchMatchCount < 5 ? "projekty" : "projektů"}`}
               </span>
-              {searchMatchCount > 0 && (
-                <>
-                  <button
-                    onClick={onSearchPrev}
-                    className="p-0.5 rounded transition-colors hover:bg-accent"
-                    style={{ color: forecastActive ? "#a8c5c2" : undefined }}
-                  >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={onSearchNext}
-                    className="p-0.5 rounded transition-colors hover:bg-accent"
-                    style={{ color: forecastActive ? "#a8c5c2" : undefined }}
-                  >
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </button>
-                </>
-              )}
             </div>
           )}
         </div>
