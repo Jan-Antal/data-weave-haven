@@ -170,7 +170,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const getWeekCapacity = useWeekCapacityLookup();
 
   const projectLookup = useMemo(() => {
-    const map = new Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; status?: string | null; risk?: string | null }>();
+    const map = new Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null }>();
     for (const p of allProjects) map.set(p.project_id, p);
     return map;
   }, [allProjects]);
@@ -815,7 +815,7 @@ function ToolbarButton({ active, disabled, label, onClick }: { active?: boolean;
   );
 }
 
-type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; status?: string | null; risk?: string | null }>;
+type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null }>;
 
 interface SiloProps {
   weekKey: string; weekNum: number; startDate: Date; endDate: Date;
@@ -1049,11 +1049,12 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const isBlockerBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_blocker);
 
   const project = projectLookup.get(bundle.project_id);
-  // Deadline fallback chain: expedice → montaz → datum_smluvni
+  // Deadline fallback chain: expedice → montáž → předání → smluvní
   const deadlineInfo = useMemo(() => {
     const fields: { key: string; label: string; value: string | null | undefined }[] = [
       { key: "expedice", label: "Exp", value: project?.expedice },
       { key: "montaz", label: "Mnt", value: project?.montaz },
+      { key: "predani", label: "Před", value: project?.predani },
       { key: "datum_smluvni", label: "Sml", value: project?.datum_smluvni },
     ];
     for (const f of fields) {
@@ -1095,7 +1096,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const urgencyInfo = useMemo(() => {
     if (isProjectDone || allCompleted) return null;
     if (!project) return null;
-    const dates = [project.expedice, project.montaz, project.datum_smluvni].filter(Boolean);
+    const dates = [project.expedice, project.montaz, project.predani, project.datum_smluvni].filter(Boolean);
     let earliest: Date | null = null;
     for (const val of dates) {
       const d = parseAppDate(val as string);
