@@ -1178,15 +1178,26 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onBundleContextMenu(e, bundle, toggleExpand); }}
         >
           <div className="flex-1 min-w-0">
-            <div className="text-[11px] truncate" style={{ color: forecastDarkMode ? (allCompleted ? "#5a6480" : "#c8d0e0") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: allCompleted ? 500 : 600 }}>{highlightMatch(bundle.project_name, searchQuery)}</div>
+            <div className="truncate" style={{ fontSize: 13, color: forecastDarkMode ? (allCompleted ? "#5a6480" : "#c8d0e0") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: allCompleted ? 400 : 500 }}>{highlightMatch(bundle.project_name, searchQuery)}</div>
             <div className="flex items-center gap-1.5">
               <span className="font-mono text-xs" style={{ color: forecastDarkMode ? "#5a6480" : (allCompleted ? "#b0b7c3" : "#6b7280") }}>{bundle.project_id}</span>
+              {(() => {
+                const proj = projectLookup.get(bundle.project_id);
+                const risk = proj?.risk;
+                if (!risk) return null;
+                const r = risk.toLowerCase();
+                if (r === "vysoká") return <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 3, marginLeft: 4, backgroundColor: "#7f1d1d", color: "#fca5a5" }}>{risk}</span>;
+                if (r === "střední") return <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 3, marginLeft: 4, backgroundColor: "#7c2d12", color: "#fdba74" }}>{risk}</span>;
+                if (r === "nízká") return <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 3, marginLeft: 4, backgroundColor: "#14532d", color: "#86efac" }}>{risk}</span>;
+                return null;
+              })()}
               {expDate && !allCompleted && (
                 <span className="text-xs truncate" style={{ color: expSeverity === "overdue" ? "#dc2626" : expSeverity === "urgent" ? "#d97706" : daysUntilExp !== null && daysUntilExp <= 14 ? "#d97706" : "#6b7280" }}>
                   Exp: {expDate}
                 </span>
               )}
             </div>
+            <div style={{ fontSize: 11, color: "#5c706f", marginTop: 1 }}>{bundle.items.length} položek</div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {expSeverity && !allCompleted && expParsed && (() => {
@@ -1205,11 +1216,11 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
             })()}
             {completedCount > 0 && <span className="text-[9px]" style={{ color: "#3a8a36", fontWeight: 600 }}>{completedCount}/{totalCount} ✓</span>}
             {displayMode === "czk" ? (
-              <span className="font-mono text-[11px]" style={{ color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 700 }}>{formatCompactCzk(bundle.total_hours * hourlyRate)}</span>
+              <span className="font-mono" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{formatCompactCzk(bundle.total_hours * hourlyRate)}</span>
             ) : displayMode === "percent" ? (
-              <span className="font-mono text-[11px]" style={{ color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 700 }}>{weeklyCapacity > 0 ? Math.round((bundle.total_hours / weeklyCapacity) * 100) : 0}%</span>
+              <span className="font-mono" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{weeklyCapacity > 0 ? Math.round((bundle.total_hours / weeklyCapacity) * 100) : 0}%</span>
             ) : (
-              <span className="font-mono text-[11px]" style={{ color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 700 }}>{Math.round(bundle.total_hours)}h</span>
+              <span className="font-mono" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{Math.round(bundle.total_hours)}h</span>
             )}
           </div>
         </div>
