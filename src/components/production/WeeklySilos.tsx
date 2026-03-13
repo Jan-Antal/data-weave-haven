@@ -889,11 +889,11 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       });
   }, [silo, hideRealCards]);
 
-  const barColor = isPast ? "#b0bab8" : isOverloaded ? "#c0392b" : isWarning ? "#d97706" : forecastDarkMode ? "#3d7a74" : "#3a8a36";
+  const barColor = isPast ? "#b0bab8" : isOverloaded ? "#c0392b" : isWarning ? "#d97706" : "#3a8a36";
   const barBg = isPast ? "linear-gradient(90deg, #d0d7d5, #b0bab8)"
     : isOverloaded ? "linear-gradient(90deg, #fca5a5, #c0392b)"
     : isWarning ? "linear-gradient(90deg, #fcd34d, #d97706)"
-    : forecastDarkMode ? "linear-gradient(90deg, #6abfb5, #3d7a74)" : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
+    : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
 
   const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}`, disabled: isPast });
   const highlighted = !isPast && (isOver || isOverTarget);
@@ -924,7 +924,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
         </div>
         <div className="text-[9px] mt-0.5" style={{ color: dateRangeColor }}>{formatDateShort(startDate)} – {formatDateShort(endDate)}</div>
         <div className="mt-1.5" style={{ opacity: isPast ? 0.6 : 1 }}>
-          <div className="h-[7px] rounded" style={{ backgroundColor: forecastDarkMode ? "#2a3d3a" : "#f0eee9", overflow: "hidden" }}>
+          <div className="h-[7px] rounded" style={{ backgroundColor: "#f0eee9", overflow: "hidden" }}>
             <div className="h-full rounded transition-all duration-300" style={{ width: `${Math.min(pct, 100)}%`, background: barBg }} />
           </div>
            <div className="flex items-baseline justify-between mt-[3px]">
