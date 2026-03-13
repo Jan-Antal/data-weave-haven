@@ -1073,6 +1073,23 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
     return dl < today;
   }, [project, isProjectDone, allCompleted]);
 
+  // Urgency badge logic (same as Inbox)
+  const urgencyInfo = useMemo(() => {
+    if (isProjectDone || allCompleted) return null;
+    if (!project) return null;
+    const dates = [project.expedice, project.montaz, project.datum_smluvni].filter(Boolean);
+    let earliest: Date | null = null;
+    for (const val of dates) {
+      const d = parseAppDate(val as string);
+      if (d && (!earliest || d < earliest)) earliest = d;
+    }
+    if (!earliest) return null;
+    const days = differenceInDays(earliest, new Date());
+    if (days < 0) return { type: "overdue" as const, label: "PO TERMÍNU" };
+    if (days <= 14) return { type: "urgent" as const, label: `${days} dní` };
+    return null;
+  }, [project, isProjectDone, allCompleted]);
+
   const shouldHighlightOverdue = (daysUntilExp !== null && daysUntilExp < 0) || isOverdueProject;
 
   const borderLeftColor = allCompleted ? "#3a8a36"
@@ -1173,7 +1190,19 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onBundleContextMenu(e, bundle, toggleExpand); }}
         >
           <div className="flex-1 min-w-0">
-            <div className="truncate" style={{ fontSize: 13, color: forecastDarkMode ? (allCompleted ? "#5a6480" : "#c8d0e0") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: allCompleted ? 400 : 600 }}>{highlightMatch(bundle.project_name, searchQuery)}</div>
+            <div className="flex items-center gap-1.5">
+              <span className="truncate" style={{ fontSize: 13, color: forecastDarkMode ? (allCompleted ? "#5a6480" : "#c8d0e0") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: allCompleted ? 400 : 600 }}>{highlightMatch(bundle.project_name, searchQuery)}</span>
+              {urgencyInfo?.type === "overdue" && (
+                <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: forecastDarkMode ? "rgba(220,38,38,0.2)" : "rgba(220,38,38,0.1)", color: "#DC2626" }}>
+                  PO TERMÍNU
+                </span>
+              )}
+              {urgencyInfo?.type === "urgent" && (
+                <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: forecastDarkMode ? "rgba(217,119,6,0.2)" : "rgba(217,119,6,0.1)", color: "#D97706" }}>
+                  {urgencyInfo.label}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-1.5">
               <span className="font-mono text-xs" style={{ color: forecastDarkMode ? "#5a6480" : (allCompleted ? "#b0b7c3" : "#6b7280") }}>{bundle.project_id}</span>
               {(() => {
