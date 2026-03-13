@@ -12,6 +12,7 @@ export interface ProjectProgress {
   paused: number;
   missing: number;
   is_complete: boolean;
+  is_blocker_only: boolean;
   scheduled_items: { id: string; item_name: string; item_code: string | null; week_label: string; status: string }[];
 }
 
