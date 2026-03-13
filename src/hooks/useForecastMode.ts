@@ -356,5 +356,6 @@ export function useForecastMode(): UseForecastModeReturn {
     realBundleOverrides,
     addRealBundleOverride,
     commitRealBundleOverrides,
+    safetyNetProjects,
   };
 }
