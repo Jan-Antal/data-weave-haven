@@ -35,18 +35,40 @@ interface ForecastSafetyNetProps {
   onViewItems?: (projectId: string) => void;
 }
 
-const sourceBadge: Record<string, { label: string; bg: string }> = {
-  scheduled: { label: "Plán", bg: "#2a3d3a" },
-  inbox: { label: "Inbox", bg: "#14532d" },
-  unplanned: { label: "Bez plánu", bg: "#451a03" },
-};
-
 const statusColors: Record<string, { bg: string; color: string }> = {
   scheduled: { bg: "#2a3d3a", color: "#7aa8a4" },
   in_progress: { bg: "#1e3a5f", color: "#60a5fa" },
   paused: { bg: "#451a03", color: "#fdba74" },
   completed: { bg: "#14532d", color: "#86efac" },
 };
+
+interface DeadlineDisplay {
+  label: string;
+  dateStr: string;
+  color: string;
+}
+
+const DEADLINE_FIELDS: { key: string; label: string }[] = [
+  { key: "expedice", label: "Exp" },
+  { key: "montaz", label: "Mnt" },
+  { key: "predani", label: "Před" },
+  { key: "datum_smluvni", label: "Sml" },
+];
+
+function resolveDeadlineDisplay(info: Record<string, string | null> | undefined): DeadlineDisplay | null {
+  if (!info) return null;
+  for (const f of DEADLINE_FIELDS) {
+    const val = info[f.key];
+    if (!val) continue;
+    const d = parseAppDate(val);
+    if (!d) continue;
+    const dateStr = `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+    const days = differenceInDays(d, new Date());
+    const color = isPast(d) ? "#DC2626" : days <= 14 ? "#D97706" : days <= 30 ? "#2563EB" : "#7aa8a4";
+    return { label: f.label, dateStr, color };
+  }
+  return null;
+}
 
 const DATE_FIELDS = [
   { key: "expedice", label: "Expedice" },
