@@ -506,7 +506,12 @@ export default function PlanVyroby() {
           onForecastToggle={async (v) => {
             forecast.setForecastActive(v);
             if (v) {
-              await forecast.generateForecast(weeklyCapacity);
+              const loaded = forecast.loadSavedSession();
+              if (loaded) {
+                toast({ title: "Obnoveno z poslední relace" });
+              } else {
+                await forecast.generateForecast(weeklyCapacity);
+              }
             }
           }}
           forecastPlanMode={forecast.planMode}
@@ -514,7 +519,17 @@ export default function PlanVyroby() {
             forecast.setPlanMode(m);
             if (forecast.forecastActive) {
               forecast.clearForecast();
-              await forecast.generateForecast(weeklyCapacity, m);
+              const loaded = forecast.loadSavedSession(m);
+              if (loaded) {
+                toast({ title: "Obnoveno z poslední relace" });
+              } else {
+                await forecast.generateForecast(weeklyCapacity, m);
+              }
+            }
+          }}
+          onResetForecast={async () => {
+            if (window.confirm("Smazat uložený forecast a začít znovu?")) {
+              await forecast.resetAndRegenerate(weeklyCapacity);
             }
           }}
           isOwner={isOwner}
