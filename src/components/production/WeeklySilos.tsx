@@ -1049,9 +1049,27 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const isBlockerBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_blocker);
 
   const project = projectLookup.get(bundle.project_id);
-  const expDate = formatDateShortYY(project?.expedice);
-  const expParsed = project?.expedice ? parseAppDate(project.expedice) : null;
-  const daysUntilExp = expParsed ? differenceInDays(expParsed, new Date()) : null;
+  // Deadline fallback chain: expedice → montaz → datum_smluvni
+  const deadlineInfo = useMemo(() => {
+    const fields: { key: string; label: string; value: string | null | undefined }[] = [
+      { key: "expedice", label: "Exp", value: project?.expedice },
+      { key: "montaz", label: "Mnt", value: project?.montaz },
+      { key: "datum_smluvni", label: "Sml", value: project?.datum_smluvni },
+    ];
+    for (const f of fields) {
+      if (f.value) {
+        const parsed = parseAppDate(f.value);
+        const formatted = formatDateShortYY(f.value);
+        if (parsed && formatted) {
+          return { label: f.label, dateStr: formatted, parsed, days: differenceInDays(parsed, new Date()) };
+        }
+      }
+    }
+    return null;
+  }, [project]);
+  const expDate = deadlineInfo?.dateStr ?? null;
+  const daysUntilExp = deadlineInfo?.days ?? null;
+  const deadlineLabel = deadlineInfo?.label ?? "Exp";
   const isProjectDone = ["Fakturace", "Dokonceno", "Dokončeno", "Expedice"].includes(project?.status ?? "");
   const expSeverity: "overdue" | "urgent" | null = (!isProjectDone && !allCompleted && daysUntilExp !== null)
     ? (daysUntilExp < 0 ? "overdue" : daysUntilExp <= 3 ? "urgent" : null)
@@ -1217,18 +1235,18 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
               })()}
               {expDate && (
                 <span className="text-xs truncate" style={{ color: !allCompleted && daysUntilExp !== null && daysUntilExp < 0 ? "#dc2626" : !allCompleted && daysUntilExp !== null && daysUntilExp <= 14 ? "#d97706" : forecastDarkMode ? "#5a7a76" : "#7aa8a4" }}>
-                  Exp: {expDate}
+                  {deadlineLabel}: {expDate}
                 </span>
               )}
             </div>
             <div style={{ fontSize: 11, color: "#5c706f", marginTop: 1 }}>{bundle.items.length} položek</div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            {expSeverity && !allCompleted && expParsed && (() => {
+            {expSeverity && !allCompleted && deadlineInfo?.parsed && (() => {
               const warnColor = expSeverity === "overdue" ? "#dc3545" : "#d97706";
               const tooltipText = expSeverity === "overdue"
-                ? `Expedice ${format(expParsed, "dd.MM.yyyy")} — po termínu o ${differenceInDays(new Date(), expParsed)} dní`
-                : `Expedice za ${differenceInDays(expParsed, new Date())} dní (${format(expParsed, "dd.MM.yyyy")})`;
+                ? `${deadlineLabel} ${format(deadlineInfo.parsed, "dd.MM.yyyy")} — po termínu o ${differenceInDays(new Date(), deadlineInfo.parsed)} dní`
+                : `${deadlineLabel} za ${differenceInDays(deadlineInfo.parsed, new Date())} dní (${format(deadlineInfo.parsed, "dd.MM.yyyy")})`;
               return (
                 <Tooltip>
                   <TooltipTrigger asChild>
