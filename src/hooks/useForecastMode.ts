@@ -301,17 +301,28 @@ export function useForecastMode(): UseForecastModeReturn {
       const userId = user?.id || "forecast-ai";
       const hourlyRate = 550;
 
+      let blockerCount = 0;
+      let normalCount = 0;
+
       for (const block of committable) {
+        const isBlocker = block.source === "project_estimate";
+        if (isBlocker) blockerCount++;
+        else normalCount++;
+
         const { error } = await supabase.from("production_schedule").insert({
           project_id: block.project_id,
-          item_name: block.bundle_description,
+          item_name: isBlocker
+            ? `${block.project_name} — Rezerva kapacity`
+            : block.bundle_description,
           scheduled_week: block.week,
           scheduled_hours: block.estimated_hours,
-          scheduled_czk: block.estimated_hours * hourlyRate,
+          scheduled_czk: isBlocker ? 0 : block.estimated_hours * hourlyRate,
           position: 999,
           status: "scheduled",
           created_by: userId,
-        });
+          is_blocker: isBlocker,
+          tpv_expected_date: isBlocker ? (block.tpv_expected_date || null) : null,
+        } as any);
         if (error) throw error;
       }
 
@@ -319,7 +330,11 @@ export function useForecastMode(): UseForecastModeReturn {
       generationTokenRef.current += 1;
       setForecastActiveRaw(false);
       resetForecastState();
-      toast({ title: `✅ ${committable.length} bloků naplánováno` });
+
+      const desc = blockerCount > 0
+        ? `Naplánováno ${normalCount} projektů · ${blockerCount} rezerv kapacity`
+        : `${committable.length} bloků naplánováno`;
+      toast({ title: `✅ ${desc}` });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
