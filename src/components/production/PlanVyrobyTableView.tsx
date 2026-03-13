@@ -111,6 +111,28 @@ interface ProjectRow {
   expediceTotalCzk: number;
 }
 
+function getCollapsedCellStyle(proj: ProjectRow, weekKey: string): { bg: string; text: string; border: string } {
+  let hasInProgress = false, hasPaused = false, hasScheduled = false, hasCompleted = false, hasInbox = false;
+  for (const item of proj.items) {
+    const alloc = item.weekAllocations.get(weekKey);
+    if (alloc && alloc.hours > 0) {
+      const s = alloc.status;
+      if (s === "in_progress") hasInProgress = true;
+      else if (s === "paused") hasPaused = true;
+      else if (s === "completed") hasCompleted = true;
+      else hasScheduled = true;
+    }
+    if (item.inboxHours > 0 && !hasInProgress && !hasPaused && !hasScheduled && !hasCompleted) hasInbox = true;
+  }
+  // Priority: in_progress > paused > scheduled > completed > inbox
+  if (hasInProgress) return { bg: "rgba(34,197,94,0.12)", text: "#16a34a", border: "rgba(34,197,94,0.3)" };
+  if (hasPaused) return { bg: "rgba(107,114,128,0.12)", text: "#6b7280", border: "rgba(107,114,128,0.3)" };
+  if (hasScheduled) return { bg: "rgba(59,130,246,0.12)", text: "#2563eb", border: "rgba(59,130,246,0.3)" };
+  if (hasCompleted) return { bg: "rgba(22,163,74,0.15)", text: "#15803d", border: "rgba(22,163,74,0.4)" };
+  if (hasInbox) return { bg: "rgba(249,115,22,0.12)", text: "#ea580c", border: "rgba(249,115,22,0.3)" };
+  return { bg: "rgba(59,130,246,0.12)", text: "#2563eb", border: "rgba(59,130,246,0.3)" };
+}
+
 const CELL_W = 132;
 const INBOX_W = 100;
 const EXPEDICE_W = 100;
