@@ -1218,14 +1218,22 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                 dl.setHours(0, 0, 0, 0);
                 return dl < today;
               })();
+              const isSelected = selectedProjectId === proj.projectId;
               return (
                 <div key={proj.projectId} style={{ marginLeft: 4, marginRight: 4 }}>
                   {/* Project header row */}
                   <div
                     className="flex cursor-pointer transition-all"
-                    onClick={() => toggleProject(proj.projectId)}
+                    onClick={(e) => { e.stopPropagation(); onSelectProject?.(proj.projectId); toggleProject(proj.projectId); }}
                     onContextMenu={(e) => handleProjectContextMenu(e, proj)}
-                    style={{ height: 48, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
+                    style={{
+                      height: 48,
+                      boxShadow: isSelected ? undefined : "0 1px 3px rgba(0,0,0,0.04)",
+                      outline: isSelected ? "2px solid #d97706" : undefined,
+                      outlineOffset: -2,
+                      borderRadius: 6,
+                      backgroundColor: isSelected ? "rgba(217,119,6,0.05)" : undefined,
+                    }}
                   >
                     <div
                       className="shrink-0 flex items-center gap-2.5 px-3 sticky left-0 z-20"
