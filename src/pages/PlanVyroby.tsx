@@ -868,7 +868,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       className="shrink-0 border-b px-6 py-1.5 flex items-center gap-4 transition-colors duration-300"
       style={{
         minHeight: 40,
-        backgroundColor: forecastActive ? "#223937" : "hsl(var(--card))",
+        backgroundColor: forecastActive ? "#1a2422" : "hsl(var(--card))",
         borderColor: forecastActive ? "#2a4a46" : "hsl(var(--border))",
       }}
     >
