@@ -77,6 +77,10 @@ interface Props {
   selectedProjectId?: string | null;
   onSelectProject?: (projectId: string) => void;
   searchQuery?: string;
+  forecastBlocks?: ForecastBlock[];
+  forecastSelectedIds?: Set<string>;
+  onToggleForecastSelect?: (id: string) => void;
+  forecastDarkMode?: boolean;
 }
 
 interface ContextMenuState {
