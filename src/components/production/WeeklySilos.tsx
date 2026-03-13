@@ -1073,6 +1073,23 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
     return dl < today;
   }, [project, isProjectDone, allCompleted]);
 
+  // Urgency badge logic (same as Inbox)
+  const urgencyInfo = useMemo(() => {
+    if (isProjectDone || allCompleted) return null;
+    if (!project) return null;
+    const dates = [project.expedice, project.montaz, project.datum_smluvni].filter(Boolean);
+    let earliest: Date | null = null;
+    for (const val of dates) {
+      const d = parseAppDate(val as string);
+      if (d && (!earliest || d < earliest)) earliest = d;
+    }
+    if (!earliest) return null;
+    const days = differenceInDays(earliest, new Date());
+    if (days < 0) return { type: "overdue" as const, label: "PO TERMÍNU" };
+    if (days <= 14) return { type: "urgent" as const, label: `${days} dní` };
+    return null;
+  }, [project, isProjectDone, allCompleted]);
+
   const shouldHighlightOverdue = (daysUntilExp !== null && daysUntilExp < 0) || isOverdueProject;
 
   const borderLeftColor = allCompleted ? "#3a8a36"
