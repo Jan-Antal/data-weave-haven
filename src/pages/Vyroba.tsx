@@ -614,9 +614,7 @@ export default function Vyroba() {
                   style={{ border: "1px solid #e5e2dd", background: "#fafaf8" }}
                 />
               ) : (
-                <div className="h-20 rounded-md flex items-center justify-center text-xs" style={{ border: "1px dashed #e5e2dd", color: "#99a5a3" }}>
-                  Foto — připravujeme
-                </div>
+                <VyrobaPhotoTab projectId={selectedProject?.projectId || ""} />
               )}
             </div>
           </div>
