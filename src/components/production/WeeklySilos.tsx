@@ -589,12 +589,14 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     [moveItemBackToInbox, returnToProduction, mergeSplitItems, findSameWeekSiblings, onNavigateToTPV, onOpenProjectDetail, handleReleaseItem]
   );
 
-  // Forecast card context menu — move between weeks or remove
+  // Forecast card context menu — same structure as real plan menus + forecast-specific actions
   const handleForecastContextMenu = useCallback((e: React.MouseEvent, block: ForecastBlock) => {
     e.preventDefault();
     e.stopPropagation();
     const futureWeeks = weeks.filter(w => !w.isPast && w.key !== block.week);
     const actions: ContextMenuAction[] = [];
+
+    // Move to week submenu
     for (const w of futureWeeks.slice(0, 10)) {
       actions.push({
         label: `Přesunout do T${w.weekNum} (${formatDateShort(w.start)})`,
@@ -602,6 +604,25 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
         onClick: () => onMoveForecastBlock?.(block.id, w.key),
       });
     }
+
+    // Project navigation actions (same as real plan)
+    if (onNavigateToTPV) {
+      actions.push({
+        label: "Zobrazit položky",
+        icon: "📋",
+        dividerBefore: true,
+        onClick: () => onNavigateToTPV(block.project_id),
+      });
+    }
+    if (onOpenProjectDetail) {
+      actions.push({
+        label: "Zobrazit detail projektu",
+        icon: "🏗",
+        onClick: () => onOpenProjectDetail(block.project_id),
+      });
+    }
+
+    // Forecast-specific: remove
     actions.push({
       label: "Odstranit z forecastu",
       icon: "✕",
@@ -610,7 +631,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       onClick: () => onRemoveForecastBlock?.(block.id),
     });
     setContextMenu({ x: e.clientX, y: e.clientY, actions });
-  }, [weeks, onMoveForecastBlock, onRemoveForecastBlock]);
+  }, [weeks, onMoveForecastBlock, onRemoveForecastBlock, onNavigateToTPV, onOpenProjectDetail]);
 
   return (
     <div className="flex-1 flex flex-col min-w-0">
