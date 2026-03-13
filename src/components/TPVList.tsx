@@ -359,7 +359,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       <div className={cn("rounded-lg border bg-card flex flex-col flex-1 min-h-0", editMode && "rounded-t-none border-t-0")}>
         {/* FIXED HEADER — never scrolls */}
         <div ref={tpvHeaderScrollRef} className="flex-shrink-0 overflow-hidden rounded-t-lg">
-          <Table>
+          <Table style={{ tableLayout: "fixed" }}>
             <TableHeader className="sticky-off">
               <TableRow className="bg-primary/5">
                 <TableHead className="w-10">
