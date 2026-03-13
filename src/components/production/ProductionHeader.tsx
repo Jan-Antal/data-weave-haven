@@ -96,8 +96,6 @@ export function ProductionHeader({ forecastActive }: { forecastActive?: boolean 
 
             <span className="w-px h-5 bg-primary-foreground/20 mx-1" />
 
-            <AdminInboxButton />
-
             {isOwner && (
               <button
                 onClick={() => navigate("/vyroba")}
@@ -115,6 +113,8 @@ export function ProductionHeader({ forecastActive }: { forecastActive?: boolean 
             >
               <LayoutDashboard className="h-5 w-5" />
             </button>
+
+            <AdminInboxButton />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
