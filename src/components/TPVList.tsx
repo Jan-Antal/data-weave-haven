@@ -177,14 +177,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const [inlineName, setInlineName] = useState("");
   const inlineRef = useRef<HTMLInputElement>(null);
 
-  // ── Scroll sync refs for split header/body ───────────────────────
-  const tpvHeaderScrollRef = useRef<HTMLDivElement>(null);
   const tpvBodyScrollRef = useRef<HTMLDivElement>(null);
-  const handleTpvBodyScroll = useCallback(() => {
-    if (tpvBodyScrollRef.current && tpvHeaderScrollRef.current) {
-      tpvHeaderScrollRef.current.scrollLeft = tpvBodyScrollRef.current.scrollLeft;
-    }
-  }, []);
 
   const visibleColCount = renderKeys.length + 2; // +checkbox +actions
 
@@ -369,11 +362,11 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       )}
 
       <div className={cn("rounded-lg border bg-card flex flex-col flex-1 min-h-0", editMode && "rounded-t-none border-t-0")}>
-        {/* FIXED HEADER — never scrolls */}
-        <div ref={tpvHeaderScrollRef} className="flex-shrink-0 overflow-x-hidden overflow-y-scroll scrollbar-hide rounded-t-lg">
+        {/* SINGLE scrollable container with sticky header */}
+        <div ref={tpvBodyScrollRef} className="flex-1 overflow-auto always-scrollbar rounded-t-lg">
           <Table style={{ tableLayout: "fixed" }}>
             {renderColGroup()}
-            <TableHeader className="sticky-off">
+            <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow className="bg-primary/5">
                 <TableHead className="w-10">
                   <Checkbox checked={items.length > 0 && selected.size === items.length} onCheckedChange={toggleAll} />
@@ -395,13 +388,6 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                 />
               </TableRow>
             </TableHeader>
-          </Table>
-        </div>
-
-        {/* SCROLLABLE BODY */}
-        <div ref={tpvBodyScrollRef} className="flex-1 overflow-auto always-scrollbar" onScroll={handleTpvBodyScroll}>
-          <Table style={{ tableLayout: "fixed" }}>
-            {renderColGroup()}
             <TableBody>
               {isLoading ? (
                 <TableRow><TableCell colSpan={visibleColCount} className="text-center text-muted-foreground">Načítání...</TableCell></TableRow>
