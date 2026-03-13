@@ -247,6 +247,64 @@ const PRODUCTION_INBOX = [
   { project_id: "Z-2201-005", item_name: "Recepce showroom", item_code: "SH-007", estimated_hours: 32, estimated_czk: 165000 },
 ];
 
+// Helper: get Monday of current week
+function getCurrentMonday(): string {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+function addWeekOffset(monday: string, weeks: number): string {
+  const d = new Date(monday);
+  d.setDate(d.getDate() + weeks * 7);
+  return d.toISOString().slice(0, 10);
+}
+
+// Generate production schedule items spread across current week + next 4 weeks
+function generateProductionSchedule(monday: string) {
+  return [
+    // T current week — Z-2201-002 Hotel Mánes (3 items, 264h)
+    { project_id: "Z-2201-002", item_name: "Recepční pult — mosaz/mramor", item_code: "LO-001", scheduled_week: monday, scheduled_hours: 120, scheduled_czk: 320000, status: "in_progress", position: 0 },
+    { project_id: "Z-2201-002", item_name: "Obkladový panel lobby", item_code: "LO-002", scheduled_week: monday, scheduled_hours: 96, scheduled_czk: 336000, status: "scheduled", position: 1 },
+    { project_id: "Z-2201-002", item_name: "Lobby sedací boxy", item_code: "LO-003", scheduled_week: monday, scheduled_hours: 48, scheduled_czk: 270000, status: "scheduled", position: 2 },
+
+    // T current week — Z-2201-004 Vila Bubeneč (2 items, 176h)
+    { project_id: "Z-2201-004", item_name: "Kuchyně vila — masiv", item_code: "KU-001", scheduled_week: monday, scheduled_hours: 120, scheduled_czk: 420000, status: "in_progress", position: 0 },
+    { project_id: "Z-2201-004", item_name: "Spižní skříň", item_code: "KU-002", scheduled_week: monday, scheduled_hours: 56, scheduled_czk: 65000, status: "scheduled", position: 1 },
+
+    // T current week — Z-2201-006 Restaurace Bellevue (2 items, 160h)
+    { project_id: "Z-2201-006", item_name: "Barový pult", item_code: "BA-001", scheduled_week: monday, scheduled_hours: 88, scheduled_czk: 210000, status: "scheduled", position: 0 },
+    { project_id: "Z-2201-006", item_name: "Policový systém bar", item_code: "BA-002", scheduled_week: monday, scheduled_hours: 72, scheduled_czk: 145000, status: "scheduled", position: 1 },
+
+    // T+1 — Z-2201-002 Hotel Mánes continued
+    { project_id: "Z-2201-002", item_name: "Lobby konferenční stoly", item_code: "LO-004", scheduled_week: addWeekOffset(monday, 1), scheduled_hours: 48, scheduled_czk: 140000, status: "scheduled", position: 0 },
+    { project_id: "Z-2201-002", item_name: "Barový pult", item_code: "BA-001", scheduled_week: addWeekOffset(monday, 1), scheduled_hours: 88, scheduled_czk: 210000, status: "scheduled", position: 1 },
+
+    // T+1 — Z-2201-001 Rezidence Vinohrady (3 items, 208h)
+    { project_id: "Z-2201-001", item_name: "Kuchyňská linka — dub", item_code: "KU-001", scheduled_week: addWeekOffset(monday, 1), scheduled_hours: 96, scheduled_czk: 185000, status: "scheduled", position: 0 },
+    { project_id: "Z-2201-001", item_name: "TV stěna — ořech", item_code: "OB-001", scheduled_week: addWeekOffset(monday, 1), scheduled_hours: 48, scheduled_czk: 72000, status: "scheduled", position: 1 },
+    { project_id: "Z-2201-001", item_name: "Ostrůvek s deskou Dekton", item_code: "KU-002", scheduled_week: addWeekOffset(monday, 1), scheduled_hours: 64, scheduled_czk: 95000, status: "scheduled", position: 2 },
+
+    // T+2 — Z-2201-003 Kanceláře Karlín Hub (3 items, 208h)
+    { project_id: "Z-2201-003", item_name: "Recepční pult — dýha dub", item_code: "KA-001", scheduled_week: addWeekOffset(monday, 2), scheduled_hours: 64, scheduled_czk: 145000, status: "scheduled", position: 0 },
+    { project_id: "Z-2201-003", item_name: "Open-space přepážky", item_code: "KA-002", scheduled_week: addWeekOffset(monday, 2), scheduled_hours: 96, scheduled_czk: 256000, status: "scheduled", position: 1 },
+    { project_id: "Z-2201-003", item_name: "Jednací stůl — konferenční", item_code: "KA-003", scheduled_week: addWeekOffset(monday, 2), scheduled_hours: 48, scheduled_czk: 136000, status: "scheduled", position: 2 },
+
+    // T+2 — Z-2201-006 Restaurace Bellevue continued
+    { project_id: "Z-2201-006", item_name: "Barové židle — kůže", item_code: "BA-003", scheduled_week: addWeekOffset(monday, 2), scheduled_hours: 48, scheduled_czk: 216000, status: "scheduled", position: 0 },
+
+    // T+3 — Z-2201-001 Rezidence Vinohrady continued
+    { project_id: "Z-2201-001", item_name: "Šatní skříň ložnice", item_code: "LO-001", scheduled_week: addWeekOffset(monday, 3), scheduled_hours: 80, scheduled_czk: 184000, status: "scheduled", position: 0 },
+    { project_id: "Z-2201-001", item_name: "Koupelnový nábytek", item_code: "KP-001", scheduled_week: addWeekOffset(monday, 3), scheduled_hours: 72, scheduled_czk: 115000, status: "scheduled", position: 1 },
+
+    // T+3 — Z-2201-003 Kanceláře continued
+    { project_id: "Z-2201-003", item_name: "Kancelářské stoly — výšk. nastav.", item_code: "KA-004", scheduled_week: addWeekOffset(monday, 3), scheduled_hours: 96, scheduled_czk: 432000, status: "scheduled", position: 0 },
+    { project_id: "Z-2201-003", item_name: "Akustické panely stěna", item_code: "KA-005", scheduled_week: addWeekOffset(monday, 3), scheduled_hours: 64, scheduled_czk: 192000, status: "scheduled", position: 1 },
+  ];
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -389,6 +447,29 @@ Deno.serve(async (req) => {
         steps.push(`Inbox ${pi.item_code} created`);
       } else {
         steps.push(`Inbox ${pi.item_code} exists, skipped`);
+      }
+    }
+
+    // 8. Seed production schedule
+    const monday = getCurrentMonday();
+    const scheduleItems = generateProductionSchedule(monday);
+    for (const si of scheduleItems) {
+      const { data: exists } = await adminClient
+        .from("production_schedule")
+        .select("id")
+        .eq("project_id", si.project_id)
+        .eq("item_code", si.item_code)
+        .eq("scheduled_week", si.scheduled_week)
+        .single();
+
+      if (!exists) {
+        await adminClient.from("production_schedule").insert({
+          ...si,
+          created_by: testUserId,
+        });
+        steps.push(`Schedule ${si.project_id} ${si.item_code} → ${si.scheduled_week} created`);
+      } else {
+        steps.push(`Schedule ${si.project_id} ${si.item_code} → ${si.scheduled_week} exists, skipped`);
       }
     }
 
