@@ -531,8 +531,12 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     return `${Math.round(row.totalHours)}h`;
   };
 
-  const formatWeekTotal = (hours: number, czk: number) => {
+  const formatWeekTotal = (hours: number, czk: number, weekKey?: string) => {
     if (displayMode === "czk") return `${formatCzkShort(Math.round(czk))} Kč`;
+    if (displayMode === "percent") {
+      const cap = weekKey ? getWeekCapacity(weekKey) : 0;
+      return `${cap > 0 ? Math.round((hours / cap) * 100) : 0}%`;
+    }
     return `${Math.round(hours)}h`;
   };
 
@@ -550,6 +554,12 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
 
   const formatItemTotal = (item: ItemRow) => {
     if (displayMode === "czk") return formatCzkShort(Math.round(item.totalCzk)) + " Kč";
+    if (displayMode === "percent") {
+      const totalProjectHours = item.totalHours;
+      // Show as % of total weekly capacity across all weeks
+      const totalCap = weeks.reduce((s, w) => s + getWeekCapacity(w.key), 0);
+      return `${totalCap > 0 ? Math.round((totalProjectHours / totalCap) * 100) : 0}%`;
+    }
     return `${Math.round(item.totalHours)}h`;
   };
 
@@ -1316,7 +1326,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                                 className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-bold"
                                 style={{ backgroundColor: cellStyle.bg, color: cellStyle.text, border: `1px solid ${cellStyle.border}` }}
                               >
-                                {formatWeekTotal(wt.hours, wt.czk)}
+                                {formatWeekTotal(wt.hours, wt.czk, week.key)}
                               </div>
                             );
                           })()}
