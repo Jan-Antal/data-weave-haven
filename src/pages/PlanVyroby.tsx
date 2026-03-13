@@ -534,6 +534,11 @@ export default function PlanVyroby() {
           }}
           isOwner={isOwner}
           isGenerating={forecast.isGenerating}
+          forecastBlockCounts={forecast.forecastActive ? {
+            real: forecast.forecastBlocks.filter(b => b.source === "existing_plan").length,
+            inbox: forecast.forecastBlocks.filter(b => b.source === "inbox_item").length,
+            ai: forecast.forecastBlocks.filter(b => b.source === "project_estimate").length,
+          } : undefined}
         />
 
         {viewTab === "kanban" ? (
@@ -687,7 +692,7 @@ export default function PlanVyroby() {
 }
 
 
-function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast }: {
+function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts }: {
   viewTab: "kanban" | "table";
   setViewTab: (v: "kanban" | "table") => void;
   displayMode: DisplayMode;
@@ -701,6 +706,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   isOwner: boolean;
   isGenerating: boolean;
   onResetForecast?: () => void;
+  forecastBlockCounts?: { real: number; inbox: number; ai: number };
 }) {
   const { data: settings } = useProductionSettings();
   const { data: scheduleData } = useProductionSchedule();
@@ -836,11 +842,12 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
         </button>
       </div>
 
-      {/* Forecast badge */}
       {forecastActive && (
         <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(245,158,11,0.15)" }}>
           <Sparkles className="h-3 w-3" style={{ color: "#f59e0b" }} />
-          <span className="text-[11px] font-bold" style={{ color: "#f59e0b" }}>FORECAST MODE</span>
+          <span className="text-[11px] font-bold" style={{ color: "#f59e0b" }}>
+            FORECAST MODE{forecastBlockCounts ? ` · ${forecastBlockCounts.real} real · ${forecastBlockCounts.inbox} inbox · ${forecastBlockCounts.ai} AI` : ""}
+          </span>
           {isGenerating && <Loader2 className="h-3 w-3 animate-spin" style={{ color: "#f59e0b" }} />}
         </div>
       )}

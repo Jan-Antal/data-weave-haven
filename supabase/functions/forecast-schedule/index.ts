@@ -10,216 +10,199 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const sb = createClient(supabaseUrl, supabaseKey);
 
     const { mode, weeklyCapacityHours } = await req.json();
+    const capacity = Number(weeklyCapacityHours) || 875;
 
-    // 1. Fetch active projects with milestone dates
-    const { data: projects } = await sb
-      .from("projects")
-      .select("project_id, project_name, status, expedice, montaz, predani, datum_smluvni, prodejni_cena")
-      .is("deleted_at", null)
-      .not("status", "in", '("Fakturace","Dokončeno")');
+    // 1. Fetch data
+    const [projectsRes, tpvRes, scheduleRes, inboxRes] = await Promise.all([
+      sb.from("projects")
+        .select("project_id, project_name, status, expedice, montaz, predani, datum_smluvni, prodejni_cena")
+        .is("deleted_at", null)
+        .not("status", "in", '("Fakturace","Dokončeno")'),
+      sb.from("tpv_items")
+        .select("project_id, item_name, pocet, cena")
+        .is("deleted_at", null),
+      sb.from("production_schedule")
+        .select("id, project_id, item_name, item_code, scheduled_week, scheduled_hours, scheduled_czk, status")
+        .in("status", ["scheduled", "in_progress", "completed", "paused"]),
+      sb.from("production_inbox")
+        .select("id, project_id, item_name, item_code, estimated_hours, estimated_czk, status")
+        .eq("status", "pending"),
+    ]);
 
-    // 2. Fetch TPV items with hours/costs
-    const { data: tpvItems } = await sb
-      .from("tpv_items")
-      .select("project_id, item_name, item_type, pocet, cena, status")
-      .is("deleted_at", null);
+    const projects = projectsRes.data || [];
+    const tpvItems = tpvRes.data || [];
+    const scheduleItems = scheduleRes.data || [];
+    const inboxItems = inboxRes.data || [];
 
-    // 3. Fetch existing schedule
-    const { data: scheduleItems } = await sb
-      .from("production_schedule")
-      .select("id, project_id, item_name, item_code, scheduled_week, scheduled_hours, scheduled_czk, status")
-      .in("status", ["scheduled", "in_progress", "completed", "paused"]);
-
-    // 4. Fetch inbox items
-    const { data: inboxItems } = await sb
-      .from("production_inbox")
-      .select("id, project_id, item_name, item_code, estimated_hours, estimated_czk, status")
-      .eq("status", "pending");
-
-    // 5. Build context for AI
+    // 2. Generate week keys (next 16 weeks from current Monday)
     const today = new Date();
-    const currentWeekKey = (() => {
-      const d = new Date(today);
-      const day = d.getDay();
-      d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
-      return d.toISOString().slice(0, 10);
-    })();
+    const day = today.getDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const currentMonday = new Date(today);
+    currentMonday.setDate(today.getDate() + mondayOffset);
+    currentMonday.setHours(0, 0, 0, 0);
 
-    // Generate next 16 week keys
     const weekKeys: string[] = [];
-    const baseMonday = new Date(currentWeekKey);
     for (let i = 0; i < 16; i++) {
-      const d = new Date(baseMonday);
-      d.setDate(baseMonday.getDate() + i * 7);
+      const d = new Date(currentMonday);
+      d.setDate(currentMonday.getDate() + i * 7);
       weekKeys.push(d.toISOString().slice(0, 10));
     }
 
-    // Calculate existing usage per week
+    // 3. Calculate existing usage per week
     const weekUsage: Record<string, number> = {};
     for (const wk of weekKeys) weekUsage[wk] = 0;
-    for (const si of (scheduleItems || [])) {
+    for (const si of scheduleItems) {
       if (si.status !== "cancelled" && weekUsage[si.scheduled_week] !== undefined) {
-        weekUsage[si.scheduled_week] = (weekUsage[si.scheduled_week] || 0) + si.scheduled_hours;
+        weekUsage[si.scheduled_week] = (weekUsage[si.scheduled_week] || 0) + Number(si.scheduled_hours);
       }
     }
 
-    // Build project summaries with source categorization
-    const projectSummaries = (projects || []).map(p => {
-      const deadline = p.expedice || p.montaz || p.predani || p.datum_smluvni || "none";
-      const tpv = (tpvItems || []).filter(t => t.project_id === p.project_id);
-      const totalTpvHours = tpv.reduce((s, t) => s + (t.pocet || 0), 0);
-      const totalTpvCost = tpv.reduce((s, t) => s + (t.cena || 0), 0);
-      const scheduled = (scheduleItems || []).filter(s => s.project_id === p.project_id && s.status !== "cancelled");
-      const scheduledHours = scheduled.reduce((s, i) => s + i.scheduled_hours, 0);
-      const inbox = (inboxItems || []).filter(i => i.project_id === p.project_id);
-      const inboxHours = inbox.reduce((s, i) => s + i.estimated_hours, 0);
+    // Helper: find first week with enough capacity, starting from startIdx
+    function findAvailableWeek(hours: number, usage: Record<string, number>, startIdx = 0): string {
+      for (let i = startIdx; i < weekKeys.length; i++) {
+        const remaining = capacity - (usage[weekKeys[i]] || 0);
+        if (remaining >= Math.min(hours, 1)) return weekKeys[i];
+      }
+      return weekKeys[weekKeys.length - 1]; // fallback to last week
+    }
 
-      // Estimate hours if TPV incomplete: use project price / 500
-      const estimatedProjectHours = totalTpvHours > 0 
-        ? totalTpvHours 
-        : (p.prodejni_cena ? Math.round(p.prodejni_cena / 500) : 0);
+    // Helper: find week working backwards from deadline
+    function findWeekBeforeDeadline(hours: number, deadlineStr: string, usage: Record<string, number>): string {
+      const deadline = new Date(deadlineStr);
+      // Find the last week that starts before the deadline
+      let targetIdx = 0;
+      for (let i = weekKeys.length - 1; i >= 0; i--) {
+        if (new Date(weekKeys[i]) <= deadline) {
+          targetIdx = i;
+          break;
+        }
+      }
+      // Work backwards from deadline to find capacity
+      for (let i = targetIdx; i >= 0; i--) {
+        const remaining = capacity - (usage[weekKeys[i]] || 0);
+        if (remaining >= Math.min(hours, 1)) return weekKeys[i];
+      }
+      // Fallback: find any available week forward
+      return findAvailableWeek(hours, usage);
+    }
 
-      const hasScheduledBundles = scheduled.length > 0;
-      const hasInboxItems = inbox.length > 0;
-      const hasNoPlanAtAll = !hasScheduledBundles && !hasInboxItems;
+    const blocks: any[] = [];
+    let blockIdx = 0;
+    // Track usage for scheduling (copy so we can accumulate)
+    const trackUsage = { ...weekUsage };
 
-      return {
-        id: p.project_id,
-        name: p.project_name,
-        deadline,
-        status: p.status,
-        totalTpvHours,
-        totalTpvCost,
-        estimatedProjectHours,
-        scheduledHours,
-        inboxHours,
-        price: p.prodejni_cena,
-        inboxItemCount: inbox.length,
-        scheduledItemCount: scheduled.length,
-        hasScheduledBundles,
-        hasInboxItems,
-        hasNoPlanAtAll,
-        // Tell AI which source type to use
-        inboxItemNames: inbox.map(i => ({ name: i.item_name, hours: i.estimated_hours, id: i.id })),
-      };
-    });
-
-    // Filter based on mode
-    const relevantProjects = projectSummaries.filter(p => {
-      if (mode === "from_scratch") return true;
-      // respect_plan: include projects with inbox items OR projects with no plan at all
-      return p.hasInboxItems || p.hasNoPlanAtAll;
-    });
-
-    const systemPrompt = `You are a production scheduling AI for a furniture manufacturing company.
-You must return ONLY a valid JSON array of forecast blocks. No markdown, no explanation.
-
-CRITICAL: There are THREE types of forecast blocks based on source:
-1. "inbox_item" — items currently in the production inbox that need scheduling into weeks
-2. "project_estimate" — projects that have deadlines but NO plan bundles yet; estimate production time based on deadline and estimated hours
-3. "existing_plan" — ONLY used in "from_scratch" mode to represent where existing planned items would be rescheduled
-
-Rules:
-- Each block: { "project_id": string, "project_name": string, "bundle_description": string, "week": string (YYYY-MM-DD format), "estimated_hours": number, "confidence": "high"|"medium"|"low", "source": "inbox_item"|"project_estimate"|"existing_plan" }
-- Respect weekly capacity of ${weeklyCapacityHours} hours per week
-- Available weeks: ${JSON.stringify(weekKeys)}
-- Schedule projects with earlier deadlines first, working backwards from deadline
-- Split large projects across multiple weeks if needed
-- For inbox_item: use the actual item names and hours from inbox
-- For project_estimate: create descriptive bundles like "Výroba — etapa 1", use "~" prefix on description to indicate estimate
-- Confidence: "high" for inbox items with exact hours, "medium" for projects with TPV data, "low" for projects estimated from price
-${mode === "respect_plan" 
-  ? `- Existing schedule usage per week: ${JSON.stringify(weekUsage)}
-- Only schedule UNPLANNED items (inbox + no-plan projects). Do NOT reschedule existing planned items.
-- Available capacity per week = ${weeklyCapacityHours} - existing_usage
-- Use source "inbox_item" for inbox items, "project_estimate" for projects with no plan`
-  : `- Ignore existing schedule. Reschedule ALL items optimally.
-- Existing planned items become source "existing_plan"
-- Inbox items become source "inbox_item"  
-- Projects with no bundles become source "project_estimate"
-- Total hours include existing + inbox + estimate hours`
-}
-- Return an empty array [] if there's nothing to schedule.`;
-
-    const userPrompt = `Schedule the following projects into production weeks:
-
-${JSON.stringify(relevantProjects, null, 2)}
-
-Return ONLY a JSON array of forecast blocks.`;
-
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.3,
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      const status = aiResponse.status;
-      if (status === 429) {
-        return new Response(JSON.stringify({ error: "Příliš mnoho požadavků, zkuste to znovu za chvíli." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // ─── TYPE 1: existing_plan (only in from_scratch mode) ───
+    if (mode === "from_scratch") {
+      for (const si of scheduleItems) {
+        if (si.status === "cancelled") continue;
+        const proj = projects.find(p => p.project_id === si.project_id);
+        blocks.push({
+          id: `forecast-${Date.now()}-${blockIdx++}`,
+          project_id: si.project_id,
+          project_name: proj?.project_name || si.project_id,
+          bundle_description: si.item_name,
+          week: si.scheduled_week,
+          estimated_hours: Number(si.scheduled_hours),
+          confidence: "high",
+          source: "existing_plan",
+          is_forecast: true,
         });
       }
-      if (status === 402) {
-        return new Response(JSON.stringify({ error: "Nedostatek kreditů. Doplňte kredity v nastavení." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+    }
+
+    // ─── TYPE 2: inbox_item ───
+    // All pending inbox items → schedule into first available week
+    for (const item of inboxItems) {
+      const hours = Number(item.estimated_hours) || 8;
+      const week = findAvailableWeek(hours, trackUsage);
+      trackUsage[week] = (trackUsage[week] || 0) + hours;
+
+      const proj = projects.find(p => p.project_id === item.project_id);
+      blocks.push({
+        id: `forecast-${Date.now()}-${blockIdx++}`,
+        project_id: item.project_id,
+        project_name: proj?.project_name || item.project_id,
+        bundle_description: item.item_name,
+        week,
+        estimated_hours: hours,
+        confidence: "high",
+        source: "inbox_item",
+        is_forecast: true,
+      });
+    }
+
+    // ─── TYPE 3: project_estimate ───
+    // Projects with NO production_schedule bundles at all (completely unplanned)
+    const projectsWithSchedule = new Set(scheduleItems.map(s => s.project_id));
+    const projectsWithInbox = new Set(inboxItems.map(i => i.project_id));
+
+    for (const proj of projects) {
+      if (projectsWithSchedule.has(proj.project_id)) continue;
+      if (projectsWithInbox.has(proj.project_id)) continue;
+
+      // Resolve deadline
+      const deadlineStr = proj.expedice || proj.montaz || proj.predani || proj.datum_smluvni;
+
+      // Estimate hours from TPV or price proxy
+      const projTpv = tpvItems.filter(t => t.project_id === proj.project_id);
+      const tpvHours = projTpv.reduce((s, t) => s + (Number(t.pocet) || 0), 0);
+      const tpvCost = projTpv.reduce((s, t) => s + (Number(t.cena) || 0), 0);
+      let estimatedHours = tpvHours > 0 ? tpvHours : (proj.prodejni_cena ? Math.round(Number(proj.prodejni_cena) / 500) : 0);
+      if (estimatedHours <= 0) estimatedHours = 40; // minimum fallback
+
+      const confidence = tpvHours > 0 ? "medium" : "low";
+
+      // Place working backwards from deadline, or forward from current week
+      let week: string;
+      if (deadlineStr) {
+        week = findWeekBeforeDeadline(estimatedHours, deadlineStr, trackUsage);
+      } else {
+        week = findAvailableWeek(estimatedHours, trackUsage);
+      }
+      trackUsage[week] = (trackUsage[week] || 0) + estimatedHours;
+
+      // Split large estimates across weeks if needed
+      if (estimatedHours > capacity * 0.5) {
+        const parts = Math.ceil(estimatedHours / (capacity * 0.4));
+        const hoursPerPart = Math.round(estimatedHours / parts);
+        for (let p = 0; p < parts; p++) {
+          const partHours = p === parts - 1 ? estimatedHours - hoursPerPart * (parts - 1) : hoursPerPart;
+          const partWeek = findAvailableWeek(partHours, trackUsage, 0);
+          trackUsage[partWeek] = (trackUsage[partWeek] || 0) + partHours;
+          blocks.push({
+            id: `forecast-${Date.now()}-${blockIdx++}`,
+            project_id: proj.project_id,
+            project_name: proj.project_name,
+            bundle_description: `~Výroba — etapa ${p + 1}/${parts}`,
+            week: partWeek,
+            estimated_hours: partHours,
+            confidence,
+            source: "project_estimate",
+            is_forecast: true,
+          });
+        }
+      } else {
+        blocks.push({
+          id: `forecast-${Date.now()}-${blockIdx++}`,
+          project_id: proj.project_id,
+          project_name: proj.project_name,
+          bundle_description: `~Výroba — odhad`,
+          week,
+          estimated_hours: estimatedHours,
+          confidence,
+          source: "project_estimate",
+          is_forecast: true,
         });
       }
-      const t = await aiResponse.text();
-      console.error("AI gateway error:", status, t);
-      throw new Error(`AI gateway error: ${status}`);
     }
 
-    const aiData = await aiResponse.json();
-    const content = aiData.choices?.[0]?.message?.content || "[]";
-    
-    let jsonStr = content.trim();
-    if (jsonStr.startsWith("```")) {
-      jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
-
-    let blocks;
-    try {
-      blocks = JSON.parse(jsonStr);
-    } catch {
-      console.error("Failed to parse AI response:", jsonStr);
-      blocks = [];
-    }
-
-    const validSources = ["inbox_item", "project_estimate", "existing_plan"];
-    const validBlocks = (Array.isArray(blocks) ? blocks : []).map((b: any, i: number) => ({
-      id: `forecast-${Date.now()}-${i}`,
-      project_id: b.project_id || "",
-      project_name: b.project_name || "",
-      bundle_description: b.bundle_description || "Forecast",
-      week: b.week || weekKeys[0],
-      estimated_hours: Number(b.estimated_hours) || 0,
-      confidence: ["high", "medium", "low"].includes(b.confidence) ? b.confidence : "medium",
-      source: validSources.includes(b.source) ? b.source : "project_estimate",
-      is_forecast: true,
-    }));
-
-    return new Response(JSON.stringify({ blocks: validBlocks, weekKeys, weekUsage }), {
+    return new Response(JSON.stringify({ blocks, weekKeys, weekUsage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
