@@ -471,13 +471,16 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
       const pName = p.projectName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       const pId = p.projectId.toLowerCase();
       if (pName.includes(q) || pId.includes(q)) return true;
+      // Match PM
+      const proj = allProjects.find(ap => ap.project_id === p.projectId);
+      if (proj?.pm && proj.pm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(q)) return true;
       return p.items.some(i => {
         const iName = i.itemName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const iCode = (i.itemCode || "").toLowerCase();
         return iName.includes(q) || iCode.includes(q);
       });
     });
-  }, [projectRows, searchQuery]);
+  }, [projectRows, searchQuery, allProjects]);
 
   const regularRows = useMemo(() => filteredRows.filter(r => !r.isBlockerOnly), [filteredRows]);
   const blockerRows = useMemo(() => filteredRows.filter(r => r.isBlockerOnly), [filteredRows]);

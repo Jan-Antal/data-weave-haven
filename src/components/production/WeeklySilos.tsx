@@ -1221,7 +1221,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
     disabled: allCompleted || !!forecastDarkMode,
   });
   const toggleExpand = useCallback(() => setExpanded(v => !v), []);
-  const isSearchMatch = bundleMatchesSearch(bundle, searchQuery);
+  const isSearchMatch = bundleMatchesSearch(bundle, searchQuery, projectLookup.get(bundle.project_id)?.pm);
 
   // Blocker card — special rendering (after all hooks)
   if (isBlockerBundle) {
