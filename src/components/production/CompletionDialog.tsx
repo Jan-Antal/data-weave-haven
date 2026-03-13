@@ -209,12 +209,18 @@ export function CompletionDialog({
                   style={{ border: "1px solid #ece8e2" }}
                   onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
                   onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
-                  onClick={() => !isCompleted && toggleItem(item.id)}
+                  onClick={(e) => {
+                    if (isCompleted) return;
+                    const target = e.target as HTMLElement;
+                    if (target.closest("button, input, [role='checkbox'], [data-no-row-toggle='true']")) return;
+                    toggleItem(item.id);
+                  }}
                 >
                   <Checkbox
                     checked={isCompleted || isChecked}
                     disabled={isCompleted}
                     onCheckedChange={() => !isCompleted && toggleItem(item.id)}
+                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => e.stopPropagation()}
                   />
                   {item.item_code && (
