@@ -13,16 +13,15 @@ function normalize(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-function matchesQuery(bundle: { project_name: string; project_id: string; items: Array<{ item_name?: string; item_code?: string | null }> }, q: string, pm?: string | null): boolean {
+function matchesQuery(text: string[], q: string): boolean {
   const nq = normalize(q);
-  if (normalize(bundle.project_name).includes(nq)) return true;
-  if (normalize(bundle.project_id).includes(nq)) return true;
-  if (pm && normalize(pm).includes(nq)) return true;
-  for (const i of bundle.items) {
-    if (i.item_name && normalize(i.item_name).includes(nq)) return true;
-    if (i.item_code && normalize(i.item_code).includes(nq)) return true;
-  }
-  return false;
+  return text.some(t => t && normalize(t).includes(nq));
+}
+
+interface InboxProject {
+  project_id: string;
+  project_name: string;
+  items: Array<{ item_code?: string | null }>;
 }
 
 interface UseSearchNavigationOptions {
@@ -33,41 +32,74 @@ interface UseSearchNavigationOptions {
   forecastPlanMode?: "respect_plan" | "from_scratch";
   weekKeys: string[];
   projectPmMap?: Map<string, string | null>;
+  inboxProjects?: InboxProject[];
 }
 
-export function useSearchNavigation({ query, scheduleData, forecastBlocks, forecastActive, forecastPlanMode, weekKeys, projectPmMap }: UseSearchNavigationOptions) {
+export function useSearchNavigation({ query, scheduleData, forecastBlocks, forecastActive, forecastPlanMode, weekKeys, projectPmMap, inboxProjects }: UseSearchNavigationOptions) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [focusedMatchKey, setFocusedMatchKey] = useState<string | null>(null);
-  const fadeTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
+  // Count unique matched projects across all sources
+  const matchedProjectIds = useMemo<Set<string>>(() => {
+    if (!query.trim()) return new Set();
+    const matched = new Set<string>();
+
+    const check = (projectId: string, projectName: string, extraTexts: string[] = []) => {
+      const pm = projectPmMap?.get(projectId) ?? "";
+      if (matchesQuery([projectName, projectId, pm, ...extraTexts], query)) {
+        matched.add(projectId);
+      }
+    };
+
+    // Inbox
+    if (inboxProjects) {
+      for (const p of inboxProjects) {
+        const codes = p.items.map(i => i.item_code ?? "");
+        check(p.project_id, p.project_name, codes);
+      }
+    }
+
+    // Schedule
+    if (scheduleData) {
+      for (const [, silo] of scheduleData) {
+        for (const bundle of silo.bundles) {
+          const codes = bundle.items.map(i => i.item_code ?? "");
+          check(bundle.project_id, bundle.project_name, codes);
+        }
+      }
+    }
+
+    // Forecast
+    if (forecastActive && forecastBlocks) {
+      for (const block of forecastBlocks) {
+        check(block.project_id, block.project_name, [block.bundle_description ?? ""]);
+      }
+    }
+
+    return matched;
+  }, [query, scheduleData, forecastBlocks, forecastActive, projectPmMap, inboxProjects]);
+
+  // Navigation matches (week-based, for prev/next arrows)
   const matches = useMemo<SearchMatch[]>(() => {
     if (!query.trim()) return [];
     const result: SearchMatch[] = [];
     const hideReal = forecastActive && forecastPlanMode === "from_scratch";
 
     for (const weekKey of weekKeys) {
-      // Real bundles
       if (!hideReal && scheduleData) {
         const silo = scheduleData.get(weekKey);
         if (silo) {
           for (const bundle of silo.bundles) {
-            if (matchesQuery(bundle, query, projectPmMap?.get(bundle.project_id))) {
+            if (matchedProjectIds.has(bundle.project_id)) {
               result.push({ weekKey, projectId: bundle.project_id, matchKey: `${weekKey}::${bundle.project_id}` });
             }
           }
         }
       }
-      // Forecast blocks
       if (forecastActive && forecastBlocks) {
         for (const block of forecastBlocks) {
           if (block.week !== weekKey) continue;
-          const fakeBundle = {
-            project_name: block.project_name,
-            project_id: block.project_id,
-            items: [{ item_name: block.bundle_description }],
-          };
-          if (matchesQuery(fakeBundle, query, projectPmMap?.get(block.project_id))) {
-            // Avoid duplicate if real bundle already matched same project in same week
+          if (matchedProjectIds.has(block.project_id)) {
             const key = `${weekKey}::${block.project_id}`;
             if (!result.some(m => m.matchKey === key)) {
               result.push({ weekKey, projectId: block.project_id, matchKey: key });
@@ -77,16 +109,12 @@ export function useSearchNavigation({ query, scheduleData, forecastBlocks, forec
       }
     }
     return result;
-  }, [query, scheduleData, forecastBlocks, forecastActive, forecastPlanMode, weekKeys, projectPmMap]);
+  }, [query, scheduleData, forecastBlocks, forecastActive, forecastPlanMode, weekKeys, matchedProjectIds]);
 
-  // Reset index when matches change
   useEffect(() => {
     setCurrentIndex(0);
     setFocusedMatchKey(null);
   }, [matches.length, query]);
-
-  // Cleanup
-  useEffect(() => () => clearTimeout(fadeTimerRef.current), []);
 
   const triggerFocus = useCallback((index: number) => {
     const match = matches[index];
@@ -114,7 +142,7 @@ export function useSearchNavigation({ query, scheduleData, forecastBlocks, forec
     currentIndex,
     currentMatch,
     focusedMatchKey,
-    totalCount: matches.length,
+    totalCount: matchedProjectIds.size,
     goNext,
     goPrev,
   };
