@@ -35,7 +35,7 @@ interface UseSearchNavigationOptions {
   projectPmMap?: Map<string, string | null>;
 }
 
-export function useSearchNavigation({ query, scheduleData, forecastBlocks, forecastActive, forecastPlanMode, weekKeys }: UseSearchNavigationOptions) {
+export function useSearchNavigation({ query, scheduleData, forecastBlocks, forecastActive, forecastPlanMode, weekKeys, projectPmMap }: UseSearchNavigationOptions) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [focusedMatchKey, setFocusedMatchKey] = useState<string | null>(null);
   const fadeTimerRef = useRef<ReturnType<typeof setTimeout>>();
