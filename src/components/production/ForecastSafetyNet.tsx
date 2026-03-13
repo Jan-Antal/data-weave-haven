@@ -385,6 +385,25 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
   const [lastClicked, setLastClicked] = useState<string | null>(null);
 
+  // Fetch project deadlines
+  const projectIds = useMemo(() => projects.map(p => p.project_id), [projects]);
+  const { data: deadlineMap } = useQuery({
+    queryKey: ["safety-net-deadlines", projectIds],
+    queryFn: async () => {
+      if (projectIds.length === 0) return new Map<string, DeadlineDisplay | null>();
+      const { data } = await supabase
+        .from("projects")
+        .select("project_id, expedice, montaz, predani, datum_smluvni")
+        .in("project_id", projectIds);
+      const map = new Map<string, DeadlineDisplay | null>();
+      for (const row of data || []) {
+        map.set(row.project_id, resolveDeadlineDisplay(row as any));
+      }
+      return map;
+    },
+    enabled: projectIds.length > 0,
+  });
+
   // Due date dialog state
   const [dueDateDialog, setDueDateDialog] = useState<{ projectId: string; projectName: string } | null>(null);
 
