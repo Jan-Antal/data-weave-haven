@@ -113,6 +113,8 @@ interface InboxPanelProps {
   onSelectProject?: (projectId: string) => void;
   searchQuery?: string;
   forecastActive?: boolean;
+  width?: number;
+  onWidthChange?: (w: number) => void;
 }
 
 interface ContextMenuState {
