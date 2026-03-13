@@ -553,7 +553,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     if (!open) setMobileDragY(0);
   }, [open]);
 
-  if (!project) return null;
+  // moved early return below all hooks
 
   const handleSave = async () => {
     if (idExists) return;
