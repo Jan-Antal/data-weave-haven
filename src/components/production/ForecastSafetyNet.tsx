@@ -640,11 +640,11 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
         )}
 
         {projects.map(p => {
-          const badge = sourceBadge[p.source] || sourceBadge.unplanned;
           const isExpanded = expandedProjects.has(p.project_id);
           const items = projectItems[p.project_id];
           const isLoading = loadingItems.has(p.project_id);
           const isMultiSelected = selectedProjects.has(p.project_id);
+          const dlInfo = deadlineMap?.get(p.project_id) ?? null;
 
           return (
             <DraggableSafetyNetRow
@@ -653,7 +653,7 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
               isExpanded={isExpanded}
               items={items}
               isLoading={isLoading}
-              badge={badge}
+              deadlineInfo={dlInfo}
               isMultiSelected={isMultiSelected}
               onToggleExpand={() => toggleExpand(p.project_id, p.source)}
               onClick={(e) => handleClick(e, p)}
