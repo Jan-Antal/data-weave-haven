@@ -102,10 +102,10 @@ export default function Vyroba() {
   const [dataLogOpen, setDataLogOpen] = useState(false);
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
 
-  // Owner-only guard
+  // Owner/Admin guard
   useEffect(() => {
-    if (!loading && !isOwner) navigate("/", { replace: true });
-  }, [loading, isOwner, navigate]);
+    if (!loading && !isOwner && !isAdmin) navigate("/", { replace: true });
+  }, [loading, isOwner, isAdmin, navigate]);
 
   // Week navigation
   const [weekOffset, setWeekOffset] = useState(0);
