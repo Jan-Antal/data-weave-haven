@@ -576,7 +576,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
         >
           Tento týden
         </button>
-        <span className="text-[9px] font-medium" style={{ color: "#99a5a3" }}>{visiblePeriodLabel}</span>
+        <span className="text-[9px] font-medium" style={{ color: forecastDarkMode ? "#6b7280" : "#99a5a3" }}>{visiblePeriodLabel}</span>
       </div>
 
       {/* Silos */}
