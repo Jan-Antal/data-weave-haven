@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Sparkles, Inbox, ChevronRight } from "lucide-react";
+import { Sparkles, Inbox, ChevronRight, GripVertical } from "lucide-react";
 import type { ForecastBlock, ForecastSource } from "@/hooks/useForecastMode";
 import { getProjectColor } from "@/lib/projectColors";
 import { useDraggable } from "@dnd-kit/core";
