@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { ChevronDown, ChevronRight, AlertTriangle, RotateCcw, GripVertical } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { ChevronDown, ChevronRight, AlertTriangle, RotateCcw, GripVertical, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
 import { useDraggable } from "@dnd-kit/core";
@@ -46,7 +46,9 @@ function DraggableSafetyNetRow({
   items,
   isLoading,
   badge,
+  isMultiSelected,
   onToggleExpand,
+  onClick,
   onContextMenu,
   onRestore,
 }: {
@@ -55,7 +57,9 @@ function DraggableSafetyNetRow({
   items: SafetyNetItem[] | undefined;
   isLoading: boolean;
   badge: { label: string; bg: string };
+  isMultiSelected: boolean;
   onToggleExpand: () => void;
+  onClick: (e: React.MouseEvent) => void;
   onContextMenu: (e: React.MouseEvent) => void;
   onRestore?: (projectId: string) => void;
 }) {
@@ -74,9 +78,14 @@ function DraggableSafetyNetRow({
     <div ref={setNodeRef} style={{ opacity: isDragging ? 0.4 : 1 }}>
       {/* Project row */}
       <div
-        className="flex items-center gap-1 py-1.5 px-1.5 rounded cursor-pointer transition-colors"
-        style={{ backgroundColor: isExpanded ? "#253533" : "transparent" }}
-        onClick={onToggleExpand}
+        className="flex items-center gap-1 py-1.5 px-1.5 rounded cursor-pointer transition-colors select-none"
+        onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
+        style={{
+          backgroundColor: isMultiSelected ? "rgba(217,119,6,0.12)" : isExpanded ? "#253533" : "transparent",
+          border: isMultiSelected ? "1.5px solid #d97706" : "1.5px solid transparent",
+          boxShadow: isMultiSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
+        }}
+        onClick={onClick}
         onContextMenu={onContextMenu}
       >
         {/* Drag handle */}
@@ -94,7 +103,7 @@ function DraggableSafetyNetRow({
           ? <ChevronDown className="w-3 h-3 shrink-0" style={{ color: "#7aa8a4" }} />
           : <ChevronRight className="w-3 h-3 shrink-0" style={{ color: "#4a5a58" }} />}
         <div className="flex-1 min-w-0">
-          <div className="truncate" style={{ fontSize: 12, fontWeight: 500, color: "#a8c5c2" }}>
+          <div className="truncate" style={{ fontSize: 12, fontWeight: 500, color: isMultiSelected ? "#fcd34d" : "#a8c5c2" }}>
             {project.project_name}
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
@@ -107,21 +116,26 @@ function DraggableSafetyNetRow({
             </span>
           </div>
         </div>
-        <div className="shrink-0 flex flex-col items-end gap-0.5">
-          <span className="font-mono text-[11px] font-semibold" style={{ color: "#7aa8a4" }}>
-            ~{project.estimated_hours}h
-          </span>
-          {onRestore && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onRestore(project.project_id); }}
-              className="flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-medium hover:opacity-80 transition-opacity"
-              style={{ background: "#2a4a46", color: "#7aa8a4" }}
-              title="Vrátit do forecastu"
-            >
-              <RotateCcw className="w-2.5 h-2.5" />
-              Vrátit
-            </button>
+        <div className="shrink-0 flex items-center gap-1.5">
+          {isMultiSelected && (
+            <Check className="h-3 w-3 flex-shrink-0" style={{ color: "#d97706" }} />
           )}
+          <div className="flex flex-col items-end gap-0.5">
+            <span className="font-mono text-[11px] font-semibold" style={{ color: "#7aa8a4" }}>
+              ~{project.estimated_hours}h
+            </span>
+            {onRestore && !isMultiSelected && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRestore(project.project_id); }}
+                className="flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-medium hover:opacity-80 transition-opacity"
+                style={{ background: "#2a4a46", color: "#7aa8a4" }}
+                title="Vrátit do forecastu"
+              >
+                <RotateCcw className="w-2.5 h-2.5" />
+                Vrátit
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -181,6 +195,20 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
   const [projectItems, setProjectItems] = useState<Record<string, SafetyNetItem[]>>({});
   const [loadingItems, setLoadingItems] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
+
+  // Multi-select state (same pattern as Inbox reserve)
+  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
+  const [lastClicked, setLastClicked] = useState<string | null>(null);
+
+  // Escape clears multi-select
+  useEffect(() => {
+    if (selectedProjects.size === 0) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setSelectedProjects(new Set()); setLastClicked(null); }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [selectedProjects.size]);
 
   const toggleExpand = useCallback(async (projectId: string, source: string) => {
     setExpandedProjects(prev => {
@@ -244,45 +272,112 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
     });
   };
 
+  const handleClick = (e: React.MouseEvent, project: SafetyNetProject) => {
+    e.stopPropagation();
+
+    // Ctrl/Cmd multi-select
+    if (e.ctrlKey || e.metaKey) {
+      setSelectedProjects(prev => {
+        const next = new Set(prev);
+        if (next.has(project.project_id)) next.delete(project.project_id);
+        else next.add(project.project_id);
+        return next;
+      });
+      setLastClicked(project.project_id);
+      return;
+    }
+
+    // Shift range-select
+    if (e.shiftKey && lastClicked) {
+      const ids = projects.map(p => p.project_id);
+      const startIdx = ids.indexOf(lastClicked);
+      const endIdx = ids.indexOf(project.project_id);
+      if (startIdx !== -1 && endIdx !== -1) {
+        const [from, to] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+        setSelectedProjects(prev => {
+          const next = new Set(prev);
+          for (let i = from; i <= to; i++) next.add(ids[i]);
+          return next;
+        });
+      }
+      setLastClicked(project.project_id);
+      return;
+    }
+
+    // Normal click: clear multi-select, toggle expand
+    setSelectedProjects(new Set());
+    setLastClicked(project.project_id);
+    toggleExpand(project.project_id, project.source);
+  };
+
   const handleContextMenu = (e: React.MouseEvent, project: SafetyNetProject) => {
     e.preventDefault();
     e.stopPropagation();
 
+    // Determine targets: if right-clicked item is in multi-select, use all; otherwise just this one
+    let targetIds: string[];
+    if (selectedProjects.size > 0 && selectedProjects.has(project.project_id)) {
+      targetIds = Array.from(selectedProjects);
+    } else {
+      targetIds = [project.project_id];
+      setSelectedProjects(new Set([project.project_id]));
+    }
+
     const isExpanded = expandedProjects.has(project.project_id);
     const actions: ContextMenuAction[] = [];
 
-    actions.push({
-      label: isExpanded ? "Sbalit" : "Rozbalit",
-      icon: "⇅",
-      onClick: () => toggleExpand(project.project_id, project.source),
-    });
-
-    if (onViewItems) {
+    // Single-item actions only when one target
+    if (targetIds.length === 1) {
       actions.push({
-        label: "Zobrazit položky",
-        icon: "📋",
-        onClick: () => onViewItems(project.project_id),
+        label: isExpanded ? "Sbalit" : "Rozbalit",
+        icon: "⇅",
+        onClick: () => toggleExpand(project.project_id, project.source),
       });
-    }
 
-    if (onViewDetail) {
-      actions.push({
-        label: "Zobrazit detail projektu",
-        icon: "🏗",
-        onClick: () => onViewDetail(project.project_id),
-      });
+      if (onViewItems) {
+        actions.push({
+          label: "Zobrazit položky",
+          icon: "📋",
+          onClick: () => onViewItems(project.project_id),
+        });
+      }
+
+      if (onViewDetail) {
+        actions.push({
+          label: "Zobrazit detail projektu",
+          icon: "🏗",
+          onClick: () => onViewDetail(project.project_id),
+        });
+      }
     }
 
     if (onRestoreToForecast) {
+      const label = targetIds.length === 1
+        ? "Vrátit do forecastu"
+        : `Vrátit ${targetIds.length} projektů do forecastu`;
       actions.push({
-        label: "Vrátit do forecastu",
+        label,
         icon: "↩",
-        onClick: () => onRestoreToForecast(project.project_id),
+        onClick: () => {
+          for (const id of targetIds) {
+            onRestoreToForecast(id);
+          }
+          setSelectedProjects(new Set());
+        },
       });
     }
 
-    setContextMenu({ x: e.clientX, y: e.clientY, actions });
+    setContextMenu({
+      x: Math.min(e.clientX, window.innerWidth - 200),
+      y: Math.min(e.clientY, window.innerHeight - 200),
+      actions,
+    });
   };
+
+  const selectedCount = selectedProjects.size;
+  const selectedHours = selectedCount > 0
+    ? projects.filter(p => selectedProjects.has(p.project_id)).reduce((s, p) => s + p.estimated_hours, 0)
+    : 0;
 
   return (
     <div
@@ -317,6 +412,7 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
           const isExpanded = expandedProjects.has(p.project_id);
           const items = projectItems[p.project_id];
           const isLoading = loadingItems.has(p.project_id);
+          const isMultiSelected = selectedProjects.has(p.project_id);
 
           return (
             <DraggableSafetyNetRow
@@ -326,13 +422,40 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
               items={items}
               isLoading={isLoading}
               badge={badge}
+              isMultiSelected={isMultiSelected}
               onToggleExpand={() => toggleExpand(p.project_id, p.source)}
+              onClick={(e) => handleClick(e, p)}
               onContextMenu={(e) => handleContextMenu(e, p)}
               onRestore={onRestoreToForecast}
             />
           );
         })}
       </div>
+
+      {/* Multi-select footer bar */}
+      {selectedCount >= 2 && onRestoreToForecast && (
+        <div
+          className="px-3 py-2 flex items-center justify-between shrink-0"
+          style={{ borderTop: "1px solid #d97706", backgroundColor: "rgba(217,119,6,0.1)" }}
+        >
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#d97706" }}>
+            ✓ {selectedCount} vybráno · ~{Math.round(selectedHours)}h
+          </span>
+          <button
+            onClick={() => {
+              for (const id of selectedProjects) {
+                onRestoreToForecast(id);
+              }
+              setSelectedProjects(new Set());
+            }}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: "#d97706", color: "#ffffff" }}
+          >
+            <RotateCcw className="w-3 h-3" />
+            Vrátit vše
+          </button>
+        </div>
+      )}
 
       {/* Context menu — uses shared ProductionContextMenu */}
       {contextMenu && (
