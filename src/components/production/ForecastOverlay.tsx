@@ -301,7 +301,7 @@ function ForecastCard({
         borderStyle: block.source === "existing_plan" ? "solid" : "dashed",
         borderColor: style.borderColor,
         opacity: isDragging ? 0.3 : 1,
-        boxShadow: isSelected ? `0 0 0 1px ${style.borderColor}40` : undefined,
+        boxShadow: isSelected ? `0 0 0 2px ${style.borderColor}, 0 0 8px ${style.borderColor}30` : undefined,
       }}
     >
       {/* Badge top-right — only for inbox and AI cards */}
