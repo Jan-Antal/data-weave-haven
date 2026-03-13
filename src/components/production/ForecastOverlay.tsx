@@ -295,6 +295,7 @@ function ForecastCard({
   return (
     <div
       className="rounded-lg overflow-hidden transition-all relative"
+      onContextMenu={(e) => {e.preventDefault();e.stopPropagation();onContextMenu?.(e);}}
       style={{
         backgroundColor: style.backgroundColor,
         borderWidth: style.borderWidth,
