@@ -207,25 +207,29 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     let animFrame = 0;
     const EDGE_ZONE = 80;
     const SCROLL_SPEED = 6;
+    let prevX = 0;
 
     const handlePointerMove = (e: PointerEvent) => {
       cancelAnimationFrame(animFrame);
       animFrame = 0;
 
       // Only auto-scroll when a button is pressed (dragging)
-      if (e.buttons === 0) return;
+      if (e.buttons === 0) { prevX = e.clientX; return; }
 
       const rect = container.getBoundingClientRect();
       const x = e.clientX;
+      const movingLeft = x < prevX;
+      const movingRight = x > prevX;
+      prevX = x;
 
-      if (x < rect.left + EDGE_ZONE && x >= rect.left) {
+      if (x < rect.left + EDGE_ZONE && x >= rect.left && movingLeft) {
         const intensity = 1 - (x - rect.left) / EDGE_ZONE;
         const step = () => {
           container.scrollLeft -= Math.round(SCROLL_SPEED * intensity);
           animFrame = requestAnimationFrame(step);
         };
         animFrame = requestAnimationFrame(step);
-      } else if (x > rect.right - EDGE_ZONE && x <= rect.right) {
+      } else if (x > rect.right - EDGE_ZONE && x <= rect.right && movingRight) {
         const intensity = 1 - (rect.right - x) / EDGE_ZONE;
         const step = () => {
           container.scrollLeft += Math.round(SCROLL_SPEED * intensity);
