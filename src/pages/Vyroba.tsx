@@ -125,6 +125,7 @@ export default function Vyroba() {
   const projects = useMemo<VyrobaProject[]>(() => {
     if (!scheduleData) return [];
     const silo = scheduleData.get(weekKey);
+    console.log('[Vyroba] query week:', weekKey, 'results:', silo?.bundles?.length ?? 0, 'all keys:', Array.from(scheduleData.keys()));
     if (!silo) return [];
     return silo.bundles
       .filter(b => b.items.some(i => i.status === "scheduled" || i.status === "in_progress"))
