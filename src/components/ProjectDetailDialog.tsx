@@ -1066,7 +1066,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                   </div>
 
                   {/* Collapsible location row */}
-                  <div className={cn("col-span-2 overflow-hidden transition-all duration-300 ease-in-out", showLocation ? "max-h-[280px] opacity-100" : "max-h-0 opacity-0")}>
+                   <div className={cn("col-span-2 overflow-hidden transition-all duration-300 ease-in-out", showLocation ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0")}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-1">
                       <div className="relative">
                         <Label className="text-xs">Lokace</Label>
@@ -1106,6 +1106,48 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                             <div className="flex items-center justify-center h-full text-xs text-muted-foreground">Zadejte adresu</div>
                           )}
                         </div>
+                      </div>
+
+                      {/* ── KONTAKT sub-section ── */}
+                      <div className="col-span-1 md:col-span-2 mt-2">
+                        <div className="relative flex items-center mb-2">
+                          <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                            <div className="w-full border-t border-border" />
+                          </div>
+                          <span className="relative bg-background pr-2 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                            Kontakt
+                          </span>
+                        </div>
+                      </div>
+                      <div className="col-span-1 md:col-span-2">
+                        <Label className="text-xs">Kontaktní osoba</Label>
+                        <Input
+                          value={form.contact_person}
+                          onChange={(e) => setForm(s => ({ ...s, contact_person: e.target.value }))}
+                          placeholder="Jméno kontaktní osoby"
+                          disabled={isSectionReadOnly("basic")}
+                          className={cn("mt-1", isSectionReadOnly("basic") && roClass)}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Kontakt email</Label>
+                        <Input
+                          value={form.contact_email}
+                          onChange={(e) => setForm(s => ({ ...s, contact_email: e.target.value }))}
+                          placeholder="email@example.com"
+                          disabled={isSectionReadOnly("basic")}
+                          className={cn("mt-1", isSectionReadOnly("basic") && roClass)}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Kontakt tel</Label>
+                        <Input
+                          value={form.contact_tel}
+                          onChange={(e) => setForm(s => ({ ...s, contact_tel: e.target.value }))}
+                          placeholder="+420 777 000 000"
+                          disabled={isSectionReadOnly("basic")}
+                          className={cn("mt-1", isSectionReadOnly("basic") && roClass)}
+                        />
                       </div>
                     </div>
                   </div>
