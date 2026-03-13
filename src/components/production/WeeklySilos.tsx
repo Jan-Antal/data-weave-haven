@@ -730,7 +730,39 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
 
       {/* Silos */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden" ref={scrollContainerRef}>
-        <div className="flex gap-[6px] p-2 h-full" style={{ minWidth: `${weeks.length * 259}px` }}>
+        <div className="flex gap-[6px] p-2 h-full" style={{ minWidth: `${(weeks.length + 1) * 259}px` }}>
+          {/* History load button */}
+          <div
+            className="shrink-0 flex flex-col items-center justify-center rounded-lg cursor-pointer select-none transition-colors"
+            style={{
+              width: 252,
+              minHeight: 120,
+              backgroundColor: forecastDarkMode ? "#1a2422" : "#f8f6f3",
+              border: forecastDarkMode ? "1px dashed #2a3d3a" : "1px dashed #d5cfc6",
+              color: forecastDarkMode ? "#7aa8a4" : "#6b7280",
+            }}
+            onClick={() => {
+              if (historyLoading) return;
+              setHistoryLoading(true);
+              const el = scrollContainerRef.current;
+              const prevScrollLeft = el?.scrollLeft ?? 0;
+              setPastWeeksLoaded(prev => prev + 4);
+              // After state update + render, restore scroll position offset by new columns
+              requestAnimationFrame(() => {
+                if (el) el.scrollLeft = prevScrollLeft + 4 * 259;
+                setHistoryLoading(false);
+              });
+            }}
+          >
+            {historyLoading ? (
+              <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
+            ) : (
+              <>
+                <span className="text-[11px] font-medium">← Historie</span>
+                <span className="text-[9px] mt-1 opacity-60">Načíst 4 starší týdny</span>
+              </>
+            )}
+          </div>
           {weeks.map(week => (
             <SiloColumn
               key={week.key} weekKey={week.key} weekNum={week.weekNum}
