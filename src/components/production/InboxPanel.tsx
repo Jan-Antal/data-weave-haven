@@ -127,7 +127,7 @@ interface CancelState {
   source: "schedule" | "inbox"; splitGroupId: string | null;
 }
 
-export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeProp, onNavigateToTPV, onOpenProjectDetail, disableDropZone, selectedProjectId, onSelectProject, searchQuery = "", forecastActive }: InboxPanelProps) {
+export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeProp, onNavigateToTPV, onOpenProjectDetail, disableDropZone, selectedProjectId, onSelectProject, searchQuery = "", forecastActive, width = 252, onWidthChange }: InboxPanelProps) {
   const displayMode: DisplayMode = displayModeProp ?? (showCzk ? "czk" : "hours");
   const { data: projects = [], isLoading } = useProductionInbox();
   useBlockerAutoReduce(projects.length > 0 ? projects : undefined);
