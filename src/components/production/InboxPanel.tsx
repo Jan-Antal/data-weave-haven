@@ -592,7 +592,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
         )}
         {sortedProjects.map((project) => {
           const info = projectInfoMap.get(project.project_id);
-          const urgency = getUrgency(info?.datum_smluvni, info?.status);
+          const urgency = getUrgency(info);
           return (
             <InboxProjectGroup key={`${project.project_id}-${expandKey}`} project={project} hourlyRate={hourlyRate}
               defaultExpanded={allExpanded} displayMode={displayMode} progress={progressData?.get(project.project_id)}
@@ -601,7 +601,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
               onProjectContextMenu={handleProjectContextMenu}
               onItemContextMenu={handleItemContextMenu}
               urgency={urgency}
-              daysLabel={getUrgencyDaysLabel(info?.datum_smluvni)}
+              daysLabel={getUrgencyDaysLabel(info)}
               isSelected={selectedProjectId === project.project_id}
               onSelectProject={onSelectProject}
               projectInfo={info}
