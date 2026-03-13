@@ -113,6 +113,8 @@ interface InboxPanelProps {
   onSelectProject?: (projectId: string) => void;
   searchQuery?: string;
   forecastActive?: boolean;
+  width?: number;
+  onWidthChange?: (w: number) => void;
 }
 
 interface ContextMenuState {
@@ -125,7 +127,7 @@ interface CancelState {
   source: "schedule" | "inbox"; splitGroupId: string | null;
 }
 
-export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeProp, onNavigateToTPV, onOpenProjectDetail, disableDropZone, selectedProjectId, onSelectProject, searchQuery = "", forecastActive }: InboxPanelProps) {
+export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeProp, onNavigateToTPV, onOpenProjectDetail, disableDropZone, selectedProjectId, onSelectProject, searchQuery = "", forecastActive, width = 252, onWidthChange }: InboxPanelProps) {
   const displayMode: DisplayMode = displayModeProp ?? (showCzk ? "czk" : "hours");
   const { data: projects = [], isLoading } = useProductionInbox();
   useBlockerAutoReduce(projects.length > 0 ? projects : undefined);
@@ -201,7 +203,6 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     }
     return result;
   }, [getWeekCapacity, scheduleData]);
-
 
   // Map project_id → project info including deadline fields
   const projectInfoMap = useMemo(() => {
@@ -526,7 +527,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   // Forecast mode: show empty state
   if (forecastActive) {
     return (
-      <div className="w-[252px] shrink-0 flex flex-col" style={{ borderRight: "1px solid #2a2f3d", backgroundColor: "#1c1f26" }}>
+      <div style={{ width, minWidth: 180, maxWidth: 500, borderRight: "1px solid #2a2f3d", backgroundColor: "#1c1f26" }} className="shrink-0 flex flex-col relative">
         <div className="px-3 py-2 flex items-center gap-2" style={{ borderBottom: "1px solid #2a2f3d" }}>
           <span className="text-sm">📥</span>
           <span className="text-[13px] font-semibold" style={{ color: "#4a5168" }}>Inbox</span>
@@ -540,13 +541,14 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
             <p className="text-[10px] mt-1" style={{ color: "#3d4558" }}>Vše naplánováno ve forecastu</p>
           </div>
         </div>
+        <InboxResizeHandle onWidthChange={onWidthChange} containerWidth={width} />
       </div>
     );
   }
 
   return (
-    <div ref={setNodeRef} className="w-[252px] shrink-0 flex flex-col transition-colors"
-      style={{ borderRight: "1px solid #ece8e2", backgroundColor: isHighlighted ? "rgba(59,130,246,0.04)" : "#ffffff", boxShadow: isHighlighted ? "inset 0 0 0 2px #3b82f6" : undefined }}>
+    <div ref={setNodeRef} className="shrink-0 flex flex-col transition-colors relative"
+      style={{ width, minWidth: 180, maxWidth: 500, borderRight: "1px solid #ece8e2", backgroundColor: isHighlighted ? "rgba(59,130,246,0.04)" : "#ffffff", boxShadow: isHighlighted ? "inset 0 0 0 2px #3b82f6" : undefined }}>
       {/* Header */}
       <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "1px solid #ece8e2" }}>
         <div className="flex items-center gap-2">
@@ -725,6 +727,47 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
           }}
         />
       )}
+      <InboxResizeHandle onWidthChange={onWidthChange} containerWidth={width} />
+    </div>
+  );
+}
+
+function InboxResizeHandle({ onWidthChange, containerWidth }: { onWidthChange?: (w: number) => void; containerWidth: number }) {
+  const dragRef = useRef(false);
+  const startX = useRef(0);
+  const startW = useRef(0);
+
+  const onDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragRef.current = true;
+    startX.current = e.clientX;
+    startW.current = containerWidth;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return;
+      const newW = Math.max(180, Math.min(500, startW.current + ev.clientX - startX.current));
+      onWidthChange?.(newW);
+    };
+    const onUp = () => {
+      dragRef.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [containerWidth, onWidthChange]);
+
+  return (
+    <div
+      onMouseDown={onDown}
+      className="absolute top-0 right-0 w-[4px] h-full cursor-col-resize z-10 group"
+    >
+      <div className="w-[2px] h-full mx-auto opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: "#7aa8a4" }} />
     </div>
   );
 }
