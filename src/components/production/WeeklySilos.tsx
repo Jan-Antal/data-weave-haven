@@ -763,7 +763,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
         )}
         {(!silo || silo.bundles.length === 0) && isPast && (
           <div className="flex-1 flex items-center justify-center px-2 py-[14px]">
-            <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#374151" : "#c4ccc9" }}>Prázdný týden</span>
+            <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5168" : "#c4ccc9" }}>Prázdný týden</span>
           </div>
         )}
         {silo?.bundles
