@@ -238,7 +238,7 @@ function DraggableSafetyNetRow({
   isExpanded: boolean;
   items: SafetyNetItem[] | undefined;
   isLoading: boolean;
-  badge: { label: string; bg: string };
+  deadlineInfo: DeadlineDisplay | null;
   isMultiSelected: boolean;
   onToggleExpand: () => void;
   onClick: (e: React.MouseEvent) => void;
