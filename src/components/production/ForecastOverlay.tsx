@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Sparkles, Inbox, ChevronRight } from "lucide-react";
+import { Sparkles, Inbox, ChevronRight, GripVertical } from "lucide-react";
 import type { ForecastBlock, ForecastSource } from "@/hooks/useForecastMode";
 import { getProjectColor } from "@/lib/projectColors";
 import { useDraggable } from "@dnd-kit/core";
@@ -112,12 +112,68 @@ function ForecastWeekBlocks({
 }
 
 /** Fetched item for expand view */
-interface ForecastSubItem {
+export interface ForecastSubItem {
   id: string;
   item_name: string;
   item_code: string | null;
   hours: number;
   source: "schedule" | "inbox" | "tpv";
+  project_id?: string;
+  project_name?: string;
+}
+
+/** Draggable sub-item inside an expanded forecast card */
+function DraggableForecastSubItem({
+  item,
+  parentBlock,
+  style: s,
+}: {
+  item: ForecastSubItem;
+  parentBlock: ForecastBlock;
+  style: ReturnType<typeof getSourceStyle>;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `forecast-subitem-${item.id}`,
+    data: {
+      type: "forecast-subitem",
+      subItemId: item.id,
+      itemName: item.item_name,
+      itemCode: item.item_code,
+      hours: item.hours,
+      subItemSource: item.source,
+      projectId: item.project_id || parentBlock.project_id,
+      projectName: item.project_name || parentBlock.project_name,
+      parentBlockId: parentBlock.id,
+      parentWeek: parentBlock.week,
+    },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className="flex items-center gap-[3px] px-[6px] py-[3px] rounded transition-colors cursor-grab group"
+      style={{ opacity: isDragging ? 0.3 : 1 }}
+      onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${s.borderColor}15`; }}
+      onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
+    >
+      <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: s.codeColor }} />
+      {item.item_code && (
+        <span className="font-mono text-[9px] font-bold shrink-0" style={{ color: s.codeColor }}>
+          {item.item_code}
+        </span>
+      )}
+      <span className="text-[10px] flex-1 truncate" style={{ color: s.nameColor, opacity: 0.8 }}>
+        {item.item_name}
+      </span>
+      {item.hours > 0 && (
+        <span className="font-mono text-[9px] shrink-0" style={{ color: s.hoursColor, opacity: 0.7 }}>
+          {item.hours}h
+        </span>
+      )}
+    </div>
+  );
 }
 
 function ForecastCard({
@@ -345,27 +401,12 @@ function ForecastCard({
             <div className="text-[9px] text-center py-1" style={{ color: style.codeColor }}>Žádné položky</div>
           ) : (
             subItems.map(item => (
-              <div
+              <DraggableForecastSubItem
                 key={item.id}
-                className="flex items-center gap-[3px] px-[6px] py-[3px] rounded transition-colors"
-                style={{ cursor: "default" }}
-                onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${style.borderColor}15`; }}
-                onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
-              >
-                {item.item_code && (
-                  <span className="font-mono text-[9px] font-bold shrink-0" style={{ color: style.codeColor }}>
-                    {item.item_code}
-                  </span>
-                )}
-                <span className="text-[10px] flex-1 truncate" style={{ color: style.nameColor, opacity: 0.8 }}>
-                  {item.item_name}
-                </span>
-                {item.hours > 0 && (
-                  <span className="font-mono text-[9px] shrink-0" style={{ color: style.hoursColor, opacity: 0.7 }}>
-                    {item.hours}h
-                  </span>
-                )}
-              </div>
+                item={{ ...item, project_id: block.project_id, project_name: block.project_name }}
+                parentBlock={block}
+                style={style}
+              />
             ))
           )}
         </div>

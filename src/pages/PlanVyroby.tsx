@@ -243,7 +243,7 @@ export default function PlanVyroby() {
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current as any;
     // In forecast mode, allow forecast-block AND silo-bundle drags (real bundles can be moved as overrides)
-    if (forecast.forecastActive && data?.type !== "forecast-block" && data?.type !== "silo-bundle") return;
+    if (forecast.forecastActive && data?.type !== "forecast-block" && data?.type !== "forecast-subitem" && data?.type !== "silo-bundle") return;
     if (data) setActiveDrag(data);
   }, [forecast.forecastActive]);
 
@@ -291,6 +291,28 @@ export default function PlanVyroby() {
         if (weekKey !== dragData.week) {
           forecast.moveForecastBlock(dragData.blockId, weekKey);
         }
+      }
+      return;
+    }
+
+    // Handle forecast sub-item drags — split from parent block into a new block at target week
+    if (dragData.type === "forecast-subitem" && forecast.forecastActive) {
+      if (!over) return;
+      const targetId = over.id.toString();
+      if (!targetId.startsWith("silo-week-")) return;
+      const targetWeek = targetId.replace("silo-week-", "");
+      if (targetWeek === dragData.parentWeek) return; // dropped back on same week
+
+      // Split: reduce parent block hours, create new block in target week
+      const parentBlock = forecast.forecastBlocks.find(b => b.id === dragData.parentBlockId);
+      if (!parentBlock) return;
+
+      const itemHours = Number(dragData.hours) || 0;
+      if (itemHours > 0 && itemHours < parentBlock.estimated_hours) {
+        forecast.splitForecastBlock(dragData.parentBlockId, parentBlock.estimated_hours - itemHours, targetWeek);
+      } else {
+        // Move the entire block if item has all the hours
+        forecast.moveForecastBlock(dragData.parentBlockId, targetWeek);
       }
       return;
     }
