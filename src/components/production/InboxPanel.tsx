@@ -526,7 +526,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   // Forecast mode: show empty state
   if (forecastActive) {
     return (
-      <div className="w-[270px] shrink-0 flex flex-col" style={{ borderRight: "1px solid #2a2f3d", backgroundColor: "#1c1f26" }}>
+      <div className="w-[252px] shrink-0 flex flex-col" style={{ borderRight: "1px solid #2a2f3d", backgroundColor: "#1c1f26" }}>
         <div className="px-3 py-2 flex items-center gap-2" style={{ borderBottom: "1px solid #2a2f3d" }}>
           <span className="text-sm">📥</span>
           <span className="text-[13px] font-semibold" style={{ color: "#4a5168" }}>Inbox</span>
@@ -545,7 +545,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   }
 
   return (
-    <div ref={setNodeRef} className="w-[270px] shrink-0 flex flex-col transition-colors"
+    <div ref={setNodeRef} className="w-[252px] shrink-0 flex flex-col transition-colors"
       style={{ borderRight: "1px solid #ece8e2", backgroundColor: isHighlighted ? "rgba(59,130,246,0.04)" : "#ffffff", boxShadow: isHighlighted ? "inset 0 0 0 2px #3b82f6" : undefined }}>
       {/* Header */}
       <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "1px solid #ece8e2" }}>
