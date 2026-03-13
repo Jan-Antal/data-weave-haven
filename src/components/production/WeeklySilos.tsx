@@ -261,6 +261,19 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
 
   const weekKeys = useMemo(() => weeks.map(w => w.key), [weeks]);
 
+  // Debug: log week key comparison when forecast is active
+  useEffect(() => {
+    if (forecastDarkMode && forecastBlocks && forecastBlocks.length > 0) {
+      const siloKeys = weeks.map(w => w.key);
+      const forecastWeeks = [...new Set(forecastBlocks.map(b => b.week))].sort();
+      const matching = forecastWeeks.filter(fw => siloKeys.includes(fw));
+      const missing = forecastWeeks.filter(fw => !siloKeys.includes(fw));
+      console.log(`[WeeklySilos] Silo week keys:`, siloKeys);
+      console.log(`[WeeklySilos] Forecast block weeks:`, forecastWeeks);
+      console.log(`[WeeklySilos] Matching: ${matching.length}, Missing: ${missing.length}`, missing.length > 0 ? missing : "");
+    }
+  }, [forecastDarkMode, forecastBlocks, weeks]);
+
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container || weeks.length === 0) return;
