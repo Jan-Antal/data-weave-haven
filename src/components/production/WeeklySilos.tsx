@@ -757,13 +757,13 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       {/* Items */}
       <div className="flex-1 overflow-y-auto p-1.5" style={{ display: "flex", flexDirection: "column", gap: 3, opacity: isPast ? 0.7 : 1 }}>
         {(!silo || silo.bundles.length === 0) && !isPast && (
-          <div className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all" style={{ border: "1.5px dashed #e2ddd6" }}>
-            <span className="text-[9px] text-center" style={{ color: "#99a5a3" }}>Přetáhni sem z Inboxu</span>
+          <div className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all" style={{ border: forecastDarkMode ? "1.5px dashed #2a2f3d" : "1.5px dashed #e2ddd6" }}>
+            <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4b5563" : "#99a5a3" }}>Přetáhni sem z Inboxu</span>
           </div>
         )}
         {(!silo || silo.bundles.length === 0) && isPast && (
           <div className="flex-1 flex items-center justify-center px-2 py-[14px]">
-            <span className="text-[9px] text-center" style={{ color: "#c4ccc9" }}>Prázdný týden</span>
+            <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#374151" : "#c4ccc9" }}>Prázdný týden</span>
           </div>
         )}
         {silo?.bundles
