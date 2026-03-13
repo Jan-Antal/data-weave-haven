@@ -104,6 +104,7 @@ export function useForecastMode(): UseForecastModeReturn {
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
   const [realBundleOverrides, setRealBundleOverrides] = useState<RealBundleOverride[]>([]);
+  const [safetyNetProjects, setSafetyNetProjects] = useState<SafetyNetProject[]>([]);
   const generationTokenRef = useRef(0);
 
   // Persist to localStorage whenever blocks or selection changes
