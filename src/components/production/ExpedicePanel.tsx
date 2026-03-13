@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, isPast, isFuture, differenceInDays } from "date-fns";
 import { Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { getProjectColor } from "@/lib/projectColors";
+import { resolveDeadline } from "@/lib/deadlineWarning";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
 import { toast } from "@/hooks/use-toast";
 
@@ -76,10 +77,15 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     qc.invalidateQueries({ queryKey: ["production-progress"] });
   }, [qc]);
 
-  // Map project_id → expedice field
-  const projectExpediceMap = useMemo(() => {
-    const m = new Map<string, string | null>();
-    for (const p of allProjects) m.set(p.project_id, p.expedice ?? null);
+  // Map project_id → deadline fields for resolveDeadline
+  const projectDeadlineMap = useMemo(() => {
+    const m = new Map<string, { expedice?: string | null; montaz?: string | null; predani?: string | null; datum_smluvni?: string | null }>();
+    for (const p of allProjects) m.set(p.project_id, {
+      expedice: p.expedice ?? null,
+      montaz: p.montaz ?? null,
+      predani: p.predani ?? null,
+      datum_smluvni: p.datum_smluvni ?? null,
+    });
     return m;
   }, [allProjects]);
 
@@ -426,7 +432,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
           <ProjectGroup
             key={group.project_id}
             group={group}
-            projectExpediceMap={projectExpediceMap}
+            projectDeadlineMap={projectDeadlineMap}
             projectTotalItems={projectTotalItems}
             scheduleData={scheduleData}
             inboxProjects={inboxProjects}
@@ -497,7 +503,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
               <ProjectGroup
                 key={group.project_id}
                 group={group}
-                projectExpediceMap={projectExpediceMap}
+                projectDeadlineMap={projectDeadlineMap}
                 projectTotalItems={projectTotalItems}
                 scheduleData={scheduleData}
                 inboxProjects={inboxProjects}
@@ -536,7 +542,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
 // === PROJECT GROUP COMPONENT ===
 interface ProjectGroupProps {
   group: { project_id: string; project_name: string; items: ScheduleItem[]; count: number };
-  projectExpediceMap: Map<string, string | null>;
+  projectDeadlineMap: Map<string, { expedice?: string | null; montaz?: string | null; predani?: string | null; datum_smluvni?: string | null }>;
   projectTotalItems: Map<string, { total: number; nonCompleted: ScheduleItem[] }>;
   scheduleData: any;
   inboxProjects: any[];
@@ -550,15 +556,24 @@ interface ProjectGroupProps {
   onSelectProject?: (projectId: string) => void;
 }
 
+const DEADLINE_SHORT_LABELS: Record<string, string> = {
+  expedice: "Exp",
+  montaz: "Mnt",
+  predani: "Před",
+  datum_smluvni: "Sml",
+};
+
 function ProjectGroup({
-  group, projectExpediceMap, projectTotalItems,
+  group, projectDeadlineMap, projectTotalItems,
   isGroupCollapsed, toggleGroup,
   onProjectContextMenu, onItemContextMenu, onNavigateToTPV,
   isArchive, isSelected, onSelectProject,
 }: ProjectGroupProps) {
-  const expediceRaw = projectExpediceMap.get(group.project_id);
-  const expediceDate = parseDate(expediceRaw);
-  const expediceStr = formatShortDate(expediceRaw);
+  const deadlineFields = projectDeadlineMap.get(group.project_id);
+  const resolved = deadlineFields ? resolveDeadline(deadlineFields) : null;
+  const deadlineDate = resolved?.date ?? null;
+  const deadlineStr = deadlineDate ? formatShortDate(deadlineDate.toISOString()) : null;
+  const deadlineLabel = resolved ? (DEADLINE_SHORT_LABELS[resolved.fieldName] ?? "Exp") : "Exp";
 
   const totals = projectTotalItems.get(group.project_id);
   const completedCount = group.count;
@@ -636,15 +651,15 @@ function ProjectGroup({
               <span style={{ fontSize: 11, color: "#6b7280" }}>
                 Expedováno: {latestExpedicedStr}
               </span>
-            ) : expediceStr ? (
+            ) : deadlineStr ? (
               <span className="shrink-0" style={{
                 fontSize: 11,
                 fontWeight: 500,
-                color: expediceDate && expediceDate < new Date() ? "#dc2626"
-                  : expediceDate && differenceInDays(expediceDate, new Date()) <= 14 ? "#d97706"
+                color: deadlineDate && deadlineDate < new Date() ? "#dc2626"
+                  : deadlineDate && differenceInDays(deadlineDate, new Date()) <= 14 ? "#d97706"
                   : "#6b7280"
               }}>
-                Exp: {expediceStr}
+                {deadlineLabel}: {deadlineStr}
               </span>
             ) : null}
           </div>

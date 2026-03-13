@@ -24,6 +24,7 @@ export interface DeadlineWarningResult {
 export function resolveDeadline(project: {
   expedice?: string | null;
   montaz?: string | null;
+  predani?: string | null;
   datum_smluvni?: string | null;
 }): DeadlineInfo | null {
   if (project.expedice) {
@@ -33,6 +34,10 @@ export function resolveDeadline(project: {
   if (project.montaz) {
     const d = parseAppDate(project.montaz);
     if (d) return { date: d, fieldName: "montaz", fieldLabel: "Datum montáže" };
+  }
+  if (project.predani) {
+    const d = parseAppDate(project.predani);
+    if (d) return { date: d, fieldName: "predani", fieldLabel: "Datum předání" };
   }
   if (project.datum_smluvni) {
     const d = parseAppDate(project.datum_smluvni);
