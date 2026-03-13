@@ -728,15 +728,25 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
 
 
   return (
-    <div className="shrink-0 border-b border-border px-6 py-1.5 flex items-center gap-4 bg-card" style={{ minHeight: 40 }}>
+    <div
+      className="shrink-0 border-b px-6 py-1.5 flex items-center gap-4 transition-colors duration-300"
+      style={{
+        minHeight: 40,
+        backgroundColor: forecastActive ? "#1a1d2e" : "hsl(var(--card))",
+        borderColor: forecastActive ? "#2a2d3e" : "hsl(var(--border))",
+      }}
+    >
       {/* Left: Tabs */}
-      <div className="inline-flex h-8 items-center rounded-md bg-card border border-border p-0.5 shrink-0">
+      <div className="inline-flex h-8 items-center rounded-md p-0.5 shrink-0" style={{
+        backgroundColor: forecastActive ? "#0f1117" : "hsl(var(--card))",
+        border: forecastActive ? "1px solid #2a2d3e" : "1px solid hsl(var(--border))",
+      }}>
         <button
           onClick={() => setViewTab("kanban")}
           className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-[13px] font-medium transition-all ${
             viewTab === "kanban"
-              ? "bg-primary text-primary-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
+              ? forecastActive ? "bg-amber-600 text-white shadow-sm" : "bg-primary text-primary-foreground shadow-sm"
+              : forecastActive ? "text-gray-400 hover:text-gray-200" : "text-muted-foreground hover:text-foreground"
           }`}
         >
           Kanban
@@ -745,27 +755,57 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
           onClick={() => setViewTab("table")}
           className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-[13px] font-medium transition-all ${
             viewTab === "table"
-              ? "bg-primary text-primary-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
+              ? forecastActive ? "bg-amber-600 text-white shadow-sm" : "bg-primary text-primary-foreground shadow-sm"
+              : forecastActive ? "text-gray-400 hover:text-gray-200" : "text-muted-foreground hover:text-foreground"
           }`}
         >
           Tabulka
         </button>
       </div>
 
+      {/* Forecast badge */}
+      {forecastActive && (
+        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(245,158,11,0.15)" }}>
+          <Sparkles className="h-3 w-3" style={{ color: "#f59e0b" }} />
+          <span className="text-[11px] font-bold" style={{ color: "#f59e0b" }}>FORECAST MODE</span>
+          {isGenerating && <Loader2 className="h-3 w-3 animate-spin" style={{ color: "#f59e0b" }} />}
+        </div>
+      )}
+
+      {/* Forecast plan mode toggle */}
+      {forecastActive && (
+        <div className="inline-flex h-7 items-center rounded-md p-0.5 shrink-0" style={{ backgroundColor: "#0f1117", border: "1px solid #2a2d3e" }}>
+          <button
+            onClick={() => onForecastPlanModeChange("respect_plan")}
+            className={`px-2 py-0.5 text-[11px] font-medium rounded-sm transition-all ${
+              forecastPlanMode === "respect_plan" ? "bg-amber-600 text-white" : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            Respektovat plán
+          </button>
+          <button
+            onClick={() => onForecastPlanModeChange("from_scratch")}
+            className={`px-2 py-0.5 text-[11px] font-medium rounded-sm transition-all ${
+              forecastPlanMode === "from_scratch" ? "bg-amber-600 text-white" : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            Od začátku
+          </button>
+        </div>
+      )}
+
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Center: Scope toggle + Stats */}
+      {/* Center: Stats */}
       <div className="flex items-center gap-2 shrink-0">
-
-        <div className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
-          <span>Kapacita <span className="font-semibold text-foreground">{Math.round(capacityHours).toLocaleString("cs-CZ")}h</span></span>
-          <span className="text-border">·</span>
-          <span>CZK <span className="font-semibold text-foreground">{formatCzk(displayCzk)}</span></span>
-          <span className="text-border">·</span>
+        <div className="flex items-center gap-1 text-xs font-mono" style={{ color: forecastActive ? "#9ca3af" : undefined }}>
+          <span>Kapacita <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{Math.round(capacityHours).toLocaleString("cs-CZ")}h</span></span>
+          <span style={{ color: forecastActive ? "#4b5563" : undefined }}>·</span>
+          <span>CZK <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{formatCzk(displayCzk)}</span></span>
+          <span style={{ color: forecastActive ? "#4b5563" : undefined }}>·</span>
           <span>Naplánováno <span style={{ fontWeight: 600, color: isOverCapacity ? "hsl(var(--destructive))" : "hsl(142 76% 36%)" }}>{Math.round(scheduledHours).toLocaleString("cs-CZ")}h</span></span>
-          <span className="text-border">·</span>
+          <span style={{ color: forecastActive ? "#4b5563" : undefined }}>·</span>
           <span>V Inboxu <span style={{ fontWeight: 600, color: "#d97706" }}>{Math.round(inboxHours).toLocaleString("cs-CZ")}h</span></span>
         </div>
       </div>
@@ -773,9 +813,12 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Right: Display mode + Search */}
+      {/* Right: Display mode + Search + Forecast toggle */}
       <div className="flex items-center gap-2 shrink-0">
-        <div className="inline-flex h-8 items-center rounded-md bg-card border border-border p-0.5">
+        <div className="inline-flex h-8 items-center rounded-md p-0.5" style={{
+          backgroundColor: forecastActive ? "#0f1117" : "hsl(var(--card))",
+          border: forecastActive ? "1px solid #2a2d3e" : "1px solid hsl(var(--border))",
+        }}>
           {([
             { key: "hours" as DisplayMode, label: "Hodiny" },
             { key: "czk" as DisplayMode, label: "Hodnota" },
@@ -786,8 +829,8 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
               onClick={() => onDisplayModeChange(m.key)}
               className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-[13px] font-medium transition-all ${
                 displayMode === m.key
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? forecastActive ? "bg-amber-600 text-white shadow-sm" : "bg-primary text-primary-foreground shadow-sm"
+                  : forecastActive ? "text-gray-400 hover:text-gray-200" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {m.label}
@@ -796,23 +839,42 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
         </div>
 
         <div className="relative w-[200px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: forecastActive ? "#6b7280" : undefined }} />
           <input
             type="text"
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
             placeholder="Hledat projekt..."
-            className="w-full h-8 pl-8 pr-8 rounded-md text-sm bg-background border border-input placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 transition-colors"
+            className="w-full h-8 pl-8 pr-8 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 transition-colors"
+            style={{
+              backgroundColor: forecastActive ? "#0f1117" : "hsl(var(--background))",
+              border: forecastActive ? "1px solid #2a2d3e" : "1px solid hsl(var(--input))",
+              color: forecastActive ? "#e5e7eb" : undefined,
+            }}
           />
           {searchQuery && (
             <button
               onClick={() => onSearchChange("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors"
+              style={{ color: forecastActive ? "#6b7280" : undefined }}
             >
               <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
+
+        {/* Forecast toggle — owner only */}
+        {isOwner && (
+          <div className="flex items-center gap-1.5 ml-2 pl-2" style={{ borderLeft: forecastActive ? "1px solid #2a2d3e" : "1px solid hsl(var(--border))" }}>
+            <Sparkles className="h-3.5 w-3.5" style={{ color: forecastActive ? "#f59e0b" : "#9ca3af" }} />
+            <span className="text-[12px] font-medium" style={{ color: forecastActive ? "#f59e0b" : "#6b7280" }}>Forecast</span>
+            <Switch
+              checked={forecastActive}
+              onCheckedChange={onForecastToggle}
+              className="data-[state=checked]:bg-amber-500"
+            />
+          </div>
+        )}
       </div>
     </div>
   );
