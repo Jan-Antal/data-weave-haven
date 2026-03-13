@@ -568,6 +568,29 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     [moveItemBackToInbox, returnToProduction, mergeSplitItems, findSameWeekSiblings, onNavigateToTPV, onOpenProjectDetail, handleReleaseItem]
   );
 
+  // Forecast card context menu — move between weeks or remove
+  const handleForecastContextMenu = useCallback((e: React.MouseEvent, block: ForecastBlock) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const futureWeeks = weeks.filter(w => !w.isPast && w.key !== block.week);
+    const actions: ContextMenuAction[] = [];
+    for (const w of futureWeeks.slice(0, 10)) {
+      actions.push({
+        label: `Přesunout do T${w.weekNum} (${formatDateShort(w.start)})`,
+        icon: "→",
+        onClick: () => onMoveForecastBlock?.(block.id, w.key),
+      });
+    }
+    actions.push({
+      label: "Odstranit z forecastu",
+      icon: "✕",
+      danger: true,
+      dividerBefore: true,
+      onClick: () => onRemoveForecastBlock?.(block.id),
+    });
+    setContextMenu({ x: e.clientX, y: e.clientY, actions });
+  }, [weeks, onMoveForecastBlock, onRemoveForecastBlock]);
+
   return (
     <div className="flex-1 flex flex-col min-w-0">
       {/* Toolbar */}
@@ -608,6 +631,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               onToggleForecastSelect={onToggleForecastSelect}
               forecastDarkMode={forecastDarkMode}
               forecastPlanMode={forecastPlanMode}
+              onForecastContextMenu={forecastDarkMode ? handleForecastContextMenu : undefined}
             />
           ))}
         </div>
