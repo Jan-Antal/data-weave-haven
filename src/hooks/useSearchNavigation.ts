@@ -51,15 +51,7 @@ export function useSearchNavigation({ query, scheduleData, forecastBlocks, forec
       }
     };
 
-    // Inbox
-    if (inboxProjects) {
-      for (const p of inboxProjects) {
-        const codes = p.items.map(i => i.item_code ?? "");
-        check(p.project_id, p.project_name, codes);
-      }
-    }
-
-    // Schedule
+    // Schedule (Week Silos only)
     if (scheduleData) {
       for (const [, silo] of scheduleData) {
         for (const bundle of silo.bundles) {
@@ -77,7 +69,7 @@ export function useSearchNavigation({ query, scheduleData, forecastBlocks, forec
     }
 
     return matched;
-  }, [query, scheduleData, forecastBlocks, forecastActive, projectPmMap, inboxProjects]);
+  }, [query, scheduleData, forecastBlocks, forecastActive, projectPmMap]);
 
   // Navigation matches (week-based, for prev/next arrows)
   const matches = useMemo<SearchMatch[]>(() => {
