@@ -20,7 +20,7 @@ serve(async (req) => {
     // 1. Fetch all data in parallel
     const [projectsRes, tpvRes, scheduleRes, inboxRes] = await Promise.all([
       sb.from("projects")
-        .select("project_id, project_name, status, expedice, montaz, predani, datum_smluvni, prodejni_cena")
+        .select("project_id, project_name, status, expedice, montaz, predani, datum_smluvni, prodejni_cena, datum_tpv")
         .is("deleted_at", null)
         .not("status", "in", '("Fakturace","Dokončeno")'),
       sb.from("tpv_items")
