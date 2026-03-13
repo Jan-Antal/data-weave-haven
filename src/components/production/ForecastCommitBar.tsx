@@ -47,7 +47,7 @@ export function ForecastCommitBar({
           ) : (
             <>
               <span className="font-bold" style={{ color: "#f59e0b" }}>{totalBlocks}</span>
-              {" "}bloků připraveno ke commitu
+              {" "}bloků připraveno k zápisu
               {inboxBlockCount > 0 && (
                 <span style={{ color: "#22c55e" }}> · {inboxBlockCount} inbox</span>
               )}
