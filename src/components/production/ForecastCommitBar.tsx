@@ -119,7 +119,7 @@ export function ForecastCommitBar({
               style={{ backgroundColor: "#3d7a74", color: "#ffffff" }}
             >
               <Check className="h-3 w-3 mr-1" />
-              Commit vše do plánu
+              Zapsat vše do plánu
             </Button>
           </>
         )}
