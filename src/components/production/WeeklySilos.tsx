@@ -21,6 +21,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { parseAppDate } from "@/lib/dateFormat";
 import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
+import { resolveDeadline } from "@/lib/deadlineWarning";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -148,7 +149,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const getWeekCapacity = useWeekCapacityLookup();
 
   const projectLookup = useMemo(() => {
-    const map = new Map<string, { datum_smluvni?: string | null; expedice?: string | null; status?: string | null; risk?: string | null }>();
+    const map = new Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; status?: string | null; risk?: string | null }>();
     for (const p of allProjects) map.set(p.project_id, p);
     return map;
   }, [allProjects]);
@@ -648,7 +649,7 @@ function ToolbarButton({ active, disabled, label, onClick }: { active?: boolean;
   );
 }
 
-type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; status?: string | null; risk?: string | null }>;
+type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; status?: string | null; risk?: string | null }>;
 
 interface SiloProps {
   weekKey: string; weekNum: number; startDate: Date; endDate: Date;
@@ -815,6 +816,22 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
     ? (daysUntilExp < 0 ? "overdue" : daysUntilExp <= 3 ? "urgent" : null)
     : null;
 
+  // Check if project is overdue based on resolved deadline (expedice → montáž → datum_smluvní)
+  const isOverdueProject = useMemo(() => {
+    if (isProjectDone || allCompleted) return false;
+    const deadline = resolveDeadline({
+      expedice: project?.expedice ?? null,
+      montaz: project?.montaz ?? null,
+      datum_smluvni: project?.datum_smluvni ?? null,
+    });
+    if (!deadline) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dl = new Date(deadline.date);
+    dl.setHours(0, 0, 0, 0);
+    return dl < today;
+  }, [project, isProjectDone, allCompleted]);
+
   const borderLeftColor = allCompleted ? "#3a8a36"
     : expSeverity === "overdue" ? "#dc3545"
     : expSeverity === "urgent" ? "#d97706"
@@ -834,7 +851,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, onBundleC
       borderRight: isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2",
       borderBottom: isSelected ? "2px solid #d97706" : isSearchMatch ? "1.5px solid #facc15" : "1px solid #ece8e2",
       borderLeft: `4px solid ${borderLeftColor}`,
-      backgroundColor: isSelected ? "rgba(217,119,6,0.05)" : isSearchMatch ? "rgba(254,240,138,0.15)" : expSeverity === "overdue" ? "hsl(0 80% 96%)" : "#ffffff", opacity: isDragging ? 0.3 : 1,
+      backgroundColor: isSelected ? "rgba(217,119,6,0.05)" : isSearchMatch ? "rgba(254,240,138,0.15)" : isOverdueProject ? "#FEE2E2" : "#ffffff", opacity: isDragging ? 0.3 : 1,
       boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : isSearchMatch ? "0 0 0 2px rgba(250,204,21,0.25)" : undefined,
       transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, box-shadow 150ms",
     }}>
