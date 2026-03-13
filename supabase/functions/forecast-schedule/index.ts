@@ -252,8 +252,8 @@ serve(async (req) => {
         if (!dl.date) {
           const projTpvEst = tpvItems.filter(t => t.project_id === proj.project_id);
           const tpvH = projTpvEst.reduce((s, t) => s + (Number(t.pocet) || 0), 0);
-          let estH = tpvH > 0 ? tpvH : (proj.prodejni_cena ? Math.round(Number(proj.prodejni_cena) / 500) : 0);
-          if (estH <= 0) estH = 40;
+          let estH = tpvH > 0 ? tpvH : (proj.prodejni_cena ? Math.round(Number(proj.prodejni_cena) / 1500) : 0);
+          if (estH <= 0) estH = 20;
           safetyNet.push({ project_id: proj.project_id, project_name: proj.project_name, estimated_hours: estH, source: "unplanned" });
           continue;
         }
@@ -261,8 +261,8 @@ serve(async (req) => {
         const tpvHours = projTpv.reduce((s, t) => s + (Number(t.pocet) || 0), 0);
         let estimatedHours = tpvHours > 0
           ? tpvHours
-          : (proj.prodejni_cena ? Math.round(Number(proj.prodejni_cena) / 500) : 0);
-        if (estimatedHours <= 0) estimatedHours = 40;
+          : (proj.prodejni_cena ? Math.round(Number(proj.prodejni_cena) / 1500) : 0);
+        if (estimatedHours <= 0) estimatedHours = 20;
 
         allWork.push({
           projectId: proj.project_id,
