@@ -385,7 +385,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
 
   // === EXPANDED STATE ===
   return (
-    <div className="w-[270px] shrink-0 flex flex-col" style={{ borderLeft: "1px solid #ece8e2", backgroundColor: "#ffffff" }}>
+    <div className="w-[252px] shrink-0 flex flex-col" style={{ borderLeft: "1px solid #ece8e2", backgroundColor: "#ffffff" }}>
       {/* Header */}
       <div className="px-3 py-2 flex flex-col gap-1" style={{ borderBottom: "1px solid #ece8e2" }}>
         <div className="flex items-center justify-between">

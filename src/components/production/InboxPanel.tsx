@@ -545,7 +545,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   }
 
   return (
-    <div ref={setNodeRef} className="w-[270px] shrink-0 flex flex-col transition-colors"
+    <div ref={setNodeRef} className="w-[252px] shrink-0 flex flex-col transition-colors"
       style={{ borderRight: "1px solid #ece8e2", backgroundColor: isHighlighted ? "rgba(59,130,246,0.04)" : "#ffffff", boxShadow: isHighlighted ? "inset 0 0 0 2px #3b82f6" : undefined }}>
       {/* Header */}
       <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "1px solid #ece8e2" }}>
