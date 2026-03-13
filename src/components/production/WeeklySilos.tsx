@@ -93,6 +93,7 @@ interface Props {
   forecastPlanMode?: "respect_plan" | "from_scratch";
   onMoveForecastBlock?: (blockId: string, newWeek: string) => void;
   onRemoveForecastBlock?: (blockId: string) => void;
+  onSplitForecastBlock?: (blockId: string, keepHours: number, splitWeek: string) => void;
 }
 
 interface ContextMenuState {
@@ -157,7 +158,7 @@ interface CancelState {
   cancelAll?: boolean;
 }
 
-export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock }: Props) {
+export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock, onSplitForecastBlock }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
@@ -590,17 +591,61 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   );
 
   // Forecast card context menu — same structure as real plan menus + forecast-specific actions
+  const [forecastExpandedIds, setForecastExpandedIds] = useState<Set<string>>(new Set());
+  const toggleForecastExpand = useCallback((blockId: string) => {
+    setForecastExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(blockId)) next.delete(blockId);
+      else next.add(blockId);
+      return next;
+    });
+  }, []);
+
+  // Forecast split dialog state
+  const [forecastSplitState, setForecastSplitState] = useState<{
+    blockId: string;
+    blockName: string;
+    totalHours: number;
+    currentWeek: string;
+  } | null>(null);
+
   const handleForecastContextMenu = useCallback((e: React.MouseEvent, block: ForecastBlock) => {
     e.preventDefault();
     e.stopPropagation();
     const futureWeeks = weeks.filter(w => !w.isPast && w.key !== block.week);
     const actions: ContextMenuAction[] = [];
 
+    // Expand/Collapse
+    actions.push({
+      label: forecastExpandedIds.has(block.id) ? "Sbalit" : "Rozbalit",
+      icon: "⇅",
+      onClick: () => toggleForecastExpand(block.id),
+    });
+
+    // Split bundle
+    if (block.estimated_hours > 1) {
+      actions.push({
+        label: "Rozdělit bundle",
+        icon: "✂",
+        onClick: () => setForecastSplitState({
+          blockId: block.id,
+          blockName: block.project_name,
+          totalHours: block.estimated_hours,
+          currentWeek: block.week,
+        }),
+      });
+    }
+
     // Move to week submenu
-    for (const w of futureWeeks.slice(0, 10)) {
+    actions.push({ label: "", icon: "", onClick: () => {}, dividerBefore: true });
+    // Remove the empty divider action and add real ones with divider on first
+    actions.pop();
+    for (let i = 0; i < Math.min(futureWeeks.length, 10); i++) {
+      const w = futureWeeks[i];
       actions.push({
         label: `Přesunout do T${w.weekNum} (${formatDateShort(w.start)})`,
         icon: "→",
+        dividerBefore: i === 0,
         onClick: () => onMoveForecastBlock?.(block.id, w.key),
       });
     }
@@ -631,7 +676,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       onClick: () => onRemoveForecastBlock?.(block.id),
     });
     setContextMenu({ x: e.clientX, y: e.clientY, actions });
-  }, [weeks, onMoveForecastBlock, onRemoveForecastBlock, onNavigateToTPV, onOpenProjectDetail]);
+  }, [weeks, onMoveForecastBlock, onRemoveForecastBlock, onNavigateToTPV, onOpenProjectDetail, forecastExpandedIds, toggleForecastExpand]);
 
   return (
     <div className="flex-1 flex flex-col min-w-0">
@@ -674,6 +719,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               forecastDarkMode={forecastDarkMode}
               forecastPlanMode={forecastPlanMode}
               onForecastContextMenu={forecastDarkMode ? handleForecastContextMenu : undefined}
+              forecastExpandedIds={forecastExpandedIds}
+              onToggleForecastExpand={toggleForecastExpand}
             />
           ))}
         </div>
@@ -706,6 +753,22 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
 
       {cancelState && (
         <CancelItemDialog open={!!cancelState} onOpenChange={open => !open && setCancelState(null)} {...cancelState} itemCode={cancelState.itemCode} />
+      )}
+
+      {/* Forecast split dialog */}
+      {forecastSplitState && onSplitForecastBlock && (
+        <ForecastSplitDialog
+          open={!!forecastSplitState}
+          onOpenChange={open => !open && setForecastSplitState(null)}
+          blockName={forecastSplitState.blockName}
+          totalHours={forecastSplitState.totalHours}
+          currentWeek={forecastSplitState.currentWeek}
+          weeks={weekOptions}
+          onSplit={(keepHours, targetWeek) => {
+            onSplitForecastBlock(forecastSplitState.blockId, keepHours, targetWeek);
+            setForecastSplitState(null);
+          }}
+        />
       )}
     </div>
   );
@@ -753,10 +816,12 @@ interface SiloProps {
   forecastDarkMode?: boolean;
   forecastPlanMode?: "respect_plan" | "from_scratch";
   onForecastContextMenu?: (e: React.MouseEvent, block: ForecastBlock) => void;
+  forecastExpandedIds?: Set<string>;
+  onToggleForecastExpand?: (blockId: string) => void;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand }: SiloProps) {
   // Capacity calculation: exclude paused items
   const activeHours = useMemo(() => {
     if (!silo) return 0;
@@ -886,6 +951,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
               selectedBlockIds={forecastSelectedIds}
               onToggleSelect={onToggleForecastSelect}
               onForecastContextMenu={onForecastContextMenu}
+              expandedIds={forecastExpandedIds}
+              onToggleExpand={onToggleForecastExpand}
             />
           </>
         )}

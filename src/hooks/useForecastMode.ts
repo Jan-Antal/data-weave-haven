@@ -85,6 +85,7 @@ interface UseForecastModeReturn {
   commitInboxOnly: () => Promise<void>;
   moveForecastBlock: (blockId: string, newWeek: string) => void;
   removeForecastBlock: (blockId: string) => void;
+  splitForecastBlock: (blockId: string, keepHours: number, splitWeek: string) => void;
   resetAndRegenerate: (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => Promise<void>;
   loadSavedSession: (modeOverride?: ForecastPlanMode) => boolean;
   /** Track a real bundle drag as a forecast-only override */
@@ -222,6 +223,27 @@ export function useForecastMode(): UseForecastModeReturn {
     });
   }, []);
 
+  const splitForecastBlock = useCallback((blockId: string, keepHours: number, splitWeek: string) => {
+    setForecastBlocks(prev => {
+      const block = prev.find(b => b.id === blockId);
+      if (!block) return prev;
+      const splitHours = block.estimated_hours - keepHours;
+      if (splitHours <= 0 || keepHours <= 0) return prev;
+      const newId = crypto.randomUUID();
+      return prev.map(b => b.id === blockId ? { ...b, estimated_hours: keepHours } : b)
+        .concat({
+          ...block,
+          id: newId,
+          week: splitWeek,
+          estimated_hours: splitHours,
+          bundle_description: `${block.bundle_description} (část 2)`,
+        });
+    });
+    // Auto-select the new block
+    setSelectedBlockIds(prev => new Set(prev));
+    toast({ title: "✂ Forecast blok rozdělen" });
+  }, []);
+
   const resetAndRegenerate = useCallback(async (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => {
     const mode = modeOverride ?? planMode;
     clearStorage(mode);
@@ -323,6 +345,7 @@ export function useForecastMode(): UseForecastModeReturn {
     commitInboxOnly,
     moveForecastBlock,
     removeForecastBlock,
+    splitForecastBlock,
     resetAndRegenerate,
     loadSavedSession,
     realBundleOverrides,
