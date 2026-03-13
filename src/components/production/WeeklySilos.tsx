@@ -591,17 +591,61 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   );
 
   // Forecast card context menu — same structure as real plan menus + forecast-specific actions
+  const [forecastExpandedIds, setForecastExpandedIds] = useState<Set<string>>(new Set());
+  const toggleForecastExpand = useCallback((blockId: string) => {
+    setForecastExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(blockId)) next.delete(blockId);
+      else next.add(blockId);
+      return next;
+    });
+  }, []);
+
+  // Forecast split dialog state
+  const [forecastSplitState, setForecastSplitState] = useState<{
+    blockId: string;
+    blockName: string;
+    totalHours: number;
+    currentWeek: string;
+  } | null>(null);
+
   const handleForecastContextMenu = useCallback((e: React.MouseEvent, block: ForecastBlock) => {
     e.preventDefault();
     e.stopPropagation();
     const futureWeeks = weeks.filter(w => !w.isPast && w.key !== block.week);
     const actions: ContextMenuAction[] = [];
 
+    // Expand/Collapse
+    actions.push({
+      label: forecastExpandedIds.has(block.id) ? "Sbalit" : "Rozbalit",
+      icon: "⇅",
+      onClick: () => toggleForecastExpand(block.id),
+    });
+
+    // Split bundle
+    if (block.estimated_hours > 1) {
+      actions.push({
+        label: "Rozdělit bundle",
+        icon: "✂",
+        onClick: () => setForecastSplitState({
+          blockId: block.id,
+          blockName: block.project_name,
+          totalHours: block.estimated_hours,
+          currentWeek: block.week,
+        }),
+      });
+    }
+
     // Move to week submenu
-    for (const w of futureWeeks.slice(0, 10)) {
+    actions.push({ label: "", icon: "", onClick: () => {}, dividerBefore: true });
+    // Remove the empty divider action and add real ones with divider on first
+    actions.pop();
+    for (let i = 0; i < Math.min(futureWeeks.length, 10); i++) {
+      const w = futureWeeks[i];
       actions.push({
         label: `Přesunout do T${w.weekNum} (${formatDateShort(w.start)})`,
         icon: "→",
+        dividerBefore: i === 0,
         onClick: () => onMoveForecastBlock?.(block.id, w.key),
       });
     }
@@ -632,7 +676,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       onClick: () => onRemoveForecastBlock?.(block.id),
     });
     setContextMenu({ x: e.clientX, y: e.clientY, actions });
-  }, [weeks, onMoveForecastBlock, onRemoveForecastBlock, onNavigateToTPV, onOpenProjectDetail]);
+  }, [weeks, onMoveForecastBlock, onRemoveForecastBlock, onNavigateToTPV, onOpenProjectDetail, forecastExpandedIds, toggleForecastExpand]);
 
   return (
     <div className="flex-1 flex flex-col min-w-0">
