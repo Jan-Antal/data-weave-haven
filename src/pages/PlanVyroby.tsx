@@ -652,7 +652,7 @@ export default function PlanVyroby() {
             )}
           </div>
         ) : (
-          <PlanVyrobyTableView displayMode={displayMode} searchQuery={searchQuery} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} />
+          <PlanVyrobyTableView displayMode={displayMode} searchQuery={searchQuery} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} />
         )}
 
         {/* Forecast commit bar */}
