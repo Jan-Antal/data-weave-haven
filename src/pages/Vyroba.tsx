@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList,
-  User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange,
+  User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange, Factory,
   Circle, CheckCircle2, X, Mail, Plus, Trash2, Loader2
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -386,6 +386,9 @@ export default function Vyroba() {
 
             <span className="w-px h-5 bg-primary-foreground/20 mx-1 hidden md:block" />
 
+            <button className="p-2 rounded-md text-primary-foreground bg-primary-foreground/10 transition-colors cursor-default" title="Výroba">
+              <Factory className="h-5 w-5" />
+            </button>
             <button onClick={() => navigate("/plan-vyroby")} className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors" title="Plán Výroby">
               <CalendarRange className="h-5 w-5" />
             </button>
