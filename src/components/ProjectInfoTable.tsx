@@ -916,7 +916,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 z-[99999]" align="start">
-                  <Calendar mode="single" selected={newProj.datum_smluvni ? parseAppDate(newProj.datum_smluvni) : undefined} defaultMonth={newProj.datum_smluvni ? parseAppDate(newProj.datum_smluvni) ?? undefined : undefined} onSelect={(date) => { if (date) { const iso = date.toISOString().split("T")[0]; setNewProj((p) => ({ ...p, datum_smluvni: iso })); } }} className={cn("p-3 pointer-events-auto")} />
+                  <Calendar mode="single" selected={newProj.datum_smluvni ? parseAppDate(newProj.datum_smluvni) : undefined} defaultMonth={newProj.datum_smluvni ? parseAppDate(newProj.datum_smluvni) ?? undefined : undefined} onSelect={(date) => { if (date) { const y = date.getFullYear(); const m = String(date.getMonth() + 1).padStart(2, "0"); const d = String(date.getDate()).padStart(2, "0"); setNewProj((p) => ({ ...p, datum_smluvni: `${y}-${m}-${d}` })); } }} className={cn("p-3 pointer-events-auto")} />
                 </PopoverContent>
               </Popover>
               {datumWarning && <p className="text-[hsl(var(--accent))] text-xs mt-1">Datum smluvní není vyplněn. Klikněte znovu pro uložení bez data.</p>}
