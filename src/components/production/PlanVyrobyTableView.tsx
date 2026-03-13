@@ -1376,6 +1376,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                           {hasAnyInbox && (
                             <div
                               className="shrink-0 flex items-center justify-center px-1 sticky z-20"
+                              onContextMenu={(e) => { if (item.inboxHours > 0) { e.stopPropagation(); handleInboxItemContextMenu(e, item); } }}
                               style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff" }}
                             >
                               {item.inboxHours > 0 && (
