@@ -177,14 +177,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const [inlineName, setInlineName] = useState("");
   const inlineRef = useRef<HTMLInputElement>(null);
 
-  // ── Scroll sync refs for split header/body ───────────────────────
-  const tpvHeaderScrollRef = useRef<HTMLDivElement>(null);
   const tpvBodyScrollRef = useRef<HTMLDivElement>(null);
-  const handleTpvBodyScroll = useCallback(() => {
-    if (tpvBodyScrollRef.current && tpvHeaderScrollRef.current) {
-      tpvHeaderScrollRef.current.scrollLeft = tpvBodyScrollRef.current.scrollLeft;
-    }
-  }, []);
 
   const visibleColCount = renderKeys.length + 2; // +checkbox +actions
 
