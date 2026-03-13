@@ -1498,7 +1498,29 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
           projectName={cancelDialog.projectName}
           projectId={cancelDialog.projectId}
           source="schedule"
+          splitGroupId={cancelDialog.splitGroupId}
+          cancelAll={cancelDialog.cancelAll}
         />
+      )}
+
+      {/* Completion dialog */}
+      {completionState && (
+        <CompletionDialog open={!!completionState} onOpenChange={open => !open && setCompletionState(null)} {...completionState} hourlyRate={hourlyRate} />
+      )}
+
+      {/* Split item dialog */}
+      {splitState && (
+        <SplitItemDialog open={!!splitState} onOpenChange={open => !open && setSplitState(null)} {...splitState} itemCode={splitState.itemCode} weeks={splitWeekOptions} weeklyCapacity={weeklyCapacity} splitGroupId={splitState.splitGroupId} />
+      )}
+
+      {/* Bundle split dialog */}
+      {bundleSplitState && (
+        <SplitBundleDialog open={!!bundleSplitState} onOpenChange={open => !open && setBundleSplitState(null)} bundleName={bundleSplitState.bundleName} currentWeekKey={bundleSplitState.currentWeekKey} items={bundleSplitState.items} weeks={splitWeekOptions} />
+      )}
+
+      {/* Pause dialog */}
+      {pauseState && (
+        <PauseItemDialog open={!!pauseState} onOpenChange={open => !open && setPauseState(null)} {...pauseState} itemCode={pauseState.itemCode} />
       )}
 
       {pdfHtml && (
