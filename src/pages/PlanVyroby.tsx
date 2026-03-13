@@ -241,9 +241,9 @@ export default function PlanVyroby() {
   }, [allProjects, formatWeekLabel]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    // Block drag start during forecast mode
-    if (forecast.forecastActive) return;
-    const data = event.active.data.current as ActiveDragData | undefined;
+    const data = event.active.data.current as any;
+    // Allow forecast block drags even in forecast mode
+    if (forecast.forecastActive && data?.type !== "forecast-block") return;
     if (data) setActiveDrag(data);
   }, [forecast.forecastActive]);
 
