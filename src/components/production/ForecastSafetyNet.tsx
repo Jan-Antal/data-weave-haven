@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import { ChevronDown, ChevronRight, AlertTriangle, RotateCcw, GripVertical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
@@ -38,6 +38,143 @@ const statusColors: Record<string, { bg: string; color: string }> = {
   paused: { bg: "#451a03", color: "#fdba74" },
   completed: { bg: "#14532d", color: "#86efac" },
 };
+
+/** Draggable row for a safety net project */
+function DraggableSafetyNetRow({
+  project,
+  isExpanded,
+  items,
+  isLoading,
+  badge,
+  onToggleExpand,
+  onContextMenu,
+  onRestore,
+}: {
+  project: SafetyNetProject;
+  isExpanded: boolean;
+  items: SafetyNetItem[] | undefined;
+  isLoading: boolean;
+  badge: { label: string; bg: string };
+  onToggleExpand: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
+  onRestore?: (projectId: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `safety-net-${project.project_id}`,
+    data: {
+      type: "safety-net-project",
+      projectId: project.project_id,
+      projectName: project.project_name,
+      estimatedHours: project.estimated_hours,
+      source: project.source,
+    },
+  });
+
+  return (
+    <div ref={setNodeRef} style={{ opacity: isDragging ? 0.4 : 1 }}>
+      {/* Project row */}
+      <div
+        className="flex items-center gap-1 py-1.5 px-1.5 rounded cursor-pointer transition-colors"
+        style={{ backgroundColor: isExpanded ? "#253533" : "transparent" }}
+        onClick={onToggleExpand}
+        onContextMenu={onContextMenu}
+      >
+        {/* Drag handle */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="shrink-0 cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-white/10"
+          onClick={(e) => e.stopPropagation()}
+          title="Přetáhni do týdne"
+        >
+          <GripVertical className="w-3 h-3" style={{ color: "#4a5a58" }} />
+        </div>
+
+        {isExpanded
+          ? <ChevronDown className="w-3 h-3 shrink-0" style={{ color: "#7aa8a4" }} />
+          : <ChevronRight className="w-3 h-3 shrink-0" style={{ color: "#4a5a58" }} />}
+        <div className="flex-1 min-w-0">
+          <div className="truncate" style={{ fontSize: 12, fontWeight: 500, color: "#a8c5c2" }}>
+            {project.project_name}
+          </div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="font-mono text-[10px]" style={{ color: "#5c706f" }}>{project.project_id}</span>
+            <span
+              className="px-1 py-0 rounded text-[9px] font-medium"
+              style={{ background: badge.bg, color: "#e5e5e5" }}
+            >
+              {badge.label}
+            </span>
+          </div>
+        </div>
+        <div className="shrink-0 flex flex-col items-end gap-0.5">
+          <span className="font-mono text-[11px] font-semibold" style={{ color: "#7aa8a4" }}>
+            ~{project.estimated_hours}h
+          </span>
+          {onRestore && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onRestore(project.project_id); }}
+              className="flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-medium hover:opacity-80 transition-opacity"
+              style={{ background: "#2a4a46", color: "#7aa8a4" }}
+              title="Vrátit do forecastu"
+            >
+              <RotateCcw className="w-2.5 h-2.5" />
+              Vrátit
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Expanded items */}
+      {isExpanded && (
+        <div className="mt-0.5 mb-1">
+          {isLoading ? (
+            <div className="pl-4 py-1">
+              <span className="text-[10px] italic" style={{ color: "#4a5a58" }}>Načítám...</span>
+            </div>
+          ) : items && items.length > 0 ? (
+            items.map(item => {
+              const sc = statusColors[item.status || ""] || { bg: "#2a3d3a", color: "#7aa8a4" };
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-1.5 py-[3px]"
+                  style={{ paddingLeft: 16, borderLeft: "1px solid #2a3d3a", marginLeft: 8, fontSize: 11 }}
+                >
+                  {item.item_code && (
+                    <span className="font-mono shrink-0" style={{ color: "#5c706f", fontSize: 10 }}>
+                      {item.item_code}
+                    </span>
+                  )}
+                  <span className="flex-1 truncate" style={{ color: "#7aa8a4" }}>
+                    {item.item_name}
+                  </span>
+                  {item.hours != null && (
+                    <span className="font-mono shrink-0" style={{ color: "#5c706f", fontSize: 10 }}>
+                      {Math.round(item.hours)}h
+                    </span>
+                  )}
+                  {item.status && (
+                    <span
+                      className="px-1 py-0 rounded text-[9px]"
+                      style={{ backgroundColor: sc.bg, color: sc.color }}
+                    >
+                      {item.status}
+                    </span>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <div className="pl-4 py-1">
+              <span className="text-[10px] italic" style={{ color: "#4a5a58" }}>Žádné položky</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail, onViewItems }: ForecastSafetyNetProps) {
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
@@ -193,55 +330,6 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
               onContextMenu={(e) => handleContextMenu(e, p)}
               onRestore={onRestoreToForecast}
             />
-
-              {/* Expanded items */}
-              {isExpanded && (
-                <div className="mt-0.5 mb-1">
-                  {isLoading ? (
-                    <div className="pl-4 py-1">
-                      <span className="text-[10px] italic" style={{ color: "#4a5a58" }}>Načítám...</span>
-                    </div>
-                  ) : items && items.length > 0 ? (
-                    items.map(item => {
-                      const sc = statusColors[item.status || ""] || { bg: "#2a3d3a", color: "#7aa8a4" };
-                      return (
-                        <div
-                          key={item.id}
-                          className="flex items-center gap-1.5 py-[3px]"
-                          style={{ paddingLeft: 16, borderLeft: "1px solid #2a3d3a", marginLeft: 8, fontSize: 11 }}
-                        >
-                          {item.item_code && (
-                            <span className="font-mono shrink-0" style={{ color: "#5c706f", fontSize: 10 }}>
-                              {item.item_code}
-                            </span>
-                          )}
-                          <span className="flex-1 truncate" style={{ color: "#7aa8a4" }}>
-                            {item.item_name}
-                          </span>
-                          {item.hours != null && (
-                            <span className="font-mono shrink-0" style={{ color: "#5c706f", fontSize: 10 }}>
-                              {Math.round(item.hours)}h
-                            </span>
-                          )}
-                          {item.status && (
-                            <span
-                              className="px-1 py-0 rounded text-[9px]"
-                              style={{ backgroundColor: sc.bg, color: sc.color }}
-                            >
-                              {item.status}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="pl-4 py-1">
-                      <span className="text-[10px] italic" style={{ color: "#4a5a58" }}>Žádné položky</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
           );
         })}
       </div>
