@@ -1,0 +1,1 @@
+ALTER TABLE public.projects ADD COLUMN contact_person text, ADD COLUMN contact_email text, ADD COLUMN contact_tel text;

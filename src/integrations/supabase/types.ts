@@ -746,6 +746,9 @@ export type Database = {
       projects: {
         Row: {
           architekt: string | null
+          contact_email: string | null
+          contact_person: string | null
+          contact_tel: string | null
           contract_link: string | null
           cost_doprava_pct: number | null
           cost_is_custom: boolean | null
@@ -802,6 +805,9 @@ export type Database = {
         }
         Insert: {
           architekt?: string | null
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_tel?: string | null
           contract_link?: string | null
           cost_doprava_pct?: number | null
           cost_is_custom?: boolean | null
@@ -858,6 +864,9 @@ export type Database = {
         }
         Update: {
           architekt?: string | null
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_tel?: string | null
           contract_link?: string | null
           cost_doprava_pct?: number | null
           cost_is_custom?: boolean | null
