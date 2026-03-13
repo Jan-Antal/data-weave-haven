@@ -364,22 +364,10 @@ function ForecastCard({
                   {block.project_name}
                 </span>
               </div>
-              <div className="flex items-center justify-between mt-0.5">
-                <span className="text-[11px] truncate" style={{ color: style.codeColor }}>
-                  {block.bundle_description}
-                </span>
-                <span
-                  className="text-[13px] font-bold shrink-0 ml-2"
-                  style={{ color: style.hoursColor }}>
-                  
-                  {style.hoursPrefix}{displayMode === "czk" ? formatCompactCzk(block.estimated_hours * hourlyRate) : displayMode === "percent" ? `${weeklyCapacity > 0 ? Math.round(block.estimated_hours / weeklyCapacity * 100) : 0}%` : `${block.estimated_hours}h`}
-                </span>
-              </div>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span
                   className="text-[9px] font-mono"
                   style={{ color: style.codeColor }}>
-                  
                   {block.project_id}
                 </span>
                 {/* Deadline inline */}
@@ -403,6 +391,17 @@ function ForecastCard({
                       {label}: {formatted}
                     </span>);
                 })()}
+              </div>
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="text-[11px] truncate" style={{ color: style.codeColor }}>
+                  {block.bundle_description}
+                </span>
+                <span
+                  className="text-[13px] font-bold shrink-0 ml-2"
+                  style={{ color: style.hoursColor }}>
+                  {style.hoursPrefix}{displayMode === "czk" ? formatCompactCzk(block.estimated_hours * hourlyRate) : displayMode === "percent" ? `${weeklyCapacity > 0 ? Math.round(block.estimated_hours / weeklyCapacity * 100) : 0}%` : `${block.estimated_hours}h`}
+                </span>
+              </div>
                 {block.tpv_item_count && block.tpv_item_count > 0
 
 
