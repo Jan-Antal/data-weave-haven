@@ -832,10 +832,19 @@ interface SiloProps {
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
   showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand }: SiloProps) {
   // Capacity calculation: exclude paused items
-  const activeHours = useMemo(() => {
-    if (!silo) return 0;
-    return silo.bundles.reduce((sum, b) =>
-      sum + b.items.reduce((s, i) => s + (i.status === "paused" ? 0 : i.scheduled_hours), 0), 0);
+  // Active hours (excl. paused), split into blocker and non-blocker
+  const { activeHours, blockerHours } = useMemo(() => {
+    if (!silo) return { activeHours: 0, blockerHours: 0 };
+    let active = 0;
+    let blocker = 0;
+    for (const b of silo.bundles) {
+      for (const i of b.items) {
+        if (i.status === "paused") continue;
+        if (i.is_blocker) blocker += i.scheduled_hours;
+        else active += i.scheduled_hours;
+      }
+    }
+    return { activeHours: active, blockerHours: blocker };
   }, [silo]);
 
   // Forecast layer is isolated and read-only, rendered separately per week
@@ -844,7 +853,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
     return forecastBlocks.filter(block => block.week === weekKey);
   }, [forecastDarkMode, forecastBlocks, weekKey]);
 
-  const totalHours = activeHours + (forecastDarkMode ? weekForecastBlocks.reduce((sum, block) => sum + block.estimated_hours, 0) : 0);
+  // totalHours includes blockers for capacity bar; displayHours excludes them for header
+  const totalHours = activeHours + blockerHours + (forecastDarkMode ? weekForecastBlocks.reduce((sum, block) => sum + block.estimated_hours, 0) : 0);
   const pct = weeklyCapacity > 0 ? (totalHours / weeklyCapacity) * 100 : 0;
   const isOverloaded = pct > 120;
   const isWarning = pct > 100 && pct <= 120;
