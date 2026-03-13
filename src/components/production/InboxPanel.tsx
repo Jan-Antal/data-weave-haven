@@ -707,6 +707,10 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
                   if (e.ctrlKey || e.metaKey) {
                     setSelectedReserves(prev => {
                       const next = new Set(prev);
+                      // If first Ctrl+click and another reserve was selected via normal click, include it
+                      if (next.size === 0 && selectedProjectId && reserveProjects.some(r => r.project_id === selectedProjectId) && selectedProjectId !== p.project_id) {
+                        next.add(selectedProjectId);
+                      }
                       if (next.has(p.project_id)) next.delete(p.project_id);
                       else next.add(p.project_id);
                       return next;
