@@ -196,7 +196,7 @@ export function useForecastMode(): UseForecastModeReturn {
       console.log(`[Forecast] By source: existing_plan=${blocks.filter(b=>b.source==="existing_plan").length}, inbox_item=${blocks.filter(b=>b.source==="inbox_item").length}, project_estimate=${blocks.filter(b=>b.source==="project_estimate").length}`);
 
       setForecastBlocks(blocks);
-      setSelectedBlockIds(new Set(blocks.map(b => b.id)));
+      setSelectedBlockIds(new Set(blocks.filter(b => b.source === "inbox_item").map(b => b.id)));
       setSafetyNetProjects(Array.isArray(data?.safetyNet) ? data.safetyNet : []);
 
       if (blocks.length === 0) {
