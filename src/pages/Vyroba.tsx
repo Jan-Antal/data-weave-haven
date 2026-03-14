@@ -2294,25 +2294,27 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
               defectDesc={defectDesc} setDefectDesc={setDefectDesc}
               defectSeverity={defectSeverity} setDefectSeverity={setDefectSeverity}
               defectResolution={defectResolution} setDefectResolution={setDefectResolution}
-              defectAssignee={defectAssignee} setDefectAssignee={setDefectAssignee}
-              allPeople={allPeople}
+              defectItemId={defectItemId} setDefectItemId={setDefectItemId}
+              defectPhotos={defectPhotos} setDefectPhotos={setDefectPhotos}
+              availableItems={singleQcItem ? [singleQcItem] : []}
+              projectId={projectId}
               onSave={async () => {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!singleQcItem) return;
+                const selectedItem = defectItemId === "__bundle__" ? null : (defectItemId === singleQcItem.id ? singleQcItem : null);
                 await addDefect.mutateAsync({
                   project_id: projectId,
-                  item_id: singleQcItem.id,
-                  item_code: singleQcItem.item_code || null,
+                  item_id: selectedItem?.id || singleQcItem.id,
+                  item_code: selectedItem?.item_code || singleQcItem.item_code || null,
                   defect_type: defectType,
                   description: defectDesc,
                   severity: defectSeverity,
                   resolution_type: defectSeverity === "blocking" ? defectResolution : null,
-                  assigned_to: defectAssignee || null,
-                  photo_url: null,
+                  photo_url: defectPhotos.length > 0 ? JSON.stringify(defectPhotos) : null,
                   reported_by: user?.id || "",
                 });
                 toast.success("Vada zaznamenaná");
-                setDefectType(""); setDefectDesc(""); setDefectSeverity("minor"); setDefectResolution(""); setDefectAssignee(""); setDefectOpen(false);
+                setDefectType(""); setDefectDesc(""); setDefectSeverity("minor"); setDefectResolution(""); setDefectItemId("__bundle__"); setDefectPhotos([]); setDefectOpen(false);
               }}
             />
           </div>
