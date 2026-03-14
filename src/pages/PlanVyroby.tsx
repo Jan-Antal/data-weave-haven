@@ -185,8 +185,6 @@ export default function PlanVyroby() {
     mergeSplitItems,
   } = useProductionDragDrop();
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: isMobile ? 99999 : 10 } }));
-
   const weeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
 
@@ -196,6 +194,8 @@ export default function PlanVyroby() {
   }, [setCurrentPage]);
 
   const isMobile = useIsMobile();
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: isMobile ? 99999 : 10 } }));
 
   useEffect(() => {
     if (!loading && !isAdmin) {
