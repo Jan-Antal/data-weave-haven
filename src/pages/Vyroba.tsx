@@ -1054,37 +1054,19 @@ export default function Vyroba() {
         </DialogContent>
       </Dialog>
 
-      {/* ═══ EXPEDICE CONFIRMATION DIALOG ═══ */}
+      {/* ═══ EXPEDICE CONFIRMATION DIALOG (simple Ano/Ne) ═══ */}
       <Dialog open={expediceDialogOpen} onOpenChange={setExpediceDialogOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Potvrdit → Expedice</DialogTitle>
+            <DialogTitle>Vše hotovo — přesunout do Expedice?</DialogTitle>
           </DialogHeader>
           <p className="text-sm" style={{ color: "#6b7280" }}>
-            Před přesunem projektu <strong>{selectedProject?.projectName}</strong> do Expedice potvrďte:
+            Projekt <strong>{selectedProject?.projectName}</strong> bude přesunut do Expedice.
           </p>
-          <div className="space-y-3 py-3">
-            <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
-              <Checkbox checked={expediceChecks.vyroba} onCheckedChange={(v) => setExpediceChecks(c => ({ ...c, vyroba: !!v }))} />
-              <span className="text-sm">Výroba dokončena</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
-              <Checkbox checked={expediceChecks.kvalita} onCheckedChange={(v) => setExpediceChecks(c => ({ ...c, kvalita: !!v }))} />
-              <span className="text-sm">Kvalita zkontrolována</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
-              <Checkbox checked={expediceChecks.dokumentace} onCheckedChange={(v) => setExpediceChecks(c => ({ ...c, dokumentace: !!v }))} />
-              <span className="text-sm">Dokumentace v pořádku</span>
-            </label>
-          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setExpediceDialogOpen(false)}>Zrušit</Button>
-            <Button
-              disabled={!expediceChecks.vyroba || !expediceChecks.kvalita || !expediceChecks.dokumentace}
-              onClick={handleConfirmExpedice}
-              style={{ background: "#3a8a36" }}
-            >
-              Potvrdit → Expedice
+            <Button variant="outline" onClick={() => setExpediceDialogOpen(false)}>Ne</Button>
+            <Button onClick={handleConfirmExpedice} style={{ background: "#3a8a36" }}>
+              Ano
             </Button>
           </DialogFooter>
         </DialogContent>
