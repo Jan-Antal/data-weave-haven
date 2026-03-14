@@ -391,15 +391,34 @@ export default function Vyroba() {
     return null;
   }
 
-  function getExpectedPct(dayIndex: number): number {
-    return Math.round(((dayIndex + 1) / 5) * 100);
+  function getWeeklyGoal(pid: string): number {
+    if (!scheduleData) return 100;
+    let thisWeekHours = 0;
+    let totalHours = 0;
+    for (const [wk, silo] of scheduleData) {
+      for (const bundle of silo.bundles) {
+        if (bundle.project_id !== pid) continue;
+        const activeHours = bundle.items
+          .filter((i: ScheduleItem) => i.status !== "cancelled")
+          .reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0);
+        totalHours += activeHours;
+        if (wk === weekKey) thisWeekHours += activeHours;
+      }
+    }
+    if (totalHours <= 0) return 100;
+    return Math.round((thisWeekHours / totalHours) * 100);
+  }
+
+  function getExpectedPct(dayIndex: number, weeklyGoal: number = 100): number {
+    return Math.round(((dayIndex + 1) / 5) * weeklyGoal);
   }
 
   function getProjectStatus(pid: string): "on-track" | "at-risk" | "behind" {
     const pct = getLatestPercent(pid);
-    if (pct >= 100) return "on-track";
+    const goal = getWeeklyGoal(pid);
+    if (pct >= goal) return "on-track";
     if (todayDayIndex < 0) return "on-track";
-    const expected = getExpectedPct(todayDayIndex);
+    const expected = getExpectedPct(todayDayIndex, goal);
     if (pct >= expected - 10) return "on-track";
     if (pct >= expected - 25) return "at-risk";
     return "behind";
@@ -509,6 +528,21 @@ export default function Vyroba() {
 
       await saveDailyLog(bId, weekKey, logDayIndex, logPhase, logPercent, logNotes || null);
       qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
+      
+      // Log "Nad plán" activity if over weekly goal
+      const wGoal = getWeeklyGoal(selectedProject.projectId);
+      if (logPercent > wGoal) {
+        const { data: { user: logUser } } = await supabase.auth.getUser();
+        if (logUser) {
+          await supabase.from("data_log").insert({
+            project_id: selectedProject.projectId,
+            user_id: logUser.id,
+            action_type: "log_nad_plan",
+            detail: `Nad plán: ${logPercent}% (cíl byl ${wGoal}%)`,
+          });
+        }
+      }
+      
       setLogModalOpen(false);
     } catch (err: any) {
       toast.error(`Chyba při ukládání logu: ${err?.message || "neznámá chyba"}`);
@@ -983,7 +1017,7 @@ export default function Vyroba() {
               {spilledProjects.map(p => (
                 <ProjectRow key={p.projectId} project={p} isSelected={selectedProjectId === p.projectId}
                   onSelect={handleSelectProject} onContextMenu={handleContextMenu} getProjectStatus={getProjectStatus}
-                  getLatestPercent={getLatestPercent} getLatestPhase={getLatestPhase} statusColors={statusColors} />
+                  getLatestPercent={getLatestPercent} getLatestPhase={getLatestPhase} statusColors={statusColors} weeklyGoal={getWeeklyGoal(p.projectId)} />
               ))}
 
               {/* Normal section */}
@@ -995,7 +1029,7 @@ export default function Vyroba() {
               {normalProjects.map(p => (
                 <ProjectRow key={p.projectId} project={p} isSelected={selectedProjectId === p.projectId}
                   onSelect={handleSelectProject} onContextMenu={handleContextMenu} getProjectStatus={getProjectStatus}
-                  getLatestPercent={getLatestPercent} getLatestPhase={getLatestPhase} statusColors={statusColors} />
+                  getLatestPercent={getLatestPercent} getLatestPhase={getLatestPhase} statusColors={statusColors} weeklyGoal={getWeeklyGoal(p.projectId)} />
               ))}
 
               {/* Paused section */}
@@ -1092,6 +1126,7 @@ export default function Vyroba() {
                 onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
                 dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
                 onDismissDyha={() => setDyhaDismissed(prev => new Set(prev).add(selectedProject.projectId))}
+                weeklyGoal={getWeeklyGoal(selectedProject.projectId)}
               />
             )}
           </div>
@@ -1131,6 +1166,7 @@ export default function Vyroba() {
                 onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
                 dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
                 onDismissDyha={() => setDyhaDismissed(prev => new Set(prev).add(selectedProject.projectId))}
+                weeklyGoal={getWeeklyGoal(selectedProject.projectId)}
               />
             </div>
           </SheetContent>
@@ -1179,37 +1215,50 @@ export default function Vyroba() {
                 </div>
               )}
             </div>
-            <div>
-              <div className="text-xs font-semibold mb-2" style={{ color: "#6b7280" }}>Celková hotovost</div>
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <Slider min={0} max={100} step={5} value={[logPercent]} onValueChange={([v]) => {
-                    setHotovostTouched(true);
-                    setLogPercent(v);
-                  }} />
-                  <div className="flex justify-between text-[9px] mt-1" style={{ color: "#99a5a3" }}>
-                    <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
+            {(() => {
+              const logWeeklyGoal = selectedProject ? getWeeklyGoal(selectedProject.projectId) : 100;
+              return (
+                <div>
+                  <div className="text-xs font-semibold mb-2" style={{ color: "#6b7280" }}>Celková hotovost</div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <Slider min={0} max={100} step={5} value={[logPercent]} onValueChange={([v]) => {
+                        setHotovostTouched(true);
+                        setLogPercent(v);
+                      }} />
+                      <div className="flex justify-between text-[9px] mt-1" style={{ color: "#99a5a3" }}>
+                        <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
+                      </div>
+                    </div>
+                    <span className="text-2xl font-mono font-bold min-w-[60px] text-right" style={{ color: logPercent >= logWeeklyGoal ? "#3a8a36" : "#1a1a1a" }}>
+                      {logPercent}%
+                    </span>
                   </div>
+                  <div className="mt-1 text-[10px]" style={{ color: "#99a5a3" }}>
+                    Týdenní cíl: <span className="font-semibold" style={{ color: logPercent >= logWeeklyGoal ? "#3a8a36" : "#d97706" }}>{logWeeklyGoal}%</span> · Celkem: 100%
+                  </div>
+                  {logPercent > logWeeklyGoal && (
+                    <div className="mt-1 text-[10px] font-medium" style={{ color: "#3a8a36" }}>
+                      🎉 Nad plán! Výborně!
+                    </div>
+                  )}
+                  {hotovostTouched && (
+                    <div className="mt-1.5 flex items-center gap-1 text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>
+                      <span>% ručně nastaveno — operace nezmění hodnotu</span>
+                      <button
+                        className="font-medium underline"
+                        style={{ color: "#d97706" }}
+                        onClick={() => {
+                          setHotovostTouched(false);
+                          const phasePct = PHASES.find(p => p.name === logPhase)?.pct || 0;
+                          setLogPercent(phasePct);
+                        }}
+                      >× Reset</button>
+                    </div>
+                  )}
                 </div>
-                <span className="text-2xl font-mono font-bold min-w-[60px] text-right" style={{ color: logPercent >= 100 ? "#3a8a36" : "#1a1a1a" }}>
-                  {logPercent}%
-                </span>
-              </div>
-              {hotovostTouched && (
-                <div className="mt-1.5 flex items-center gap-1 text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>
-                  <span>% ručně nastaveno — operace nezmění hodnotu</span>
-                  <button
-                    className="font-medium underline"
-                    style={{ color: "#d97706" }}
-                    onClick={() => {
-                      setHotovostTouched(false);
-                      const phasePct = PHASES.find(p => p.name === logPhase)?.pct || 0;
-                      setLogPercent(phasePct);
-                    }}
-                  >× Reset</button>
-                </div>
-              )}
-            </div>
+              );
+            })()}
 
             {/* Tab switcher: Poznámky / Foto */}
             <div>
@@ -1541,7 +1590,7 @@ export default function Vyroba() {
 /* PROJECT ROW (left panel)                */
 /* ═══════════════════════════════════════ */
 
-function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectStatus, getLatestPercent, getLatestPhase, statusColors }: {
+function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectStatus, getLatestPercent, getLatestPhase, statusColors, weeklyGoal = 100 }: {
   project: VyrobaProject;
   isSelected: boolean;
   onSelect: (pid: string) => void;
@@ -1550,11 +1599,16 @@ function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectSt
   getLatestPercent: (pid: string) => number;
   getLatestPhase: (pid: string) => string | null;
   statusColors: Record<string, string>;
+  weeklyGoal?: number;
 }) {
   const status = getProjectStatus(project.projectId);
   const pct = getLatestPercent(project.projectId);
   const phase = getLatestPhase(project.projectId);
   const borderColor = project.color;
+
+  // Goal-based color logic
+  const goalDiff = pct - weeklyGoal;
+  const progressColor = goalDiff >= 0 ? "#3a8a36" : goalDiff >= -10 ? "#d97706" : "#dc2626";
 
   // Deadline urgency color for project name
   const now = new Date();
@@ -1602,8 +1656,14 @@ function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectSt
               <span style={{ fontSize: 11, color: PHASES.find(ph => ph.name === phase)?.color || "#6b7280", fontWeight: 500 }}>· {phase}</span>
             )}
           </div>
-          <div className="mt-1.5 h-[3px] rounded-full overflow-hidden" style={{ background: "hsl(var(--border))" }}>
-            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: statusColors[status] }} />
+          <div className="mt-1.5 relative">
+            <div className="h-[3px] rounded-full overflow-hidden" style={{ background: "hsl(var(--border))" }}>
+              <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: progressColor }} />
+            </div>
+            {/* Weekly goal marker */}
+            {weeklyGoal < 100 && (
+              <div className="absolute top-[-1px] h-[5px] w-[1.5px] rounded-full" style={{ left: `${weeklyGoal}%`, background: "#d97706", opacity: 0.8 }} />
+            )}
           </div>
         </div>
       </button>
@@ -1636,7 +1696,7 @@ function useProjectDetails(projectIds: string[]) {
 /* DETAIL PANEL                            */
 /* ═══════════════════════════════════════ */
 
-function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog, nextWeekNum, onSpillAll, onOpenExpedice, onToggleItem, getCumulativeForDay, getExpectedPct, status, latestPct, latestPhase, logs, expandedMap, setExpandedMap, bundleId, allItems, scheduleData, pushUndo, onOpenProjectDetail, dyhaDismissed, onDismissDyha }: {
+function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog, nextWeekNum, onSpillAll, onOpenExpedice, onToggleItem, getCumulativeForDay, getExpectedPct, status, latestPct, latestPhase, logs, expandedMap, setExpandedMap, bundleId, allItems, scheduleData, pushUndo, onOpenProjectDetail, dyhaDismissed, onDismissDyha, weeklyGoal }: {
   project: VyrobaProject;
   weekKey: string;
   currentMonday: Date;
@@ -1647,7 +1707,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
   onOpenExpedice: () => void;
   onToggleItem: (id: string, status: string) => void;
   getCumulativeForDay: (dayIndex: number) => CumulativeInfo | null;
-  getExpectedPct: (dayIndex: number) => number;
+  getExpectedPct: (dayIndex: number, weeklyGoal?: number) => number;
   status: "on-track" | "at-risk" | "behind";
   latestPct: number;
   latestPhase: string | null;
@@ -1661,9 +1721,10 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
   onOpenProjectDetail: () => void;
   dyhaDismissed: boolean;
   onDismissDyha: () => void;
+  weeklyGoal: number;
 }) {
   const isMobile = useIsMobile();
-  const expectedPct = todayDayIndex >= 0 ? getExpectedPct(todayDayIndex) : 0;
+  const expectedPct = todayDayIndex >= 0 ? getExpectedPct(todayDayIndex, weeklyGoal) : 0;
   const isExpanded = expandedMap[bundleId] ?? true;
   const statusColors = { "on-track": "#3a8a36", "at-risk": "#d97706", "behind": "#dc2626" };
   const statusLabels = { "on-track": "On track", "at-risk": "At risk", "behind": "Pozadu" };
@@ -1747,7 +1808,9 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
               {latestPct}%
             </div>
             {todayDayIndex >= 0 && (
-              <div className="text-xs" style={{ color: "#99a5a3" }}>Cíl: 100%</div>
+              <div className="text-xs" style={{ color: latestPct >= weeklyGoal ? "#3a8a36" : "#99a5a3" }}>
+                Cíl: {weeklyGoal}%
+              </div>
             )}
           </div>
         </div>
@@ -1756,6 +1819,10 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           <div className="h-1 rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
             <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(latestPct, 100)}%`, background: statusColor }} />
           </div>
+          {/* Weekly goal marker */}
+          {weeklyGoal < 100 && (
+            <div className="absolute top-[-3px] h-[10px] w-[2px] rounded-full" style={{ left: `${weeklyGoal}%`, background: "#d97706", opacity: 0.7 }} />
+          )}
           {todayDayIndex >= 0 && (
             <div className="absolute top-[-2px] h-[8px] w-[2px]" style={{ left: `${expectedPct}%`, background: "#1a1a1a", opacity: 0.2 }} />
           )}
@@ -1781,6 +1848,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
                 onOpenLog={() => onOpenLog(di)}
                 statusColor={statusColor}
                 logs={logs}
+                weeklyGoal={weeklyGoal}
               />
             ))}
           </div>
@@ -2826,13 +2894,14 @@ function VykresynSection({ projectId }: { projectId: string }) {
 /* DAY CELL                                */
 /* ═══════════════════════════════════════ */
 
-function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, logs }: {
+function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, logs, weeklyGoal = 100 }: {
   dayIndex: number;
   todayDayIndex: number;
   cumulative: CumulativeInfo | null;
   onOpenLog: () => void;
   statusColor: string;
   logs: DailyLog[];
+  weeklyGoal?: number;
 }) {
   const isToday = dayIndex === todayDayIndex;
   const isFuture = todayDayIndex >= 0 && dayIndex > todayDayIndex;
@@ -2898,7 +2967,9 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-medium" style={{ color: "#6b7280" }}>{DAY_NAMES[dayIndex]}</span>
         {isToday && (
-          <span className="text-[7px] font-bold px-1 py-[1px] rounded" style={{ background: "rgba(58,138,54,0.15)", color: "#3a8a36" }}>DNES</span>
+          <span className="text-[7px] font-bold px-1 py-[1px] rounded" style={{ background: "rgba(58,138,54,0.15)", color: "#3a8a36" }}>
+            {pct >= weeklyGoal ? "🎉 DNES" : "DNES"}
+          </span>
         )}
       </div>
 
@@ -2914,7 +2985,10 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
             <div className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: PHASES.find(p => p.name === cumulative.phase)?.color || "#6b7280" }} />
               <span className="text-[9px]" style={{ color: "#6b7280" }}>{cumulative.phase}</span>
-            </div>
+           </div>
+          )}
+          {weeklyGoal < 100 && !isNoProduction && (
+            <div className="text-[8px]" style={{ color: "#99a5a3" }}>Cíl: {weeklyGoal}%</div>
           )}
           {isToday && (
             <span className="mt-0.5 w-full text-[9px] font-medium py-0.5 rounded transition-colors text-center"
