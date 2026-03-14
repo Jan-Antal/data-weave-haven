@@ -40,6 +40,15 @@ export function useUpdateProject() {
         const fmtNew = value ? (parseAppDate(value) ? formatAppDate(parseAppDate(value)!) : value) : "—";
         logActivity({ projectId, actionType: "datum_smluvni_change", oldValue: fmtOld, newValue: fmtNew });
       }
+      if (field === "pm" && value !== oldValue && projectId) {
+        logActivity({ projectId, actionType: "pm_change", oldValue: oldValue || "—", newValue: value || "—" });
+      }
+      if (field === "kalkulant" && value !== oldValue && projectId) {
+        logActivity({ projectId, actionType: "kalkulant_change", oldValue: oldValue || "—", newValue: value || "—" });
+      }
+      if (field === "prodejni_cena" && value !== oldValue && projectId) {
+        logActivity({ projectId, actionType: "prodejni_cena_change", oldValue: oldValue || "—", newValue: value || "—" });
+      }
 
       return { id, field, value, oldValue, updatedProject: data as Project };
     },

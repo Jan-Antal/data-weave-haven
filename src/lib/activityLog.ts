@@ -24,7 +24,21 @@ export type ActivityActionType =
   | "item_paused"
   | "item_cancelled"
   | "item_returned_to_inbox"
-  | "item_split";
+  | "item_split"
+  | "pm_change"
+  | "kalkulant_change"
+  | "prodejni_cena_change"
+  | "forecast_committed"
+  | "item_hotovo"
+  | "item_qc_confirmed"
+  | "item_expedice"
+  | "item_moved_next_week"
+  | "item_paused_vyroba"
+  | "vyroba_log_saved"
+  | "vyroba_no_activity"
+  | "defect_reported"
+  | "defect_resolved"
+  | "phase_changed";
 
 interface LogParams {
   projectId: string;
