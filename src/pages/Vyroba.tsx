@@ -324,11 +324,16 @@ export default function Vyroba() {
   function getAllItemsForProject(pid: string): { item: ScheduleItem; weekKey: string; weekNum: number }[] {
     if (!scheduleData) return [];
     const items: { item: ScheduleItem; weekKey: string; weekNum: number }[] = [];
+    const seen = new Set<string>();
     for (const [wk, silo] of scheduleData) {
       for (const bundle of silo.bundles) {
         if (bundle.project_id !== pid) continue;
         for (const item of bundle.items) {
           if (item.status === "cancelled") continue;
+          // Deduplicate by item_code + item_name within same week
+          const dedupeKey = `${wk}::${item.item_code || ""}::${item.item_name}`;
+          if (seen.has(dedupeKey)) continue;
+          seen.add(dedupeKey);
           items.push({ item, weekKey: wk, weekNum: silo.week_number });
         }
       }
