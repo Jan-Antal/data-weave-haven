@@ -651,117 +651,135 @@ export default function PlanVyroby() {
           })() : undefined}
         />
 
-        {/* Main content + DataLog sidebar */}
+        {/* Main content + DataLog sidebar wrapper */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        {viewTab === "kanban" ? (
-          <div className={`flex-1 flex min-h-0 ${forecast.forecastActive && forecast.forecastBlocks.length > 0 ? 'pb-14' : ''}`} onClick={() => setSelectedProjectId(null)}>
-            {forecast.forecastActive ? (
-              <ForecastSafetyNet
-                projects={forecast.safetyNetProjects}
-                onRestoreToForecast={forecast.restoreFromSafetyNet}
-                onViewDetail={handleOpenProjectDetail}
-                onViewItems={handleNavigateToTPV}
-              />
+            {viewTab === "kanban" ? (
+              <div className={`flex-1 flex min-h-0 ${forecast.forecastActive && forecast.forecastBlocks.length > 0 ? 'pb-14' : ''}`} onClick={() => setSelectedProjectId(null)}>
+                {forecast.forecastActive ? (
+                  <ForecastSafetyNet
+                    projects={forecast.safetyNetProjects}
+                    onRestoreToForecast={forecast.restoreFromSafetyNet}
+                    onViewDetail={handleOpenProjectDetail}
+                    onViewItems={handleNavigateToTPV}
+                  />
+                ) : (
+                  <InboxPanel
+                    overDroppableId={overDroppableId}
+                    displayMode={displayMode}
+                    onNavigateToTPV={handleNavigateToTPV}
+                    onOpenProjectDetail={handleOpenProjectDetail}
+                    disableDropZone={isDraggingFromInbox}
+                    selectedProjectId={selectedProjectId}
+                    onSelectProject={handleSelectProject}
+                    searchQuery={searchQuery}
+                    width={inboxWidth}
+                    onWidthChange={handleInboxWidthChange}
+                  />
+                )}
+                <WeeklySilos
+                  showCzk={showCzk}
+                  onToggleCzk={(v) => setDisplayMode(v ? "czk" : "hours")}
+                  overDroppableId={overDroppableId}
+                  onNavigateToTPV={handleNavigateToTPV}
+                  onOpenProjectDetail={handleOpenProjectDetail}
+                  displayMode={displayMode}
+                  onDisplayModeChange={setDisplayMode}
+                  selectedProjectId={selectedProjectId}
+                  onSelectProject={handleSelectProject}
+                  searchQuery={searchQuery}
+                  focusedMatchKey={searchNav.focusedMatchKey}
+                  searchMatchWeekKey={searchNav.currentMatch?.weekKey ?? null}
+                  searchMatchedProjectIds={searchNav.active ? searchNav.matchedProjectIds : undefined}
+                  searchActive={searchNav.active}
+                  forecastBlocks={forecast.forecastActive ? forecast.forecastBlocks : undefined}
+                  forecastSelectedIds={forecast.forecastActive ? forecast.selectedBlockIds : undefined}
+                  onToggleForecastSelect={forecast.forecastActive ? forecast.toggleBlockSelection : undefined}
+                  forecastDarkMode={forecast.forecastActive}
+                  forecastPlanMode={forecast.forecastActive ? forecast.planMode : undefined}
+                  onMoveForecastBlock={forecast.forecastActive ? forecast.moveForecastBlock : undefined}
+                  onRemoveForecastBlock={forecast.forecastActive ? forecast.removeForecastBlock : undefined}
+                  onSplitForecastBlock={forecast.forecastActive ? forecast.splitForecastBlock : undefined}
+                  forecastSafetyNet={forecast.forecastActive ? forecast.safetyNetProjects : undefined}
+                  onRestoreFromSafetyNet={forecast.forecastActive ? forecast.restoreFromSafetyNet : undefined}
+                  onConvertReserveToForecast={forecast.forecastActive ? (bundle, weekKey) => {
+                    const totalHours = bundle.items.reduce((s, i) => s + i.scheduled_hours, 0);
+                    forecast.addForecastBlock({
+                      id: `reserve-converted-${bundle.project_id}-${weekKey}-${Date.now()}`,
+                      project_id: bundle.project_id,
+                      project_name: bundle.project_name,
+                      bundle_description: `Rezerva → Forecast`,
+                      week: weekKey,
+                      estimated_hours: totalHours,
+                      confidence: "low",
+                      source: "project_estimate",
+                      is_forecast: true,
+                    });
+                  } : undefined}
+                />
+                {!forecast.forecastActive && (
+                  <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />
+                )}
+              </div>
             ) : (
-              <InboxPanel
-                overDroppableId={overDroppableId}
-                displayMode={displayMode}
-                onNavigateToTPV={handleNavigateToTPV}
-                onOpenProjectDetail={handleOpenProjectDetail}
-                disableDropZone={isDraggingFromInbox}
-                selectedProjectId={selectedProjectId}
-                onSelectProject={handleSelectProject}
-                searchQuery={searchQuery}
-                width={inboxWidth}
-                onWidthChange={handleInboxWidthChange}
-              />
+              <PlanVyrobyTableView displayMode={displayMode} searchQuery={searchQuery} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} />
             )}
-            <WeeklySilos
-              showCzk={showCzk}
-              onToggleCzk={(v) => setDisplayMode(v ? "czk" : "hours")}
-              overDroppableId={overDroppableId}
-              onNavigateToTPV={handleNavigateToTPV}
-              onOpenProjectDetail={handleOpenProjectDetail}
-              displayMode={displayMode}
-              onDisplayModeChange={setDisplayMode}
-              selectedProjectId={selectedProjectId}
-              onSelectProject={handleSelectProject}
-              searchQuery={searchQuery}
-              focusedMatchKey={searchNav.focusedMatchKey}
-              searchMatchWeekKey={searchNav.currentMatch?.weekKey ?? null}
-              searchMatchedProjectIds={searchNav.active ? searchNav.matchedProjectIds : undefined}
-              searchActive={searchNav.active}
-              forecastBlocks={forecast.forecastActive ? forecast.forecastBlocks : undefined}
-              forecastSelectedIds={forecast.forecastActive ? forecast.selectedBlockIds : undefined}
-              onToggleForecastSelect={forecast.forecastActive ? forecast.toggleBlockSelection : undefined}
-              forecastDarkMode={forecast.forecastActive}
-              forecastPlanMode={forecast.forecastActive ? forecast.planMode : undefined}
-              onMoveForecastBlock={forecast.forecastActive ? forecast.moveForecastBlock : undefined}
-              onRemoveForecastBlock={forecast.forecastActive ? forecast.removeForecastBlock : undefined}
-              onSplitForecastBlock={forecast.forecastActive ? forecast.splitForecastBlock : undefined}
-              forecastSafetyNet={forecast.forecastActive ? forecast.safetyNetProjects : undefined}
-              onRestoreFromSafetyNet={forecast.forecastActive ? forecast.restoreFromSafetyNet : undefined}
-              onConvertReserveToForecast={forecast.forecastActive ? (bundle, weekKey) => {
-                const totalHours = bundle.items.reduce((s, i) => s + i.scheduled_hours, 0);
-                forecast.addForecastBlock({
-                  id: `reserve-converted-${bundle.project_id}-${weekKey}-${Date.now()}`,
-                  project_id: bundle.project_id,
-                  project_name: bundle.project_name,
-                  bundle_description: `Rezerva → Forecast`,
-                  week: weekKey,
-                  estimated_hours: totalHours,
-                  confidence: "low",
-                  source: "project_estimate",
-                  is_forecast: true,
-                });
-              } : undefined}
-            />
-            {!forecast.forecastActive && (
-              <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />
+
+            {/* Forecast commit bar */}
+            {forecast.forecastActive && (
+              <ForecastCommitBar
+                totalBlocks={forecast.forecastBlocks.length}
+                selectedCount={forecast.selectedBlockIds.size}
+                inboxBlockCount={forecast.forecastBlocks.filter(b => b.source === "inbox_item").length}
+                projectBlockCount={forecast.forecastBlocks.filter(b => b.source === "project_estimate").length}
+                selectedInboxCount={forecast.forecastBlocks.filter(b => b.source === "inbox_item" && forecast.selectedBlockIds.has(b.id)).length}
+                selectedProjectCount={forecast.forecastBlocks.filter(b => b.source === "project_estimate" && forecast.selectedBlockIds.has(b.id)).length}
+                isGenerating={forecast.isGenerating}
+                allInboxSelected={(() => {
+                  const inboxIds = forecast.forecastBlocks.filter(b => b.source === "inbox_item").map(b => b.id);
+                  return inboxIds.length > 0 && inboxIds.every(id => forecast.selectedBlockIds.has(id));
+                })()}
+                onCommitSelected={async () => {
+                  if (forecast.selectedBlockIds.size === 0) return;
+                  const blockCount = forecast.selectedBlockIds.size;
+                  await forecast.commitRealBundleOverrides(moveBundleToWeek);
+                  await forecast.commitBlocks(Array.from(forecast.selectedBlockIds));
+                  try {
+                    const { logActivity } = await import("@/lib/activityLog");
+                    logActivity({ projectId: "_system_", actionType: "forecast_committed", detail: `${blockCount} bloků zapsáno` });
+                  } catch {}
+                }}
+                onCancel={() => forecast.setForecastActive(false)}
+                onToggleInboxSelect={forecast.toggleInboxSelection}
+                onDeselectProjects={() => {
+                  const projectIds = forecast.forecastBlocks
+                    .filter(b => b.source === "project_estimate" && forecast.selectedBlockIds.has(b.id))
+                    .map(b => b.id);
+                  for (const id of projectIds) {
+                    forecast.toggleBlockSelection(id);
+                  }
+                }}
+              />
             )}
           </div>
-        ) : (
-          <PlanVyrobyTableView displayMode={displayMode} searchQuery={searchQuery} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} />
-        )}
 
-        {/* Forecast commit bar */}
-        {forecast.forecastActive && (
-          <ForecastCommitBar
-            totalBlocks={forecast.forecastBlocks.length}
-            selectedCount={forecast.selectedBlockIds.size}
-            inboxBlockCount={forecast.forecastBlocks.filter(b => b.source === "inbox_item").length}
-            projectBlockCount={forecast.forecastBlocks.filter(b => b.source === "project_estimate").length}
-            selectedInboxCount={forecast.forecastBlocks.filter(b => b.source === "inbox_item" && forecast.selectedBlockIds.has(b.id)).length}
-            selectedProjectCount={forecast.forecastBlocks.filter(b => b.source === "project_estimate" && forecast.selectedBlockIds.has(b.id)).length}
-            isGenerating={forecast.isGenerating}
-            allInboxSelected={(() => {
-              const inboxIds = forecast.forecastBlocks.filter(b => b.source === "inbox_item").map(b => b.id);
-              return inboxIds.length > 0 && inboxIds.every(id => forecast.selectedBlockIds.has(id));
-            })()}
-            onCommitSelected={async () => {
-              if (forecast.selectedBlockIds.size === 0) return;
-              const blockCount = forecast.selectedBlockIds.size;
-              await forecast.commitRealBundleOverrides(moveBundleToWeek);
-              await forecast.commitBlocks(Array.from(forecast.selectedBlockIds));
-              // Log forecast commit
-              try {
-                const { logActivity } = await import("@/lib/activityLog");
-                logActivity({ projectId: "_system_", actionType: "forecast_committed", detail: `${blockCount} bloků zapsáno` });
-              } catch {}
-            }}
-            onCancel={() => forecast.setForecastActive(false)}
-            onToggleInboxSelect={forecast.toggleInboxSelection}
-            onDeselectProjects={() => {
-              const projectIds = forecast.forecastBlocks
-                .filter(b => b.source === "project_estimate" && forecast.selectedBlockIds.has(b.id))
-                .map(b => b.id);
-              for (const id of projectIds) {
-                forecast.toggleBlockSelection(id);
-              }
-            }}
-          />
-        )}
+          {/* DataLog sidebar */}
+          <div
+            className={cn(
+              "transition-all duration-250 ease-in-out overflow-hidden shrink-0",
+              dataLogOpen ? "w-[360px]" : "w-0"
+            )}
+          >
+            <DataLogPanel
+              open={dataLogOpen}
+              onOpenChange={(v) => {
+                setDataLogOpen(v);
+                try { localStorage.setItem("datalog-panel-plan-vyroby", String(v)); } catch {}
+              }}
+              defaultCategory="projects"
+            />
+          </div>
+        </div>
       </div>
 
       <DragOverlay dropAnimation={null}>
