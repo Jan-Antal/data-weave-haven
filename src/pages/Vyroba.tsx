@@ -708,6 +708,41 @@ export default function Vyroba() {
         <span style={{ color: todayDayIndex >= 0 && stats.todayLogged < stats.total ? "#d97706" : "#6b7280" }}>
           Dnes: {stats.todayLogged}/{stats.total}
         </span>
+        {/* ── Week navigation (right-aligned) ── */}
+        <div className="flex-1" />
+        <div className="relative flex items-center gap-1" ref={weekPickerRef}>
+          <button onClick={() => setWeekOffset(w => w - 1)} className="p-1 rounded hover:bg-muted transition-colors" style={{ color: "#a8c5c2" }}>
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => setWeekPickerOpen(o => !o)}
+            className="font-mono select-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer"
+            style={{ fontSize: 13, color: "#a8c5c2" }}
+          >
+            T{weekNum} · {fmtDate(currentMonday)}–{fmtDate(friday)}{currentMonday.getFullYear()}
+          </button>
+          <button onClick={() => setWeekOffset(w => w + 1)} className="p-1 rounded hover:bg-muted transition-colors" style={{ color: "#a8c5c2" }}>
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+          {weekOffset !== 0 && (
+            <button
+              onClick={() => setWeekOffset(0)}
+              className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors"
+              style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", fontSize: 11 }}
+            >
+              Dnes
+            </button>
+          )}
+          {/* Week picker popup */}
+          {weekPickerOpen && (
+            <WeekPickerPopup
+              currentWeekOffset={weekOffset}
+              onSelectOffset={(offset) => { setWeekOffset(offset); setWeekPickerOpen(false); }}
+              onClose={() => setWeekPickerOpen(false)}
+              containerRef={weekPickerRef}
+            />
+          )}
+        </div>
       </div>
 
       {/* ═══ BODY ═══ */}
