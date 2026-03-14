@@ -9,6 +9,7 @@ import { useWeeklyCapacity } from "@/hooks/useWeeklyCapacity";
 import { getProjectColor } from "@/lib/projectColors";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useVyrobaUndo, type UndoAction } from "@/hooks/useVyrobaUndo";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList,
   User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange, Factory,
@@ -171,6 +172,7 @@ export default function Vyroba() {
   const { openPeopleManagement } = usePeopleManagement();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { pushUndo } = useVyrobaUndo();
   const isMobile = useIsMobile();
 
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
@@ -444,6 +446,13 @@ export default function Vyroba() {
   async function handleSaveLog() {
     if (!selectedProject || logDayIndex < 0) return;
     try {
+      // Push undo for log note + phase change
+      const existingLogs = getLogsForProject(selectedProject.projectId);
+      const existingLog = existingLogs.find(l => l.day_index === logDayIndex);
+      const prevPhase = getLatestPhase(selectedProject.projectId) || "Řezání";
+      const prevPercent = getLatestPercent(selectedProject.projectId);
+      pushUndo({ type: "phase_change", bundleId: bundleId(selectedProject.projectId), prevPhase, prevPercent, logId: existingLog?.id, timestamp: Date.now() });
+
       await saveDailyLog(bundleId(selectedProject.projectId), weekKey, logDayIndex, logPhase, logPercent, logNotes || null);
       qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
       toast.success("✓ Log uložen", { duration: 2000 });
@@ -472,6 +481,12 @@ export default function Vyroba() {
       return;
     }
     const ids = Array.from(spillSelected);
+    // Push undo for move
+    const prevWeeks = selectedProject.scheduleItems
+      .filter(i => ids.includes(i.id))
+      .map(i => ({ id: i.id, prevWeek: i.scheduled_week }));
+    pushUndo({ type: "move_items", items: prevWeeks, targetWeek: nextWeekKey, timestamp: Date.now() });
+
     const { error } = await supabase.from("production_schedule").update({ scheduled_week: nextWeekKey }).in("id", ids);
     if (error) { toast.error(error.message); return; }
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
@@ -486,6 +501,16 @@ export default function Vyroba() {
 
   async function handleConfirmExpedice() {
     if (!selectedProject) return;
+    // Push undo for expedice
+    const allItems = selectedProject.scheduleItems;
+    pushUndo({
+      type: "expedice",
+      projectId: selectedProject.projectId,
+      prevStatus: selectedProject.projectStatus || "Ve výrobě",
+      itemSnapshots: allItems.map(i => ({ id: i.id, prevStatus: i.status })),
+      timestamp: Date.now(),
+    });
+
     const { data: { user } } = await supabase.auth.getUser();
     const activeItems = selectedProject.scheduleItems.filter(i => i.status !== "completed" && i.status !== "cancelled");
     if (activeItems.length > 0) {
@@ -504,6 +529,8 @@ export default function Vyroba() {
 
   /* ── Toggle single item complete ── */
   async function toggleItemComplete(itemId: string, currentStatus: string) {
+    // Push undo
+    pushUndo({ type: "item_hotovo", itemId, prevStatus: currentStatus, timestamp: Date.now() });
     const { data: { user } } = await supabase.auth.getUser();
     if (currentStatus === "completed") {
       await supabase.from("production_schedule").update({ status: "scheduled", completed_at: null, completed_by: null }).eq("id", itemId);
@@ -582,6 +609,7 @@ export default function Vyroba() {
   async function handleNoProduction() {
     if (!selectedProject || logDayIndex < 0) return;
     try {
+      pushUndo({ type: "no_activity", logId: "", logDate: weekKey, projectId: selectedProject.projectId, timestamp: Date.now() });
       await saveDailyLog(bundleId(selectedProject.projectId), weekKey, logDayIndex, `Bez výroby: ${noProductionReason}`, getLatestPercent(selectedProject.projectId));
       qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
       toast.success("Zaznamenáno bez výroby");
@@ -873,8 +901,7 @@ export default function Vyroba() {
                 bundleId={bundleId(selectedProject.projectId)}
                 allItems={getAllItemsForProject(selectedProject.projectId)}
                 scheduleData={scheduleData}
-
-
+                pushUndo={pushUndo}
                 onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
                 dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
                 onDismissDyha={() => setDyhaDismissed(prev => new Set(prev).add(selectedProject.projectId))}
@@ -913,7 +940,7 @@ export default function Vyroba() {
                 bundleId={bundleId(selectedProject.projectId)}
                 allItems={getAllItemsForProject(selectedProject.projectId)}
                 scheduleData={scheduleData}
-                
+                pushUndo={pushUndo}
                 onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
                 dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
                 onDismissDyha={() => setDyhaDismissed(prev => new Set(prev).add(selectedProject.projectId))}
@@ -1303,7 +1330,7 @@ function useProjectDetails(projectIds: string[]) {
 /* DETAIL PANEL                            */
 /* ═══════════════════════════════════════ */
 
-function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog, nextWeekNum, onSpillAll, onOpenExpedice, onToggleItem, getCumulativeForDay, getExpectedPct, status, latestPct, latestPhase, logs, expandedMap, setExpandedMap, bundleId, allItems, scheduleData, onOpenProjectDetail, dyhaDismissed, onDismissDyha }: {
+function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog, nextWeekNum, onSpillAll, onOpenExpedice, onToggleItem, getCumulativeForDay, getExpectedPct, status, latestPct, latestPhase, logs, expandedMap, setExpandedMap, bundleId, allItems, scheduleData, pushUndo, onOpenProjectDetail, dyhaDismissed, onDismissDyha }: {
   project: VyrobaProject;
   weekKey: string;
   currentMonday: Date;
@@ -1324,7 +1351,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
   bundleId: string;
   allItems: { item: ScheduleItem; weekKey: string; weekNum: number }[];
   scheduleData: Map<string, any> | undefined;
-  
+  pushUndo: (action: UndoAction) => void;
   onOpenProjectDetail: () => void;
   dyhaDismissed: boolean;
   onDismissDyha: () => void;
@@ -1517,6 +1544,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           bundleId={bundleId}
           onOpenExpedice={onOpenExpedice}
           isMobile={isMobile}
+          pushUndo={pushUndo}
         />
 
         {/* ── NAPLÁNOVANÉ (future) — collapsible ── */}
@@ -1588,7 +1616,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
 /* UNIFIED ITEM LIST (Items + QC merged)   */
 /* ═══════════════════════════════════════ */
 
-function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, onToggleExpand, bundleId, onOpenExpedice, isMobile }: {
+function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, onToggleExpand, bundleId, onOpenExpedice, isMobile, pushUndo }: {
   projectId: string;
   currentItems: { item: ScheduleItem; weekKey: string; weekNum: number }[];
   onToggleItem: (id: string, status: string) => void;
@@ -1597,6 +1625,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   bundleId: string;
   onOpenExpedice: () => void;
   isMobile: boolean;
+  pushUndo: (action: UndoAction) => void;
 }) {
   const { checks, checkItem } = useQualityChecks(projectId);
   const { profile } = useAuth();
@@ -1651,6 +1680,10 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
       // All have QC — mark as hotovo directly
       (async () => {
         const ids = targetItems.map(({ item }) => item.id);
+        // Push undo for each item
+        for (const { item } of targetItems) {
+          pushUndo({ type: "item_hotovo", itemId: item.id, prevStatus: item.status, timestamp: Date.now() });
+        }
         const { data: { user } } = await supabase.auth.getUser();
         await supabase.from("production_schedule").update({
           status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
@@ -1676,6 +1709,11 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
     setQcSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      // Push undo for QC confirm
+      const qcItemIds = qcModalItems.filter(({ item }) => !checkMap.has(item.id)).map(({ item }) => item.id);
+      if (qcItemIds.length > 0) {
+        pushUndo({ type: "qc_confirm", itemIds: qcItemIds, timestamp: Date.now() });
+      }
       // Record QC for all items in modal
       for (const { item } of qcModalItems) {
         if (!checkMap.has(item.id)) {
