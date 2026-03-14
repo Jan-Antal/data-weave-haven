@@ -608,11 +608,45 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             </div>
             <div>
               <label className="text-[10px] text-muted-foreground">Od</label>
-              <Input type="date" value={newHolidayStart} onChange={e => setNewHolidayStart(e.target.value)} className="h-7 text-xs" />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn("h-7 w-full justify-start text-left font-normal text-xs", !newHolidayStart && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-1.5 h-3 w-3" />
+                    {newHolidayStart ? format(parse(newHolidayStart, "yyyy-MM-dd", new Date()), "d. M. yyyy") : "—"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 z-[99999]" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={newHolidayStart ? parse(newHolidayStart, "yyyy-MM-dd", new Date()) : undefined}
+                    defaultMonth={newHolidayStart ? parse(newHolidayStart, "yyyy-MM-dd", new Date()) : new Date()}
+                    onSelect={(d) => { if (d) setNewHolidayStart(format(d, "yyyy-MM-dd")); }}
+                    weekStartsOn={1}
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <label className="text-[10px] text-muted-foreground">Do</label>
-              <Input type="date" value={newHolidayEnd} onChange={e => setNewHolidayEnd(e.target.value)} className="h-7 text-xs" />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn("h-7 w-full justify-start text-left font-normal text-xs", !newHolidayEnd && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-1.5 h-3 w-3" />
+                    {newHolidayEnd ? format(parse(newHolidayEnd, "yyyy-MM-dd", new Date()), "d. M. yyyy") : "—"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 z-[99999]" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={newHolidayEnd ? parse(newHolidayEnd, "yyyy-MM-dd", new Date()) : undefined}
+                    defaultMonth={newHolidayEnd ? parse(newHolidayEnd, "yyyy-MM-dd", new Date()) : (newHolidayStart ? parse(newHolidayStart, "yyyy-MM-dd", new Date()) : new Date())}
+                    onSelect={(d) => { if (d) setNewHolidayEnd(format(d, "yyyy-MM-dd")); }}
+                    weekStartsOn={1}
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <label className="text-[10px] text-muted-foreground">Kapacita (h)</label>
