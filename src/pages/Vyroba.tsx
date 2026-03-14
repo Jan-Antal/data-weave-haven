@@ -422,12 +422,17 @@ export default function Vyroba() {
     return items;
   }
 
-  // ── BUNDLE PROGRESS: weighted by hours across ALL weeks ──
+  // ── BUNDLE PROGRESS: prefer latest daily log percent, fallback to completed hours ──
   function getBundleProgress(pid: string): { totalHours: number; completedHours: number; bundleProgress: number } {
     const allItems = getAllItemsForProject(pid);
     const totalHours = allItems.reduce((s, e) => s + e.item.scheduled_hours, 0);
     const completedHours = allItems.filter(e => e.item.status === "completed").reduce((s, e) => s + e.item.scheduled_hours, 0);
-    const bundleProgress = totalHours > 0 ? Math.round((completedHours / totalHours) * 100) : 0;
+
+    // Check daily logs for the latest percent — this reflects actual logged progress
+    const latestLogPct = getLatestPercent(pid);
+    const completionPct = totalHours > 0 ? Math.round((completedHours / totalHours) * 100) : 0;
+    // Use whichever is higher: logged progress or completion-based progress
+    const bundleProgress = Math.max(latestLogPct, completionPct);
     return { totalHours, completedHours, bundleProgress };
   }
 
