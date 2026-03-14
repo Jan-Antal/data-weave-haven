@@ -2069,6 +2069,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
       // Open QC modal for items missing QC
       setQcModalItems(missingQC);
       setQcModalOpen(true);
+      setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectItemId("__bundle__"); setDefectPhotos([]);
     }
   }
 
