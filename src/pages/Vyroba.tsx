@@ -1947,17 +1947,22 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         </div>
         <CollapsibleContent>
           <div className="mt-2 space-y-1">
-            {dedupedItems.map(({ item, mergedIds: mids, thisWeekHours }) => {
-              const isCompleted = item.status === "completed";
+            {dedupedItems.map(({ item, mergedIds: mids, thisWeekHours, partsThisWeek, splitTotalFromRow }) => {
+              const isCompleted = mids.every(id => {
+                const orig = currentItems.find(ci => ci.item.id === id);
+                return orig?.item.status === "completed";
+              });
               const isPaused = item.status === "paused";
-              const isSplit = item.split_part != null && item.split_total != null;
-              const qcCheck = checkMap.get(item.id);
-              const hasQC = !!qcCheck;
+              const isSplit = mids.length > 1 || (item.split_part != null && item.split_total != null);
+              const hasQC = mids.every(id => checkMap.has(id));
+              const qcCheck = checkMap.get(mids[0]);
               const isSelected = mids.every(id => selectedItems.has(id));
 
               const bothDone = isCompleted && hasQC;
               const rowBg = bothDone ? "rgba(58,138,54,0.06)" : isSelected ? "rgba(37,99,235,0.04)" : "#ffffff";
               const rowBorder = bothDone ? "1px solid rgba(58,138,54,0.2)" : isSelected ? "1px solid rgba(37,99,235,0.2)" : "1px solid #ece8e2";
+
+              const splitBadgeY = splitTotalFromRow || partsThisWeek;
 
               // For splits, compute % of total allocated this week
               const splitPctLabel = isSplit && item.split_total
