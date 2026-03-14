@@ -698,7 +698,7 @@ export default function Vyroba() {
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
     qc.invalidateQueries({ queryKey: ["projects"] });
     qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
-    toast.success("Vráceno z Expedice");
+    toast.success("↩ Vráceno z Expedice", { duration: 2000 });
     setReturnExpediceConfirm(null);
   }
 
