@@ -54,6 +54,20 @@ const DOT_COLORS: Record<string, string> = {
   item_cancelled: "bg-red-600",
   item_returned_to_inbox: "bg-slate-500",
   item_split: "bg-violet-500",
+  pm_change: "bg-purple-500",
+  kalkulant_change: "bg-purple-400",
+  prodejni_cena_change: "bg-emerald-500",
+  forecast_committed: "bg-sky-600",
+  item_hotovo: "bg-green-500",
+  item_qc_confirmed: "bg-green-600",
+  item_expedice: "bg-teal-500",
+  item_moved_next_week: "bg-indigo-400",
+  item_paused_vyroba: "bg-yellow-500",
+  vyroba_log_saved: "bg-blue-400",
+  vyroba_no_activity: "bg-gray-400",
+  defect_reported: "bg-red-500",
+  defect_resolved: "bg-green-500",
+  phase_changed: "bg-violet-500",
 };
 
 const CZECH_DAY_SHORT = ["Ne", "Po", "Út", "St", "Čt", "Pá", "So"];
