@@ -481,6 +481,12 @@ export default function Vyroba() {
       return;
     }
     const ids = Array.from(spillSelected);
+    // Push undo for move
+    const prevWeeks = selectedProject.scheduleItems
+      .filter(i => ids.includes(i.id))
+      .map(i => ({ id: i.id, prevWeek: i.scheduled_week }));
+    pushUndo({ type: "move_items", items: prevWeeks, targetWeek: nextWeekKey, timestamp: Date.now() });
+
     const { error } = await supabase.from("production_schedule").update({ scheduled_week: nextWeekKey }).in("id", ids);
     if (error) { toast.error(error.message); return; }
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
