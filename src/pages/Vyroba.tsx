@@ -1722,8 +1722,12 @@ export default function Vyroba() {
       <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
       <CostBreakdownPresetsDialog open={costPresetsOpen} onOpenChange={setCostPresetsOpen} />
-      <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} />
       <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
+      </div>{/* end flex-1 main content */}
+      <div className={cn("transition-all duration-200 ease-in-out overflow-hidden border-l border-border", dataLogOpen ? "w-[360px]" : "w-0 border-l-0")}>
+        {dataLogOpen && <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} defaultCategory="vyroba" />}
+      </div>
+      </div>{/* end flex outer */}
     </div>
   );
 }
