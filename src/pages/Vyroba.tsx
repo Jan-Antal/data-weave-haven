@@ -528,6 +528,13 @@ export default function Vyroba() {
 
       await saveDailyLog(bId, weekKey, logDayIndex, logPhase, logPercent, logNotes || null);
       qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
+      
+      // Log "Nad plán" activity if over weekly goal
+      const wGoal = getWeeklyGoal(selectedProject.projectId);
+      if (logPercent > wGoal) {
+        logActivity(selectedProject.projectId, "log_nad_plan", `Nad plán: ${logPercent}% (cíl byl ${wGoal}%)`);
+      }
+      
       setLogModalOpen(false);
     } catch (err: any) {
       toast.error(`Chyba při ukládání logu: ${err?.message || "neznámá chyba"}`);
