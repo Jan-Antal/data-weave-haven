@@ -1781,6 +1781,7 @@ export default function Vyroba() {
         {dataLogOpen && <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} defaultCategory="vyroba" />}
       </div>
       </div>{/* end outer flex */}
+      {isMobile && <MobileNavBar />}
     </div>
   );
 }
