@@ -1804,21 +1804,11 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                     {/* Hours */}
                     <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
 
-                    {/* QC button / indicator */}
+                    {/* QC badge — display only */}
                     {qcCheck ? (
-                      <button onClick={(e) => { e.stopPropagation(); setUncheckConfirm(qcCheck.id); }} className="shrink-0">
-                        <QualityCheckDisplay check={qcCheck} />
-                      </button>
+                      <QualityCheckDisplay check={qcCheck} />
                     ) : (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleQC(item.id); }}
-                        disabled={qcLoading === item.id}
-                        className="px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors shrink-0"
-                        style={{ color: "#6b7280", border: "0.5px solid #d0cdc8" }}
-                        title="Kontrola kvality"
-                      >
-                        {qcLoading === item.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "✓ QC"}
-                      </button>
+                      <QualityCheckBadgeEmpty />
                     )}
                   </div>
                 </div>
