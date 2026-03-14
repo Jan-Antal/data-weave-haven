@@ -1220,7 +1220,7 @@ function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectSt
   const status = getProjectStatus(project.projectId);
   const pct = getLatestPercent(project.projectId);
   const phase = getLatestPhase(project.projectId);
-  const borderColor = project.isSpilled ? "#d97706" : status === "behind" ? "#dc2626" : status === "at-risk" ? "#d97706" : project.color;
+  const borderColor = project.color;
 
   // Deadline urgency color for project name
   const now = new Date();
