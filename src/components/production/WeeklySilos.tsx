@@ -997,7 +997,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
   return (
     <div ref={combinedRef} data-week-key={weekKey} className="w-[252px] shrink-0 flex flex-col transition-all"
       style={{
-        backgroundColor: forecastDarkMode ? "#1f2e2c" : (isCurrent ? "rgba(58,138,54,0.03)" : "#ffffff"), borderRadius: 9,
+        backgroundColor: forecastDarkMode ? "#1f2e2c" : "#ffffff", borderRadius: 9,
         border: highlighted ? `2px solid ${dropBorderColor}`
           : isCurrent ? (forecastDarkMode ? "2.5px solid #4a9e96" : "2.5px solid #3a8a36")
           : isOverloaded && !isPast ? (forecastDarkMode ? "1px solid rgba(192,57,43,0.5)" : "1px solid rgba(220,53,69,0.4)")
