@@ -2133,6 +2133,13 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           </div>
         )}
 
+        {/* ── Empty Aktuální message ── */}
+        {currentItems.length === 0 && bundleProgress.bundleProgress > 0 && (
+          <div className="rounded-md px-3 py-3 text-[12px] text-center" style={{ background: "rgba(58,138,54,0.05)", border: "1px solid rgba(58,138,54,0.15)", color: "#3a8a36" }}>
+            Všechny položky tohoto týdne jsou dokončeny nebo přesunuty
+          </div>
+        )}
+
         {/* ── AKTUÁLNÍ items (unified with QC) ── */}
         <UnifiedItemList
           projectId={project.projectId}
@@ -2196,6 +2203,17 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
               </div>
             </CollapsibleContent>
           </Collapsible>
+        )}
+
+        {/* ── Mobile spill button (moved from Operace row) ── */}
+        {isMobile && (
+          <button
+            onClick={onSpillAll}
+            className="w-full py-2.5 rounded-md text-sm font-medium transition-colors min-h-[44px]"
+            style={{ background: "#d97706", color: "#fff" }}
+          >
+            ⇒ Přesunout do T{nextWeekNum}
+          </button>
         )}
 
         {/* ── Daily log shortcut ── */}
