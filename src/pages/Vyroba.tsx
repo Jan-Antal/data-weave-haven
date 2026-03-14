@@ -296,6 +296,10 @@ export default function Vyroba() {
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const selectedProject = enrichedProjects.find(p => p.projectId === selectedProjectId) || null;
 
+  // Week picker
+  const [weekPickerOpen, setWeekPickerOpen] = useState(false);
+  const weekPickerRef = useRef<HTMLDivElement>(null);
+
   // Context menu state
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; projectId: string } | null>(null);
 
@@ -624,16 +628,6 @@ export default function Vyroba() {
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            <button onClick={() => setWeekOffset(w => w - 1)} className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="text-primary-foreground text-sm font-mono select-none min-w-[140px] md:min-w-[200px] text-center">
-              T{weekNum} · {fmtDate(currentMonday)}–{fmtDate(friday)}{currentMonday.getFullYear()}
-            </span>
-            <button onClick={() => setWeekOffset(w => w + 1)} className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
-              <ChevronRight className="h-4 w-4" />
-            </button>
-
             <span className="w-px h-5 bg-primary-foreground/20 mx-1 hidden md:block" />
 
             <button className="p-2 rounded-md text-primary-foreground bg-primary-foreground/10 transition-colors cursor-default" title="Výroba">
@@ -714,6 +708,41 @@ export default function Vyroba() {
         <span style={{ color: todayDayIndex >= 0 && stats.todayLogged < stats.total ? "#d97706" : "#6b7280" }}>
           Dnes: {stats.todayLogged}/{stats.total}
         </span>
+        {/* ── Week navigation (right-aligned) ── */}
+        <div className="flex-1" />
+        <div className="relative flex items-center gap-1" ref={weekPickerRef}>
+          <button onClick={() => setWeekOffset(w => w - 1)} className="p-1 rounded hover:bg-muted transition-colors" style={{ color: "#a8c5c2" }}>
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => setWeekPickerOpen(o => !o)}
+            className="font-mono select-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer"
+            style={{ fontSize: 13, color: "#a8c5c2" }}
+          >
+            T{weekNum} · {fmtDate(currentMonday)}–{fmtDate(friday)}{currentMonday.getFullYear()}
+          </button>
+          <button onClick={() => setWeekOffset(w => w + 1)} className="p-1 rounded hover:bg-muted transition-colors" style={{ color: "#a8c5c2" }}>
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+          {weekOffset !== 0 && (
+            <button
+              onClick={() => setWeekOffset(0)}
+              className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors"
+              style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", fontSize: 11 }}
+            >
+              Dnes
+            </button>
+          )}
+          {/* Week picker popup */}
+          {weekPickerOpen && (
+            <WeekPickerPopup
+              currentWeekOffset={weekOffset}
+              onSelectOffset={(offset) => { setWeekOffset(offset); setWeekPickerOpen(false); }}
+              onClose={() => setWeekPickerOpen(false)}
+              containerRef={weekPickerRef}
+            />
+          )}
+        </div>
       </div>
 
       {/* ═══ BODY ═══ */}
@@ -2065,6 +2094,92 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
         onDelete={(file) => handleDelete(file.name)}
         canDelete
       />
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════ */
+/* WEEK PICKER POPUP                       */
+/* ═══════════════════════════════════════ */
+
+function WeekPickerPopup({ currentWeekOffset, onSelectOffset, onClose, containerRef }: {
+  currentWeekOffset: number;
+  onSelectOffset: (offset: number) => void;
+  onClose: () => void;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  // Close on Escape or click outside
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    function handleClick(e: MouseEvent) {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node) &&
+          containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    }
+    document.addEventListener("keydown", handleKey);
+    document.addEventListener("mousedown", handleClick);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("mousedown", handleClick);
+    };
+  }, [onClose, containerRef]);
+
+  // Generate weeks: -4 to +12 from today
+  const weeks = useMemo(() => {
+    const todayMonday = getMonday(new Date());
+    const result: { offset: number; monday: Date; friday: Date; weekNum: number; isCurrent: boolean; isToday: boolean }[] = [];
+    for (let i = -4; i <= 12; i++) {
+      const monday = addWeeks(todayMonday, i);
+      const fri = new Date(monday);
+      fri.setDate(fri.getDate() + 4);
+      result.push({
+        offset: i,
+        monday,
+        friday: fri,
+        weekNum: getISOWeekNumber(monday),
+        isCurrent: i === currentWeekOffset,
+        isToday: i === 0,
+      });
+    }
+    return result;
+  }, [currentWeekOffset]);
+
+  return (
+    <div ref={popupRef}
+      className="absolute top-full right-0 mt-1 z-50 rounded-lg shadow-lg py-1 overflow-y-auto"
+      style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", maxHeight: 320, width: 240 }}
+    >
+      {weeks.map(w => (
+        <button
+          key={w.offset}
+          onClick={() => onSelectOffset(w.offset)}
+          className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-muted/60"
+          style={{
+            background: w.isCurrent ? "hsl(var(--accent) / 0.1)" : w.isToday ? "hsl(var(--success) / 0.06)" : undefined,
+            borderLeft: w.isCurrent ? "3px solid hsl(var(--accent))" : w.isToday ? "3px solid hsl(var(--success))" : "3px solid transparent",
+          }}
+        >
+          <span className="font-mono text-[11px] font-bold min-w-[28px]" style={{
+            color: w.isCurrent ? "hsl(var(--accent))" : w.isToday ? "hsl(var(--success))" : "hsl(var(--muted-foreground))"
+          }}>
+            T{w.weekNum}
+          </span>
+          <span className="text-[11px]" style={{ color: "hsl(var(--foreground))" }}>
+            {fmtDate(w.monday)}–{fmtDate(w.friday)}{w.monday.getFullYear()}
+          </span>
+          {w.isToday && !w.isCurrent && (
+            <span className="text-[8px] font-bold px-1 py-[1px] rounded ml-auto" style={{ background: "hsl(var(--success) / 0.12)", color: "hsl(var(--success))" }}>dnes</span>
+          )}
+          {w.isCurrent && (
+            <Check className="h-3 w-3 ml-auto" style={{ color: "hsl(var(--accent))" }} />
+          )}
+        </button>
+      ))}
     </div>
   );
 }
