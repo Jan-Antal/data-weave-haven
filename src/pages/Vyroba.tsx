@@ -1006,6 +1006,47 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           isMobile={isMobile}
         />
 
+        {/* ── NAPLÁNOVANÉ (future) ── */}
+        {futureItems.length > 0 && (
+          <div>
+            <div className="text-[10px] uppercase font-semibold mb-2" style={{ color: "#99a5a3" }}>Naplánované</div>
+            <div className="space-y-1">
+              {futureItems.map(({ item, weekNum: wn }) => (
+                <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#f5f3f0", opacity: 0.5 }}>
+                  {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
+                  <span className="text-[13px] flex-1 truncate" style={{ color: "#6b7280" }}>{item.item_name}</span>
+                  <span className="font-mono text-[10px] shrink-0" style={{ color: "#99a5a3" }}>T{wn}</span>
+                  <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── HOTOVÉ ── */}
+        {completedItems.length > 0 && (
+          <div>
+            <div className="text-[10px] uppercase font-semibold mb-2" style={{ color: "#99a5a3" }}>Hotové</div>
+            <div className="space-y-1">
+              {completedItems.map(({ item }) => (
+                <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#ffffff", opacity: 0.55 }}>
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#3a8a36" }} />
+                  {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
+                  <span className="text-[13px] flex-1 truncate" style={{ color: "#99a5a3", textDecoration: "line-through" }}>{item.item_name}</span>
+                  <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Daily log shortcut ── */}
+        {todayDayIndex >= 0 && (
+          <button onClick={() => onOpenLog()} className={`w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90 ${isMobile ? "min-h-[44px]" : ""}`} style={{ background: "#3a8a36" }}>
+            + Log dnes ({DAY_SHORT[todayDayIndex]})
+          </button>
+        )}
+
         {/* ── Výkresy Section ── */}
         <VykresynSection projectId={project.projectId} />
       </div>
