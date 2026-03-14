@@ -469,16 +469,15 @@ export default function Vyroba() {
 
   function openSpillDialog() {
     if (!selectedProject) return;
-    const activeItems = selectedProject.scheduleItems.filter(i => i.status === "scheduled" || i.status === "in_progress");
     const pct = getLatestPercent(selectedProject.projectId);
-    // Pre-uncheck items that are 100% done or completed
     const doneIds = new Set(selectedProject.scheduleItems.filter(i => i.status === "completed").map(i => i.id));
     const selected = new Set(
-      activeItems
-        .filter(i => !doneIds.has(i.id) && pct < 100)
+      selectedProject.scheduleItems
+        .filter(i => i.status !== "cancelled" && !doneIds.has(i.id) && getRemainingHours(i, pct) > 0)
         .map(i => i.id)
     );
     setSpillSelected(selected);
+    setSpillFullHours(new Set());
     setSpillDialogOpen(true);
   }
 
