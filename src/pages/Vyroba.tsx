@@ -2077,13 +2077,9 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
                         <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#3a8a36" }} />
                         {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#3a8a36" }}>{item.item_code}</span>}
                         <span className="text-[13px] flex-1 truncate" style={{ color: "#5a9a58" }}>{item.item_name}</span>
+                        {qcCheck && <QualityCheckFullDisplay check={qcCheck} />}
                         <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
                       </div>
-                      {qcCheck && (
-                        <div className="ml-6 mt-0.5">
-                          <QualityCheckFullDisplay check={qcCheck} />
-                        </div>
-                      )}
                     </div>
                   );
                 })}
