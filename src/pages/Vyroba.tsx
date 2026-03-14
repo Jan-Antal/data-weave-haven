@@ -2409,7 +2409,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   item_code: selectedItem?.item_code || null,
                   defect_type: defectType,
                   description: defectDesc,
-                  severity: defectSeverity,
+                  severity: defectSeverity as "minor" | "blocking",
                   resolution_type: defectSeverity === "blocking" ? defectResolution : null,
                   photo_url: defectPhotos.length > 0 ? JSON.stringify(defectPhotos) : null,
                   reported_by: user?.id || "",
