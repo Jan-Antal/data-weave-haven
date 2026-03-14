@@ -912,8 +912,15 @@ export default function Vyroba() {
 
   /* ═══ RENDER ═══ */
   return (
-    <div className="h-screen flex flex-col overflow-hidden" style={{ background: "#f8f7f4" }}>
-      {/* ═══ HEADER ═══ */}
+    <div className={cn("h-screen flex flex-col overflow-hidden", isMobile && "pb-14")} style={{ background: "#f8f7f4" }}>
+      {/* ═══ MOBILE HEADER ═══ */}
+      {isMobile && (
+        <MobileHeader
+          onDataLog={toggleDataLog}
+          showDataLog={isAdmin || role === "pm" || isOwner}
+        />
+      )}
+      {/* ═══ HEADER (desktop) ═══ */}
       <header className="border-b bg-primary px-4 md:px-6 py-4 shrink-0 z-50 hidden md:block">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 shrink-0">
