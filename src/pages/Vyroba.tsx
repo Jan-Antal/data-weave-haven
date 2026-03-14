@@ -1579,7 +1579,19 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   const [qcLoading, setQcLoading] = useState<string | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [uncheckConfirm, setUncheckConfirm] = useState<string | null>(null);
+  const [hotovoWarning, setHotovoWarning] = useState<string | null>(null);
+  const [hotovoConfirm, setHotovoConfirm] = useState<string | null>(null);
   const qc = useQueryClient();
+
+  // Deduplicate items by id
+  const dedupedItems = useMemo(() => {
+    const seen = new Set<string>();
+    return currentItems.filter(({ item }) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  }, [currentItems]);
 
   const checkMap = useMemo(() => {
     const m = new Map<string, any>();
@@ -1609,26 +1621,52 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
     setUncheckConfirm(null);
   }
 
-  // Batch complete
+  function handleHotovoClick(item: ScheduleItem) {
+    if (item.status === "completed") {
+      // Undo — set back to scheduled
+      onToggleItem(item.id, item.status);
+      return;
+    }
+    const hasQC = checkMap.has(item.id);
+    if (!hasQC) {
+      // Show warning — no QC
+      setHotovoWarning(item.id);
+      setHotovoConfirm(null);
+      return;
+    }
+    // Has QC — show inline confirm
+    setHotovoConfirm(item.id);
+    setHotovoWarning(null);
+  }
+
+  async function confirmHotovo(itemId: string) {
+    onToggleItem(itemId, "scheduled");
+    setHotovoConfirm(null);
+  }
+
+  // Batch complete — only items with QC
   async function handleBatchComplete() {
+    const ids = Array.from(selectedItems).filter(id => checkMap.has(id));
+    if (ids.length === 0) {
+      toast.error("Žádná vybraná položka nemá QC kontrolu");
+      return;
+    }
     const { data: { user } } = await supabase.auth.getUser();
-    const ids = Array.from(selectedItems);
     await supabase.from("production_schedule").update({
       status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
     }).in("id", ids);
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
     setSelectedItems(new Set());
-    toast.success(`${ids.length} položek označeno jako hotovo`);
+    const skipped = selectedItems.size - ids.length;
+    toast.success(`${ids.length} položek označeno jako hotovo${skipped > 0 ? ` · ${skipped} přeskočeno (chybí QC)` : ""}`);
   }
 
-  const completedCount = currentItems.filter(i => i.item.status === "completed").length;
-  const allReady = currentItems.length > 0 && currentItems.every(({ item }) => {
-    const isDone = item.status === "completed";
-    const hasQC = checkMap.has(item.id);
-    return isDone && hasQC;
+  const completedCount = dedupedItems.filter(i => i.item.status === "completed").length;
+  const allReady = dedupedItems.length > 0 && dedupedItems.every(({ item }) => {
+    return item.status === "completed" && checkMap.has(item.id);
   });
 
-  const allSelected = currentItems.length > 0 && currentItems.every(i => selectedItems.has(i.item.id));
+  const allSelected = dedupedItems.length > 0 && dedupedItems.every(i => selectedItems.has(i.item.id));
 
   return (
     <>
@@ -1649,15 +1687,15 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         <div className="flex items-center gap-2">
           <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold cursor-pointer" style={{ color: "#6b7280" }}>
             {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-            Aktuální ({completedCount}/{currentItems.length})
+            Aktuální ({completedCount}/{dedupedItems.length})
           </CollapsibleTrigger>
-          {currentItems.length > 0 && (
+          {dedupedItems.length > 0 && (
             <label className="flex items-center gap-1 text-[10px] cursor-pointer" style={{ color: "#99a5a3" }}>
               <Checkbox
                 className="h-3.5 w-3.5"
                 checked={allSelected}
                 onCheckedChange={(v) => {
-                  if (v) setSelectedItems(new Set(currentItems.map(i => i.item.id)));
+                  if (v) setSelectedItems(new Set(dedupedItems.map(i => i.item.id)));
                   else setSelectedItems(new Set());
                 }}
               />
@@ -1667,7 +1705,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         </div>
         <CollapsibleContent>
           <div className="mt-2 space-y-1">
-            {currentItems.map(({ item }) => {
+            {dedupedItems.map(({ item }) => {
               const isCompleted = item.status === "completed";
               const isPaused = item.status === "paused";
               const isSplit = item.split_part != null && item.split_total != null;
@@ -1678,71 +1716,108 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
               const doneNoQC = isCompleted && !hasQC;
               const rowBg = bothDone ? "rgba(58,138,54,0.06)" : doneNoQC ? "rgba(217,119,6,0.06)" : "#ffffff";
               const rowBorder = bothDone ? "1px solid rgba(58,138,54,0.2)" : doneNoQC ? "1px solid rgba(217,119,6,0.2)" : "1px solid #ece8e2";
+              const showWarning = hotovoWarning === item.id;
+              const showConfirm = hotovoConfirm === item.id;
 
               return (
-                <div key={item.id} className="flex items-center gap-2 px-2.5 py-2 rounded-md" style={{ border: rowBorder, background: rowBg }}>
-                  {/* Select checkbox */}
-                  <Checkbox
-                    className="h-3.5 w-3.5 shrink-0"
-                    checked={selectedItems.has(item.id)}
-                    onCheckedChange={(v) => {
-                      setSelectedItems(prev => {
-                        const next = new Set(prev);
-                        if (v) next.add(item.id); else next.delete(item.id);
-                        return next;
-                      });
-                    }}
-                  />
+                <div key={item.id}>
+                  <div className="flex items-center gap-2 px-2.5 py-2 rounded-md" style={{ border: rowBorder, background: rowBg }}>
+                    {/* Select checkbox — small, 16px */}
+                    <Checkbox
+                      className="h-4 w-4 shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+                      checked={selectedItems.has(item.id)}
+                      onCheckedChange={(v) => {
+                        setSelectedItems(prev => {
+                          const next = new Set(prev);
+                          if (v) next.add(item.id); else next.delete(item.id);
+                          return next;
+                        });
+                      }}
+                    />
 
-                  {/* Hotovo checkbox */}
-                  <Checkbox
-                    className="h-4 w-4 shrink-0"
-                    checked={isCompleted}
-                    onCheckedChange={() => onToggleItem(item.id, item.status)}
-                  />
-
-                  {/* Left: item info */}
-                  <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                    {item.item_code && (
-                      <span className="font-mono text-[12px] font-bold shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>
-                    )}
-                    <span className="text-[13px] truncate" style={{
-                      color: bothDone ? "#3a8a36" : isCompleted ? "#99a5a3" : "#1a1a1a",
-                      textDecoration: bothDone ? "line-through" : undefined,
-                    }}>
-                      {item.item_name}
-                    </span>
-                    {isSplit && (
-                      <span className="text-[9px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(217,119,6,0.1)", color: "#d97706" }}>
-                        část {item.split_part}/{item.split_total}
+                    {/* Item info */}
+                    <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                      {item.item_code && (
+                        <span className="font-mono text-[12px] font-bold shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>
+                      )}
+                      <span className="text-[13px] truncate" style={{
+                        color: bothDone ? "#3a8a36" : isCompleted ? "#99a5a3" : "#1a1a1a",
+                        textDecoration: bothDone ? "line-through" : undefined,
+                      }}>
+                        {item.item_name}
                       </span>
+                      {isSplit && (
+                        <span className="text-[9px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(217,119,6,0.1)", color: "#d97706" }}>
+                          část {item.split_part}/{item.split_total}
+                        </span>
+                      )}
+                      {isPaused && (
+                        <span className="text-[8px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(217,119,6,0.12)", color: "#d97706" }}>⏸</span>
+                      )}
+                    </div>
+
+                    {/* Hours */}
+                    <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
+
+                    {/* QC button / indicator */}
+                    {qcCheck ? (
+                      <button onClick={() => setUncheckConfirm(qcCheck.id)} className="shrink-0">
+                        <QualityCheckDisplay check={qcCheck} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleQC(item.id)}
+                        disabled={qcLoading === item.id}
+                        className="px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors shrink-0"
+                        style={{ color: "#6b7280", border: "0.5px solid #d0cdc8" }}
+                        title="Kontrola kvality"
+                      >
+                        {qcLoading === item.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "✓ QC"}
+                      </button>
                     )}
-                    {isPaused && (
-                      <span className="text-[8px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(217,119,6,0.12)", color: "#d97706" }}>⏸</span>
-                    )}
-                    {doneNoQC && (
-                      <span className="text-[8px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(217,119,6,0.12)", color: "#d97706" }}>Chybí QC</span>
+
+                    {/* Hotovo action — icon button on the right, distinct from select checkbox */}
+                    {isCompleted ? (
+                      <button
+                        onClick={() => handleHotovoClick(item)}
+                        className="shrink-0 flex items-center justify-center rounded-full transition-colors"
+                        style={{ width: 24, height: 24, background: "rgba(58,138,54,0.12)" }}
+                        title="Označeno jako hotovo — klikněte pro vrácení"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#3a8a36" }} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleHotovoClick(item)}
+                        className={`shrink-0 flex items-center justify-center rounded-full transition-all ${isMobile ? "" : "opacity-40 hover:opacity-100"}`}
+                        style={{ width: 24, height: 24, border: "1.5px solid #d0cdc8" }}
+                        title="Označit hotovo"
+                      >
+                        <Circle className="h-3 w-3" style={{ color: "#99a5a3" }} />
+                      </button>
                     )}
                   </div>
 
-                  {/* Right: hours, QC */}
-                  <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
+                  {/* Inline warning: no QC */}
+                  {showWarning && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 mt-0.5 rounded text-[11px]" style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.15)", color: "#92400e" }}>
+                      <AlertTriangle className="h-3 w-3 shrink-0" style={{ color: "#d97706" }} />
+                      <span>Položka nemá QC kontrolu — označte jako zkontrolováno před dokončením</span>
+                      <button onClick={() => setHotovoWarning(null)} className="ml-auto shrink-0"><X className="h-3 w-3" /></button>
+                    </div>
+                  )}
 
-                  {/* QC button / indicator */}
-                  {qcCheck ? (
-                    <button onClick={() => setUncheckConfirm(qcCheck.id)} className="shrink-0">
-                      <QualityCheckDisplay check={qcCheck} />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleQC(item.id)}
-                      disabled={qcLoading === item.id}
-                      className="px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors shrink-0"
-                      style={{ color: "#6b7280", border: "0.5px solid #d0cdc8" }}
-                      title="Kontrola kvality"
-                    >
-                      {qcLoading === item.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "✓ QC"}
-                    </button>
+                  {/* Inline confirm: has QC, confirm hotovo */}
+                  {showConfirm && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 mt-0.5 rounded text-[11px]" style={{ background: "rgba(58,138,54,0.06)", border: "1px solid rgba(58,138,54,0.15)", color: "#1a1a1a" }}>
+                      <span>Označit <strong>{item.item_code || item.item_name}</strong> jako hotovo?</span>
+                      <button onClick={() => confirmHotovo(item.id)} className="px-2 py-0.5 rounded text-[10px] font-medium" style={{ background: "#3a8a36", color: "#fff" }}>
+                        Potvrdit
+                      </button>
+                      <button onClick={() => setHotovoConfirm(null)} className="px-2 py-0.5 rounded text-[10px]" style={{ color: "#6b7280", border: "1px solid #e5e2dd" }}>
+                        Zrušit
+                      </button>
+                    </div>
                   )}
                 </div>
               );
@@ -1766,7 +1841,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         >
           Označit vše jako hotovo
         </button>
-        {!allReady && currentItems.length > 0 && (
+        {!allReady && dedupedItems.length > 0 && (
           <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded text-[10px] whitespace-nowrap z-10"
             style={{ background: "#1a1a1a", color: "#ffffff" }}>
             Nejprve dokončete a zkontrolujte všechny položky
