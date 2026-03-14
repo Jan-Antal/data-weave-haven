@@ -2077,7 +2077,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
 /* UNIFIED ITEM LIST (Items + QC merged)   */
 /* ═══════════════════════════════════════ */
 
-function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, onToggleExpand, bundleId, onOpenExpedice, isMobile, pushUndo }: {
+function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, onToggleExpand, bundleId, onOpenExpedice, isMobile, pushUndo, areAllPartsCompleted, getIncompletePartsInfo }: {
   projectId: string;
   currentItems: { item: ScheduleItem; weekKey: string; weekNum: number }[];
   onToggleItem: (id: string, status: string) => void;
@@ -2087,6 +2087,8 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   onOpenExpedice: () => void;
   isMobile: boolean;
   pushUndo: (entry: Omit<import("@/hooks/useUndoRedo").UndoEntry, "id" | "timestamp">) => void;
+  areAllPartsCompleted: (itemCode: string | null, itemName: string) => boolean;
+  getIncompletePartsInfo: (itemCode: string | null, itemName: string) => { incomplete: number; total: number; weekNums: number[] };
 }) {
   const { checks, checkItem, uncheckItem } = useQualityChecks(projectId);
   const { defects, addDefect, resolveDefect } = useQualityDefects(projectId);
