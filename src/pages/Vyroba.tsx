@@ -952,21 +952,41 @@ export default function Vyroba() {
           <div className="space-y-5 py-2">
             <div>
               <div className="text-xs font-semibold mb-2" style={{ color: "#6b7280" }}>
-                {logDayIndex >= 0 ? DAY_NAMES[logDayIndex] : "Dnes"} — Fáze
+                {logDayIndex >= 0 ? DAY_NAMES[logDayIndex] : "Dnes"} — Operace
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {PHASES.map(p => (
-                  <button key={p.name} onClick={() => setLogPhase(p.name)}
-                    className="px-2.5 py-1 rounded-full text-xs font-medium transition-all"
-                    style={{
-                      background: logPhase === p.name ? p.color : "#f5f3f0",
-                      color: logPhase === p.name ? "#fff" : "#1a1a1a",
-                      border: `1px solid ${logPhase === p.name ? p.color : "#e5e2dd"}`,
-                    }}>
-                    {p.name}
-                  </button>
-                ))}
+                {PHASES.map(p => {
+                  const currentPhasePct = PHASES.find(ph => ph.name === logPhase)?.pct || 0;
+                  const isLower = p.pct < currentPhasePct;
+                  return (
+                    <button key={p.name} onClick={() => {
+                      if (isLower) {
+                        setLogPhaseWarning("Nelze přejít na nižší fázi");
+                        setTimeout(() => setLogPhaseWarning(null), 2500);
+                        return;
+                      }
+                      setLogPhase(p.name);
+                      setLogPercent(p.pct);
+                      setLogPhaseWarning(null);
+                    }}
+                      className="px-2.5 py-1 rounded-full text-xs font-medium transition-all"
+                      style={{
+                        background: logPhase === p.name ? p.color : isLower ? "#f0eeeb" : "#f5f3f0",
+                        color: logPhase === p.name ? "#fff" : isLower ? "#b0b7c3" : "#1a1a1a",
+                        border: `1px solid ${logPhase === p.name ? p.color : "#e5e2dd"}`,
+                        cursor: isLower ? "not-allowed" : "pointer",
+                        opacity: isLower ? 0.5 : 1,
+                      }}>
+                      {p.name}
+                    </button>
+                  );
+                })}
               </div>
+              {logPhaseWarning && (
+                <div className="mt-1.5 text-[11px] font-medium" style={{ color: "#dc2626" }}>
+                  ⚠ {logPhaseWarning}
+                </div>
+              )}
             </div>
             <div>
               <div className="text-xs font-semibold mb-2" style={{ color: "#6b7280" }}>Celková hotovost</div>
