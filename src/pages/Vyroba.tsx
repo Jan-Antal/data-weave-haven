@@ -1859,30 +1859,35 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         </div>
         <CollapsibleContent>
           <div className="mt-2 space-y-1">
-            {dedupedItems.map(({ item }) => {
+            {dedupedItems.map(({ item, mergedIds: mids, thisWeekHours }) => {
               const isCompleted = item.status === "completed";
               const isPaused = item.status === "paused";
               const isSplit = item.split_part != null && item.split_total != null;
               const qcCheck = checkMap.get(item.id);
               const hasQC = !!qcCheck;
-              const isSelected = selectedItems.has(item.id);
+              const isSelected = mids.every(id => selectedItems.has(id));
 
               const bothDone = isCompleted && hasQC;
               const rowBg = bothDone ? "rgba(58,138,54,0.06)" : isSelected ? "rgba(37,99,235,0.04)" : "#ffffff";
               const rowBorder = bothDone ? "1px solid rgba(58,138,54,0.2)" : isSelected ? "1px solid rgba(37,99,235,0.2)" : "1px solid #ece8e2";
 
+              // For splits, compute % of total allocated this week
+              const splitPctLabel = isSplit && item.split_total
+                ? `${Math.round((thisWeekHours / (item.scheduled_hours * item.split_total / (item.split_part || 1))) * 100)}%`
+                : null;
+
               return (
-                <div key={item.id}>
+                <div key={mids.join("-")}>
                   <div
                     className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer transition-colors"
                     style={{ border: rowBorder, background: rowBg }}
-                    onClick={() => toggleSelect(item.id)}
+                    onClick={() => toggleSelect(mids)}
                   >
                     {/* Select checkbox */}
                     <Checkbox
                       className="h-4 w-4 shrink-0"
                       checked={isSelected}
-                      onCheckedChange={() => toggleSelect(item.id)}
+                      onCheckedChange={() => toggleSelect(mids)}
                       onClick={(e) => e.stopPropagation()}
                     />
 
@@ -1907,7 +1912,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                     </div>
 
                     {/* Hours */}
-                    <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
+                    <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{thisWeekHours}h</span>
 
                     {/* QC badge — display only */}
                     {qcCheck ? (
