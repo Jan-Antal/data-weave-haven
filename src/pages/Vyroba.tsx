@@ -751,10 +751,25 @@ export default function Vyroba() {
   async function handleNoProduction() {
     if (!selectedProject || logDayIndex < 0) return;
     try {
-      pushUndo({ type: "no_activity", logId: "", logDate: weekKey, projectId: selectedProject.projectId, timestamp: Date.now() });
-      await saveDailyLog(bundleId(selectedProject.projectId), weekKey, logDayIndex, `Bez výroby: ${noProductionReason}`, getLatestPercent(selectedProject.projectId));
+      const bId = bundleId(selectedProject.projectId);
+      const capturedDay = logDayIndex;
+      const capturedReason = noProductionReason;
+      const capturedPct = getLatestPercent(selectedProject.projectId);
+      pushUndo({
+        page: "vyroba",
+        actionType: "no_activity",
+        description: "žádná aktivita",
+        undo: async () => {
+          await (supabase.from("production_daily_logs") as any).delete().eq("bundle_id", bId).eq("day_index", capturedDay).eq("week_key", weekKey);
+          qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
+        },
+        redo: async () => {
+          await saveDailyLog(bId, weekKey, capturedDay, `Bez výroby: ${capturedReason}`, capturedPct);
+          qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
+        },
+      });
+      await saveDailyLog(bId, weekKey, logDayIndex, `Bez výroby: ${noProductionReason}`, capturedPct);
       qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
-      toast.success("Zaznamenáno bez výroby");
       setNoProductionOpen(false);
       setLogModalOpen(false);
     } catch {
