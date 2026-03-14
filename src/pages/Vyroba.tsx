@@ -49,6 +49,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQualityDefects, type QualityDefect } from "@/hooks/useQualityDefects";
 import { logActivity } from "@/lib/activityLog";
+import { MobileNavBar } from "@/components/mobile/MobileNavBar";
+import { MobileHeader } from "@/components/mobile/MobileHeader";
 
 /* ═══ helpers ═══ */
 function getMonday(d: Date): Date {
@@ -910,9 +912,16 @@ export default function Vyroba() {
 
   /* ═══ RENDER ═══ */
   return (
-    <div className="h-screen flex flex-col overflow-hidden" style={{ background: "#f8f7f4" }}>
-      {/* ═══ HEADER ═══ */}
-      <header className="border-b bg-primary px-4 md:px-6 py-4 shrink-0 z-50">
+    <div className={cn("h-screen flex flex-col overflow-hidden", isMobile && "pb-14")} style={{ background: "#f8f7f4" }}>
+      {/* ═══ MOBILE HEADER ═══ */}
+      {isMobile && (
+        <MobileHeader
+          onDataLog={toggleDataLog}
+          showDataLog={isAdmin || role === "pm" || isOwner}
+        />
+      )}
+      {/* ═══ HEADER (desktop) ═══ */}
+      <header className="border-b bg-primary px-4 md:px-6 py-4 shrink-0 z-50 hidden md:block">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 shrink-0">
             <h1 className="text-xl font-serif text-primary-foreground tracking-wide">
@@ -1781,6 +1790,7 @@ export default function Vyroba() {
         {dataLogOpen && <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} defaultCategory="vyroba" />}
       </div>
       </div>{/* end outer flex */}
+      {isMobile && <MobileNavBar />}
     </div>
   );
 }

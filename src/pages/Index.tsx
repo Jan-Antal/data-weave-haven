@@ -39,6 +39,7 @@ import { useAchievementChecker } from "@/hooks/useAchievements";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
+import { MobileNavBar } from "@/components/mobile/MobileNavBar";
 import { MobileCardList } from "@/components/mobile/MobileCardList";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { MobilePrehled } from "@/components/mobile/MobilePrehled";
@@ -190,7 +191,7 @@ const Index = () => {
     <ColumnVisibilityProvider>
     <ExportProvider>
     <DataLogHighlightProvider>
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className={cn("h-screen bg-background flex flex-col overflow-hidden", isMobile && "pb-[126px]")}>
       {/* TEST MODE banner */}
       {profile?.email === "alfred@ami-test.cz" && (
         <div className="bg-orange-500 text-white px-6 flex items-center justify-center gap-2 font-bold tracking-wide shrink-0" style={{ height: 32 }}>
@@ -208,29 +209,8 @@ const Index = () => {
       {/* Mobile Header */}
       {isMobile && (
         <MobileHeader
-          profileName={profile?.full_name || profile?.email || "Uživatel"}
-          profileEmail={profile?.email || ""}
-          profileRole={role}
-          isAdmin={isAdmin}
-          isOwner={isOwner}
-          realRole={realRole}
-          simulatedRole={simulatedRole}
-          setSimulatedRole={setSimulatedRole}
-          canAccessSettings={canAccessSettings}
-          onSignOut={signOut}
-          onAccountSettings={() => setAccountSettingsOpen(true)}
-          onSettings={handleOpenSettings}
-          canManageUsers={canManageUsers}
-          canManagePeople={canManagePeople}
-          canManageExchangeRates={canManageExchangeRates}
-          canManageStatuses={canManageStatuses}
-          canAccessRecycleBin={canAccessRecycleBin}
-          onUserMgmt={() => setUserMgmtOpen(true)}
-          onPeopleMgmt={openPeopleManagement}
-          onExchangeRates={() => setExchangeRateOpen(true)}
-          onStatusMgmt={() => setStatusMgmtOpen(true)}
-          onRecycleBin={() => setRecycleBinOpen(true)}
           onDataLog={toggleDataLog}
+          showDataLog={canAccessSettings || realRole === "owner" || role === "pm"}
         />
       )}
 
@@ -584,22 +564,25 @@ const Index = () => {
 
       {/* Mobile Bottom Nav */}
       {isMobile && (
-        <MobileBottomNav
-          onNewProject={() => document.dispatchEvent(new CustomEvent("open-add-project"))}
-          canCreateProject={canCreateProject}
-          activeTab={mobileTab}
-          onTabChange={setMobileTab}
-          isInTPVList={!!mobileTPVProject}
-          onExitTPVList={handleMobileTPVBack}
-        >
-          <button
-            onClick={() => window.dispatchEvent(new Event("ami-toggle"))}
-            className={cn("flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center text-muted-foreground")}
+        <>
+          <MobileBottomNav
+            onNewProject={() => document.dispatchEvent(new CustomEvent("open-add-project"))}
+            canCreateProject={canCreateProject}
+            activeTab={mobileTab}
+            onTabChange={setMobileTab}
+            isInTPVList={!!mobileTPVProject}
+            onExitTPVList={handleMobileTPVBack}
           >
-            <MessageCircle className="h-5 w-5" strokeWidth={1.75} />
-            <span className="text-[10px]">Asistent</span>
-          </button>
-        </MobileBottomNav>
+            <button
+              onClick={() => window.dispatchEvent(new Event("ami-toggle"))}
+              className={cn("flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center text-muted-foreground")}
+            >
+              <MessageCircle className="h-5 w-5" strokeWidth={1.75} />
+              <span className="text-[10px]">Asistent</span>
+            </button>
+          </MobileBottomNav>
+          <MobileNavBar />
+        </>
       )}
 
       <ExchangeRateSettings open={exchangeRateOpen} onOpenChange={setExchangeRateOpen} />

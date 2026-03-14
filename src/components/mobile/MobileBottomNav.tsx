@@ -175,8 +175,8 @@ export function MobileBottomNav({
 
   return (
     <>
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border flex items-center justify-around z-50"
-        style={{ height: "calc(70px + env(safe-area-inset-bottom, 0px))", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      <nav className="md:hidden fixed left-0 right-0 bg-background border-t border-border flex items-center justify-around z-50"
+        style={{ bottom: "calc(56px + env(safe-area-inset-bottom, 0px))", height: 70 }}
       >
         {/* Home / Projekty toggle */}
         <button
