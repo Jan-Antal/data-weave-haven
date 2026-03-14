@@ -1000,24 +1000,6 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
           Tabulka
         </button>
       </div>
-          </div>
-          {/* DataLog sidebar */}
-          <div
-            className={cn(
-              "transition-all duration-250 ease-in-out overflow-hidden shrink-0",
-              dataLogOpen ? "w-[360px]" : "w-0"
-            )}
-          >
-            <DataLogPanel
-              open={dataLogOpen}
-              onOpenChange={(v) => {
-                setDataLogOpen(v);
-                try { localStorage.setItem("datalog-panel-plan-vyroby", String(v)); } catch {}
-              }}
-              defaultCategory="projects"
-            />
-          </div>
-        </div>
 
       {/* Forecast plan mode toggle + Reset */}
       {forecastActive && (
