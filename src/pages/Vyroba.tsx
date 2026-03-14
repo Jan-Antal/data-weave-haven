@@ -1437,43 +1437,34 @@ export default function Vyroba() {
               );
             })()}
 
-            {/* Tab switcher: Poznámky / Foto */}
+            {/* Poznámky section */}
             <div>
-              <div className="flex gap-0 mb-2">
-                <button onClick={() => setLogTab("notes")} className="px-3 py-1 text-xs font-medium rounded-l transition-colors"
-                  style={{ background: logTab === "notes" ? "#223937" : "#f5f3f0", color: logTab === "notes" ? "#fff" : "#6b7280", border: logTab === "notes" ? "none" : "1px solid #e5e2dd" }}>
-                  Poznámky
-                </button>
-                <button onClick={() => setLogTab("photo")} className="px-3 py-1 text-xs font-medium rounded-r transition-colors"
-                  style={{ background: logTab === "photo" ? "#223937" : "#f5f3f0", color: logTab === "photo" ? "#fff" : "#6b7280", border: logTab === "photo" ? "none" : "1px solid #e5e2dd" }}>
-                  Foto
-                </button>
-              </div>
-              {logTab === "notes" ? (
-                <textarea
-                  value={logNotes}
-                  onChange={e => {
-                    logNotesUndoStack.current = [...logNotesUndoStack.current.slice(-49), logNotes];
-                    setLogNotes(e.target.value);
-                  }}
-                  onKeyDown={e => {
-                    if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (logNotesUndoStack.current.length > 0) {
-                        const prev = logNotesUndoStack.current[logNotesUndoStack.current.length - 1];
-                        logNotesUndoStack.current = logNotesUndoStack.current.slice(0, -1);
-                        setLogNotes(prev);
-                      }
+              <div className="text-[11px] uppercase tracking-wider font-medium mb-1" style={{ color: "hsl(var(--muted-foreground))" }}>Poznámky</div>
+              <textarea
+                value={logNotes}
+                onChange={e => {
+                  logNotesUndoStack.current = [...logNotesUndoStack.current.slice(-49), logNotes];
+                  setLogNotes(e.target.value);
+                }}
+                onKeyDown={e => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (logNotesUndoStack.current.length > 0) {
+                      const prev = logNotesUndoStack.current[logNotesUndoStack.current.length - 1];
+                      logNotesUndoStack.current = logNotesUndoStack.current.slice(0, -1);
+                      setLogNotes(prev);
                     }
-                  }}
-                  placeholder="Poznámky k dnešnímu dni..."
-                  className="w-full h-20 text-xs rounded-md p-2 resize-none"
-                  style={{ border: "1px solid #e5e2dd", background: "#fafaf8" }}
-                />
-              ) : (
-                <VyrobaPhotoTab projectId={selectedProject?.projectId || ""} />
-              )}
+                  }
+                }}
+                placeholder="Čeho jste dnes dosáhli? Problémy, poznámky..."
+                className="w-full h-20 text-xs rounded-md p-2 resize-none border border-input bg-background"
+              />
+            </div>
+
+            {/* Foto section */}
+            <div>
+              <VyrobaPhotoTab projectId={selectedProject?.projectId || ""} />
             </div>
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2">
