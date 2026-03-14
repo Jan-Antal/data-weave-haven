@@ -324,11 +324,16 @@ export default function Vyroba() {
   function getAllItemsForProject(pid: string): { item: ScheduleItem; weekKey: string; weekNum: number }[] {
     if (!scheduleData) return [];
     const items: { item: ScheduleItem; weekKey: string; weekNum: number }[] = [];
+    const seen = new Set<string>();
     for (const [wk, silo] of scheduleData) {
       for (const bundle of silo.bundles) {
         if (bundle.project_id !== pid) continue;
         for (const item of bundle.items) {
           if (item.status === "cancelled") continue;
+          // Deduplicate by item_code + item_name within same week
+          const dedupeKey = `${wk}::${item.item_code || ""}::${item.item_name}`;
+          if (seen.has(dedupeKey)) continue;
+          seen.add(dedupeKey);
           items.push({ item, weekKey: wk, weekNum: silo.week_number });
         }
       }
@@ -593,16 +598,16 @@ export default function Vyroba() {
                     </div>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className="font-mono" style={{ fontSize: 11, color: "#99a5a3" }}>{p.projectId}</span>
-                      {phase && (
-                        <>
-                          <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
-                          <span style={{ fontSize: 11, color: "#6b7280" }}>{phase}</span>
-                        </>
-                      )}
                       {p.deadline && (
                         <>
                           <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
                           <span style={{ fontSize: 11, color: "#6b7280" }}>{fmtDateFull(p.deadline)}</span>
+                        </>
+                      )}
+                      {phase && (
+                        <>
+                          <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
+                          <span style={{ fontSize: 11, color: PHASES.find(ph => ph.name === phase)?.color || "#6b7280", fontWeight: 500 }}>{phase}</span>
                         </>
                       )}
                     </div>
@@ -923,7 +928,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
               {latestPct}%
             </div>
             {todayDayIndex >= 0 && (
-              <div className="text-xs" style={{ color: "#99a5a3" }}>oček. {expectedPct}%</div>
+              <div className="text-xs" style={{ color: "#99a5a3" }}>Cíl: 100%</div>
             )}
           </div>
         </div>
@@ -1039,6 +1044,13 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           </div>
         )}
 
+        {/* ── Daily log shortcut — directly below quality section ── */}
+        {todayDayIndex >= 0 && (
+          <button onClick={() => onOpenLog()} className={`w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90 ${isMobile ? "min-h-[44px]" : ""}`} style={{ background: "#3a8a36" }}>
+            + Log dnes ({DAY_SHORT[todayDayIndex]})
+          </button>
+        )}
+
         {/* ── Expedice button ── */}
         {currentItems.some(i => i.item.status !== "completed") && (
           <button onClick={onOpenExpedice} className={`w-full py-2.5 rounded-md text-sm font-medium transition-colors ${isMobile ? "min-h-[44px]" : ""}`}
@@ -1049,13 +1061,6 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
 
         {/* ── Výkresy Section ── */}
         <VykresynSection projectId={project.projectId} />
-
-        {/* ── Daily log shortcut ── */}
-        {todayDayIndex >= 0 && (
-          <button onClick={() => onOpenLog()} className={`w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90 ${isMobile ? "min-h-[44px]" : ""}`} style={{ background: "#3a8a36" }}>
-            + Log dnes ({DAY_SHORT[todayDayIndex]})
-          </button>
-        )}
       </div>
     </div>
   );
@@ -1256,17 +1261,23 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
   let bg = "#ffffff";
   let border = "#e5e2dd";
   let borderStyle = "solid";
+  let borderWidth = "1px";
 
   if (isFuture || notCurrentWeek) {
     bg = "#fafaf8";
     border = "#e5e2dd";
     borderStyle = "dashed";
   } else if (isToday) {
-    bg = "#ffffff";
+    bg = "rgba(58,138,54,0.03)";
     border = "#3a8a36";
+    borderWidth = "2px";
   } else if (isPast && !cumulative?.hasLog) {
     bg = "#ffffff";
-    border = "#fca5a5";
+    border = "#e5a8a8";
+    borderWidth = "1px";
+  } else if (isPast && cumulative?.hasLog) {
+    bg = "#ffffff";
+    border = "#86c083";
   }
 
   const clickable = isToday || (isPast && !isFuture);
@@ -1276,7 +1287,7 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
       className={`rounded-lg p-2 flex flex-col gap-1 transition-all ${clickable ? "cursor-pointer hover:shadow-sm" : ""}`}
       style={{
         background: bg,
-        border: `1px ${borderStyle} ${border}`,
+        border: `${borderWidth} ${borderStyle} ${border}`,
         opacity: (isFuture ? 0.5 : (isPast && !cumulative?.hasLog) ? 0.6 : 1),
       }}
       onClick={clickable ? onOpenLog : undefined}
