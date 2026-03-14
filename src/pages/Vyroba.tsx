@@ -1795,9 +1795,9 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         }
       }
       // Now mark ALL target items (selected or all) as completed
-      const targetItems = selectedItems.size > 0
-        ? dedupedItems.filter(({ mergedIds }) => mergedIds.some(id => selectedItems.has(id)) && dedupedItems.find(d => d.mergedIds === mergedIds)?.item.status !== "completed")
-        : dedupedItems.filter(({ item }) => item.status !== "completed");
+      const targetItems2 = selectedItems.size > 0
+        ? dedupedItems.filter(d => d.mergedIds.some(id => selectedItems.has(id)) && d.item.status !== "completed")
+        : dedupedItems.filter(d => d.item.status !== "completed");
       const ids = targetItems.flatMap(({ mergedIds }) => mergedIds);
       if (ids.length > 0) {
         await supabase.from("production_schedule").update({
