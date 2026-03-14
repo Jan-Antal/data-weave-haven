@@ -589,7 +589,7 @@ export default function Vyroba() {
     }
 
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
-    toast.success(`${movedCount} položek přesunuto do T${nextWeekNum}`);
+    toast.success(`⇒ ${movedCount} položek přesunuto do T${nextWeekNum}`, { duration: 2000 });
     setSpillDialogOpen(false);
   }
 
