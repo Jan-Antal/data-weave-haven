@@ -2043,7 +2043,26 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
       // Push undo for QC confirm
       const qcItemIds = qcModalItems.filter(({ item }) => !checkMap.has(item.id)).map(({ item }) => item.id);
       if (qcItemIds.length > 0) {
-        pushUndo({ type: "qc_confirm", itemIds: qcItemIds, timestamp: Date.now() });
+        pushUndo({
+          page: "vyroba",
+          actionType: "qc_confirm",
+          description: `QC potvrzení (${qcItemIds.length} položek)`,
+          undo: async () => {
+            const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
+            for (const itemId of qcItemIds) {
+              await (supabase.from("production_quality_checks" as any) as any).delete().eq("item_id", itemId).gte("checked_at", oneMinuteAgo);
+            }
+            qc.invalidateQueries({ queryKey: ["production-schedule"] });
+            qc.invalidateQueries({ queryKey: ["quality-checks", projectId] });
+          },
+          redo: async () => {
+            const { data: { user: u } } = await supabase.auth.getUser();
+            for (const itemId of qcItemIds) {
+              await (supabase.from("production_quality_checks" as any) as any).insert({ item_id: itemId, project_id: projectId, checked_by: u?.id });
+            }
+            qc.invalidateQueries({ queryKey: ["quality-checks", projectId] });
+          },
+        });
       }
       // Record QC for all items in modal
       for (const { item } of qcModalItems) {
@@ -2067,7 +2086,6 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
       }
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["quality-checks", projectId] });
-      toast.success(`${ids.length} položek dokončeno`);
       setSelectedItems(new Set());
       setQcModalOpen(false);
       // Check if ALL items are now completed
