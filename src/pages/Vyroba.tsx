@@ -1526,7 +1526,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
   bundleId: string;
   allItems: { item: ScheduleItem; weekKey: string; weekNum: number }[];
   scheduleData: Map<string, any> | undefined;
-  pushUndo: (action: UndoAction) => void;
+  pushUndo: (entry: Omit<import("@/hooks/useUndoRedo").UndoEntry, "id" | "timestamp">) => void;
   onOpenProjectDetail: () => void;
   dyhaDismissed: boolean;
   onDismissDyha: () => void;
