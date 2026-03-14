@@ -821,6 +821,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               forecastExpandedIds={forecastExpandedIds}
               onToggleForecastExpand={toggleForecastExpand}
               focusedMatchKey={focusedMatchKey}
+              searchMatchedProjectIds={searchMatchedProjectIds}
+              searchActive={searchActive}
             />
           ))}
         </div>
