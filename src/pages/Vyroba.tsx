@@ -527,7 +527,6 @@ export default function Vyroba() {
     if (!selectedProject) return;
     const di = dayIdx ?? todayDayIndex;
     setLogDayIndex(di);
-    setLogTab("notes");
     setLogPhaseWarning(null);
     setHotovostTouched(false);
     logNotesUndoStack.current = [];
