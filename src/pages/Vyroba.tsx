@@ -2441,7 +2441,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   onClick={async () => {
                     const { data: { user } } = await supabase.auth.getUser();
                     resolveDefect.mutate({ defectId: d.id, userId: user?.id || "" });
-                    
+                    logActivity({ projectId, actionType: "defect_resolved", newValue: d.defect_type, detail: d.item_code || "" });
                   }}>Označiť ako opravenú</button>
               </div>
             ))}
