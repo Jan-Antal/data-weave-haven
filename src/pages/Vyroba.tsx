@@ -2243,7 +2243,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                                         onClick={async () => {
                                           const { data: { user } } = await supabase.auth.getUser();
                                           resolveDefect.mutate({ defectId: d.id, userId: user?.id || "" });
-                                          toast.success("Vada označená ako opravená");
+                                          
                                         }}>Označiť ako opravenú</button>
                                     </div>
                                   ))}
