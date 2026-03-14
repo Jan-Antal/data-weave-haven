@@ -2494,7 +2494,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSingleQcModalOpen(false)}>Zrušit</Button>
+            <Button variant="outline" onClick={() => { setSingleQcModalOpen(false); setDefectOpen(false); }}>Zrušit</Button>
             <Button
               style={{ background: "#3a8a36" }}
               onClick={async () => {
