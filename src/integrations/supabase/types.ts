@@ -434,6 +434,30 @@ export type Database = {
           },
         ]
       }
+      production_quality_checks: {
+        Row: {
+          checked_at: string
+          checked_by: string
+          id: string
+          item_id: string
+          project_id: string
+        }
+        Insert: {
+          checked_at?: string
+          checked_by: string
+          id?: string
+          item_id: string
+          project_id: string
+        }
+        Update: {
+          checked_at?: string
+          checked_by?: string
+          id?: string
+          item_id?: string
+          project_id?: string
+        }
+        Relationships: []
+      }
       production_schedule: {
         Row: {
           adhoc_reason: string | null
