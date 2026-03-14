@@ -79,9 +79,10 @@ const DAY_SHORT = ["Po", "Út", "St", "Čt", "Pá"];
 
 const PHASES = [
   { name: "Řezání", color: "#f59e0b" },
-  { name: "Lepení", color: "#3b82f6" },
+  { name: "CNC", color: "#6366f1" },
+  { name: "Dýha", color: "#e67e22" },
   { name: "Lakování", color: "#8b5cf6" },
-  { name: "Montáž", color: "#10b981" },
+  { name: "Kompletace", color: "#3b82f6" },
   { name: "Expedice", color: "#16a34a" },
 ];
 
