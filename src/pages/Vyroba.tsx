@@ -1742,12 +1742,16 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   isMobile: boolean;
   pushUndo: (action: UndoAction) => void;
 }) {
-  const { checks, checkItem } = useQualityChecks(projectId);
+  const { checks, checkItem, uncheckItem } = useQualityChecks(projectId);
   const { profile } = useAuth();
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [qcModalOpen, setQcModalOpen] = useState(false);
   const [qcModalItems, setQcModalItems] = useState<{ item: ScheduleItem }[]>([]);
   const [qcSubmitting, setQcSubmitting] = useState(false);
+  const [singleQcItem, setSingleQcItem] = useState<ScheduleItem | null>(null);
+  const [singleQcModalOpen, setSingleQcModalOpen] = useState(false);
+  const [uncheckConfirmItemId, setUncheckConfirmItemId] = useState<string | null>(null);
+  const [uncheckConfirmCode, setUncheckConfirmCode] = useState<string>("");
   const qc = useQueryClient();
   const qcUserFirstName = profile?.full_name?.split(" ")[0]?.slice(0, 8) || "–";
 
@@ -1987,13 +1991,34 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                     {/* Hours */}
                     <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{thisWeekHours}h</span>
 
-                    {/* QC badge — display only */}
-                    {qcCheck ? (
-                      <QualityCheckDisplay check={qcCheck} />
-                    ) : (
-                      <QualityCheckBadgeEmpty />
-                    )}
+                    {/* QC badge — clickable */}
+                    <div onClick={(e) => e.stopPropagation()}>
+                      {qcCheck ? (
+                        <button onClick={() => { setUncheckConfirmItemId(item.id); setUncheckConfirmCode(`${item.item_code || ""} ${item.item_name}`.trim()); }}>
+                          <QualityCheckDisplay check={qcCheck} />
+                        </button>
+                      ) : (
+                        <button onClick={() => { setSingleQcItem(item); setSingleQcModalOpen(true); }}>
+                          <QualityCheckBadgeEmpty />
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Inline uncheck confirm */}
+                  {uncheckConfirmItemId === item.id && (
+                    <div className="flex items-center gap-2 px-3 py-2 mt-1 rounded-md text-[12px]" style={{ background: "rgba(220,38,38,0.05)", border: "1px solid rgba(220,38,38,0.15)" }}>
+                      <span style={{ color: "#92400e" }}>Zrušit QC kontrolu pro <strong>{uncheckConfirmCode}</strong>?</span>
+                      <button className="px-2 py-0.5 rounded text-[11px] font-medium" style={{ background: "#dc2626", color: "#fff" }}
+                        onClick={async () => {
+                          const check = checkMap.get(item.id);
+                          if (check) await uncheckItem(check.id);
+                          setUncheckConfirmItemId(null);
+                        }}>Ano</button>
+                      <button className="px-2 py-0.5 rounded text-[11px] font-medium" style={{ background: "hsl(var(--muted))", color: "hsl(var(--foreground))" }}
+                        onClick={() => setUncheckConfirmItemId(null)}>Ne</button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -2055,6 +2080,37 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Single-item QC modal */}
+      <Dialog open={singleQcModalOpen} onOpenChange={setSingleQcModalOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Kontrola kvality — {singleQcItem?.item_code} {singleQcItem?.item_name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="flex items-start gap-2 px-3 py-3 rounded-md text-[13px]" style={{ background: "rgba(217,119,6,0.1)", border: "1px solid rgba(217,119,6,0.2)", color: "#92400e" }}>
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "#d97706" }} />
+              <span>⚠ Před potvrzením zkontrolujte: rozměry, povrchovou úpravu, spoje a balení.</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSingleQcModalOpen(false)}>Zrušit</Button>
+            <Button
+              style={{ background: "#3a8a36" }}
+              onClick={async () => {
+                if (singleQcItem) {
+                  await checkItem(singleQcItem.id);
+                  toast.success(`QC potvrzeno — ${singleQcItem.item_code || singleQcItem.item_name}`);
+                }
+                setSingleQcModalOpen(false);
+                setSingleQcItem(null);
+              }}
+            >
+              Potvrdit QC — {qcUserFirstName}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -2064,7 +2120,7 @@ function QualityCheckDisplay({ check }: { check: any }) {
   const firstName = name ? name.split(" ")[0].slice(0, 8) : "–";
   return (
     <span
-      className="inline-flex items-center gap-1 shrink-0"
+      className="inline-flex items-center gap-1 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
       style={{
         background: "#dcfce7",
         color: "#166534",
@@ -2084,7 +2140,7 @@ function QualityCheckDisplay({ check }: { check: any }) {
 function QualityCheckBadgeEmpty() {
   return (
     <span
-      className="inline-flex items-center gap-1 shrink-0"
+      className="inline-flex items-center gap-1 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
       style={{
         background: "#fef3c7",
         color: "#92400e",
