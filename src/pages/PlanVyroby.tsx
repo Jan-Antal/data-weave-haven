@@ -579,17 +579,19 @@ export default function PlanVyroby() {
       onDragEnd={handleDragEnd}
     >
       <div
-        className="h-screen flex flex-col overflow-hidden transition-colors duration-300"
+        className={cn("h-screen flex flex-col overflow-hidden transition-colors duration-300", isMobile && "pb-14")}
         style={{ backgroundColor: forecast.forecastActive ? "#1a2422" : "#f4f2f0" }}
       >
+        {isMobile && <MobileHeader />}
         {profile?.email === "alfred@ami-test.cz" && (
           <div className="bg-orange-500 text-white px-6 flex items-center justify-center gap-2 font-bold tracking-wide shrink-0" style={{ height: 32 }}>
             <span>⚠ TEST MODE — Testovací prostředí — data nejsou produkční</span>
           </div>
         )}
-        <ProductionHeader forecastActive={forecast.forecastActive} dataLogOpen={dataLogOpen} onToggleDataLog={toggleDataLog} />
+        {!isMobile && <ProductionHeader forecastActive={forecast.forecastActive} dataLogOpen={dataLogOpen} onToggleDataLog={toggleDataLog} />}
 
-        {/* Row 2: Tabs + Search + Display mode + Stats + Period + Forecast toggle */}
+        {/* Row 2: Tabs + Search + Display mode + Stats + Period + Forecast toggle — desktop only */}
+        {!isMobile && (
         <ToolbarRow2
           viewTab={viewTab}
           setViewTab={setViewTab}
