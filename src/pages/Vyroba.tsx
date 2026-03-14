@@ -1,20 +1,19 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useProductionSchedule, getISOWeekNumber, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useProductionDailyLogs, saveDailyLog, type DailyLog } from "@/hooks/useProductionDailyLogs";
 import { getProjectColor } from "@/lib/projectColors";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList,
   User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange, Factory,
-  Circle, CheckCircle2, X, Mail, Plus, Trash2, Loader2
+  Circle, CheckCircle2, X, Plus, Trash2, Loader2, Download, Printer, FileText
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { renumberSiblings } from "@/components/production/SplitItemDialog";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -66,6 +65,15 @@ function weekKeyStr(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .slice(0, 20);
+}
+
 const DAY_NAMES = ["Pondělí", "Úterý", "Středa", "Čtvrtek", "Pátek"];
 const DAY_SHORT = ["Po", "Út", "St", "Čt", "Pá"];
 
@@ -86,6 +94,57 @@ interface VyrobaProject {
   pm?: string | null;
   expedice?: string | null;
   deadline?: Date | null;
+  isSpilled?: boolean;
+}
+
+interface CumulativeInfo { percent: number; phase: string | null; isCarryForward: boolean; hasLog: boolean }
+
+/* ═══ Quality checks hook ═══ */
+function useQualityChecks(projectId: string) {
+  const qc = useQueryClient();
+  const { data: checks = [], refetch } = useQuery({
+    queryKey: ["quality-checks", projectId],
+    enabled: !!projectId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("production_quality_checks" as any)
+        .select("*")
+        .eq("project_id", projectId);
+      if (error) throw error;
+      return (data || []) as any[];
+    },
+  });
+
+  const checkItem = useCallback(async (itemId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await (supabase.from("production_quality_checks" as any) as any).insert({
+      item_id: itemId,
+      project_id: projectId,
+      checked_by: user?.id,
+    });
+    if (error) throw error;
+    refetch();
+  }, [projectId, refetch]);
+
+  return { checks, checkItem };
+}
+
+/* ═══ Profile name lookup ═══ */
+function useProfileName(userId: string | null) {
+  const { data } = useQuery({
+    queryKey: ["profile-name", userId],
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", userId!)
+        .maybeSingle();
+      return data?.full_name || data?.email || "–";
+    },
+  });
+  return data || null;
 }
 
 /* ═══ MAIN PAGE ═══ */
@@ -121,30 +180,53 @@ export default function Vyroba() {
   const { data: scheduleData } = useProductionSchedule();
   const { data: dailyLogsMap } = useProductionDailyLogs(weekKey);
 
-  // Build projects from schedule for this week
+  // Build projects from schedule for this week + spilled from previous weeks
   const projects = useMemo<VyrobaProject[]>(() => {
     if (!scheduleData) return [];
+    const result: VyrobaProject[] = [];
+    const currentMondayTime = currentMonday.getTime();
+
+    // Current week bundles
     const silo = scheduleData.get(weekKey);
-    console.log('[Vyroba] query week:', weekKey, 'results:', silo?.bundles?.length ?? 0, 'all keys:', Array.from(scheduleData.keys()));
-    if (!silo) return [];
-    return silo.bundles
-      .filter(b => b.items.some(i => i.status === "scheduled" || i.status === "in_progress"))
-      .map((b) => {
-        // Resolve deadline from project info in items
-        let deadlineDate: Date | null = null;
-        // We'll fetch deadline from project data below
-        return {
+    if (silo) {
+      for (const b of silo.bundles) {
+        if (b.items.some(i => i.status === "scheduled" || i.status === "in_progress")) {
+          result.push({
+            projectId: b.project_id,
+            projectName: b.project_name,
+            totalHours: b.total_hours,
+            scheduleItems: b.items,
+            color: getProjectColor(b.project_id),
+            isSpilled: false,
+          });
+        }
+      }
+    }
+
+    // Spilled: items from past weeks still active
+    for (const [wk, ws] of scheduleData) {
+      const wkDate = new Date(wk);
+      if (wkDate.getTime() >= currentMondayTime) continue;
+      for (const b of ws.bundles) {
+        const activeItems = b.items.filter(i => i.status === "scheduled" || i.status === "in_progress");
+        if (activeItems.length === 0) continue;
+        // Don't duplicate if already in current week
+        if (result.some(r => r.projectId === b.project_id)) continue;
+        result.push({
           projectId: b.project_id,
           projectName: b.project_name,
-          totalHours: b.total_hours,
-          scheduleItems: b.items,
+          totalHours: activeItems.reduce((s, i) => s + i.scheduled_hours, 0),
+          scheduleItems: activeItems,
           color: getProjectColor(b.project_id),
-          pm: null,
-          expedice: null,
-          deadline: deadlineDate,
-        };
-      });
-  }, [scheduleData, weekKey]);
+          isSpilled: true,
+        });
+      }
+    }
+
+    // Sort: spilled first
+    result.sort((a, b) => (b.isSpilled ? 1 : 0) - (a.isSpilled ? 1 : 0));
+    return result;
+  }, [scheduleData, weekKey, currentMonday]);
 
   // Fetch project details for deadlines/PM
   const { data: projectDetails } = useProjectDetails(projects.map(p => p.projectId));
@@ -183,10 +265,15 @@ export default function Vyroba() {
 
   // Log modal
   const [logModalOpen, setLogModalOpen] = useState(false);
+  const [logDayIndex, setLogDayIndex] = useState(-1);
   const [logPhase, setLogPhase] = useState("Řezání");
   const [logPercent, setLogPercent] = useState(0);
   const [logTab, setLogTab] = useState<"notes" | "photo">("notes");
   const [logNotes, setLogNotes] = useState("");
+
+  // Expedice confirmation dialog
+  const [expediceDialogOpen, setExpediceDialogOpen] = useState(false);
+  const [expediceChecks, setExpediceChecks] = useState({ vyroba: false, kvalita: false, dokumentace: false });
 
   // Items expand
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
@@ -233,6 +320,22 @@ export default function Vyroba() {
     return "behind";
   }
 
+  // Get ALL items for a project across ALL weeks
+  function getAllItemsForProject(pid: string): { item: ScheduleItem; weekKey: string; weekNum: number }[] {
+    if (!scheduleData) return [];
+    const items: { item: ScheduleItem; weekKey: string; weekNum: number }[] = [];
+    for (const [wk, silo] of scheduleData) {
+      for (const bundle of silo.bundles) {
+        if (bundle.project_id !== pid) continue;
+        for (const item of bundle.items) {
+          if (item.status === "cancelled") continue;
+          items.push({ item, weekKey: wk, weekNum: silo.week_number });
+        }
+      }
+    }
+    return items;
+  }
+
   /* ── Stats ── */
   const stats = useMemo(() => {
     const total = enrichedProjects.length;
@@ -244,8 +347,10 @@ export default function Vyroba() {
   }, [enrichedProjects, dailyLogsMap, todayDayIndex]);
 
   /* ── Log modal ── */
-  function openLogModal() {
+  function openLogModal(dayIdx?: number) {
     if (!selectedProject) return;
+    const di = dayIdx ?? todayDayIndex;
+    setLogDayIndex(di);
     const latestPhase = getLatestPhase(selectedProject.projectId);
     setLogPhase(latestPhase || "Řezání");
     setLogPercent(getLatestPercent(selectedProject.projectId));
@@ -255,9 +360,9 @@ export default function Vyroba() {
   }
 
   async function handleSaveLog() {
-    if (!selectedProject || todayDayIndex < 0) return;
+    if (!selectedProject || logDayIndex < 0) return;
     try {
-      await saveDailyLog(bundleId(selectedProject.projectId), weekKey, todayDayIndex, logPhase, logPercent);
+      await saveDailyLog(bundleId(selectedProject.projectId), weekKey, logDayIndex, logPhase, logPercent);
       qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
       toast.success("✓ Log uložen", { duration: 2000 });
       setLogModalOpen(false);
@@ -281,74 +386,44 @@ export default function Vyroba() {
     toast.success(`${ids.length} položek → T${nextWeekNum}`);
   }
 
-  /* ── Check if all bundle items completed → move to Expedice ── */
-  async function checkAndMoveToExpedice(projectId: string, projectName: string) {
-    // Re-fetch all schedule items for this project in current week
-    const { data: items } = await supabase
-      .from("production_schedule")
-      .select("id, status")
-      .eq("project_id", projectId)
-      .eq("scheduled_week", weekKey)
-      .not("status", "eq", "cancelled");
-
-    if (!items || items.length === 0) return;
-
-    const allCompleted = items.every(i => i.status === "completed");
-    if (!allCompleted) return;
-
-    // Update project status to Expedice
-    const { error } = await supabase
-      .from("projects")
-      .update({ status: "Expedice" })
-      .eq("project_id", projectId);
-
-    if (error) {
-      console.warn("Failed to update project status:", error.message);
-      return;
-    }
-
-    qc.invalidateQueries({ queryKey: ["projects"] });
-    qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
-    toast.success(`${projectName} dokončeno — přesunuto do Expedice`, { duration: 4000 });
+  /* ── Expedice confirmation flow ── */
+  function openExpediceDialog() {
+    setExpediceChecks({ vyroba: false, kvalita: false, dokumentace: false });
+    setExpediceDialogOpen(true);
   }
 
-  /* ── Complete all items ── */
-  async function handleCompleteAll() {
+  async function handleConfirmExpedice() {
     if (!selectedProject) return;
-    const activeItems = selectedProject.scheduleItems.filter(i => i.status !== "completed" && i.status !== "cancelled");
-    if (activeItems.length === 0) return;
     const { data: { user } } = await supabase.auth.getUser();
-    const ids = activeItems.map(i => i.id);
-    const { error } = await supabase.from("production_schedule").update({
-      status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
-    }).in("id", ids);
-    if (error) { toast.error(error.message); return; }
+    // Complete all active items
+    const activeItems = selectedProject.scheduleItems.filter(i => i.status !== "completed" && i.status !== "cancelled");
+    if (activeItems.length > 0) {
+      const ids = activeItems.map(i => i.id);
+      await supabase.from("production_schedule").update({
+        status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
+      }).in("id", ids);
+    }
+    // Update project status
+    await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", selectedProject.projectId);
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
-
-    // All items now completed → move to Expedice
-    await checkAndMoveToExpedice(selectedProject.projectId, selectedProject.projectName);
+    qc.invalidateQueries({ queryKey: ["projects"] });
+    qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
+    toast.success(`${selectedProject.projectName} → Expedice`, { duration: 4000 });
+    setExpediceDialogOpen(false);
   }
 
   /* ── Toggle single item complete ── */
   async function toggleItemComplete(itemId: string, currentStatus: string) {
-    if (!selectedProject) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (currentStatus === "completed") {
-      const { error } = await supabase.from("production_schedule").update({ status: "scheduled", completed_at: null, completed_by: null }).eq("id", itemId);
-      if (error) { toast.error(error.message); return; }
+      await supabase.from("production_schedule").update({ status: "scheduled", completed_at: null, completed_by: null }).eq("id", itemId);
     } else {
-      const { error } = await supabase.from("production_schedule").update({
+      await supabase.from("production_schedule").update({
         status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
       }).eq("id", itemId);
-      if (error) { toast.error(error.message); return; }
     }
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
-
-    // After toggling to completed, check if all are now done
-    if (currentStatus !== "completed") {
-      // Small delay to let the invalidation propagate, then check
-      setTimeout(() => checkAndMoveToExpedice(selectedProject.projectId, selectedProject.projectName), 300);
-    }
+    // Individual checkbox does NOT change project status
   }
 
   function handleSelectProject(pid: string) {
@@ -359,7 +434,7 @@ export default function Vyroba() {
   if (loading) {
     return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">Načítání...</p></div>;
   }
-  if (!isOwner) return null;
+  if (!isOwner && !isAdmin) return null;
 
   const statusColors = { "on-track": "#3a8a36", "at-risk": "#d97706", "behind": "#dc2626" };
 
@@ -487,7 +562,7 @@ export default function Vyroba() {
               const pct = getLatestPercent(p.projectId);
               const phase = getLatestPhase(p.projectId);
               const isSelected = selectedProjectId === p.projectId;
-              const borderColor = p.color;
+              const borderColor = p.isSpilled ? "#d97706" : status === "behind" ? "#dc2626" : status === "at-risk" ? "#d97706" : p.color;
               return (
                 <button
                   key={p.projectId}
@@ -496,14 +571,23 @@ export default function Vyroba() {
                   style={{
                     background: isSelected ? "#ffffff" : "transparent",
                     borderBottom: "1px solid #f0eeea",
+                    outline: isSelected ? "2px solid #d97706" : undefined,
+                    outlineOffset: -2,
                   }}
                 >
                   {/* Status color bar */}
-                  <div className="w-[3px] shrink-0 rounded-r-sm" style={{ background: borderColor }} />
-                  <div className="flex-1 px-2.5 py-2 min-w-0">
+                  <div className="w-[4px] shrink-0 rounded-r-sm" style={{ background: borderColor }} />
+                  <div className="flex-1 px-2.5 py-[5px] min-w-0">
                     <div className="flex items-center justify-between gap-1">
-                      <span className="truncate" style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a" }}>{p.projectName}</span>
-                      <span className="font-mono text-xs font-bold shrink-0" style={{ color: borderColor }}>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="truncate" style={{ fontSize: 14, fontWeight: 500, color: "#1a1a1a" }}>{p.projectName}</span>
+                        {p.isSpilled && (
+                          <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.1)", color: "#D97706" }}>
+                            Omeškaní
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-mono text-xs font-bold shrink-0" style={{ color: statusColors[status] }}>
                         {pct}%
                       </span>
                     </div>
@@ -524,7 +608,7 @@ export default function Vyroba() {
                     </div>
                     {/* 3px progress bar */}
                     <div className="mt-1.5 h-[3px] rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
-                      <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: borderColor }} />
+                      <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: statusColors[status] }} />
                     </div>
                   </div>
                 </button>
@@ -545,11 +629,12 @@ export default function Vyroba() {
               <DetailPanel
                 project={selectedProject}
                 weekKey={weekKey}
+                currentMonday={currentMonday}
                 todayDayIndex={todayDayIndex}
                 onOpenLog={openLogModal}
                 nextWeekNum={nextWeekNum}
                 onSpillAll={handleSpillAll}
-                onCompleteAll={handleCompleteAll}
+                onOpenExpedice={openExpediceDialog}
                 onToggleItem={toggleItemComplete}
                 getCumulativeForDay={(di) => getCumulativeForDay(selectedProject.projectId, di)}
                 getExpectedPct={getExpectedPct}
@@ -560,6 +645,8 @@ export default function Vyroba() {
                 expandedMap={expandedMap}
                 setExpandedMap={setExpandedMap}
                 bundleId={bundleId(selectedProject.projectId)}
+                allItems={getAllItemsForProject(selectedProject.projectId)}
+                scheduleData={scheduleData}
               />
             )}
           </div>
@@ -578,11 +665,12 @@ export default function Vyroba() {
               <DetailPanel
                 project={selectedProject}
                 weekKey={weekKey}
+                currentMonday={currentMonday}
                 todayDayIndex={todayDayIndex}
                 onOpenLog={openLogModal}
                 nextWeekNum={nextWeekNum}
                 onSpillAll={handleSpillAll}
-                onCompleteAll={handleCompleteAll}
+                onOpenExpedice={openExpediceDialog}
                 onToggleItem={toggleItemComplete}
                 getCumulativeForDay={(di) => getCumulativeForDay(selectedProject.projectId, di)}
                 getExpectedPct={getExpectedPct}
@@ -593,6 +681,8 @@ export default function Vyroba() {
                 expandedMap={expandedMap}
                 setExpandedMap={setExpandedMap}
                 bundleId={bundleId(selectedProject.projectId)}
+                allItems={getAllItemsForProject(selectedProject.projectId)}
+                scheduleData={scheduleData}
               />
             </div>
           </SheetContent>
@@ -606,11 +696,16 @@ export default function Vyroba() {
             <DialogTitle className="flex items-center gap-2">
               <span className="font-mono text-xs" style={{ color: "#6b7280" }}>{selectedProject?.projectId}</span>
               <span>{selectedProject?.projectName}</span>
+              {logDayIndex >= 0 && logDayIndex !== todayDayIndex && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(220,38,38,0.1)", color: "#dc2626" }}>doplněno</span>
+              )}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-5 py-2">
             <div>
-              <div className="text-xs font-semibold mb-2" style={{ color: "#6b7280" }}>Fáze dnes</div>
+              <div className="text-xs font-semibold mb-2" style={{ color: "#6b7280" }}>
+                {logDayIndex >= 0 ? DAY_NAMES[logDayIndex] : "Dnes"} — Fáze
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {PHASES.map(p => (
                   <button key={p.name} onClick={() => setLogPhase(p.name)}
@@ -668,7 +763,43 @@ export default function Vyroba() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setLogModalOpen(false)}>Zrušit</Button>
             <Button onClick={handleSaveLog} style={{ background: "#3a8a36" }}>
-              + Log dnes ({todayDayIndex >= 0 ? DAY_SHORT[todayDayIndex] : "–"})
+              + Log {logDayIndex >= 0 ? DAY_SHORT[logDayIndex] : "–"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ EXPEDICE CONFIRMATION DIALOG ═══ */}
+      <Dialog open={expediceDialogOpen} onOpenChange={setExpediceDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Potvrdit → Expedice</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm" style={{ color: "#6b7280" }}>
+            Před přesunem projektu <strong>{selectedProject?.projectName}</strong> do Expedice potvrďte:
+          </p>
+          <div className="space-y-3 py-3">
+            <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
+              <Checkbox checked={expediceChecks.vyroba} onCheckedChange={(v) => setExpediceChecks(c => ({ ...c, vyroba: !!v }))} />
+              <span className="text-sm">Výroba dokončena</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
+              <Checkbox checked={expediceChecks.kvalita} onCheckedChange={(v) => setExpediceChecks(c => ({ ...c, kvalita: !!v }))} />
+              <span className="text-sm">Kvalita zkontrolována</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
+              <Checkbox checked={expediceChecks.dokumentace} onCheckedChange={(v) => setExpediceChecks(c => ({ ...c, dokumentace: !!v }))} />
+              <span className="text-sm">Dokumentace v pořádku</span>
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExpediceDialogOpen(false)}>Zrušit</Button>
+            <Button
+              disabled={!expediceChecks.vyroba || !expediceChecks.kvalita || !expediceChecks.dokumentace}
+              onClick={handleConfirmExpedice}
+              style={{ background: "#3a8a36" }}
+            >
+              Potvrdit → Expedice
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -689,7 +820,6 @@ export default function Vyroba() {
 /* ═══════════════════════════════════════ */
 /* useProjectDetails hook                  */
 /* ═══════════════════════════════════════ */
-import { useQuery } from "@tanstack/react-query";
 
 function useProjectDetails(projectIds: string[]) {
   return useQuery({
@@ -712,16 +842,15 @@ function useProjectDetails(projectIds: string[]) {
 /* DETAIL PANEL                            */
 /* ═══════════════════════════════════════ */
 
-interface CumulativeInfo { percent: number; phase: string | null; isCarryForward: boolean; hasLog: boolean }
-
-function DetailPanel({ project, weekKey, todayDayIndex, onOpenLog, nextWeekNum, onSpillAll, onCompleteAll, onToggleItem, getCumulativeForDay, getExpectedPct, status, latestPct, latestPhase, logs, expandedMap, setExpandedMap, bundleId }: {
+function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog, nextWeekNum, onSpillAll, onOpenExpedice, onToggleItem, getCumulativeForDay, getExpectedPct, status, latestPct, latestPhase, logs, expandedMap, setExpandedMap, bundleId, allItems, scheduleData }: {
   project: VyrobaProject;
   weekKey: string;
+  currentMonday: Date;
   todayDayIndex: number;
-  onOpenLog: () => void;
+  onOpenLog: (dayIdx?: number) => void;
   nextWeekNum: number;
   onSpillAll: () => void;
-  onCompleteAll: () => void;
+  onOpenExpedice: () => void;
   onToggleItem: (id: string, status: string) => void;
   getCumulativeForDay: (dayIndex: number) => CumulativeInfo | null;
   getExpectedPct: (dayIndex: number) => number;
@@ -732,14 +861,38 @@ function DetailPanel({ project, weekKey, todayDayIndex, onOpenLog, nextWeekNum, 
   expandedMap: Record<string, boolean>;
   setExpandedMap: (fn: (m: Record<string, boolean>) => Record<string, boolean>) => void;
   bundleId: string;
+  allItems: { item: ScheduleItem; weekKey: string; weekNum: number }[];
+  scheduleData: Map<string, any> | undefined;
 }) {
+  const isMobile = useIsMobile();
   const expectedPct = todayDayIndex >= 0 ? getExpectedPct(todayDayIndex) : 0;
   const isExpanded = expandedMap[bundleId] ?? true;
   const statusColors = { "on-track": "#3a8a36", "at-risk": "#d97706", "behind": "#dc2626" };
   const statusLabels = { "on-track": "On track", "at-risk": "At risk", "behind": "Pozadu" };
   const statusColor = statusColors[status];
-  const activeItems = project.scheduleItems.filter(i => i.status !== "cancelled");
-  const completedCount = activeItems.filter(i => i.status === "completed").length;
+
+  // Group all items by category
+  const { currentItems, futureItems, completedItems } = useMemo(() => {
+    const current: { item: ScheduleItem; weekKey: string; weekNum: number }[] = [];
+    const future: { item: ScheduleItem; weekKey: string; weekNum: number }[] = [];
+    const completed: { item: ScheduleItem; weekKey: string; weekNum: number }[] = [];
+    
+    for (const entry of allItems) {
+      if (entry.item.status === "completed") {
+        completed.push(entry);
+      } else if (entry.weekKey === weekKey) {
+        current.push(entry);
+      } else if (new Date(entry.weekKey) > new Date(weekKey)) {
+        future.push(entry);
+      } else {
+        // Past week active items → treat as current (spilled)
+        current.push(entry);
+      }
+    }
+    return { currentItems: current, futureItems: future, completedItems: completed };
+  }, [allItems, weekKey]);
+
+  const totalActiveItems = currentItems.length + futureItems.length + completedItems.length;
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -752,10 +905,15 @@ function DetailPanel({ project, weekKey, todayDayIndex, onOpenLog, nextWeekNum, 
               <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full" style={{ background: `${statusColor}15`, color: statusColor, border: `1px solid ${statusColor}40` }}>
                 {statusLabels[status]}
               </span>
+              {project.isSpilled && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(217,119,6,0.1)", color: "#D97706" }}>
+                  Omeškaní
+                </span>
+              )}
             </div>
             <div style={{ fontSize: 16, fontWeight: 500, color: "#1a1a1a" }}>{project.projectName}</div>
             <div className="text-xs mt-0.5" style={{ color: "#6b7280" }}>
-              {activeItems.length} položek
+              {totalActiveItems} položek
               {project.deadline && <> · Expedice {fmtDateFull(project.deadline)}</>}
               {project.pm && <> · {project.pm}</>}
             </div>
@@ -788,7 +946,15 @@ function DetailPanel({ project, weekKey, todayDayIndex, onOpenLog, nextWeekNum, 
           <div className="text-[10px] uppercase font-semibold mb-2" style={{ color: "#99a5a3" }}>Průběh týdne</div>
           <div className="grid grid-cols-5 gap-2">
             {[0, 1, 2, 3, 4].map(di => (
-              <DayCell key={di} dayIndex={di} todayDayIndex={todayDayIndex} cumulative={getCumulativeForDay(di)} onOpenLog={onOpenLog} statusColor={statusColor} />
+              <DayCell
+                key={di}
+                dayIndex={di}
+                todayDayIndex={todayDayIndex}
+                cumulative={getCumulativeForDay(di)}
+                onOpenLog={() => onOpenLog(di)}
+                statusColor={statusColor}
+                logs={logs}
+              />
             ))}
           </div>
         </div>
@@ -822,50 +988,71 @@ function DetailPanel({ project, weekKey, todayDayIndex, onOpenLog, nextWeekNum, 
           </div>
         </div>
 
-        {/* ── Items ── */}
+        {/* ── AKTUÁLNÍ items ── */}
         <Collapsible open={isExpanded} onOpenChange={open => setExpandedMap(m => ({ ...m, [bundleId]: open }))}>
           <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold cursor-pointer" style={{ color: "#6b7280" }}>
             {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-            Položky ({completedCount}/{activeItems.length})
+            Aktuální ({currentItems.filter(i => i.item.status === "completed").length}/{currentItems.length})
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <div className="mt-2 space-y-1" style={{ maxHeight: 300, overflowY: "auto" }}>
-              {activeItems.map(item => {
-                const isCompleted = item.status === "completed";
-                const isPaused = item.status === "paused";
-                const isInProgress = item.status === "in_progress";
-                return (
-                  <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#ffffff", opacity: isCompleted ? 0.55 : 1 }}>
-                    <Checkbox
-                      className="h-3.5 w-3.5"
-                      checked={isCompleted}
-                      onCheckedChange={() => onToggleItem(item.id, item.status)}
-                    />
-                    {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
-                    <span className="text-[13px] flex-1 truncate" style={{ color: isCompleted ? "#99a5a3" : "#1a1a1a", textDecoration: isCompleted ? "line-through" : undefined }}>
-                      {item.item_name}
-                    </span>
-                    <span className="font-mono text-[11px] shrink-0" style={{ color: "#6b7280" }}>{item.scheduled_hours}h</span>
-                    {isInProgress && <span className="text-[8px] font-medium px-1.5 py-0.5 rounded-full" style={{ background: "rgba(37,99,235,0.1)", color: "#2563eb" }}>probíhá</span>}
-                    {isPaused && <span className="text-[8px] font-medium px-1.5 py-0.5 rounded-full" style={{ background: "rgba(217,119,6,0.12)", color: "#d97706" }}>⏸ čeká</span>}
-                    {isCompleted && <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(58,138,54,0.12)", color: "#3a8a36" }}>✓ hotovo</span>}
-                  </div>
-                );
-              })}
+            <div className="mt-2 space-y-1">
+              {currentItems.map(({ item }) => (
+                <ItemRow key={item.id} item={item} onToggle={onToggleItem} interactive projectId={project.projectId} />
+              ))}
             </div>
-            {activeItems.some(i => i.status !== "completed") && (
-              <div className="flex justify-end mt-2">
-                <button onClick={onCompleteAll} className="text-[11px] font-medium px-3 py-1 rounded" style={{ background: "rgba(58,138,54,0.1)", color: "#3a8a36", border: "1px solid rgba(58,138,54,0.2)" }}>
-                  Označit vše jako hotovo
-                </button>
-              </div>
-            )}
+            {/* Quality check per item */}
+            <QualitySection projectId={project.projectId} items={currentItems.map(e => e.item)} />
           </CollapsibleContent>
         </Collapsible>
 
+        {/* ── NAPLÁNOVANÉ (future) ── */}
+        {futureItems.length > 0 && (
+          <div>
+            <div className="text-[10px] uppercase font-semibold mb-2" style={{ color: "#99a5a3" }}>Naplánované</div>
+            <div className="space-y-1">
+              {futureItems.map(({ item, weekNum: wn }) => (
+                <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#f5f3f0", opacity: 0.5 }}>
+                  {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
+                  <span className="text-[13px] flex-1 truncate" style={{ color: "#6b7280" }}>{item.item_name}</span>
+                  <span className="font-mono text-[10px] shrink-0" style={{ color: "#99a5a3" }}>T{wn}</span>
+                  <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── HOTOVÉ ── */}
+        {completedItems.length > 0 && (
+          <div>
+            <div className="text-[10px] uppercase font-semibold mb-2" style={{ color: "#99a5a3" }}>Hotové</div>
+            <div className="space-y-1">
+              {completedItems.map(({ item }) => (
+                <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#ffffff", opacity: 0.55 }}>
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#3a8a36" }} />
+                  {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
+                  <span className="text-[13px] flex-1 truncate" style={{ color: "#99a5a3", textDecoration: "line-through" }}>{item.item_name}</span>
+                  <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Expedice button ── */}
+        {currentItems.some(i => i.item.status !== "completed") && (
+          <button onClick={onOpenExpedice} className={`w-full py-2.5 rounded-md text-sm font-medium transition-colors ${isMobile ? "min-h-[44px]" : ""}`}
+            style={{ background: "rgba(58,138,54,0.1)", color: "#3a8a36", border: "1px solid rgba(58,138,54,0.2)" }}>
+            Označit vše jako hotovo
+          </button>
+        )}
+
+        {/* ── Výkresy Section ── */}
+        <VykresynSection projectId={project.projectId} />
+
         {/* ── Daily log shortcut ── */}
         {todayDayIndex >= 0 && (
-          <button onClick={onOpenLog} className="w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90" style={{ background: "#3a8a36" }}>
+          <button onClick={() => onOpenLog()} className={`w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90 ${isMobile ? "min-h-[44px]" : ""}`} style={{ background: "#3a8a36" }}>
             + Log dnes ({DAY_SHORT[todayDayIndex]})
           </button>
         )}
@@ -875,15 +1062,178 @@ function DetailPanel({ project, weekKey, todayDayIndex, onOpenLog, nextWeekNum, 
 }
 
 /* ═══════════════════════════════════════ */
+/* ITEM ROW                                */
+/* ═══════════════════════════════════════ */
+
+function ItemRow({ item, onToggle, interactive, projectId }: {
+  item: ScheduleItem;
+  onToggle: (id: string, status: string) => void;
+  interactive: boolean;
+  projectId: string;
+}) {
+  const isCompleted = item.status === "completed";
+  const isPaused = item.status === "paused";
+  const isInProgress = item.status === "in_progress";
+  const isSplit = item.split_part != null && item.split_total != null;
+
+  return (
+    <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#ffffff", opacity: isCompleted ? 0.55 : 1 }}>
+      {interactive && (
+        <Checkbox
+          className="h-3.5 w-3.5"
+          checked={isCompleted}
+          onCheckedChange={() => onToggle(item.id, item.status)}
+        />
+      )}
+      {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
+      <span className="text-[13px] flex-1 truncate" style={{ color: isCompleted ? "#99a5a3" : "#1a1a1a", textDecoration: isCompleted ? "line-through" : undefined }}>
+        {item.item_name}
+        {isSplit && (
+          <span className="text-[10px] ml-1" style={{ color: "#6b7280" }}>
+            část {item.split_part}/{item.split_total}
+          </span>
+        )}
+      </span>
+      <span className="font-mono text-[11px] shrink-0" style={{ color: "#6b7280" }}>{item.scheduled_hours}h</span>
+      {isInProgress && <span className="text-[8px] font-medium px-1.5 py-0.5 rounded-full" style={{ background: "rgba(37,99,235,0.1)", color: "#2563eb" }}>probíhá</span>}
+      {isPaused && <span className="text-[8px] font-medium px-1.5 py-0.5 rounded-full" style={{ background: "rgba(217,119,6,0.12)", color: "#d97706" }}>⏸ čeká</span>}
+      {isCompleted && <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(58,138,54,0.12)", color: "#3a8a36" }}>✓ hotovo</span>}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════ */
+/* QUALITY SECTION                         */
+/* ═══════════════════════════════════════ */
+
+function QualitySection({ projectId, items }: { projectId: string; items: ScheduleItem[] }) {
+  const { checks, checkItem } = useQualityChecks(projectId);
+  const [loading, setLoading] = useState<string | null>(null);
+
+  const checkMap = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const c of checks) m.set(c.item_id, c);
+    return m;
+  }, [checks]);
+
+  async function handleCheck(itemId: string) {
+    setLoading(itemId);
+    try {
+      await checkItem(itemId);
+      toast.success("✓ Zkontrolováno");
+    } catch {
+      toast.error("Chyba kontroly");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="mt-3">
+      <div className="text-[10px] uppercase font-semibold mb-1.5" style={{ color: "#99a5a3" }}>Kontrola kvality</div>
+      <div className="space-y-1">
+        {items.map(item => {
+          const check = checkMap.get(item.id);
+          return (
+            <div key={item.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-md" style={{ border: "1px solid #ece8e2", background: "#ffffff" }}>
+              <span className="text-[12px] flex-1 truncate" style={{ color: "#4b5563" }}>
+                {item.item_code ? `${item.item_code} · ` : ""}{item.item_name}
+              </span>
+              {check ? (
+                <QualityCheckDisplay check={check} />
+              ) : (
+                <button
+                  onClick={() => handleCheck(item.id)}
+                  disabled={loading === item.id}
+                  className="px-2 py-1 text-[11px] font-medium rounded transition-colors min-h-[36px]"
+                  style={{ background: "rgba(37,99,235,0.08)", color: "#2563eb", border: "1px solid rgba(37,99,235,0.2)" }}
+                >
+                  {loading === item.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "✓ Zkontrolovat"}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function QualityCheckDisplay({ check }: { check: any }) {
+  const name = useProfileName(check.checked_by);
+  const date = new Date(check.checked_at);
+  const dateStr = `${date.getDate()}.${date.getMonth() + 1}.`;
+  return (
+    <span className="text-[10px] shrink-0" style={{ color: "#3a8a36" }}>
+      ✓ {name || "–"} {dateStr}
+    </span>
+  );
+}
+
+/* ═══════════════════════════════════════ */
+/* VÝKRESY SECTION                         */
+/* ═══════════════════════════════════════ */
+
+function VykresynSection({ projectId }: { projectId: string }) {
+  const [open, setOpen] = useState(false);
+  const { filesByCategory, listFiles } = useSharePointDocs(projectId);
+
+  useEffect(() => {
+    if (open && projectId) listFiles("vykresy");
+  }, [open, projectId, listFiles]);
+
+  const files = filesByCategory["vykresy"] || [];
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold cursor-pointer" style={{ color: "#6b7280" }}>
+        {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        <FileText className="h-3 w-3" />
+        Výkresy ({files.length})
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-2 space-y-1">
+          {files.length === 0 ? (
+            <div className="text-xs py-3 text-center" style={{ color: "#99a5a3" }}>Žádné výkresy</div>
+          ) : (
+            files.map(file => (
+              <div key={file.itemId || file.name} className="flex items-center gap-2 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#ffffff" }}>
+                {file.thumbnailUrl && (
+                  <img src={file.thumbnailUrl} alt="" className="w-8 h-8 rounded object-cover shrink-0" />
+                )}
+                <span className="text-[12px] flex-1 truncate" style={{ color: "#1a1a1a" }}>{file.name}</span>
+                {file.downloadUrl && (
+                  <a href={file.downloadUrl} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-muted transition-colors">
+                    <Download className="h-3.5 w-3.5" style={{ color: "#6b7280" }} />
+                  </a>
+                )}
+                {file.webUrl && (
+                  <a href={file.webUrl} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-muted transition-colors" title="Tisk">
+                    <Printer className="h-3.5 w-3.5" style={{ color: "#6b7280" }} />
+                  </a>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+/* ═══════════════════════════════════════ */
 /* DAY CELL                                */
 /* ═══════════════════════════════════════ */
 
-function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor }: {
+function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, logs }: {
   dayIndex: number;
   todayDayIndex: number;
   cumulative: CumulativeInfo | null;
   onOpenLog: () => void;
   statusColor: string;
+  logs: DailyLog[];
 }) {
   const isToday = dayIndex === todayDayIndex;
   const isFuture = todayDayIndex >= 0 && dayIndex > todayDayIndex;
@@ -891,6 +1241,17 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor }
   const notCurrentWeek = todayDayIndex < 0;
   const hasData = cumulative !== null;
   const pct = cumulative?.percent ?? 0;
+
+  // Check if log was added retroactively (logged_at date != the actual day)
+  const exactLog = logs.find(l => l.day_index === dayIndex);
+  const isRetroactive = useMemo(() => {
+    if (!exactLog || !isPast) return false;
+    // Compare logged_at date with the actual day
+    const loggedDate = new Date(exactLog.logged_at);
+    const actualDay = new Date();
+    actualDay.setDate(actualDay.getDate() - (todayDayIndex - dayIndex));
+    return loggedDate.toDateString() !== actualDay.toDateString();
+  }, [exactLog, isPast, todayDayIndex, dayIndex]);
 
   let bg = "#ffffff";
   let border = "#e5e2dd";
@@ -908,20 +1269,33 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor }
     border = "#fca5a5";
   }
 
+  const clickable = isToday || (isPast && !isFuture);
+
   return (
-    <div className="rounded-lg p-2 flex flex-col gap-1 transition-all" style={{
-      background: bg,
-      border: `1px ${borderStyle} ${border}`,
-      opacity: isFuture ? 0.5 : 1,
-    }}>
+    <div
+      className={`rounded-lg p-2 flex flex-col gap-1 transition-all ${clickable ? "cursor-pointer hover:shadow-sm" : ""}`}
+      style={{
+        background: bg,
+        border: `1px ${borderStyle} ${border}`,
+        opacity: (isFuture ? 0.5 : (isPast && !cumulative?.hasLog) ? 0.6 : 1),
+      }}
+      onClick={clickable ? onOpenLog : undefined}
+    >
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-medium" style={{ color: "#6b7280" }}>{DAY_NAMES[dayIndex]}</span>
-        {isToday && <span className="w-2 h-2 rounded-full" style={{ background: "#3a8a36" }} />}
+        {isToday && (
+          <span className="text-[7px] font-bold px-1 py-[1px] rounded" style={{ background: "rgba(58,138,54,0.15)", color: "#3a8a36" }}>DNES</span>
+        )}
       </div>
 
       {hasData ? (
         <>
-          <div className="text-xl font-mono font-bold text-right" style={{ color: pct >= 100 ? "#3a8a36" : "#1a1a1a" }}>{pct}%</div>
+          <div className="flex items-center justify-between">
+            <div className="text-xl font-mono font-bold" style={{ color: pct >= 100 ? "#3a8a36" : "#1a1a1a" }}>{pct}%</div>
+            {isRetroactive && (
+              <span className="text-[7px] font-bold px-1 py-[1px] rounded" style={{ background: "rgba(220,38,38,0.1)", color: "#dc2626" }}>doplněno</span>
+            )}
+          </div>
           {cumulative?.phase && (
             <div className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: PHASES.find(p => p.name === cumulative.phase)?.color || "#6b7280" }} />
@@ -929,10 +1303,10 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor }
             </div>
           )}
           {isToday && (
-            <button onClick={onOpenLog} className="mt-0.5 w-full text-[9px] font-medium py-0.5 rounded transition-colors"
+            <span className="mt-0.5 w-full text-[9px] font-medium py-0.5 rounded transition-colors text-center"
               style={{ background: "rgba(58,138,54,0.08)", color: "#3a8a36", border: "1px solid rgba(58,138,54,0.2)" }}>
               Upravit log
-            </button>
+            </span>
           )}
         </>
       ) : (
@@ -942,10 +1316,10 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor }
           ) : isFuture ? (
             <span className="text-[11px]" style={{ color: "#d0cdc8" }}>–</span>
           ) : isToday ? (
-            <button onClick={onOpenLog} className="text-[9px] font-medium py-0.5 px-2 rounded transition-colors"
+            <span className="text-[9px] font-medium py-0.5 px-2 rounded transition-colors"
               style={{ background: "rgba(58,138,54,0.08)", color: "#3a8a36", border: "1px solid rgba(58,138,54,0.2)" }}>
               + Log dnes
-            </button>
+            </span>
           ) : (
             <span className="text-[11px]" style={{ color: "#d0cdc8" }}>–</span>
           )}
@@ -960,6 +1334,7 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor }
 /* ═══════════════════════════════════════ */
 
 function VyrobaPhotoTab({ projectId }: { projectId: string }) {
+  const isMobile = useIsMobile();
   const { filesByCategory, listFiles, uploadFile, deleteFile, uploading } = useSharePointDocs(projectId);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -972,21 +1347,27 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
 
   const photos = useMemo(() => {
     const all = filesByCategory["fotky"] || [];
-    return all.filter(f => isImageFile(f.name));
+    return all.filter(f => isImageFile(f.name)).sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
   }, [filesByCategory]);
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     for (const file of Array.from(files)) {
+      // Auto-name: {project_id}-{slug}-Vyroba-{date}-{time}.{ext}
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const timeStr = `${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}`;
+      const ext = file.name.split(".").pop() || "jpg";
+      const autoName = `${projectId}-${slugify(projectId)}-Vyroba-${dateStr}-${timeStr}.${ext}`;
+      const renamedFile = new File([file], autoName, { type: file.type });
       try {
-        await uploadFile("fotky", file);
-        toast.success(`✓ ${file.name} nahráno`);
+        await uploadFile("fotky", renamedFile);
+        toast.success(`✓ ${autoName} nahráno`);
       } catch (err: any) {
         toast.error(err.message || "Upload selhal");
       }
     }
-    // Refresh list
     listFiles("fotky", true);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
@@ -1005,11 +1386,20 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
       {/* Upload button */}
       <div className="flex items-center justify-between mb-2">
         <span className="text-[10px]" style={{ color: "#99a5a3" }}>{photos.length} fotek</span>
-        <label className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium cursor-pointer transition-colors"
+        <label className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium cursor-pointer transition-colors min-h-[36px]"
           style={{ background: "rgba(58,138,54,0.08)", color: "#3a8a36", border: "1px solid rgba(58,138,54,0.2)" }}>
           {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
           Přidat foto
-          <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} disabled={uploading} />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleUpload}
+            disabled={uploading}
+            {...(isMobile ? { capture: "environment" as any } : {})}
+          />
         </label>
       </div>
 
@@ -1020,25 +1410,31 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-1.5" style={{ maxHeight: 200, overflowY: "auto" }}>
-          {photos.map((photo, idx) => (
-            <div key={photo.itemId || photo.name} className="relative aspect-square rounded-md overflow-hidden group cursor-pointer"
-              style={{ background: "#f0eeea" }}
-              onClick={() => { setLightboxIndex(idx); setLightboxOpen(true); }}>
-              <img
-                src={photo.thumbnailUrl || photo.downloadUrl || ""}
-                alt={photo.name}
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
-              {/* Delete button on hover */}
-              <button
-                onClick={(e) => { e.stopPropagation(); handleDelete(photo.name); }}
-                className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                style={{ background: "rgba(0,0,0,0.6)" }}>
-                <X className="h-3 w-3 text-white" />
-              </button>
-            </div>
-          ))}
+          {photos.map((photo, idx) => {
+            const date = new Date(photo.lastModified);
+            const dateLabel = `${date.getDate()}.${date.getMonth() + 1}.`;
+            return (
+              <div key={photo.itemId || photo.name} className="relative group cursor-pointer"
+                onClick={() => { setLightboxIndex(idx); setLightboxOpen(true); }}>
+                <div className="aspect-square rounded-md overflow-hidden" style={{ background: "#f0eeea" }}>
+                  <img
+                    src={photo.thumbnailUrl || photo.downloadUrl || ""}
+                    alt={photo.name}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
+                <div className="text-[9px] text-center mt-0.5" style={{ color: "#99a5a3" }}>{dateLabel}</div>
+                {/* Delete button on hover */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDelete(photo.name); }}
+                  className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ background: "rgba(0,0,0,0.6)" }}>
+                  <X className="h-3 w-3 text-white" />
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
