@@ -1147,11 +1147,14 @@ export default function Vyroba() {
           </DialogHeader>
           {selectedProject && (() => {
             const activeItems = selectedProject.scheduleItems.filter(i => i.status !== "cancelled");
-            // Next week capacity
+            const pct = getLatestPercent(selectedProject.projectId);
+            // Next week capacity — use remaining hours
             const nextSilo = scheduleData?.get(nextWeekKey);
             const nextUsed = nextSilo ? nextSilo.bundles.reduce((s, b) => s + b.total_hours, 0) : 0;
-            const selectedHours = activeItems.filter(i => spillSelected.has(i.id)).reduce((s, i) => s + i.scheduled_hours, 0);
-            const nextTotal = nextUsed + selectedHours;
+            const selectedRemainingHours = activeItems
+              .filter(i => spillSelected.has(i.id))
+              .reduce((s, i) => s + getRemainingHours(i, pct), 0);
+            const nextTotal = nextUsed + selectedRemainingHours;
             const nextPct = Math.round((nextTotal / 760) * 100);
             const nextColor = nextPct > 100 ? "#dc2626" : nextPct > 85 ? "#d97706" : "#3a8a36";
 
@@ -1159,8 +1162,8 @@ export default function Vyroba() {
               <div className="space-y-3 py-2">
                 {/* Target capacity bar */}
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="font-mono font-semibold" style={{ color: "#6b7280" }}>T{nextWeekNum}:</span>
-                  <div className="flex-1 h-[6px] rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
+                  <span className="font-mono font-semibold" style={{ color: "hsl(var(--muted-foreground))" }}>T{nextWeekNum}:</span>
+                  <div className="flex-1 h-[6px] rounded-full overflow-hidden" style={{ background: "hsl(var(--border))" }}>
                     <div className="h-full rounded-full" style={{ width: `${Math.min(nextPct, 100)}%`, background: nextColor }} />
                   </div>
                   <span className="font-mono text-[11px]" style={{ color: nextColor }}>{nextTotal}h/760h · {nextPct}%</span>
@@ -1174,14 +1177,15 @@ export default function Vyroba() {
                 {/* Item checklist */}
                 <div className="space-y-1 max-h-[300px] overflow-y-auto">
                   {activeItems.map(item => {
-                    const isDone = item.status === "completed";
+                    const isDone = item.status === "completed" || pct >= 100;
+                    const remaining = getRemainingHours(item, pct);
                     return (
-                      <label key={item.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer ${isDone ? "opacity-40" : ""}`}
-                        style={{ border: "1px solid #ece8e2", background: spillSelected.has(item.id) ? "rgba(217,119,6,0.04)" : "#fff" }}>
+                      <label key={item.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer ${isDone || remaining <= 0 ? "opacity-40" : ""}`}
+                        style={{ border: "1px solid hsl(var(--border))", background: spillSelected.has(item.id) ? "rgba(217,119,6,0.04)" : "hsl(var(--card))" }}>
                         <Checkbox
                           className="h-4 w-4"
                           checked={spillSelected.has(item.id)}
-                          disabled={isDone}
+                          disabled={isDone || remaining <= 0}
                           onCheckedChange={(v) => {
                             setSpillSelected(prev => {
                               const next = new Set(prev);
@@ -1190,9 +1194,16 @@ export default function Vyroba() {
                             });
                           }}
                         />
-                        {item.item_code && <span className="font-mono text-[10px] font-bold" style={{ color: "#223937" }}>{item.item_code}</span>}
-                        <span className="text-[12px] flex-1 truncate" style={{ color: isDone ? "#99a5a3" : "#1a1a1a", textDecoration: isDone ? "line-through" : undefined }}>{item.item_name}</span>
-                        <span className="font-mono text-[11px]" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1">
+                            {item.item_code && <span className="font-mono text-[10px] font-bold" style={{ color: "hsl(var(--foreground))" }}>{item.item_code}</span>}
+                            <span className="text-[12px] truncate" style={{ color: isDone ? "hsl(var(--muted-foreground))" : "hsl(var(--foreground))", textDecoration: isDone ? "line-through" : undefined }}>{item.item_name}</span>
+                          </div>
+                          <span className="text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>
+                            Zbývá: {remaining}h (z {item.scheduled_hours}h celkem, {pct}% hotovo)
+                          </span>
+                        </div>
+                        <span className="font-mono text-[11px] font-semibold shrink-0" style={{ color: remaining > 0 ? "#d97706" : "hsl(var(--muted-foreground))" }}>{remaining}h</span>
                       </label>
                     );
                   })}
