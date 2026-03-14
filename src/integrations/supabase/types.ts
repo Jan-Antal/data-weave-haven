@@ -339,6 +339,7 @@ export type Database = {
           id: string
           logged_at: string | null
           logged_by: string | null
+          note_text: string | null
           percent: number
           phase: string | null
           week_key: string
@@ -349,6 +350,7 @@ export type Database = {
           id?: string
           logged_at?: string | null
           logged_by?: string | null
+          note_text?: string | null
           percent?: number
           phase?: string | null
           week_key: string
@@ -359,6 +361,7 @@ export type Database = {
           id?: string
           logged_at?: string | null
           logged_by?: string | null
+          note_text?: string | null
           percent?: number
           phase?: string | null
           week_key?: string
