@@ -649,8 +649,30 @@ export default function Vyroba() {
 
   /* ── Toggle single item complete ── */
   async function toggleItemComplete(itemId: string, currentStatus: string) {
-    // Push undo
-    pushUndo({ type: "item_hotovo", itemId, prevStatus: currentStatus, timestamp: Date.now() });
+    const newStatus = currentStatus === "completed" ? "scheduled" : "completed";
+    pushUndo({
+      page: "vyroba",
+      actionType: "item_hotovo",
+      description: newStatus === "completed" ? "označení jako hotovo" : "vrácení položky",
+      undo: async () => {
+        if (currentStatus === "completed") {
+          const { data: { user } } = await supabase.auth.getUser();
+          await supabase.from("production_schedule").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null }).eq("id", itemId);
+        } else {
+          await supabase.from("production_schedule").update({ status: currentStatus, completed_at: null, completed_by: null }).eq("id", itemId);
+        }
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      },
+      redo: async () => {
+        if (newStatus === "completed") {
+          const { data: { user } } = await supabase.auth.getUser();
+          await supabase.from("production_schedule").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null }).eq("id", itemId);
+        } else {
+          await supabase.from("production_schedule").update({ status: "scheduled", completed_at: null, completed_by: null }).eq("id", itemId);
+        }
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      },
+    });
     const { data: { user } } = await supabase.auth.getUser();
     if (currentStatus === "completed") {
       await supabase.from("production_schedule").update({ status: "scheduled", completed_at: null, completed_by: null }).eq("id", itemId);
