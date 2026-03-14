@@ -37,7 +37,7 @@ export function useQualityDefects(projectId: string) {
   });
 
   const addDefect = useMutation({
-    mutationFn: async (defect: Omit<QualityDefect, "id" | "reported_at" | "resolved" | "resolved_by" | "resolved_at">) => {
+    mutationFn: async (defect: DefectInsert) => {
       const { error } = await (supabase.from("production_quality_defects" as any) as any).insert(defect);
       if (error) throw error;
     },
