@@ -2076,7 +2076,6 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                                     <div key={d.id} className="space-y-1 border-b pb-2 last:border-0">
                                       <div className="font-semibold">{d.defect_type}</div>
                                       <div className="text-muted-foreground">{d.description}</div>
-                                      {d.assigned_to && <div>Priradené: {d.assigned_to}</div>}
                                       <button className="px-2 py-1 rounded text-[11px] font-medium" style={{ background: "#16a34a", color: "#fff" }}
                                         onClick={async () => {
                                           const { data: { user } } = await supabase.auth.getUser();
