@@ -1781,6 +1781,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   pushUndo: (action: UndoAction) => void;
 }) {
   const { checks, checkItem, uncheckItem } = useQualityChecks(projectId);
+  const { defects, addDefect, resolveDefect } = useQualityDefects(projectId);
   const { profile } = useAuth();
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [qcModalOpen, setQcModalOpen] = useState(false);
@@ -1791,6 +1792,14 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   const [singleQcModalOpen, setSingleQcModalOpen] = useState(false);
   const [uncheckConfirmItemId, setUncheckConfirmItemId] = useState<string | null>(null);
   const [uncheckConfirmCode, setUncheckConfirmCode] = useState<string>("");
+  // Defect form state
+  const [defectOpen, setDefectOpen] = useState(false);
+  const [defectType, setDefectType] = useState("");
+  const [defectDesc, setDefectDesc] = useState("");
+  const [defectSeverity, setDefectSeverity] = useState<"minor" | "blocking">("minor");
+  const [defectResolution, setDefectResolution] = useState("");
+  const [defectAssignee, setDefectAssignee] = useState("");
+  const { data: allPeople = [] } = useAllPeople();
   const qc = useQueryClient();
   const qcUserFirstName = profile?.full_name?.split(" ")[0]?.slice(0, 8) || "–";
 
