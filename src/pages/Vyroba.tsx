@@ -501,6 +501,16 @@ export default function Vyroba() {
 
   async function handleConfirmExpedice() {
     if (!selectedProject) return;
+    // Push undo for expedice
+    const allItems = selectedProject.scheduleItems;
+    pushUndo({
+      type: "expedice",
+      projectId: selectedProject.projectId,
+      prevStatus: selectedProject.projectStatus || "Ve výrobě",
+      itemSnapshots: allItems.map(i => ({ id: i.id, prevStatus: i.status })),
+      timestamp: Date.now(),
+    });
+
     const { data: { user } } = await supabase.auth.getUser();
     const activeItems = selectedProject.scheduleItems.filter(i => i.status !== "completed" && i.status !== "cancelled");
     if (activeItems.length > 0) {
