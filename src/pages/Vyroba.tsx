@@ -1678,14 +1678,37 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   const qc = useQueryClient();
   const qcUserFirstName = profile?.full_name?.split(" ")[0]?.slice(0, 8) || "–";
 
-  // Deduplicate items by id
+  // Deduplicate by id, then merge splits by item_code+item_name within same week
   const dedupedItems = useMemo(() => {
-    const seen = new Set<string>();
-    return currentItems.filter(({ item }) => {
-      if (seen.has(item.id)) return false;
-      seen.add(item.id);
+    // Step 1: deduplicate by id
+    const seenIds = new Set<string>();
+    const unique = currentItems.filter(({ item }) => {
+      if (seenIds.has(item.id)) return false;
+      seenIds.add(item.id);
       return true;
     });
+
+    // Step 2: merge splits sharing item_code+item_name in the same week
+    const mergeKey = (i: ScheduleItem) => `${i.item_code || ""}::${i.item_name}::${i.scheduled_week}`;
+    const grouped = new Map<string, { item: ScheduleItem; weekKey: string; weekNum: number; mergedIds: string[]; totalHoursAllSplits: number; thisWeekHours: number }>();
+    for (const entry of unique) {
+      const key = mergeKey(entry.item);
+      const existing = grouped.get(key);
+      if (existing) {
+        // Accumulate hours for this week
+        existing.thisWeekHours += entry.item.scheduled_hours;
+        existing.mergedIds.push(entry.item.id);
+        // Keep the lowest split_part as representative
+        if (entry.item.split_part != null && existing.item.split_part != null && entry.item.split_part < existing.item.split_part) {
+          existing.item = { ...entry.item, scheduled_hours: existing.thisWeekHours };
+        } else {
+          existing.item = { ...existing.item, scheduled_hours: existing.thisWeekHours };
+        }
+      } else {
+        grouped.set(key, { ...entry, mergedIds: [entry.item.id], totalHoursAllSplits: 0, thisWeekHours: entry.item.scheduled_hours });
+      }
+    }
+    return Array.from(grouped.values());
   }, [currentItems]);
 
   const checkMap = useMemo(() => {
@@ -1697,22 +1720,25 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
 
 
 
-  function toggleSelect(itemId: string) {
+  function toggleSelect(mergedIds: string[]) {
     setSelectedItems(prev => {
       const next = new Set(prev);
-      if (next.has(itemId)) next.delete(itemId); else next.add(itemId);
+      const allIn = mergedIds.every(id => next.has(id));
+      if (allIn) mergedIds.forEach(id => next.delete(id));
+      else mergedIds.forEach(id => next.add(id));
       return next;
     });
   }
 
+  const allMergedIds = useMemo(() => dedupedItems.flatMap(d => d.mergedIds), [dedupedItems]);
   const completedCount = dedupedItems.filter(i => i.item.status === "completed").length;
-  const allSelected = dedupedItems.length > 0 && dedupedItems.every(i => selectedItems.has(i.item.id));
+  const allSelected = dedupedItems.length > 0 && dedupedItems.every(i => i.mergedIds.every(id => selectedItems.has(id)));
 
   // "Označit jako hotovo" — targets selected or all
   function handleMarkHotovo() {
     const targetItems = selectedItems.size > 0
-      ? dedupedItems.filter(({ item }) => selectedItems.has(item.id) && item.status !== "completed")
-      : dedupedItems.filter(({ item }) => item.status !== "completed");
+      ? dedupedItems.filter(d => d.mergedIds.some(id => selectedItems.has(id)) && d.item.status !== "completed")
+      : dedupedItems.filter(d => d.item.status !== "completed");
 
     if (targetItems.length === 0) return;
 
@@ -1721,10 +1747,12 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
     if (missingQC.length === 0) {
       // All have QC — mark as hotovo directly
       (async () => {
-        const ids = targetItems.map(({ item }) => item.id);
+        const ids = targetItems.flatMap(({ mergedIds }) => mergedIds);
         // Push undo for each item
-        for (const { item } of targetItems) {
-          pushUndo({ type: "item_hotovo", itemId: item.id, prevStatus: item.status, timestamp: Date.now() });
+        for (const { mergedIds: mids, item } of targetItems) {
+          for (const mid of mids) {
+            pushUndo({ type: "item_hotovo", itemId: mid, prevStatus: item.status, timestamp: Date.now() });
+          }
         }
         const { data: { user } } = await supabase.auth.getUser();
         await supabase.from("production_schedule").update({
@@ -1767,10 +1795,10 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         }
       }
       // Now mark ALL target items (selected or all) as completed
-      const targetItems = selectedItems.size > 0
-        ? dedupedItems.filter(({ item }) => selectedItems.has(item.id) && item.status !== "completed")
-        : dedupedItems.filter(({ item }) => item.status !== "completed");
-      const ids = targetItems.map(({ item }) => item.id);
+      const targetItems2 = selectedItems.size > 0
+        ? dedupedItems.filter(d => d.mergedIds.some(id => selectedItems.has(id)) && d.item.status !== "completed")
+        : dedupedItems.filter(d => d.item.status !== "completed");
+      const ids = targetItems2.flatMap(({ mergedIds }) => mergedIds);
       if (ids.length > 0) {
         await supabase.from("production_schedule").update({
           status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
@@ -1819,7 +1847,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                     className="h-3.5 w-3.5"
                     checked={allSelected}
                     onCheckedChange={(v) => {
-                      if (v) setSelectedItems(new Set(dedupedItems.map(i => i.item.id)));
+                       if (v) setSelectedItems(new Set(dedupedItems.flatMap(i => i.mergedIds)));
                       else setSelectedItems(new Set());
                     }}
                   />
@@ -1831,30 +1859,35 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         </div>
         <CollapsibleContent>
           <div className="mt-2 space-y-1">
-            {dedupedItems.map(({ item }) => {
+            {dedupedItems.map(({ item, mergedIds: mids, thisWeekHours }) => {
               const isCompleted = item.status === "completed";
               const isPaused = item.status === "paused";
               const isSplit = item.split_part != null && item.split_total != null;
               const qcCheck = checkMap.get(item.id);
               const hasQC = !!qcCheck;
-              const isSelected = selectedItems.has(item.id);
+              const isSelected = mids.every(id => selectedItems.has(id));
 
               const bothDone = isCompleted && hasQC;
               const rowBg = bothDone ? "rgba(58,138,54,0.06)" : isSelected ? "rgba(37,99,235,0.04)" : "#ffffff";
               const rowBorder = bothDone ? "1px solid rgba(58,138,54,0.2)" : isSelected ? "1px solid rgba(37,99,235,0.2)" : "1px solid #ece8e2";
 
+              // For splits, compute % of total allocated this week
+              const splitPctLabel = isSplit && item.split_total
+                ? `${Math.round((thisWeekHours / (item.scheduled_hours * item.split_total / (item.split_part || 1))) * 100)}%`
+                : null;
+
               return (
-                <div key={item.id}>
+                <div key={mids.join("-")}>
                   <div
                     className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer transition-colors"
                     style={{ border: rowBorder, background: rowBg }}
-                    onClick={() => toggleSelect(item.id)}
+                    onClick={() => toggleSelect(mids)}
                   >
                     {/* Select checkbox */}
                     <Checkbox
                       className="h-4 w-4 shrink-0"
                       checked={isSelected}
-                      onCheckedChange={() => toggleSelect(item.id)}
+                      onCheckedChange={() => toggleSelect(mids)}
                       onClick={(e) => e.stopPropagation()}
                     />
 
@@ -1879,7 +1912,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                     </div>
 
                     {/* Hours */}
-                    <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
+                    <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{thisWeekHours}h</span>
 
                     {/* QC badge — display only */}
                     {qcCheck ? (
