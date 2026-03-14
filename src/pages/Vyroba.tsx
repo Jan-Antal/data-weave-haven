@@ -296,6 +296,10 @@ export default function Vyroba() {
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const selectedProject = enrichedProjects.find(p => p.projectId === selectedProjectId) || null;
 
+  // Week picker
+  const [weekPickerOpen, setWeekPickerOpen] = useState(false);
+  const weekPickerRef = useRef<HTMLDivElement>(null);
+
   // Context menu state
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; projectId: string } | null>(null);
 
