@@ -436,20 +436,31 @@ export default function Vyroba() {
     if (!selectedProject) return;
     const di = dayIdx ?? todayDayIndex;
     setLogDayIndex(di);
-    const latestPhase = getLatestPhase(selectedProject.projectId);
-    const phaseName = latestPhase || "Řezání";
-    setLogPhase(phaseName);
-    const phasePct = PHASES.find(p => p.name === phaseName)?.pct || 0;
-    setLogPercent(Math.max(phasePct, getLatestPercent(selectedProject.projectId)));
     setLogTab("notes");
     setLogPhaseWarning(null);
     setHotovostTouched(false);
     logNotesUndoStack.current = [];
 
-    // Load existing note for this day
+    // Load log data specifically for the clicked day
     const logs = getLogsForProject(selectedProject.projectId);
     const existingLog = logs.find(l => l.day_index === di);
-    setLogNotes(existingLog?.note_text || "");
+
+    if (existingLog) {
+      // Day has an existing log — populate from it
+      setLogPhase(existingLog.phase || "Řezání");
+      setLogPercent(existingLog.percent);
+      setLogNotes(existingLog.note_text || "");
+    } else if (di === todayDayIndex) {
+      // Today with no log yet — pre-fill percent with current progress, rest empty
+      setLogPhase("Řezání");
+      setLogPercent(getLatestPercent(selectedProject.projectId));
+      setLogNotes("");
+    } else {
+      // Past/future day with no log — completely empty form
+      setLogPhase("Řezání");
+      setLogPercent(0);
+      setLogNotes("");
+    }
 
     setLogModalOpen(true);
   }
