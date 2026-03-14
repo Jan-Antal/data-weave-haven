@@ -575,12 +575,12 @@ const Index = () => {
           <div
             className={cn(
               "transition-all duration-250 ease-in-out overflow-hidden shrink-0",
-              dataLogOpen ? "w-[340px]" : "w-0"
+              dataLogOpen ? "w-[360px]" : "w-0"
             )}
           >
             <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
               setDataLogOpen(v);
-              try { sessionStorage.setItem("datalog-open", String(v)); } catch {}
+              try { localStorage.setItem("datalog-panel-index", String(v)); } catch {}
             }} />
           </div>
         )}
