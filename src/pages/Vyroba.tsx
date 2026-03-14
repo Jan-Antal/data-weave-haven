@@ -1014,53 +1014,21 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
 }
 
 /* ═══════════════════════════════════════ */
-/* ITEM ROW                                */
+/* UNIFIED ITEM LIST (Items + QC merged)   */
 /* ═══════════════════════════════════════ */
 
-function ItemRow({ item, onToggle, interactive, projectId }: {
-  item: ScheduleItem;
-  onToggle: (id: string, status: string) => void;
-  interactive: boolean;
+function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, onToggleExpand, bundleId, onOpenExpedice, isMobile }: {
   projectId: string;
+  currentItems: { item: ScheduleItem; weekKey: string; weekNum: number }[];
+  onToggleItem: (id: string, status: string) => void;
+  isExpanded: boolean;
+  onToggleExpand: (open: boolean) => void;
+  bundleId: string;
+  onOpenExpedice: () => void;
+  isMobile: boolean;
 }) {
-  const isCompleted = item.status === "completed";
-  const isPaused = item.status === "paused";
-  const isInProgress = item.status === "in_progress";
-  const isSplit = item.split_part != null && item.split_total != null;
-
-  return (
-    <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#ffffff", opacity: isCompleted ? 0.55 : 1 }}>
-      {interactive && (
-        <Checkbox
-          className="h-3.5 w-3.5"
-          checked={isCompleted}
-          onCheckedChange={() => onToggle(item.id, item.status)}
-        />
-      )}
-      {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
-      <span className="text-[13px] flex-1 truncate" style={{ color: isCompleted ? "#99a5a3" : "#1a1a1a", textDecoration: isCompleted ? "line-through" : undefined }}>
-        {item.item_name}
-        {isSplit && (
-          <span className="text-[10px] ml-1" style={{ color: "#6b7280" }}>
-            část {item.split_part}/{item.split_total}
-          </span>
-        )}
-      </span>
-      <span className="font-mono text-[11px] shrink-0" style={{ color: "#6b7280" }}>{item.scheduled_hours}h</span>
-      {isInProgress && <span className="text-[8px] font-medium px-1.5 py-0.5 rounded-full" style={{ background: "rgba(37,99,235,0.1)", color: "#2563eb" }}>probíhá</span>}
-      {isPaused && <span className="text-[8px] font-medium px-1.5 py-0.5 rounded-full" style={{ background: "rgba(217,119,6,0.12)", color: "#d97706" }}>⏸ čeká</span>}
-      {isCompleted && <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(58,138,54,0.12)", color: "#3a8a36" }}>✓ hotovo</span>}
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════ */
-/* QUALITY SECTION                         */
-/* ═══════════════════════════════════════ */
-
-function QualitySection({ projectId, items }: { projectId: string; items: ScheduleItem[] }) {
   const { checks, checkItem } = useQualityChecks(projectId);
-  const [loading, setLoading] = useState<string | null>(null);
+  const [qcLoading, setQcLoading] = useState<string | null>(null);
 
   const checkMap = useMemo(() => {
     const m = new Map<string, any>();
@@ -1068,48 +1036,124 @@ function QualitySection({ projectId, items }: { projectId: string; items: Schedu
     return m;
   }, [checks]);
 
-  async function handleCheck(itemId: string) {
-    setLoading(itemId);
+  async function handleQC(itemId: string) {
+    setQcLoading(itemId);
     try {
       await checkItem(itemId);
       toast.success("✓ Zkontrolováno");
     } catch {
       toast.error("Chyba kontroly");
     } finally {
-      setLoading(null);
+      setQcLoading(null);
     }
   }
 
-  if (items.length === 0) return null;
+  const completedCount = currentItems.filter(i => i.item.status === "completed").length;
+  const allReady = currentItems.length > 0 && currentItems.every(({ item }) => {
+    const isDone = item.status === "completed";
+    const hasQC = checkMap.has(item.id);
+    return isDone && hasQC;
+  });
 
   return (
-    <div className="mt-3">
-      <div className="text-[10px] uppercase font-semibold mb-1.5" style={{ color: "#99a5a3" }}>Kontrola kvality</div>
-      <div className="space-y-1">
-        {items.map(item => {
-          const check = checkMap.get(item.id);
-          return (
-            <div key={item.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-md" style={{ border: "1px solid #ece8e2", background: "#ffffff" }}>
-              <span className="text-[12px] flex-1 truncate" style={{ color: "#4b5563" }}>
-                {item.item_code ? `${item.item_code} · ` : ""}{item.item_name}
-              </span>
-              {check ? (
-                <QualityCheckDisplay check={check} />
-              ) : (
-                <button
-                  onClick={() => handleCheck(item.id)}
-                  disabled={loading === item.id}
-                  className="px-2 py-1 text-[11px] font-medium rounded transition-colors min-h-[36px]"
-                  style={{ background: "rgba(37,99,235,0.08)", color: "#2563eb", border: "1px solid rgba(37,99,235,0.2)" }}
-                >
-                  {loading === item.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "✓ Zkontrolovat"}
-                </button>
-              )}
-            </div>
-          );
-        })}
+    <>
+      <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
+        <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold cursor-pointer" style={{ color: "#6b7280" }}>
+          {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          Aktuální ({completedCount}/{currentItems.length})
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="mt-2 space-y-1">
+            {currentItems.map(({ item }) => {
+              const isCompleted = item.status === "completed";
+              const isPaused = item.status === "paused";
+              const isSplit = item.split_part != null && item.split_total != null;
+              const qcCheck = checkMap.get(item.id);
+              const hasQC = !!qcCheck;
+
+              // Row state colors
+              const bothDone = isCompleted && hasQC;
+              const doneNoQC = isCompleted && !hasQC;
+              const rowBg = bothDone ? "rgba(58,138,54,0.06)" : doneNoQC ? "rgba(217,119,6,0.06)" : "#ffffff";
+              const rowBorder = bothDone ? "1px solid rgba(58,138,54,0.2)" : doneNoQC ? "1px solid rgba(217,119,6,0.2)" : "1px solid #ece8e2";
+
+              return (
+                <div key={item.id} className="flex items-center gap-2 px-2.5 py-2 rounded-md" style={{ border: rowBorder, background: rowBg }}>
+                  {/* Left: item info */}
+                  <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                    {item.item_code && (
+                      <span className="font-mono text-[12px] font-bold shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>
+                    )}
+                    <span className="text-[13px] truncate" style={{
+                      color: bothDone ? "#3a8a36" : isCompleted ? "#99a5a3" : "#1a1a1a",
+                      textDecoration: isCompleted ? "line-through" : undefined,
+                    }}>
+                      {item.item_name}
+                    </span>
+                    {isSplit && (
+                      <span className="text-[9px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(99,102,241,0.1)", color: "#6366f1" }}>
+                        část {item.split_part}/{item.split_total}
+                      </span>
+                    )}
+                    {isPaused && (
+                      <span className="text-[8px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(217,119,6,0.12)", color: "#d97706" }}>⏸</span>
+                    )}
+                  </div>
+
+                  {/* Right: hours, QC, checkbox */}
+                  <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
+
+                  {/* QC button / indicator */}
+                  {qcCheck ? (
+                    <QualityCheckDisplay check={qcCheck} />
+                  ) : (
+                    <button
+                      onClick={() => handleQC(item.id)}
+                      disabled={qcLoading === item.id}
+                      className="px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors shrink-0"
+                      style={{ color: "#6b7280", border: "0.5px solid #d0cdc8" }}
+                      title="Kontrola kvality"
+                    >
+                      {qcLoading === item.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "✓ QC"}
+                    </button>
+                  )}
+
+                  {/* Hotovo checkbox */}
+                  <Checkbox
+                    className="h-4 w-4 shrink-0"
+                    checked={isCompleted}
+                    onCheckedChange={() => onToggleItem(item.id, item.status)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Expedice button — only active when ALL items are both done + QC'd */}
+      <div className="relative group">
+        <button
+          onClick={allReady ? onOpenExpedice : undefined}
+          disabled={!allReady}
+          className={`w-full py-2.5 rounded-md text-sm font-medium transition-colors ${isMobile ? "min-h-[44px]" : ""}`}
+          style={{
+            background: allReady ? "rgba(58,138,54,0.1)" : "#f5f3f0",
+            color: allReady ? "#3a8a36" : "#b0b7c3",
+            border: allReady ? "1px solid rgba(58,138,54,0.2)" : "1px solid #e5e2dd",
+            cursor: allReady ? "pointer" : "not-allowed",
+          }}
+        >
+          Označit vše jako hotovo
+        </button>
+        {!allReady && currentItems.length > 0 && (
+          <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded text-[10px] whitespace-nowrap z-10"
+            style={{ background: "#1a1a1a", color: "#ffffff" }}>
+            Nejprve dokončete a zkontrolujte všechny položky
+          </div>
+        )}
       </div>
-    </div>
+    </>
   );
 }
 
