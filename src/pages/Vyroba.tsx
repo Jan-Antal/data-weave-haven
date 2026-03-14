@@ -1545,14 +1545,24 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="mt-2 space-y-1">
-                {completedItems.map(({ item }) => (
-                  <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#ffffff" }}>
-                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#3a8a36" }} />
-                    {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#3a8a36" }}>{item.item_code}</span>}
-                    <span className="text-[13px] flex-1 truncate" style={{ color: "#5a9a58" }}>{item.item_name}</span>
-                    <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
-                  </div>
-                ))}
+                {completedItems.map(({ item }) => {
+                  const qcCheck = hotoveCheckMap.get(item.id);
+                  return (
+                    <div key={item.id} className="px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#ffffff" }}>
+                      <div className="flex items-center gap-2.5">
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#3a8a36" }} />
+                        {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#3a8a36" }}>{item.item_code}</span>}
+                        <span className="text-[13px] flex-1 truncate" style={{ color: "#5a9a58" }}>{item.item_name}</span>
+                        <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
+                      </div>
+                      {qcCheck && (
+                        <div className="ml-6 mt-0.5">
+                          <QualityCheckFullDisplay check={qcCheck} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </CollapsibleContent>
           </Collapsible>
