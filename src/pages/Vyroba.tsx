@@ -2120,7 +2120,7 @@ function QualityCheckDisplay({ check }: { check: any }) {
   const firstName = name ? name.split(" ")[0].slice(0, 8) : "–";
   return (
     <span
-      className="inline-flex items-center gap-1 shrink-0"
+      className="inline-flex items-center gap-1 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
       style={{
         background: "#dcfce7",
         color: "#166534",
