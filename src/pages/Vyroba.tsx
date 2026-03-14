@@ -1657,7 +1657,7 @@ function useProjectDetails(projectIds: string[]) {
 /* DETAIL PANEL                            */
 /* ═══════════════════════════════════════ */
 
-function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog, nextWeekNum, onSpillAll, onOpenExpedice, onToggleItem, getCumulativeForDay, getExpectedPct, status, latestPct, latestPhase, logs, expandedMap, setExpandedMap, bundleId, allItems, scheduleData, pushUndo, onOpenProjectDetail, dyhaDismissed, onDismissDyha }: {
+function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog, nextWeekNum, onSpillAll, onOpenExpedice, onToggleItem, getCumulativeForDay, getExpectedPct, status, latestPct, latestPhase, logs, expandedMap, setExpandedMap, bundleId, allItems, scheduleData, pushUndo, onOpenProjectDetail, dyhaDismissed, onDismissDyha, weeklyGoal }: {
   project: VyrobaProject;
   weekKey: string;
   currentMonday: Date;
@@ -1668,7 +1668,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
   onOpenExpedice: () => void;
   onToggleItem: (id: string, status: string) => void;
   getCumulativeForDay: (dayIndex: number) => CumulativeInfo | null;
-  getExpectedPct: (dayIndex: number) => number;
+  getExpectedPct: (dayIndex: number, weeklyGoal?: number) => number;
   status: "on-track" | "at-risk" | "behind";
   latestPct: number;
   latestPhase: string | null;
@@ -1682,9 +1682,10 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
   onOpenProjectDetail: () => void;
   dyhaDismissed: boolean;
   onDismissDyha: () => void;
+  weeklyGoal: number;
 }) {
   const isMobile = useIsMobile();
-  const expectedPct = todayDayIndex >= 0 ? getExpectedPct(todayDayIndex) : 0;
+  const expectedPct = todayDayIndex >= 0 ? getExpectedPct(todayDayIndex, weeklyGoal) : 0;
   const isExpanded = expandedMap[bundleId] ?? true;
   const statusColors = { "on-track": "#3a8a36", "at-risk": "#d97706", "behind": "#dc2626" };
   const statusLabels = { "on-track": "On track", "at-risk": "At risk", "behind": "Pozadu" };
