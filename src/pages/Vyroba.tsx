@@ -41,6 +41,13 @@ import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
 import { PauseItemDialog } from "@/components/production/PauseItemDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useQualityDefects, type QualityDefect } from "@/hooks/useQualityDefects";
+import { useAllPeople } from "@/hooks/usePeople";
 
 /* ═══ helpers ═══ */
 function getMonday(d: Date): Date {
