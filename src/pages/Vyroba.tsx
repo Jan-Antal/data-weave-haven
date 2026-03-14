@@ -717,6 +717,11 @@ export default function Vyroba() {
       }).eq("id", itemId);
     }
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
+    // Log item hotovo
+    if (newStatus === "completed" && selectedProject) {
+      const item = selectedProject.scheduleItems.find(i => i.id === itemId);
+      logActivity({ projectId: selectedProject.projectId, actionType: "item_hotovo", newValue: item?.item_code || item?.item_name || itemId, detail: "Označeno jako hotovo" });
+    }
   }
 
 
