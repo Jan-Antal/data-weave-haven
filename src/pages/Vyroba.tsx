@@ -1847,7 +1847,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                     className="h-3.5 w-3.5"
                     checked={allSelected}
                     onCheckedChange={(v) => {
-                      if (v) setSelectedItems(new Set(dedupedItems.map(i => i.item.id)));
+                       if (v) setSelectedItems(new Set(dedupedItems.flatMap(i => i.mergedIds)));
                       else setSelectedItems(new Set());
                     }}
                   />
