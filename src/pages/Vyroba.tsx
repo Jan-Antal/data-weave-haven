@@ -1811,8 +1811,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   {showWarning && (
                     <div className="flex items-center gap-2 px-3 py-1.5 mt-0.5 rounded text-[11px]" style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.15)", color: "#92400e" }}>
                       <AlertTriangle className="h-3 w-3 shrink-0" style={{ color: "#d97706" }} />
-                      <span>Položka nemá QC kontrolu — označte jako zkontrolováno před dokončením</span>
-                      <button onClick={() => setHotovoWarning(null)} className="ml-auto shrink-0"><X className="h-3 w-3" /></button>
+                      <span>Nejprve označte jako zkontrolováno (✓ QC)</span>
                     </div>
                   )}
 
