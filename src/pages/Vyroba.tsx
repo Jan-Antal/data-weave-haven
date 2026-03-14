@@ -1261,17 +1261,23 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
   let bg = "#ffffff";
   let border = "#e5e2dd";
   let borderStyle = "solid";
+  let borderWidth = "1px";
 
   if (isFuture || notCurrentWeek) {
     bg = "#fafaf8";
     border = "#e5e2dd";
     borderStyle = "dashed";
   } else if (isToday) {
-    bg = "#ffffff";
+    bg = "rgba(58,138,54,0.03)";
     border = "#3a8a36";
+    borderWidth = "2px";
   } else if (isPast && !cumulative?.hasLog) {
     bg = "#ffffff";
-    border = "#fca5a5";
+    border = "#e5a8a8";
+    borderWidth = "1px";
+  } else if (isPast && cumulative?.hasLog) {
+    bg = "#ffffff";
+    border = "#86c083";
   }
 
   const clickable = isToday || (isPast && !isFuture);
