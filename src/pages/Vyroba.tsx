@@ -2151,33 +2151,91 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         </CollapsibleContent>
       </Collapsible>
 
-      {/* "Označit jako hotovo" button */}
-      <button
-        onClick={handleMarkHotovo}
-        disabled={dedupedItems.filter(i => i.item.status !== "completed").length === 0}
-        className={`w-full py-2.5 rounded-md text-sm font-medium transition-colors ${isMobile ? "min-h-[44px]" : ""}`}
-        style={{
-          background: dedupedItems.some(i => i.item.status !== "completed") ? "rgba(58,138,54,0.1)" : "#f5f3f0",
-          color: dedupedItems.some(i => i.item.status !== "completed") ? "#3a8a36" : "#b0b7c3",
-          border: dedupedItems.some(i => i.item.status !== "completed") ? "1px solid rgba(58,138,54,0.2)" : "1px solid #e5e2dd",
-          cursor: dedupedItems.some(i => i.item.status !== "completed") ? "pointer" : "not-allowed",
-        }}
-      >
-        Označit {selectedItems.size > 0 ? `${selectedItems.size} položek` : "vše"} jako hotovo
-      </button>
+      {/* Blocking defects warning */}
+      {(() => {
+        const allItemIds = dedupedItems.flatMap(d => d.mergedIds);
+        const blockingDefects = defects.filter(d => !d.resolved && d.severity === "blocking" && allItemIds.includes(d.item_id));
+        if (blockingDefects.length === 0) return null;
+        return (
+          <div className="rounded-md px-3 py-2 space-y-1.5 text-[12px]" style={{ background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.15)" }}>
+            <div className="font-semibold" style={{ color: "#dc2626" }}>⛔ Blokujúce vady ({blockingDefects.length})</div>
+            {blockingDefects.map(d => (
+              <div key={d.id} className="flex items-center justify-between gap-2">
+                <span className="truncate" style={{ color: "#92400e" }}>{d.item_code || ""} — {d.defect_type}</span>
+                <button className="px-2 py-0.5 rounded text-[10px] font-medium shrink-0" style={{ background: "#16a34a", color: "#fff" }}
+                  onClick={async () => {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    resolveDefect.mutate({ defectId: d.id, userId: user?.id || "" });
+                    toast.success("Vada opravená");
+                  }}>Označiť ako opravenú</button>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
-      {/* QC MODE POPUP — simplified warning */}
+      {/* "Označit jako hotovo" button */}
+      {(() => {
+        const allItemIds = dedupedItems.flatMap(d => d.mergedIds);
+        const hasBlockingDefects = defects.some(d => !d.resolved && d.severity === "blocking" && allItemIds.includes(d.item_id));
+        const hasIncomplete = dedupedItems.some(i => i.item.status !== "completed");
+        const isDisabled = !hasIncomplete || hasBlockingDefects;
+        return (
+          <button
+            onClick={handleMarkHotovo}
+            disabled={isDisabled}
+            className={`w-full py-2.5 rounded-md text-sm font-medium transition-colors ${isMobile ? "min-h-[44px]" : ""}`}
+            style={{
+              background: isDisabled ? "#f5f3f0" : "rgba(58,138,54,0.1)",
+              color: isDisabled ? "#b0b7c3" : "#3a8a36",
+              border: isDisabled ? "1px solid #e5e2dd" : "1px solid rgba(58,138,54,0.2)",
+              cursor: isDisabled ? "not-allowed" : "pointer",
+            }}
+          >
+            {hasBlockingDefects ? "Blokované — najskôr opravte vady" : `Označit ${selectedItems.size > 0 ? `${selectedItems.size} položek` : "vše"} jako hotovo`}
+          </button>
+        );
+      })()}
+
+      {/* QC MODE POPUP */}
       <Dialog open={qcModalOpen} onOpenChange={setQcModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Kontrola kvality — {projectName}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            {/* Warning banner — no checkboxes */}
-            <div className="flex items-start gap-2 px-3 py-3 rounded-md text-[13px]" style={{ background: "rgba(217,119,6,0.1)", border: "1px solid rgba(217,119,6,0.2)", color: "#92400e" }}>
-              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "#d97706" }} />
-              <span>⚠ Před potvrzením zkontrolujte: rozměry, povrchovou úpravu, spoje a balení.</span>
-            </div>
+            <QcWarningBox />
+
+            {/* Defect section */}
+            <QcDefectForm
+              defectOpen={defectOpen}
+              setDefectOpen={setDefectOpen}
+              defectType={defectType} setDefectType={setDefectType}
+              defectDesc={defectDesc} setDefectDesc={setDefectDesc}
+              defectSeverity={defectSeverity} setDefectSeverity={setDefectSeverity}
+              defectResolution={defectResolution} setDefectResolution={setDefectResolution}
+              defectAssignee={defectAssignee} setDefectAssignee={setDefectAssignee}
+              allPeople={allPeople}
+              onSave={async () => {
+                const { data: { user } } = await supabase.auth.getUser();
+                const targetItem = qcModalItems[0]?.item;
+                if (!targetItem) return;
+                await addDefect.mutateAsync({
+                  project_id: projectId,
+                  item_id: targetItem.id,
+                  item_code: targetItem.item_code || null,
+                  defect_type: defectType,
+                  description: defectDesc,
+                  severity: defectSeverity,
+                  resolution_type: defectSeverity === "blocking" ? defectResolution : null,
+                  assigned_to: defectAssignee || null,
+                  photo_url: null,
+                  reported_by: user?.id || "",
+                });
+                toast.success("Vada zaznamenaná");
+                setDefectType(""); setDefectDesc(""); setDefectSeverity("minor"); setDefectResolution(""); setDefectAssignee(""); setDefectOpen(false);
+              }}
+            />
 
             {/* Items requiring QC */}
             <div>
@@ -2208,15 +2266,42 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
 
       {/* Single-item QC modal */}
       <Dialog open={singleQcModalOpen} onOpenChange={setSingleQcModalOpen}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Kontrola kvality — {singleQcItem?.item_code} {singleQcItem?.item_name}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="flex items-start gap-2 px-3 py-3 rounded-md text-[13px]" style={{ background: "rgba(217,119,6,0.1)", border: "1px solid rgba(217,119,6,0.2)", color: "#92400e" }}>
-              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "#d97706" }} />
-              <span>⚠ Před potvrzením zkontrolujte: rozměry, povrchovou úpravu, spoje a balení.</span>
-            </div>
+          <div className="space-y-4 py-2">
+            <QcWarningBox />
+
+            {/* Defect section */}
+            <QcDefectForm
+              defectOpen={defectOpen}
+              setDefectOpen={setDefectOpen}
+              defectType={defectType} setDefectType={setDefectType}
+              defectDesc={defectDesc} setDefectDesc={setDefectDesc}
+              defectSeverity={defectSeverity} setDefectSeverity={setDefectSeverity}
+              defectResolution={defectResolution} setDefectResolution={setDefectResolution}
+              defectAssignee={defectAssignee} setDefectAssignee={setDefectAssignee}
+              allPeople={allPeople}
+              onSave={async () => {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!singleQcItem) return;
+                await addDefect.mutateAsync({
+                  project_id: projectId,
+                  item_id: singleQcItem.id,
+                  item_code: singleQcItem.item_code || null,
+                  defect_type: defectType,
+                  description: defectDesc,
+                  severity: defectSeverity,
+                  resolution_type: defectSeverity === "blocking" ? defectResolution : null,
+                  assigned_to: defectAssignee || null,
+                  photo_url: null,
+                  reported_by: user?.id || "",
+                });
+                toast.success("Vada zaznamenaná");
+                setDefectType(""); setDefectDesc(""); setDefectSeverity("minor"); setDefectResolution(""); setDefectAssignee(""); setDefectOpen(false);
+              }}
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSingleQcModalOpen(false)}>Zrušit</Button>
