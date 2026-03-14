@@ -391,15 +391,34 @@ export default function Vyroba() {
     return null;
   }
 
-  function getExpectedPct(dayIndex: number): number {
-    return Math.round(((dayIndex + 1) / 5) * 100);
+  function getWeeklyGoal(pid: string): number {
+    if (!scheduleData) return 100;
+    let thisWeekHours = 0;
+    let totalHours = 0;
+    for (const [wk, silo] of scheduleData) {
+      for (const bundle of silo.bundles) {
+        if (bundle.project_id !== pid) continue;
+        const activeHours = bundle.items
+          .filter((i: ScheduleItem) => i.status !== "cancelled")
+          .reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0);
+        totalHours += activeHours;
+        if (wk === weekKey) thisWeekHours += activeHours;
+      }
+    }
+    if (totalHours <= 0) return 100;
+    return Math.round((thisWeekHours / totalHours) * 100);
+  }
+
+  function getExpectedPct(dayIndex: number, weeklyGoal: number = 100): number {
+    return Math.round(((dayIndex + 1) / 5) * weeklyGoal);
   }
 
   function getProjectStatus(pid: string): "on-track" | "at-risk" | "behind" {
     const pct = getLatestPercent(pid);
-    if (pct >= 100) return "on-track";
+    const goal = getWeeklyGoal(pid);
+    if (pct >= goal) return "on-track";
     if (todayDayIndex < 0) return "on-track";
-    const expected = getExpectedPct(todayDayIndex);
+    const expected = getExpectedPct(todayDayIndex, goal);
     if (pct >= expected - 10) return "on-track";
     if (pct >= expected - 25) return "at-risk";
     return "behind";
