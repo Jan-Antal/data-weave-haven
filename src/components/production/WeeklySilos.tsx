@@ -1057,7 +1057,9 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             isSelected={selectedProjectId === bundle.project_id}
             onSelectProject={onSelectProject} searchQuery={searchQuery}
             forecastDarkMode={forecastDarkMode}
-            isFocusedMatch={focusedMatchKey === `${weekKey}::${bundle.project_id}`} />
+            isFocusedMatch={focusedMatchKey === `${weekKey}::${bundle.project_id}`}
+            searchMatchedProjectIds={searchMatchedProjectIds}
+            searchActive={searchActive} />
         ))}
 
         {/* Rezerva kapacit section — blocker bundles separated */}
@@ -1077,7 +1079,9 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
                 isSelected={selectedProjectId === bundle.project_id}
                 onSelectProject={onSelectProject} searchQuery={searchQuery}
                 forecastDarkMode={forecastDarkMode}
-                isFocusedMatch={focusedMatchKey === `${weekKey}::${bundle.project_id}`} />
+                isFocusedMatch={focusedMatchKey === `${weekKey}::${bundle.project_id}`}
+                searchMatchedProjectIds={searchMatchedProjectIds}
+                searchActive={searchActive} />
             ))}
           </>
         )}
