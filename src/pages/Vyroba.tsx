@@ -13,7 +13,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList,
   User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange, Factory,
   CheckCircle2, X, Plus, Trash2, Loader2, Download, Printer, FileText,
-  AlertTriangle, Camera, ArrowRight
+  AlertTriangle, Camera, ArrowRight, Shield
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
@@ -1329,6 +1329,14 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
   const statusLabels = { "on-track": "On track", "at-risk": "At risk", "behind": "Pozadu" };
   const statusColor = statusColors[status];
 
+  // QC checks for hotové section
+  const { checks: hotoveChecks } = useQualityChecks(project.projectId);
+  const hotoveCheckMap = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const c of hotoveChecks) m.set(c.item_id, c);
+    return m;
+  }, [hotoveChecks]);
+
   // Collapsible states for sections
   const [futureOpen, setFutureOpen] = useState(false);
   const [completedOpen, setCompletedOpen] = useState(false);
@@ -1537,14 +1545,24 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="mt-2 space-y-1">
-                {completedItems.map(({ item }) => (
-                  <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#ffffff" }}>
-                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#3a8a36" }} />
-                    {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#3a8a36" }}>{item.item_code}</span>}
-                    <span className="text-[13px] flex-1 truncate" style={{ color: "#5a9a58" }}>{item.item_name}</span>
-                    <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
-                  </div>
-                ))}
+                {completedItems.map(({ item }) => {
+                  const qcCheck = hotoveCheckMap.get(item.id);
+                  return (
+                    <div key={item.id} className="px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#ffffff" }}>
+                      <div className="flex items-center gap-2.5">
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#3a8a36" }} />
+                        {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#3a8a36" }}>{item.item_code}</span>}
+                        <span className="text-[13px] flex-1 truncate" style={{ color: "#5a9a58" }}>{item.item_name}</span>
+                        <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
+                      </div>
+                      {qcCheck && (
+                        <div className="ml-6 mt-0.5">
+                          <QualityCheckFullDisplay check={qcCheck} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -1575,15 +1593,14 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   onOpenExpedice: () => void;
   isMobile: boolean;
 }) {
-  const { checks, checkItem, uncheckItem } = useQualityChecks(projectId);
-  const [qcLoading, setQcLoading] = useState<string | null>(null);
+  const { checks, checkItem } = useQualityChecks(projectId);
+  const { profile } = useAuth();
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-  const [uncheckConfirm, setUncheckConfirm] = useState<string | null>(null);
   const [qcModalOpen, setQcModalOpen] = useState(false);
   const [qcModalItems, setQcModalItems] = useState<{ item: ScheduleItem }[]>([]);
-  const [qcChecklist, setQcChecklist] = useState({ rozmery: false, povrch: false, spoje: false, cistota: false });
   const [qcSubmitting, setQcSubmitting] = useState(false);
   const qc = useQueryClient();
+  const qcUserFirstName = profile?.full_name?.split(" ")[0]?.slice(0, 8) || "–";
 
   // Deduplicate items by id
   const dedupedItems = useMemo(() => {
@@ -1601,27 +1618,8 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
     return m;
   }, [checks]);
 
-  async function handleQC(itemId: string) {
-    setQcLoading(itemId);
-    try {
-      await checkItem(itemId);
-      toast.success("✓ Zkontrolováno");
-    } catch {
-      toast.error("Chyba kontroly");
-    } finally {
-      setQcLoading(null);
-    }
-  }
 
-  async function handleUncheckQC(checkId: string) {
-    try {
-      await uncheckItem(checkId);
-      toast.success("QC kontrola zrušena");
-    } catch {
-      toast.error("Chyba");
-    }
-    setUncheckConfirm(null);
-  }
+
 
   function toggleSelect(itemId: string) {
     setSelectedItems(prev => {
@@ -1664,15 +1662,12 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
     } else {
       // Open QC modal for items missing QC
       setQcModalItems(missingQC);
-      setQcChecklist({ rozmery: false, povrch: false, spoje: false, cistota: false });
       setQcModalOpen(true);
     }
   }
 
-  const allChecklistDone = qcChecklist.rozmery && qcChecklist.povrch && qcChecklist.spoje && qcChecklist.cistota;
-
   async function handleQcModalConfirm() {
-    if (!allChecklistDone || qcSubmitting) return;
+    if (qcSubmitting) return;
     setQcSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -1804,21 +1799,11 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                     {/* Hours */}
                     <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
 
-                    {/* QC button / indicator */}
+                    {/* QC badge — display only */}
                     {qcCheck ? (
-                      <button onClick={(e) => { e.stopPropagation(); setUncheckConfirm(qcCheck.id); }} className="shrink-0">
-                        <QualityCheckDisplay check={qcCheck} />
-                      </button>
+                      <QualityCheckDisplay check={qcCheck} />
                     ) : (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleQC(item.id); }}
-                        disabled={qcLoading === item.id}
-                        className="px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors shrink-0"
-                        style={{ color: "#6b7280", border: "0.5px solid #d0cdc8" }}
-                        title="Kontrola kvality"
-                      >
-                        {qcLoading === item.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "✓ QC"}
-                      </button>
+                      <QualityCheckBadgeEmpty />
                     )}
                   </div>
                 </div>
@@ -1843,46 +1828,27 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         Označit {selectedItems.size > 0 ? `${selectedItems.size} položek` : "vše"} jako hotovo
       </button>
 
-      {/* QC MODE POPUP — full modal */}
+      {/* QC MODE POPUP — simplified warning */}
       <Dialog open={qcModalOpen} onOpenChange={setQcModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Kontrola kvality — {projectName}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            {/* Warning banner */}
-            <div className="flex items-center gap-2 px-3 py-2 rounded-md text-[12px]" style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.15)", color: "#92400e" }}>
-              <AlertTriangle className="h-4 w-4 shrink-0" style={{ color: "#d97706" }} />
-              <span>⚠ Před dokončením zkontrolujte každý prvek podle checklist</span>
-            </div>
-
-            {/* Checklist */}
-            <div className="space-y-2">
-              {[
-                { key: "rozmery" as const, label: "Rozměry odpovídají výkresům" },
-                { key: "povrch" as const, label: "Povrchová úprava bez vad" },
-                { key: "spoje" as const, label: "Spoje a uchycení pevné" },
-                { key: "cistota" as const, label: "Čistota a balení v pořádku" },
-              ].map(({ key, label }) => (
-                <label key={key} className="flex items-center gap-3 cursor-pointer min-h-[36px]">
-                  <Checkbox
-                    checked={qcChecklist[key]}
-                    onCheckedChange={(v) => setQcChecklist(c => ({ ...c, [key]: !!v }))}
-                  />
-                  <span className="text-sm">{label}</span>
-                </label>
-              ))}
+            {/* Warning banner — no checkboxes */}
+            <div className="flex items-start gap-2 px-3 py-3 rounded-md text-[13px]" style={{ background: "rgba(217,119,6,0.1)", border: "1px solid rgba(217,119,6,0.2)", color: "#92400e" }}>
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "#d97706" }} />
+              <span>⚠ Před potvrzením zkontrolujte: rozměry, povrchovou úpravu, spoje a balení.</span>
             </div>
 
             {/* Items requiring QC */}
             <div>
-              <div className="text-[10px] uppercase font-semibold mb-1.5" style={{ color: "#99a5a3" }}>Položky vyžadující QC ({qcModalItems.length})</div>
+              <div className="text-[10px] uppercase font-semibold mb-1.5" style={{ color: "#99a5a3" }}>Položky ({qcModalItems.length})</div>
               <div className="space-y-1 max-h-[200px] overflow-y-auto">
                 {qcModalItems.map(({ item }) => (
                   <div key={item.id} className="flex items-center gap-2 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#fafaf8" }}>
                     {item.item_code && <span className="font-mono text-[11px] font-bold shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
                     <span className="text-[12px] flex-1 truncate" style={{ color: "#1a1a1a" }}>{item.item_name}</span>
-                    <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
                   </div>
                 ))}
               </div>
@@ -1891,49 +1857,71 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
           <DialogFooter>
             <Button variant="outline" onClick={() => setQcModalOpen(false)}>Zrušit</Button>
             <Button
-              disabled={!allChecklistDone || qcSubmitting}
+              disabled={qcSubmitting}
               onClick={handleQcModalConfirm}
-              style={{ background: allChecklistDone ? "#3a8a36" : undefined }}
+              style={{ background: "#3a8a36" }}
             >
               {qcSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-              Potvrdit QC a dokončit
+              Potvrdit QC — {qcUserFirstName}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* QC Uncheck confirm */}
-      <ConfirmDialog
-        open={!!uncheckConfirm}
-        onConfirm={() => uncheckConfirm && handleUncheckQC(uncheckConfirm)}
-        onCancel={() => setUncheckConfirm(null)}
-        title="Zrušit QC kontrolu?"
-        description="Kontrola kvality bude odstraněna pro tuto položku."
-        confirmLabel="Zrušit QC"
-        cancelLabel="Zpět"
-        variant="destructive"
-      />
     </>
   );
 }
 
 function QualityCheckDisplay({ check }: { check: any }) {
   const name = useProfileName(check.checked_by);
-  const date = new Date(check.checked_at);
-  const dateStr = `${date.getDate()}.${date.getMonth() + 1}.`;
+  const firstName = name ? name.split(" ")[0].slice(0, 8) : "–";
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="text-[10px] shrink-0 cursor-pointer" style={{ color: "#3a8a36" }}>
-            ✓ QC
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p className="text-xs">Zkontroloval: {name || "–"} · {dateStr}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <span
+      className="inline-flex items-center gap-1 shrink-0"
+      style={{
+        background: "#dcfce7",
+        color: "#166534",
+        border: "1px solid #16a34a",
+        padding: "4px 10px",
+        borderRadius: "9999px",
+        fontSize: "12px",
+        fontWeight: 500,
+        lineHeight: 1,
+      }}
+    >
+      ✓ {firstName}
+    </span>
+  );
+}
+
+function QualityCheckBadgeEmpty() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 shrink-0"
+      style={{
+        background: "#fef3c7",
+        color: "#92400e",
+        border: "1px solid #f59e0b",
+        padding: "4px 10px",
+        borderRadius: "9999px",
+        fontSize: "12px",
+        fontWeight: 500,
+        lineHeight: 1,
+      }}
+    >
+      <Shield className="h-3 w-3" />
+      QC
+    </span>
+  );
+}
+
+function QualityCheckFullDisplay({ check }: { check: any }) {
+  const name = useProfileName(check.checked_by);
+  const date = new Date(check.checked_at);
+  const dateStr = `${date.getDate()}.${date.getMonth() + 1}.${String(date.getFullYear()).slice(2)}`;
+  return (
+    <span style={{ color: "#166534", fontSize: "11px" }}>
+      ✓ QC: {name || "–"} · {dateStr}
+    </span>
   );
 }
 
