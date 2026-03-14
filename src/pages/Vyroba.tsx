@@ -1156,17 +1156,35 @@ export default function Vyroba() {
             <DialogTitle>Přesunout do T{nextWeekNum}</DialogTitle>
           </DialogHeader>
           {selectedProject && (() => {
-            const allItems = selectedProject.scheduleItems.filter(i => i.status !== "cancelled");
+            const rawItems = selectedProject.scheduleItems.filter(i => i.status !== "cancelled");
             const pct = getLatestPercent(selectedProject.projectId);
+
+            // Deduplicate spill items by item_code
+            const spillMergeKey = (i: ScheduleItem) => i.item_code ? `code::${i.item_code}` : `name::${i.item_name}`;
+            const spillGrouped = new Map<string, { item: ScheduleItem; mergedIds: string[]; totalHours: number }>();
+            for (const item of rawItems) {
+              const key = spillMergeKey(item);
+              const existing = spillGrouped.get(key);
+              if (existing) {
+                existing.totalHours += item.scheduled_hours;
+                existing.mergedIds.push(item.id);
+                existing.item = { ...existing.item, item_name: existing.item.item_name.replace(/\s*\(\d+\/\d+\)$/, '').trim(), scheduled_hours: existing.totalHours };
+              } else {
+                spillGrouped.set(key, { item: { ...item, item_name: item.item_name.replace(/\s*\(\d+\/\d+\)$/, '').trim() }, mergedIds: [item.id], totalHours: item.scheduled_hours });
+              }
+            }
+            const allItems = Array.from(spillGrouped.values());
+
             const nextSilo = scheduleData?.get(nextWeekKey);
             const nextUsed = nextSilo ? nextSilo.bundles.reduce((s, b) => s + b.total_hours, 0) : 0;
 
-            // Calculate selected hours respecting full-hours toggle
+            // Calculate selected hours respecting full-hours toggle (check any merged id)
             const selectedHoursToMove = allItems
-              .filter(i => spillSelected.has(i.id))
-              .reduce((s, i) => {
-                if (spillFullHours.has(i.id)) return s + i.scheduled_hours;
-                return s + getRemainingHours(i, pct);
+              .filter(g => g.mergedIds.some(id => spillSelected.has(id)))
+              .reduce((s, g) => {
+                const useFull = g.mergedIds.some(id => spillFullHours.has(id));
+                if (useFull) return s + g.totalHours;
+                return s + Math.round(g.totalHours * (1 - pct / 100));
               }, 0);
 
             const nextTotal = nextUsed + selectedHoursToMove;
@@ -1185,16 +1203,19 @@ export default function Vyroba() {
 
                 {/* Item checklist */}
                 <div className="space-y-1 max-h-[320px] overflow-y-auto">
-                  {allItems.map(item => {
-                    const isDone = item.status === "completed";
-                    const remaining = getRemainingHours(item, pct);
-                    const isFull = spillFullHours.has(item.id);
-                    const isSelected = spillSelected.has(item.id);
-                    const hoursShown = isFull ? item.scheduled_hours : remaining;
+                  {allItems.map(({ item, mergedIds: mids, totalHours }) => {
+                    const isDone = mids.every(id => {
+                      const orig = rawItems.find(ri => ri.id === id);
+                      return orig?.status === "completed";
+                    });
+                    const remaining = Math.round(totalHours * (1 - pct / 100));
+                    const isFull = mids.some(id => spillFullHours.has(id));
+                    const isSelected = mids.some(id => spillSelected.has(id));
+                    const hoursShown = isFull ? totalHours : remaining;
 
                     return (
                       <div
-                        key={item.id}
+                        key={mids.join("-")}
                         className="flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer select-none"
                         style={{
                           border: `1px solid ${isDone ? "hsl(var(--border))" : isFull ? "rgba(217,119,6,0.4)" : "hsl(var(--border))"}`,
@@ -1205,7 +1226,9 @@ export default function Vyroba() {
                           if (isDone) return;
                           setSpillSelected(prev => {
                             const next = new Set(prev);
-                            if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
+                            const allIn = mids.every(id => next.has(id));
+                            if (allIn) mids.forEach(id => next.delete(id));
+                            else mids.forEach(id => next.add(id));
                             return next;
                           });
                         }}
@@ -1220,14 +1243,19 @@ export default function Vyroba() {
                           <div className="flex items-center gap-1.5">
                             {item.item_code && <span className="font-mono text-[10px] font-bold" style={{ color: "hsl(var(--foreground))" }}>{item.item_code}</span>}
                             <span className="text-[12px] truncate" style={{ color: "hsl(var(--foreground))" }}>{item.item_name}</span>
+                            {mids.length > 1 && (
+                              <span className="text-[9px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(217,119,6,0.1)", color: "#d97706" }}>
+                                {mids.length} částí
+                              </span>
+                            )}
                           </div>
                           {isDone ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded mt-0.5" style={{ background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))" }}>Hotovo</span>
                           ) : (
                             <span className="text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>
                               {isFull
-                                ? <span className="font-semibold" style={{ color: "#d97706" }}>{item.scheduled_hours}h (plná kapacita)</span>
-                                : <>{remaining}h zbývá (z {item.scheduled_hours}h)</>
+                                ? <span className="font-semibold" style={{ color: "#d97706" }}>{totalHours}h (plná kapacita)</span>
+                                : <>{remaining}h zbývá (z {totalHours}h)</>
                               }
                             </span>
                           )}
@@ -1252,7 +1280,9 @@ export default function Vyroba() {
                               e.stopPropagation();
                               setSpillFullHours(prev => {
                                 const next = new Set(prev);
-                                if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
+                                const allIn = mids.every(id => next.has(id));
+                                if (allIn) mids.forEach(id => next.delete(id));
+                                else mids.forEach(id => next.add(id));
                                 return next;
                               });
                             }}
@@ -1750,13 +1780,16 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   const [qcModalItems, setQcModalItems] = useState<{ item: ScheduleItem }[]>([]);
   const [qcSubmitting, setQcSubmitting] = useState(false);
   const [singleQcItem, setSingleQcItem] = useState<ScheduleItem | null>(null);
+  const [singleQcMergedIds, setSingleQcMergedIds] = useState<string[]>([]);
   const [singleQcModalOpen, setSingleQcModalOpen] = useState(false);
   const [uncheckConfirmItemId, setUncheckConfirmItemId] = useState<string | null>(null);
   const [uncheckConfirmCode, setUncheckConfirmCode] = useState<string>("");
   const qc = useQueryClient();
   const qcUserFirstName = profile?.full_name?.split(" ")[0]?.slice(0, 8) || "–";
 
-  // Deduplicate by id, then merge splits by item_code+item_name within same week
+  // Deduplicate by id, then merge splits by item_code within same week
+  const stripSplitSuffix = (name: string) => name.replace(/\s*\(\d+\/\d+\)$/, '').trim();
+
   const dedupedItems = useMemo(() => {
     // Step 1: deduplicate by id
     const seenIds = new Set<string>();
@@ -1766,24 +1799,32 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
       return true;
     });
 
-    // Step 2: merge splits sharing item_code+item_name in the same week
-    const mergeKey = (i: ScheduleItem) => `${i.item_code || ""}::${i.item_name}::${i.scheduled_week}`;
-    const grouped = new Map<string, { item: ScheduleItem; weekKey: string; weekNum: number; mergedIds: string[]; totalHoursAllSplits: number; thisWeekHours: number }>();
+    // Step 2: merge splits sharing item_code in the same week (item_code only, ignore name variations)
+    const mergeKey = (i: ScheduleItem) => {
+      if (i.item_code) return `code::${i.item_code}::${i.scheduled_week}`;
+      return `name::${i.item_name}::${i.scheduled_week}`;
+    };
+    const grouped = new Map<string, { item: ScheduleItem; weekKey: string; weekNum: number; mergedIds: string[]; totalHoursAllSplits: number; thisWeekHours: number; partsThisWeek: number; splitTotalFromRow: number | null }>();
     for (const entry of unique) {
       const key = mergeKey(entry.item);
       const existing = grouped.get(key);
       if (existing) {
-        // Accumulate hours for this week
         existing.thisWeekHours += entry.item.scheduled_hours;
         existing.mergedIds.push(entry.item.id);
-        // Keep the lowest split_part as representative
-        if (entry.item.split_part != null && existing.item.split_part != null && entry.item.split_part < existing.item.split_part) {
-          existing.item = { ...entry.item, scheduled_hours: existing.thisWeekHours };
-        } else {
-          existing.item = { ...existing.item, scheduled_hours: existing.thisWeekHours };
-        }
+        existing.partsThisWeek += 1;
+        if (entry.item.split_total != null) existing.splitTotalFromRow = entry.item.split_total;
+        // Update representative item with stripped name and summed hours
+        existing.item = { ...existing.item, item_name: stripSplitSuffix(existing.item.item_name), scheduled_hours: existing.thisWeekHours };
       } else {
-        grouped.set(key, { ...entry, mergedIds: [entry.item.id], totalHoursAllSplits: 0, thisWeekHours: entry.item.scheduled_hours });
+        grouped.set(key, {
+          ...entry,
+          mergedIds: [entry.item.id],
+          totalHoursAllSplits: 0,
+          thisWeekHours: entry.item.scheduled_hours,
+          partsThisWeek: 1,
+          splitTotalFromRow: entry.item.split_total,
+          item: { ...entry.item, item_name: stripSplitSuffix(entry.item.item_name) },
+        });
       }
     }
     return Array.from(grouped.values());
@@ -1937,22 +1978,23 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         </div>
         <CollapsibleContent>
           <div className="mt-2 space-y-1">
-            {dedupedItems.map(({ item, mergedIds: mids, thisWeekHours }) => {
-              const isCompleted = item.status === "completed";
+            {dedupedItems.map(({ item, mergedIds: mids, thisWeekHours, partsThisWeek, splitTotalFromRow }) => {
+              const isCompleted = mids.every(id => {
+                const orig = currentItems.find(ci => ci.item.id === id);
+                return orig?.item.status === "completed";
+              });
               const isPaused = item.status === "paused";
-              const isSplit = item.split_part != null && item.split_total != null;
-              const qcCheck = checkMap.get(item.id);
-              const hasQC = !!qcCheck;
+              const isSplit = mids.length > 1 || (item.split_part != null && item.split_total != null);
+              const hasQC = mids.every(id => checkMap.has(id));
+              const qcCheck = checkMap.get(mids[0]);
               const isSelected = mids.every(id => selectedItems.has(id));
 
               const bothDone = isCompleted && hasQC;
               const rowBg = bothDone ? "rgba(58,138,54,0.06)" : isSelected ? "rgba(37,99,235,0.04)" : "#ffffff";
               const rowBorder = bothDone ? "1px solid rgba(58,138,54,0.2)" : isSelected ? "1px solid rgba(37,99,235,0.2)" : "1px solid #ece8e2";
 
-              // For splits, compute % of total allocated this week
-              const splitPctLabel = isSplit && item.split_total
-                ? `${Math.round((thisWeekHours / (item.scheduled_hours * item.split_total / (item.split_part || 1))) * 100)}%`
-                : null;
+              const splitBadgeY = splitTotalFromRow || partsThisWeek;
+
 
               return (
                 <div key={mids.join("-")}>
@@ -1981,7 +2023,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                       </span>
                       {isSplit && (
                         <span className="text-[9px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(217,119,6,0.1)", color: "#d97706" }}>
-                          část {item.split_part}/{item.split_total}
+                          část {partsThisWeek}/{splitBadgeY}
                         </span>
                       )}
                       {isPaused && (
@@ -1994,12 +2036,12 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
 
                     {/* QC badge — clickable */}
                     <div onClick={(e) => e.stopPropagation()}>
-                      {qcCheck ? (
-                        <button onClick={() => { setUncheckConfirmItemId(item.id); setUncheckConfirmCode(`${item.item_code || ""} ${item.item_name}`.trim()); }}>
-                          <QualityCheckDisplay check={qcCheck} />
+                      {hasQC ? (
+                        <button onClick={() => { setUncheckConfirmItemId(mids[0]); setUncheckConfirmCode(`${item.item_code || ""} ${item.item_name}`.trim()); }}>
+                          <QualityCheckDisplay check={checkMap.get(mids[0])} />
                         </button>
                       ) : (
-                        <button onClick={() => { setSingleQcItem(item); setSingleQcModalOpen(true); }}>
+                        <button onClick={() => { setSingleQcItem(item); setSingleQcMergedIds(mids); setSingleQcModalOpen(true); }}>
                           <QualityCheckBadgeEmpty />
                         </button>
                       )}
@@ -2007,13 +2049,15 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   </div>
 
                   {/* Inline uncheck confirm */}
-                  {uncheckConfirmItemId === item.id && (
+                  {uncheckConfirmItemId === mids[0] && (
                     <div className="flex items-center gap-2 px-3 py-2 mt-1 rounded-md text-[12px]" style={{ background: "rgba(220,38,38,0.05)", border: "1px solid rgba(220,38,38,0.15)" }}>
                       <span style={{ color: "#92400e" }}>Zrušit QC kontrolu pro <strong>{uncheckConfirmCode}</strong>?</span>
                       <button className="px-2 py-0.5 rounded text-[11px] font-medium" style={{ background: "#dc2626", color: "#fff" }}
                         onClick={async () => {
-                          const check = checkMap.get(item.id);
-                          if (check) await uncheckItem(check.id);
+                          for (const mid of mids) {
+                            const check = checkMap.get(mid);
+                            if (check) await uncheckItem(check.id);
+                          }
                           setUncheckConfirmItemId(null);
                         }}>Ano</button>
                       <button className="px-2 py-0.5 rounded text-[11px] font-medium" style={{ background: "hsl(var(--muted))", color: "hsl(var(--foreground))" }}
@@ -2099,12 +2143,15 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
             <Button
               style={{ background: "#3a8a36" }}
               onClick={async () => {
-                if (singleQcItem) {
-                  await checkItem(singleQcItem.id);
+                if (singleQcItem && singleQcMergedIds.length > 0) {
+                  for (const id of singleQcMergedIds) {
+                    if (!checkMap.has(id)) await checkItem(id);
+                  }
                   toast.success(`QC potvrzeno — ${singleQcItem.item_code || singleQcItem.item_name}`);
                 }
                 setSingleQcModalOpen(false);
                 setSingleQcItem(null);
+                setSingleQcMergedIds([]);
               }}
             >
               Potvrdit QC — {qcUserFirstName}
