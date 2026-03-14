@@ -544,6 +544,15 @@ export default function Vyroba() {
         }
       }
       
+      // Log vyroba_log_saved
+      logActivity({ projectId: selectedProject.projectId, actionType: "vyroba_log_saved", newValue: `${logPercent}%`, detail: logPhase || "" });
+
+      // Log phase_changed if phase changed
+      const prevPhaseVal = getLatestPhase(selectedProject.projectId) || "Řezání";
+      if (logPhase !== prevPhaseVal) {
+        logActivity({ projectId: selectedProject.projectId, actionType: "phase_changed", oldValue: prevPhaseVal, newValue: logPhase, detail: `${logPercent}%` });
+      }
+
       setLogModalOpen(false);
     } catch (err: any) {
       toast.error(`Chyba při ukládání logu: ${err?.message || "neznámá chyba"}`);
