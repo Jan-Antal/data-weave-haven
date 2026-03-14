@@ -41,6 +41,13 @@ import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
 import { PauseItemDialog } from "@/components/production/PauseItemDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useQualityDefects, type QualityDefect } from "@/hooks/useQualityDefects";
+import { useAllPeople } from "@/hooks/usePeople";
 
 /* ═══ helpers ═══ */
 function getMonday(d: Date): Date {
@@ -1774,6 +1781,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   pushUndo: (action: UndoAction) => void;
 }) {
   const { checks, checkItem, uncheckItem } = useQualityChecks(projectId);
+  const { defects, addDefect, resolveDefect } = useQualityDefects(projectId);
   const { profile } = useAuth();
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [qcModalOpen, setQcModalOpen] = useState(false);
@@ -1784,6 +1792,14 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   const [singleQcModalOpen, setSingleQcModalOpen] = useState(false);
   const [uncheckConfirmItemId, setUncheckConfirmItemId] = useState<string | null>(null);
   const [uncheckConfirmCode, setUncheckConfirmCode] = useState<string>("");
+  // Defect form state
+  const [defectOpen, setDefectOpen] = useState(false);
+  const [defectType, setDefectType] = useState("");
+  const [defectDesc, setDefectDesc] = useState("");
+  const [defectSeverity, setDefectSeverity] = useState<"minor" | "blocking">("minor");
+  const [defectResolution, setDefectResolution] = useState("");
+  const [defectAssignee, setDefectAssignee] = useState("");
+  const { data: allPeople = [] } = useAllPeople();
   const qc = useQueryClient();
   const qcUserFirstName = profile?.full_name?.split(" ")[0]?.slice(0, 8) || "–";
 
@@ -2012,7 +2028,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                     />
 
                     {/* Item info */}
-                    <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                    <div className="flex-1 min-w-0 flex items-center gap-1.5 flex-wrap">
                       {item.item_code && (
                         <span className="font-mono text-[12px] font-bold shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>
                       )}
@@ -2029,6 +2045,70 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                       {isPaused && (
                         <span className="text-[8px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(217,119,6,0.12)", color: "#d97706" }}>⏸</span>
                       )}
+                      {/* Defect badges */}
+                      {(() => {
+                        const itemDefects = defects.filter(d => mids.includes(d.item_id));
+                        const unresolvedBlocking = itemDefects.filter(d => !d.resolved && d.severity === "blocking");
+                        const unresolvedMinor = itemDefects.filter(d => !d.resolved && d.severity === "minor");
+                        const resolved = itemDefects.filter(d => d.resolved);
+                        return (
+                          <>
+                            {unresolvedBlocking.length > 0 && (
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button onClick={e => e.stopPropagation()} className="text-[9px] font-semibold px-1.5 py-[2px] rounded shrink-0" style={{ background: "rgba(220,38,38,0.1)", color: "#dc2626", border: "1px solid rgba(220,38,38,0.2)" }}>
+                                    ⛔ Vada k oprave
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-72 text-xs space-y-2" onClick={e => e.stopPropagation()}>
+                                  {unresolvedBlocking.map(d => (
+                                    <div key={d.id} className="space-y-1 border-b pb-2 last:border-0">
+                                      <div className="font-semibold">{d.defect_type}</div>
+                                      <div className="text-muted-foreground">{d.description}</div>
+                                      {d.assigned_to && <div>Priradené: {d.assigned_to}</div>}
+                                      <button className="px-2 py-1 rounded text-[11px] font-medium" style={{ background: "#16a34a", color: "#fff" }}
+                                        onClick={async () => {
+                                          const { data: { user } } = await supabase.auth.getUser();
+                                          resolveDefect.mutate({ defectId: d.id, userId: user?.id || "" });
+                                          toast.success("Vada označená ako opravená");
+                                        }}>Označiť ako opravenú</button>
+                                    </div>
+                                  ))}
+                                </PopoverContent>
+                              </Popover>
+                            )}
+                            {unresolvedMinor.length > 0 && (
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button onClick={e => e.stopPropagation()} className="text-[9px] font-semibold px-1.5 py-[2px] rounded shrink-0" style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #f59e0b" }}>
+                                    ⚠ Drobná Vada
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-72 text-xs space-y-2" onClick={e => e.stopPropagation()}>
+                                  {unresolvedMinor.map(d => (
+                                    <div key={d.id} className="space-y-1 border-b pb-2 last:border-0">
+                                      <div className="font-semibold">{d.defect_type}</div>
+                                      <div className="text-muted-foreground">{d.description}</div>
+                                      {d.assigned_to && <div>Priradené: {d.assigned_to}</div>}
+                                      <button className="px-2 py-1 rounded text-[11px] font-medium" style={{ background: "#16a34a", color: "#fff" }}
+                                        onClick={async () => {
+                                          const { data: { user } } = await supabase.auth.getUser();
+                                          resolveDefect.mutate({ defectId: d.id, userId: user?.id || "" });
+                                          toast.success("Vada označená ako opravená");
+                                        }}>Označiť ako opravenú</button>
+                                    </div>
+                                  ))}
+                                </PopoverContent>
+                              </Popover>
+                            )}
+                            {resolved.length > 0 && unresolvedBlocking.length === 0 && unresolvedMinor.length === 0 && (
+                              <span className="text-[9px] font-medium px-1.5 py-[2px] rounded shrink-0" style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a" }}>
+                                ✓ Opravená
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {/* Hours */}
@@ -2071,33 +2151,91 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         </CollapsibleContent>
       </Collapsible>
 
-      {/* "Označit jako hotovo" button */}
-      <button
-        onClick={handleMarkHotovo}
-        disabled={dedupedItems.filter(i => i.item.status !== "completed").length === 0}
-        className={`w-full py-2.5 rounded-md text-sm font-medium transition-colors ${isMobile ? "min-h-[44px]" : ""}`}
-        style={{
-          background: dedupedItems.some(i => i.item.status !== "completed") ? "rgba(58,138,54,0.1)" : "#f5f3f0",
-          color: dedupedItems.some(i => i.item.status !== "completed") ? "#3a8a36" : "#b0b7c3",
-          border: dedupedItems.some(i => i.item.status !== "completed") ? "1px solid rgba(58,138,54,0.2)" : "1px solid #e5e2dd",
-          cursor: dedupedItems.some(i => i.item.status !== "completed") ? "pointer" : "not-allowed",
-        }}
-      >
-        Označit {selectedItems.size > 0 ? `${selectedItems.size} položek` : "vše"} jako hotovo
-      </button>
+      {/* Blocking defects warning */}
+      {(() => {
+        const allItemIds = dedupedItems.flatMap(d => d.mergedIds);
+        const blockingDefects = defects.filter(d => !d.resolved && d.severity === "blocking" && allItemIds.includes(d.item_id));
+        if (blockingDefects.length === 0) return null;
+        return (
+          <div className="rounded-md px-3 py-2 space-y-1.5 text-[12px]" style={{ background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.15)" }}>
+            <div className="font-semibold" style={{ color: "#dc2626" }}>⛔ Blokujúce vady ({blockingDefects.length})</div>
+            {blockingDefects.map(d => (
+              <div key={d.id} className="flex items-center justify-between gap-2">
+                <span className="truncate" style={{ color: "#92400e" }}>{d.item_code || ""} — {d.defect_type}</span>
+                <button className="px-2 py-0.5 rounded text-[10px] font-medium shrink-0" style={{ background: "#16a34a", color: "#fff" }}
+                  onClick={async () => {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    resolveDefect.mutate({ defectId: d.id, userId: user?.id || "" });
+                    toast.success("Vada opravená");
+                  }}>Označiť ako opravenú</button>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
-      {/* QC MODE POPUP — simplified warning */}
+      {/* "Označit jako hotovo" button */}
+      {(() => {
+        const allItemIds = dedupedItems.flatMap(d => d.mergedIds);
+        const hasBlockingDefects = defects.some(d => !d.resolved && d.severity === "blocking" && allItemIds.includes(d.item_id));
+        const hasIncomplete = dedupedItems.some(i => i.item.status !== "completed");
+        const isDisabled = !hasIncomplete || hasBlockingDefects;
+        return (
+          <button
+            onClick={handleMarkHotovo}
+            disabled={isDisabled}
+            className={`w-full py-2.5 rounded-md text-sm font-medium transition-colors ${isMobile ? "min-h-[44px]" : ""}`}
+            style={{
+              background: isDisabled ? "#f5f3f0" : "rgba(58,138,54,0.1)",
+              color: isDisabled ? "#b0b7c3" : "#3a8a36",
+              border: isDisabled ? "1px solid #e5e2dd" : "1px solid rgba(58,138,54,0.2)",
+              cursor: isDisabled ? "not-allowed" : "pointer",
+            }}
+          >
+            {hasBlockingDefects ? "Blokované — najskôr opravte vady" : `Označit ${selectedItems.size > 0 ? `${selectedItems.size} položek` : "vše"} jako hotovo`}
+          </button>
+        );
+      })()}
+
+      {/* QC MODE POPUP */}
       <Dialog open={qcModalOpen} onOpenChange={setQcModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Kontrola kvality — {projectName}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            {/* Warning banner — no checkboxes */}
-            <div className="flex items-start gap-2 px-3 py-3 rounded-md text-[13px]" style={{ background: "rgba(217,119,6,0.1)", border: "1px solid rgba(217,119,6,0.2)", color: "#92400e" }}>
-              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "#d97706" }} />
-              <span>⚠ Před potvrzením zkontrolujte: rozměry, povrchovou úpravu, spoje a balení.</span>
-            </div>
+            <QcWarningBox />
+
+            {/* Defect section */}
+            <QcDefectForm
+              defectOpen={defectOpen}
+              setDefectOpen={setDefectOpen}
+              defectType={defectType} setDefectType={setDefectType}
+              defectDesc={defectDesc} setDefectDesc={setDefectDesc}
+              defectSeverity={defectSeverity} setDefectSeverity={setDefectSeverity}
+              defectResolution={defectResolution} setDefectResolution={setDefectResolution}
+              defectAssignee={defectAssignee} setDefectAssignee={setDefectAssignee}
+              allPeople={allPeople}
+              onSave={async () => {
+                const { data: { user } } = await supabase.auth.getUser();
+                const targetItem = qcModalItems[0]?.item;
+                if (!targetItem) return;
+                await addDefect.mutateAsync({
+                  project_id: projectId,
+                  item_id: targetItem.id,
+                  item_code: targetItem.item_code || null,
+                  defect_type: defectType,
+                  description: defectDesc,
+                  severity: defectSeverity,
+                  resolution_type: defectSeverity === "blocking" ? defectResolution : null,
+                  assigned_to: defectAssignee || null,
+                  photo_url: null,
+                  reported_by: user?.id || "",
+                });
+                toast.success("Vada zaznamenaná");
+                setDefectType(""); setDefectDesc(""); setDefectSeverity("minor"); setDefectResolution(""); setDefectAssignee(""); setDefectOpen(false);
+              }}
+            />
 
             {/* Items requiring QC */}
             <div>
@@ -2128,15 +2266,42 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
 
       {/* Single-item QC modal */}
       <Dialog open={singleQcModalOpen} onOpenChange={setSingleQcModalOpen}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Kontrola kvality — {singleQcItem?.item_code} {singleQcItem?.item_name}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="flex items-start gap-2 px-3 py-3 rounded-md text-[13px]" style={{ background: "rgba(217,119,6,0.1)", border: "1px solid rgba(217,119,6,0.2)", color: "#92400e" }}>
-              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "#d97706" }} />
-              <span>⚠ Před potvrzením zkontrolujte: rozměry, povrchovou úpravu, spoje a balení.</span>
-            </div>
+          <div className="space-y-4 py-2">
+            <QcWarningBox />
+
+            {/* Defect section */}
+            <QcDefectForm
+              defectOpen={defectOpen}
+              setDefectOpen={setDefectOpen}
+              defectType={defectType} setDefectType={setDefectType}
+              defectDesc={defectDesc} setDefectDesc={setDefectDesc}
+              defectSeverity={defectSeverity} setDefectSeverity={setDefectSeverity}
+              defectResolution={defectResolution} setDefectResolution={setDefectResolution}
+              defectAssignee={defectAssignee} setDefectAssignee={setDefectAssignee}
+              allPeople={allPeople}
+              onSave={async () => {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!singleQcItem) return;
+                await addDefect.mutateAsync({
+                  project_id: projectId,
+                  item_id: singleQcItem.id,
+                  item_code: singleQcItem.item_code || null,
+                  defect_type: defectType,
+                  description: defectDesc,
+                  severity: defectSeverity,
+                  resolution_type: defectSeverity === "blocking" ? defectResolution : null,
+                  assigned_to: defectAssignee || null,
+                  photo_url: null,
+                  reported_by: user?.id || "",
+                });
+                toast.success("Vada zaznamenaná");
+                setDefectType(""); setDefectDesc(""); setDefectSeverity("minor"); setDefectResolution(""); setDefectAssignee(""); setDefectOpen(false);
+              }}
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSingleQcModalOpen(false)}>Zrušit</Button>
@@ -2160,6 +2325,125 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/* ═══ QC Warning Box ═══ */
+function QcWarningBox() {
+  return (
+    <div className="rounded-md px-3 py-3 text-[13px] space-y-2" style={{ background: "#fef3c7", border: "1px solid #f59e0b", color: "#92400e" }}>
+      <div className="font-semibold">Pred odoslaním do Expedície skontrolujte:</div>
+      <div>
+        <div className="font-bold mt-1">Materiálová kvalita</div>
+        <ul className="list-disc ml-4 space-y-0.5">
+          <li>Dýha — vizuálna kontrola povrchu, hrany</li>
+          <li>Lak — rovnomernosť, zhoda so vzorkou, bez škvŕn, lesk</li>
+          <li>Škrabance a drobné poškodenie</li>
+        </ul>
+      </div>
+      <div>
+        <div className="font-bold mt-1">Kvalita výroby</div>
+        <ul className="list-disc ml-4 space-y-0.5">
+          <li>Presnosť osadenia — nič nepresahuje, nič nie je krivé</li>
+          <li>Funkčnosť — zásuvky, výsuvy, závesy, kovanie</li>
+        </ul>
+      </div>
+      <div>
+        <div className="font-bold mt-1">Kvalita expedície</div>
+        <ul className="list-disc ml-4 space-y-0.5">
+          <li>Kompletnosť — všetky diely sú priložené</li>
+          <li>Balenie — ochrana hrán, bez rizika poškodenia</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ QC Defect Form ═══ */
+const DEFECT_TYPES = ["Škrabanec", "Nerovnosť laku", "Poškodenie dýhy", "Chýbajúci diel", "Funkčná vada", "Iné"];
+
+function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, defectDesc, setDefectDesc, defectSeverity, setDefectSeverity, defectResolution, setDefectResolution, defectAssignee, setDefectAssignee, allPeople, onSave }: {
+  defectOpen: boolean; setDefectOpen: (v: boolean) => void;
+  defectType: string; setDefectType: (v: string) => void;
+  defectDesc: string; setDefectDesc: (v: string) => void;
+  defectSeverity: "minor" | "blocking"; setDefectSeverity: (v: "minor" | "blocking") => void;
+  defectResolution: string; setDefectResolution: (v: string) => void;
+  defectAssignee: string; setDefectAssignee: (v: string) => void;
+  allPeople: { id: string; name: string; role: string }[];
+  onSave: () => Promise<void>;
+}) {
+  const canSave = defectType && defectDesc && (defectSeverity === "minor" || defectResolution);
+
+  return (
+    <Collapsible open={defectOpen} onOpenChange={setDefectOpen}>
+      <CollapsibleTrigger className="flex items-center gap-1 text-[13px] font-medium cursor-pointer" style={{ color: "#d97706" }}>
+        <Plus className="h-3.5 w-3.5" />
+        Zaznamenať vadu
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-2 space-y-3 rounded-md p-3" style={{ border: "1px solid #e5e2dd", background: "#fafaf8" }}>
+          {/* Type */}
+          <div>
+            <Label className="text-[11px] font-semibold mb-1 block">Typ vady *</Label>
+            <Select value={defectType} onValueChange={setDefectType}>
+              <SelectTrigger className="h-8 text-[12px]"><SelectValue placeholder="Vyberte typ..." /></SelectTrigger>
+              <SelectContent>
+                {DEFECT_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          {/* Description */}
+          <div>
+            <Label className="text-[11px] font-semibold mb-1 block">Popis *</Label>
+            <Textarea value={defectDesc} onChange={e => setDefectDesc(e.target.value)} className="min-h-[60px] text-[12px]" placeholder="Popíšte vadu..." />
+          </div>
+          {/* Severity */}
+          <div>
+            <Label className="text-[11px] font-semibold mb-1 block">Závažnosť *</Label>
+            <RadioGroup value={defectSeverity} onValueChange={(v) => setDefectSeverity(v as "minor" | "blocking")} className="space-y-1">
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="minor" id="sev-minor" />
+                <Label htmlFor="sev-minor" className="text-[12px] font-normal cursor-pointer">🟡 Malá — možno expedovať</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="blocking" id="sev-blocking" />
+                <Label htmlFor="sev-blocking" className="text-[12px] font-normal cursor-pointer">🔴 Vyžaduje opravu pred expedíciou</Label>
+              </div>
+            </RadioGroup>
+          </div>
+          {/* Resolution (only for blocking) */}
+          {defectSeverity === "blocking" && (
+            <div>
+              <Label className="text-[11px] font-semibold mb-1 block">Riešenie *</Label>
+              <RadioGroup value={defectResolution} onValueChange={setDefectResolution} className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="repair" id="res-repair" />
+                  <Label htmlFor="res-repair" className="text-[12px] font-normal cursor-pointer">🔨 Opraviť existujúci kus</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="new" id="res-new" />
+                  <Label htmlFor="res-new" className="text-[12px] font-normal cursor-pointer">🆕 Vyrobiť nový kus</Label>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
+          {/* Assignee */}
+          <div>
+            <Label className="text-[11px] font-semibold mb-1 block">Priradená osoba</Label>
+            <Select value={defectAssignee} onValueChange={setDefectAssignee}>
+              <SelectTrigger className="h-8 text-[12px]"><SelectValue placeholder="Vybrať osobu..." /></SelectTrigger>
+              <SelectContent>
+                {[...new Set(allPeople.map(p => p.name))].sort().map(n => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          {/* Save */}
+          <Button size="sm" disabled={!canSave} onClick={onSave} className="w-full" style={{ background: canSave ? "#d97706" : undefined }}>
+            Uložiť vadu
+          </Button>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
