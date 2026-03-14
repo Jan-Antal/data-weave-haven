@@ -2855,13 +2855,14 @@ function VykresynSection({ projectId }: { projectId: string }) {
 /* DAY CELL                                */
 /* ═══════════════════════════════════════ */
 
-function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, logs }: {
+function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, logs, weeklyGoal = 100 }: {
   dayIndex: number;
   todayDayIndex: number;
   cumulative: CumulativeInfo | null;
   onOpenLog: () => void;
   statusColor: string;
   logs: DailyLog[];
+  weeklyGoal?: number;
 }) {
   const isToday = dayIndex === todayDayIndex;
   const isFuture = todayDayIndex >= 0 && dayIndex > todayDayIndex;
