@@ -344,6 +344,7 @@ export default function Vyroba() {
   // Spill dialog
   const [spillDialogOpen, setSpillDialogOpen] = useState(false);
   const [spillSelected, setSpillSelected] = useState<Set<string>>(new Set());
+  const [spillFullHours, setSpillFullHours] = useState<Set<string>>(new Set());
 
   // Items expand
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
