@@ -2080,6 +2080,37 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Single-item QC modal */}
+      <Dialog open={singleQcModalOpen} onOpenChange={setSingleQcModalOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Kontrola kvality — {singleQcItem?.item_code} {singleQcItem?.item_name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="flex items-start gap-2 px-3 py-3 rounded-md text-[13px]" style={{ background: "rgba(217,119,6,0.1)", border: "1px solid rgba(217,119,6,0.2)", color: "#92400e" }}>
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "#d97706" }} />
+              <span>⚠ Před potvrzením zkontrolujte: rozměry, povrchovou úpravu, spoje a balení.</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSingleQcModalOpen(false)}>Zrušit</Button>
+            <Button
+              style={{ background: "#3a8a36" }}
+              onClick={async () => {
+                if (singleQcItem) {
+                  await checkItem(singleQcItem.id);
+                  toast.success(`QC potvrzeno — ${singleQcItem.item_code || singleQcItem.item_name}`);
+                }
+                setSingleQcModalOpen(false);
+                setSingleQcItem(null);
+              }}
+            >
+              Potvrdit QC — {qcUserFirstName}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
