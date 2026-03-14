@@ -1728,8 +1728,9 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
     });
   }
 
+  const allMergedIds = useMemo(() => dedupedItems.flatMap(d => d.mergedIds), [dedupedItems]);
   const completedCount = dedupedItems.filter(i => i.item.status === "completed").length;
-  const allSelected = dedupedItems.length > 0 && dedupedItems.every(i => selectedItems.has(i.item.id));
+  const allSelected = dedupedItems.length > 0 && dedupedItems.every(i => i.mergedIds.every(id => selectedItems.has(id)));
 
   // "Označit jako hotovo" — targets selected or all
   function handleMarkHotovo() {
