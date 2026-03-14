@@ -446,6 +446,13 @@ export default function Vyroba() {
   async function handleSaveLog() {
     if (!selectedProject || logDayIndex < 0) return;
     try {
+      // Push undo for log note + phase change
+      const existingLogs = getLogsForProject(selectedProject.projectId);
+      const existingLog = existingLogs.find(l => l.day_index === logDayIndex);
+      const prevPhase = getLatestPhase(selectedProject.projectId) || "Řezání";
+      const prevPercent = getLatestPercent(selectedProject.projectId);
+      pushUndo({ type: "phase_change", bundleId: bundleId(selectedProject.projectId), prevPhase, prevPercent, logId: existingLog?.id, timestamp: Date.now() });
+
       await saveDailyLog(bundleId(selectedProject.projectId), weekKey, logDayIndex, logPhase, logPercent, logNotes || null);
       qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
       toast.success("✓ Log uložen", { duration: 2000 });
