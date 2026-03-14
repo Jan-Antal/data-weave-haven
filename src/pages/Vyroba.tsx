@@ -2407,7 +2407,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   photo_url: defectPhotos.length > 0 ? JSON.stringify(defectPhotos) : null,
                   reported_by: user?.id || "",
                 });
-                toast.success("Vada zaznamenaná");
+                
                 setDefectType(""); setDefectDesc(""); setDefectSeverity("minor"); setDefectResolution(""); setDefectItemId("__bundle__"); setDefectPhotos([]); setDefectOpen(false);
               }}
             />
