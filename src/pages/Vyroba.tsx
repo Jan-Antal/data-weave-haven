@@ -2946,7 +2946,10 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
             <div className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: PHASES.find(p => p.name === cumulative.phase)?.color || "#6b7280" }} />
               <span className="text-[9px]" style={{ color: "#6b7280" }}>{cumulative.phase}</span>
-            </div>
+           </div>
+          )}
+          {weeklyGoal < 100 && !isNoProduction && (
+            <div className="text-[8px]" style={{ color: "#99a5a3" }}>Cíl: {weeklyGoal}%</div>
           )}
           {isToday && (
             <span className="mt-0.5 w-full text-[9px] font-medium py-0.5 rounded transition-colors text-center"
