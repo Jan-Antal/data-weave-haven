@@ -1670,19 +1670,19 @@ export default function Vyroba() {
 /* PROJECT ROW (left panel)                */
 /* ═══════════════════════════════════════ */
 
-function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectStatus, getLatestPercent, getLatestPhase, statusColors, weeklyGoal = 100 }: {
+function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectStatus, getBundleProgress: getBP, getLatestPhase, statusColors, weeklyGoal = 100 }: {
   project: VyrobaProject;
   isSelected: boolean;
   onSelect: (pid: string) => void;
   onContextMenu: (e: React.MouseEvent, pid: string) => void;
   getProjectStatus: (pid: string) => "on-track" | "at-risk" | "behind";
-  getLatestPercent: (pid: string) => number;
+  getBundleProgress: () => { totalHours: number; completedHours: number; bundleProgress: number };
   getLatestPhase: (pid: string) => string | null;
   statusColors: Record<string, string>;
   weeklyGoal?: number;
 }) {
   const status = getProjectStatus(project.projectId);
-  const pct = getLatestPercent(project.projectId);
+  const { bundleProgress: pct } = getBP();
   const phase = getLatestPhase(project.projectId);
   const borderColor = project.color;
 
