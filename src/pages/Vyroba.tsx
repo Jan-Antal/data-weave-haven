@@ -1287,7 +1287,7 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
       className={`rounded-lg p-2 flex flex-col gap-1 transition-all ${clickable ? "cursor-pointer hover:shadow-sm" : ""}`}
       style={{
         background: bg,
-        border: `1px ${borderStyle} ${border}`,
+        border: `${borderWidth} ${borderStyle} ${border}`,
         opacity: (isFuture ? 0.5 : (isPast && !cumulative?.hasLog) ? 0.6 : 1),
       }}
       onClick={clickable ? onOpenLog : undefined}
