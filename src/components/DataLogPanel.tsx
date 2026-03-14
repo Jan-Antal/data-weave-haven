@@ -13,6 +13,7 @@ import { useDataLogHighlight } from "@/components/DataLogHighlightContext";
 interface DataLogPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultCategory?: Category;
 }
 
 type Category = "all" | "status" | "terminy" | "documents" | "projects" | "users" | "vyroba";
