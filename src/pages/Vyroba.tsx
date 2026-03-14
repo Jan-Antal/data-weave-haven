@@ -1200,36 +1200,50 @@ export default function Vyroba() {
                 </div>
               )}
             </div>
-            <div>
-              <div className="text-xs font-semibold mb-2" style={{ color: "#6b7280" }}>Celková hotovost</div>
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <Slider min={0} max={100} step={5} value={[logPercent]} onValueChange={([v]) => {
-                    setHotovostTouched(true);
-                    setLogPercent(v);
-                  }} />
-                  <div className="flex justify-between text-[9px] mt-1" style={{ color: "#99a5a3" }}>
-                    <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
+            {(() => {
+              const logWeeklyGoal = selectedProject ? getWeeklyGoal(selectedProject.projectId) : 100;
+              return (
+                <div>
+                  <div className="text-xs font-semibold mb-2" style={{ color: "#6b7280" }}>Celková hotovost</div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <Slider min={0} max={100} step={5} value={[logPercent]} onValueChange={([v]) => {
+                        setHotovostTouched(true);
+                        setLogPercent(v);
+                      }} />
+                      <div className="flex justify-between text-[9px] mt-1" style={{ color: "#99a5a3" }}>
+                        <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
+                      </div>
+                    </div>
+                    <span className="text-2xl font-mono font-bold min-w-[60px] text-right" style={{ color: logPercent >= logWeeklyGoal ? "#3a8a36" : "#1a1a1a" }}>
+                      {logPercent}%
+                    </span>
                   </div>
+                  <div className="mt-1 text-[10px]" style={{ color: "#99a5a3" }}>
+                    Týdenní cíl: <span className="font-semibold" style={{ color: logPercent >= logWeeklyGoal ? "#3a8a36" : "#d97706" }}>{logWeeklyGoal}%</span> · Celkem: 100%
+                  </div>
+                  {logPercent > logWeeklyGoal && (
+                    <div className="mt-1 text-[10px] font-medium" style={{ color: "#3a8a36" }}>
+                      🎉 Nad plán! Výborně!
+                    </div>
+                  )}
+                  {hotovostTouched && (
+                    <div className="mt-1.5 flex items-center gap-1 text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>
+                      <span>% ručně nastaveno — operace nezmění hodnotu</span>
+                      <button
+                        className="font-medium underline"
+                        style={{ color: "#d97706" }}
+                        onClick={() => {
+                          setHotovostTouched(false);
+                          const phasePct = PHASES.find(p => p.name === logPhase)?.pct || 0;
+                          setLogPercent(phasePct);
+                        }}
+                      >× Reset</button>
+                    </div>
+                  )}
                 </div>
-                <span className="text-2xl font-mono font-bold min-w-[60px] text-right" style={{ color: logPercent >= 100 ? "#3a8a36" : "#1a1a1a" }}>
-                  {logPercent}%
-                </span>
-              </div>
-              {hotovostTouched && (
-                <div className="mt-1.5 flex items-center gap-1 text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>
-                  <span>% ručně nastaveno — operace nezmění hodnotu</span>
-                  <button
-                    className="font-medium underline"
-                    style={{ color: "#d97706" }}
-                    onClick={() => {
-                      setHotovostTouched(false);
-                      const phasePct = PHASES.find(p => p.name === logPhase)?.pct || 0;
-                      setLogPercent(phasePct);
-                    }}
-                  >× Reset</button>
-                </div>
-              )}
+              );
+            })()}
             </div>
 
             {/* Tab switcher: Poznámky / Foto */}
