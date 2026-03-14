@@ -2028,7 +2028,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                     />
 
                     {/* Item info */}
-                    <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                    <div className="flex-1 min-w-0 flex items-center gap-1.5 flex-wrap">
                       {item.item_code && (
                         <span className="font-mono text-[12px] font-bold shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>
                       )}
@@ -2045,6 +2045,70 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                       {isPaused && (
                         <span className="text-[8px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(217,119,6,0.12)", color: "#d97706" }}>⏸</span>
                       )}
+                      {/* Defect badges */}
+                      {(() => {
+                        const itemDefects = defects.filter(d => mids.includes(d.item_id));
+                        const unresolvedBlocking = itemDefects.filter(d => !d.resolved && d.severity === "blocking");
+                        const unresolvedMinor = itemDefects.filter(d => !d.resolved && d.severity === "minor");
+                        const resolved = itemDefects.filter(d => d.resolved);
+                        return (
+                          <>
+                            {unresolvedBlocking.length > 0 && (
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button onClick={e => e.stopPropagation()} className="text-[9px] font-semibold px-1.5 py-[2px] rounded shrink-0" style={{ background: "rgba(220,38,38,0.1)", color: "#dc2626", border: "1px solid rgba(220,38,38,0.2)" }}>
+                                    ⛔ Vada k oprave
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-72 text-xs space-y-2" onClick={e => e.stopPropagation()}>
+                                  {unresolvedBlocking.map(d => (
+                                    <div key={d.id} className="space-y-1 border-b pb-2 last:border-0">
+                                      <div className="font-semibold">{d.defect_type}</div>
+                                      <div className="text-muted-foreground">{d.description}</div>
+                                      {d.assigned_to && <div>Priradené: {d.assigned_to}</div>}
+                                      <button className="px-2 py-1 rounded text-[11px] font-medium" style={{ background: "#16a34a", color: "#fff" }}
+                                        onClick={async () => {
+                                          const { data: { user } } = await supabase.auth.getUser();
+                                          resolveDefect.mutate({ defectId: d.id, userId: user?.id || "" });
+                                          toast.success("Vada označená ako opravená");
+                                        }}>Označiť ako opravenú</button>
+                                    </div>
+                                  ))}
+                                </PopoverContent>
+                              </Popover>
+                            )}
+                            {unresolvedMinor.length > 0 && (
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button onClick={e => e.stopPropagation()} className="text-[9px] font-semibold px-1.5 py-[2px] rounded shrink-0" style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #f59e0b" }}>
+                                    ⚠ Drobná Vada
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-72 text-xs space-y-2" onClick={e => e.stopPropagation()}>
+                                  {unresolvedMinor.map(d => (
+                                    <div key={d.id} className="space-y-1 border-b pb-2 last:border-0">
+                                      <div className="font-semibold">{d.defect_type}</div>
+                                      <div className="text-muted-foreground">{d.description}</div>
+                                      {d.assigned_to && <div>Priradené: {d.assigned_to}</div>}
+                                      <button className="px-2 py-1 rounded text-[11px] font-medium" style={{ background: "#16a34a", color: "#fff" }}
+                                        onClick={async () => {
+                                          const { data: { user } } = await supabase.auth.getUser();
+                                          resolveDefect.mutate({ defectId: d.id, userId: user?.id || "" });
+                                          toast.success("Vada označená ako opravená");
+                                        }}>Označiť ako opravenú</button>
+                                    </div>
+                                  ))}
+                                </PopoverContent>
+                              </Popover>
+                            )}
+                            {resolved.length > 0 && unresolvedBlocking.length === 0 && unresolvedMinor.length === 0 && (
+                              <span className="text-[9px] font-medium px-1.5 py-[2px] rounded shrink-0" style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a" }}>
+                                ✓ Opravená
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {/* Hours */}
