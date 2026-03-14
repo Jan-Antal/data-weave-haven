@@ -2458,17 +2458,36 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                     {/* Hours */}
                     <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{thisWeekHours}h</span>
 
-                    {/* QC badge — clickable */}
+                    {/* QC badge — clickable only if ALL parts completed across all weeks */}
                     <div onClick={(e) => e.stopPropagation()}>
                       {hasQC ? (
                         <button onClick={() => { setUncheckConfirmItemId(mids[0]); setUncheckConfirmCode(`${item.item_code || ""} ${item.item_name}`.trim()); }}>
                           <QualityCheckDisplay check={checkMap.get(mids[0])} />
                         </button>
-                      ) : (
-                        <button onClick={() => { setSingleQcItem(item); setSingleQcMergedIds(mids); setSingleQcModalOpen(true); setDefectItemId(item.id); setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectPhotos([]); }}>
-                          <QualityCheckBadgeEmpty />
-                        </button>
-                      )}
+                      ) : (() => {
+                        const allDone = areAllPartsCompleted(item.item_code, item.item_name);
+                        if (!allDone) {
+                          const info = getIncompletePartsInfo(item.item_code, item.item_name);
+                          return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex items-center gap-1 shrink-0 cursor-not-allowed opacity-50"
+                                  style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #f59e0b", padding: "4px 10px", borderRadius: "9999px", fontSize: "12px", fontWeight: 500, lineHeight: 1 }}>
+                                  <Shield className="h-3 w-3" /> QC
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[250px] text-xs">
+                                Čeká na dokončení části {info.total - info.incomplete}/{info.total} v T{info.weekNums.join(", T")} — QC nelze provést
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        }
+                        return (
+                          <button onClick={() => { setSingleQcItem(item); setSingleQcMergedIds(mids); setSingleQcModalOpen(true); setDefectItemId(item.id); setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectPhotos([]); }}>
+                            <QualityCheckBadgeEmpty />
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
 
