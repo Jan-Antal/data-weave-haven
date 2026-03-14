@@ -1044,6 +1044,13 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           </div>
         )}
 
+        {/* ── Daily log shortcut — directly below quality section ── */}
+        {todayDayIndex >= 0 && (
+          <button onClick={() => onOpenLog()} className={`w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90 ${isMobile ? "min-h-[44px]" : ""}`} style={{ background: "#3a8a36" }}>
+            + Log dnes ({DAY_SHORT[todayDayIndex]})
+          </button>
+        )}
+
         {/* ── Expedice button ── */}
         {currentItems.some(i => i.item.status !== "completed") && (
           <button onClick={onOpenExpedice} className={`w-full py-2.5 rounded-md text-sm font-medium transition-colors ${isMobile ? "min-h-[44px]" : ""}`}
@@ -1054,13 +1061,6 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
 
         {/* ── Výkresy Section ── */}
         <VykresynSection projectId={project.projectId} />
-
-        {/* ── Daily log shortcut ── */}
-        {todayDayIndex >= 0 && (
-          <button onClick={() => onOpenLog()} className={`w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90 ${isMobile ? "min-h-[44px]" : ""}`} style={{ background: "#3a8a36" }}>
-            + Log dnes ({DAY_SHORT[todayDayIndex]})
-          </button>
-        )}
       </div>
     </div>
   );
