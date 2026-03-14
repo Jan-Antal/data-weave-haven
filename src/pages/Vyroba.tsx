@@ -548,7 +548,23 @@ export default function Vyroba() {
     const prevWeeks = selectedProject.scheduleItems
       .filter(i => ids.includes(i.id))
       .map(i => ({ id: i.id, prevWeek: i.scheduled_week }));
-    pushUndo({ type: "move_items", items: prevWeeks, targetWeek: nextWeekKey, timestamp: Date.now() });
+    pushUndo({
+      page: "vyroba",
+      actionType: "move_items",
+      description: `přesun ${ids.length} položek do T${nextWeekNum}`,
+      undo: async () => {
+        for (const pw of prevWeeks) {
+          await supabase.from("production_schedule").update({ scheduled_week: pw.prevWeek }).eq("id", pw.id);
+        }
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      },
+      redo: async () => {
+        for (const pw of prevWeeks) {
+          await supabase.from("production_schedule").update({ scheduled_week: nextWeekKey }).eq("id", pw.id);
+        }
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      },
+    });
 
     const itemsToMove = selectedProject.scheduleItems.filter(i => ids.includes(i.id));
     let movedCount = 0;
