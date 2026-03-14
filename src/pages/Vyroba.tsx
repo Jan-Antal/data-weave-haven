@@ -1809,8 +1809,8 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   const [defectDesc, setDefectDesc] = useState("");
   const [defectSeverity, setDefectSeverity] = useState<"minor" | "blocking">("minor");
   const [defectResolution, setDefectResolution] = useState("");
-  const [defectAssignee, setDefectAssignee] = useState("");
-  const { data: allPeople = [] } = useAllPeople();
+  const [defectItemId, setDefectItemId] = useState<string>("__bundle__");
+  const [defectPhotos, setDefectPhotos] = useState<string[]>([]);
   const qc = useQueryClient();
   const qcUserFirstName = profile?.full_name?.split(" ")[0]?.slice(0, 8) || "–";
 
