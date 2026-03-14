@@ -474,7 +474,6 @@ export default function Vyroba() {
 
   /* ── Expedice confirmation flow ── */
   function openExpediceDialog() {
-    setExpediceChecks({ vyroba: false, kvalita: false, dokumentace: false });
     setExpediceDialogOpen(true);
   }
 
