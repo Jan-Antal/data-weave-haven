@@ -1954,7 +1954,12 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
 
   // Collapsible states for sections
   const [futureOpen, setFutureOpen] = useState(false);
-  const [completedOpen, setCompletedOpen] = useState(false);
+  // Auto-expand Hotové when Aktuální has 0 items but progress > 0
+  const autoExpandHotove = currentItems.length === 0 && bundleProgress.bundleProgress > 0;
+  const [completedOpen, setCompletedOpen] = useState(autoExpandHotove);
+  useEffect(() => {
+    if (autoExpandHotove) setCompletedOpen(true);
+  }, [autoExpandHotove]);
 
   // Group all items by category
   const { currentItems, futureItems, completedItems } = useMemo(() => {
