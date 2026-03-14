@@ -194,7 +194,16 @@ export default function Vyroba() {
   const [statusMgmtOpen, setStatusMgmtOpen] = useState(false);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [costPresetsOpen, setCostPresetsOpen] = useState(false);
-  const [dataLogOpen, setDataLogOpen] = useState(false);
+  const [dataLogOpen, setDataLogOpen] = useState(() => {
+    try { return localStorage.getItem("datalog-panel-vyroba") === "true"; } catch { return false; }
+  });
+  const toggleDataLog = useCallback(() => {
+    setDataLogOpen(prev => {
+      const next = !prev;
+      try { localStorage.setItem("datalog-panel-vyroba", String(next)); } catch {}
+      return next;
+    });
+  }, []);
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
 
   // Owner/Admin guard
