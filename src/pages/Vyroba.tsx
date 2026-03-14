@@ -1780,6 +1780,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   const [qcModalItems, setQcModalItems] = useState<{ item: ScheduleItem }[]>([]);
   const [qcSubmitting, setQcSubmitting] = useState(false);
   const [singleQcItem, setSingleQcItem] = useState<ScheduleItem | null>(null);
+  const [singleQcMergedIds, setSingleQcMergedIds] = useState<string[]>([]);
   const [singleQcModalOpen, setSingleQcModalOpen] = useState(false);
   const [uncheckConfirmItemId, setUncheckConfirmItemId] = useState<string | null>(null);
   const [uncheckConfirmCode, setUncheckConfirmCode] = useState<string>("");
