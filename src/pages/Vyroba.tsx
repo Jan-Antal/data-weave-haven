@@ -2507,6 +2507,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                 setSingleQcModalOpen(false);
                 setSingleQcItem(null);
                 setSingleQcMergedIds([]);
+                setDefectOpen(false);
               }}
             >
               Potvrdit QC — {qcUserFirstName}
