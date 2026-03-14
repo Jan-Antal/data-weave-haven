@@ -1834,28 +1834,102 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         </CollapsibleContent>
       </Collapsible>
 
-      {/* Expedice button */}
-      <div className="relative group">
+      {/* Smart "Označit vše jako hotovo" button + QC panel */}
+      {qcPanel ? (() => {
+        const missingQC = dedupedItems.filter(({ item }) => item.status !== "completed" && !checkMap.has(item.id));
+        const withQC = dedupedItems.filter(({ item }) => item.status !== "completed" && checkMap.has(item.id));
+        const allHaveQC = missingQC.length === 0;
+
+        if (allHaveQC) {
+          // All have QC — just open expedice
+          setTimeout(() => { setQcPanel(false); onOpenExpedice(); }, 0);
+          return null;
+        }
+
+        return (
+          <div className="rounded-md p-3 space-y-2" style={{ background: "rgba(217,119,6,0.06)", border: "1px solid rgba(217,119,6,0.15)" }}>
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] font-semibold" style={{ color: "#92400e" }}>⚠ Tyto položky nemají QC kontrolu:</span>
+              <button onClick={() => setQcPanel(false)} className="p-0.5 rounded hover:bg-black/5"><X className="h-3.5 w-3.5" style={{ color: "#6b7280" }} /></button>
+            </div>
+            <div className="space-y-1">
+              {missingQC.map(({ item }) => (
+                <div key={item.id} className="flex items-center gap-2 px-2 py-1.5 rounded" style={{ background: "#ffffff", border: "1px solid #ece8e2" }}>
+                  <span className="text-[12px] flex-1 truncate" style={{ color: "#1a1a1a" }}>
+                    {item.item_code && <span className="font-mono font-bold mr-1">{item.item_code}</span>}
+                    {item.item_name}
+                  </span>
+                  <button
+                    onClick={() => handleQC(item.id)}
+                    disabled={qcLoading === item.id}
+                    className="px-2 py-0.5 rounded text-[10px] font-medium shrink-0"
+                    style={{ background: "#3a8a36", color: "#fff" }}
+                  >
+                    {qcLoading === item.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "✓ QC"}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-1">
+              {withQC.length > 0 && (
+                <button
+                  onClick={async () => {
+                    const ids = withQC.map(({ item }) => item.id);
+                    const { data: { user } } = await supabase.auth.getUser();
+                    await supabase.from("production_schedule").update({
+                      status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
+                    }).in("id", ids);
+                    qc.invalidateQueries({ queryKey: ["production-schedule"] });
+                    toast.success(`${ids.length} položek dokončeno`);
+                    setQcPanel(false);
+                    onOpenExpedice();
+                  }}
+                  className="px-3 py-1.5 rounded text-[11px] font-medium"
+                  style={{ background: "#3a8a36", color: "#fff" }}
+                >
+                  Dokončit jen zkontrolované ({withQC.length})
+                </button>
+              )}
+              <span className="text-[10px] self-center" style={{ color: "#6b7280" }}>
+                {withQC.length === 0 ? "Žádná položka nemá QC kontrolu — nejprve zkontrolujte kvalitu" : "Dokončete QC a pokračujte"}
+              </span>
+            </div>
+          </div>
+        );
+      })() : (
         <button
-          onClick={allReady ? onOpenExpedice : undefined}
-          disabled={!allReady}
+          onClick={() => {
+            // Check if all non-completed items have QC
+            const nonCompleted = dedupedItems.filter(({ item }) => item.status !== "completed");
+            if (nonCompleted.length === 0) return;
+            const allHaveQC = nonCompleted.every(({ item }) => checkMap.has(item.id));
+            if (allHaveQC) {
+              // Mark all as completed, then open expedice
+              (async () => {
+                const ids = nonCompleted.map(({ item }) => item.id);
+                const { data: { user } } = await supabase.auth.getUser();
+                await supabase.from("production_schedule").update({
+                  status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
+                }).in("id", ids);
+                qc.invalidateQueries({ queryKey: ["production-schedule"] });
+                onOpenExpedice();
+              })();
+            } else {
+              setQcPanel(true);
+            }
+          }}
+          disabled={dedupedItems.length === 0}
           className={`w-full py-2.5 rounded-md text-sm font-medium transition-colors ${isMobile ? "min-h-[44px]" : ""}`}
           style={{
-            background: allReady ? "rgba(58,138,54,0.1)" : "#f5f3f0",
-            color: allReady ? "#3a8a36" : "#b0b7c3",
-            border: allReady ? "1px solid rgba(58,138,54,0.2)" : "1px solid #e5e2dd",
-            cursor: allReady ? "pointer" : "not-allowed",
+            background: dedupedItems.length > 0 ? "rgba(58,138,54,0.1)" : "#f5f3f0",
+            color: dedupedItems.length > 0 ? "#3a8a36" : "#b0b7c3",
+            border: dedupedItems.length > 0 ? "1px solid rgba(58,138,54,0.2)" : "1px solid #e5e2dd",
+            cursor: dedupedItems.length > 0 ? "pointer" : "not-allowed",
           }}
         >
           Označit vše jako hotovo
         </button>
-        {!allReady && dedupedItems.length > 0 && (
-          <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded text-[10px] whitespace-nowrap z-10"
-            style={{ background: "#1a1a1a", color: "#ffffff" }}>
-            Nejprve dokončete a zkontrolujte všechny položky
-          </div>
-        )}
-      </div>
+      )}
 
       {/* QC Uncheck confirm */}
       <ConfirmDialog
