@@ -1045,52 +1045,102 @@ export default function Vyroba() {
 
       {/* ═══ STATS BAR ═══ */}
       <div className="shrink-0 flex items-center gap-3 px-4 text-xs" style={{ height: 40, background: "#f5f3f0", borderBottom: "1px solid #e5e2dd" }}>
-        <span style={{ color: "#1a1a1a", fontWeight: 500 }}>{stats.total} projektů</span>
-        <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
-        <span className="font-mono" style={{ color: "#2563eb" }}>∅ {stats.avgPct}%</span>
-        <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
-        <span style={{ color: "#3a8a36" }}>✓ {stats.onTrack} on track</span>
-        <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
-        <span style={{ color: stats.behind > 0 ? "#dc2626" : "#6b7280" }}>⚠ {stats.behind} pozadu</span>
-        <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
-        <span style={{ color: todayDayIndex >= 0 && stats.todayLogged < stats.total ? "#d97706" : "#6b7280" }}>
-          Dnes: {stats.todayLogged}/{stats.total}
-        </span>
-        {/* ── Week navigation (right-aligned) ── */}
-        <div className="flex-1" />
-        <div className="relative flex items-center gap-1" ref={weekPickerRef}>
-          <button onClick={() => setWeekOffset(w => w - 1)} className="p-1 rounded hover:bg-muted transition-colors" style={{ color: "#223937" }}>
-            <ChevronLeft className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => setWeekPickerOpen(o => !o)}
-            className="font-mono select-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer"
-            style={{ fontSize: 13, color: "#223937" }}
-          >
-            T{weekNum} · {fmtDate(currentMonday)}–{fmtDate(friday)}{currentMonday.getFullYear()}
-          </button>
-          <button onClick={() => setWeekOffset(w => w + 1)} className="p-1 rounded hover:bg-muted transition-colors" style={{ color: "#223937" }}>
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-          {weekOffset !== 0 && (
-            <button
-              onClick={() => setWeekOffset(0)}
-              className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors"
-              style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", fontSize: 11 }}
-            >
-              Dnes
-            </button>
-          )}
-          {/* Week picker popup */}
-          {weekPickerOpen && (
-            <WeekPickerPopup
-              currentWeekOffset={weekOffset}
-              onSelectOffset={(offset) => { setWeekOffset(offset); setWeekPickerOpen(false); }}
-              onClose={() => setWeekPickerOpen(false)}
-              containerRef={weekPickerRef}
-            />
-          )}
-        </div>
+        {isMobile ? (
+          /* Mobile: compact single row */
+          <>
+            <div className="relative flex items-center gap-1" ref={weekPickerRef}>
+              <button onClick={() => setWeekOffset(w => w - 1)} className="p-1 rounded hover:bg-muted transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center" style={{ color: "#223937" }}>
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setWeekPickerOpen(o => !o)}
+                className="font-mono select-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer font-bold"
+                style={{ fontSize: 13, color: "#223937" }}
+              >
+                T{weekNum}
+              </button>
+              <button onClick={() => setWeekOffset(w => w + 1)} className="p-1 rounded hover:bg-muted transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center" style={{ color: "#223937" }}>
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              {weekPickerOpen && (
+                <WeekPickerPopup
+                  currentWeekOffset={weekOffset}
+                  onSelectOffset={(offset) => { setWeekOffset(offset); setWeekPickerOpen(false); }}
+                  onClose={() => setWeekPickerOpen(false)}
+                  containerRef={weekPickerRef}
+                />
+              )}
+            </div>
+            <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
+            <span style={{ color: "#1a1a1a", fontWeight: 500 }}>{stats.total} projektů</span>
+            <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
+            <span className="font-mono" style={{ color: "#2563eb" }}>ø {stats.avgPct}%</span>
+            {stats.behind > 0 && (
+              <>
+                <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
+                <span style={{ color: "#dc2626" }}>⚠ {stats.behind} pozadu</span>
+              </>
+            )}
+            <div className="flex-1" />
+            {weekOffset !== 0 && (
+              <button
+                onClick={() => setWeekOffset(0)}
+                className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors"
+                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", fontSize: 11 }}
+              >
+                Dnes
+              </button>
+            )}
+          </>
+        ) : (
+          /* Desktop: full stats */
+          <>
+            <span style={{ color: "#1a1a1a", fontWeight: 500 }}>{stats.total} projektů</span>
+            <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
+            <span className="font-mono" style={{ color: "#2563eb" }}>∅ {stats.avgPct}%</span>
+            <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
+            <span style={{ color: "#3a8a36" }}>✓ {stats.onTrack} on track</span>
+            <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
+            <span style={{ color: stats.behind > 0 ? "#dc2626" : "#6b7280" }}>⚠ {stats.behind} pozadu</span>
+            <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
+            <span style={{ color: todayDayIndex >= 0 && stats.todayLogged < stats.total ? "#d97706" : "#6b7280" }}>
+              Dnes: {stats.todayLogged}/{stats.total}
+            </span>
+            <div className="flex-1" />
+            <div className="relative flex items-center gap-1" ref={weekPickerRef}>
+              <button onClick={() => setWeekOffset(w => w - 1)} className="p-1 rounded hover:bg-muted transition-colors" style={{ color: "#223937" }}>
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setWeekPickerOpen(o => !o)}
+                className="font-mono select-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer"
+                style={{ fontSize: 13, color: "#223937" }}
+              >
+                T{weekNum} · {fmtDate(currentMonday)}–{fmtDate(friday)}{currentMonday.getFullYear()}
+              </button>
+              <button onClick={() => setWeekOffset(w => w + 1)} className="p-1 rounded hover:bg-muted transition-colors" style={{ color: "#223937" }}>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+              {weekOffset !== 0 && (
+                <button
+                  onClick={() => setWeekOffset(0)}
+                  className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors"
+                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", fontSize: 11 }}
+                >
+                  Dnes
+                </button>
+              )}
+              {weekPickerOpen && (
+                <WeekPickerPopup
+                  currentWeekOffset={weekOffset}
+                  onSelectOffset={(offset) => { setWeekOffset(offset); setWeekPickerOpen(false); }}
+                  onClose={() => setWeekPickerOpen(false)}
+                  containerRef={weekPickerRef}
+                />
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* ═══ BODY ═══ */}
