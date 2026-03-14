@@ -354,7 +354,6 @@ export default function Vyroba() {
   const [logDayIndex, setLogDayIndex] = useState(-1);
   const [logPhase, setLogPhase] = useState("Řezání");
   const [logPercent, setLogPercent] = useState(0);
-  const [logTab, setLogTab] = useState<"notes" | "photo">("notes");
   const [logNotes, setLogNotes] = useState("");
   const logNotesUndoStack = useRef<string[]>([]);
   const [hotovostTouched, setHotovostTouched] = useState(false);
@@ -528,7 +527,6 @@ export default function Vyroba() {
     if (!selectedProject) return;
     const di = dayIdx ?? todayDayIndex;
     setLogDayIndex(di);
-    setLogTab("notes");
     setLogPhaseWarning(null);
     setHotovostTouched(false);
     logNotesUndoStack.current = [];
@@ -1437,43 +1435,34 @@ export default function Vyroba() {
               );
             })()}
 
-            {/* Tab switcher: Poznámky / Foto */}
+            {/* Poznámky section */}
             <div>
-              <div className="flex gap-0 mb-2">
-                <button onClick={() => setLogTab("notes")} className="px-3 py-1 text-xs font-medium rounded-l transition-colors"
-                  style={{ background: logTab === "notes" ? "#223937" : "#f5f3f0", color: logTab === "notes" ? "#fff" : "#6b7280", border: logTab === "notes" ? "none" : "1px solid #e5e2dd" }}>
-                  Poznámky
-                </button>
-                <button onClick={() => setLogTab("photo")} className="px-3 py-1 text-xs font-medium rounded-r transition-colors"
-                  style={{ background: logTab === "photo" ? "#223937" : "#f5f3f0", color: logTab === "photo" ? "#fff" : "#6b7280", border: logTab === "photo" ? "none" : "1px solid #e5e2dd" }}>
-                  Foto
-                </button>
-              </div>
-              {logTab === "notes" ? (
-                <textarea
-                  value={logNotes}
-                  onChange={e => {
-                    logNotesUndoStack.current = [...logNotesUndoStack.current.slice(-49), logNotes];
-                    setLogNotes(e.target.value);
-                  }}
-                  onKeyDown={e => {
-                    if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (logNotesUndoStack.current.length > 0) {
-                        const prev = logNotesUndoStack.current[logNotesUndoStack.current.length - 1];
-                        logNotesUndoStack.current = logNotesUndoStack.current.slice(0, -1);
-                        setLogNotes(prev);
-                      }
+              <div className="text-[11px] uppercase tracking-wider font-medium mb-1" style={{ color: "hsl(var(--muted-foreground))" }}>Poznámky</div>
+              <textarea
+                value={logNotes}
+                onChange={e => {
+                  logNotesUndoStack.current = [...logNotesUndoStack.current.slice(-49), logNotes];
+                  setLogNotes(e.target.value);
+                }}
+                onKeyDown={e => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (logNotesUndoStack.current.length > 0) {
+                      const prev = logNotesUndoStack.current[logNotesUndoStack.current.length - 1];
+                      logNotesUndoStack.current = logNotesUndoStack.current.slice(0, -1);
+                      setLogNotes(prev);
                     }
-                  }}
-                  placeholder="Poznámky k dnešnímu dni..."
-                  className="w-full h-20 text-xs rounded-md p-2 resize-none"
-                  style={{ border: "1px solid #e5e2dd", background: "#fafaf8" }}
-                />
-              ) : (
-                <VyrobaPhotoTab projectId={selectedProject?.projectId || ""} />
-              )}
+                  }
+                }}
+                placeholder="Čeho jste dnes dosáhli? Problémy, poznámky..."
+                className="w-full h-20 text-xs rounded-md p-2 resize-none border border-input bg-background"
+              />
+            </div>
+
+            {/* Foto section */}
+            <div>
+              <VyrobaPhotoTab projectId={selectedProject?.projectId || ""} />
             </div>
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -3297,6 +3286,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (projectId) listFiles("fotky");
@@ -3310,24 +3300,23 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    console.log('[Vyroba Foto] uploading to project:', projectId);
     for (const file of Array.from(files)) {
       const now = new Date();
       const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
       const timeStr = `${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}`;
       const ext = file.name.split(".").pop() || "jpg";
-      const autoName = `${projectId}-${slugify(projectId)}-Vyroba-${dateStr}-${timeStr}.${ext}`;
+      const autoName = `${projectId}-Log-${dateStr}-${timeStr}.${ext}`;
       const renamedFile = new File([file], autoName, { type: file.type });
       try {
         await uploadFile("fotky", renamedFile);
         toast.success(`✓ ${autoName} nahráno`);
       } catch (err: any) {
-        console.error('[Vyroba Foto] upload error:', err);
         toast.error(`Upload selhal: ${err?.message || "neznámá chyba"}`);
       }
     }
     listFiles("fotky", true);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
   }
 
   async function handleDelete(fileName: string) {
@@ -3342,26 +3331,58 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px]" style={{ color: "#99a5a3" }}>{photos.length} fotek</span>
-        <label className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium cursor-pointer transition-colors min-h-[36px]"
-          style={{ background: "rgba(58,138,54,0.08)", color: "#3a8a36", border: "1px solid rgba(58,138,54,0.2)" }}>
-          {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-          Přidat foto
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={handleUpload}
-            disabled={uploading}
-            {...(isMobile ? { capture: "environment" as any } : {})}
-          />
-        </label>
+        <span className="text-[11px] uppercase tracking-wider font-medium" style={{ color: "hsl(var(--muted-foreground))" }}>Foto</span>
+        {isMobile ? (
+          <div className="flex gap-1.5">
+            <label className="flex items-center justify-center gap-1 px-2 py-1 rounded text-[11px] font-medium cursor-pointer transition-colors min-h-[44px] flex-1"
+              style={{ border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}>
+              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span>📷</span>}
+              Odfotit
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleUpload}
+                disabled={uploading}
+              />
+            </label>
+            <label className="flex items-center justify-center gap-1 px-2 py-1 rounded text-[11px] font-medium cursor-pointer transition-colors min-h-[44px] flex-1"
+              style={{ border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}>
+              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span>🖼</span>}
+              Z galérie
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleUpload}
+                disabled={uploading}
+              />
+            </label>
+          </div>
+        ) : (
+          <label className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium cursor-pointer transition-colors"
+            style={{ background: "hsl(var(--success) / 0.08)", color: "hsl(var(--success))", border: "1px solid hsl(var(--success) / 0.2)" }}>
+            {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+            Přidat foto
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleUpload}
+              disabled={uploading}
+            />
+          </label>
+        )}
       </div>
 
       {photos.length === 0 ? (
-        <div className="h-16 rounded-md flex items-center justify-center text-xs" style={{ border: "1px dashed #e5e2dd", color: "#99a5a3" }}>
+        <div className="h-16 rounded-md flex items-center justify-center text-xs border border-dashed border-border" style={{ color: "hsl(var(--muted-foreground))" }}>
           Žádné fotky
         </div>
       ) : (
@@ -3372,7 +3393,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
             return (
               <div key={photo.itemId || photo.name} className="relative group cursor-pointer"
                 onClick={() => { setLightboxIndex(idx); setLightboxOpen(true); }}>
-                <div className="aspect-square rounded-md overflow-hidden" style={{ background: "#f0eeea" }}>
+                <div className="aspect-square rounded-md overflow-hidden bg-muted">
                   <img
                     src={photo.thumbnailUrl || photo.downloadUrl || ""}
                     alt={photo.name}
@@ -3380,7 +3401,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
                     loading="lazy"
                   />
                 </div>
-                <div className="text-[9px] text-center mt-0.5" style={{ color: "#99a5a3" }}>{dateLabel}</div>
+                <div className="text-[9px] text-center mt-0.5" style={{ color: "hsl(var(--muted-foreground))" }}>{dateLabel}</div>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDelete(photo.name); }}
                   className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
