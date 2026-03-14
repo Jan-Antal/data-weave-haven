@@ -501,12 +501,12 @@ export default function Vyroba() {
   const stats = useMemo(() => {
     const activeProjects = enrichedProjects.filter(p => !p.isPaused);
     const total = activeProjects.length;
-    const avgPct = total > 0 ? Math.round(activeProjects.reduce((s, p) => s + getLatestPercent(p.projectId), 0) / total) : 0;
+    const avgPct = total > 0 ? Math.round(activeProjects.reduce((s, p) => s + getBundleProgress(p.projectId).bundleProgress, 0) / total) : 0;
     const onTrack = activeProjects.filter(p => getProjectStatus(p.projectId) === "on-track").length;
     const behind = activeProjects.filter(p => getProjectStatus(p.projectId) === "behind").length;
     const todayLogged = todayDayIndex >= 0 ? activeProjects.filter(p => getLogsForProject(p.projectId).some(l => l.day_index === todayDayIndex)).length : 0;
     return { total, avgPct, onTrack, behind, todayLogged };
-  }, [enrichedProjects, dailyLogsMap, todayDayIndex]);
+  }, [enrichedProjects, dailyLogsMap, todayDayIndex, scheduleData]);
 
   /* ── Log modal ── */
   function openLogModal(dayIdx?: number) {
