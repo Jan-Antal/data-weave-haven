@@ -1199,6 +1199,10 @@ export default function Vyroba() {
                 dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
                 onDismissDyha={() => setDyhaDismissed(prev => new Set(prev).add(selectedProject.projectId))}
                 weeklyGoal={getWeeklyGoal(selectedProject.projectId)}
+                bundleProgress={getBundleProgress(selectedProject.projectId)}
+                isWeeklyGoalMet={isWeeklyGoalMet(selectedProject.projectId)}
+                areAllPartsCompleted={(itemCode, itemName) => areAllPartsCompleted(selectedProject.projectId, itemCode, itemName)}
+                getIncompletePartsInfo={(itemCode, itemName) => getIncompletePartsInfo(selectedProject.projectId, itemCode, itemName)}
               />
             )}
           </div>
