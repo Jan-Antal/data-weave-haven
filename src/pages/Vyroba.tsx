@@ -628,16 +628,6 @@ export default function Vyroba() {
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            <button onClick={() => setWeekOffset(w => w - 1)} className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="text-primary-foreground text-sm font-mono select-none min-w-[140px] md:min-w-[200px] text-center">
-              T{weekNum} · {fmtDate(currentMonday)}–{fmtDate(friday)}{currentMonday.getFullYear()}
-            </span>
-            <button onClick={() => setWeekOffset(w => w + 1)} className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
-              <ChevronRight className="h-4 w-4" />
-            </button>
-
             <span className="w-px h-5 bg-primary-foreground/20 mx-1 hidden md:block" />
 
             <button className="p-2 rounded-md text-primary-foreground bg-primary-foreground/10 transition-colors cursor-default" title="Výroba">
