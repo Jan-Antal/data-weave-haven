@@ -1919,21 +1919,55 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
 
 function QualityCheckDisplay({ check }: { check: any }) {
   const name = useProfileName(check.checked_by);
-  const date = new Date(check.checked_at);
-  const dateStr = `${date.getDate()}.${date.getMonth() + 1}.`;
+  const firstName = name ? name.split(" ")[0].slice(0, 8) : "–";
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="text-[10px] shrink-0 cursor-pointer" style={{ color: "#3a8a36" }}>
-            ✓ QC
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p className="text-xs">Zkontroloval: {name || "–"} · {dateStr}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <span
+      className="inline-flex items-center gap-1 shrink-0"
+      style={{
+        background: "#dcfce7",
+        color: "#166534",
+        border: "1px solid #16a34a",
+        padding: "4px 10px",
+        borderRadius: "9999px",
+        fontSize: "12px",
+        fontWeight: 500,
+        lineHeight: 1,
+      }}
+    >
+      ✓ {firstName}
+    </span>
+  );
+}
+
+function QualityCheckBadgeEmpty() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 shrink-0"
+      style={{
+        background: "#fef3c7",
+        color: "#92400e",
+        border: "1px solid #f59e0b",
+        padding: "4px 10px",
+        borderRadius: "9999px",
+        fontSize: "12px",
+        fontWeight: 500,
+        lineHeight: 1,
+      }}
+    >
+      <Shield className="h-3 w-3" />
+      QC
+    </span>
+  );
+}
+
+function QualityCheckFullDisplay({ check }: { check: any }) {
+  const name = useProfileName(check.checked_by);
+  const date = new Date(check.checked_at);
+  const dateStr = `${date.getDate()}.${date.getMonth() + 1}.${String(date.getFullYear()).slice(2)}`;
+  return (
+    <span style={{ color: "#166534", fontSize: "11px" }}>
+      ✓ QC: {name || "–"} · {dateStr}
+    </span>
   );
 }
 
