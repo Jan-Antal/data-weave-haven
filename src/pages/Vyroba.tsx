@@ -1089,7 +1089,8 @@ export default function Vyroba() {
       </div>
 
       {/* ═══ BODY ═══ */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-w-0 flex min-h-0">
         {/* ═══ LEFT PANEL ═══ */}
         <div className={`shrink-0 flex flex-col overflow-y-auto ${isMobile ? "w-full" : "w-[252px]"}`} style={{ borderRight: isMobile ? "none" : "1px solid #e5e2dd", background: "#ffffff" }}>
           {/* Capacity bar */}
