@@ -1048,7 +1048,7 @@ export default function Vyroba() {
                     className="font-medium underline"
                     style={{ color: "#d97706" }}
                     onClick={() => {
-                      hotovostTouched.current = false;
+                      setHotovostTouched(false);
                       const phasePct = PHASES.find(p => p.name === logPhase)?.pct || 0;
                       setLogPercent(phasePct);
                     }}
