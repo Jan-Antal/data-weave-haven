@@ -1737,7 +1737,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   // "Označit jako hotovo" — targets selected or all
   function handleMarkHotovo() {
     const targetItems = selectedItems.size > 0
-      ? dedupedItems.filter(({ item }) => selectedItems.has(item.id) && item.status !== "completed")
+      ? dedupedItems.filter(({ mergedIds }) => mergedIds.some(id => selectedItems.has(id)) && dedupedItems.find(d => d.mergedIds === mergedIds)?.item.status !== "completed")
       : dedupedItems.filter(({ item }) => item.status !== "completed");
 
     if (targetItems.length === 0) return;
