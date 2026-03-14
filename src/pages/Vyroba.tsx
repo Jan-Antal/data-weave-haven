@@ -1953,6 +1953,10 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   const [defectResolution, setDefectResolution] = useState("");
   const [defectItemId, setDefectItemId] = useState<string>("__bundle__");
   const [defectPhotos, setDefectPhotos] = useState<string[]>([]);
+  // Reset defect form when project changes or QC dialogs close
+  useEffect(() => {
+    setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectItemId("__bundle__"); setDefectPhotos([]);
+  }, [projectId]);
   const qc = useQueryClient();
   const qcUserFirstName = profile?.full_name?.split(" ")[0]?.slice(0, 8) || "–";
 
