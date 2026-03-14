@@ -1709,6 +1709,11 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
     setQcSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      // Push undo for QC confirm
+      const qcItemIds = qcModalItems.filter(({ item }) => !checkMap.has(item.id)).map(({ item }) => item.id);
+      if (qcItemIds.length > 0) {
+        pushUndo({ type: "qc_confirm", itemIds: qcItemIds, timestamp: Date.now() });
+      }
       // Record QC for all items in modal
       for (const { item } of qcModalItems) {
         if (!checkMap.has(item.id)) {
