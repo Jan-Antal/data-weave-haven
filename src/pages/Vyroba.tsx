@@ -515,26 +515,8 @@ export default function Vyroba() {
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
   }
 
-  /* ── Phase change ── */
-  async function handlePhaseChange(phaseName: string) {
-    if (!selectedProject) return;
-    const phase = PHASES.find(p => p.name === phaseName);
-    if (!phase) return;
-    const currentPct = getLatestPercent(selectedProject.projectId);
-    if (phase.pct <= currentPct) {
-      toast.error("Nelze přejít na nižší fázi — výroba jde jen dopředu");
-      return;
-    }
-    // Save log with new phase and its pct
-    const di = todayDayIndex >= 0 ? todayDayIndex : 0;
-    try {
-      await saveDailyLog(bundleId(selectedProject.projectId), weekKey, di, phaseName, phase.pct);
-      qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
-      toast.success(`Fáze: ${phaseName} (${phase.pct}%)`);
-    } catch {
-      toast.error("Chyba při změně fáze");
-    }
-  }
+
+
 
   /* ── Return from Expedice ── */
   async function handleReturnFromExpedice(pid: string) {
