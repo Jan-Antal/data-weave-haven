@@ -1030,7 +1030,7 @@ export default function Vyroba() {
               <div className="flex items-center gap-4">
                 <div className="flex-1">
                   <Slider min={0} max={100} step={5} value={[logPercent]} onValueChange={([v]) => {
-                    hotovostTouched.current = true;
+                    setHotovostTouched(true);
                     setLogPercent(v);
                   }} />
                   <div className="flex justify-between text-[9px] mt-1" style={{ color: "#99a5a3" }}>
