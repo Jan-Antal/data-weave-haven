@@ -119,6 +119,16 @@ export default function PlanVyroby() {
     localStorage.setItem("inbox-panel-width", String(w));
   }, []);
   const showCzk = displayMode === "czk";
+  const [dataLogOpen, setDataLogOpen] = useState(() => {
+    try { return localStorage.getItem("datalog-panel-plan-vyroby") === "true"; } catch { return false; }
+  });
+  const toggleDataLog = useCallback(() => {
+    setDataLogOpen(prev => {
+      const next = !prev;
+      try { localStorage.setItem("datalog-panel-plan-vyroby", String(next)); } catch {}
+      return next;
+    });
+  }, []);
   const [activeDrag, setActiveDrag] = useState<ActiveDragData | null>(null);
   const isDraggingFromInbox = activeDrag?.type === "inbox-item" || activeDrag?.type === "inbox-items" || activeDrag?.type === "inbox-project";
   const [overDroppableId, setOverDroppableId] = useState<string | null>(null);
