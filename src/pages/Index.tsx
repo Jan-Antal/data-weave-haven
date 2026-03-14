@@ -208,29 +208,8 @@ const Index = () => {
       {/* Mobile Header */}
       {isMobile && (
         <MobileHeader
-          profileName={profile?.full_name || profile?.email || "Uživatel"}
-          profileEmail={profile?.email || ""}
-          profileRole={role}
-          isAdmin={isAdmin}
-          isOwner={isOwner}
-          realRole={realRole}
-          simulatedRole={simulatedRole}
-          setSimulatedRole={setSimulatedRole}
-          canAccessSettings={canAccessSettings}
-          onSignOut={signOut}
-          onAccountSettings={() => setAccountSettingsOpen(true)}
-          onSettings={handleOpenSettings}
-          canManageUsers={canManageUsers}
-          canManagePeople={canManagePeople}
-          canManageExchangeRates={canManageExchangeRates}
-          canManageStatuses={canManageStatuses}
-          canAccessRecycleBin={canAccessRecycleBin}
-          onUserMgmt={() => setUserMgmtOpen(true)}
-          onPeopleMgmt={openPeopleManagement}
-          onExchangeRates={() => setExchangeRateOpen(true)}
-          onStatusMgmt={() => setStatusMgmtOpen(true)}
-          onRecycleBin={() => setRecycleBinOpen(true)}
           onDataLog={toggleDataLog}
+          showDataLog={canAccessSettings || realRole === "owner" || role === "pm"}
         />
       )}
 
