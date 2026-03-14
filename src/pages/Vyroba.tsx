@@ -1889,19 +1889,20 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           </div>
           <div className="text-right shrink-0">
             <div className="text-3xl font-mono font-bold" style={{ color: statusColor }}>
-              {latestPct}%
+              {bundleProgress.bundleProgress}%
             </div>
-            {todayDayIndex >= 0 && (
-              <div className="text-xs" style={{ color: latestPct >= weeklyGoal ? "#3a8a36" : "#99a5a3" }}>
-                Cíl: {weeklyGoal}%
-              </div>
+            <div className="text-xs" style={{ color: isWeeklyGoalMet ? "#3a8a36" : "#99a5a3" }}>
+              Týdenní cíl: {weeklyGoal}%
+            </div>
+            {isWeeklyGoalMet && (
+              <div className="text-[10px] font-medium" style={{ color: "#3a8a36" }}>🎉 Týdenní cíl splněn!</div>
             )}
           </div>
         </div>
         {/* Progress bar 4px */}
         <div className="mt-2 relative">
           <div className="h-1 rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
-            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(latestPct, 100)}%`, background: statusColor }} />
+            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(bundleProgress.bundleProgress, 100)}%`, background: statusColor }} />
           </div>
           {/* Weekly goal marker */}
           {weeklyGoal < 100 && (
