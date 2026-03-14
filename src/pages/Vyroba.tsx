@@ -1747,10 +1747,12 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
     if (missingQC.length === 0) {
       // All have QC — mark as hotovo directly
       (async () => {
-        const ids = targetItems.map(({ item }) => item.id);
+        const ids = targetItems.flatMap(({ mergedIds }) => mergedIds);
         // Push undo for each item
-        for (const { item } of targetItems) {
-          pushUndo({ type: "item_hotovo", itemId: item.id, prevStatus: item.status, timestamp: Date.now() });
+        for (const { mergedIds: mids, item } of targetItems) {
+          for (const mid of mids) {
+            pushUndo({ type: "item_hotovo", itemId: mid, prevStatus: item.status, timestamp: Date.now() });
+          }
         }
         const { data: { user } } = await supabase.auth.getUser();
         await supabase.from("production_schedule").update({
