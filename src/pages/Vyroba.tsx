@@ -1562,7 +1562,7 @@ export default function Vyroba() {
 /* PROJECT ROW (left panel)                */
 /* ═══════════════════════════════════════ */
 
-function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectStatus, getLatestPercent, getLatestPhase, statusColors }: {
+function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectStatus, getLatestPercent, getLatestPhase, statusColors, weeklyGoal = 100 }: {
   project: VyrobaProject;
   isSelected: boolean;
   onSelect: (pid: string) => void;
@@ -1571,11 +1571,16 @@ function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectSt
   getLatestPercent: (pid: string) => number;
   getLatestPhase: (pid: string) => string | null;
   statusColors: Record<string, string>;
+  weeklyGoal?: number;
 }) {
   const status = getProjectStatus(project.projectId);
   const pct = getLatestPercent(project.projectId);
   const phase = getLatestPhase(project.projectId);
   const borderColor = project.color;
+
+  // Goal-based color logic
+  const goalDiff = pct - weeklyGoal;
+  const progressColor = goalDiff >= 0 ? "#3a8a36" : goalDiff >= -10 ? "#d97706" : "#dc2626";
 
   // Deadline urgency color for project name
   const now = new Date();
@@ -1623,8 +1628,14 @@ function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectSt
               <span style={{ fontSize: 11, color: PHASES.find(ph => ph.name === phase)?.color || "#6b7280", fontWeight: 500 }}>· {phase}</span>
             )}
           </div>
-          <div className="mt-1.5 h-[3px] rounded-full overflow-hidden" style={{ background: "hsl(var(--border))" }}>
-            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: statusColors[status] }} />
+          <div className="mt-1.5 relative">
+            <div className="h-[3px] rounded-full overflow-hidden" style={{ background: "hsl(var(--border))" }}>
+              <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: progressColor }} />
+            </div>
+            {/* Weekly goal marker */}
+            {weeklyGoal < 100 && (
+              <div className="absolute top-[-1px] h-[5px] w-[1.5px] rounded-full" style={{ left: `${weeklyGoal}%`, background: "#d97706", opacity: 0.8 }} />
+            )}
           </div>
         </div>
       </button>
