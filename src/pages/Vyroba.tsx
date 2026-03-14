@@ -928,7 +928,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
               {latestPct}%
             </div>
             {todayDayIndex >= 0 && (
-              <div className="text-xs" style={{ color: "#99a5a3" }}>oček. {expectedPct}%</div>
+              <div className="text-xs" style={{ color: "#99a5a3" }}>Cíl: 100%</div>
             )}
           </div>
         </div>
