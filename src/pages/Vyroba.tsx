@@ -907,7 +907,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="font-mono text-xs" style={{ color: "#6b7280" }}>{project.projectId}</span>
-              <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full" style={{ background: `${statusColor}15`, color: statusColor, border: `1px solid ${statusColor}40` }}>
+              <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: `${statusColor}18`, color: statusColor }}>
                 {statusLabels[status]}
               </span>
               {project.isSpilled && (
