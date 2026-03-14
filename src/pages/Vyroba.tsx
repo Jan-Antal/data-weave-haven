@@ -2216,6 +2216,8 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
       }
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["quality-checks", projectId] });
+      const qcItemCodes = qcModalItems.filter(({ item }) => !checkMap.has(item.id)).map(({ item }) => item.item_code || item.item_name);
+      logActivity({ projectId, actionType: "item_qc_confirmed", newValue: qcItemCodes.join(", "), detail: profile?.full_name || profile?.email || "" });
       setSelectedItems(new Set());
       setQcModalOpen(false);
       // Check if ALL items are now completed
