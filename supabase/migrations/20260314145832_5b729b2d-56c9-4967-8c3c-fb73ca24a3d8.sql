@@ -1,0 +1,1 @@
+ALTER TABLE public.production_daily_logs ADD COLUMN IF NOT EXISTS note_text text;

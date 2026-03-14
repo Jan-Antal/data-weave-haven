@@ -427,20 +427,25 @@ export default function Vyroba() {
     setLogPhase(latestPhase || "Řezání");
     setLogPercent(getLatestPercent(selectedProject.projectId));
     setLogTab("notes");
-    setLogNotes("");
     logNotesUndoStack.current = [];
+
+    // Load existing note for this day
+    const logs = getLogsForProject(selectedProject.projectId);
+    const existingLog = logs.find(l => l.day_index === di);
+    setLogNotes(existingLog?.note_text || "");
+
     setLogModalOpen(true);
   }
 
   async function handleSaveLog() {
     if (!selectedProject || logDayIndex < 0) return;
     try {
-      await saveDailyLog(bundleId(selectedProject.projectId), weekKey, logDayIndex, logPhase, logPercent);
+      await saveDailyLog(bundleId(selectedProject.projectId), weekKey, logDayIndex, logPhase, logPercent, logNotes || null);
       qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
       toast.success("✓ Log uložen", { duration: 2000 });
       setLogModalOpen(false);
-    } catch {
-      toast.error("Chyba při ukládání logu");
+    } catch (err: any) {
+      toast.error(`Chyba při ukládání logu: ${err?.message || "neznámá chyba"}`);
     }
   }
 
@@ -2127,6 +2132,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    console.log('[Vyroba Foto] uploading to project:', projectId);
     for (const file of Array.from(files)) {
       const now = new Date();
       const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -2138,7 +2144,8 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
         await uploadFile("fotky", renamedFile);
         toast.success(`✓ ${autoName} nahráno`);
       } catch (err: any) {
-        toast.error(err.message || "Upload selhal");
+        console.error('[Vyroba Foto] upload error:', err);
+        toast.error(`Upload selhal: ${err?.message || "neznámá chyba"}`);
       }
     }
     listFiles("fotky", true);

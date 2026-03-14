@@ -11,6 +11,7 @@ export interface DailyLog {
   percent: number;
   logged_by: string | null;
   logged_at: string;
+  note_text: string | null;
 }
 
 export function useProductionDailyLogs(weekKey: string) {
@@ -52,21 +53,23 @@ export async function saveDailyLog(
   weekKey: string,
   dayIndex: number,
   phase: string | null,
-  percent: number
+  percent: number,
+  noteText?: string | null
 ) {
   const { data: { user } } = await supabase.auth.getUser();
+  const payload: any = {
+    bundle_id: bundleId,
+    week_key: weekKey,
+    day_index: dayIndex,
+    phase,
+    percent,
+    logged_by: user?.id || null,
+    logged_at: new Date().toISOString(),
+  };
+  if (noteText !== undefined) {
+    payload.note_text = noteText;
+  }
   const { error } = await (supabase.from("production_daily_logs" as any) as any)
-    .upsert(
-      {
-        bundle_id: bundleId,
-        week_key: weekKey,
-        day_index: dayIndex,
-        phase,
-        percent,
-        logged_by: user?.id || null,
-        logged_at: new Date().toISOString(),
-      },
-      { onConflict: "bundle_id,week_key,day_index" }
-    );
+    .upsert(payload, { onConflict: "bundle_id,week_key,day_index" });
   if (error) throw error;
 }
