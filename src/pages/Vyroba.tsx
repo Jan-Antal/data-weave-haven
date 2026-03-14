@@ -494,27 +494,26 @@ export default function Vyroba() {
     const ids = Array.from(spillSelected);
     const pct = getLatestPercent(selectedProject.projectId);
 
-    // Push undo for move
     const prevWeeks = selectedProject.scheduleItems
       .filter(i => ids.includes(i.id))
       .map(i => ({ id: i.id, prevWeek: i.scheduled_week }));
     pushUndo({ type: "move_items", items: prevWeeks, targetWeek: nextWeekKey, timestamp: Date.now() });
 
-    // Create new items in next week with remaining hours only
     const itemsToMove = selectedProject.scheduleItems.filter(i => ids.includes(i.id));
     let movedCount = 0;
     for (const item of itemsToMove) {
-      const remaining = getRemainingHours(item, pct);
-      if (remaining <= 0) continue;
-      const remainingCzk = Math.round(item.scheduled_czk * (1 - pct / 100));
+      const useFull = spillFullHours.has(item.id);
+      const hours = useFull ? item.scheduled_hours : getRemainingHours(item, pct);
+      if (hours <= 0) continue;
+      const czk = useFull ? item.scheduled_czk : Math.round(item.scheduled_czk * (1 - pct / 100));
       const { error } = await supabase.from("production_schedule").insert({
         project_id: item.project_id,
         item_name: item.item_name,
         item_code: item.item_code,
         stage_id: item.stage_id,
         scheduled_week: nextWeekKey,
-        scheduled_hours: remaining,
-        scheduled_czk: remainingCzk,
+        scheduled_hours: hours,
+        scheduled_czk: czk,
         status: "scheduled",
         is_blocker: false,
       });
@@ -523,7 +522,7 @@ export default function Vyroba() {
     }
 
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
-    toast.success(`${movedCount} položek → T${nextWeekNum} (zbývající hodiny)`);
+    toast.success(`${movedCount} položek přesunuto do T${nextWeekNum}`);
     setSpillDialogOpen(false);
   }
 
