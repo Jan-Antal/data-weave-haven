@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useActivityLog, useActivityLogUsers, type ActivityLogEntry, type DateRange } from "@/hooks/useActivityLog";
 import { useUserAnalytics, useUserRecentActions, formatSessionDuration, type UserAnalytics } from "@/hooks/useUserAnalytics";
 import { useProjects } from "@/hooks/useProjects";
