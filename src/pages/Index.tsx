@@ -99,7 +99,7 @@ const Index = () => {
   const toggleDataLog = useCallback(() => {
     setDataLogOpen(prev => {
       const next = !prev;
-      try { sessionStorage.setItem("datalog-open", String(next)); } catch {}
+      try { localStorage.setItem("datalog-panel-index", String(next)); } catch {}
       return next;
     });
   }, []);
