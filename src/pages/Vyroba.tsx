@@ -425,9 +425,12 @@ export default function Vyroba() {
     const di = dayIdx ?? todayDayIndex;
     setLogDayIndex(di);
     const latestPhase = getLatestPhase(selectedProject.projectId);
-    setLogPhase(latestPhase || "Řezání");
-    setLogPercent(getLatestPercent(selectedProject.projectId));
+    const phaseName = latestPhase || "Řezání";
+    setLogPhase(phaseName);
+    const phasePct = PHASES.find(p => p.name === phaseName)?.pct || 0;
+    setLogPercent(Math.max(phasePct, getLatestPercent(selectedProject.projectId)));
     setLogTab("notes");
+    setLogPhaseWarning(null);
     logNotesUndoStack.current = [];
 
     // Load existing note for this day
