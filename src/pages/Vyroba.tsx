@@ -469,10 +469,20 @@ export default function Vyroba() {
   function openSpillDialog() {
     if (!selectedProject) return;
     const activeItems = selectedProject.scheduleItems.filter(i => i.status === "scheduled" || i.status === "in_progress");
+    const pct = getLatestPercent(selectedProject.projectId);
+    // Pre-uncheck items that are 100% done or completed
     const doneIds = new Set(selectedProject.scheduleItems.filter(i => i.status === "completed").map(i => i.id));
-    const selected = new Set(activeItems.filter(i => !doneIds.has(i.id)).map(i => i.id));
+    const selected = new Set(
+      activeItems
+        .filter(i => !doneIds.has(i.id) && pct < 100)
+        .map(i => i.id)
+    );
     setSpillSelected(selected);
     setSpillDialogOpen(true);
+  }
+
+  function getRemainingHours(item: ScheduleItem, progressPct: number): number {
+    return Math.round(item.scheduled_hours * (1 - progressPct / 100));
   }
 
   async function handleSpillConfirm() {
@@ -481,16 +491,39 @@ export default function Vyroba() {
       return;
     }
     const ids = Array.from(spillSelected);
+    const pct = getLatestPercent(selectedProject.projectId);
+
     // Push undo for move
     const prevWeeks = selectedProject.scheduleItems
       .filter(i => ids.includes(i.id))
       .map(i => ({ id: i.id, prevWeek: i.scheduled_week }));
     pushUndo({ type: "move_items", items: prevWeeks, targetWeek: nextWeekKey, timestamp: Date.now() });
 
-    const { error } = await supabase.from("production_schedule").update({ scheduled_week: nextWeekKey }).in("id", ids);
-    if (error) { toast.error(error.message); return; }
+    // Create new items in next week with remaining hours only
+    const itemsToMove = selectedProject.scheduleItems.filter(i => ids.includes(i.id));
+    let movedCount = 0;
+    for (const item of itemsToMove) {
+      const remaining = getRemainingHours(item, pct);
+      if (remaining <= 0) continue;
+      const remainingCzk = Math.round(item.scheduled_czk * (1 - pct / 100));
+      const { error } = await supabase.from("production_schedule").insert({
+        project_id: item.project_id,
+        item_name: item.item_name,
+        item_code: item.item_code,
+        stage_id: item.stage_id,
+        scheduled_week: nextWeekKey,
+        scheduled_hours: remaining,
+        scheduled_czk: remainingCzk,
+        status: "scheduled",
+        inbox_item_id: item.inbox_item_id,
+        is_blocker: false,
+      });
+      if (error) { toast.error(error.message); return; }
+      movedCount++;
+    }
+
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
-    toast.success(`${ids.length} položek → T${nextWeekNum}`);
+    toast.success(`${movedCount} položek → T${nextWeekNum} (zbývající hodiny)`);
     setSpillDialogOpen(false);
   }
 
