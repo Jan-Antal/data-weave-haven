@@ -2489,7 +2489,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   for (const id of singleQcMergedIds) {
                     if (!checkMap.has(id)) await checkItem(id);
                   }
-                  toast.success(`QC potvrzeno — ${singleQcItem.item_code || singleQcItem.item_name}`);
+                  
                 }
                 setSingleQcModalOpen(false);
                 setSingleQcItem(null);
