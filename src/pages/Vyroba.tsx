@@ -422,12 +422,17 @@ export default function Vyroba() {
     return items;
   }
 
-  // ── BUNDLE PROGRESS: weighted by hours across ALL weeks ──
+  // ── BUNDLE PROGRESS: prefer latest daily log percent, fallback to completed hours ──
   function getBundleProgress(pid: string): { totalHours: number; completedHours: number; bundleProgress: number } {
     const allItems = getAllItemsForProject(pid);
     const totalHours = allItems.reduce((s, e) => s + e.item.scheduled_hours, 0);
     const completedHours = allItems.filter(e => e.item.status === "completed").reduce((s, e) => s + e.item.scheduled_hours, 0);
-    const bundleProgress = totalHours > 0 ? Math.round((completedHours / totalHours) * 100) : 0;
+
+    // Check daily logs for the latest percent — this reflects actual logged progress
+    const latestLogPct = getLatestPercent(pid);
+    const completionPct = totalHours > 0 ? Math.round((completedHours / totalHours) * 100) : 0;
+    // Use whichever is higher: logged progress or completion-based progress
+    const bundleProgress = Math.max(latestLogPct, completionPct);
     return { totalHours, completedHours, bundleProgress };
   }
 
@@ -1040,52 +1045,102 @@ export default function Vyroba() {
 
       {/* ═══ STATS BAR ═══ */}
       <div className="shrink-0 flex items-center gap-3 px-4 text-xs" style={{ height: 40, background: "#f5f3f0", borderBottom: "1px solid #e5e2dd" }}>
-        <span style={{ color: "#1a1a1a", fontWeight: 500 }}>{stats.total} projektů</span>
-        <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
-        <span className="font-mono" style={{ color: "#2563eb" }}>∅ {stats.avgPct}%</span>
-        <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
-        <span style={{ color: "#3a8a36" }}>✓ {stats.onTrack} on track</span>
-        <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
-        <span style={{ color: stats.behind > 0 ? "#dc2626" : "#6b7280" }}>⚠ {stats.behind} pozadu</span>
-        <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
-        <span style={{ color: todayDayIndex >= 0 && stats.todayLogged < stats.total ? "#d97706" : "#6b7280" }}>
-          Dnes: {stats.todayLogged}/{stats.total}
-        </span>
-        {/* ── Week navigation (right-aligned) ── */}
-        <div className="flex-1" />
-        <div className="relative flex items-center gap-1" ref={weekPickerRef}>
-          <button onClick={() => setWeekOffset(w => w - 1)} className="p-1 rounded hover:bg-muted transition-colors" style={{ color: "#223937" }}>
-            <ChevronLeft className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => setWeekPickerOpen(o => !o)}
-            className="font-mono select-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer"
-            style={{ fontSize: 13, color: "#223937" }}
-          >
-            T{weekNum} · {fmtDate(currentMonday)}–{fmtDate(friday)}{currentMonday.getFullYear()}
-          </button>
-          <button onClick={() => setWeekOffset(w => w + 1)} className="p-1 rounded hover:bg-muted transition-colors" style={{ color: "#223937" }}>
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-          {weekOffset !== 0 && (
-            <button
-              onClick={() => setWeekOffset(0)}
-              className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors"
-              style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", fontSize: 11 }}
-            >
-              Dnes
-            </button>
-          )}
-          {/* Week picker popup */}
-          {weekPickerOpen && (
-            <WeekPickerPopup
-              currentWeekOffset={weekOffset}
-              onSelectOffset={(offset) => { setWeekOffset(offset); setWeekPickerOpen(false); }}
-              onClose={() => setWeekPickerOpen(false)}
-              containerRef={weekPickerRef}
-            />
-          )}
-        </div>
+        {isMobile ? (
+          /* Mobile: compact single row */
+          <>
+            <div className="relative flex items-center gap-1" ref={weekPickerRef}>
+              <button onClick={() => setWeekOffset(w => w - 1)} className="p-1 rounded hover:bg-muted transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center" style={{ color: "#223937" }}>
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setWeekPickerOpen(o => !o)}
+                className="font-mono select-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer font-bold"
+                style={{ fontSize: 13, color: "#223937" }}
+              >
+                T{weekNum}
+              </button>
+              <button onClick={() => setWeekOffset(w => w + 1)} className="p-1 rounded hover:bg-muted transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center" style={{ color: "#223937" }}>
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              {weekPickerOpen && (
+                <WeekPickerPopup
+                  currentWeekOffset={weekOffset}
+                  onSelectOffset={(offset) => { setWeekOffset(offset); setWeekPickerOpen(false); }}
+                  onClose={() => setWeekPickerOpen(false)}
+                  containerRef={weekPickerRef}
+                />
+              )}
+            </div>
+            <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
+            <span style={{ color: "#1a1a1a", fontWeight: 500 }}>{stats.total} projektů</span>
+            <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
+            <span className="font-mono" style={{ color: "#2563eb" }}>ø {stats.avgPct}%</span>
+            {stats.behind > 0 && (
+              <>
+                <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
+                <span style={{ color: "#dc2626" }}>⚠ {stats.behind} pozadu</span>
+              </>
+            )}
+            <div className="flex-1" />
+            {weekOffset !== 0 && (
+              <button
+                onClick={() => setWeekOffset(0)}
+                className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors"
+                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", fontSize: 11 }}
+              >
+                Dnes
+              </button>
+            )}
+          </>
+        ) : (
+          /* Desktop: full stats */
+          <>
+            <span style={{ color: "#1a1a1a", fontWeight: 500 }}>{stats.total} projektů</span>
+            <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
+            <span className="font-mono" style={{ color: "#2563eb" }}>∅ {stats.avgPct}%</span>
+            <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
+            <span style={{ color: "#3a8a36" }}>✓ {stats.onTrack} on track</span>
+            <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
+            <span style={{ color: stats.behind > 0 ? "#dc2626" : "#6b7280" }}>⚠ {stats.behind} pozadu</span>
+            <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
+            <span style={{ color: todayDayIndex >= 0 && stats.todayLogged < stats.total ? "#d97706" : "#6b7280" }}>
+              Dnes: {stats.todayLogged}/{stats.total}
+            </span>
+            <div className="flex-1" />
+            <div className="relative flex items-center gap-1" ref={weekPickerRef}>
+              <button onClick={() => setWeekOffset(w => w - 1)} className="p-1 rounded hover:bg-muted transition-colors" style={{ color: "#223937" }}>
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setWeekPickerOpen(o => !o)}
+                className="font-mono select-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer"
+                style={{ fontSize: 13, color: "#223937" }}
+              >
+                T{weekNum} · {fmtDate(currentMonday)}–{fmtDate(friday)}{currentMonday.getFullYear()}
+              </button>
+              <button onClick={() => setWeekOffset(w => w + 1)} className="p-1 rounded hover:bg-muted transition-colors" style={{ color: "#223937" }}>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+              {weekOffset !== 0 && (
+                <button
+                  onClick={() => setWeekOffset(0)}
+                  className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors"
+                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", fontSize: 11 }}
+                >
+                  Dnes
+                </button>
+              )}
+              {weekPickerOpen && (
+                <WeekPickerPopup
+                  currentWeekOffset={weekOffset}
+                  onSelectOffset={(offset) => { setWeekOffset(offset); setWeekPickerOpen(false); }}
+                  onClose={() => setWeekPickerOpen(false)}
+                  containerRef={weekPickerRef}
+                />
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* ═══ BODY ═══ */}
@@ -1093,14 +1148,16 @@ export default function Vyroba() {
       <div className="flex-1 min-w-0 flex min-h-0">
         {/* ═══ LEFT PANEL ═══ */}
         <div className={`shrink-0 flex flex-col overflow-y-auto ${isMobile ? "w-full" : "w-[252px]"}`} style={{ borderRight: isMobile ? "none" : "1px solid #e5e2dd", background: "#ffffff" }}>
-          {/* Capacity bar */}
-          <div className="px-3 py-2 flex items-center gap-2" style={{ borderBottom: "1px solid #f0eeea", background: "#fafaf8" }}>
-            <span className="text-[10px] font-mono font-semibold" style={{ color: "#6b7280" }}>T{weekNum}</span>
-            <div className="flex-1 h-[6px] rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(capacityPct, 100)}%`, background: capacityColor }} />
+          {/* Capacity bar — hidden on mobile */}
+          {!isMobile && (
+            <div className="px-3 py-2 flex items-center gap-2" style={{ borderBottom: "1px solid #f0eeea", background: "#fafaf8" }}>
+              <span className="text-[10px] font-mono font-semibold" style={{ color: "#6b7280" }}>T{weekNum}</span>
+              <div className="flex-1 h-[6px] rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
+                <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(capacityPct, 100)}%`, background: capacityColor }} />
+              </div>
+              <span className="text-[10px] font-mono" style={{ color: capacityColor }}>{weekCapacity.used}h/{weekCapacity.total}h · {capacityPct}%</span>
             </div>
-            <span className="text-[10px] font-mono" style={{ color: capacityColor }}>{weekCapacity.used}h/{weekCapacity.total}h · {capacityPct}%</span>
-          </div>
+          )}
 
           <div className="px-3 py-1.5 text-[10px] uppercase font-semibold" style={{ color: "#6b7280", borderBottom: "1px solid #f0eeea" }}>
             Projekty v T{weekNum} ({enrichedProjects.filter(p => !p.isPaused).length})
@@ -1246,8 +1303,16 @@ export default function Vyroba() {
         <Sheet open={mobileDetailOpen} onOpenChange={setMobileDetailOpen}>
           <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl p-0 overflow-hidden">
             <div className="flex flex-col h-full overflow-y-auto">
-              <div className="flex justify-center pt-2 pb-1 shrink-0">
+              <div className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0">
+                <button
+                  onClick={() => setMobileDetailOpen(false)}
+                  className="text-xs font-medium flex items-center gap-1 min-h-[36px]"
+                  style={{ color: "#6b7280" }}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" /> Zpět
+                </button>
                 <div className="w-10 h-1 rounded-full" style={{ background: "#d0cdc8" }} />
+                <div className="w-[50px]" /> {/* spacer for centering drag handle */}
               </div>
               <DetailPanel
                 project={selectedProject}
@@ -1911,6 +1976,12 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
     return { currentItems: current, futureItems: future, completedItems: completed };
   }, [allItems, weekKey]);
 
+  // Auto-expand Hotové when Aktuální has 0 items but progress > 0
+  const autoExpandHotove = currentItems.length === 0 && bundleProgress.bundleProgress > 0;
+  useEffect(() => {
+    if (autoExpandHotove) setCompletedOpen(true);
+  }, [autoExpandHotove]);
+
   const totalActiveItems = currentItems.length + futureItems.length + completedItems.length;
 
   // PM initials
@@ -2007,13 +2078,13 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
         {/* ── Phases (read-only display) ── */}
         <div>
           <div className="text-[10px] uppercase font-semibold mb-2" style={{ color: "#99a5a3" }}>Operace</div>
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className={`flex items-center gap-1.5 ${isMobile ? "overflow-x-auto flex-nowrap pb-1" : "flex-wrap"}`}>
             {PHASES.map(p => {
               const isCurrent = latestPhase === p.name;
               const phasePctDone = latestPct >= p.pct;
               return (
                 <span key={p.name}
-                  className="px-2.5 py-1 rounded-full text-xs font-medium cursor-default pointer-events-none select-none"
+                  className="px-2.5 py-1 rounded-full text-xs font-medium cursor-default pointer-events-none select-none whitespace-nowrap shrink-0"
                   style={{
                     background: isCurrent ? `${p.color}15` : "#f5f3f0",
                     color: isCurrent ? "#3a8a36" : phasePctDone ? "#3a8a36" : "#6b7280",
@@ -2023,14 +2094,18 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
                 </span>
               );
             })}
-            <div className="flex-1" />
-            <button
-              onClick={onSpillAll}
-              className={`px-3 py-1 text-[11px] font-semibold rounded transition-colors ${isMobile ? "min-h-[44px]" : ""}`}
-              style={{ background: "#d97706", color: "#fff" }}
-            >
-              ⇒ Přesunout do T{nextWeekNum}
-            </button>
+            {!isMobile && (
+              <>
+                <div className="flex-1" />
+                <button
+                  onClick={onSpillAll}
+                  className="px-3 py-1 text-[11px] font-semibold rounded transition-colors"
+                  style={{ background: "#d97706", color: "#fff" }}
+                >
+                  ⇒ Přesunout do T{nextWeekNum}
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -2055,6 +2130,13 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ── Empty Aktuální message ── */}
+        {currentItems.length === 0 && bundleProgress.bundleProgress > 0 && (
+          <div className="rounded-md px-3 py-3 text-[12px] text-center" style={{ background: "rgba(58,138,54,0.05)", border: "1px solid rgba(58,138,54,0.15)", color: "#3a8a36" }}>
+            Všechny položky tohoto týdne jsou dokončeny nebo přesunuty
           </div>
         )}
 
@@ -2121,6 +2203,17 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
               </div>
             </CollapsibleContent>
           </Collapsible>
+        )}
+
+        {/* ── Mobile spill button (moved from Operace row) ── */}
+        {isMobile && (
+          <button
+            onClick={onSpillAll}
+            className="w-full py-2.5 rounded-md text-sm font-medium transition-colors min-h-[44px]"
+            style={{ background: "#d97706", color: "#fff" }}
+          >
+            ⇒ Přesunout do T{nextWeekNum}
+          </button>
         )}
 
         {/* ── Daily log shortcut ── */}
@@ -2960,6 +3053,7 @@ function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, de
 
 function QualityCheckDisplay({ check }: { check: any }) {
   const name = useProfileName(check.checked_by);
+  const isMobile = useIsMobile();
   const firstName = name ? name.split(" ")[0].slice(0, 8) : "–";
   return (
     <span
@@ -2968,7 +3062,9 @@ function QualityCheckDisplay({ check }: { check: any }) {
         background: "#dcfce7",
         color: "#166534",
         border: "1px solid #16a34a",
-        padding: "4px 10px",
+        padding: isMobile ? "10px 12px" : "4px 10px",
+        minHeight: isMobile ? 44 : undefined,
+        minWidth: isMobile ? 44 : undefined,
         borderRadius: "9999px",
         fontSize: "12px",
         fontWeight: 500,
@@ -2981,6 +3077,7 @@ function QualityCheckDisplay({ check }: { check: any }) {
 }
 
 function QualityCheckBadgeEmpty() {
+  const isMobile = useIsMobile();
   return (
     <span
       className="inline-flex items-center gap-1 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
@@ -2988,7 +3085,9 @@ function QualityCheckBadgeEmpty() {
         background: "#fef3c7",
         color: "#92400e",
         border: "1px solid #f59e0b",
-        padding: "4px 10px",
+        padding: isMobile ? "10px 12px" : "4px 10px",
+        minHeight: isMobile ? 44 : undefined,
+        minWidth: isMobile ? 44 : undefined,
         borderRadius: "9999px",
         fontSize: "12px",
         fontWeight: 500,
@@ -3076,6 +3175,7 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
   logs: DailyLog[];
   weeklyGoal?: number;
 }) {
+  const isMobile = useIsMobile();
   const isToday = dayIndex === todayDayIndex;
   const isFuture = todayDayIndex >= 0 && dayIndex > todayDayIndex;
   const isPast = todayDayIndex >= 0 && dayIndex < todayDayIndex;
@@ -3138,7 +3238,7 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
       onClick={clickable ? onOpenLog : undefined}
     >
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-medium" style={{ color: "#6b7280" }}>{DAY_NAMES[dayIndex]}</span>
+        <span className="text-[10px] font-medium" style={{ color: "#6b7280" }}>{isMobile ? DAY_SHORT[dayIndex] : DAY_NAMES[dayIndex]}</span>
         {isToday && (
           <span className="text-[7px] font-bold px-1 py-[1px] rounded" style={{ background: "rgba(58,138,54,0.15)", color: "#3a8a36" }}>
             {pct >= weeklyGoal ? "🎉 DNES" : "DNES"}
@@ -3149,18 +3249,18 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
       {hasData ? (
         <>
           <div className="flex items-center justify-between">
-            <div className="text-xl font-mono font-bold" style={{ color: isNoProduction ? "#99a5a3" : pct >= 100 ? "#3a8a36" : "#1a1a1a" }}>{pct}%</div>
-            {isRetroactive && (
+            <div className={`font-mono font-bold ${isMobile ? "text-lg" : "text-xl"}`} style={{ color: isNoProduction ? "#99a5a3" : pct >= 100 ? "#3a8a36" : "#1a1a1a" }}>{pct}%</div>
+            {isRetroactive && !isMobile && (
               <span className="text-[7px] font-bold px-1 py-[1px] rounded" style={{ background: "rgba(220,38,38,0.1)", color: "#dc2626" }}>doplněno</span>
             )}
           </div>
           {cumulative?.phase && !isNoProduction && (
             <div className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: PHASES.find(p => p.name === cumulative.phase)?.color || "#6b7280" }} />
-              <span className="text-[9px]" style={{ color: "#6b7280" }}>{cumulative.phase}</span>
+              {!isMobile && <span className="text-[9px]" style={{ color: "#6b7280" }}>{cumulative.phase}</span>}
            </div>
           )}
-          {isToday && (
+          {isToday && !isMobile && (
             <span className="mt-0.5 w-full text-[9px] font-medium py-0.5 rounded transition-colors text-center"
               style={{ background: "rgba(58,138,54,0.08)", color: "#3a8a36", border: "1px solid rgba(58,138,54,0.2)" }}>
               Upravit log
