@@ -1648,10 +1648,8 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
     }
   }
 
-  const allChecklistDone = qcChecklist.rozmery && qcChecklist.povrch && qcChecklist.spoje && qcChecklist.cistota;
-
   async function handleQcModalConfirm() {
-    if (!allChecklistDone || qcSubmitting) return;
+    if (qcSubmitting) return;
     setQcSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
