@@ -47,7 +47,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQualityDefects, type QualityDefect } from "@/hooks/useQualityDefects";
-import { useAllPeople } from "@/hooks/usePeople";
 
 /* ═══ helpers ═══ */
 function getMonday(d: Date): Date {
@@ -1809,8 +1808,8 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   const [defectDesc, setDefectDesc] = useState("");
   const [defectSeverity, setDefectSeverity] = useState<"minor" | "blocking">("minor");
   const [defectResolution, setDefectResolution] = useState("");
-  const [defectAssignee, setDefectAssignee] = useState("");
-  const { data: allPeople = [] } = useAllPeople();
+  const [defectItemId, setDefectItemId] = useState<string>("__bundle__");
+  const [defectPhotos, setDefectPhotos] = useState<string[]>([]);
   const qc = useQueryClient();
   const qcUserFirstName = profile?.full_name?.split(" ")[0]?.slice(0, 8) || "–";
 
@@ -2076,7 +2075,6 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                                     <div key={d.id} className="space-y-1 border-b pb-2 last:border-0">
                                       <div className="font-semibold">{d.defect_type}</div>
                                       <div className="text-muted-foreground">{d.description}</div>
-                                      {d.assigned_to && <div>Priradené: {d.assigned_to}</div>}
                                       <button className="px-2 py-1 rounded text-[11px] font-medium" style={{ background: "#16a34a", color: "#fff" }}
                                         onClick={async () => {
                                           const { data: { user } } = await supabase.auth.getUser();
@@ -2100,7 +2098,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                                     <div key={d.id} className="space-y-1 border-b pb-2 last:border-0">
                                       <div className="font-semibold">{d.defect_type}</div>
                                       <div className="text-muted-foreground">{d.description}</div>
-                                      {d.assigned_to && <div>Priradené: {d.assigned_to}</div>}
+                                      
                                       <button className="px-2 py-1 rounded text-[11px] font-medium" style={{ background: "#16a34a", color: "#fff" }}
                                         onClick={async () => {
                                           const { data: { user } } = await supabase.auth.getUser();
@@ -2225,26 +2223,28 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
               defectDesc={defectDesc} setDefectDesc={setDefectDesc}
               defectSeverity={defectSeverity} setDefectSeverity={setDefectSeverity}
               defectResolution={defectResolution} setDefectResolution={setDefectResolution}
-              defectAssignee={defectAssignee} setDefectAssignee={setDefectAssignee}
-              allPeople={allPeople}
+              defectItemId={defectItemId} setDefectItemId={setDefectItemId}
+              defectPhotos={defectPhotos} setDefectPhotos={setDefectPhotos}
+              availableItems={qcModalItems.map(({ item }) => item)}
+              projectId={projectId}
               onSave={async () => {
                 const { data: { user } } = await supabase.auth.getUser();
-                const targetItem = qcModalItems[0]?.item;
-                if (!targetItem) return;
+                const selectedItem = defectItemId === "__bundle__" ? null : qcModalItems.find(({ item }) => item.id === defectItemId)?.item;
+                const targetItemId = selectedItem?.id || qcModalItems[0]?.item.id;
+                if (!targetItemId) return;
                 await addDefect.mutateAsync({
                   project_id: projectId,
-                  item_id: targetItem.id,
-                  item_code: targetItem.item_code || null,
+                  item_id: targetItemId,
+                  item_code: selectedItem?.item_code || null,
                   defect_type: defectType,
                   description: defectDesc,
                   severity: defectSeverity,
                   resolution_type: defectSeverity === "blocking" ? defectResolution : null,
-                  assigned_to: defectAssignee || null,
-                  photo_url: null,
+                  photo_url: defectPhotos.length > 0 ? JSON.stringify(defectPhotos) : null,
                   reported_by: user?.id || "",
                 });
                 toast.success("Vada zaznamenaná");
-                setDefectType(""); setDefectDesc(""); setDefectSeverity("minor"); setDefectResolution(""); setDefectAssignee(""); setDefectOpen(false);
+                setDefectType(""); setDefectDesc(""); setDefectSeverity("minor"); setDefectResolution(""); setDefectItemId("__bundle__"); setDefectPhotos([]); setDefectOpen(false);
               }}
             />
 
@@ -2292,25 +2292,27 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
               defectDesc={defectDesc} setDefectDesc={setDefectDesc}
               defectSeverity={defectSeverity} setDefectSeverity={setDefectSeverity}
               defectResolution={defectResolution} setDefectResolution={setDefectResolution}
-              defectAssignee={defectAssignee} setDefectAssignee={setDefectAssignee}
-              allPeople={allPeople}
+              defectItemId={defectItemId} setDefectItemId={setDefectItemId}
+              defectPhotos={defectPhotos} setDefectPhotos={setDefectPhotos}
+              availableItems={singleQcItem ? [singleQcItem] : []}
+              projectId={projectId}
               onSave={async () => {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!singleQcItem) return;
+                const selectedItem = defectItemId === "__bundle__" ? null : (defectItemId === singleQcItem.id ? singleQcItem : null);
                 await addDefect.mutateAsync({
                   project_id: projectId,
-                  item_id: singleQcItem.id,
-                  item_code: singleQcItem.item_code || null,
+                  item_id: selectedItem?.id || singleQcItem.id,
+                  item_code: selectedItem?.item_code || singleQcItem.item_code || null,
                   defect_type: defectType,
                   description: defectDesc,
                   severity: defectSeverity,
                   resolution_type: defectSeverity === "blocking" ? defectResolution : null,
-                  assigned_to: defectAssignee || null,
-                  photo_url: null,
+                  photo_url: defectPhotos.length > 0 ? JSON.stringify(defectPhotos) : null,
                   reported_by: user?.id || "",
                 });
                 toast.success("Vada zaznamenaná");
-                setDefectType(""); setDefectDesc(""); setDefectSeverity("minor"); setDefectResolution(""); setDefectAssignee(""); setDefectOpen(false);
+                setDefectType(""); setDefectDesc(""); setDefectSeverity("minor"); setDefectResolution(""); setDefectItemId("__bundle__"); setDefectPhotos([]); setDefectOpen(false);
               }}
             />
           </div>
@@ -2373,17 +2375,52 @@ function QcWarningBox() {
 /* ═══ QC Defect Form ═══ */
 const DEFECT_TYPES = ["Škrabanec", "Nerovnosť laku", "Poškodenie dýhy", "Chýbajúci diel", "Funkčná vada", "Iné"];
 
-function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, defectDesc, setDefectDesc, defectSeverity, setDefectSeverity, defectResolution, setDefectResolution, defectAssignee, setDefectAssignee, allPeople, onSave }: {
+function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, defectDesc, setDefectDesc, defectSeverity, setDefectSeverity, defectResolution, setDefectResolution, defectItemId, setDefectItemId, defectPhotos, setDefectPhotos, availableItems, projectId, onSave }: {
   defectOpen: boolean; setDefectOpen: (v: boolean) => void;
   defectType: string; setDefectType: (v: string) => void;
   defectDesc: string; setDefectDesc: (v: string) => void;
   defectSeverity: "minor" | "blocking"; setDefectSeverity: (v: "minor" | "blocking") => void;
   defectResolution: string; setDefectResolution: (v: string) => void;
-  defectAssignee: string; setDefectAssignee: (v: string) => void;
-  allPeople: { id: string; name: string; role: string }[];
+  defectItemId: string; setDefectItemId: (v: string) => void;
+  defectPhotos: string[]; setDefectPhotos: (v: string[]) => void;
+  availableItems: ScheduleItem[];
+  projectId: string;
   onSave: () => Promise<void>;
 }) {
+  const isMobile = useIsMobile();
+  const { uploadFile } = useSharePointDocs(projectId);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
   const canSave = defectType && defectDesc && (defectSeverity === "minor" || defectResolution);
+
+  async function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setPhotoUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        const now = new Date();
+        const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+        const timeStr = `${String(now.getHours()).padStart(2,"0")}-${String(now.getMinutes()).padStart(2,"0")}`;
+        const itemLabel = defectItemId === "__bundle__" ? "bundle" : (availableItems.find(i => i.id === defectItemId)?.item_code || "item");
+        const ext = file.name.split(".").pop() || "jpg";
+        const autoName = `${projectId}-Vada-${itemLabel}-${dateStr}-${timeStr}.${ext}`;
+        const renamedFile = new File([file], autoName, { type: file.type });
+        const result = await uploadFile("fotky", renamedFile);
+        if (result?.downloadUrl) {
+          setDefectPhotos([...defectPhotos, result.downloadUrl]);
+        } else if (result?.webUrl) {
+          setDefectPhotos([...defectPhotos, result.webUrl]);
+        }
+      }
+    } catch (err) {
+      toast.error("Chyba pri nahrávaní fotky");
+    } finally {
+      setPhotoUploading(false);
+      if (photoInputRef.current) photoInputRef.current.value = "";
+    }
+  }
 
   return (
     <Collapsible open={defectOpen} onOpenChange={setDefectOpen}>
@@ -2393,6 +2430,21 @@ function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, de
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="mt-2 space-y-3 rounded-md p-3" style={{ border: "1px solid #e5e2dd", background: "#fafaf8" }}>
+          {/* Item selector */}
+          <div>
+            <Label className="text-[11px] font-semibold mb-1 block">Prvok s vadou *</Label>
+            <Select value={defectItemId} onValueChange={setDefectItemId}>
+              <SelectTrigger className="h-8 text-[12px]"><SelectValue placeholder="Vyberte prvok..." /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__bundle__">Celý bundle</SelectItem>
+                {availableItems.map(item => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.item_code ? `${item.item_code} — ` : ""}{item.item_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           {/* Type */}
           <div>
             <Label className="text-[11px] font-semibold mb-1 block">Typ vady *</Label>
@@ -2407,6 +2459,24 @@ function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, de
           <div>
             <Label className="text-[11px] font-semibold mb-1 block">Popis *</Label>
             <Textarea value={defectDesc} onChange={e => setDefectDesc(e.target.value)} className="min-h-[60px] text-[12px]" placeholder="Popíšte vadu..." />
+          </div>
+          {/* Photo upload */}
+          <div>
+            <Label className="text-[11px] font-semibold mb-1 block">Fotky</Label>
+            <input ref={photoInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoSelect} {...(isMobile ? { capture: "environment" as const } : {})} />
+            <div className="flex items-center gap-2 flex-wrap">
+              {defectPhotos.map((url, idx) => (
+                <div key={idx} className="relative group">
+                  <img src={url} alt="Vada" className="w-[60px] h-[60px] rounded object-cover border" style={{ borderColor: "#e5e2dd" }} />
+                  <button className="absolute -top-1.5 -right-1.5 rounded-full w-4 h-4 flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: "#dc2626", color: "#fff" }}
+                    onClick={() => setDefectPhotos(defectPhotos.filter((_, i) => i !== idx))}>×</button>
+                </div>
+              ))}
+              {photoUploading && <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#d97706" }} />}
+              <button type="button" onClick={() => photoInputRef.current?.click()} className="flex items-center gap-1 text-[12px] font-medium px-2 py-1 rounded" style={{ color: "#d97706", border: "1px solid #f59e0b", background: "#fef3c7" }}>
+                <Camera className="h-3.5 w-3.5" /> Pridať foto
+              </button>
+            </div>
           </div>
           {/* Severity */}
           <div>
@@ -2438,16 +2508,6 @@ function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, de
               </RadioGroup>
             </div>
           )}
-          {/* Assignee */}
-          <div>
-            <Label className="text-[11px] font-semibold mb-1 block">Priradená osoba</Label>
-            <Select value={defectAssignee} onValueChange={setDefectAssignee}>
-              <SelectTrigger className="h-8 text-[12px]"><SelectValue placeholder="Vybrať osobu..." /></SelectTrigger>
-              <SelectContent>
-                {[...new Set(allPeople.map(p => p.name))].sort().map(n => <SelectItem key={n} value={n}>{n}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
           {/* Save */}
           <Button size="sm" disabled={!canSave} onClick={onSave} className="w-full" style={{ background: canSave ? "#d97706" : undefined }}>
             Uložiť vadu
