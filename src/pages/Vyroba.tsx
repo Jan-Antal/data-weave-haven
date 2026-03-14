@@ -1949,7 +1949,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   const [defectOpen, setDefectOpen] = useState(false);
   const [defectType, setDefectType] = useState("");
   const [defectDesc, setDefectDesc] = useState("");
-  const [defectSeverity, setDefectSeverity] = useState<"minor" | "blocking">("minor");
+  const [defectSeverity, setDefectSeverity] = useState<"minor" | "blocking" | "">("");
   const [defectResolution, setDefectResolution] = useState("");
   const [defectItemId, setDefectItemId] = useState<string>("__bundle__");
   const [defectPhotos, setDefectPhotos] = useState<string[]>([]);
