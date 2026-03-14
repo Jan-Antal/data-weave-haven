@@ -2225,26 +2225,28 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
               defectDesc={defectDesc} setDefectDesc={setDefectDesc}
               defectSeverity={defectSeverity} setDefectSeverity={setDefectSeverity}
               defectResolution={defectResolution} setDefectResolution={setDefectResolution}
-              defectAssignee={defectAssignee} setDefectAssignee={setDefectAssignee}
-              allPeople={allPeople}
+              defectItemId={defectItemId} setDefectItemId={setDefectItemId}
+              defectPhotos={defectPhotos} setDefectPhotos={setDefectPhotos}
+              availableItems={qcModalItems.map(({ item }) => item)}
+              projectId={projectId}
               onSave={async () => {
                 const { data: { user } } = await supabase.auth.getUser();
-                const targetItem = qcModalItems[0]?.item;
-                if (!targetItem) return;
+                const selectedItem = defectItemId === "__bundle__" ? null : qcModalItems.find(({ item }) => item.id === defectItemId)?.item;
+                const targetItemId = selectedItem?.id || qcModalItems[0]?.item.id;
+                if (!targetItemId) return;
                 await addDefect.mutateAsync({
                   project_id: projectId,
-                  item_id: targetItem.id,
-                  item_code: targetItem.item_code || null,
+                  item_id: targetItemId,
+                  item_code: selectedItem?.item_code || null,
                   defect_type: defectType,
                   description: defectDesc,
                   severity: defectSeverity,
                   resolution_type: defectSeverity === "blocking" ? defectResolution : null,
-                  assigned_to: defectAssignee || null,
-                  photo_url: null,
+                  photo_url: defectPhotos.length > 0 ? JSON.stringify(defectPhotos) : null,
                   reported_by: user?.id || "",
                 });
                 toast.success("Vada zaznamenaná");
-                setDefectType(""); setDefectDesc(""); setDefectSeverity("minor"); setDefectResolution(""); setDefectAssignee(""); setDefectOpen(false);
+                setDefectType(""); setDefectDesc(""); setDefectSeverity("minor"); setDefectResolution(""); setDefectItemId("__bundle__"); setDefectPhotos([]); setDefectOpen(false);
               }}
             />
 
