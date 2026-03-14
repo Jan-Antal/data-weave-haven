@@ -1800,7 +1800,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   bundleId: string;
   onOpenExpedice: () => void;
   isMobile: boolean;
-  pushUndo: (action: UndoAction) => void;
+  pushUndo: (entry: Omit<import("@/hooks/useUndoRedo").UndoEntry, "id" | "timestamp">) => void;
 }) {
   const { checks, checkItem, uncheckItem } = useQualityChecks(projectId);
   const { defects, addDefect, resolveDefect } = useQualityDefects(projectId);
