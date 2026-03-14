@@ -1833,46 +1833,27 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         Označit {selectedItems.size > 0 ? `${selectedItems.size} položek` : "vše"} jako hotovo
       </button>
 
-      {/* QC MODE POPUP — full modal */}
+      {/* QC MODE POPUP — simplified warning */}
       <Dialog open={qcModalOpen} onOpenChange={setQcModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Kontrola kvality — {projectName}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            {/* Warning banner */}
-            <div className="flex items-center gap-2 px-3 py-2 rounded-md text-[12px]" style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.15)", color: "#92400e" }}>
-              <AlertTriangle className="h-4 w-4 shrink-0" style={{ color: "#d97706" }} />
-              <span>⚠ Před dokončením zkontrolujte každý prvek podle checklist</span>
-            </div>
-
-            {/* Checklist */}
-            <div className="space-y-2">
-              {[
-                { key: "rozmery" as const, label: "Rozměry odpovídají výkresům" },
-                { key: "povrch" as const, label: "Povrchová úprava bez vad" },
-                { key: "spoje" as const, label: "Spoje a uchycení pevné" },
-                { key: "cistota" as const, label: "Čistota a balení v pořádku" },
-              ].map(({ key, label }) => (
-                <label key={key} className="flex items-center gap-3 cursor-pointer min-h-[36px]">
-                  <Checkbox
-                    checked={qcChecklist[key]}
-                    onCheckedChange={(v) => setQcChecklist(c => ({ ...c, [key]: !!v }))}
-                  />
-                  <span className="text-sm">{label}</span>
-                </label>
-              ))}
+            {/* Warning banner — no checkboxes */}
+            <div className="flex items-start gap-2 px-3 py-3 rounded-md text-[13px]" style={{ background: "rgba(217,119,6,0.1)", border: "1px solid rgba(217,119,6,0.2)", color: "#92400e" }}>
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "#d97706" }} />
+              <span>⚠ Před potvrzením zkontrolujte: rozměry, povrchovou úpravu, spoje a balení.</span>
             </div>
 
             {/* Items requiring QC */}
             <div>
-              <div className="text-[10px] uppercase font-semibold mb-1.5" style={{ color: "#99a5a3" }}>Položky vyžadující QC ({qcModalItems.length})</div>
+              <div className="text-[10px] uppercase font-semibold mb-1.5" style={{ color: "#99a5a3" }}>Položky ({qcModalItems.length})</div>
               <div className="space-y-1 max-h-[200px] overflow-y-auto">
                 {qcModalItems.map(({ item }) => (
                   <div key={item.id} className="flex items-center gap-2 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#fafaf8" }}>
                     {item.item_code && <span className="font-mono text-[11px] font-bold shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
                     <span className="text-[12px] flex-1 truncate" style={{ color: "#1a1a1a" }}>{item.item_name}</span>
-                    <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
                   </div>
                 ))}
               </div>
@@ -1881,28 +1862,16 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
           <DialogFooter>
             <Button variant="outline" onClick={() => setQcModalOpen(false)}>Zrušit</Button>
             <Button
-              disabled={!allChecklistDone || qcSubmitting}
+              disabled={qcSubmitting}
               onClick={handleQcModalConfirm}
-              style={{ background: allChecklistDone ? "#3a8a36" : undefined }}
+              style={{ background: "#3a8a36" }}
             >
               {qcSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-              Potvrdit QC a dokončit
+              Potvrdit QC — {qcUserFirstName}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* QC Uncheck confirm */}
-      <ConfirmDialog
-        open={!!uncheckConfirm}
-        onConfirm={() => uncheckConfirm && handleUncheckQC(uncheckConfirm)}
-        onCancel={() => setUncheckConfirm(null)}
-        title="Zrušit QC kontrolu?"
-        description="Kontrola kvality bude odstraněna pro tuto položku."
-        confirmLabel="Zrušit QC"
-        cancelLabel="Zpět"
-        variant="destructive"
-      />
     </>
   );
 }
