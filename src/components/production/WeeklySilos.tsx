@@ -103,6 +103,10 @@ interface Props {
   focusedMatchKey?: string | null;
   /** Week key of the current search match — triggers scroll */
   searchMatchWeekKey?: string | null;
+  /** Set of project IDs matching the current search — used for dimming non-matches */
+  searchMatchedProjectIds?: Set<string>;
+  /** Whether search is active (>= 3 chars) */
+  searchActive?: boolean;
 }
 
 interface ContextMenuState {
