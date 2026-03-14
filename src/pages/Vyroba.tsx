@@ -1581,7 +1581,15 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   const [uncheckConfirm, setUncheckConfirm] = useState<string | null>(null);
   const [hotovoWarning, setHotovoWarning] = useState<string | null>(null);
   const [hotovoConfirm, setHotovoConfirm] = useState<string | null>(null);
+  const [qcPanel, setQcPanel] = useState(false);
   const qc = useQueryClient();
+
+  // Auto-dismiss hotovo warning after 3s
+  useEffect(() => {
+    if (!hotovoWarning) return;
+    const t = setTimeout(() => setHotovoWarning(null), 3000);
+    return () => clearTimeout(t);
+  }, [hotovoWarning]);
 
   // Deduplicate items by id
   const dedupedItems = useMemo(() => {
