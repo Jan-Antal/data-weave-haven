@@ -9,12 +9,12 @@ import { useWeeklyCapacity } from "@/hooks/useWeeklyCapacity";
 import { getProjectColor } from "@/lib/projectColors";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useVyrobaUndo, type UndoAction } from "@/hooks/useVyrobaUndo";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList,
   User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange, Factory,
   CheckCircle2, X, Plus, Trash2, Loader2, Download, Printer, FileText,
-  AlertTriangle, Camera, ArrowRight, Shield
+  AlertTriangle, Camera, ArrowRight, Shield, Undo2, Redo2
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
