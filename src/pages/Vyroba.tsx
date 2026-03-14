@@ -1991,13 +1991,34 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                     {/* Hours */}
                     <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{thisWeekHours}h</span>
 
-                    {/* QC badge — display only */}
-                    {qcCheck ? (
-                      <QualityCheckDisplay check={qcCheck} />
-                    ) : (
-                      <QualityCheckBadgeEmpty />
-                    )}
+                    {/* QC badge — clickable */}
+                    <div onClick={(e) => e.stopPropagation()}>
+                      {qcCheck ? (
+                        <button onClick={() => { setUncheckConfirmItemId(item.id); setUncheckConfirmCode(`${item.item_code || ""} ${item.item_name}`.trim()); }}>
+                          <QualityCheckDisplay check={qcCheck} />
+                        </button>
+                      ) : (
+                        <button onClick={() => { setSingleQcItem(item); setSingleQcModalOpen(true); }}>
+                          <QualityCheckBadgeEmpty />
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Inline uncheck confirm */}
+                  {uncheckConfirmItemId === item.id && (
+                    <div className="flex items-center gap-2 px-3 py-2 mt-1 rounded-md text-[12px]" style={{ background: "rgba(220,38,38,0.05)", border: "1px solid rgba(220,38,38,0.15)" }}>
+                      <span style={{ color: "#92400e" }}>Zrušit QC kontrolu pro <strong>{uncheckConfirmCode}</strong>?</span>
+                      <button className="px-2 py-0.5 rounded text-[11px] font-medium" style={{ background: "#dc2626", color: "#fff" }}
+                        onClick={async () => {
+                          const check = checkMap.get(item.id);
+                          if (check) await uncheckItem(check.id);
+                          setUncheckConfirmItemId(null);
+                        }}>Ano</button>
+                      <button className="px-2 py-0.5 rounded text-[11px] font-medium" style={{ background: "hsl(var(--muted))", color: "hsl(var(--foreground))" }}
+                        onClick={() => setUncheckConfirmItemId(null)}>Ne</button>
+                    </div>
+                  )}
                 </div>
               );
             })}
