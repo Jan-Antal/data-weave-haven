@@ -47,6 +47,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQualityDefects, type QualityDefect } from "@/hooks/useQualityDefects";
+import { logActivity } from "@/lib/activityLog";
 
 /* ═══ helpers ═══ */
 function getMonday(d: Date): Date {
