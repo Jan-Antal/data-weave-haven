@@ -1786,7 +1786,6 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                       )}
                       <span className="text-[13px] truncate" style={{
                         color: bothDone ? "#3a8a36" : isCompleted ? "#99a5a3" : "#1a1a1a",
-                        textDecoration: bothDone ? "line-through" : undefined,
                       }}>
                         {item.item_name}
                       </span>
