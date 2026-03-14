@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList,
   User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange, Factory,
-  Circle, CheckCircle2, X, Plus, Trash2, Loader2, Download, Printer, FileText,
+  CheckCircle2, X, Plus, Trash2, Loader2, Download, Printer, FileText,
   AlertTriangle, Camera, ArrowRight
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -338,7 +338,6 @@ export default function Vyroba() {
 
   // Expedice confirmation dialog
   const [expediceDialogOpen, setExpediceDialogOpen] = useState(false);
-  const [expediceChecks, setExpediceChecks] = useState({ vyroba: false, kvalita: false, dokumentace: false });
 
   // Spill dialog
   const [spillDialogOpen, setSpillDialogOpen] = useState(false);
@@ -474,7 +473,6 @@ export default function Vyroba() {
 
   /* ── Expedice confirmation flow ── */
   function openExpediceDialog() {
-    setExpediceChecks({ vyroba: false, kvalita: false, dokumentace: false });
     setExpediceDialogOpen(true);
   }
 
@@ -1054,37 +1052,19 @@ export default function Vyroba() {
         </DialogContent>
       </Dialog>
 
-      {/* ═══ EXPEDICE CONFIRMATION DIALOG ═══ */}
+      {/* ═══ EXPEDICE CONFIRMATION DIALOG (simple Ano/Ne) ═══ */}
       <Dialog open={expediceDialogOpen} onOpenChange={setExpediceDialogOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Potvrdit → Expedice</DialogTitle>
+            <DialogTitle>Vše hotovo — přesunout do Expedice?</DialogTitle>
           </DialogHeader>
           <p className="text-sm" style={{ color: "#6b7280" }}>
-            Před přesunem projektu <strong>{selectedProject?.projectName}</strong> do Expedice potvrďte:
+            Projekt <strong>{selectedProject?.projectName}</strong> bude přesunut do Expedice.
           </p>
-          <div className="space-y-3 py-3">
-            <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
-              <Checkbox checked={expediceChecks.vyroba} onCheckedChange={(v) => setExpediceChecks(c => ({ ...c, vyroba: !!v }))} />
-              <span className="text-sm">Výroba dokončena</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
-              <Checkbox checked={expediceChecks.kvalita} onCheckedChange={(v) => setExpediceChecks(c => ({ ...c, kvalita: !!v }))} />
-              <span className="text-sm">Kvalita zkontrolována</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
-              <Checkbox checked={expediceChecks.dokumentace} onCheckedChange={(v) => setExpediceChecks(c => ({ ...c, dokumentace: !!v }))} />
-              <span className="text-sm">Dokumentace v pořádku</span>
-            </label>
-          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setExpediceDialogOpen(false)}>Zrušit</Button>
-            <Button
-              disabled={!expediceChecks.vyroba || !expediceChecks.kvalita || !expediceChecks.dokumentace}
-              onClick={handleConfirmExpedice}
-              style={{ background: "#3a8a36" }}
-            >
-              Potvrdit → Expedice
+            <Button variant="outline" onClick={() => setExpediceDialogOpen(false)}>Ne</Button>
+            <Button onClick={handleConfirmExpedice} style={{ background: "#3a8a36" }}>
+              Ano
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1597,17 +1577,11 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   const [qcLoading, setQcLoading] = useState<string | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [uncheckConfirm, setUncheckConfirm] = useState<string | null>(null);
-  const [hotovoWarning, setHotovoWarning] = useState<string | null>(null);
-  const [hotovoConfirm, setHotovoConfirm] = useState<string | null>(null);
-  const [qcPanel, setQcPanel] = useState(false);
+  const [qcModalOpen, setQcModalOpen] = useState(false);
+  const [qcModalItems, setQcModalItems] = useState<{ item: ScheduleItem }[]>([]);
+  const [qcChecklist, setQcChecklist] = useState({ rozmery: false, povrch: false, spoje: false, cistota: false });
+  const [qcSubmitting, setQcSubmitting] = useState(false);
   const qc = useQueryClient();
-
-  // Auto-dismiss hotovo warning after 3s
-  useEffect(() => {
-    if (!hotovoWarning) return;
-    const t = setTimeout(() => setHotovoWarning(null), 3000);
-    return () => clearTimeout(t);
-  }, [hotovoWarning]);
 
   // Deduplicate items by id
   const dedupedItems = useMemo(() => {
@@ -1647,32 +1621,98 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
     setUncheckConfirm(null);
   }
 
-  function handleHotovoClick(item: ScheduleItem) {
-    if (item.status === "completed") {
-      // Undo — set back to scheduled
-      onToggleItem(item.id, item.status);
-      return;
-    }
-    const hasQC = checkMap.has(item.id);
-    if (!hasQC) {
-      // Show warning — no QC
-      setHotovoWarning(item.id);
-      setHotovoConfirm(null);
-      return;
-    }
-    // Has QC — show inline confirm
-    setHotovoConfirm(item.id);
-    setHotovoWarning(null);
-  }
-
-  async function confirmHotovo(itemId: string) {
-    onToggleItem(itemId, "scheduled");
-    setHotovoConfirm(null);
+  function toggleSelect(itemId: string) {
+    setSelectedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId); else next.add(itemId);
+      return next;
+    });
   }
 
   const completedCount = dedupedItems.filter(i => i.item.status === "completed").length;
-
   const allSelected = dedupedItems.length > 0 && dedupedItems.every(i => selectedItems.has(i.item.id));
+
+  // "Označit jako hotovo" — targets selected or all
+  function handleMarkHotovo() {
+    const targetItems = selectedItems.size > 0
+      ? dedupedItems.filter(({ item }) => selectedItems.has(item.id) && item.status !== "completed")
+      : dedupedItems.filter(({ item }) => item.status !== "completed");
+
+    if (targetItems.length === 0) return;
+
+    const missingQC = targetItems.filter(({ item }) => !checkMap.has(item.id));
+
+    if (missingQC.length === 0) {
+      // All have QC — mark as hotovo directly
+      (async () => {
+        const ids = targetItems.map(({ item }) => item.id);
+        const { data: { user } } = await supabase.auth.getUser();
+        await supabase.from("production_schedule").update({
+          status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
+        }).in("id", ids);
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        toast.success(`${ids.length} položek dokončeno`);
+        setSelectedItems(new Set());
+        // Check if ALL items are now completed
+        const allNowCompleted = dedupedItems.every(({ item }) => item.status === "completed" || ids.includes(item.id));
+        if (allNowCompleted) {
+          onOpenExpedice();
+        }
+      })();
+    } else {
+      // Open QC modal for items missing QC
+      setQcModalItems(missingQC);
+      setQcChecklist({ rozmery: false, povrch: false, spoje: false, cistota: false });
+      setQcModalOpen(true);
+    }
+  }
+
+  const allChecklistDone = qcChecklist.rozmery && qcChecklist.povrch && qcChecklist.spoje && qcChecklist.cistota;
+
+  async function handleQcModalConfirm() {
+    if (!allChecklistDone || qcSubmitting) return;
+    setQcSubmitting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      // Record QC for all items in modal
+      for (const { item } of qcModalItems) {
+        if (!checkMap.has(item.id)) {
+          await (supabase.from("production_quality_checks" as any) as any).insert({
+            item_id: item.id,
+            project_id: projectId,
+            checked_by: user?.id,
+          });
+        }
+      }
+      // Now mark ALL target items (selected or all) as completed
+      const targetItems = selectedItems.size > 0
+        ? dedupedItems.filter(({ item }) => selectedItems.has(item.id) && item.status !== "completed")
+        : dedupedItems.filter(({ item }) => item.status !== "completed");
+      const ids = targetItems.map(({ item }) => item.id);
+      if (ids.length > 0) {
+        await supabase.from("production_schedule").update({
+          status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
+        }).in("id", ids);
+      }
+      qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      qc.invalidateQueries({ queryKey: ["quality-checks", projectId] });
+      toast.success(`${ids.length} položek dokončeno`);
+      setSelectedItems(new Set());
+      setQcModalOpen(false);
+      // Check if ALL items are now completed
+      const allNowCompleted = dedupedItems.every(({ item }) => item.status === "completed" || ids.includes(item.id));
+      if (allNowCompleted) {
+        onOpenExpedice();
+      }
+    } catch {
+      toast.error("Chyba při dokončování");
+    } finally {
+      setQcSubmitting(false);
+    }
+  }
+
+  // Get project name from first item
+  const projectName = dedupedItems[0]?.item.project_name || projectId;
 
   return (
     <>
@@ -1718,28 +1758,25 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
               const isSplit = item.split_part != null && item.split_total != null;
               const qcCheck = checkMap.get(item.id);
               const hasQC = !!qcCheck;
+              const isSelected = selectedItems.has(item.id);
 
               const bothDone = isCompleted && hasQC;
-              const doneNoQC = isCompleted && !hasQC;
-              const rowBg = bothDone ? "rgba(58,138,54,0.06)" : doneNoQC ? "rgba(217,119,6,0.06)" : "#ffffff";
-              const rowBorder = bothDone ? "1px solid rgba(58,138,54,0.2)" : doneNoQC ? "1px solid rgba(217,119,6,0.2)" : "1px solid #ece8e2";
-              const showWarning = hotovoWarning === item.id;
-              const showConfirm = hotovoConfirm === item.id;
+              const rowBg = bothDone ? "rgba(58,138,54,0.06)" : isSelected ? "rgba(37,99,235,0.04)" : "#ffffff";
+              const rowBorder = bothDone ? "1px solid rgba(58,138,54,0.2)" : isSelected ? "1px solid rgba(37,99,235,0.2)" : "1px solid #ece8e2";
 
               return (
                 <div key={item.id}>
-                  <div className="flex items-center gap-2 px-2.5 py-2 rounded-md" style={{ border: rowBorder, background: rowBg }}>
-                    {/* Select checkbox — small, 16px */}
+                  <div
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer transition-colors"
+                    style={{ border: rowBorder, background: rowBg }}
+                    onClick={() => toggleSelect(item.id)}
+                  >
+                    {/* Select checkbox */}
                     <Checkbox
-                      className="h-4 w-4 shrink-0 opacity-60 hover:opacity-100 transition-opacity"
-                      checked={selectedItems.has(item.id)}
-                      onCheckedChange={(v) => {
-                        setSelectedItems(prev => {
-                          const next = new Set(prev);
-                          if (v) next.add(item.id); else next.delete(item.id);
-                          return next;
-                        });
-                      }}
+                      className="h-4 w-4 shrink-0"
+                      checked={isSelected}
+                      onCheckedChange={() => toggleSelect(item.id)}
+                      onClick={(e) => e.stopPropagation()}
                     />
 
                     {/* Item info */}
@@ -1768,12 +1805,12 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
 
                     {/* QC button / indicator */}
                     {qcCheck ? (
-                      <button onClick={() => setUncheckConfirm(qcCheck.id)} className="shrink-0">
+                      <button onClick={(e) => { e.stopPropagation(); setUncheckConfirm(qcCheck.id); }} className="shrink-0">
                         <QualityCheckDisplay check={qcCheck} />
                       </button>
                     ) : (
                       <button
-                        onClick={() => handleQC(item.id)}
+                        onClick={(e) => { e.stopPropagation(); handleQC(item.id); }}
                         disabled={qcLoading === item.id}
                         className="px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors shrink-0"
                         style={{ color: "#6b7280", border: "0.5px solid #d0cdc8" }}
@@ -1782,49 +1819,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                         {qcLoading === item.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "✓ QC"}
                       </button>
                     )}
-
-                    {/* Hotovo action — icon button on the right, distinct from select checkbox */}
-                    {isCompleted ? (
-                      <button
-                        onClick={() => handleHotovoClick(item)}
-                        className="shrink-0 flex items-center justify-center rounded-full transition-colors"
-                        style={{ width: 24, height: 24, background: "rgba(58,138,54,0.12)" }}
-                        title="Označeno jako hotovo — klikněte pro vrácení"
-                      >
-                        <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#3a8a36" }} />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleHotovoClick(item)}
-                        className={`shrink-0 flex items-center justify-center rounded-full transition-all ${isMobile ? "" : "opacity-40 hover:opacity-100"}`}
-                        style={{ width: 24, height: 24, border: "1.5px solid #d0cdc8" }}
-                        title="Označit hotovo"
-                      >
-                        <Circle className="h-3 w-3" style={{ color: "#99a5a3" }} />
-                      </button>
-                    )}
                   </div>
-
-                  {/* Inline warning: no QC */}
-                  {showWarning && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 mt-0.5 rounded text-[11px]" style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.15)", color: "#92400e" }}>
-                      <AlertTriangle className="h-3 w-3 shrink-0" style={{ color: "#d97706" }} />
-                      <span>Nejprve označte jako zkontrolováno (✓ QC)</span>
-                    </div>
-                  )}
-
-                  {/* Inline confirm: has QC, confirm hotovo */}
-                  {showConfirm && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 mt-0.5 rounded text-[11px]" style={{ background: "rgba(58,138,54,0.06)", border: "1px solid rgba(58,138,54,0.15)", color: "#1a1a1a" }}>
-                      <span>Označit <strong>{item.item_code || item.item_name}</strong> jako hotovo?</span>
-                      <button onClick={() => confirmHotovo(item.id)} className="px-2 py-0.5 rounded text-[10px] font-medium" style={{ background: "#3a8a36", color: "#fff" }}>
-                        Potvrdit
-                      </button>
-                      <button onClick={() => setHotovoConfirm(null)} className="px-2 py-0.5 rounded text-[10px]" style={{ color: "#6b7280", border: "1px solid #e5e2dd" }}>
-                        Zrušit
-                      </button>
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -1832,102 +1827,79 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         </CollapsibleContent>
       </Collapsible>
 
-      {/* Smart "Označit vše jako hotovo" button + QC panel */}
-      {qcPanel ? (() => {
-        const missingQC = dedupedItems.filter(({ item }) => item.status !== "completed" && !checkMap.has(item.id));
-        const withQC = dedupedItems.filter(({ item }) => item.status !== "completed" && checkMap.has(item.id));
-        const allHaveQC = missingQC.length === 0;
+      {/* "Označit jako hotovo" button */}
+      <button
+        onClick={handleMarkHotovo}
+        disabled={dedupedItems.filter(i => i.item.status !== "completed").length === 0}
+        className={`w-full py-2.5 rounded-md text-sm font-medium transition-colors ${isMobile ? "min-h-[44px]" : ""}`}
+        style={{
+          background: dedupedItems.some(i => i.item.status !== "completed") ? "rgba(58,138,54,0.1)" : "#f5f3f0",
+          color: dedupedItems.some(i => i.item.status !== "completed") ? "#3a8a36" : "#b0b7c3",
+          border: dedupedItems.some(i => i.item.status !== "completed") ? "1px solid rgba(58,138,54,0.2)" : "1px solid #e5e2dd",
+          cursor: dedupedItems.some(i => i.item.status !== "completed") ? "pointer" : "not-allowed",
+        }}
+      >
+        Označit {selectedItems.size > 0 ? `${selectedItems.size} položek` : "vše"} jako hotovo
+      </button>
 
-        if (allHaveQC) {
-          // All have QC — just open expedice
-          setTimeout(() => { setQcPanel(false); onOpenExpedice(); }, 0);
-          return null;
-        }
-
-        return (
-          <div className="rounded-md p-3 space-y-2" style={{ background: "rgba(217,119,6,0.06)", border: "1px solid rgba(217,119,6,0.15)" }}>
-            <div className="flex items-center justify-between">
-              <span className="text-[12px] font-semibold" style={{ color: "#92400e" }}>⚠ Tyto položky nemají QC kontrolu:</span>
-              <button onClick={() => setQcPanel(false)} className="p-0.5 rounded hover:bg-black/5"><X className="h-3.5 w-3.5" style={{ color: "#6b7280" }} /></button>
+      {/* QC MODE POPUP — full modal */}
+      <Dialog open={qcModalOpen} onOpenChange={setQcModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Kontrola kvality — {projectName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Warning banner */}
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md text-[12px]" style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.15)", color: "#92400e" }}>
+              <AlertTriangle className="h-4 w-4 shrink-0" style={{ color: "#d97706" }} />
+              <span>⚠ Před dokončením zkontrolujte každý prvek podle checklist</span>
             </div>
-            <div className="space-y-1">
-              {missingQC.map(({ item }) => (
-                <div key={item.id} className="flex items-center gap-2 px-2 py-1.5 rounded" style={{ background: "#ffffff", border: "1px solid #ece8e2" }}>
-                  <span className="text-[12px] flex-1 truncate" style={{ color: "#1a1a1a" }}>
-                    {item.item_code && <span className="font-mono font-bold mr-1">{item.item_code}</span>}
-                    {item.item_name}
-                  </span>
-                  <button
-                    onClick={() => handleQC(item.id)}
-                    disabled={qcLoading === item.id}
-                    className="px-2 py-0.5 rounded text-[10px] font-medium shrink-0"
-                    style={{ background: "#3a8a36", color: "#fff" }}
-                  >
-                    {qcLoading === item.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "✓ QC"}
-                  </button>
-                </div>
+
+            {/* Checklist */}
+            <div className="space-y-2">
+              {[
+                { key: "rozmery" as const, label: "Rozměry odpovídají výkresům" },
+                { key: "povrch" as const, label: "Povrchová úprava bez vad" },
+                { key: "spoje" as const, label: "Spoje a uchycení pevné" },
+                { key: "cistota" as const, label: "Čistota a balení v pořádku" },
+              ].map(({ key, label }) => (
+                <label key={key} className="flex items-center gap-3 cursor-pointer min-h-[36px]">
+                  <Checkbox
+                    checked={qcChecklist[key]}
+                    onCheckedChange={(v) => setQcChecklist(c => ({ ...c, [key]: !!v }))}
+                  />
+                  <span className="text-sm">{label}</span>
+                </label>
               ))}
             </div>
-            <div className="flex gap-2 pt-1">
-              {withQC.length > 0 && (
-                <button
-                  onClick={async () => {
-                    const ids = withQC.map(({ item }) => item.id);
-                    const { data: { user } } = await supabase.auth.getUser();
-                    await supabase.from("production_schedule").update({
-                      status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
-                    }).in("id", ids);
-                    qc.invalidateQueries({ queryKey: ["production-schedule"] });
-                    toast.success(`${ids.length} položek dokončeno`);
-                    setQcPanel(false);
-                    onOpenExpedice();
-                  }}
-                  className="px-3 py-1.5 rounded text-[11px] font-medium"
-                  style={{ background: "#3a8a36", color: "#fff" }}
-                >
-                  Dokončit jen zkontrolované ({withQC.length})
-                </button>
-              )}
-              <span className="text-[10px] self-center" style={{ color: "#6b7280" }}>
-                {withQC.length === 0 ? "Žádná položka nemá QC kontrolu — nejprve zkontrolujte kvalitu" : "Dokončete QC a pokračujte"}
-              </span>
+
+            {/* Items requiring QC */}
+            <div>
+              <div className="text-[10px] uppercase font-semibold mb-1.5" style={{ color: "#99a5a3" }}>Položky vyžadující QC ({qcModalItems.length})</div>
+              <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                {qcModalItems.map(({ item }) => (
+                  <div key={item.id} className="flex items-center gap-2 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#fafaf8" }}>
+                    {item.item_code && <span className="font-mono text-[11px] font-bold shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
+                    <span className="text-[12px] flex-1 truncate" style={{ color: "#1a1a1a" }}>{item.item_name}</span>
+                    <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        );
-      })() : (
-        <button
-          onClick={() => {
-            // Check if all non-completed items have QC
-            const nonCompleted = dedupedItems.filter(({ item }) => item.status !== "completed");
-            if (nonCompleted.length === 0) return;
-            const allHaveQC = nonCompleted.every(({ item }) => checkMap.has(item.id));
-            if (allHaveQC) {
-              // Mark all as completed, then open expedice
-              (async () => {
-                const ids = nonCompleted.map(({ item }) => item.id);
-                const { data: { user } } = await supabase.auth.getUser();
-                await supabase.from("production_schedule").update({
-                  status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
-                }).in("id", ids);
-                qc.invalidateQueries({ queryKey: ["production-schedule"] });
-                onOpenExpedice();
-              })();
-            } else {
-              setQcPanel(true);
-            }
-          }}
-          disabled={dedupedItems.length === 0}
-          className={`w-full py-2.5 rounded-md text-sm font-medium transition-colors ${isMobile ? "min-h-[44px]" : ""}`}
-          style={{
-            background: dedupedItems.length > 0 ? "rgba(58,138,54,0.1)" : "#f5f3f0",
-            color: dedupedItems.length > 0 ? "#3a8a36" : "#b0b7c3",
-            border: dedupedItems.length > 0 ? "1px solid rgba(58,138,54,0.2)" : "1px solid #e5e2dd",
-            cursor: dedupedItems.length > 0 ? "pointer" : "not-allowed",
-          }}
-        >
-          Označit vše jako hotovo
-        </button>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQcModalOpen(false)}>Zrušit</Button>
+            <Button
+              disabled={!allChecklistDone || qcSubmitting}
+              onClick={handleQcModalConfirm}
+              style={{ background: allChecklistDone ? "#3a8a36" : undefined }}
+            >
+              {qcSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              Potvrdit QC a dokončit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* QC Uncheck confirm */}
       <ConfirmDialog
