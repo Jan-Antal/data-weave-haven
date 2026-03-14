@@ -1303,8 +1303,16 @@ export default function Vyroba() {
         <Sheet open={mobileDetailOpen} onOpenChange={setMobileDetailOpen}>
           <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl p-0 overflow-hidden">
             <div className="flex flex-col h-full overflow-y-auto">
-              <div className="flex justify-center pt-2 pb-1 shrink-0">
+              <div className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0">
+                <button
+                  onClick={() => setMobileDetailOpen(false)}
+                  className="text-xs font-medium flex items-center gap-1 min-h-[36px]"
+                  style={{ color: "#6b7280" }}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" /> Zpět
+                </button>
                 <div className="w-10 h-1 rounded-full" style={{ background: "#d0cdc8" }} />
+                <div className="w-[50px]" /> {/* spacer for centering drag handle */}
               </div>
               <DetailPanel
                 project={selectedProject}
