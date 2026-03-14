@@ -67,7 +67,7 @@ const Index = () => {
   const [costPresetsOpen, setCostPresetsOpen] = useState(false);
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
   const [dataLogOpen, setDataLogOpen] = useState(() => {
-    try { return sessionStorage.getItem("datalog-open") === "true"; } catch { return false; }
+    try { return localStorage.getItem("datalog-panel-index") === "true"; } catch { return false; }
   });
   const [activeTab, setActiveTab] = useState("project-info");
   const [riskHighlight, setRiskHighlight] = useState<RiskHighlightType>(null);
