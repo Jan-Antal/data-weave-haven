@@ -991,19 +991,18 @@ export default function Vyroba() {
               </div>
               {logTab === "notes" ? (
                 <textarea
-                  ref={logNotesTextareaRef}
                   value={logNotes}
                   onChange={e => {
-                    logNotesUndoStack.current.push(logNotes);
-                    if (logNotesUndoStack.current.length > 50) logNotesUndoStack.current.shift();
+                    logNotesUndoStack.current = [...logNotesUndoStack.current.slice(-49), logNotes];
                     setLogNotes(e.target.value);
                   }}
                   onKeyDown={e => {
-                    if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+                    if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
                       e.preventDefault();
                       e.stopPropagation();
                       if (logNotesUndoStack.current.length > 0) {
-                        const prev = logNotesUndoStack.current.pop()!;
+                        const prev = logNotesUndoStack.current[logNotesUndoStack.current.length - 1];
+                        logNotesUndoStack.current = logNotesUndoStack.current.slice(0, -1);
                         setLogNotes(prev);
                       }
                     }
