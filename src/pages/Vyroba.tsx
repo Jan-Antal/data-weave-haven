@@ -3169,6 +3169,7 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
   logs: DailyLog[];
   weeklyGoal?: number;
 }) {
+  const isMobile = useIsMobile();
   const isToday = dayIndex === todayDayIndex;
   const isFuture = todayDayIndex >= 0 && dayIndex > todayDayIndex;
   const isPast = todayDayIndex >= 0 && dayIndex < todayDayIndex;
