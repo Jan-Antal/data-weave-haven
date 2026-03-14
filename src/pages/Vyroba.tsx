@@ -1600,27 +1600,8 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
     return m;
   }, [checks]);
 
-  async function handleQC(itemId: string) {
-    setQcLoading(itemId);
-    try {
-      await checkItem(itemId);
-      toast.success("✓ Zkontrolováno");
-    } catch {
-      toast.error("Chyba kontroly");
-    } finally {
-      setQcLoading(null);
-    }
-  }
 
-  async function handleUncheckQC(checkId: string) {
-    try {
-      await uncheckItem(checkId);
-      toast.success("QC kontrola zrušena");
-    } catch {
-      toast.error("Chyba");
-    }
-    setUncheckConfirm(null);
-  }
+
 
   function toggleSelect(itemId: string) {
     setSelectedItems(prev => {
