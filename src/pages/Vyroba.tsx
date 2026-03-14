@@ -2483,8 +2483,9 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   reported_by: user?.id || "",
                 });
                 
-                setDefectType(""); setDefectDesc(""); setDefectSeverity("minor"); setDefectResolution(""); setDefectItemId("__bundle__"); setDefectPhotos([]); setDefectOpen(false);
+                setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectItemId("__bundle__"); setDefectPhotos([]); setDefectOpen(false);
               }}
+              singleItemMode
             />
           </div>
           <DialogFooter>
