@@ -1041,7 +1041,7 @@ export default function Vyroba() {
                   {logPercent}%
                 </span>
               </div>
-              {hotovostTouched.current && (
+              {hotovostTouched && (
                 <div className="mt-1.5 flex items-center gap-1 text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>
                   <span>% ručně nastaveno — operace nezmění hodnotu</span>
                   <button
