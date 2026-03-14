@@ -2546,24 +2546,28 @@ function QcWarningBox() {
 /* ═══ QC Defect Form ═══ */
 const DEFECT_TYPES = ["Škrabanec", "Nerovnosť laku", "Poškodenie dýhy", "Chýbajúci diel", "Funkčná vada", "Iné"];
 
-function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, defectDesc, setDefectDesc, defectSeverity, setDefectSeverity, defectResolution, setDefectResolution, defectItemId, setDefectItemId, defectPhotos, setDefectPhotos, availableItems, projectId, onSave }: {
+function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, defectDesc, setDefectDesc, defectSeverity, setDefectSeverity, defectResolution, setDefectResolution, defectItemId, setDefectItemId, defectPhotos, setDefectPhotos, availableItems, projectId, onSave, singleItemMode = false }: {
   defectOpen: boolean; setDefectOpen: (v: boolean) => void;
   defectType: string; setDefectType: (v: string) => void;
   defectDesc: string; setDefectDesc: (v: string) => void;
-  defectSeverity: "minor" | "blocking"; setDefectSeverity: (v: "minor" | "blocking") => void;
+  defectSeverity: "minor" | "blocking" | ""; setDefectSeverity: (v: "minor" | "blocking" | "") => void;
   defectResolution: string; setDefectResolution: (v: string) => void;
   defectItemId: string; setDefectItemId: (v: string) => void;
   defectPhotos: string[]; setDefectPhotos: (v: string[]) => void;
   availableItems: ScheduleItem[];
   projectId: string;
   onSave: () => Promise<void>;
+  singleItemMode?: boolean;
 }) {
   const isMobile = useIsMobile();
   const { uploadFile } = useSharePointDocs(projectId);
   const [photoUploading, setPhotoUploading] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  const canSave = defectType && defectDesc && (defectSeverity === "minor" || defectResolution);
+  const isIne = defectType === "Iné";
+  const descRequired = isIne;
+  const hasSeverity = defectSeverity === "minor" || defectSeverity === "blocking";
+  const canSave = defectType && hasSeverity && (!descRequired || defectDesc.trim()) && (defectSeverity !== "blocking" || defectResolution);
 
   async function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
@@ -2595,27 +2599,42 @@ function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, de
 
   return (
     <Collapsible open={defectOpen} onOpenChange={setDefectOpen}>
-      <CollapsibleTrigger className="flex items-center gap-1 text-[13px] font-medium cursor-pointer" style={{ color: "#d97706" }}>
-        <Plus className="h-3.5 w-3.5" />
-        Zaznamenať vadu
+      <CollapsibleTrigger asChild>
+        <button
+          className="flex items-center gap-1.5 text-[13px] font-medium cursor-pointer rounded-md transition-colors"
+          style={{
+            color: "#92400e",
+            border: "1px solid #f59e0b",
+            background: defectOpen ? "#fef3c7" : "transparent",
+            padding: "6px 14px",
+            borderRadius: "6px",
+          }}
+          onMouseEnter={(e) => { if (!defectOpen) (e.currentTarget as HTMLElement).style.background = "#fef3c7"; }}
+          onMouseLeave={(e) => { if (!defectOpen) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+        >
+          <AlertTriangle className="h-3.5 w-3.5" />
+          Zaznamenať vadu
+        </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="mt-2 space-y-3 rounded-md p-3" style={{ border: "1px solid #e5e2dd", background: "#fafaf8" }}>
-          {/* Item selector */}
-          <div>
-            <Label className="text-[11px] font-semibold mb-1 block">Prvok s vadou *</Label>
-            <Select value={defectItemId} onValueChange={setDefectItemId}>
-              <SelectTrigger className="h-8 text-[12px]"><SelectValue placeholder="Vyberte prvok..." /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__bundle__">Celý bundle</SelectItem>
-                {availableItems.map(item => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.item_code ? `${item.item_code} — ` : ""}{item.item_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Item selector — only in multi-item mode */}
+          {!singleItemMode && (
+            <div>
+              <Label className="text-[11px] font-semibold mb-1 block">Prvok s vadou *</Label>
+              <Select value={defectItemId} onValueChange={setDefectItemId}>
+                <SelectTrigger className="h-8 text-[12px]"><SelectValue placeholder="Vyberte prvok..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__bundle__">Celý bundle</SelectItem>
+                  {availableItems.map(item => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.item_code ? `${item.item_code} — ` : ""}{item.item_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           {/* Type */}
           <div>
             <Label className="text-[11px] font-semibold mb-1 block">Typ vady *</Label>
@@ -2628,7 +2647,9 @@ function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, de
           </div>
           {/* Description */}
           <div>
-            <Label className="text-[11px] font-semibold mb-1 block">Popis *</Label>
+            <Label className="text-[11px] font-semibold mb-1 block">
+              Popis {descRequired && <span className="text-red-500">*</span>}
+            </Label>
             <Textarea value={defectDesc} onChange={e => setDefectDesc(e.target.value)} className="min-h-[60px] text-[12px]" placeholder="Popíšte vadu..." />
           </div>
           {/* Photo upload */}
@@ -2649,7 +2670,7 @@ function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, de
               </button>
             </div>
           </div>
-          {/* Severity */}
+          {/* Severity — no default */}
           <div>
             <Label className="text-[11px] font-semibold mb-1 block">Závažnosť *</Label>
             <RadioGroup value={defectSeverity} onValueChange={(v) => setDefectSeverity(v as "minor" | "blocking")} className="space-y-1">
