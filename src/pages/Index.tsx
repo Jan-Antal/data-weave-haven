@@ -297,6 +297,25 @@ const Index = () => {
             >
               <LayoutDashboard className="h-5 w-5" />
             </button>
+            {(canAccessSettings || realRole === "owner" || role === "pm") && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={toggleDataLog}
+                    className={cn(
+                      "p-2 rounded-md transition-colors",
+                      dataLogOpen
+                        ? "text-primary-foreground bg-primary-foreground/10"
+                        : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                    )}
+                    title="Data Log"
+                  >
+                    <Clock className="h-5 w-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Data Log</TooltipContent>
+              </Tooltip>
+            )}
             {canAccessSettings && <AdminInboxButton />}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
