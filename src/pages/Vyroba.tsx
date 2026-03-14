@@ -1809,6 +1809,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
                 onOpenLog={() => onOpenLog(di)}
                 statusColor={statusColor}
                 logs={logs}
+                weeklyGoal={weeklyGoal}
               />
             ))}
           </div>
