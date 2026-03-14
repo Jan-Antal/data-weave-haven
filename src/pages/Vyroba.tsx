@@ -3053,6 +3053,7 @@ function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, de
 
 function QualityCheckDisplay({ check }: { check: any }) {
   const name = useProfileName(check.checked_by);
+  const isMobile = useIsMobile();
   const firstName = name ? name.split(" ")[0].slice(0, 8) : "–";
   return (
     <span
@@ -3061,7 +3062,9 @@ function QualityCheckDisplay({ check }: { check: any }) {
         background: "#dcfce7",
         color: "#166534",
         border: "1px solid #16a34a",
-        padding: "4px 10px",
+        padding: isMobile ? "10px 12px" : "4px 10px",
+        minHeight: isMobile ? 44 : undefined,
+        minWidth: isMobile ? 44 : undefined,
         borderRadius: "9999px",
         fontSize: "12px",
         fontWeight: 500,
