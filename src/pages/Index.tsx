@@ -39,6 +39,7 @@ import { useAchievementChecker } from "@/hooks/useAchievements";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
+import { MobileNavBar } from "@/components/mobile/MobileNavBar";
 import { MobileCardList } from "@/components/mobile/MobileCardList";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { MobilePrehled } from "@/components/mobile/MobilePrehled";
