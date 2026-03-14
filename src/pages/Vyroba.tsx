@@ -600,14 +600,35 @@ export default function Vyroba() {
 
   async function handleConfirmExpedice() {
     if (!selectedProject) return;
-    // Push undo for expedice
     const allItems = selectedProject.scheduleItems;
+    const prevStatus = selectedProject.projectStatus || "Ve výrobě";
+    const snapshots = allItems.map(i => ({ id: i.id, prevStatus: i.status }));
+    const pid = selectedProject.projectId;
+    const pName = selectedProject.projectName;
     pushUndo({
-      type: "expedice",
-      projectId: selectedProject.projectId,
-      prevStatus: selectedProject.projectStatus || "Ve výrobě",
-      itemSnapshots: allItems.map(i => ({ id: i.id, prevStatus: i.status })),
-      timestamp: Date.now(),
+      page: "vyroba",
+      actionType: "expedice",
+      description: `${pName} → Expedice`,
+      undo: async () => {
+        await supabase.from("projects").update({ status: prevStatus }).eq("project_id", pid);
+        for (const snap of snapshots) {
+          await supabase.from("production_schedule").update({ status: snap.prevStatus, completed_at: null, completed_by: null }).eq("id", snap.id);
+        }
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        qc.invalidateQueries({ queryKey: ["projects"] });
+        qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
+      },
+      redo: async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        const ids = snapshots.filter(s => s.prevStatus !== "completed" && s.prevStatus !== "cancelled").map(s => s.id);
+        if (ids.length > 0) {
+          await supabase.from("production_schedule").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null }).in("id", ids);
+        }
+        await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", pid);
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        qc.invalidateQueries({ queryKey: ["projects"] });
+        qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
+      },
     });
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -618,11 +639,11 @@ export default function Vyroba() {
         status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
       }).in("id", ids);
     }
-    await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", selectedProject.projectId);
+    await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", pid);
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
     qc.invalidateQueries({ queryKey: ["projects"] });
     qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
-    toast.success(`${selectedProject.projectName} → Expedice`, { duration: 4000 });
+    toast.success(`✓ ${pName} odoslaný do Expedice`, { duration: 4000 });
     setExpediceDialogOpen(false);
   }
 
