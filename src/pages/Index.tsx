@@ -380,11 +380,7 @@ const Index = () => {
                       Koš
                     </DropdownMenuItem>
                   )}
-                  {(isAdmin || role === "pm" || isOwner) && (
-                    <DropdownMenuItem onClick={toggleDataLog}>
-                      Data Log
-                    </DropdownMenuItem>
-                  )}
+                  
                   {realRole === "owner" && (
                     <>
                       <DropdownMenuSeparator />
