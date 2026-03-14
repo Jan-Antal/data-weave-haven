@@ -435,7 +435,7 @@ export default function Vyroba() {
     setLogPercent(Math.max(phasePct, getLatestPercent(selectedProject.projectId)));
     setLogTab("notes");
     setLogPhaseWarning(null);
-    hotovostTouched.current = false;
+    setHotovostTouched(false);
     logNotesUndoStack.current = [];
 
     // Load existing note for this day
