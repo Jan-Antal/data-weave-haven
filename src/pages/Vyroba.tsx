@@ -172,6 +172,7 @@ export default function Vyroba() {
   const { openPeopleManagement } = usePeopleManagement();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { pushUndo } = useVyrobaUndo();
   const isMobile = useIsMobile();
 
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
