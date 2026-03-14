@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList,
   User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange, Factory,
-  Circle, CheckCircle2, X, Plus, Trash2, Loader2, Download, Printer, FileText,
+  CheckCircle2, X, Plus, Trash2, Loader2, Download, Printer, FileText,
   AlertTriangle, Camera, ArrowRight
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
