@@ -1413,21 +1413,51 @@ export default function Vyroba() {
         </DialogContent>
       </Dialog>
 
-      {/* ═══ EXPEDICE CONFIRMATION DIALOG (simple Ano/Ne) ═══ */}
+      {/* ═══ EXPEDICE CONFIRMATION DIALOG ═══ */}
       <Dialog open={expediceDialogOpen} onOpenChange={setExpediceDialogOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Vše hotovo — přesunout do Expedice?</DialogTitle>
+            <DialogTitle>Přesunout do Expedice?</DialogTitle>
           </DialogHeader>
-          <p className="text-sm" style={{ color: "#6b7280" }}>
-            Projekt <strong>{selectedProject?.projectName}</strong> bude přesunut do Expedice.
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setExpediceDialogOpen(false)}>Ne</Button>
-            <Button onClick={handleConfirmExpedice} style={{ background: "#3a8a36" }}>
-              Ano
-            </Button>
-          </DialogFooter>
+          {(() => {
+            if (!selectedProject) return null;
+            const allItemsForProject = getAllItemsForProject(selectedProject.projectId);
+            const incompleteItems = allItemsForProject.filter(e => e.item.status !== "completed");
+            const hasIncomplete = incompleteItems.length > 0;
+            const incompleteWeeks = [...new Set(incompleteItems.map(e => e.weekNum))];
+            return (
+              <div className="space-y-3">
+                <p className="text-sm" style={{ color: "#6b7280" }}>
+                  Projekt <strong>{selectedProject.projectName}</strong> bude přesunut do Expedice.
+                </p>
+                {hasIncomplete && (
+                  <div className="rounded-md px-3 py-2 text-[12px]" style={{ background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.15)" }}>
+                    <div className="font-semibold" style={{ color: "#dc2626" }}>
+                      ⚠ {incompleteItems.length} nedokončených částí v T{incompleteWeeks.join(", T")}
+                    </div>
+                    <div className="text-[11px] mt-1" style={{ color: "#92400e" }}>
+                      Nedokončené části zůstanou v plánu.
+                    </div>
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  {!hasIncomplete && (
+                    <Button onClick={handleConfirmExpedice} style={{ background: "#3a8a36" }} className="w-full">
+                      Ano — přesunout do Expedice
+                    </Button>
+                  )}
+                  {hasIncomplete && (
+                    <Button onClick={handleConfirmExpedice} variant="outline" className="w-full text-xs" style={{ borderColor: "#dc2626", color: "#dc2626" }}>
+                      Expedovat jen dokončené části
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => setExpediceDialogOpen(false)} className="w-full">
+                    Ne
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
