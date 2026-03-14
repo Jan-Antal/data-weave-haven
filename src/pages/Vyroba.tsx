@@ -609,6 +609,7 @@ export default function Vyroba() {
   async function handleNoProduction() {
     if (!selectedProject || logDayIndex < 0) return;
     try {
+      pushUndo({ type: "no_activity", logId: "", logDate: weekKey, projectId: selectedProject.projectId, timestamp: Date.now() });
       await saveDailyLog(bundleId(selectedProject.projectId), weekKey, logDayIndex, `Bez výroby: ${noProductionReason}`, getLatestPercent(selectedProject.projectId));
       qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
       toast.success("Zaznamenáno bez výroby");
