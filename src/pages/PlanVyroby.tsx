@@ -651,6 +651,9 @@ export default function PlanVyroby() {
           })() : undefined}
         />
 
+        {/* Main content + DataLog sidebar */}
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {viewTab === "kanban" ? (
           <div className={`flex-1 flex min-h-0 ${forecast.forecastActive && forecast.forecastBlocks.length > 0 ? 'pb-14' : ''}`} onClick={() => setSelectedProjectId(null)}>
             {forecast.forecastActive ? (
