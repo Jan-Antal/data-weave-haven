@@ -427,20 +427,25 @@ export default function Vyroba() {
     setLogPhase(latestPhase || "Řezání");
     setLogPercent(getLatestPercent(selectedProject.projectId));
     setLogTab("notes");
-    setLogNotes("");
     logNotesUndoStack.current = [];
+
+    // Load existing note for this day
+    const logs = getLogsForProject(selectedProject.projectId);
+    const existingLog = logs.find(l => l.day_index === di);
+    setLogNotes(existingLog?.note_text || "");
+
     setLogModalOpen(true);
   }
 
   async function handleSaveLog() {
     if (!selectedProject || logDayIndex < 0) return;
     try {
-      await saveDailyLog(bundleId(selectedProject.projectId), weekKey, logDayIndex, logPhase, logPercent);
+      await saveDailyLog(bundleId(selectedProject.projectId), weekKey, logDayIndex, logPhase, logPercent, logNotes || null);
       qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
       toast.success("✓ Log uložen", { duration: 2000 });
       setLogModalOpen(false);
-    } catch {
-      toast.error("Chyba při ukládání logu");
+    } catch (err: any) {
+      toast.error(`Chyba při ukládání logu: ${err?.message || "neznámá chyba"}`);
     }
   }
 
