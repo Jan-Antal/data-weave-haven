@@ -430,6 +430,7 @@ export default function Vyroba() {
     setLogPercent(getLatestPercent(selectedProject.projectId));
     setLogTab("notes");
     setLogNotes("");
+    logNotesUndoStack.current = [];
     setLogModalOpen(true);
   }
 
