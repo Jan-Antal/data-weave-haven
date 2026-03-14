@@ -1036,7 +1036,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       </div>
 
       {/* Items */}
-      <div className="flex-1 overflow-y-auto p-1.5" style={{ display: "flex", flexDirection: "column", gap: 3, opacity: isPast ? 0.7 : 1 }}>
+      <div className="flex-1 overflow-y-auto p-1.5" style={{ display: "flex", flexDirection: "column", gap: 3 }}>
         {(realBundles.length === 0 && blockerBundles.length === 0) && !isPast && weekForecastBlocks.length === 0 && (
           <div className="flex-1 flex items-center justify-center rounded-[5px] px-2 py-[14px] transition-all" style={{ border: forecastDarkMode ? "1.5px dashed #2a3d3a" : "1.5px dashed #e2ddd6" }}>
             <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }}>{forecastDarkMode ? "Žádný forecast" : "Přetáhni sem z Inboxu"}</span>
@@ -1303,7 +1303,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
       backgroundColor: forecastDarkMode
         ? (isHighlighted ? "rgba(217,119,6,0.08)" : "#252a35")
         : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : isHighlighted ? "rgba(217,119,6,0.05)" : "#ffffff"),
-      opacity: isDragging ? 0.3 : isDimmed ? 0.5 : 1,
+      opacity: isDragging ? 0.3 : isDimmed ? 0.5 : allCompleted ? 0.55 : 1,
       outline: isFocusedMatch ? "2px solid #d97706" : undefined,
       outlineOffset: isFocusedMatch ? "2px" : undefined,
       boxShadow: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "inset 0 0 0 1px hsl(0 60% 86%)" : isHighlighted ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined),
