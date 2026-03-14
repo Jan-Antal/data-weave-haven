@@ -354,7 +354,6 @@ export default function Vyroba() {
   const [logDayIndex, setLogDayIndex] = useState(-1);
   const [logPhase, setLogPhase] = useState("Řezání");
   const [logPercent, setLogPercent] = useState(0);
-  const [logTab, setLogTab] = useState<"notes" | "photo">("notes");
   const [logNotes, setLogNotes] = useState("");
   const logNotesUndoStack = useRef<string[]>([]);
   const [hotovostTouched, setHotovostTouched] = useState(false);
