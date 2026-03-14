@@ -1756,7 +1756,9 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   const qc = useQueryClient();
   const qcUserFirstName = profile?.full_name?.split(" ")[0]?.slice(0, 8) || "–";
 
-  // Deduplicate by id, then merge splits by item_code+item_name within same week
+  // Deduplicate by id, then merge splits by item_code within same week
+  const stripSplitSuffix = (name: string) => name.replace(/\s*\(\d+\/\d+\)$/, '').trim();
+
   const dedupedItems = useMemo(() => {
     // Step 1: deduplicate by id
     const seenIds = new Set<string>();
@@ -1766,24 +1768,32 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
       return true;
     });
 
-    // Step 2: merge splits sharing item_code+item_name in the same week
-    const mergeKey = (i: ScheduleItem) => `${i.item_code || ""}::${i.item_name}::${i.scheduled_week}`;
-    const grouped = new Map<string, { item: ScheduleItem; weekKey: string; weekNum: number; mergedIds: string[]; totalHoursAllSplits: number; thisWeekHours: number }>();
+    // Step 2: merge splits sharing item_code in the same week (item_code only, ignore name variations)
+    const mergeKey = (i: ScheduleItem) => {
+      if (i.item_code) return `code::${i.item_code}::${i.scheduled_week}`;
+      return `name::${i.item_name}::${i.scheduled_week}`;
+    };
+    const grouped = new Map<string, { item: ScheduleItem; weekKey: string; weekNum: number; mergedIds: string[]; totalHoursAllSplits: number; thisWeekHours: number; partsThisWeek: number; splitTotalFromRow: number | null }>();
     for (const entry of unique) {
       const key = mergeKey(entry.item);
       const existing = grouped.get(key);
       if (existing) {
-        // Accumulate hours for this week
         existing.thisWeekHours += entry.item.scheduled_hours;
         existing.mergedIds.push(entry.item.id);
-        // Keep the lowest split_part as representative
-        if (entry.item.split_part != null && existing.item.split_part != null && entry.item.split_part < existing.item.split_part) {
-          existing.item = { ...entry.item, scheduled_hours: existing.thisWeekHours };
-        } else {
-          existing.item = { ...existing.item, scheduled_hours: existing.thisWeekHours };
-        }
+        existing.partsThisWeek += 1;
+        if (entry.item.split_total != null) existing.splitTotalFromRow = entry.item.split_total;
+        // Update representative item with stripped name and summed hours
+        existing.item = { ...existing.item, item_name: stripSplitSuffix(existing.item.item_name), scheduled_hours: existing.thisWeekHours };
       } else {
-        grouped.set(key, { ...entry, mergedIds: [entry.item.id], totalHoursAllSplits: 0, thisWeekHours: entry.item.scheduled_hours });
+        grouped.set(key, {
+          ...entry,
+          mergedIds: [entry.item.id],
+          totalHoursAllSplits: 0,
+          thisWeekHours: entry.item.scheduled_hours,
+          partsThisWeek: 1,
+          splitTotalFromRow: entry.item.split_total,
+          item: { ...entry.item, item_name: stripSplitSuffix(entry.item.item_name) },
+        });
       }
     }
     return Array.from(grouped.values());
