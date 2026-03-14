@@ -1539,7 +1539,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
                   <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#ffffff" }}>
                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#3a8a36" }} />
                     {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#3a8a36" }}>{item.item_code}</span>}
-                    <span className="text-[13px] flex-1 truncate" style={{ color: "#5a9a58", textDecoration: "line-through" }}>{item.item_name}</span>
+                    <span className="text-[13px] flex-1 truncate" style={{ color: "#5a9a58" }}>{item.item_name}</span>
                     <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
                   </div>
                 ))}
