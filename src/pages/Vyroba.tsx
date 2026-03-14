@@ -515,7 +515,6 @@ export default function Vyroba() {
         scheduled_hours: remaining,
         scheduled_czk: remainingCzk,
         status: "scheduled",
-        inbox_item_id: item.inbox_item_id,
         is_blocker: false,
       });
       if (error) { toast.error(error.message); return; }
