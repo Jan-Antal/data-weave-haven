@@ -9,6 +9,7 @@ import { useWeeklyCapacity } from "@/hooks/useWeeklyCapacity";
 import { getProjectColor } from "@/lib/projectColors";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useVyrobaUndo, type UndoAction } from "@/hooks/useVyrobaUndo";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList,
   User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange, Factory,
