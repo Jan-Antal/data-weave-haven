@@ -1324,7 +1324,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
   bundleId: string;
   allItems: { item: ScheduleItem; weekKey: string; weekNum: number }[];
   scheduleData: Map<string, any> | undefined;
-  onPhaseChange: (phaseName: string) => void;
+  
   onOpenProjectDetail: () => void;
   dyhaDismissed: boolean;
   onDismissDyha: () => void;
