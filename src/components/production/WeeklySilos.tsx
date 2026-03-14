@@ -921,6 +921,8 @@ interface SiloProps {
   forecastExpandedIds?: Set<string>;
   onToggleForecastExpand?: (blockId: string) => void;
   focusedMatchKey?: string | null;
+  searchMatchedProjectIds?: Set<string>;
+  searchActive?: boolean;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
