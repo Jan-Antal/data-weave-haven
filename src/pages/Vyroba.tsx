@@ -332,7 +332,6 @@ export default function Vyroba() {
   const [logTab, setLogTab] = useState<"notes" | "photo">("notes");
   const [logNotes, setLogNotes] = useState("");
   const logNotesUndoStack = useRef<string[]>([]);
-  const logNotesTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [noProductionOpen, setNoProductionOpen] = useState(false);
   const [noProductionReason, setNoProductionReason] = useState("dovolenka");
 
