@@ -1446,25 +1446,23 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           </div>
         </div>
 
-        {/* ── Phases ── */}
+        {/* ── Phases (read-only display) ── */}
         <div>
           <div className="text-[10px] uppercase font-semibold mb-2" style={{ color: "#99a5a3" }}>Operace</div>
           <div className="flex items-center gap-1.5 flex-wrap">
             {PHASES.map(p => {
               const isCurrent = latestPhase === p.name;
-              const phaseUsed = logs.some(l => l.phase === p.name);
               const phasePctDone = latestPct >= p.pct;
               return (
-                <button key={p.name}
-                  onClick={() => onPhaseChange(p.name)}
-                  className="px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer"
+                <span key={p.name}
+                  className="px-2.5 py-1 rounded-full text-xs font-medium cursor-default pointer-events-none select-none"
                   style={{
                     background: isCurrent ? `${p.color}15` : "#f5f3f0",
                     color: isCurrent ? "#3a8a36" : phasePctDone ? "#3a8a36" : "#6b7280",
                     border: isCurrent ? `1.5px solid #3a8a36` : `1px solid ${phasePctDone ? "rgba(58,138,54,0.3)" : "#e5e2dd"}`,
                   }}>
                   {phasePctDone && !isCurrent ? "✓ " : ""}{p.name} <span className="text-[9px] opacity-60">{p.pct}%</span>
-                </button>
+                </span>
               );
             })}
             <div className="flex-1" />
