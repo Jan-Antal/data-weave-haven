@@ -392,40 +392,7 @@ export default function Vyroba() {
     return null;
   }
 
-  function getWeeklyGoal(pid: string): number {
-    if (!scheduleData) return 100;
-    let thisWeekHours = 0;
-    let totalHours = 0;
-    for (const [wk, silo] of scheduleData) {
-      for (const bundle of silo.bundles) {
-        if (bundle.project_id !== pid) continue;
-        const activeHours = bundle.items
-          .filter((i: ScheduleItem) => i.status !== "cancelled")
-          .reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0);
-        totalHours += activeHours;
-        if (wk === weekKey) thisWeekHours += activeHours;
-      }
-    }
-    if (totalHours <= 0) return 100;
-    return Math.round((thisWeekHours / totalHours) * 100);
-  }
-
-  function getExpectedPct(dayIndex: number, weeklyGoal: number = 100): number {
-    return Math.round(((dayIndex + 1) / 5) * weeklyGoal);
-  }
-
-  function getProjectStatus(pid: string): "on-track" | "at-risk" | "behind" {
-    const pct = getLatestPercent(pid);
-    const goal = getWeeklyGoal(pid);
-    if (pct >= goal) return "on-track";
-    if (todayDayIndex < 0) return "on-track";
-    const expected = getExpectedPct(todayDayIndex, goal);
-    if (pct >= expected - 10) return "on-track";
-    if (pct >= expected - 25) return "at-risk";
-    return "behind";
-  }
-
-  // Get ALL items for a project across ALL weeks
+  // Get ALL items for a project across ALL weeks (non-cancelled)
   function getAllItemsForProject(pid: string): { item: ScheduleItem; weekKey: string; weekNum: number }[] {
     if (!scheduleData) return [];
     const items: { item: ScheduleItem; weekKey: string; weekNum: number }[] = [];
@@ -445,16 +412,101 @@ export default function Vyroba() {
     return items;
   }
 
+  // ── BUNDLE PROGRESS: weighted by hours across ALL weeks ──
+  function getBundleProgress(pid: string): { totalHours: number; completedHours: number; bundleProgress: number } {
+    const allItems = getAllItemsForProject(pid);
+    const totalHours = allItems.reduce((s, e) => s + e.item.scheduled_hours, 0);
+    const completedHours = allItems.filter(e => e.item.status === "completed").reduce((s, e) => s + e.item.scheduled_hours, 0);
+    const bundleProgress = totalHours > 0 ? Math.round((completedHours / totalHours) * 100) : 0;
+    return { totalHours, completedHours, bundleProgress };
+  }
+
+  // ── WEEKLY GOAL: this week's hours / total hours across all weeks ──
+  function getWeeklyGoal(pid: string): number {
+    if (!scheduleData) return 100;
+    let thisWeekHours = 0;
+    let totalHours = 0;
+    for (const [wk, silo] of scheduleData) {
+      for (const bundle of silo.bundles) {
+        if (bundle.project_id !== pid) continue;
+        const activeHours = bundle.items
+          .filter((i: ScheduleItem) => i.status !== "cancelled")
+          .reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0);
+        totalHours += activeHours;
+        if (wk === weekKey) thisWeekHours += activeHours;
+      }
+    }
+    if (totalHours <= 0) return 100;
+    return Math.round((thisWeekHours / totalHours) * 100);
+  }
+
+  // ── Check if weekly goal is met (this week's completed hours >= this week's total hours) ──
+  function isWeeklyGoalMet(pid: string): boolean {
+    if (!scheduleData) return false;
+    const silo = scheduleData.get(weekKey);
+    if (!silo) return false;
+    const bundle = silo.bundles.find(b => b.project_id === pid);
+    if (!bundle) return false;
+    const activeItems = bundle.items.filter(i => i.status !== "cancelled");
+    const thisWeekHours = activeItems.reduce((s, i) => s + i.scheduled_hours, 0);
+    const thisWeekCompleted = activeItems.filter(i => i.status === "completed").reduce((s, i) => s + i.scheduled_hours, 0);
+    return thisWeekHours > 0 && thisWeekCompleted >= thisWeekHours;
+  }
+
+  // ── Check if ALL parts of an item_code are completed across ALL weeks ──
+  function areAllPartsCompleted(pid: string, itemCode: string | null, itemName: string): boolean {
+    if (!scheduleData) return false;
+    const allItems = getAllItemsForProject(pid);
+    const stripSuffix = (n: string) => n.replace(/\s*\(\d+\/\d+\)$/, '').trim();
+    const matching = allItems.filter(e => {
+      if (itemCode && e.item.item_code === itemCode) return true;
+      if (!itemCode && stripSuffix(e.item.item_name) === stripSuffix(itemName)) return true;
+      return false;
+    });
+    if (matching.length === 0) return false;
+    return matching.every(e => e.item.status === "completed");
+  }
+
+  // ── Get incomplete parts info for an item_code across ALL weeks ──
+  function getIncompletePartsInfo(pid: string, itemCode: string | null, itemName: string): { incomplete: number; total: number; weekNums: number[] } {
+    if (!scheduleData) return { incomplete: 0, total: 0, weekNums: [] };
+    const allItems = getAllItemsForProject(pid);
+    const stripSuffix = (n: string) => n.replace(/\s*\(\d+\/\d+\)$/, '').trim();
+    const matching = allItems.filter(e => {
+      if (itemCode && e.item.item_code === itemCode) return true;
+      if (!itemCode && stripSuffix(e.item.item_name) === stripSuffix(itemName)) return true;
+      return false;
+    });
+    const incomplete = matching.filter(e => e.item.status !== "completed");
+    const weekNums = [...new Set(incomplete.map(e => e.weekNum))];
+    return { incomplete: incomplete.length, total: matching.length, weekNums };
+  }
+
+  function getExpectedPct(dayIndex: number, weeklyGoal: number = 100): number {
+    return Math.round(((dayIndex + 1) / 5) * weeklyGoal);
+  }
+
+  function getProjectStatus(pid: string): "on-track" | "at-risk" | "behind" {
+    const { bundleProgress } = getBundleProgress(pid);
+    const goal = getWeeklyGoal(pid);
+    if (bundleProgress >= goal) return "on-track";
+    if (todayDayIndex < 0) return "on-track";
+    const expected = getExpectedPct(todayDayIndex, goal);
+    if (bundleProgress >= expected - 10) return "on-track";
+    if (bundleProgress >= expected - 25) return "at-risk";
+    return "behind";
+  }
+
   /* ── Stats ── */
   const stats = useMemo(() => {
     const activeProjects = enrichedProjects.filter(p => !p.isPaused);
     const total = activeProjects.length;
-    const avgPct = total > 0 ? Math.round(activeProjects.reduce((s, p) => s + getLatestPercent(p.projectId), 0) / total) : 0;
+    const avgPct = total > 0 ? Math.round(activeProjects.reduce((s, p) => s + getBundleProgress(p.projectId).bundleProgress, 0) / total) : 0;
     const onTrack = activeProjects.filter(p => getProjectStatus(p.projectId) === "on-track").length;
     const behind = activeProjects.filter(p => getProjectStatus(p.projectId) === "behind").length;
     const todayLogged = todayDayIndex >= 0 ? activeProjects.filter(p => getLogsForProject(p.projectId).some(l => l.day_index === todayDayIndex)).length : 0;
     return { total, avgPct, onTrack, behind, todayLogged };
-  }, [enrichedProjects, dailyLogsMap, todayDayIndex]);
+  }, [enrichedProjects, dailyLogsMap, todayDayIndex, scheduleData]);
 
   /* ── Log modal ── */
   function openLogModal(dayIdx?: number) {
@@ -1037,7 +1089,7 @@ export default function Vyroba() {
               {spilledProjects.map(p => (
                 <ProjectRow key={p.projectId} project={p} isSelected={selectedProjectId === p.projectId}
                   onSelect={handleSelectProject} onContextMenu={handleContextMenu} getProjectStatus={getProjectStatus}
-                  getLatestPercent={getLatestPercent} getLatestPhase={getLatestPhase} statusColors={statusColors} weeklyGoal={getWeeklyGoal(p.projectId)} />
+                  getBundleProgress={() => getBundleProgress(p.projectId)} getLatestPhase={getLatestPhase} statusColors={statusColors} weeklyGoal={getWeeklyGoal(p.projectId)} />
               ))}
 
               {/* Normal section */}
@@ -1049,7 +1101,7 @@ export default function Vyroba() {
               {normalProjects.map(p => (
                 <ProjectRow key={p.projectId} project={p} isSelected={selectedProjectId === p.projectId}
                   onSelect={handleSelectProject} onContextMenu={handleContextMenu} getProjectStatus={getProjectStatus}
-                  getLatestPercent={getLatestPercent} getLatestPhase={getLatestPhase} statusColors={statusColors} weeklyGoal={getWeeklyGoal(p.projectId)} />
+                  getBundleProgress={() => getBundleProgress(p.projectId)} getLatestPhase={getLatestPhase} statusColors={statusColors} weeklyGoal={getWeeklyGoal(p.projectId)} />
               ))}
 
               {/* Paused section */}
@@ -1147,6 +1199,10 @@ export default function Vyroba() {
                 dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
                 onDismissDyha={() => setDyhaDismissed(prev => new Set(prev).add(selectedProject.projectId))}
                 weeklyGoal={getWeeklyGoal(selectedProject.projectId)}
+                bundleProgress={getBundleProgress(selectedProject.projectId)}
+                isWeeklyGoalMet={isWeeklyGoalMet(selectedProject.projectId)}
+                areAllPartsCompleted={(itemCode, itemName) => areAllPartsCompleted(selectedProject.projectId, itemCode, itemName)}
+                getIncompletePartsInfo={(itemCode, itemName) => getIncompletePartsInfo(selectedProject.projectId, itemCode, itemName)}
               />
             )}
           </div>
@@ -1187,6 +1243,10 @@ export default function Vyroba() {
                 dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
                 onDismissDyha={() => setDyhaDismissed(prev => new Set(prev).add(selectedProject.projectId))}
                 weeklyGoal={getWeeklyGoal(selectedProject.projectId)}
+                bundleProgress={getBundleProgress(selectedProject.projectId)}
+                isWeeklyGoalMet={isWeeklyGoalMet(selectedProject.projectId)}
+                areAllPartsCompleted={(itemCode, itemName) => areAllPartsCompleted(selectedProject.projectId, itemCode, itemName)}
+                getIncompletePartsInfo={(itemCode, itemName) => getIncompletePartsInfo(selectedProject.projectId, itemCode, itemName)}
               />
             </div>
           </SheetContent>
@@ -1353,21 +1413,51 @@ export default function Vyroba() {
         </DialogContent>
       </Dialog>
 
-      {/* ═══ EXPEDICE CONFIRMATION DIALOG (simple Ano/Ne) ═══ */}
+      {/* ═══ EXPEDICE CONFIRMATION DIALOG ═══ */}
       <Dialog open={expediceDialogOpen} onOpenChange={setExpediceDialogOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Vše hotovo — přesunout do Expedice?</DialogTitle>
+            <DialogTitle>Přesunout do Expedice?</DialogTitle>
           </DialogHeader>
-          <p className="text-sm" style={{ color: "#6b7280" }}>
-            Projekt <strong>{selectedProject?.projectName}</strong> bude přesunut do Expedice.
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setExpediceDialogOpen(false)}>Ne</Button>
-            <Button onClick={handleConfirmExpedice} style={{ background: "#3a8a36" }}>
-              Ano
-            </Button>
-          </DialogFooter>
+          {(() => {
+            if (!selectedProject) return null;
+            const allItemsForProject = getAllItemsForProject(selectedProject.projectId);
+            const incompleteItems = allItemsForProject.filter(e => e.item.status !== "completed");
+            const hasIncomplete = incompleteItems.length > 0;
+            const incompleteWeeks = [...new Set(incompleteItems.map(e => e.weekNum))];
+            return (
+              <div className="space-y-3">
+                <p className="text-sm" style={{ color: "#6b7280" }}>
+                  Projekt <strong>{selectedProject.projectName}</strong> bude přesunut do Expedice.
+                </p>
+                {hasIncomplete && (
+                  <div className="rounded-md px-3 py-2 text-[12px]" style={{ background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.15)" }}>
+                    <div className="font-semibold" style={{ color: "#dc2626" }}>
+                      ⚠ {incompleteItems.length} nedokončených částí v T{incompleteWeeks.join(", T")}
+                    </div>
+                    <div className="text-[11px] mt-1" style={{ color: "#92400e" }}>
+                      Nedokončené části zůstanou v plánu.
+                    </div>
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  {!hasIncomplete && (
+                    <Button onClick={handleConfirmExpedice} style={{ background: "#3a8a36" }} className="w-full">
+                      Ano — přesunout do Expedice
+                    </Button>
+                  )}
+                  {hasIncomplete && (
+                    <Button onClick={handleConfirmExpedice} variant="outline" className="w-full text-xs" style={{ borderColor: "#dc2626", color: "#dc2626" }}>
+                      Expedovat jen dokončené části
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => setExpediceDialogOpen(false)} className="w-full">
+                    Ne
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
@@ -1610,19 +1700,19 @@ export default function Vyroba() {
 /* PROJECT ROW (left panel)                */
 /* ═══════════════════════════════════════ */
 
-function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectStatus, getLatestPercent, getLatestPhase, statusColors, weeklyGoal = 100 }: {
+function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectStatus, getBundleProgress: getBP, getLatestPhase, statusColors, weeklyGoal = 100 }: {
   project: VyrobaProject;
   isSelected: boolean;
   onSelect: (pid: string) => void;
   onContextMenu: (e: React.MouseEvent, pid: string) => void;
   getProjectStatus: (pid: string) => "on-track" | "at-risk" | "behind";
-  getLatestPercent: (pid: string) => number;
+  getBundleProgress: () => { totalHours: number; completedHours: number; bundleProgress: number };
   getLatestPhase: (pid: string) => string | null;
   statusColors: Record<string, string>;
   weeklyGoal?: number;
 }) {
   const status = getProjectStatus(project.projectId);
-  const pct = getLatestPercent(project.projectId);
+  const { bundleProgress: pct } = getBP();
   const phase = getLatestPhase(project.projectId);
   const borderColor = project.color;
 
@@ -1716,7 +1806,7 @@ function useProjectDetails(projectIds: string[]) {
 /* DETAIL PANEL                            */
 /* ═══════════════════════════════════════ */
 
-function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog, nextWeekNum, onSpillAll, onOpenExpedice, onToggleItem, getCumulativeForDay, getExpectedPct, status, latestPct, latestPhase, logs, expandedMap, setExpandedMap, bundleId, allItems, scheduleData, pushUndo, onOpenProjectDetail, dyhaDismissed, onDismissDyha, weeklyGoal }: {
+function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog, nextWeekNum, onSpillAll, onOpenExpedice, onToggleItem, getCumulativeForDay, getExpectedPct, status, latestPct, latestPhase, logs, expandedMap, setExpandedMap, bundleId, allItems, scheduleData, pushUndo, onOpenProjectDetail, dyhaDismissed, onDismissDyha, weeklyGoal, bundleProgress, isWeeklyGoalMet, areAllPartsCompleted, getIncompletePartsInfo }: {
   project: VyrobaProject;
   weekKey: string;
   currentMonday: Date;
@@ -1742,6 +1832,10 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
   dyhaDismissed: boolean;
   onDismissDyha: () => void;
   weeklyGoal: number;
+  bundleProgress: { totalHours: number; completedHours: number; bundleProgress: number };
+  isWeeklyGoalMet: boolean;
+  areAllPartsCompleted: (itemCode: string | null, itemName: string) => boolean;
+  getIncompletePartsInfo: (itemCode: string | null, itemName: string) => { incomplete: number; total: number; weekNums: number[] };
 }) {
   const isMobile = useIsMobile();
   const expectedPct = todayDayIndex >= 0 ? getExpectedPct(todayDayIndex, weeklyGoal) : 0;
@@ -1825,19 +1919,20 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           </div>
           <div className="text-right shrink-0">
             <div className="text-3xl font-mono font-bold" style={{ color: statusColor }}>
-              {latestPct}%
+              {bundleProgress.bundleProgress}%
             </div>
-            {todayDayIndex >= 0 && (
-              <div className="text-xs" style={{ color: latestPct >= weeklyGoal ? "#3a8a36" : "#99a5a3" }}>
-                Cíl: {weeklyGoal}%
-              </div>
+            <div className="text-xs" style={{ color: isWeeklyGoalMet ? "#3a8a36" : "#99a5a3" }}>
+              Týdenní cíl: {weeklyGoal}%
+            </div>
+            {isWeeklyGoalMet && (
+              <div className="text-[10px] font-medium" style={{ color: "#3a8a36" }}>🎉 Týdenní cíl splněn!</div>
             )}
           </div>
         </div>
         {/* Progress bar 4px */}
         <div className="mt-2 relative">
           <div className="h-1 rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
-            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(latestPct, 100)}%`, background: statusColor }} />
+            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(bundleProgress.bundleProgress, 100)}%`, background: statusColor }} />
           </div>
           {/* Weekly goal marker */}
           {weeklyGoal < 100 && (
@@ -1939,6 +2034,8 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           onOpenExpedice={onOpenExpedice}
           isMobile={isMobile}
           pushUndo={pushUndo}
+          areAllPartsCompleted={areAllPartsCompleted}
+          getIncompletePartsInfo={getIncompletePartsInfo}
         />
 
         {/* ── NAPLÁNOVANÉ (future) — collapsible ── */}
@@ -2010,7 +2107,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
 /* UNIFIED ITEM LIST (Items + QC merged)   */
 /* ═══════════════════════════════════════ */
 
-function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, onToggleExpand, bundleId, onOpenExpedice, isMobile, pushUndo }: {
+function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, onToggleExpand, bundleId, onOpenExpedice, isMobile, pushUndo, areAllPartsCompleted, getIncompletePartsInfo }: {
   projectId: string;
   currentItems: { item: ScheduleItem; weekKey: string; weekNum: number }[];
   onToggleItem: (id: string, status: string) => void;
@@ -2020,6 +2117,8 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   onOpenExpedice: () => void;
   isMobile: boolean;
   pushUndo: (entry: Omit<import("@/hooks/useUndoRedo").UndoEntry, "id" | "timestamp">) => void;
+  areAllPartsCompleted: (itemCode: string | null, itemName: string) => boolean;
+  getIncompletePartsInfo: (itemCode: string | null, itemName: string) => { incomplete: number; total: number; weekNums: number[] };
 }) {
   const { checks, checkItem, uncheckItem } = useQualityChecks(projectId);
   const { defects, addDefect, resolveDefect } = useQualityDefects(projectId);
@@ -2389,17 +2488,36 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                     {/* Hours */}
                     <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{thisWeekHours}h</span>
 
-                    {/* QC badge — clickable */}
+                    {/* QC badge — clickable only if ALL parts completed across all weeks */}
                     <div onClick={(e) => e.stopPropagation()}>
                       {hasQC ? (
                         <button onClick={() => { setUncheckConfirmItemId(mids[0]); setUncheckConfirmCode(`${item.item_code || ""} ${item.item_name}`.trim()); }}>
                           <QualityCheckDisplay check={checkMap.get(mids[0])} />
                         </button>
-                      ) : (
-                        <button onClick={() => { setSingleQcItem(item); setSingleQcMergedIds(mids); setSingleQcModalOpen(true); setDefectItemId(item.id); setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectPhotos([]); }}>
-                          <QualityCheckBadgeEmpty />
-                        </button>
-                      )}
+                      ) : (() => {
+                        const allDone = areAllPartsCompleted(item.item_code, item.item_name);
+                        if (!allDone) {
+                          const info = getIncompletePartsInfo(item.item_code, item.item_name);
+                          return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex items-center gap-1 shrink-0 cursor-not-allowed opacity-50"
+                                  style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #f59e0b", padding: "4px 10px", borderRadius: "9999px", fontSize: "12px", fontWeight: 500, lineHeight: 1 }}>
+                                  <Shield className="h-3 w-3" /> QC
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[250px] text-xs">
+                                Čeká na dokončení části {info.total - info.incomplete}/{info.total} v T{info.weekNums.join(", T")} — QC nelze provést
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        }
+                        return (
+                          <button onClick={() => { setSingleQcItem(item); setSingleQcMergedIds(mids); setSingleQcModalOpen(true); setDefectItemId(item.id); setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectPhotos([]); }}>
+                            <QualityCheckBadgeEmpty />
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
 
