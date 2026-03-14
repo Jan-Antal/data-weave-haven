@@ -1001,32 +1001,23 @@ export default function Vyroba() {
                 {logDayIndex >= 0 ? DAY_NAMES[logDayIndex] : "Dnes"} — Operace
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {PHASES.map(p => {
-                  const currentPhasePct = PHASES.find(ph => ph.name === logPhase)?.pct || 0;
-                  const isLower = p.pct < currentPhasePct;
-                  return (
-                    <button key={p.name} onClick={() => {
-                      if (isLower) {
-                        setLogPhaseWarning("Nelze přejít na nižší fázi");
-                        setTimeout(() => setLogPhaseWarning(null), 2500);
-                        return;
-                      }
-                      setLogPhase(p.name);
+                {PHASES.map(p => (
+                  <button key={p.name} onClick={() => {
+                    setLogPhase(p.name);
+                    if (!hotovostTouched.current) {
                       setLogPercent(p.pct);
-                      setLogPhaseWarning(null);
-                    }}
-                      className="px-2.5 py-1 rounded-full text-xs font-medium transition-all"
-                      style={{
-                        background: logPhase === p.name ? p.color : isLower ? "#f0eeeb" : "#f5f3f0",
-                        color: logPhase === p.name ? "#fff" : isLower ? "#b0b7c3" : "#1a1a1a",
-                        border: `1px solid ${logPhase === p.name ? p.color : "#e5e2dd"}`,
-                        cursor: isLower ? "not-allowed" : "pointer",
-                        opacity: isLower ? 0.5 : 1,
-                      }}>
-                      {p.name}
-                    </button>
-                  );
-                })}
+                    }
+                  }}
+                    className="px-2.5 py-1 rounded-full text-xs font-medium transition-all"
+                    style={{
+                      background: logPhase === p.name ? p.color : "#f5f3f0",
+                      color: logPhase === p.name ? "#fff" : "#1a1a1a",
+                      border: `1px solid ${logPhase === p.name ? p.color : "#e5e2dd"}`,
+                      cursor: "pointer",
+                    }}>
+                    {p.name}
+                  </button>
+                ))}
               </div>
               {logPhaseWarning && (
                 <div className="mt-1.5 text-[11px] font-medium" style={{ color: "#dc2626" }}>
@@ -1038,7 +1029,10 @@ export default function Vyroba() {
               <div className="text-xs font-semibold mb-2" style={{ color: "#6b7280" }}>Celková hotovost</div>
               <div className="flex items-center gap-4">
                 <div className="flex-1">
-                  <Slider min={0} max={100} step={5} value={[logPercent]} onValueChange={([v]) => setLogPercent(v)} />
+                  <Slider min={0} max={100} step={5} value={[logPercent]} onValueChange={([v]) => {
+                    hotovostTouched.current = true;
+                    setLogPercent(v);
+                  }} />
                   <div className="flex justify-between text-[9px] mt-1" style={{ color: "#99a5a3" }}>
                     <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
                   </div>
@@ -1047,6 +1041,20 @@ export default function Vyroba() {
                   {logPercent}%
                 </span>
               </div>
+              {hotovostTouched.current && (
+                <div className="mt-1.5 flex items-center gap-1 text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>
+                  <span>% ručně nastaveno — operace nezmění hodnotu</span>
+                  <button
+                    className="font-medium underline"
+                    style={{ color: "#d97706" }}
+                    onClick={() => {
+                      hotovostTouched.current = false;
+                      const phasePct = PHASES.find(p => p.name === logPhase)?.pct || 0;
+                      setLogPercent(phasePct);
+                    }}
+                  >× Reset</button>
+                </div>
+              )}
             </div>
 
             {/* Tab switcher: Poznámky / Foto */}
