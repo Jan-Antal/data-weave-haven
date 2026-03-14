@@ -1723,11 +1723,7 @@ export default function Vyroba() {
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
       <CostBreakdownPresetsDialog open={costPresetsOpen} onOpenChange={setCostPresetsOpen} />
       <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
-      </div>{/* end flex-1 main content */}
-      <div className={cn("transition-all duration-200 ease-in-out overflow-hidden border-l border-border", dataLogOpen ? "w-[360px]" : "w-0 border-l-0")}>
-        {dataLogOpen && <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} defaultCategory="vyroba" />}
-      </div>
-      </div>{/* end flex outer */}
+      </div>{/* end outer flex */}
     </div>
   );
 }
