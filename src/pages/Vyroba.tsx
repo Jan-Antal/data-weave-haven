@@ -385,6 +385,7 @@ export default function Vyroba() {
 
   function getProjectStatus(pid: string): "on-track" | "at-risk" | "behind" {
     const pct = getLatestPercent(pid);
+    if (pct >= 100) return "on-track";
     if (todayDayIndex < 0) return "on-track";
     const expected = getExpectedPct(todayDayIndex);
     if (pct >= expected - 10) return "on-track";
