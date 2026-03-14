@@ -1616,7 +1616,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
 /* UNIFIED ITEM LIST (Items + QC merged)   */
 /* ═══════════════════════════════════════ */
 
-function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, onToggleExpand, bundleId, onOpenExpedice, isMobile }: {
+function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, onToggleExpand, bundleId, onOpenExpedice, isMobile, pushUndo }: {
   projectId: string;
   currentItems: { item: ScheduleItem; weekKey: string; weekNum: number }[];
   onToggleItem: (id: string, status: string) => void;
@@ -1625,6 +1625,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   bundleId: string;
   onOpenExpedice: () => void;
   isMobile: boolean;
+  pushUndo: (action: UndoAction) => void;
 }) {
   const { checks, checkItem } = useQualityChecks(projectId);
   const { profile } = useAuth();
