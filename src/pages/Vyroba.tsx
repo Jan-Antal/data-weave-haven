@@ -711,17 +711,17 @@ export default function Vyroba() {
         {/* ── Week navigation (right-aligned) ── */}
         <div className="flex-1" />
         <div className="relative flex items-center gap-1" ref={weekPickerRef}>
-          <button onClick={() => setWeekOffset(w => w - 1)} className="p-1 rounded hover:bg-muted transition-colors" style={{ color: "#a8c5c2" }}>
+          <button onClick={() => setWeekOffset(w => w - 1)} className="p-1 rounded hover:bg-muted transition-colors" style={{ color: "#223937" }}>
             <ChevronLeft className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => setWeekPickerOpen(o => !o)}
             className="font-mono select-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer"
-            style={{ fontSize: 13, color: "#a8c5c2" }}
+            style={{ fontSize: 13, color: "#223937" }}
           >
             T{weekNum} · {fmtDate(currentMonday)}–{fmtDate(friday)}{currentMonday.getFullYear()}
           </button>
-          <button onClick={() => setWeekOffset(w => w + 1)} className="p-1 rounded hover:bg-muted transition-colors" style={{ color: "#a8c5c2" }}>
+          <button onClick={() => setWeekOffset(w => w + 1)} className="p-1 rounded hover:bg-muted transition-colors" style={{ color: "#223937" }}>
             <ChevronRight className="h-3.5 w-3.5" />
           </button>
           {weekOffset !== 0 && (
