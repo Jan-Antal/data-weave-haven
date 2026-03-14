@@ -2734,7 +2734,7 @@ function QualityCheckDisplay({ check }: { check: any }) {
         lineHeight: 1,
       }}
     >
-      ✓ {firstName}
+      QC ✓ {firstName}
     </span>
   );
 }
