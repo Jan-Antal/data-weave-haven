@@ -529,6 +529,8 @@ export default function Vyroba() {
 
   /* ── Toggle single item complete ── */
   async function toggleItemComplete(itemId: string, currentStatus: string) {
+    // Push undo
+    pushUndo({ type: "item_hotovo", itemId, prevStatus: currentStatus, timestamp: Date.now() });
     const { data: { user } } = await supabase.auth.getUser();
     if (currentStatus === "completed") {
       await supabase.from("production_schedule").update({ status: "scheduled", completed_at: null, completed_by: null }).eq("id", itemId);
