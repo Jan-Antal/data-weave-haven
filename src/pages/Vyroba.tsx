@@ -1575,15 +1575,14 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   onOpenExpedice: () => void;
   isMobile: boolean;
 }) {
-  const { checks, checkItem, uncheckItem } = useQualityChecks(projectId);
-  const [qcLoading, setQcLoading] = useState<string | null>(null);
+  const { checks, checkItem } = useQualityChecks(projectId);
+  const { profile } = useAuth();
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-  const [uncheckConfirm, setUncheckConfirm] = useState<string | null>(null);
   const [qcModalOpen, setQcModalOpen] = useState(false);
   const [qcModalItems, setQcModalItems] = useState<{ item: ScheduleItem }[]>([]);
-  const [qcChecklist, setQcChecklist] = useState({ rozmery: false, povrch: false, spoje: false, cistota: false });
   const [qcSubmitting, setQcSubmitting] = useState(false);
   const qc = useQueryClient();
+  const qcUserFirstName = profile?.full_name?.split(" ")[0]?.slice(0, 8) || "–";
 
   // Deduplicate items by id
   const dedupedItems = useMemo(() => {
