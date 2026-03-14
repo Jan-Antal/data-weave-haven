@@ -1776,7 +1776,7 @@ function useProjectDetails(projectIds: string[]) {
 /* DETAIL PANEL                            */
 /* ═══════════════════════════════════════ */
 
-function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog, nextWeekNum, onSpillAll, onOpenExpedice, onToggleItem, getCumulativeForDay, getExpectedPct, status, latestPct, latestPhase, logs, expandedMap, setExpandedMap, bundleId, allItems, scheduleData, pushUndo, onOpenProjectDetail, dyhaDismissed, onDismissDyha, weeklyGoal }: {
+function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog, nextWeekNum, onSpillAll, onOpenExpedice, onToggleItem, getCumulativeForDay, getExpectedPct, status, latestPct, latestPhase, logs, expandedMap, setExpandedMap, bundleId, allItems, scheduleData, pushUndo, onOpenProjectDetail, dyhaDismissed, onDismissDyha, weeklyGoal, bundleProgress, isWeeklyGoalMet, areAllPartsCompleted, getIncompletePartsInfo }: {
   project: VyrobaProject;
   weekKey: string;
   currentMonday: Date;
@@ -1802,6 +1802,10 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
   dyhaDismissed: boolean;
   onDismissDyha: () => void;
   weeklyGoal: number;
+  bundleProgress: { totalHours: number; completedHours: number; bundleProgress: number };
+  isWeeklyGoalMet: boolean;
+  areAllPartsCompleted: (itemCode: string | null, itemName: string) => boolean;
+  getIncompletePartsInfo: (itemCode: string | null, itemName: string) => { incomplete: number; total: number; weekNums: number[] };
 }) {
   const isMobile = useIsMobile();
   const expectedPct = todayDayIndex >= 0 ? getExpectedPct(todayDayIndex, weeklyGoal) : 0;
