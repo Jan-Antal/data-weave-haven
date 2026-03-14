@@ -2301,7 +2301,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                           <QualityCheckDisplay check={checkMap.get(mids[0])} />
                         </button>
                       ) : (
-                        <button onClick={() => { setSingleQcItem(item); setSingleQcMergedIds(mids); setSingleQcModalOpen(true); }}>
+                        <button onClick={() => { setSingleQcItem(item); setSingleQcMergedIds(mids); setSingleQcModalOpen(true); setDefectItemId(item.id); setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectPhotos([]); }}>
                           <QualityCheckBadgeEmpty />
                         </button>
                       )}
