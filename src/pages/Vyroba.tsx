@@ -598,16 +598,16 @@ export default function Vyroba() {
                     </div>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className="font-mono" style={{ fontSize: 11, color: "#99a5a3" }}>{p.projectId}</span>
-                      {phase && (
-                        <>
-                          <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
-                          <span style={{ fontSize: 11, color: "#6b7280" }}>{phase}</span>
-                        </>
-                      )}
                       {p.deadline && (
                         <>
                           <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
                           <span style={{ fontSize: 11, color: "#6b7280" }}>{fmtDateFull(p.deadline)}</span>
+                        </>
+                      )}
+                      {phase && (
+                        <>
+                          <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
+                          <span style={{ fontSize: 11, color: PHASES.find(ph => ph.name === phase)?.color || "#6b7280", fontWeight: 500 }}>{phase}</span>
                         </>
                       )}
                     </div>
