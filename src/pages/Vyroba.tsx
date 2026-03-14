@@ -1803,9 +1803,6 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
           {selectedItems.size > 0 ? (
             <>
               <span className="text-xs font-semibold" style={{ color: "#2563eb" }}>✓ {selectedItems.size} vybráno</span>
-              <button onClick={() => toast.info("Přesun položek — připravujeme")} className="px-2 py-0.5 rounded text-[11px] font-medium" style={{ color: "#2563eb", border: "1px solid rgba(37,99,235,0.25)" }}>
-                Přesunout
-              </button>
               <button onClick={() => setSelectedItems(new Set())} className="px-2 py-0.5 rounded text-[11px]" style={{ color: "#6b7280", border: "1px solid #e5e2dd" }}>
                 Zrušit výběr
               </button>
