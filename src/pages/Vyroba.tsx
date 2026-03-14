@@ -804,6 +804,36 @@ export default function Vyroba() {
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
+            {/* Undo/Redo arrows */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => undo("vyroba")}
+                  disabled={!canUndo("vyroba")}
+                  className="p-2 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                >
+                  <Undo2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {canUndo("vyroba") ? `Zpět: ${lastUndoDescription("vyroba")}` : "Nic k vrácení"}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => redo("vyroba")}
+                  disabled={!canRedo("vyroba")}
+                  className="p-2 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                >
+                  <Redo2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {canRedo("vyroba") ? `Obnovit: ${lastRedoDescription("vyroba")}` : "Nic k obnovení"}
+              </TooltipContent>
+            </Tooltip>
+
             <span className="w-px h-5 bg-primary-foreground/20 mx-1 hidden md:block" />
 
             <button className="p-2 rounded-md text-primary-foreground bg-primary-foreground/10 transition-colors cursor-default" title="Výroba">
