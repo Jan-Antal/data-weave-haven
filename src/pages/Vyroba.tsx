@@ -634,6 +634,9 @@ export default function Vyroba() {
 
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
     toast.success(`⇒ ${movedCount} položek přesunuto do T${nextWeekNum}`, { duration: 2000 });
+    if (selectedProject) {
+      logActivity({ projectId: selectedProject.projectId, actionType: "item_moved_next_week", newValue: `T${nextWeekNum}`, detail: `${movedCount} položek` });
+    }
     setSpillDialogOpen(false);
   }
 
