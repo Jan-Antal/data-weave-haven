@@ -1256,52 +1256,51 @@ function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectSt
   const nameColor = deadlinePast ? "#dc2626" : deadlineSoon ? "#d97706" : "#1a1a1a";
 
   return (
-    <button
-      onClick={() => onSelect(project.projectId)}
-      onContextMenu={(e) => onContextMenu(e, project.projectId)}
-      className="w-full text-left flex items-stretch transition-colors"
-      style={{
-        background: isSelected ? "#ffffff" : "transparent",
-        borderBottom: "1px solid #f0eeea",
-        outline: isSelected ? "2px solid #d97706" : undefined,
-        outlineOffset: -2,
-      }}
-    >
-      <div className="w-[4px] shrink-0 rounded-r-sm" style={{ background: borderColor }} />
-      <div className="flex-1 px-2.5 py-[5px] min-w-0">
-        <div className="flex items-center justify-between gap-1">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="truncate" style={{ fontSize: 14, fontWeight: 500, color: nameColor }}>{project.projectName}</span>
-            {project.isSpilled && (
-              <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.1)", color: "#D97706" }}>
-                Omeškaní
-              </span>
+    <div className="rounded-lg overflow-hidden mx-1.5 mb-1" style={{
+      backgroundColor: isSelected ? "rgba(217,119,6,0.04)" : "#ffffff",
+      borderTop: isSelected ? "2px solid #d97706" : "1px solid hsl(var(--border))",
+      borderRight: isSelected ? "2px solid #d97706" : "1px solid hsl(var(--border))",
+      borderBottom: isSelected ? "2px solid #d97706" : "1px solid hsl(var(--border))",
+      borderLeft: `4px solid ${borderColor}`,
+      boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
+      transition: "border-color 150ms, box-shadow 150ms",
+    }}>
+      <button
+        onClick={() => onSelect(project.projectId)}
+        onContextMenu={(e) => onContextMenu(e, project.projectId)}
+        className="w-full flex items-center gap-1.5 px-2.5 py-[5px] text-left transition-colors"
+        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
+        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-1">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="truncate" style={{ fontSize: 14, fontWeight: 500, color: nameColor }}>{project.projectName}</span>
+              {project.isSpilled && (
+                <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.1)", color: "#D97706" }}>
+                  Omeškaní
+                </span>
+              )}
+            </div>
+            <span className="font-mono text-xs font-bold shrink-0" style={{ color: statusColors[status] }}>
+              {pct}%
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="font-mono" style={{ fontSize: 11, color: "#6b7280" }}>{project.projectId}</span>
+            {project.deadline && (
+              <span style={{ fontSize: 11, color: "#6b7280" }}>· {fmtDateFull(project.deadline)}</span>
+            )}
+            {phase && (
+              <span style={{ fontSize: 11, color: PHASES.find(ph => ph.name === phase)?.color || "#6b7280", fontWeight: 500 }}>· {phase}</span>
             )}
           </div>
-          <span className="font-mono text-xs font-bold shrink-0" style={{ color: statusColors[status] }}>
-            {pct}%
-          </span>
+          <div className="mt-1.5 h-[3px] rounded-full overflow-hidden" style={{ background: "hsl(var(--border))" }}>
+            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: statusColors[status] }} />
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <span className="font-mono" style={{ fontSize: 11, color: "#99a5a3" }}>{project.projectId}</span>
-          {project.deadline && (
-            <>
-              <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
-              <span style={{ fontSize: 11, color: "#6b7280" }}>{fmtDateFull(project.deadline)}</span>
-            </>
-          )}
-          {phase && (
-            <>
-              <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
-              <span style={{ fontSize: 11, color: PHASES.find(ph => ph.name === phase)?.color || "#6b7280", fontWeight: 500 }}>{phase}</span>
-            </>
-          )}
-        </div>
-        <div className="mt-1.5 h-[3px] rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
-          <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: statusColors[status] }} />
-        </div>
-      </div>
-    </button>
+      </button>
+    </div>
   );
 }
 
