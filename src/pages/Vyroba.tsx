@@ -1720,10 +1720,12 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
 
 
 
-  function toggleSelect(itemId: string) {
+  function toggleSelect(mergedIds: string[]) {
     setSelectedItems(prev => {
       const next = new Set(prev);
-      if (next.has(itemId)) next.delete(itemId); else next.add(itemId);
+      const allIn = mergedIds.every(id => next.has(id));
+      if (allIn) mergedIds.forEach(id => next.delete(id));
+      else mergedIds.forEach(id => next.add(id));
       return next;
     });
   }
