@@ -1004,7 +1004,7 @@ export default function Vyroba() {
                 {PHASES.map(p => (
                   <button key={p.name} onClick={() => {
                     setLogPhase(p.name);
-                    if (!hotovostTouched.current) {
+                    if (!hotovostTouched) {
                       setLogPercent(p.pct);
                     }
                   }}
