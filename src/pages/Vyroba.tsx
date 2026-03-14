@@ -2928,7 +2928,9 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-medium" style={{ color: "#6b7280" }}>{DAY_NAMES[dayIndex]}</span>
         {isToday && (
-          <span className="text-[7px] font-bold px-1 py-[1px] rounded" style={{ background: "rgba(58,138,54,0.15)", color: "#3a8a36" }}>DNES</span>
+          <span className="text-[7px] font-bold px-1 py-[1px] rounded" style={{ background: "rgba(58,138,54,0.15)", color: "#3a8a36" }}>
+            {pct >= weeklyGoal ? "🎉 DNES" : "DNES"}
+          </span>
         )}
       </div>
 
