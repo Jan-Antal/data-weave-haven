@@ -994,8 +994,23 @@ export default function Vyroba() {
               </div>
               {logTab === "notes" ? (
                 <textarea
+                  ref={logNotesTextareaRef}
                   value={logNotes}
-                  onChange={e => setLogNotes(e.target.value)}
+                  onChange={e => {
+                    logNotesUndoStack.current.push(logNotes);
+                    if (logNotesUndoStack.current.length > 50) logNotesUndoStack.current.shift();
+                    setLogNotes(e.target.value);
+                  }}
+                  onKeyDown={e => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (logNotesUndoStack.current.length > 0) {
+                        const prev = logNotesUndoStack.current.pop()!;
+                        setLogNotes(prev);
+                      }
+                    }
+                  }}
                   placeholder="Poznámky k dnešnímu dni..."
                   className="w-full h-20 text-xs rounded-md p-2 resize-none"
                   style={{ border: "1px solid #e5e2dd", background: "#fafaf8" }}
