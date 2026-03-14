@@ -245,6 +245,38 @@ const Index = () => {
             <span className="text-primary-foreground/70 text-sm font-sans">Project Info 2026</span>
           </div>
           <div className="flex items-center gap-1">
+            {/* Undo/Redo arrows */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => undo()}
+                  disabled={!canUndo()}
+                  className="p-2 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                >
+                  <Undo2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {canUndo() ? `Zpět: ${lastUndoDescription()}` : "Nic k vrácení"}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => redo()}
+                  disabled={!canRedo()}
+                  className="p-2 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                >
+                  <Redo2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {canRedo() ? `Obnovit: ${lastRedoDescription()}` : "Nic k obnovení"}
+              </TooltipContent>
+            </Tooltip>
+
+            <span className="w-px h-5 bg-primary-foreground/20 mx-1" />
+
             <button
               onClick={() => navigate("/vyroba")}
               className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
