@@ -2143,12 +2143,15 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
             <Button
               style={{ background: "#3a8a36" }}
               onClick={async () => {
-                if (singleQcItem) {
-                  await checkItem(singleQcItem.id);
+                if (singleQcItem && singleQcMergedIds.length > 0) {
+                  for (const id of singleQcMergedIds) {
+                    if (!checkMap.has(id)) await checkItem(id);
+                  }
                   toast.success(`QC potvrzeno — ${singleQcItem.item_code || singleQcItem.item_name}`);
                 }
                 setSingleQcModalOpen(false);
                 setSingleQcItem(null);
+                setSingleQcMergedIds([]);
               }}
             >
               Potvrdit QC — {qcUserFirstName}
