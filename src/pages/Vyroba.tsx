@@ -1680,6 +1680,10 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
       // All have QC — mark as hotovo directly
       (async () => {
         const ids = targetItems.map(({ item }) => item.id);
+        // Push undo for each item
+        for (const { item } of targetItems) {
+          pushUndo({ type: "item_hotovo", itemId: item.id, prevStatus: item.status, timestamp: Date.now() });
+        }
         const { data: { user } } = await supabase.auth.getUser();
         await supabase.from("production_schedule").update({
           status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
