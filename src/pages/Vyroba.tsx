@@ -2132,6 +2132,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    console.log('[Vyroba Foto] uploading to project:', projectId);
     for (const file of Array.from(files)) {
       const now = new Date();
       const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -2143,7 +2144,8 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
         await uploadFile("fotky", renamedFile);
         toast.success(`✓ ${autoName} nahráno`);
       } catch (err: any) {
-        toast.error(err.message || "Upload selhal");
+        console.error('[Vyroba Foto] upload error:', err);
+        toast.error(`Upload selhal: ${err?.message || "neznámá chyba"}`);
       }
     }
     listFiles("fotky", true);
