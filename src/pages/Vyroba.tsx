@@ -1148,14 +1148,16 @@ export default function Vyroba() {
       <div className="flex-1 min-w-0 flex min-h-0">
         {/* ═══ LEFT PANEL ═══ */}
         <div className={`shrink-0 flex flex-col overflow-y-auto ${isMobile ? "w-full" : "w-[252px]"}`} style={{ borderRight: isMobile ? "none" : "1px solid #e5e2dd", background: "#ffffff" }}>
-          {/* Capacity bar */}
-          <div className="px-3 py-2 flex items-center gap-2" style={{ borderBottom: "1px solid #f0eeea", background: "#fafaf8" }}>
-            <span className="text-[10px] font-mono font-semibold" style={{ color: "#6b7280" }}>T{weekNum}</span>
-            <div className="flex-1 h-[6px] rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(capacityPct, 100)}%`, background: capacityColor }} />
+          {/* Capacity bar — hidden on mobile */}
+          {!isMobile && (
+            <div className="px-3 py-2 flex items-center gap-2" style={{ borderBottom: "1px solid #f0eeea", background: "#fafaf8" }}>
+              <span className="text-[10px] font-mono font-semibold" style={{ color: "#6b7280" }}>T{weekNum}</span>
+              <div className="flex-1 h-[6px] rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
+                <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(capacityPct, 100)}%`, background: capacityColor }} />
+              </div>
+              <span className="text-[10px] font-mono" style={{ color: capacityColor }}>{weekCapacity.used}h/{weekCapacity.total}h · {capacityPct}%</span>
             </div>
-            <span className="text-[10px] font-mono" style={{ color: capacityColor }}>{weekCapacity.used}h/{weekCapacity.total}h · {capacityPct}%</span>
-          </div>
+          )}
 
           <div className="px-3 py-1.5 text-[10px] uppercase font-semibold" style={{ color: "#6b7280", borderBottom: "1px solid #f0eeea" }}>
             Projekty v T{weekNum} ({enrichedProjects.filter(p => !p.isPaused).length})
