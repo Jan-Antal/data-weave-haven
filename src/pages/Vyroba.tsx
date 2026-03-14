@@ -1304,7 +1304,7 @@ function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectSt
       borderTop: isSelected ? "2px solid #d97706" : "1px solid hsl(var(--border))",
       borderRight: isSelected ? "2px solid #d97706" : "1px solid hsl(var(--border))",
       borderBottom: isSelected ? "2px solid #d97706" : "1px solid hsl(var(--border))",
-      borderLeft: `4px solid ${borderColor}`,
+      borderLeft: isSelected ? "4px solid #d97706" : `4px solid ${borderColor}`,
       boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
       transition: "border-color 150ms, box-shadow 150ms",
     }}>
