@@ -1610,7 +1610,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
                     color: isCurrent ? "#3a8a36" : phasePctDone ? "#3a8a36" : "#6b7280",
                     border: isCurrent ? `1.5px solid #3a8a36` : `1px solid ${phasePctDone ? "rgba(58,138,54,0.3)" : "#e5e2dd"}`,
                   }}>
-                  {phasePctDone && !isCurrent ? "✓ " : ""}{p.name} <span className="text-[9px] opacity-60">{p.pct}%</span>
+                  {phasePctDone && !isCurrent ? "✓ " : ""}{p.name}
                 </span>
               );
             })}
