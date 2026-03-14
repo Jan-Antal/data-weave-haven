@@ -2077,13 +2077,13 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
         {/* ── Phases (read-only display) ── */}
         <div>
           <div className="text-[10px] uppercase font-semibold mb-2" style={{ color: "#99a5a3" }}>Operace</div>
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className={`flex items-center gap-1.5 ${isMobile ? "overflow-x-auto flex-nowrap pb-1" : "flex-wrap"}`}>
             {PHASES.map(p => {
               const isCurrent = latestPhase === p.name;
               const phasePctDone = latestPct >= p.pct;
               return (
                 <span key={p.name}
-                  className="px-2.5 py-1 rounded-full text-xs font-medium cursor-default pointer-events-none select-none"
+                  className="px-2.5 py-1 rounded-full text-xs font-medium cursor-default pointer-events-none select-none whitespace-nowrap shrink-0"
                   style={{
                     background: isCurrent ? `${p.color}15` : "#f5f3f0",
                     color: isCurrent ? "#3a8a36" : phasePctDone ? "#3a8a36" : "#6b7280",
@@ -2093,14 +2093,18 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
                 </span>
               );
             })}
-            <div className="flex-1" />
-            <button
-              onClick={onSpillAll}
-              className={`px-3 py-1 text-[11px] font-semibold rounded transition-colors ${isMobile ? "min-h-[44px]" : ""}`}
-              style={{ background: "#d97706", color: "#fff" }}
-            >
-              ⇒ Přesunout do T{nextWeekNum}
-            </button>
+            {!isMobile && (
+              <>
+                <div className="flex-1" />
+                <button
+                  onClick={onSpillAll}
+                  className="px-3 py-1 text-[11px] font-semibold rounded transition-colors"
+                  style={{ background: "#d97706", color: "#fff" }}
+                >
+                  ⇒ Přesunout do T{nextWeekNum}
+                </button>
+              </>
+            )}
           </div>
         </div>
 
