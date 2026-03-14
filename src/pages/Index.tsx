@@ -82,7 +82,7 @@ const Index = () => {
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [mobileTPVProject, setMobileTPVProject] = useState<any>(null);
   const scrollPositions = useRef<Record<string, number>>({});
-  const { setCurrentPage } = useUndoRedo();
+  const { setCurrentPage, undo, redo, canUndo, canRedo, lastUndoDescription, lastRedoDescription } = useUndoRedo();
 
   // Set undo page context based on active tab/view
   useEffect(() => {
