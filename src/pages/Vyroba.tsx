@@ -1544,6 +1544,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           bundleId={bundleId}
           onOpenExpedice={onOpenExpedice}
           isMobile={isMobile}
+          pushUndo={pushUndo}
         />
 
         {/* ── NAPLÁNOVANÉ (future) — collapsible ── */}
