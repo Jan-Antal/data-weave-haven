@@ -2097,3 +2097,89 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
     </div>
   );
 }
+
+/* ═══════════════════════════════════════ */
+/* WEEK PICKER POPUP                       */
+/* ═══════════════════════════════════════ */
+
+function WeekPickerPopup({ currentWeekOffset, onSelectOffset, onClose, containerRef }: {
+  currentWeekOffset: number;
+  onSelectOffset: (offset: number) => void;
+  onClose: () => void;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  // Close on Escape or click outside
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    function handleClick(e: MouseEvent) {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node) &&
+          containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    }
+    document.addEventListener("keydown", handleKey);
+    document.addEventListener("mousedown", handleClick);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("mousedown", handleClick);
+    };
+  }, [onClose, containerRef]);
+
+  // Generate weeks: -4 to +12 from today
+  const weeks = useMemo(() => {
+    const todayMonday = getMonday(new Date());
+    const result: { offset: number; monday: Date; friday: Date; weekNum: number; isCurrent: boolean; isToday: boolean }[] = [];
+    for (let i = -4; i <= 12; i++) {
+      const monday = addWeeks(todayMonday, i);
+      const fri = new Date(monday);
+      fri.setDate(fri.getDate() + 4);
+      result.push({
+        offset: i,
+        monday,
+        friday: fri,
+        weekNum: getISOWeekNumber(monday),
+        isCurrent: i === currentWeekOffset,
+        isToday: i === 0,
+      });
+    }
+    return result;
+  }, [currentWeekOffset]);
+
+  return (
+    <div ref={popupRef}
+      className="absolute top-full right-0 mt-1 z-50 rounded-lg shadow-lg py-1 overflow-y-auto"
+      style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", maxHeight: 320, width: 240 }}
+    >
+      {weeks.map(w => (
+        <button
+          key={w.offset}
+          onClick={() => onSelectOffset(w.offset)}
+          className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-muted/60"
+          style={{
+            background: w.isCurrent ? "hsl(var(--accent) / 0.1)" : w.isToday ? "hsl(var(--success) / 0.06)" : undefined,
+            borderLeft: w.isCurrent ? "3px solid hsl(var(--accent))" : w.isToday ? "3px solid hsl(var(--success))" : "3px solid transparent",
+          }}
+        >
+          <span className="font-mono text-[11px] font-bold min-w-[28px]" style={{
+            color: w.isCurrent ? "hsl(var(--accent))" : w.isToday ? "hsl(var(--success))" : "hsl(var(--muted-foreground))"
+          }}>
+            T{w.weekNum}
+          </span>
+          <span className="text-[11px]" style={{ color: "hsl(var(--foreground))" }}>
+            {fmtDate(w.monday)}–{fmtDate(w.friday)}{w.monday.getFullYear()}
+          </span>
+          {w.isToday && !w.isCurrent && (
+            <span className="text-[8px] font-bold px-1 py-[1px] rounded ml-auto" style={{ background: "hsl(var(--success) / 0.12)", color: "hsl(var(--success))" }}>dnes</span>
+          )}
+          {w.isCurrent && (
+            <Check className="h-3 w-3 ml-auto" style={{ color: "hsl(var(--accent))" }} />
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
