@@ -1384,10 +1384,9 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
             <div className="text-xs mt-0.5 flex items-center gap-2" style={{ color: "#6b7280" }}>
               {totalActiveItems} položek
               {project.deadline && <> · Expedice {fmtDateFull(project.deadline)}</>}
-              {project.pm && pmInitials && (
+              {project.pm && (
                 <span className="inline-flex items-center gap-1">
-                  · <span className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white" style={{ background: project.color }}>{pmInitials}</span>
-                  <span>{project.pm}</span>
+                  · <span>{project.pm}</span>
                 </span>
               )}
             </div>
