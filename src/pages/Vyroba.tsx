@@ -1996,7 +1996,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                       </span>
                       {isSplit && (
                         <span className="text-[9px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(217,119,6,0.1)", color: "#d97706" }}>
-                          část {item.split_part}/{item.split_total}
+                          část {partsThisWeek}/{splitBadgeY}
                         </span>
                       )}
                       {isPaused && (
