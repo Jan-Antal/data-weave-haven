@@ -2328,6 +2328,125 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   );
 }
 
+/* ═══ QC Warning Box ═══ */
+function QcWarningBox() {
+  return (
+    <div className="rounded-md px-3 py-3 text-[13px] space-y-2" style={{ background: "#fef3c7", border: "1px solid #f59e0b", color: "#92400e" }}>
+      <div className="font-semibold">Pred odoslaním do Expedície skontrolujte:</div>
+      <div>
+        <div className="font-bold mt-1">Materiálová kvalita</div>
+        <ul className="list-disc ml-4 space-y-0.5">
+          <li>Dýha — vizuálna kontrola povrchu, hrany</li>
+          <li>Lak — rovnomernosť, zhoda so vzorkou, bez škvŕn, lesk</li>
+          <li>Škrabance a drobné poškodenie</li>
+        </ul>
+      </div>
+      <div>
+        <div className="font-bold mt-1">Kvalita výroby</div>
+        <ul className="list-disc ml-4 space-y-0.5">
+          <li>Presnosť osadenia — nič nepresahuje, nič nie je krivé</li>
+          <li>Funkčnosť — zásuvky, výsuvy, závesy, kovanie</li>
+        </ul>
+      </div>
+      <div>
+        <div className="font-bold mt-1">Kvalita expedície</div>
+        <ul className="list-disc ml-4 space-y-0.5">
+          <li>Kompletnosť — všetky diely sú priložené</li>
+          <li>Balenie — ochrana hrán, bez rizika poškodenia</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ QC Defect Form ═══ */
+const DEFECT_TYPES = ["Škrabanec", "Nerovnosť laku", "Poškodenie dýhy", "Chýbajúci diel", "Funkčná vada", "Iné"];
+
+function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, defectDesc, setDefectDesc, defectSeverity, setDefectSeverity, defectResolution, setDefectResolution, defectAssignee, setDefectAssignee, allPeople, onSave }: {
+  defectOpen: boolean; setDefectOpen: (v: boolean) => void;
+  defectType: string; setDefectType: (v: string) => void;
+  defectDesc: string; setDefectDesc: (v: string) => void;
+  defectSeverity: "minor" | "blocking"; setDefectSeverity: (v: "minor" | "blocking") => void;
+  defectResolution: string; setDefectResolution: (v: string) => void;
+  defectAssignee: string; setDefectAssignee: (v: string) => void;
+  allPeople: { id: string; name: string; role: string }[];
+  onSave: () => Promise<void>;
+}) {
+  const canSave = defectType && defectDesc && (defectSeverity === "minor" || defectResolution);
+
+  return (
+    <Collapsible open={defectOpen} onOpenChange={setDefectOpen}>
+      <CollapsibleTrigger className="flex items-center gap-1 text-[13px] font-medium cursor-pointer" style={{ color: "#d97706" }}>
+        <Plus className="h-3.5 w-3.5" />
+        Zaznamenať vadu
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-2 space-y-3 rounded-md p-3" style={{ border: "1px solid #e5e2dd", background: "#fafaf8" }}>
+          {/* Type */}
+          <div>
+            <Label className="text-[11px] font-semibold mb-1 block">Typ vady *</Label>
+            <Select value={defectType} onValueChange={setDefectType}>
+              <SelectTrigger className="h-8 text-[12px]"><SelectValue placeholder="Vyberte typ..." /></SelectTrigger>
+              <SelectContent>
+                {DEFECT_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          {/* Description */}
+          <div>
+            <Label className="text-[11px] font-semibold mb-1 block">Popis *</Label>
+            <Textarea value={defectDesc} onChange={e => setDefectDesc(e.target.value)} className="min-h-[60px] text-[12px]" placeholder="Popíšte vadu..." />
+          </div>
+          {/* Severity */}
+          <div>
+            <Label className="text-[11px] font-semibold mb-1 block">Závažnosť *</Label>
+            <RadioGroup value={defectSeverity} onValueChange={(v) => setDefectSeverity(v as "minor" | "blocking")} className="space-y-1">
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="minor" id="sev-minor" />
+                <Label htmlFor="sev-minor" className="text-[12px] font-normal cursor-pointer">🟡 Malá — možno expedovať</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="blocking" id="sev-blocking" />
+                <Label htmlFor="sev-blocking" className="text-[12px] font-normal cursor-pointer">🔴 Vyžaduje opravu pred expedíciou</Label>
+              </div>
+            </RadioGroup>
+          </div>
+          {/* Resolution (only for blocking) */}
+          {defectSeverity === "blocking" && (
+            <div>
+              <Label className="text-[11px] font-semibold mb-1 block">Riešenie *</Label>
+              <RadioGroup value={defectResolution} onValueChange={setDefectResolution} className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="repair" id="res-repair" />
+                  <Label htmlFor="res-repair" className="text-[12px] font-normal cursor-pointer">🔨 Opraviť existujúci kus</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="new" id="res-new" />
+                  <Label htmlFor="res-new" className="text-[12px] font-normal cursor-pointer">🆕 Vyrobiť nový kus</Label>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
+          {/* Assignee */}
+          <div>
+            <Label className="text-[11px] font-semibold mb-1 block">Priradená osoba</Label>
+            <Select value={defectAssignee} onValueChange={setDefectAssignee}>
+              <SelectTrigger className="h-8 text-[12px]"><SelectValue placeholder="Vybrať osobu..." /></SelectTrigger>
+              <SelectContent>
+                {[...new Set(allPeople.map(p => p.name))].sort().map(n => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          {/* Save */}
+          <Button size="sm" disabled={!canSave} onClick={onSave} className="w-full" style={{ background: canSave ? "#d97706" : undefined }}>
+            Uložiť vadu
+          </Button>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 function QualityCheckDisplay({ check }: { check: any }) {
   const name = useProfileName(check.checked_by);
   const firstName = name ? name.split(" ")[0].slice(0, 8) : "–";
