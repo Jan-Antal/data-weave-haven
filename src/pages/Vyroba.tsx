@@ -2510,6 +2510,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   reported_by: user?.id || "",
                 });
                 
+                logActivity({ projectId, actionType: "defect_reported", newValue: defectType, detail: `${selectedItem?.item_code || "bundle"} — ${defectSeverity}` });
                 setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectItemId("__bundle__"); setDefectPhotos([]); setDefectOpen(false);
               }}
             />
