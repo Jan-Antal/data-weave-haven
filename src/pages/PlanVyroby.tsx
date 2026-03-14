@@ -726,8 +726,14 @@ export default function PlanVyroby() {
             })()}
             onCommitSelected={async () => {
               if (forecast.selectedBlockIds.size === 0) return;
+              const blockCount = forecast.selectedBlockIds.size;
               await forecast.commitRealBundleOverrides(moveBundleToWeek);
               await forecast.commitBlocks(Array.from(forecast.selectedBlockIds));
+              // Log forecast commit
+              try {
+                const { logActivity } = await import("@/lib/activityLog");
+                logActivity({ projectId: "_system_", actionType: "forecast_committed", detail: `${blockCount} bloků zapsáno` });
+              } catch {}
             }}
             onCancel={() => forecast.setForecastActive(false)}
             onToggleInboxSelect={forecast.toggleInboxSelection}

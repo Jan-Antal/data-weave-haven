@@ -54,6 +54,20 @@ const DOT_COLORS: Record<string, string> = {
   item_cancelled: "bg-red-600",
   item_returned_to_inbox: "bg-slate-500",
   item_split: "bg-violet-500",
+  pm_change: "bg-purple-500",
+  kalkulant_change: "bg-purple-400",
+  prodejni_cena_change: "bg-emerald-500",
+  forecast_committed: "bg-sky-600",
+  item_hotovo: "bg-green-500",
+  item_qc_confirmed: "bg-green-600",
+  item_expedice: "bg-teal-500",
+  item_moved_next_week: "bg-indigo-400",
+  item_paused_vyroba: "bg-yellow-500",
+  vyroba_log_saved: "bg-blue-400",
+  vyroba_no_activity: "bg-gray-400",
+  defect_reported: "bg-red-500",
+  defect_resolved: "bg-green-500",
+  phase_changed: "bg-violet-500",
 };
 
 const CZECH_DAY_SHORT = ["Ne", "Po", "Út", "St", "Čt", "Pá", "So"];
@@ -307,6 +321,87 @@ function ActivityItem({
       );
       break;
     }
+    case "pm_change":
+      mainText = <>✏️ <span className="font-medium">{userName}</span> změnil/a PM {projectLabel}</>;
+      subContent = (
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <span className="text-[11px] line-through px-1.5 py-0.5 rounded" style={{ background: '#fee2e2', color: '#991b1b' }}>{entry.old_value || "—"}</span>
+          <span className="text-[10px]" style={{ color: '#9ca3af' }}>→</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: '#d1fae5', color: '#065f46' }}>{entry.new_value || "—"}</span>
+        </div>
+      );
+      break;
+    case "kalkulant_change":
+      mainText = <>✏️ <span className="font-medium">{userName}</span> změnil/a kalkulanta {projectLabel}</>;
+      subContent = (
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <span className="text-[11px] line-through px-1.5 py-0.5 rounded" style={{ background: '#fee2e2', color: '#991b1b' }}>{entry.old_value || "—"}</span>
+          <span className="text-[10px]" style={{ color: '#9ca3af' }}>→</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: '#d1fae5', color: '#065f46' }}>{entry.new_value || "—"}</span>
+        </div>
+      );
+      break;
+    case "prodejni_cena_change":
+      mainText = <>💰 <span className="font-medium">{userName}</span> změnil/a prodejní cenu {projectLabel}</>;
+      subContent = (
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <span className="text-[11px] line-through px-1.5 py-0.5 rounded" style={{ background: '#fee2e2', color: '#991b1b' }}>{entry.old_value || "—"}</span>
+          <span className="text-[10px]" style={{ color: '#9ca3af' }}>→</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: '#d1fae5', color: '#065f46' }}>{entry.new_value || "—"}</span>
+        </div>
+      );
+      break;
+    case "forecast_committed":
+      mainText = <>📊 <span className="font-medium">{userName}</span> zapsal forecast {projectLabel}</>;
+      subContent = entry.detail ? <div className="text-[11px] mt-0.5 text-muted-foreground">{entry.detail}</div> : null;
+      break;
+    case "item_hotovo":
+      mainText = <>✅ <span className="font-medium">{userName}</span> dokončil/a položku {projectLabel}</>;
+      subContent = entry.new_value ? <div className="text-[11px] mt-0.5 text-muted-foreground">{entry.new_value}{entry.detail ? ` — ${entry.detail}` : ""}</div> : null;
+      break;
+    case "item_qc_confirmed":
+      mainText = <>🛡 <span className="font-medium">{userName}</span> potvrdil/a QC {projectLabel}</>;
+      subContent = entry.new_value ? <div className="text-[11px] mt-0.5 text-muted-foreground">{entry.new_value}</div> : null;
+      break;
+    case "item_expedice":
+      mainText = <>📦 <span className="font-medium">{userName}</span> odeslal/a do Expedice {projectLabel}</>;
+      subContent = entry.detail ? <div className="text-[11px] mt-0.5 text-muted-foreground">{entry.detail}</div> : null;
+      break;
+    case "item_moved_next_week":
+      mainText = <>⇒ <span className="font-medium">{userName}</span> přesunul/a do příštího týdne {projectLabel}</>;
+      subContent = <div className="text-[11px] mt-0.5 text-muted-foreground">{entry.new_value}{entry.detail ? ` — ${entry.detail}` : ""}</div>;
+      break;
+    case "item_paused_vyroba":
+      mainText = <>⏸ <span className="font-medium">{userName}</span> pozastavil/a projekt {projectLabel}</>;
+      subContent = entry.new_value ? <div className="text-[11px] mt-0.5 text-muted-foreground">{entry.new_value}</div> : null;
+      break;
+    case "vyroba_log_saved":
+      mainText = <>📝 <span className="font-medium">{userName}</span> uložil/a denní log {projectLabel}</>;
+      subContent = <div className="text-[11px] mt-0.5 text-muted-foreground">{entry.new_value}{entry.detail ? ` — ${entry.detail}` : ""}</div>;
+      break;
+    case "vyroba_no_activity":
+      mainText = <>⬜ <span className="font-medium">{userName}</span> — žádná aktivita {projectLabel}</>;
+      subContent = entry.detail ? <div className="text-[11px] mt-0.5 text-muted-foreground">{entry.detail}</div> : null;
+      break;
+    case "defect_reported":
+      mainText = <>🐛 <span className="font-medium">{userName}</span> zaznamenaná vada {projectLabel}</>;
+      subContent = <div className="text-[11px] mt-0.5 text-muted-foreground">{entry.new_value}{entry.detail ? ` — ${entry.detail}` : ""}</div>;
+      break;
+    case "defect_resolved":
+      mainText = <>✅ <span className="font-medium">{userName}</span> opravil/a vadu {projectLabel}</>;
+      subContent = <div className="text-[11px] mt-0.5 text-muted-foreground">{entry.new_value}{entry.detail ? ` — ${entry.detail}` : ""}</div>;
+      break;
+    case "phase_changed":
+      mainText = <>🔄 <span className="font-medium">{userName}</span> změnil/a fázi výroby {projectLabel}</>;
+      subContent = (
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <span className="text-[11px] line-through px-1.5 py-0.5 rounded" style={{ background: '#fee2e2', color: '#991b1b' }}>{entry.old_value || "—"}</span>
+          <span className="text-[10px]" style={{ color: '#9ca3af' }}>→</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: '#d1fae5', color: '#065f46' }}>{entry.new_value || "—"}</span>
+          {entry.detail && <span className="text-[10px] text-muted-foreground">· {entry.detail}</span>}
+        </div>
+      );
+      break;
     default:
       mainText = <><span className="font-medium">{userName}</span> — {entry.action_type} {projectLabel}</>;
   }

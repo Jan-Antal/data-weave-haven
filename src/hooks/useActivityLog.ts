@@ -27,12 +27,12 @@ interface Filters {
 
 function getActionTypes(category: Filters["category"]): string[] | null {
   switch (category) {
-    case "status": return ["status_change", "konstrukter_change", "stage_status_change", "stage_konstrukter_change"];
+    case "status": return ["status_change", "konstrukter_change", "stage_status_change", "stage_konstrukter_change", "pm_change", "kalkulant_change"];
     case "terminy": return ["datum_smluvni_change", "stage_datum_smluvni_change"];
     case "documents": return ["document_uploaded", "document_deleted", "stage_document_uploaded", "stage_document_deleted"];
-    case "projects": return ["project_created", "project_deleted", "project_restored", "stage_created", "stage_deleted"];
+    case "projects": return ["project_created", "project_deleted", "project_restored", "stage_created", "stage_deleted", "prodejni_cena_change", "forecast_committed"];
     case "users": return ["user_login", "session_end"];
-    case "vyroba": return ["item_scheduled", "item_moved", "item_completed", "item_paused", "item_cancelled", "item_returned_to_inbox", "item_split"];
+    case "vyroba": return ["item_scheduled", "item_moved", "item_completed", "item_paused", "item_cancelled", "item_returned_to_inbox", "item_split", "item_hotovo", "item_qc_confirmed", "item_expedice", "item_moved_next_week", "item_paused_vyroba", "vyroba_log_saved", "vyroba_no_activity", "defect_reported", "defect_resolved", "phase_changed"];
     default: return null;
   }
 }

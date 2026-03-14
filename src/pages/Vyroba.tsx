@@ -47,6 +47,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQualityDefects, type QualityDefect } from "@/hooks/useQualityDefects";
+import { logActivity } from "@/lib/activityLog";
 
 /* ═══ helpers ═══ */
 function getMonday(d: Date): Date {
@@ -543,6 +544,15 @@ export default function Vyroba() {
         }
       }
       
+      // Log vyroba_log_saved
+      logActivity({ projectId: selectedProject.projectId, actionType: "vyroba_log_saved", newValue: `${logPercent}%`, detail: logPhase || "" });
+
+      // Log phase_changed if phase changed
+      const prevPhaseVal = getLatestPhase(selectedProject.projectId) || "Řezání";
+      if (logPhase !== prevPhaseVal) {
+        logActivity({ projectId: selectedProject.projectId, actionType: "phase_changed", oldValue: prevPhaseVal, newValue: logPhase, detail: `${logPercent}%` });
+      }
+
       setLogModalOpen(false);
     } catch (err: any) {
       toast.error(`Chyba při ukládání logu: ${err?.message || "neznámá chyba"}`);
@@ -624,6 +634,9 @@ export default function Vyroba() {
 
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
     toast.success(`⇒ ${movedCount} položek přesunuto do T${nextWeekNum}`, { duration: 2000 });
+    if (selectedProject) {
+      logActivity({ projectId: selectedProject.projectId, actionType: "item_moved_next_week", newValue: `T${nextWeekNum}`, detail: `${movedCount} položek` });
+    }
     setSpillDialogOpen(false);
   }
 
@@ -678,6 +691,7 @@ export default function Vyroba() {
     qc.invalidateQueries({ queryKey: ["projects"] });
     qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
     toast.success(`✓ ${pName} odoslaný do Expedice`, { duration: 4000 });
+    logActivity({ projectId: pid, actionType: "item_expedice", detail: "Odesláno do Expedice" });
     setExpediceDialogOpen(false);
   }
 
@@ -716,6 +730,11 @@ export default function Vyroba() {
       }).eq("id", itemId);
     }
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
+    // Log item hotovo
+    if (newStatus === "completed" && selectedProject) {
+      const item = selectedProject.scheduleItems.find(i => i.id === itemId);
+      logActivity({ projectId: selectedProject.projectId, actionType: "item_hotovo", newValue: item?.item_code || item?.item_name || itemId, detail: "Označeno jako hotovo" });
+    }
   }
 
 
@@ -804,6 +823,7 @@ export default function Vyroba() {
       });
       await saveDailyLog(bId, weekKey, logDayIndex, `Bez výroby: ${noProductionReason}`, capturedPct);
       qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
+      logActivity({ projectId: selectedProject.projectId, actionType: "vyroba_no_activity", detail: noProductionReason });
       setNoProductionOpen(false);
       setLogModalOpen(false);
     } catch {
@@ -2196,6 +2216,8 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
       }
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["quality-checks", projectId] });
+      const qcItemCodes = qcModalItems.filter(({ item }) => !checkMap.has(item.id)).map(({ item }) => item.item_code || item.item_name);
+      logActivity({ projectId, actionType: "item_qc_confirmed", newValue: qcItemCodes.join(", "), detail: profile?.full_name || profile?.email || "" });
       setSelectedItems(new Set());
       setQcModalOpen(false);
       // Check if ALL items are now completed
@@ -2323,7 +2345,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                                         onClick={async () => {
                                           const { data: { user } } = await supabase.auth.getUser();
                                           resolveDefect.mutate({ defectId: d.id, userId: user?.id || "" });
-                                          
+                                          logActivity({ projectId, actionType: "defect_resolved", newValue: d.defect_type, detail: d.item_code || "" });
                                         }}>Označiť ako opravenú</button>
                                     </div>
                                   ))}
@@ -2347,7 +2369,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                                         onClick={async () => {
                                           const { data: { user } } = await supabase.auth.getUser();
                                           resolveDefect.mutate({ defectId: d.id, userId: user?.id || "" });
-                                          
+                                          logActivity({ projectId, actionType: "defect_resolved", newValue: d.defect_type, detail: d.item_code || "" });
                                         }}>Označiť ako opravenú</button>
                                     </div>
                                   ))}
@@ -2419,7 +2441,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   onClick={async () => {
                     const { data: { user } } = await supabase.auth.getUser();
                     resolveDefect.mutate({ defectId: d.id, userId: user?.id || "" });
-                    
+                    logActivity({ projectId, actionType: "defect_resolved", newValue: d.defect_type, detail: d.item_code || "" });
                   }}>Označiť ako opravenú</button>
               </div>
             ))}
@@ -2488,6 +2510,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   reported_by: user?.id || "",
                 });
                 
+                logActivity({ projectId, actionType: "defect_reported", newValue: defectType, detail: `${selectedItem?.item_code || "bundle"} — ${defectSeverity}` });
                 setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectItemId("__bundle__"); setDefectPhotos([]); setDefectOpen(false);
               }}
             />
@@ -2556,6 +2579,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   reported_by: user?.id || "",
                 });
                 
+                logActivity({ projectId, actionType: "defect_reported", newValue: defectType, detail: `${selectedItem?.item_code || singleQcItem.item_code || "item"} — ${defectSeverity}` });
                 setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectItemId("__bundle__"); setDefectPhotos([]); setDefectOpen(false);
               }}
               singleItemMode
