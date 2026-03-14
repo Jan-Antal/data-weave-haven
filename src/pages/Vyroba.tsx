@@ -332,6 +332,7 @@ export default function Vyroba() {
   const [logTab, setLogTab] = useState<"notes" | "photo">("notes");
   const [logNotes, setLogNotes] = useState("");
   const logNotesUndoStack = useRef<string[]>([]);
+  const [logPhaseWarning, setLogPhaseWarning] = useState<string | null>(null);
   const [noProductionOpen, setNoProductionOpen] = useState(false);
   const [noProductionReason, setNoProductionReason] = useState("dovolenka");
 
@@ -424,9 +425,12 @@ export default function Vyroba() {
     const di = dayIdx ?? todayDayIndex;
     setLogDayIndex(di);
     const latestPhase = getLatestPhase(selectedProject.projectId);
-    setLogPhase(latestPhase || "Řezání");
-    setLogPercent(getLatestPercent(selectedProject.projectId));
+    const phaseName = latestPhase || "Řezání";
+    setLogPhase(phaseName);
+    const phasePct = PHASES.find(p => p.name === phaseName)?.pct || 0;
+    setLogPercent(Math.max(phasePct, getLatestPercent(selectedProject.projectId)));
     setLogTab("notes");
+    setLogPhaseWarning(null);
     logNotesUndoStack.current = [];
 
     // Load existing note for this day
@@ -511,26 +515,8 @@ export default function Vyroba() {
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
   }
 
-  /* ── Phase change ── */
-  async function handlePhaseChange(phaseName: string) {
-    if (!selectedProject) return;
-    const phase = PHASES.find(p => p.name === phaseName);
-    if (!phase) return;
-    const currentPct = getLatestPercent(selectedProject.projectId);
-    if (phase.pct <= currentPct) {
-      toast.error("Nelze přejít na nižší fázi — výroba jde jen dopředu");
-      return;
-    }
-    // Save log with new phase and its pct
-    const di = todayDayIndex >= 0 ? todayDayIndex : 0;
-    try {
-      await saveDailyLog(bundleId(selectedProject.projectId), weekKey, di, phaseName, phase.pct);
-      qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
-      toast.success(`Fáze: ${phaseName} (${phase.pct}%)`);
-    } catch {
-      toast.error("Chyba při změně fáze");
-    }
-  }
+
+
 
   /* ── Return from Expedice ── */
   async function handleReturnFromExpedice(pid: string) {
@@ -887,7 +873,8 @@ export default function Vyroba() {
                 bundleId={bundleId(selectedProject.projectId)}
                 allItems={getAllItemsForProject(selectedProject.projectId)}
                 scheduleData={scheduleData}
-                onPhaseChange={handlePhaseChange}
+
+
                 onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
                 dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
                 onDismissDyha={() => setDyhaDismissed(prev => new Set(prev).add(selectedProject.projectId))}
@@ -926,7 +913,7 @@ export default function Vyroba() {
                 bundleId={bundleId(selectedProject.projectId)}
                 allItems={getAllItemsForProject(selectedProject.projectId)}
                 scheduleData={scheduleData}
-                onPhaseChange={handlePhaseChange}
+                
                 onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
                 dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
                 onDismissDyha={() => setDyhaDismissed(prev => new Set(prev).add(selectedProject.projectId))}
@@ -951,21 +938,41 @@ export default function Vyroba() {
           <div className="space-y-5 py-2">
             <div>
               <div className="text-xs font-semibold mb-2" style={{ color: "#6b7280" }}>
-                {logDayIndex >= 0 ? DAY_NAMES[logDayIndex] : "Dnes"} — Fáze
+                {logDayIndex >= 0 ? DAY_NAMES[logDayIndex] : "Dnes"} — Operace
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {PHASES.map(p => (
-                  <button key={p.name} onClick={() => setLogPhase(p.name)}
-                    className="px-2.5 py-1 rounded-full text-xs font-medium transition-all"
-                    style={{
-                      background: logPhase === p.name ? p.color : "#f5f3f0",
-                      color: logPhase === p.name ? "#fff" : "#1a1a1a",
-                      border: `1px solid ${logPhase === p.name ? p.color : "#e5e2dd"}`,
-                    }}>
-                    {p.name}
-                  </button>
-                ))}
+                {PHASES.map(p => {
+                  const currentPhasePct = PHASES.find(ph => ph.name === logPhase)?.pct || 0;
+                  const isLower = p.pct < currentPhasePct;
+                  return (
+                    <button key={p.name} onClick={() => {
+                      if (isLower) {
+                        setLogPhaseWarning("Nelze přejít na nižší fázi");
+                        setTimeout(() => setLogPhaseWarning(null), 2500);
+                        return;
+                      }
+                      setLogPhase(p.name);
+                      setLogPercent(p.pct);
+                      setLogPhaseWarning(null);
+                    }}
+                      className="px-2.5 py-1 rounded-full text-xs font-medium transition-all"
+                      style={{
+                        background: logPhase === p.name ? p.color : isLower ? "#f0eeeb" : "#f5f3f0",
+                        color: logPhase === p.name ? "#fff" : isLower ? "#b0b7c3" : "#1a1a1a",
+                        border: `1px solid ${logPhase === p.name ? p.color : "#e5e2dd"}`,
+                        cursor: isLower ? "not-allowed" : "pointer",
+                        opacity: isLower ? 0.5 : 1,
+                      }}>
+                      {p.name}
+                    </button>
+                  );
+                })}
               </div>
+              {logPhaseWarning && (
+                <div className="mt-1.5 text-[11px] font-medium" style={{ color: "#dc2626" }}>
+                  ⚠ {logPhaseWarning}
+                </div>
+              )}
             </div>
             <div>
               <div className="text-xs font-semibold mb-2" style={{ color: "#6b7280" }}>Celková hotovost</div>
@@ -1296,7 +1303,7 @@ function useProjectDetails(projectIds: string[]) {
 /* DETAIL PANEL                            */
 /* ═══════════════════════════════════════ */
 
-function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog, nextWeekNum, onSpillAll, onOpenExpedice, onToggleItem, getCumulativeForDay, getExpectedPct, status, latestPct, latestPhase, logs, expandedMap, setExpandedMap, bundleId, allItems, scheduleData, onPhaseChange, onOpenProjectDetail, dyhaDismissed, onDismissDyha }: {
+function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog, nextWeekNum, onSpillAll, onOpenExpedice, onToggleItem, getCumulativeForDay, getExpectedPct, status, latestPct, latestPhase, logs, expandedMap, setExpandedMap, bundleId, allItems, scheduleData, onOpenProjectDetail, dyhaDismissed, onDismissDyha }: {
   project: VyrobaProject;
   weekKey: string;
   currentMonday: Date;
@@ -1317,7 +1324,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
   bundleId: string;
   allItems: { item: ScheduleItem; weekKey: string; weekNum: number }[];
   scheduleData: Map<string, any> | undefined;
-  onPhaseChange: (phaseName: string) => void;
+  
   onOpenProjectDetail: () => void;
   dyhaDismissed: boolean;
   onDismissDyha: () => void;
@@ -1446,25 +1453,23 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           </div>
         </div>
 
-        {/* ── Phases ── */}
+        {/* ── Phases (read-only display) ── */}
         <div>
           <div className="text-[10px] uppercase font-semibold mb-2" style={{ color: "#99a5a3" }}>Operace</div>
           <div className="flex items-center gap-1.5 flex-wrap">
             {PHASES.map(p => {
               const isCurrent = latestPhase === p.name;
-              const phaseUsed = logs.some(l => l.phase === p.name);
               const phasePctDone = latestPct >= p.pct;
               return (
-                <button key={p.name}
-                  onClick={() => onPhaseChange(p.name)}
-                  className="px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer"
+                <span key={p.name}
+                  className="px-2.5 py-1 rounded-full text-xs font-medium cursor-default pointer-events-none select-none"
                   style={{
                     background: isCurrent ? `${p.color}15` : "#f5f3f0",
                     color: isCurrent ? "#3a8a36" : phasePctDone ? "#3a8a36" : "#6b7280",
                     border: isCurrent ? `1.5px solid #3a8a36` : `1px solid ${phasePctDone ? "rgba(58,138,54,0.3)" : "#e5e2dd"}`,
                   }}>
                   {phasePctDone && !isCurrent ? "✓ " : ""}{p.name} <span className="text-[9px] opacity-60">{p.pct}%</span>
-                </button>
+                </span>
               );
             })}
             <div className="flex-1" />
