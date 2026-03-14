@@ -178,8 +178,14 @@ export default function Vyroba() {
   const { openPeopleManagement } = usePeopleManagement();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { pushUndo } = useVyrobaUndo();
+  const { pushUndo, undo, redo, canUndo, canRedo, lastUndoDescription, lastRedoDescription, setCurrentPage } = useUndoRedo();
   const isMobile = useIsMobile();
+
+  // Set undo page context
+  useEffect(() => {
+    setCurrentPage("vyroba");
+    return () => setCurrentPage(null);
+  }, [setCurrentPage]);
 
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [userMgmtOpen, setUserMgmtOpen] = useState(false);
