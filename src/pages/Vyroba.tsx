@@ -1652,27 +1652,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
     setHotovoConfirm(null);
   }
 
-  // Batch complete — only items with QC
-  async function handleBatchComplete() {
-    const ids = Array.from(selectedItems).filter(id => checkMap.has(id));
-    if (ids.length === 0) {
-      toast.error("Žádná vybraná položka nemá QC kontrolu");
-      return;
-    }
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from("production_schedule").update({
-      status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
-    }).in("id", ids);
-    qc.invalidateQueries({ queryKey: ["production-schedule"] });
-    setSelectedItems(new Set());
-    const skipped = selectedItems.size - ids.length;
-    toast.success(`${ids.length} položek označeno jako hotovo${skipped > 0 ? ` · ${skipped} přeskočeno (chybí QC)` : ""}`);
-  }
-
   const completedCount = dedupedItems.filter(i => i.item.status === "completed").length;
-  const allReady = dedupedItems.length > 0 && dedupedItems.every(({ item }) => {
-    return item.status === "completed" && checkMap.has(item.id);
-  });
 
   const allSelected = dedupedItems.length > 0 && dedupedItems.every(i => selectedItems.has(i.item.id));
 
