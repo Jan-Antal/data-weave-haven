@@ -116,6 +116,7 @@ function AppRoutes() {
             <Route path="/vyroba" element={<Vyroba />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/set-password" element={<SetPassword />} />
+            <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
