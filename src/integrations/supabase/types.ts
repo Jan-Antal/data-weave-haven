@@ -461,6 +461,60 @@ export type Database = {
         }
         Relationships: []
       }
+      production_quality_defects: {
+        Row: {
+          assigned_to: string | null
+          defect_type: string
+          description: string
+          id: string
+          item_code: string | null
+          item_id: string
+          photo_url: string | null
+          project_id: string
+          reported_at: string
+          reported_by: string
+          resolution_type: string | null
+          resolved: boolean
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          defect_type: string
+          description: string
+          id?: string
+          item_code?: string | null
+          item_id: string
+          photo_url?: string | null
+          project_id: string
+          reported_at?: string
+          reported_by: string
+          resolution_type?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          defect_type?: string
+          description?: string
+          id?: string
+          item_code?: string | null
+          item_id?: string
+          photo_url?: string | null
+          project_id?: string
+          reported_at?: string
+          reported_by?: string
+          resolution_type?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+        }
+        Relationships: []
+      }
       production_schedule: {
         Row: {
           adhoc_reason: string | null
