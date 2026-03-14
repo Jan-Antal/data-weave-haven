@@ -646,13 +646,28 @@ function getActionLabel(actionType: string, newValue: string | null, projectId: 
 
 /* ──────── Main panel ──────── */
 
-export function DataLogPanel({ open, onOpenChange }: DataLogPanelProps) {
+export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPanelProps) {
   const [tab, setTab] = useState<PanelTab>("activity");
-  const [category, setCategory] = useState<Category>("all");
+  const [category, setCategory] = useState<Category>(defaultCategory ?? "all");
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   const [userFilter, setUserFilter] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>("7d");
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+
+  // Escape key closes panel
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onOpenChange(false);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, onOpenChange]);
+
+  // Sync default category when prop changes
+  useEffect(() => {
+    if (defaultCategory) setCategory(defaultCategory);
+  }, [defaultCategory]);
   const { highlightProject } = useDataLogHighlight();
 
   const { data: projects = [] } = useProjects();
