@@ -148,7 +148,7 @@ export function PauseItemDialog({ open, onOpenChange, itemId, itemName, itemCode
                   {expectedDate ? format(expectedDate, "d.M.yyyy") : "Vyberte datum"}
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
+              <PopoverContent className="w-auto p-0 z-[99999]" align="start">
                 <Calendar
                   mode="single"
                   selected={expectedDate}
