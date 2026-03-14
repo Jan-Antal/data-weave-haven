@@ -1511,7 +1511,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           <Collapsible open={futureOpen} onOpenChange={setFutureOpen}>
             <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold cursor-pointer" style={{ color: "#666666" }}>
               {futureOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              Naplánované ({futureItems.length} položek{futureWeekNums.length > 0 && ` · T${futureWeekNums.join(", T")}`})
+              Naplánované ({futureItems.length} položek)
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="mt-2 space-y-1">
