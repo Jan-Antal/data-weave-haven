@@ -1431,13 +1431,20 @@ export default function Vyroba() {
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
+                              const allInFull = mids.every(id => spillFullHours.has(id));
                               setSpillFullHours(prev => {
                                 const next = new Set(prev);
-                                const allIn = mids.every(id => next.has(id));
-                                if (allIn) mids.forEach(id => next.delete(id));
+                                if (allInFull) mids.forEach(id => next.delete(id));
                                 else mids.forEach(id => next.add(id));
                                 return next;
                               });
+                              if (!allInFull) {
+                                setSpillSelected(prev => {
+                                  const next = new Set(prev);
+                                  mids.forEach(id => next.add(id));
+                                  return next;
+                                });
+                              }
                             }}
                           >
                             Plná kapacita
