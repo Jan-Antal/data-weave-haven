@@ -19,6 +19,8 @@ export interface QualityDefect {
   resolved_at: string | null;
 }
 
+type DefectInsert = Omit<QualityDefect, "id" | "reported_at" | "resolved" | "resolved_by" | "resolved_at" | "assigned_to">;
+
 export function useQualityDefects(projectId: string) {
   const qc = useQueryClient();
 
