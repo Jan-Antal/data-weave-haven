@@ -1742,12 +1742,16 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   isMobile: boolean;
   pushUndo: (action: UndoAction) => void;
 }) {
-  const { checks, checkItem } = useQualityChecks(projectId);
+  const { checks, checkItem, uncheckItem } = useQualityChecks(projectId);
   const { profile } = useAuth();
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [qcModalOpen, setQcModalOpen] = useState(false);
   const [qcModalItems, setQcModalItems] = useState<{ item: ScheduleItem }[]>([]);
   const [qcSubmitting, setQcSubmitting] = useState(false);
+  const [singleQcItem, setSingleQcItem] = useState<ScheduleItem | null>(null);
+  const [singleQcModalOpen, setSingleQcModalOpen] = useState(false);
+  const [uncheckConfirmItemId, setUncheckConfirmItemId] = useState<string | null>(null);
+  const [uncheckConfirmCode, setUncheckConfirmCode] = useState<string>("");
   const qc = useQueryClient();
   const qcUserFirstName = profile?.full_name?.split(" ")[0]?.slice(0, 8) || "–";
 
