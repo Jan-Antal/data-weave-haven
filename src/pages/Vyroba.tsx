@@ -49,6 +49,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQualityDefects, type QualityDefect } from "@/hooks/useQualityDefects";
 import { logActivity } from "@/lib/activityLog";
+import { MobileNavBar } from "@/components/mobile/MobileNavBar";
 
 /* ═══ helpers ═══ */
 function getMonday(d: Date): Date {
