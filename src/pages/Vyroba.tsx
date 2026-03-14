@@ -484,11 +484,31 @@ export default function Vyroba() {
       const existingLog = existingLogs.find(l => l.day_index === logDayIndex);
       const prevPhase = getLatestPhase(selectedProject.projectId) || "Řezání";
       const prevPercent = getLatestPercent(selectedProject.projectId);
-      pushUndo({ type: "phase_change", bundleId: bundleId(selectedProject.projectId), prevPhase, prevPercent, logId: existingLog?.id, timestamp: Date.now() });
+      const bId = bundleId(selectedProject.projectId);
+      const capturedDay = logDayIndex;
+      const capturedPhase = logPhase;
+      const capturedPct = logPercent;
+      const capturedNotes = logNotes || null;
+      pushUndo({
+        page: "vyroba",
+        actionType: "phase_change",
+        description: "změna fáze/logu",
+        undo: async () => {
+          if (existingLog) {
+            await saveDailyLog(bId, weekKey, capturedDay, existingLog.phase || prevPhase, existingLog.percent, existingLog.note_text || null);
+          } else {
+            await (supabase.from("production_daily_logs") as any).delete().eq("bundle_id", bId).eq("day_index", capturedDay).eq("week_key", weekKey);
+          }
+          qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
+        },
+        redo: async () => {
+          await saveDailyLog(bId, weekKey, capturedDay, capturedPhase, capturedPct, capturedNotes);
+          qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
+        },
+      });
 
-      await saveDailyLog(bundleId(selectedProject.projectId), weekKey, logDayIndex, logPhase, logPercent, logNotes || null);
+      await saveDailyLog(bId, weekKey, logDayIndex, logPhase, logPercent, logNotes || null);
       qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
-      toast.success("✓ Log uložen", { duration: 2000 });
       setLogModalOpen(false);
     } catch (err: any) {
       toast.error(`Chyba při ukládání logu: ${err?.message || "neznámá chyba"}`);
