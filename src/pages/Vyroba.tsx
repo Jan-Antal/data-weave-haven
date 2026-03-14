@@ -1994,10 +1994,6 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
 
               const splitBadgeY = splitTotalFromRow || partsThisWeek;
 
-              // For splits, compute % of total allocated this week
-              const splitPctLabel = isSplit && item.split_total
-                ? `${Math.round((thisWeekHours / (item.scheduled_hours * item.split_total / (item.split_part || 1))) * 100)}%`
-                : null;
 
               return (
                 <div key={mids.join("-")}>
