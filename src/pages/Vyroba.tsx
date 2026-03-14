@@ -3160,9 +3160,6 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
               <span className="text-[9px]" style={{ color: "#6b7280" }}>{cumulative.phase}</span>
            </div>
           )}
-          {weeklyGoal < 100 && !isNoProduction && (
-            <div className="text-[8px]" style={{ color: "#99a5a3" }}>Cíl: {weeklyGoal}%</div>
-          )}
           {isToday && (
             <span className="mt-0.5 w-full text-[9px] font-medium py-0.5 rounded transition-colors text-center"
               style={{ background: "rgba(58,138,54,0.08)", color: "#3a8a36", border: "1px solid rgba(58,138,54,0.2)" }}>
