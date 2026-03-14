@@ -721,7 +721,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
   ];
 
   return (
-    <div className="w-[340px] shrink-0 border-l border-border bg-card flex flex-col datalog-panel overflow-hidden h-full">
+    <div className="w-[360px] shrink-0 border-l border-border bg-card flex flex-col datalog-panel overflow-hidden h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b bg-card shrink-0">
         <div className="flex items-center gap-2">
