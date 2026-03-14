@@ -3232,7 +3232,7 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
       onClick={clickable ? onOpenLog : undefined}
     >
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-medium" style={{ color: "#6b7280" }}>{DAY_NAMES[dayIndex]}</span>
+        <span className="text-[10px] font-medium" style={{ color: "#6b7280" }}>{isMobile ? DAY_SHORT[dayIndex] : DAY_NAMES[dayIndex]}</span>
         {isToday && (
           <span className="text-[7px] font-bold px-1 py-[1px] rounded" style={{ background: "rgba(58,138,54,0.15)", color: "#3a8a36" }}>
             {pct >= weeklyGoal ? "🎉 DNES" : "DNES"}
@@ -3243,18 +3243,18 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
       {hasData ? (
         <>
           <div className="flex items-center justify-between">
-            <div className="text-xl font-mono font-bold" style={{ color: isNoProduction ? "#99a5a3" : pct >= 100 ? "#3a8a36" : "#1a1a1a" }}>{pct}%</div>
-            {isRetroactive && (
+            <div className={`font-mono font-bold ${isMobile ? "text-lg" : "text-xl"}`} style={{ color: isNoProduction ? "#99a5a3" : pct >= 100 ? "#3a8a36" : "#1a1a1a" }}>{pct}%</div>
+            {isRetroactive && !isMobile && (
               <span className="text-[7px] font-bold px-1 py-[1px] rounded" style={{ background: "rgba(220,38,38,0.1)", color: "#dc2626" }}>doplněno</span>
             )}
           </div>
           {cumulative?.phase && !isNoProduction && (
             <div className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: PHASES.find(p => p.name === cumulative.phase)?.color || "#6b7280" }} />
-              <span className="text-[9px]" style={{ color: "#6b7280" }}>{cumulative.phase}</span>
+              {!isMobile && <span className="text-[9px]" style={{ color: "#6b7280" }}>{cumulative.phase}</span>}
            </div>
           )}
-          {isToday && (
+          {isToday && !isMobile && (
             <span className="mt-0.5 w-full text-[9px] font-medium py-0.5 rounded transition-colors text-center"
               style={{ background: "rgba(58,138,54,0.08)", color: "#3a8a36", border: "1px solid rgba(58,138,54,0.2)" }}>
               Upravit log
