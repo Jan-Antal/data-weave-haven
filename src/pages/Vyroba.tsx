@@ -745,6 +745,8 @@ export default function Vyroba() {
   function handleSelectProject(pid: string) {
     setSelectedProjectId(pid);
     if (isMobile) setMobileDetailOpen(true);
+    // Reset defect form on project change
+    setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectItemId("__bundle__"); setDefectPhotos([]);
   }
 
   /* ── No production today ── */
