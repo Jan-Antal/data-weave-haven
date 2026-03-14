@@ -1644,7 +1644,6 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
     } else {
       // Open QC modal for items missing QC
       setQcModalItems(missingQC);
-      setQcChecklist({ rozmery: false, povrch: false, spoje: false, cistota: false });
       setQcModalOpen(true);
     }
   }
