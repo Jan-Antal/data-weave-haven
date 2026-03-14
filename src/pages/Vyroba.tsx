@@ -1018,7 +1018,7 @@ export default function Vyroba() {
                   {isAdmin && <DropdownMenuItem onClick={() => setCapacitySettingsOpen(true)}>Kapacita výroby</DropdownMenuItem>}
                   {canManageStatuses && <DropdownMenuItem onClick={() => setStatusMgmtOpen(true)}>Správa statusů</DropdownMenuItem>}
                   {canAccessRecycleBin && <DropdownMenuItem onClick={() => setRecycleBinOpen(true)}>Koš</DropdownMenuItem>}
-                  {(isAdmin || role === "pm" || isOwner) && <DropdownMenuItem onClick={() => setDataLogOpen(true)}>Data Log</DropdownMenuItem>}
+                  
                   {realRole === "owner" && (
                     <>
                       <DropdownMenuSeparator />
