@@ -994,71 +994,17 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           </div>
         </div>
 
-        {/* ── AKTUÁLNÍ items ── */}
-        <Collapsible open={isExpanded} onOpenChange={open => setExpandedMap(m => ({ ...m, [bundleId]: open }))}>
-          <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold cursor-pointer" style={{ color: "#6b7280" }}>
-            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-            Aktuální ({currentItems.filter(i => i.item.status === "completed").length}/{currentItems.length})
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="mt-2 space-y-1">
-              {currentItems.map(({ item }) => (
-                <ItemRow key={item.id} item={item} onToggle={onToggleItem} interactive projectId={project.projectId} />
-              ))}
-            </div>
-            {/* Quality check per item */}
-            <QualitySection projectId={project.projectId} items={currentItems.map(e => e.item)} />
-          </CollapsibleContent>
-        </Collapsible>
-
-        {/* ── NAPLÁNOVANÉ (future) ── */}
-        {futureItems.length > 0 && (
-          <div>
-            <div className="text-[10px] uppercase font-semibold mb-2" style={{ color: "#99a5a3" }}>Naplánované</div>
-            <div className="space-y-1">
-              {futureItems.map(({ item, weekNum: wn }) => (
-                <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#f5f3f0", opacity: 0.5 }}>
-                  {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
-                  <span className="text-[13px] flex-1 truncate" style={{ color: "#6b7280" }}>{item.item_name}</span>
-                  <span className="font-mono text-[10px] shrink-0" style={{ color: "#99a5a3" }}>T{wn}</span>
-                  <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── HOTOVÉ ── */}
-        {completedItems.length > 0 && (
-          <div>
-            <div className="text-[10px] uppercase font-semibold mb-2" style={{ color: "#99a5a3" }}>Hotové</div>
-            <div className="space-y-1">
-              {completedItems.map(({ item }) => (
-                <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#ffffff", opacity: 0.55 }}>
-                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#3a8a36" }} />
-                  {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
-                  <span className="text-[13px] flex-1 truncate" style={{ color: "#99a5a3", textDecoration: "line-through" }}>{item.item_name}</span>
-                  <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Daily log shortcut — directly below quality section ── */}
-        {todayDayIndex >= 0 && (
-          <button onClick={() => onOpenLog()} className={`w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90 ${isMobile ? "min-h-[44px]" : ""}`} style={{ background: "#3a8a36" }}>
-            + Log dnes ({DAY_SHORT[todayDayIndex]})
-          </button>
-        )}
-
-        {/* ── Expedice button ── */}
-        {currentItems.some(i => i.item.status !== "completed") && (
-          <button onClick={onOpenExpedice} className={`w-full py-2.5 rounded-md text-sm font-medium transition-colors ${isMobile ? "min-h-[44px]" : ""}`}
-            style={{ background: "rgba(58,138,54,0.1)", color: "#3a8a36", border: "1px solid rgba(58,138,54,0.2)" }}>
-            Označit vše jako hotovo
-          </button>
-        )}
+        {/* ── AKTUÁLNÍ items (unified with QC) ── */}
+        <UnifiedItemList
+          projectId={project.projectId}
+          currentItems={currentItems}
+          onToggleItem={onToggleItem}
+          isExpanded={isExpanded}
+          onToggleExpand={open => setExpandedMap(m => ({ ...m, [bundleId]: open }))}
+          bundleId={bundleId}
+          onOpenExpedice={onOpenExpedice}
+          isMobile={isMobile}
+        />
 
         {/* ── Výkresy Section ── */}
         <VykresynSection projectId={project.projectId} />
