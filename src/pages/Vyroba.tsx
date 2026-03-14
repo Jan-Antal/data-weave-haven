@@ -1999,18 +1999,28 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
       // All have QC — mark as hotovo directly
       (async () => {
         const ids = targetItems.flatMap(({ mergedIds }) => mergedIds);
-        // Push undo for each item
-        for (const { mergedIds: mids, item } of targetItems) {
-          for (const mid of mids) {
-            pushUndo({ type: "item_hotovo", itemId: mid, prevStatus: item.status, timestamp: Date.now() });
-          }
-        }
+        const snapshots = targetItems.map(({ mergedIds: mids, item }) => mids.map(mid => ({ id: mid, prevStatus: item.status }))).flat();
+        pushUndo({
+          page: "vyroba",
+          actionType: "item_hotovo",
+          description: `${ids.length} položek dokončeno`,
+          undo: async () => {
+            for (const snap of snapshots) {
+              await supabase.from("production_schedule").update({ status: snap.prevStatus, completed_at: null, completed_by: null }).eq("id", snap.id);
+            }
+            qc.invalidateQueries({ queryKey: ["production-schedule"] });
+          },
+          redo: async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            await supabase.from("production_schedule").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null }).in("id", ids);
+            qc.invalidateQueries({ queryKey: ["production-schedule"] });
+          },
+        });
         const { data: { user } } = await supabase.auth.getUser();
         await supabase.from("production_schedule").update({
           status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
         }).in("id", ids);
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
-        toast.success(`${ids.length} položek dokončeno`);
         setSelectedItems(new Set());
         // Check if ALL items are now completed
         const allNowCompleted = dedupedItems.every(({ item }) => item.status === "completed" || ids.includes(item.id));
