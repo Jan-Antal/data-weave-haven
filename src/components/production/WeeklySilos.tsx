@@ -347,12 +347,17 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     if (el) siloRefs.current.set(key, el); else siloRefs.current.delete(key);
   }, []);
 
-  // Scroll to matching silo when search nav changes
+  // Scroll to matching silo when search nav changes, then scroll to specific bundle card
   useEffect(() => {
-    if (!searchMatchWeekKey) return;
+    if (!searchMatchWeekKey || !focusedMatchKey) return;
     const el = siloRefs.current.get(searchMatchWeekKey);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      // After horizontal scroll settles, scroll vertically to the bundle card
+      setTimeout(() => {
+        const cardEl = document.querySelector(`[data-bundle-key="${focusedMatchKey}"]`);
+        if (cardEl) cardEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 350);
     }
   }, [searchMatchWeekKey, focusedMatchKey]);
 
