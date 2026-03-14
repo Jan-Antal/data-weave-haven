@@ -5,13 +5,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useProductionSchedule, getISOWeekNumber, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useProductionDailyLogs, saveDailyLog, type DailyLog } from "@/hooks/useProductionDailyLogs";
+import { useWeeklyCapacity } from "@/hooks/useWeeklyCapacity";
 import { getProjectColor } from "@/lib/projectColors";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList,
   User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange, Factory,
-  Circle, CheckCircle2, X, Plus, Trash2, Loader2, Download, Printer, FileText
+  Circle, CheckCircle2, X, Plus, Trash2, Loader2, Download, Printer, FileText,
+  AlertTriangle, Camera, ArrowRight
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
@@ -33,6 +35,11 @@ import { parseAppDate } from "@/lib/dateFormat";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useSharePointDocs, type SPFile } from "@/hooks/useSharePointDocs";
 import { PhotoLightbox, isImageFile } from "@/components/PhotoLightbox";
+import { ProductionContextMenu, type ContextMenuAction } from "@/components/production/ProductionContextMenu";
+import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
+import { PauseItemDialog } from "@/components/production/PauseItemDialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 /* ═══ helpers ═══ */
 function getMonday(d: Date): Date {
@@ -78,12 +85,12 @@ const DAY_NAMES = ["Pondělí", "Úterý", "Středa", "Čtvrtek", "Pátek"];
 const DAY_SHORT = ["Po", "Út", "St", "Čt", "Pá"];
 
 const PHASES = [
-  { name: "Řezání", color: "#f59e0b" },
-  { name: "CNC", color: "#6366f1" },
-  { name: "Dýha", color: "#e67e22" },
-  { name: "Lakování", color: "#8b5cf6" },
-  { name: "Kompletace", color: "#3b82f6" },
-  { name: "Expedice", color: "#16a34a" },
+  { name: "Řezání", color: "#f59e0b", pct: 15 },
+  { name: "Dýha", color: "#e67e22", pct: 25 },
+  { name: "CNC", color: "#6366f1", pct: 40 },
+  { name: "Lakování", color: "#8b5cf6", pct: 55 },
+  { name: "Kompletace", color: "#3b82f6", pct: 85 },
+  { name: "Expedice", color: "#16a34a", pct: 95 },
 ];
 
 interface VyrobaProject {
@@ -96,6 +103,10 @@ interface VyrobaProject {
   expedice?: string | null;
   deadline?: Date | null;
   isSpilled?: boolean;
+  isPaused?: boolean;
+  pauseReason?: string | null;
+  pauseExpectedDate?: string | null;
+  projectStatus?: string | null;
 }
 
 interface CumulativeInfo { percent: number; phase: string | null; isCarryForward: boolean; hasLog: boolean }
@@ -127,7 +138,13 @@ function useQualityChecks(projectId: string) {
     refetch();
   }, [projectId, refetch]);
 
-  return { checks, checkItem };
+  const uncheckItem = useCallback(async (checkId: string) => {
+    const { error } = await (supabase.from("production_quality_checks" as any) as any).delete().eq("id", checkId);
+    if (error) throw error;
+    refetch();
+  }, [refetch]);
+
+  return { checks, checkItem, uncheckItem };
 }
 
 /* ═══ Profile name lookup ═══ */
@@ -191,7 +208,8 @@ export default function Vyroba() {
     const silo = scheduleData.get(weekKey);
     if (silo) {
       for (const b of silo.bundles) {
-        if (b.items.some(i => i.status === "scheduled" || i.status === "in_progress")) {
+        const isPaused = b.items.every(i => i.status === "paused");
+        if (b.items.some(i => i.status === "scheduled" || i.status === "in_progress" || i.status === "paused" || i.status === "completed")) {
           result.push({
             projectId: b.project_id,
             projectName: b.project_name,
@@ -199,6 +217,9 @@ export default function Vyroba() {
             scheduleItems: b.items,
             color: getProjectColor(b.project_id),
             isSpilled: false,
+            isPaused,
+            pauseReason: isPaused ? b.items[0]?.pause_reason : null,
+            pauseExpectedDate: isPaused ? b.items[0]?.pause_expected_date : null,
           });
         }
       }
@@ -211,7 +232,6 @@ export default function Vyroba() {
       for (const b of ws.bundles) {
         const activeItems = b.items.filter(i => i.status === "scheduled" || i.status === "in_progress");
         if (activeItems.length === 0) continue;
-        // Don't duplicate if already in current week
         if (result.some(r => r.projectId === b.project_id)) continue;
         result.push({
           projectId: b.project_id,
@@ -224,8 +244,12 @@ export default function Vyroba() {
       }
     }
 
-    // Sort: spilled first
-    result.sort((a, b) => (b.isSpilled ? 1 : 0) - (a.isSpilled ? 1 : 0));
+    // Sort: spilled first, paused last
+    result.sort((a, b) => {
+      if (a.isPaused && !b.isPaused) return 1;
+      if (!a.isPaused && b.isPaused) return -1;
+      return (b.isSpilled ? 1 : 0) - (a.isSpilled ? 1 : 0);
+    });
     return result;
   }, [scheduleData, weekKey, currentMonday]);
 
@@ -240,9 +264,24 @@ export default function Vyroba() {
       if (!detail) return p;
       const deadlineSrc = detail.expedice || detail.datum_smluvni || null;
       const deadlineDate = deadlineSrc ? parseAppDate(deadlineSrc) : null;
-      return { ...p, pm: detail.pm, expedice: detail.expedice, deadline: deadlineDate };
+      return { ...p, pm: detail.pm, expedice: detail.expedice, deadline: deadlineDate, projectStatus: detail.status };
     });
   }, [projects, projectDetails]);
+
+  // Capacity for this week
+  const weekCapacity = useMemo(() => {
+    if (!scheduleData) return { used: 0, total: 760 };
+    const silo = scheduleData.get(weekKey);
+    const used = silo ? silo.bundles.reduce((s, b) => {
+      // Don't count paused items
+      const activeHours = b.items.filter(i => i.status !== "paused" && i.status !== "cancelled").reduce((h, i) => h + i.scheduled_hours, 0);
+      return s + activeHours;
+    }, 0) : 0;
+    return { used, total: 760 };
+  }, [scheduleData, weekKey]);
+
+  const capacityPct = weekCapacity.total > 0 ? Math.round((weekCapacity.used / weekCapacity.total) * 100) : 0;
+  const capacityColor = capacityPct > 100 ? "#dc2626" : capacityPct > 85 ? "#d97706" : "#3a8a36";
 
   // Today info
   const todayDayIndex = useMemo(() => {
@@ -256,6 +295,23 @@ export default function Vyroba() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const selectedProject = enrichedProjects.find(p => p.projectId === selectedProjectId) || null;
+
+  // Context menu state
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; projectId: string } | null>(null);
+
+  // Project detail dialog
+  const [detailProject, setDetailProject] = useState<any | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+
+  // Pause dialog
+  const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
+  const [pauseTarget, setPauseTarget] = useState<{ id: string; name: string; code?: string | null }>({ id: "", name: "" });
+
+  // Return from expedice confirm
+  const [returnExpediceConfirm, setReturnExpediceConfirm] = useState<string | null>(null);
+
+  // Dýha dismissal per project
+  const [dyhaDismissed, setDyhaDismissed] = useState<Set<string>>(new Set());
 
   // Auto-select first
   useEffect(() => {
@@ -271,10 +327,16 @@ export default function Vyroba() {
   const [logPercent, setLogPercent] = useState(0);
   const [logTab, setLogTab] = useState<"notes" | "photo">("notes");
   const [logNotes, setLogNotes] = useState("");
+  const [noProductionOpen, setNoProductionOpen] = useState(false);
+  const [noProductionReason, setNoProductionReason] = useState("dovolenka");
 
   // Expedice confirmation dialog
   const [expediceDialogOpen, setExpediceDialogOpen] = useState(false);
   const [expediceChecks, setExpediceChecks] = useState({ vyroba: false, kvalita: false, dokumentace: false });
+
+  // Spill dialog
+  const [spillDialogOpen, setSpillDialogOpen] = useState(false);
+  const [spillSelected, setSpillSelected] = useState<Set<string>>(new Set());
 
   // Items expand
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
@@ -331,8 +393,7 @@ export default function Vyroba() {
         if (bundle.project_id !== pid) continue;
         for (const item of bundle.items) {
           if (item.status === "cancelled") continue;
-          // Deduplicate by item_code + item_name within same week
-          const dedupeKey = `${wk}::${item.item_code || ""}::${item.item_name}`;
+          const dedupeKey = `${wk}::${item.id}`;
           if (seen.has(dedupeKey)) continue;
           seen.add(dedupeKey);
           items.push({ item, weekKey: wk, weekNum: silo.week_number });
@@ -344,11 +405,12 @@ export default function Vyroba() {
 
   /* ── Stats ── */
   const stats = useMemo(() => {
-    const total = enrichedProjects.length;
-    const avgPct = total > 0 ? Math.round(enrichedProjects.reduce((s, p) => s + getLatestPercent(p.projectId), 0) / total) : 0;
-    const onTrack = enrichedProjects.filter(p => getProjectStatus(p.projectId) === "on-track").length;
-    const behind = enrichedProjects.filter(p => getProjectStatus(p.projectId) === "behind").length;
-    const todayLogged = todayDayIndex >= 0 ? enrichedProjects.filter(p => getLogsForProject(p.projectId).some(l => l.day_index === todayDayIndex)).length : 0;
+    const activeProjects = enrichedProjects.filter(p => !p.isPaused);
+    const total = activeProjects.length;
+    const avgPct = total > 0 ? Math.round(activeProjects.reduce((s, p) => s + getLatestPercent(p.projectId), 0) / total) : 0;
+    const onTrack = activeProjects.filter(p => getProjectStatus(p.projectId) === "on-track").length;
+    const behind = activeProjects.filter(p => getProjectStatus(p.projectId) === "behind").length;
+    const todayLogged = todayDayIndex >= 0 ? activeProjects.filter(p => getLogsForProject(p.projectId).some(l => l.day_index === todayDayIndex)).length : 0;
     return { total, avgPct, onTrack, behind, todayLogged };
   }, [enrichedProjects, dailyLogsMap, todayDayIndex]);
 
@@ -377,19 +439,30 @@ export default function Vyroba() {
     }
   }
 
-  /* ── Spill to next week ── */
+  /* ── Spill dialog ── */
   const nextWeekKey = weekKeyStr(addWeeks(currentMonday, 1));
   const nextWeekNum = getISOWeekNumber(addWeeks(currentMonday, 1));
 
-  async function handleSpillAll() {
+  function openSpillDialog() {
     if (!selectedProject) return;
     const activeItems = selectedProject.scheduleItems.filter(i => i.status === "scheduled" || i.status === "in_progress");
-    if (activeItems.length === 0) return;
-    const ids = activeItems.map(i => i.id);
+    const doneIds = new Set(selectedProject.scheduleItems.filter(i => i.status === "completed").map(i => i.id));
+    const selected = new Set(activeItems.filter(i => !doneIds.has(i.id)).map(i => i.id));
+    setSpillSelected(selected);
+    setSpillDialogOpen(true);
+  }
+
+  async function handleSpillConfirm() {
+    if (!selectedProject || spillSelected.size === 0) {
+      toast.error("Vyberte alespoň jednu položku");
+      return;
+    }
+    const ids = Array.from(spillSelected);
     const { error } = await supabase.from("production_schedule").update({ scheduled_week: nextWeekKey }).in("id", ids);
     if (error) { toast.error(error.message); return; }
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
     toast.success(`${ids.length} položek → T${nextWeekNum}`);
+    setSpillDialogOpen(false);
   }
 
   /* ── Expedice confirmation flow ── */
@@ -401,7 +474,6 @@ export default function Vyroba() {
   async function handleConfirmExpedice() {
     if (!selectedProject) return;
     const { data: { user } } = await supabase.auth.getUser();
-    // Complete all active items
     const activeItems = selectedProject.scheduleItems.filter(i => i.status !== "completed" && i.status !== "cancelled");
     if (activeItems.length > 0) {
       const ids = activeItems.map(i => i.id);
@@ -409,7 +481,6 @@ export default function Vyroba() {
         status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
       }).in("id", ids);
     }
-    // Update project status
     await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", selectedProject.projectId);
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
     qc.invalidateQueries({ queryKey: ["projects"] });
@@ -429,12 +500,101 @@ export default function Vyroba() {
       }).eq("id", itemId);
     }
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
-    // Individual checkbox does NOT change project status
+  }
+
+  /* ── Phase change ── */
+  async function handlePhaseChange(phaseName: string) {
+    if (!selectedProject) return;
+    const phase = PHASES.find(p => p.name === phaseName);
+    if (!phase) return;
+    const currentPct = getLatestPercent(selectedProject.projectId);
+    if (phase.pct <= currentPct) {
+      toast.error("Nelze přejít na nižší fázi — výroba jde jen dopředu");
+      return;
+    }
+    // Save log with new phase and its pct
+    const di = todayDayIndex >= 0 ? todayDayIndex : 0;
+    try {
+      await saveDailyLog(bundleId(selectedProject.projectId), weekKey, di, phaseName, phase.pct);
+      qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
+      toast.success(`Fáze: ${phaseName} (${phase.pct}%)`);
+    } catch {
+      toast.error("Chyba při změně fáze");
+    }
+  }
+
+  /* ── Return from Expedice ── */
+  async function handleReturnFromExpedice(pid: string) {
+    const items = getAllItemsForProject(pid);
+    const completedIds = items.filter(e => e.item.status === "completed").map(e => e.item.id);
+    if (completedIds.length > 0) {
+      await supabase.from("production_schedule").update({ status: "in_progress", completed_at: null, completed_by: null, expediced_at: null }).in("id", completedIds);
+    }
+    await supabase.from("projects").update({ status: "Ve výrobě" }).eq("project_id", pid);
+    qc.invalidateQueries({ queryKey: ["production-schedule"] });
+    qc.invalidateQueries({ queryKey: ["projects"] });
+    qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
+    toast.success("Vráceno z Expedice");
+    setReturnExpediceConfirm(null);
+  }
+
+  /* ── Context menu ── */
+  function handleContextMenu(e: React.MouseEvent, pid: string) {
+    e.preventDefault();
+    setCtxMenu({ x: e.clientX, y: e.clientY, projectId: pid });
+  }
+
+  function getContextMenuActions(pid: string): ContextMenuAction[] {
+    const p = enrichedProjects.find(pr => pr.projectId === pid);
+    const actions: ContextMenuAction[] = [
+      { label: "Zobrazit detail projektu", icon: "📋", onClick: () => openProjectDetail(pid) },
+      { label: "Zobrazit položky", icon: "📦", onClick: () => { setSelectedProjectId(pid); } },
+    ];
+    if (p && !p.isPaused) {
+      actions.push({
+        label: "⏸ Pozastavit", icon: "⏸",
+        onClick: () => {
+          const allIds = p.scheduleItems.filter(i => i.status === "scheduled" || i.status === "in_progress").map(i => i.id);
+          setPauseTarget({ id: allIds.join(","), name: p.projectName });
+          setPauseDialogOpen(true);
+        },
+      });
+    }
+    if (p?.projectStatus === "Expedice") {
+      actions.push({
+        label: "↩ Vrátit z Expedice", icon: "↩",
+        onClick: () => setReturnExpediceConfirm(pid),
+        dividerBefore: true,
+      });
+    }
+    return actions;
+  }
+
+  function openProjectDetail(pid: string) {
+    const detail = projectDetails?.get(pid);
+    if (detail) {
+      setDetailProject({ ...detail, project_id: pid });
+      setDetailDialogOpen(true);
+    }
   }
 
   function handleSelectProject(pid: string) {
     setSelectedProjectId(pid);
     if (isMobile) setMobileDetailOpen(true);
+  }
+
+  /* ── No production today ── */
+  async function handleNoProduction() {
+    if (!selectedProject || logDayIndex < 0) return;
+    try {
+      await saveDailyLog(bundleId(selectedProject.projectId), weekKey, logDayIndex, `Bez výroby: ${noProductionReason}`, getLatestPercent(selectedProject.projectId));
+      qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
+      toast.success("Zaznamenáno bez výroby");
+      setNoProductionOpen(false);
+      setLogModalOpen(false);
+    } catch {
+      toast.error("Chyba");
+    }
   }
 
   if (loading) {
@@ -443,6 +603,11 @@ export default function Vyroba() {
   if (!isOwner && !isAdmin) return null;
 
   const statusColors = { "on-track": "#3a8a36", "at-risk": "#d97706", "behind": "#dc2626" };
+
+  // Split projects into sections
+  const spilledProjects = enrichedProjects.filter(p => p.isSpilled && !p.isPaused);
+  const normalProjects = enrichedProjects.filter(p => !p.isSpilled && !p.isPaused);
+  const pausedProjects = enrichedProjects.filter(p => p.isPaused);
 
   /* ═══ RENDER ═══ */
   return (
@@ -555,71 +720,106 @@ export default function Vyroba() {
       <div className="flex flex-1 min-h-0">
         {/* ═══ LEFT PANEL ═══ */}
         <div className={`shrink-0 flex flex-col overflow-y-auto ${isMobile ? "w-full" : "w-[252px]"}`} style={{ borderRight: isMobile ? "none" : "1px solid #e5e2dd", background: "#ffffff" }}>
-          <div className="px-3 py-1.5 text-[10px] uppercase font-semibold" style={{ color: "#6b7280", borderBottom: "1px solid #f0eeea" }}>
-            Projekty v T{weekNum} ({enrichedProjects.length})
+          {/* Capacity bar */}
+          <div className="px-3 py-2 flex items-center gap-2" style={{ borderBottom: "1px solid #f0eeea", background: "#fafaf8" }}>
+            <span className="text-[10px] font-mono font-semibold" style={{ color: "#6b7280" }}>T{weekNum}</span>
+            <div className="flex-1 h-[6px] rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
+              <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(capacityPct, 100)}%`, background: capacityColor }} />
+            </div>
+            <span className="text-[10px] font-mono" style={{ color: capacityColor }}>{weekCapacity.used}h/{weekCapacity.total}h · {capacityPct}%</span>
           </div>
+
+          <div className="px-3 py-1.5 text-[10px] uppercase font-semibold" style={{ color: "#6b7280", borderBottom: "1px solid #f0eeea" }}>
+            Projekty v T{weekNum} ({enrichedProjects.filter(p => !p.isPaused).length})
+          </div>
+
           {enrichedProjects.length === 0 ? (
             <div className="flex-1 flex items-center justify-center p-4 text-center">
               <span className="text-sm" style={{ color: "#99a5a3" }}>Žádné projekty v tomto týdnu</span>
             </div>
           ) : (
-            enrichedProjects.map(p => {
-              const status = getProjectStatus(p.projectId);
-              const pct = getLatestPercent(p.projectId);
-              const phase = getLatestPhase(p.projectId);
-              const isSelected = selectedProjectId === p.projectId;
-              const borderColor = p.isSpilled ? "#d97706" : status === "behind" ? "#dc2626" : status === "at-risk" ? "#d97706" : p.color;
-              return (
-                <button
-                  key={p.projectId}
-                  onClick={() => handleSelectProject(p.projectId)}
-                  className="w-full text-left flex items-stretch transition-colors"
-                  style={{
-                    background: isSelected ? "#ffffff" : "transparent",
-                    borderBottom: "1px solid #f0eeea",
-                    outline: isSelected ? "2px solid #d97706" : undefined,
-                    outlineOffset: -2,
-                  }}
-                >
-                  {/* Status color bar */}
-                  <div className="w-[4px] shrink-0 rounded-r-sm" style={{ background: borderColor }} />
-                  <div className="flex-1 px-2.5 py-[5px] min-w-0">
-                    <div className="flex items-center justify-between gap-1">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="truncate" style={{ fontSize: 14, fontWeight: 500, color: "#1a1a1a" }}>{p.projectName}</span>
-                        {p.isSpilled && (
-                          <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.1)", color: "#D97706" }}>
-                            Omeškaní
-                          </span>
-                        )}
-                      </div>
-                      <span className="font-mono text-xs font-bold shrink-0" style={{ color: statusColors[status] }}>
-                        {pct}%
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="font-mono" style={{ fontSize: 11, color: "#99a5a3" }}>{p.projectId}</span>
-                      {p.deadline && (
-                        <>
-                          <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
-                          <span style={{ fontSize: 11, color: "#6b7280" }}>{fmtDateFull(p.deadline)}</span>
-                        </>
-                      )}
-                      {phase && (
-                        <>
-                          <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
-                          <span style={{ fontSize: 11, color: PHASES.find(ph => ph.name === phase)?.color || "#6b7280", fontWeight: 500 }}>{phase}</span>
-                        </>
-                      )}
-                    </div>
-                    {/* 3px progress bar */}
-                    <div className="mt-1.5 h-[3px] rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
-                      <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: statusColors[status] }} />
-                    </div>
+            <>
+              {/* Spilled section */}
+              {spilledProjects.length > 0 && (
+                <div className="px-3 py-1 text-[9px] uppercase font-semibold" style={{ color: "#d97706", borderBottom: "1px solid #f0eeea" }}>
+                  Přelité z minulého týdne ({spilledProjects.length})
+                </div>
+              )}
+              {spilledProjects.map(p => (
+                <ProjectRow key={p.projectId} project={p} isSelected={selectedProjectId === p.projectId}
+                  onSelect={handleSelectProject} onContextMenu={handleContextMenu} getProjectStatus={getProjectStatus}
+                  getLatestPercent={getLatestPercent} getLatestPhase={getLatestPhase} statusColors={statusColors} />
+              ))}
+
+              {/* Normal section */}
+              {normalProjects.length > 0 && spilledProjects.length > 0 && (
+                <div className="px-3 py-1 text-[9px] uppercase font-semibold" style={{ color: "#6b7280", borderBottom: "1px solid #f0eeea" }}>
+                  Naplánované v T{weekNum} ({normalProjects.length})
+                </div>
+              )}
+              {normalProjects.map(p => (
+                <ProjectRow key={p.projectId} project={p} isSelected={selectedProjectId === p.projectId}
+                  onSelect={handleSelectProject} onContextMenu={handleContextMenu} getProjectStatus={getProjectStatus}
+                  getLatestPercent={getLatestPercent} getLatestPhase={getLatestPhase} statusColors={statusColors} />
+              ))}
+
+              {/* Paused section */}
+              {pausedProjects.length > 0 && (
+                <>
+                  <div className="px-3 py-1 text-[9px] uppercase font-semibold" style={{ color: "#99a5a3", borderBottom: "1px solid #f0eeea" }}>
+                    ⏸ Pozastavené ({pausedProjects.length})
                   </div>
-                </button>
-              );
-            })
+                  {pausedProjects.map(p => {
+                    const isSelected = selectedProjectId === p.projectId;
+                    const expectedDate = p.pauseExpectedDate ? new Date(p.pauseExpectedDate) : null;
+                    const now = new Date();
+                    const daysUntil = expectedDate ? Math.ceil((expectedDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                    const dateColor = daysUntil === null ? "#99a5a3" : daysUntil < 0 ? "#dc2626" : daysUntil <= 7 ? "#d97706" : "#3a8a36";
+                    return (
+                      <button
+                        key={p.projectId}
+                        onClick={() => handleSelectProject(p.projectId)}
+                        onContextMenu={(e) => handleContextMenu(e, p.projectId)}
+                        className="w-full text-left flex items-stretch transition-colors"
+                        style={{
+                          background: isSelected ? "#fafaf8" : "transparent",
+                          borderBottom: "1px solid #f0eeea",
+                          outline: isSelected ? "2px solid #99a5a3" : undefined,
+                          outlineOffset: -2,
+                          opacity: 0.7,
+                        }}
+                      >
+                        <div className="w-[4px] shrink-0 rounded-r-sm" style={{ background: "#99a5a3" }} />
+                        <div className="flex-1 px-2.5 py-[5px] min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="truncate" style={{ fontSize: 14, fontWeight: 500, color: "#6b7280" }}>{p.projectName}</span>
+                            <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(107,122,120,0.1)", color: "#6b7280" }}>⏸</span>
+                            {daysUntil !== null && daysUntil < 0 && (
+                              <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(220,38,38,0.1)", color: "#dc2626" }}>!</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="font-mono" style={{ fontSize: 11, color: "#99a5a3" }}>{p.projectId}</span>
+                            {p.pauseReason && (
+                              <>
+                                <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
+                                <span style={{ fontSize: 11, color: "#99a5a3" }}>{p.pauseReason}</span>
+                              </>
+                            )}
+                            {expectedDate && (
+                              <>
+                                <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
+                                <span style={{ fontSize: 11, color: dateColor }}>{fmtDateFull(expectedDate)}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+            </>
           )}
         </div>
 
@@ -639,7 +839,7 @@ export default function Vyroba() {
                 todayDayIndex={todayDayIndex}
                 onOpenLog={openLogModal}
                 nextWeekNum={nextWeekNum}
-                onSpillAll={handleSpillAll}
+                onSpillAll={openSpillDialog}
                 onOpenExpedice={openExpediceDialog}
                 onToggleItem={toggleItemComplete}
                 getCumulativeForDay={(di) => getCumulativeForDay(selectedProject.projectId, di)}
@@ -653,6 +853,10 @@ export default function Vyroba() {
                 bundleId={bundleId(selectedProject.projectId)}
                 allItems={getAllItemsForProject(selectedProject.projectId)}
                 scheduleData={scheduleData}
+                onPhaseChange={handlePhaseChange}
+                onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
+                dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
+                onDismissDyha={() => setDyhaDismissed(prev => new Set(prev).add(selectedProject.projectId))}
               />
             )}
           </div>
@@ -664,7 +868,6 @@ export default function Vyroba() {
         <Sheet open={mobileDetailOpen} onOpenChange={setMobileDetailOpen}>
           <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl p-0 overflow-hidden">
             <div className="flex flex-col h-full overflow-y-auto">
-              {/* Drag handle */}
               <div className="flex justify-center pt-2 pb-1 shrink-0">
                 <div className="w-10 h-1 rounded-full" style={{ background: "#d0cdc8" }} />
               </div>
@@ -675,7 +878,7 @@ export default function Vyroba() {
                 todayDayIndex={todayDayIndex}
                 onOpenLog={openLogModal}
                 nextWeekNum={nextWeekNum}
-                onSpillAll={handleSpillAll}
+                onSpillAll={openSpillDialog}
                 onOpenExpedice={openExpediceDialog}
                 onToggleItem={toggleItemComplete}
                 getCumulativeForDay={(di) => getCumulativeForDay(selectedProject.projectId, di)}
@@ -689,6 +892,10 @@ export default function Vyroba() {
                 bundleId={bundleId(selectedProject.projectId)}
                 allItems={getAllItemsForProject(selectedProject.projectId)}
                 scheduleData={scheduleData}
+                onPhaseChange={handlePhaseChange}
+                onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
+                dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
+                onDismissDyha={() => setDyhaDismissed(prev => new Set(prev).add(selectedProject.projectId))}
               />
             </div>
           </SheetContent>
@@ -766,11 +973,36 @@ export default function Vyroba() {
               )}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            {logDayIndex === todayDayIndex && (
+              <Button variant="outline" onClick={() => setNoProductionOpen(true)} className="text-xs">
+                Dnes nebyla výroba
+              </Button>
+            )}
+            <div className="flex-1" />
             <Button variant="outline" onClick={() => setLogModalOpen(false)}>Zrušit</Button>
             <Button onClick={handleSaveLog} style={{ background: "#3a8a36" }}>
-              + Log {logDayIndex >= 0 ? DAY_SHORT[logDayIndex] : "–"}
+              💾 Uložit
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ NO PRODUCTION DIALOG ═══ */}
+      <Dialog open={noProductionOpen} onOpenChange={setNoProductionOpen}>
+        <DialogContent className="sm:max-w-xs">
+          <DialogHeader><DialogTitle>Důvod bez výroby</DialogTitle></DialogHeader>
+          <div className="space-y-2 py-2">
+            {["dovolenka", "nemoc", "čeká na materiál", "jiný důvod"].map(r => (
+              <label key={r} className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" checked={noProductionReason === r} onChange={() => setNoProductionReason(r)} className="accent-amber-600" />
+                <span className="text-sm capitalize">{r}</span>
+              </label>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNoProductionOpen(false)}>Zrušit</Button>
+            <Button onClick={handleNoProduction}>Potvrdit</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -811,6 +1043,117 @@ export default function Vyroba() {
         </DialogContent>
       </Dialog>
 
+      {/* ═══ SPILL DIALOG ═══ */}
+      <Dialog open={spillDialogOpen} onOpenChange={setSpillDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Přesunout do T{nextWeekNum}</DialogTitle>
+          </DialogHeader>
+          {selectedProject && (() => {
+            const activeItems = selectedProject.scheduleItems.filter(i => i.status !== "cancelled");
+            // Next week capacity
+            const nextSilo = scheduleData?.get(nextWeekKey);
+            const nextUsed = nextSilo ? nextSilo.bundles.reduce((s, b) => s + b.total_hours, 0) : 0;
+            const selectedHours = activeItems.filter(i => spillSelected.has(i.id)).reduce((s, i) => s + i.scheduled_hours, 0);
+            const nextTotal = nextUsed + selectedHours;
+            const nextPct = Math.round((nextTotal / 760) * 100);
+            const nextColor = nextPct > 100 ? "#dc2626" : nextPct > 85 ? "#d97706" : "#3a8a36";
+
+            return (
+              <div className="space-y-3 py-2">
+                {/* Target capacity bar */}
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-mono font-semibold" style={{ color: "#6b7280" }}>T{nextWeekNum}:</span>
+                  <div className="flex-1 h-[6px] rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
+                    <div className="h-full rounded-full" style={{ width: `${Math.min(nextPct, 100)}%`, background: nextColor }} />
+                  </div>
+                  <span className="font-mono text-[11px]" style={{ color: nextColor }}>{nextTotal}h/760h · {nextPct}%</span>
+                </div>
+                {nextPct > 100 && (
+                  <div className="flex items-center gap-1 text-[11px] px-2 py-1 rounded" style={{ background: "rgba(220,38,38,0.06)", color: "#dc2626" }}>
+                    <AlertTriangle className="h-3 w-3" /> Přesun překročí kapacitu cílového týdne
+                  </div>
+                )}
+
+                {/* Item checklist */}
+                <div className="space-y-1 max-h-[300px] overflow-y-auto">
+                  {activeItems.map(item => {
+                    const isDone = item.status === "completed";
+                    return (
+                      <label key={item.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer ${isDone ? "opacity-40" : ""}`}
+                        style={{ border: "1px solid #ece8e2", background: spillSelected.has(item.id) ? "rgba(217,119,6,0.04)" : "#fff" }}>
+                        <Checkbox
+                          className="h-4 w-4"
+                          checked={spillSelected.has(item.id)}
+                          disabled={isDone}
+                          onCheckedChange={(v) => {
+                            setSpillSelected(prev => {
+                              const next = new Set(prev);
+                              if (v) next.add(item.id); else next.delete(item.id);
+                              return next;
+                            });
+                          }}
+                        />
+                        {item.item_code && <span className="font-mono text-[10px] font-bold" style={{ color: "#223937" }}>{item.item_code}</span>}
+                        <span className="text-[12px] flex-1 truncate" style={{ color: isDone ? "#99a5a3" : "#1a1a1a", textDecoration: isDone ? "line-through" : undefined }}>{item.item_name}</span>
+                        <span className="font-mono text-[11px]" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSpillDialogOpen(false)}>Zrušit</Button>
+            <Button onClick={handleSpillConfirm} disabled={spillSelected.size === 0} style={{ background: "#d97706" }}>
+              Přesunout {spillSelected.size} položek
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ CONTEXT MENU ═══ */}
+      {ctxMenu && (
+        <ProductionContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          actions={getContextMenuActions(ctxMenu.projectId)}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
+
+      {/* ═══ PAUSE DIALOG ═══ */}
+      <PauseItemDialog
+        open={pauseDialogOpen}
+        onOpenChange={setPauseDialogOpen}
+        itemId={pauseTarget.id}
+        itemName={pauseTarget.name}
+        itemCode={pauseTarget.code}
+        source="schedule"
+      />
+
+      {/* ═══ PROJECT DETAIL DIALOG ═══ */}
+      {detailProject && (
+        <ProjectDetailDialog
+          project={detailProject}
+          open={detailDialogOpen}
+          onOpenChange={(open) => { setDetailDialogOpen(open); if (!open) setDetailProject(null); }}
+        />
+      )}
+
+      {/* ═══ RETURN FROM EXPEDICE CONFIRM ═══ */}
+      <ConfirmDialog
+        open={!!returnExpediceConfirm}
+        onConfirm={() => returnExpediceConfirm && handleReturnFromExpedice(returnExpediceConfirm)}
+        onCancel={() => setReturnExpediceConfirm(null)}
+        title="Vrátit z Expedice?"
+        description="Projekt bude vrácen do výroby a všechny položky budou nastaveny na 'in_progress'."
+        confirmLabel="Vrátit"
+        cancelLabel="Zrušit"
+        variant="default"
+      />
+
       <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
       <UserManagement open={userMgmtOpen} onOpenChange={setUserMgmtOpen} />
       <ExchangeRateSettings open={exchangeRateOpen} onOpenChange={setExchangeRateOpen} />
@@ -820,6 +1163,81 @@ export default function Vyroba() {
       <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} />
       <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════ */
+/* PROJECT ROW (left panel)                */
+/* ═══════════════════════════════════════ */
+
+function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectStatus, getLatestPercent, getLatestPhase, statusColors }: {
+  project: VyrobaProject;
+  isSelected: boolean;
+  onSelect: (pid: string) => void;
+  onContextMenu: (e: React.MouseEvent, pid: string) => void;
+  getProjectStatus: (pid: string) => "on-track" | "at-risk" | "behind";
+  getLatestPercent: (pid: string) => number;
+  getLatestPhase: (pid: string) => string | null;
+  statusColors: Record<string, string>;
+}) {
+  const status = getProjectStatus(project.projectId);
+  const pct = getLatestPercent(project.projectId);
+  const phase = getLatestPhase(project.projectId);
+  const borderColor = project.isSpilled ? "#d97706" : status === "behind" ? "#dc2626" : status === "at-risk" ? "#d97706" : project.color;
+
+  // Deadline urgency color for project name
+  const now = new Date();
+  const deadlinePast = project.deadline && project.deadline < now;
+  const deadlineSoon = project.deadline && !deadlinePast && project.deadline.getTime() - now.getTime() < 14 * 24 * 60 * 60 * 1000;
+  const nameColor = deadlinePast ? "#dc2626" : deadlineSoon ? "#d97706" : "#1a1a1a";
+
+  return (
+    <button
+      onClick={() => onSelect(project.projectId)}
+      onContextMenu={(e) => onContextMenu(e, project.projectId)}
+      className="w-full text-left flex items-stretch transition-colors"
+      style={{
+        background: isSelected ? "#ffffff" : "transparent",
+        borderBottom: "1px solid #f0eeea",
+        outline: isSelected ? "2px solid #d97706" : undefined,
+        outlineOffset: -2,
+      }}
+    >
+      <div className="w-[4px] shrink-0 rounded-r-sm" style={{ background: borderColor }} />
+      <div className="flex-1 px-2.5 py-[5px] min-w-0">
+        <div className="flex items-center justify-between gap-1">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="truncate" style={{ fontSize: 14, fontWeight: 500, color: nameColor }}>{project.projectName}</span>
+            {project.isSpilled && (
+              <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.1)", color: "#D97706" }}>
+                Omeškaní
+              </span>
+            )}
+          </div>
+          <span className="font-mono text-xs font-bold shrink-0" style={{ color: statusColors[status] }}>
+            {pct}%
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <span className="font-mono" style={{ fontSize: 11, color: "#99a5a3" }}>{project.projectId}</span>
+          {project.deadline && (
+            <>
+              <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
+              <span style={{ fontSize: 11, color: "#6b7280" }}>{fmtDateFull(project.deadline)}</span>
+            </>
+          )}
+          {phase && (
+            <>
+              <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
+              <span style={{ fontSize: 11, color: PHASES.find(ph => ph.name === phase)?.color || "#6b7280", fontWeight: 500 }}>{phase}</span>
+            </>
+          )}
+        </div>
+        <div className="mt-1.5 h-[3px] rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
+          <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: statusColors[status] }} />
+        </div>
+      </div>
+    </button>
   );
 }
 
@@ -848,7 +1266,7 @@ function useProjectDetails(projectIds: string[]) {
 /* DETAIL PANEL                            */
 /* ═══════════════════════════════════════ */
 
-function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog, nextWeekNum, onSpillAll, onOpenExpedice, onToggleItem, getCumulativeForDay, getExpectedPct, status, latestPct, latestPhase, logs, expandedMap, setExpandedMap, bundleId, allItems, scheduleData }: {
+function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog, nextWeekNum, onSpillAll, onOpenExpedice, onToggleItem, getCumulativeForDay, getExpectedPct, status, latestPct, latestPhase, logs, expandedMap, setExpandedMap, bundleId, allItems, scheduleData, onPhaseChange, onOpenProjectDetail, dyhaDismissed, onDismissDyha }: {
   project: VyrobaProject;
   weekKey: string;
   currentMonday: Date;
@@ -869,6 +1287,10 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
   bundleId: string;
   allItems: { item: ScheduleItem; weekKey: string; weekNum: number }[];
   scheduleData: Map<string, any> | undefined;
+  onPhaseChange: (phaseName: string) => void;
+  onOpenProjectDetail: () => void;
+  dyhaDismissed: boolean;
+  onDismissDyha: () => void;
 }) {
   const isMobile = useIsMobile();
   const expectedPct = todayDayIndex >= 0 ? getExpectedPct(todayDayIndex) : 0;
@@ -876,6 +1298,10 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
   const statusColors = { "on-track": "#3a8a36", "at-risk": "#d97706", "behind": "#dc2626" };
   const statusLabels = { "on-track": "On track", "at-risk": "At risk", "behind": "Pozadu" };
   const statusColor = statusColors[status];
+
+  // Collapsible states for sections
+  const [futureOpen, setFutureOpen] = useState(false);
+  const [completedOpen, setCompletedOpen] = useState(false);
 
   // Group all items by category
   const { currentItems, futureItems, completedItems } = useMemo(() => {
@@ -891,7 +1317,6 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
       } else if (new Date(entry.weekKey) > new Date(weekKey)) {
         future.push(entry);
       } else {
-        // Past week active items → treat as current (spilled)
         current.push(entry);
       }
     }
@@ -900,6 +1325,15 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
 
   const totalActiveItems = currentItems.length + futureItems.length + completedItems.length;
 
+  // PM initials
+  const pmInitials = project.pm ? project.pm.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) : null;
+
+  // Future weeks summary
+  const futureWeekNums = [...new Set(futureItems.map(i => i.weekNum))].sort();
+
+  // Show Dýha warning
+  const showDyhaWarning = latestPhase === "Dýha" && !dyhaDismissed;
+
   return (
     <div className="flex flex-col flex-1 min-h-0">
       {/* ── Header ── */}
@@ -907,7 +1341,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
         <div className="flex items-start justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="font-mono text-xs" style={{ color: "#6b7280" }}>{project.projectId}</span>
+              <button onClick={onOpenProjectDetail} className="font-mono text-xs hover:underline cursor-pointer" style={{ color: "#6b7280" }}>{project.projectId}</button>
               <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: `${statusColor}18`, color: statusColor }}>
                 {statusLabels[status]}
               </span>
@@ -917,11 +1351,18 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
                 </span>
               )}
             </div>
-            <div style={{ fontSize: 16, fontWeight: 500, color: "#1a1a1a" }}>{project.projectName}</div>
-            <div className="text-xs mt-0.5" style={{ color: "#6b7280" }}>
+            <button onClick={onOpenProjectDetail} className="hover:underline cursor-pointer text-left" style={{ fontSize: 16, fontWeight: 500, color: "#1a1a1a" }}>
+              {project.projectName}
+            </button>
+            <div className="text-xs mt-0.5 flex items-center gap-2" style={{ color: "#6b7280" }}>
               {totalActiveItems} položek
               {project.deadline && <> · Expedice {fmtDateFull(project.deadline)}</>}
-              {project.pm && <> · {project.pm}</>}
+              {project.pm && pmInitials && (
+                <span className="inline-flex items-center gap-1">
+                  · <span className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white" style={{ background: project.color }}>{pmInitials}</span>
+                  <span>{project.pm}</span>
+                </span>
+              )}
             </div>
           </div>
           <div className="text-right shrink-0">
@@ -942,6 +1383,9 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
             <div className="absolute top-[-2px] h-[8px] w-[2px]" style={{ left: `${expectedPct}%`, background: "#1a1a1a", opacity: 0.2 }} />
           )}
         </div>
+
+        {/* ── Výkresy inline ── */}
+        <VykresynSection projectId={project.projectId} />
       </div>
 
       {/* ── Scrollable body ── */}
@@ -965,34 +1409,61 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           </div>
         </div>
 
-        {/* ── Phases + Spill ── */}
+        {/* ── Phases ── */}
         <div>
-          <div className="text-[10px] uppercase font-semibold mb-2" style={{ color: "#99a5a3" }}>Fáze výroby</div>
+          <div className="text-[10px] uppercase font-semibold mb-2" style={{ color: "#99a5a3" }}>Operace</div>
           <div className="flex items-center gap-1.5 flex-wrap">
             {PHASES.map(p => {
               const isCurrent = latestPhase === p.name;
               const phaseUsed = logs.some(l => l.phase === p.name);
+              const phasePctDone = latestPct >= p.pct;
               return (
-                <span key={p.name} className="px-2.5 py-1 rounded-full text-xs font-medium"
+                <button key={p.name}
+                  onClick={() => onPhaseChange(p.name)}
+                  className="px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer"
                   style={{
                     background: isCurrent ? `${p.color}15` : "#f5f3f0",
-                    color: isCurrent ? p.color : "#6b7280",
-                    border: `1px solid ${isCurrent ? p.color : "#e5e2dd"}`,
+                    color: isCurrent ? "#3a8a36" : phasePctDone ? "#3a8a36" : "#6b7280",
+                    border: isCurrent ? `1.5px solid #3a8a36` : `1px solid ${phasePctDone ? "rgba(58,138,54,0.3)" : "#e5e2dd"}`,
                   }}>
-                  {phaseUsed && !isCurrent ? "✓ " : ""}{p.name}
-                </span>
+                  {phasePctDone && !isCurrent ? "✓ " : ""}{p.name} <span className="text-[9px] opacity-60">{p.pct}%</span>
+                </button>
               );
             })}
             <div className="flex-1" />
             <button
               onClick={onSpillAll}
-              className="px-3 py-1 text-[11px] font-semibold rounded transition-colors"
+              className={`px-3 py-1 text-[11px] font-semibold rounded transition-colors ${isMobile ? "min-h-[44px]" : ""}`}
               style={{ background: "#d97706", color: "#fff" }}
             >
               ⇒ Přesunout do T{nextWeekNum}
             </button>
           </div>
         </div>
+
+        {/* ── DÝHA WARNING ── */}
+        {showDyhaWarning && (
+          <div className="rounded-lg p-3" style={{ background: "rgba(230,126,34,0.08)", border: "1.5px solid rgba(230,126,34,0.3)" }}>
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "#e67e22" }} />
+              <div className="flex-1">
+                <div className="text-[12px] font-semibold" style={{ color: "#e67e22" }}>⚠ Kritická operace: Dýha vyžaduje kontrolu kvality</div>
+                <div className="flex gap-2 mt-2">
+                  <button className={`px-3 py-1.5 text-[11px] font-medium rounded transition-colors ${isMobile ? "min-h-[44px]" : ""}`}
+                    style={{ background: "#e67e22", color: "#fff" }}
+                    onClick={() => { /* Photo upload handled via VyrobaPhotoTab */ }}>
+                    📷 Odeslat fotku
+                  </button>
+                  <button className={`px-3 py-1.5 text-[11px] font-medium rounded transition-colors ${isMobile ? "min-h-[44px]" : ""}`}
+                    style={{ border: "1px solid #e5e2dd", color: "#6b7280" }}
+                    onClick={onDismissDyha}>
+                    Pokračovat na vlastní riziko
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── AKTUÁLNÍ items (unified with QC) ── */}
         <UnifiedItemList
@@ -1006,38 +1477,48 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           isMobile={isMobile}
         />
 
-        {/* ── NAPLÁNOVANÉ (future) ── */}
+        {/* ── NAPLÁNOVANÉ (future) — collapsible ── */}
         {futureItems.length > 0 && (
-          <div>
-            <div className="text-[10px] uppercase font-semibold mb-2" style={{ color: "#99a5a3" }}>Naplánované</div>
-            <div className="space-y-1">
-              {futureItems.map(({ item, weekNum: wn }) => (
-                <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#f5f3f0", opacity: 0.5 }}>
-                  {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
-                  <span className="text-[13px] flex-1 truncate" style={{ color: "#6b7280" }}>{item.item_name}</span>
-                  <span className="font-mono text-[10px] shrink-0" style={{ color: "#99a5a3" }}>T{wn}</span>
-                  <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <Collapsible open={futureOpen} onOpenChange={setFutureOpen}>
+            <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold cursor-pointer" style={{ color: "#666666" }}>
+              {futureOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              Naplánované ({futureItems.length} položek{futureWeekNums.length > 0 && ` · T${futureWeekNums.join(", T")}`})
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="mt-2 space-y-1">
+                {futureItems.map(({ item, weekNum: wn }) => (
+                  <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#f5f3f0" }}>
+                    <span className="text-[9px] font-mono font-bold px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(37,99,235,0.08)", color: "#2563eb" }}>T{wn}</span>
+                    {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
+                    <span className="text-[13px] flex-1 truncate" style={{ color: "#666666" }}>{item.item_name}</span>
+                    <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         )}
 
-        {/* ── HOTOVÉ ── */}
+        {/* ── HOTOVÉ — collapsible ── */}
         {completedItems.length > 0 && (
-          <div>
-            <div className="text-[10px] uppercase font-semibold mb-2" style={{ color: "#99a5a3" }}>Hotové</div>
-            <div className="space-y-1">
-              {completedItems.map(({ item }) => (
-                <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#ffffff", opacity: 0.55 }}>
-                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#3a8a36" }} />
-                  {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
-                  <span className="text-[13px] flex-1 truncate" style={{ color: "#99a5a3", textDecoration: "line-through" }}>{item.item_name}</span>
-                  <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <Collapsible open={completedOpen} onOpenChange={setCompletedOpen}>
+            <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold cursor-pointer" style={{ color: "#3a8a36" }}>
+              {completedOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              ✓ Hotové ({completedItems.length})
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="mt-2 space-y-1">
+                {completedItems.map(({ item }) => (
+                  <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-md" style={{ border: "1px solid #ece8e2", background: "#ffffff" }}>
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#3a8a36" }} />
+                    {item.item_code && <span className="font-mono text-[10px] shrink-0" style={{ color: "#3a8a36" }}>{item.item_code}</span>}
+                    <span className="text-[13px] flex-1 truncate" style={{ color: "#5a9a58", textDecoration: "line-through" }}>{item.item_name}</span>
+                    <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         )}
 
         {/* ── Daily log shortcut ── */}
@@ -1046,9 +1527,6 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
             + Log dnes ({DAY_SHORT[todayDayIndex]})
           </button>
         )}
-
-        {/* ── Výkresy Section ── */}
-        <VykresynSection projectId={project.projectId} />
       </div>
     </div>
   );
@@ -1068,8 +1546,11 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   onOpenExpedice: () => void;
   isMobile: boolean;
 }) {
-  const { checks, checkItem } = useQualityChecks(projectId);
+  const { checks, checkItem, uncheckItem } = useQualityChecks(projectId);
   const [qcLoading, setQcLoading] = useState<string | null>(null);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [uncheckConfirm, setUncheckConfirm] = useState<string | null>(null);
+  const qc = useQueryClient();
 
   const checkMap = useMemo(() => {
     const m = new Map<string, any>();
@@ -1089,6 +1570,28 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
     }
   }
 
+  async function handleUncheckQC(checkId: string) {
+    try {
+      await uncheckItem(checkId);
+      toast.success("QC kontrola zrušena");
+    } catch {
+      toast.error("Chyba");
+    }
+    setUncheckConfirm(null);
+  }
+
+  // Batch complete
+  async function handleBatchComplete() {
+    const { data: { user } } = await supabase.auth.getUser();
+    const ids = Array.from(selectedItems);
+    await supabase.from("production_schedule").update({
+      status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
+    }).in("id", ids);
+    qc.invalidateQueries({ queryKey: ["production-schedule"] });
+    setSelectedItems(new Set());
+    toast.success(`${ids.length} položek označeno jako hotovo`);
+  }
+
   const completedCount = currentItems.filter(i => i.item.status === "completed").length;
   const allReady = currentItems.length > 0 && currentItems.every(({ item }) => {
     const isDone = item.status === "completed";
@@ -1096,13 +1599,43 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
     return isDone && hasQC;
   });
 
+  const allSelected = currentItems.length > 0 && currentItems.every(i => selectedItems.has(i.item.id));
+
   return (
     <>
+      {/* Selection action bar */}
+      {selectedItems.size > 0 && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md text-xs" style={{ background: "rgba(37,99,235,0.06)", border: "1px solid rgba(37,99,235,0.15)" }}>
+          <span className="font-semibold" style={{ color: "#2563eb" }}>{selectedItems.size} vybráno</span>
+          <button onClick={handleBatchComplete} className="px-2 py-1 rounded text-[11px] font-medium" style={{ background: "#3a8a36", color: "#fff" }}>
+            Označit jako hotovo
+          </button>
+          <button onClick={() => setSelectedItems(new Set())} className="px-2 py-1 rounded text-[11px]" style={{ color: "#6b7280", border: "1px solid #e5e2dd" }}>
+            Zrušit výběr
+          </button>
+        </div>
+      )}
+
       <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
-        <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold cursor-pointer" style={{ color: "#6b7280" }}>
-          {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-          Aktuální ({completedCount}/{currentItems.length})
-        </CollapsibleTrigger>
+        <div className="flex items-center gap-2">
+          <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold cursor-pointer" style={{ color: "#6b7280" }}>
+            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            Aktuální ({completedCount}/{currentItems.length})
+          </CollapsibleTrigger>
+          {currentItems.length > 0 && (
+            <label className="flex items-center gap-1 text-[10px] cursor-pointer" style={{ color: "#99a5a3" }}>
+              <Checkbox
+                className="h-3.5 w-3.5"
+                checked={allSelected}
+                onCheckedChange={(v) => {
+                  if (v) setSelectedItems(new Set(currentItems.map(i => i.item.id)));
+                  else setSelectedItems(new Set());
+                }}
+              />
+              Vše
+            </label>
+          )}
+        </div>
         <CollapsibleContent>
           <div className="mt-2 space-y-1">
             {currentItems.map(({ item }) => {
@@ -1112,7 +1645,6 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
               const qcCheck = checkMap.get(item.id);
               const hasQC = !!qcCheck;
 
-              // Row state colors
               const bothDone = isCompleted && hasQC;
               const doneNoQC = isCompleted && !hasQC;
               const rowBg = bothDone ? "rgba(58,138,54,0.06)" : doneNoQC ? "rgba(217,119,6,0.06)" : "#ffffff";
@@ -1120,6 +1652,26 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
 
               return (
                 <div key={item.id} className="flex items-center gap-2 px-2.5 py-2 rounded-md" style={{ border: rowBorder, background: rowBg }}>
+                  {/* Select checkbox */}
+                  <Checkbox
+                    className="h-3.5 w-3.5 shrink-0"
+                    checked={selectedItems.has(item.id)}
+                    onCheckedChange={(v) => {
+                      setSelectedItems(prev => {
+                        const next = new Set(prev);
+                        if (v) next.add(item.id); else next.delete(item.id);
+                        return next;
+                      });
+                    }}
+                  />
+
+                  {/* Hotovo checkbox */}
+                  <Checkbox
+                    className="h-4 w-4 shrink-0"
+                    checked={isCompleted}
+                    onCheckedChange={() => onToggleItem(item.id, item.status)}
+                  />
+
                   {/* Left: item info */}
                   <div className="flex-1 min-w-0 flex items-center gap-1.5">
                     {item.item_code && (
@@ -1127,26 +1679,31 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                     )}
                     <span className="text-[13px] truncate" style={{
                       color: bothDone ? "#3a8a36" : isCompleted ? "#99a5a3" : "#1a1a1a",
-                      textDecoration: isCompleted ? "line-through" : undefined,
+                      textDecoration: bothDone ? "line-through" : undefined,
                     }}>
                       {item.item_name}
                     </span>
                     {isSplit && (
-                      <span className="text-[9px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(99,102,241,0.1)", color: "#6366f1" }}>
+                      <span className="text-[9px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(217,119,6,0.1)", color: "#d97706" }}>
                         část {item.split_part}/{item.split_total}
                       </span>
                     )}
                     {isPaused && (
                       <span className="text-[8px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(217,119,6,0.12)", color: "#d97706" }}>⏸</span>
                     )}
+                    {doneNoQC && (
+                      <span className="text-[8px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(217,119,6,0.12)", color: "#d97706" }}>Chybí QC</span>
+                    )}
                   </div>
 
-                  {/* Right: hours, QC, checkbox */}
+                  {/* Right: hours, QC */}
                   <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>{item.scheduled_hours}h</span>
 
                   {/* QC button / indicator */}
                   {qcCheck ? (
-                    <QualityCheckDisplay check={qcCheck} />
+                    <button onClick={() => setUncheckConfirm(qcCheck.id)} className="shrink-0">
+                      <QualityCheckDisplay check={qcCheck} />
+                    </button>
                   ) : (
                     <button
                       onClick={() => handleQC(item.id)}
@@ -1158,13 +1715,6 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                       {qcLoading === item.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "✓ QC"}
                     </button>
                   )}
-
-                  {/* Hotovo checkbox */}
-                  <Checkbox
-                    className="h-4 w-4 shrink-0"
-                    checked={isCompleted}
-                    onCheckedChange={() => onToggleItem(item.id, item.status)}
-                  />
                 </div>
               );
             })}
@@ -1172,7 +1722,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         </CollapsibleContent>
       </Collapsible>
 
-      {/* Expedice button — only active when ALL items are both done + QC'd */}
+      {/* Expedice button */}
       <div className="relative group">
         <button
           onClick={allReady ? onOpenExpedice : undefined}
@@ -1194,6 +1744,18 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
           </div>
         )}
       </div>
+
+      {/* QC Uncheck confirm */}
+      <ConfirmDialog
+        open={!!uncheckConfirm}
+        onConfirm={() => uncheckConfirm && handleUncheckQC(uncheckConfirm)}
+        onCancel={() => setUncheckConfirm(null)}
+        title="Zrušit QC kontrolu?"
+        description="Kontrola kvality bude odstraněna pro tuto položku."
+        confirmLabel="Zrušit QC"
+        cancelLabel="Zpět"
+        variant="destructive"
+      />
     </>
   );
 }
@@ -1203,14 +1765,23 @@ function QualityCheckDisplay({ check }: { check: any }) {
   const date = new Date(check.checked_at);
   const dateStr = `${date.getDate()}.${date.getMonth() + 1}.`;
   return (
-    <span className="text-[10px] shrink-0" style={{ color: "#3a8a36" }}>
-      ✓ {name || "–"} {dateStr}
-    </span>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="text-[10px] shrink-0 cursor-pointer" style={{ color: "#3a8a36" }}>
+            ✓ QC
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p className="text-xs">Zkontroloval: {name || "–"} · {dateStr}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
 /* ═══════════════════════════════════════ */
-/* VÝKRESY SECTION                         */
+/* VÝKRESY SECTION (header collapsible)    */
 /* ═══════════════════════════════════════ */
 
 function VykresynSection({ projectId }: { projectId: string }) {
@@ -1225,10 +1796,10 @@ function VykresynSection({ projectId }: { projectId: string }) {
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold cursor-pointer" style={{ color: "#6b7280" }}>
+      <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold cursor-pointer mt-2" style={{ color: "#6b7280" }}>
         {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
         <FileText className="h-3 w-3" />
-        Výkresy ({files.length})
+        📄 Výkresy ({files.length})
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="mt-2 space-y-1">
@@ -1279,16 +1850,19 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
   const hasData = cumulative !== null;
   const pct = cumulative?.percent ?? 0;
 
-  // Check if log was added retroactively (logged_at date != the actual day)
   const exactLog = logs.find(l => l.day_index === dayIndex);
   const isRetroactive = useMemo(() => {
     if (!exactLog || !isPast) return false;
-    // Compare logged_at date with the actual day
     const loggedDate = new Date(exactLog.logged_at);
     const actualDay = new Date();
     actualDay.setDate(actualDay.getDate() - (todayDayIndex - dayIndex));
-    return loggedDate.toDateString() !== actualDay.toDateString();
+    // 12h threshold
+    const diff = loggedDate.getTime() - actualDay.getTime();
+    return diff > 12 * 60 * 60 * 1000;
   }, [exactLog, isPast, todayDayIndex, dayIndex]);
+
+  // Check for "no production" log
+  const isNoProduction = exactLog?.phase?.startsWith("Bez výroby");
 
   let bg = "#ffffff";
   let border = "#e5e2dd";
@@ -1303,13 +1877,19 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
     bg = "rgba(58,138,54,0.03)";
     border = "#3a8a36";
     borderWidth = "2px";
+  } else if (isPast && isNoProduction) {
+    bg = "#f5f3f0";
+    border = "#d0cdc8";
+  } else if (isPast && cumulative?.hasLog && !isRetroactive) {
+    bg = "#ffffff";
+    border = "#86c083";
+  } else if (isPast && cumulative?.hasLog && isRetroactive) {
+    bg = "#ffffff";
+    border = "#d97706";
   } else if (isPast && !cumulative?.hasLog) {
     bg = "#ffffff";
     border = "#e5a8a8";
     borderWidth = "1px";
-  } else if (isPast && cumulative?.hasLog) {
-    bg = "#ffffff";
-    border = "#86c083";
   }
 
   const clickable = isToday || (isPast && !isFuture);
@@ -1334,12 +1914,12 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
       {hasData ? (
         <>
           <div className="flex items-center justify-between">
-            <div className="text-xl font-mono font-bold" style={{ color: pct >= 100 ? "#3a8a36" : "#1a1a1a" }}>{pct}%</div>
+            <div className="text-xl font-mono font-bold" style={{ color: isNoProduction ? "#99a5a3" : pct >= 100 ? "#3a8a36" : "#1a1a1a" }}>{pct}%</div>
             {isRetroactive && (
               <span className="text-[7px] font-bold px-1 py-[1px] rounded" style={{ background: "rgba(220,38,38,0.1)", color: "#dc2626" }}>doplněno</span>
             )}
           </div>
-          {cumulative?.phase && (
+          {cumulative?.phase && !isNoProduction && (
             <div className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: PHASES.find(p => p.name === cumulative.phase)?.color || "#6b7280" }} />
               <span className="text-[9px]" style={{ color: "#6b7280" }}>{cumulative.phase}</span>
@@ -1355,7 +1935,7 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center py-1">
           {isPast && !isFuture ? (
-            <span className="text-[9px]" style={{ color: "#fca5a5", opacity: 0.8 }}>bez logu</span>
+            <span className="text-[9px]" style={{ color: "#e5a8a8" }}>bez logu</span>
           ) : isFuture ? (
             <span className="text-[11px]" style={{ color: "#d0cdc8" }}>–</span>
           ) : isToday ? (
@@ -1383,7 +1963,6 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load fotky on mount
   useEffect(() => {
     if (projectId) listFiles("fotky");
   }, [projectId, listFiles]);
@@ -1397,7 +1976,6 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     for (const file of Array.from(files)) {
-      // Auto-name: {project_id}-{slug}-Vyroba-{date}-{time}.{ext}
       const now = new Date();
       const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
       const timeStr = `${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}`;
@@ -1426,7 +2004,6 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
 
   return (
     <div>
-      {/* Upload button */}
       <div className="flex items-center justify-between mb-2">
         <span className="text-[10px]" style={{ color: "#99a5a3" }}>{photos.length} fotek</span>
         <label className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium cursor-pointer transition-colors min-h-[36px]"
@@ -1446,7 +2023,6 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
         </label>
       </div>
 
-      {/* Photo grid */}
       {photos.length === 0 ? (
         <div className="h-16 rounded-md flex items-center justify-center text-xs" style={{ border: "1px dashed #e5e2dd", color: "#99a5a3" }}>
           Žádné fotky
@@ -1468,7 +2044,6 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
                   />
                 </div>
                 <div className="text-[9px] text-center mt-0.5" style={{ color: "#99a5a3" }}>{dateLabel}</div>
-                {/* Delete button on hover */}
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDelete(photo.name); }}
                   className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -1481,7 +2056,6 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
         </div>
       )}
 
-      {/* Lightbox */}
       <PhotoLightbox
         open={lightboxOpen}
         onClose={() => setLightboxOpen(false)}
