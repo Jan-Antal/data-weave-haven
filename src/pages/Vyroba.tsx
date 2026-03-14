@@ -913,7 +913,7 @@ export default function Vyroba() {
                 bundleId={bundleId(selectedProject.projectId)}
                 allItems={getAllItemsForProject(selectedProject.projectId)}
                 scheduleData={scheduleData}
-                onPhaseChange={handlePhaseChange}
+                
                 onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
                 dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
                 onDismissDyha={() => setDyhaDismissed(prev => new Set(prev).add(selectedProject.projectId))}
