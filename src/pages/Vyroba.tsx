@@ -823,6 +823,7 @@ export default function Vyroba() {
       });
       await saveDailyLog(bId, weekKey, logDayIndex, `Bez výroby: ${noProductionReason}`, capturedPct);
       qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
+      logActivity({ projectId: selectedProject.projectId, actionType: "vyroba_no_activity", detail: noProductionReason });
       setNoProductionOpen(false);
       setLogModalOpen(false);
     } catch {
