@@ -1329,6 +1329,14 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
   const statusLabels = { "on-track": "On track", "at-risk": "At risk", "behind": "Pozadu" };
   const statusColor = statusColors[status];
 
+  // QC checks for hotové section
+  const { checks: hotoveChecks } = useQualityChecks(project.projectId);
+  const hotoveCheckMap = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const c of hotoveChecks) m.set(c.item_id, c);
+    return m;
+  }, [hotoveChecks]);
+
   // Collapsible states for sections
   const [futureOpen, setFutureOpen] = useState(false);
   const [completedOpen, setCompletedOpen] = useState(false);
