@@ -1060,42 +1060,68 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
           ))}
         </div>
 
-        <div className="relative flex items-center gap-0.5">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: forecastActive ? "#7aa8a4" : undefined }} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => onSearchChange(e.target.value)}
-              placeholder="Hledat projekt..."
-              className="w-[200px] h-8 pl-8 pr-8 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 transition-colors"
-              style={{
-                backgroundColor: forecastActive ? "#223937" : "hsl(var(--background))",
-                border: forecastActive ? "1px solid #2a4a46" : "1px solid hsl(var(--input))",
-                color: forecastActive ? "#a8c5c2" : undefined,
-              }}
-            />
-            {searchQuery && (
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 z-10" style={{ color: forecastActive ? "#7aa8a4" : undefined }} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => onSearchChange(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Escape") { onSearchChange(""); return; }
+              if (e.key === "Enter" && searchNavActive && searchNavTotalCount > 0) {
+                e.preventDefault();
+                if (e.shiftKey) searchNavGoPrev?.();
+                else searchNavGoNext?.();
+              }
+            }}
+            placeholder="Hledat projekt..."
+            className="h-8 pl-8 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 transition-colors"
+            style={{
+              width: searchQuery ? 280 : 200,
+              paddingRight: searchQuery ? 120 : 12,
+              backgroundColor: forecastActive ? "#223937" : "hsl(var(--background))",
+              border: forecastActive ? "1px solid #2a4a46" : "1px solid hsl(var(--input))",
+              color: forecastActive ? "#a8c5c2" : undefined,
+              transition: "width 150ms ease",
+            }}
+          />
+          {searchQuery && (
+            <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+              {searchNavActive && searchNavTotalCount > 0 && (
+                <>
+                  <button
+                    onClick={searchNavGoPrev}
+                    className="p-0.5 rounded transition-colors hover:bg-black/5"
+                    style={{ color: forecastActive ? "#7aa8a4" : "hsl(var(--muted-foreground))" }}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="text-[11px] font-mono whitespace-nowrap" style={{
+                    color: forecastActive ? "#a8c5c2" : "hsl(var(--muted-foreground))",
+                  }}>
+                    {searchNavCurrentIndex + 1}/{searchNavTotalCount}
+                  </span>
+                  <button
+                    onClick={searchNavGoNext}
+                    className="p-0.5 rounded transition-colors hover:bg-black/5"
+                    style={{ color: forecastActive ? "#7aa8a4" : "hsl(var(--muted-foreground))" }}
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
+              {searchNavActive && searchNavTotalCount === 0 && (
+                <span className="text-[11px] font-mono whitespace-nowrap" style={{ color: "hsl(0 70% 55%)" }}>
+                  0 výsledků
+                </span>
+              )}
               <button
                 onClick={() => onSearchChange("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors"
-                style={{ color: forecastActive ? "#6b7280" : undefined }}
+                className="p-0.5 rounded transition-colors hover:bg-black/5 ml-0.5"
+                style={{ color: forecastActive ? "#6b7280" : "hsl(var(--muted-foreground))" }}
               >
                 <X className="h-3.5 w-3.5" />
               </button>
-            )}
-          </div>
-          {searchQuery && (
-            <div className="flex items-center gap-0.5 ml-1">
-              <span className="text-[11px] font-mono whitespace-nowrap" style={{
-                color: searchMatchCount === 0
-                  ? "hsl(0 70% 55%)"
-                  : forecastActive ? "#a8c5c2" : "hsl(var(--muted-foreground))",
-              }}>
-                {searchMatchCount === 0
-                  ? "0 výsledků"
-                  : `${searchMatchCount} ${searchMatchCount === 1 ? "projekt" : searchMatchCount < 5 ? "projekty" : "projektů"}`}
-              </span>
             </div>
           )}
         </div>

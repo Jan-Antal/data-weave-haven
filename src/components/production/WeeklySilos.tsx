@@ -1289,25 +1289,25 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   }
 
   return (
-    <div className="rounded-[6px] overflow-hidden relative" style={{
+    <div data-bundle-key={`${weekKey}::${bundle.project_id}`} className="rounded-[6px] overflow-hidden relative" style={{
       borderTop: forecastDarkMode
-        ? ((isSelected || isSearchMatch) ? "2px solid #d97706" : "1px solid #3d4558")
-        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : (isSelected || isSearchMatch) ? "2px solid #d97706" : "1px solid #ece8e2"),
+        ? (isHighlighted ? "2px solid #d97706" : "1px solid #3d4558")
+        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isHighlighted ? "2px solid #d97706" : "1px solid #ece8e2"),
       borderRight: forecastDarkMode
-        ? ((isSelected || isSearchMatch) ? "2px solid #d97706" : "1px solid #3d4558")
-        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : (isSelected || isSearchMatch) ? "2px solid #d97706" : "1px solid #ece8e2"),
+        ? (isHighlighted ? "2px solid #d97706" : "1px solid #3d4558")
+        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isHighlighted ? "2px solid #d97706" : "1px solid #ece8e2"),
       borderBottom: forecastDarkMode
-        ? ((isSelected || isSearchMatch) ? "2px solid #d97706" : "1px solid #3d4558")
-        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : (isSelected || isSearchMatch) ? "2px solid #d97706" : "1px solid #ece8e2"),
-      borderLeft: (isSelected || isSearchMatch) ? "4px solid #d97706" : `4px solid ${borderLeftColor}`,
+        ? (isHighlighted ? "2px solid #d97706" : "1px solid #3d4558")
+        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isHighlighted ? "2px solid #d97706" : "1px solid #ece8e2"),
+      borderLeft: isHighlighted ? "4px solid #d97706" : `4px solid ${borderLeftColor}`,
       backgroundColor: forecastDarkMode
-        ? ((isSelected || isSearchMatch) ? "rgba(217,119,6,0.08)" : "#252a35")
-        : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : (isSelected || isSearchMatch) ? "rgba(217,119,6,0.05)" : "#ffffff"),
-      opacity: isDragging ? 0.3 : 1,
+        ? (isHighlighted ? "rgba(217,119,6,0.08)" : "#252a35")
+        : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : isHighlighted ? "rgba(217,119,6,0.05)" : "#ffffff"),
+      opacity: isDragging ? 0.3 : isDimmed ? 0.5 : 1,
       outline: isFocusedMatch ? "2px solid #d97706" : undefined,
       outlineOffset: isFocusedMatch ? "2px" : undefined,
-      boxShadow: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "inset 0 0 0 1px hsl(0 60% 86%)" : (isSelected || isSearchMatch) ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined),
-      transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, box-shadow 150ms, outline 300ms",
+      boxShadow: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "inset 0 0 0 1px hsl(0 60% 86%)" : isHighlighted ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined),
+      transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, box-shadow 150ms, outline 300ms, opacity 200ms",
     }}>
 
       <div className="flex" style={{ borderBottom: expanded ? (forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2") : "none", backgroundColor: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : undefined) }}>
