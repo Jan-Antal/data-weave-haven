@@ -1244,7 +1244,6 @@ export default function Vyroba() {
                 </div>
               );
             })()}
-            </div>
 
             {/* Tab switcher: Poznámky / Foto */}
             <div>
