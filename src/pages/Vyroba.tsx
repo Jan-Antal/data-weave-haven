@@ -1141,72 +1141,136 @@ export default function Vyroba() {
 
       {/* ═══ SPILL DIALOG ═══ */}
       <Dialog open={spillDialogOpen} onOpenChange={setSpillDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Přesunout do T{nextWeekNum}</DialogTitle>
           </DialogHeader>
           {selectedProject && (() => {
-            const activeItems = selectedProject.scheduleItems.filter(i => i.status !== "cancelled");
+            const allItems = selectedProject.scheduleItems.filter(i => i.status !== "cancelled");
             const pct = getLatestPercent(selectedProject.projectId);
-            // Next week capacity — use remaining hours
             const nextSilo = scheduleData?.get(nextWeekKey);
             const nextUsed = nextSilo ? nextSilo.bundles.reduce((s, b) => s + b.total_hours, 0) : 0;
-            const selectedRemainingHours = activeItems
+
+            // Calculate selected hours respecting full-hours toggle
+            const selectedHoursToMove = allItems
               .filter(i => spillSelected.has(i.id))
-              .reduce((s, i) => s + getRemainingHours(i, pct), 0);
-            const nextTotal = nextUsed + selectedRemainingHours;
+              .reduce((s, i) => {
+                if (spillFullHours.has(i.id)) return s + i.scheduled_hours;
+                return s + getRemainingHours(i, pct);
+              }, 0);
+
+            const nextTotal = nextUsed + selectedHoursToMove;
             const nextPct = Math.round((nextTotal / 760) * 100);
-            const nextColor = nextPct > 100 ? "#dc2626" : nextPct > 85 ? "#d97706" : "#3a8a36";
+            const nextColor = nextPct > 100 ? "#dc2626" : nextPct > 80 ? "#d97706" : "#3a8a36";
 
             return (
-              <div className="space-y-3 py-2">
-                {/* Target capacity bar */}
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="font-mono font-semibold" style={{ color: "hsl(var(--muted-foreground))" }}>T{nextWeekNum}:</span>
-                  <div className="flex-1 h-[6px] rounded-full overflow-hidden" style={{ background: "hsl(var(--border))" }}>
-                    <div className="h-full rounded-full" style={{ width: `${Math.min(nextPct, 100)}%`, background: nextColor }} />
-                  </div>
-                  <span className="font-mono text-[11px]" style={{ color: nextColor }}>{nextTotal}h/760h · {nextPct}%</span>
+              <div className="space-y-3 py-1">
+                {/* Progress summary header */}
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-[12px]" style={{ background: "hsl(var(--muted))" }}>
+                  <span style={{ color: "hsl(var(--muted-foreground))" }}>Bundle:</span>
+                  <span className="font-semibold" style={{ color: "hsl(var(--foreground))" }}>{pct}% dokončeno</span>
+                  <span style={{ color: "hsl(var(--muted-foreground))" }}>·</span>
+                  <span style={{ color: "hsl(var(--muted-foreground))" }}>Přesouvám zbývající kapacitu</span>
                 </div>
-                {nextPct > 100 && (
-                  <div className="flex items-center gap-1 text-[11px] px-2 py-1 rounded" style={{ background: "rgba(220,38,38,0.06)", color: "#dc2626" }}>
-                    <AlertTriangle className="h-3 w-3" /> Přesun překročí kapacitu cílového týdne
-                  </div>
-                )}
 
                 {/* Item checklist */}
-                <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                  {activeItems.map(item => {
-                    const isDone = item.status === "completed" || pct >= 100;
+                <div className="space-y-1 max-h-[320px] overflow-y-auto">
+                  {allItems.map(item => {
+                    const isDone = item.status === "completed";
                     const remaining = getRemainingHours(item, pct);
+                    const isFull = spillFullHours.has(item.id);
+                    const isSelected = spillSelected.has(item.id);
+                    const hoursShown = isFull ? item.scheduled_hours : remaining;
+
                     return (
-                      <label key={item.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer ${isDone || remaining <= 0 ? "opacity-40" : ""}`}
-                        style={{ border: "1px solid hsl(var(--border))", background: spillSelected.has(item.id) ? "rgba(217,119,6,0.04)" : "hsl(var(--card))" }}>
+                      <div
+                        key={item.id}
+                        className="flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer select-none"
+                        style={{
+                          border: `1px solid ${isDone ? "hsl(var(--border))" : isFull ? "rgba(217,119,6,0.4)" : "hsl(var(--border))"}`,
+                          background: isDone ? "hsl(var(--muted))" : isFull ? "rgba(217,119,6,0.06)" : isSelected ? "rgba(217,119,6,0.03)" : "hsl(var(--card))",
+                          opacity: isDone ? 0.5 : 1,
+                        }}
+                        onClick={() => {
+                          if (isDone) return;
+                          setSpillSelected(prev => {
+                            const next = new Set(prev);
+                            if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
+                            return next;
+                          });
+                        }}
+                      >
                         <Checkbox
-                          className="h-4 w-4"
-                          checked={spillSelected.has(item.id)}
-                          disabled={isDone || remaining <= 0}
-                          onCheckedChange={(v) => {
-                            setSpillSelected(prev => {
-                              const next = new Set(prev);
-                              if (v) next.add(item.id); else next.delete(item.id);
-                              return next;
-                            });
-                          }}
+                          className="h-4 w-4 shrink-0"
+                          checked={isSelected}
+                          disabled={isDone}
+                          onCheckedChange={() => {}}
                         />
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1.5">
                             {item.item_code && <span className="font-mono text-[10px] font-bold" style={{ color: "hsl(var(--foreground))" }}>{item.item_code}</span>}
-                            <span className="text-[12px] truncate" style={{ color: isDone ? "hsl(var(--muted-foreground))" : "hsl(var(--foreground))", textDecoration: isDone ? "line-through" : undefined }}>{item.item_name}</span>
+                            <span className="text-[12px] truncate" style={{ color: "hsl(var(--foreground))" }}>{item.item_name}</span>
                           </div>
-                          <span className="text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>
-                            Zbývá: {remaining}h (z {item.scheduled_hours}h celkem, {pct}% hotovo)
-                          </span>
+                          {isDone ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded mt-0.5" style={{ background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))" }}>Hotovo</span>
+                          ) : (
+                            <span className="text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>
+                              {isFull
+                                ? <span className="font-semibold" style={{ color: "#d97706" }}>{item.scheduled_hours}h (plná kapacita)</span>
+                                : <>{remaining}h zbývá (z {item.scheduled_hours}h)</>
+                              }
+                            </span>
+                          )}
                         </div>
-                        <span className="font-mono text-[11px] font-semibold shrink-0" style={{ color: remaining > 0 ? "#d97706" : "hsl(var(--muted-foreground))" }}>{remaining}h</span>
-                      </label>
+                        {/* Hours badge */}
+                        <span className="font-mono text-[11px] font-semibold shrink-0 px-1.5 py-0.5 rounded" style={{
+                          color: isDone ? "hsl(var(--muted-foreground))" : isFull ? "#92400e" : "#d97706",
+                          background: isDone ? "transparent" : isFull ? "rgba(217,119,6,0.12)" : "transparent",
+                        }}>
+                          {isDone ? "—" : `${hoursShown}h`}
+                        </span>
+                        {/* Full capacity toggle */}
+                        {!isDone && (
+                          <button
+                            className="text-[10px] font-medium px-2 py-1 rounded shrink-0 transition-colors"
+                            style={{
+                              background: isFull ? "#d97706" : "hsl(var(--muted))",
+                              color: isFull ? "#fff" : "hsl(var(--muted-foreground))",
+                              border: isFull ? "1px solid #d97706" : "1px solid hsl(var(--border))",
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSpillFullHours(prev => {
+                                const next = new Set(prev);
+                                if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
+                                return next;
+                              });
+                            }}
+                          >
+                            Plná kapacita
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
+                </div>
+
+                {/* Capacity bar */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex-1 h-[6px] rounded-full overflow-hidden" style={{ background: "hsl(var(--border))" }}>
+                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(nextPct, 100)}%`, background: nextColor }} />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span style={{ color: "hsl(var(--muted-foreground))" }}>
+                      T{nextWeekNum}: <span className="font-semibold" style={{ color: nextColor }}>{selectedHoursToMove}h přidáno</span> · {nextTotal}h / 760h celkem
+                    </span>
+                    <span className="font-mono font-semibold" style={{ color: nextColor }}>{nextPct}% využito</span>
+                  </div>
+                  {nextPct > 100 && (
+                    <div className="flex items-center gap-1 text-[11px] px-2 py-1 rounded" style={{ background: "rgba(220,38,38,0.06)", color: "#dc2626" }}>
+                      <AlertTriangle className="h-3 w-3" /> Překročí kapacitu cílového týdne
+                    </div>
+                  )}
                 </div>
               </div>
             );
