@@ -2004,6 +2004,8 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           onOpenExpedice={onOpenExpedice}
           isMobile={isMobile}
           pushUndo={pushUndo}
+          areAllPartsCompleted={areAllPartsCompleted}
+          getIncompletePartsInfo={getIncompletePartsInfo}
         />
 
         {/* ── NAPLÁNOVANÉ (future) — collapsible ── */}
