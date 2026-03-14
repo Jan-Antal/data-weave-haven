@@ -654,6 +654,7 @@ export default function PlanVyroby() {
             };
           })() : undefined}
         />
+        )}
 
         {/* Main content + DataLog sidebar wrapper */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
