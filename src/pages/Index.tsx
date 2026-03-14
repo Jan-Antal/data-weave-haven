@@ -13,7 +13,7 @@ import { DashboardStats } from "@/components/DashboardStats";
 import { TableFilters, useTableFilters } from "@/components/TableFilters";
 import { ExportButton } from "@/components/ExportButton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Settings, Plus, LogOut, User, Check, ChevronUp, ChevronDown, UserCog, Factory, CalendarRange, LayoutDashboard, MessageCircle } from "lucide-react";
+import { Settings, Plus, LogOut, User, Check, ChevronUp, ChevronDown, UserCog, Factory, CalendarRange, LayoutDashboard, MessageCircle, Undo2, Redo2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AmiAssistant } from "@/components/AmiAssistant";
 import { AdminInboxButton } from "@/components/AdminInbox";
@@ -30,6 +30,7 @@ import { DataLogPanel } from "@/components/DataLogPanel";
 import { CapacitySettings } from "@/components/production/CapacitySettings";
 import { DataLogHighlightProvider } from "@/components/DataLogHighlightContext";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
@@ -81,7 +82,7 @@ const Index = () => {
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [mobileTPVProject, setMobileTPVProject] = useState<any>(null);
   const scrollPositions = useRef<Record<string, number>>({});
-  const { setCurrentPage } = useUndoRedo();
+  const { setCurrentPage, undo, redo, canUndo, canRedo, lastUndoDescription, lastRedoDescription } = useUndoRedo();
 
   // Set undo page context based on active tab/view
   useEffect(() => {
@@ -244,6 +245,38 @@ const Index = () => {
             <span className="text-primary-foreground/70 text-sm font-sans">Project Info 2026</span>
           </div>
           <div className="flex items-center gap-1">
+            {/* Undo/Redo arrows */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => undo()}
+                  disabled={!canUndo()}
+                  className="p-2 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                >
+                  <Undo2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {canUndo() ? `Zpět: ${lastUndoDescription()}` : "Nic k vrácení"}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => redo()}
+                  disabled={!canRedo()}
+                  className="p-2 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                >
+                  <Redo2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {canRedo() ? `Obnovit: ${lastRedoDescription()}` : "Nic k obnovení"}
+              </TooltipContent>
+            </Tooltip>
+
+            <span className="w-px h-5 bg-primary-foreground/20 mx-1" />
+
             <button
               onClick={() => navigate("/vyroba")}
               className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"

@@ -482,10 +482,6 @@ export default function PlanVyroby() {
           for (const itemId of dragData.batchItemIds!) {
             await moveInboxItemToWeek(itemId, weekDate);
           }
-          const weekNum = getISOWeekNumber(new Date(weekDate));
-          toast({
-            title: `${dragData.batchItemIds!.length} položek naplánováno do T${weekNum}`,
-          });
         };
         if (!checkAndWarnDeadline(projectId, weekDate, action)) return;
         await action();

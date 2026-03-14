@@ -9,12 +9,12 @@ import { useWeeklyCapacity } from "@/hooks/useWeeklyCapacity";
 import { getProjectColor } from "@/lib/projectColors";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useVyrobaUndo, type UndoAction } from "@/hooks/useVyrobaUndo";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList,
   User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange, Factory,
   CheckCircle2, X, Plus, Trash2, Loader2, Download, Printer, FileText,
-  AlertTriangle, Camera, ArrowRight, Shield
+  AlertTriangle, Camera, ArrowRight, Shield, Undo2, Redo2
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
@@ -178,8 +178,14 @@ export default function Vyroba() {
   const { openPeopleManagement } = usePeopleManagement();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { pushUndo } = useVyrobaUndo();
+  const { pushUndo, undo, redo, canUndo, canRedo, lastUndoDescription, lastRedoDescription, setCurrentPage } = useUndoRedo();
   const isMobile = useIsMobile();
+
+  // Set undo page context
+  useEffect(() => {
+    setCurrentPage("vyroba");
+    return () => setCurrentPage(null);
+  }, [setCurrentPage]);
 
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [userMgmtOpen, setUserMgmtOpen] = useState(false);
@@ -478,11 +484,31 @@ export default function Vyroba() {
       const existingLog = existingLogs.find(l => l.day_index === logDayIndex);
       const prevPhase = getLatestPhase(selectedProject.projectId) || "Řezání";
       const prevPercent = getLatestPercent(selectedProject.projectId);
-      pushUndo({ type: "phase_change", bundleId: bundleId(selectedProject.projectId), prevPhase, prevPercent, logId: existingLog?.id, timestamp: Date.now() });
+      const bId = bundleId(selectedProject.projectId);
+      const capturedDay = logDayIndex;
+      const capturedPhase = logPhase;
+      const capturedPct = logPercent;
+      const capturedNotes = logNotes || null;
+      pushUndo({
+        page: "vyroba",
+        actionType: "phase_change",
+        description: "změna fáze/logu",
+        undo: async () => {
+          if (existingLog) {
+            await saveDailyLog(bId, weekKey, capturedDay, existingLog.phase || prevPhase, existingLog.percent, existingLog.note_text || null);
+          } else {
+            await (supabase.from("production_daily_logs") as any).delete().eq("bundle_id", bId).eq("day_index", capturedDay).eq("week_key", weekKey);
+          }
+          qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
+        },
+        redo: async () => {
+          await saveDailyLog(bId, weekKey, capturedDay, capturedPhase, capturedPct, capturedNotes);
+          qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
+        },
+      });
 
-      await saveDailyLog(bundleId(selectedProject.projectId), weekKey, logDayIndex, logPhase, logPercent, logNotes || null);
+      await saveDailyLog(bId, weekKey, logDayIndex, logPhase, logPercent, logNotes || null);
       qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
-      toast.success("✓ Log uložen", { duration: 2000 });
       setLogModalOpen(false);
     } catch (err: any) {
       toast.error(`Chyba při ukládání logu: ${err?.message || "neznámá chyba"}`);
@@ -522,7 +548,23 @@ export default function Vyroba() {
     const prevWeeks = selectedProject.scheduleItems
       .filter(i => ids.includes(i.id))
       .map(i => ({ id: i.id, prevWeek: i.scheduled_week }));
-    pushUndo({ type: "move_items", items: prevWeeks, targetWeek: nextWeekKey, timestamp: Date.now() });
+    pushUndo({
+      page: "vyroba",
+      actionType: "move_items",
+      description: `přesun ${ids.length} položek do T${nextWeekNum}`,
+      undo: async () => {
+        for (const pw of prevWeeks) {
+          await supabase.from("production_schedule").update({ scheduled_week: pw.prevWeek }).eq("id", pw.id);
+        }
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      },
+      redo: async () => {
+        for (const pw of prevWeeks) {
+          await supabase.from("production_schedule").update({ scheduled_week: nextWeekKey }).eq("id", pw.id);
+        }
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      },
+    });
 
     const itemsToMove = selectedProject.scheduleItems.filter(i => ids.includes(i.id));
     let movedCount = 0;
@@ -547,7 +589,7 @@ export default function Vyroba() {
     }
 
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
-    toast.success(`${movedCount} položek přesunuto do T${nextWeekNum}`);
+    toast.success(`⇒ ${movedCount} položek přesunuto do T${nextWeekNum}`, { duration: 2000 });
     setSpillDialogOpen(false);
   }
 
@@ -558,14 +600,35 @@ export default function Vyroba() {
 
   async function handleConfirmExpedice() {
     if (!selectedProject) return;
-    // Push undo for expedice
     const allItems = selectedProject.scheduleItems;
+    const prevStatus = selectedProject.projectStatus || "Ve výrobě";
+    const snapshots = allItems.map(i => ({ id: i.id, prevStatus: i.status }));
+    const pid = selectedProject.projectId;
+    const pName = selectedProject.projectName;
     pushUndo({
-      type: "expedice",
-      projectId: selectedProject.projectId,
-      prevStatus: selectedProject.projectStatus || "Ve výrobě",
-      itemSnapshots: allItems.map(i => ({ id: i.id, prevStatus: i.status })),
-      timestamp: Date.now(),
+      page: "vyroba",
+      actionType: "expedice",
+      description: `${pName} → Expedice`,
+      undo: async () => {
+        await supabase.from("projects").update({ status: prevStatus }).eq("project_id", pid);
+        for (const snap of snapshots) {
+          await supabase.from("production_schedule").update({ status: snap.prevStatus, completed_at: null, completed_by: null }).eq("id", snap.id);
+        }
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        qc.invalidateQueries({ queryKey: ["projects"] });
+        qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
+      },
+      redo: async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        const ids = snapshots.filter(s => s.prevStatus !== "completed" && s.prevStatus !== "cancelled").map(s => s.id);
+        if (ids.length > 0) {
+          await supabase.from("production_schedule").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null }).in("id", ids);
+        }
+        await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", pid);
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        qc.invalidateQueries({ queryKey: ["projects"] });
+        qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
+      },
     });
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -576,18 +639,40 @@ export default function Vyroba() {
         status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
       }).in("id", ids);
     }
-    await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", selectedProject.projectId);
+    await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", pid);
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
     qc.invalidateQueries({ queryKey: ["projects"] });
     qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
-    toast.success(`${selectedProject.projectName} → Expedice`, { duration: 4000 });
+    toast.success(`✓ ${pName} odoslaný do Expedice`, { duration: 4000 });
     setExpediceDialogOpen(false);
   }
 
   /* ── Toggle single item complete ── */
   async function toggleItemComplete(itemId: string, currentStatus: string) {
-    // Push undo
-    pushUndo({ type: "item_hotovo", itemId, prevStatus: currentStatus, timestamp: Date.now() });
+    const newStatus = currentStatus === "completed" ? "scheduled" : "completed";
+    pushUndo({
+      page: "vyroba",
+      actionType: "item_hotovo",
+      description: newStatus === "completed" ? "označení jako hotovo" : "vrácení položky",
+      undo: async () => {
+        if (currentStatus === "completed") {
+          const { data: { user } } = await supabase.auth.getUser();
+          await supabase.from("production_schedule").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null }).eq("id", itemId);
+        } else {
+          await supabase.from("production_schedule").update({ status: currentStatus, completed_at: null, completed_by: null }).eq("id", itemId);
+        }
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      },
+      redo: async () => {
+        if (newStatus === "completed") {
+          const { data: { user } } = await supabase.auth.getUser();
+          await supabase.from("production_schedule").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null }).eq("id", itemId);
+        } else {
+          await supabase.from("production_schedule").update({ status: "scheduled", completed_at: null, completed_by: null }).eq("id", itemId);
+        }
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      },
+    });
     const { data: { user } } = await supabase.auth.getUser();
     if (currentStatus === "completed") {
       await supabase.from("production_schedule").update({ status: "scheduled", completed_at: null, completed_by: null }).eq("id", itemId);
@@ -613,7 +698,7 @@ export default function Vyroba() {
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
     qc.invalidateQueries({ queryKey: ["projects"] });
     qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
-    toast.success("Vráceno z Expedice");
+    toast.success("↩ Vráceno z Expedice", { duration: 2000 });
     setReturnExpediceConfirm(null);
   }
 
@@ -666,10 +751,25 @@ export default function Vyroba() {
   async function handleNoProduction() {
     if (!selectedProject || logDayIndex < 0) return;
     try {
-      pushUndo({ type: "no_activity", logId: "", logDate: weekKey, projectId: selectedProject.projectId, timestamp: Date.now() });
-      await saveDailyLog(bundleId(selectedProject.projectId), weekKey, logDayIndex, `Bez výroby: ${noProductionReason}`, getLatestPercent(selectedProject.projectId));
+      const bId = bundleId(selectedProject.projectId);
+      const capturedDay = logDayIndex;
+      const capturedReason = noProductionReason;
+      const capturedPct = getLatestPercent(selectedProject.projectId);
+      pushUndo({
+        page: "vyroba",
+        actionType: "no_activity",
+        description: "žádná aktivita",
+        undo: async () => {
+          await (supabase.from("production_daily_logs") as any).delete().eq("bundle_id", bId).eq("day_index", capturedDay).eq("week_key", weekKey);
+          qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
+        },
+        redo: async () => {
+          await saveDailyLog(bId, weekKey, capturedDay, `Bez výroby: ${capturedReason}`, capturedPct);
+          qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
+        },
+      });
+      await saveDailyLog(bId, weekKey, logDayIndex, `Bez výroby: ${noProductionReason}`, capturedPct);
       qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
-      toast.success("Zaznamenáno bez výroby");
       setNoProductionOpen(false);
       setLogModalOpen(false);
     } catch {
@@ -704,6 +804,36 @@ export default function Vyroba() {
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
+            {/* Undo/Redo arrows */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => undo("vyroba")}
+                  disabled={!canUndo("vyroba")}
+                  className="p-2 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                >
+                  <Undo2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {canUndo("vyroba") ? `Zpět: ${lastUndoDescription("vyroba")}` : "Nic k vrácení"}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => redo("vyroba")}
+                  disabled={!canRedo("vyroba")}
+                  className="p-2 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                >
+                  <Redo2 className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {canRedo("vyroba") ? `Obnovit: ${lastRedoDescription("vyroba")}` : "Nic k obnovení"}
+              </TooltipContent>
+            </Tooltip>
+
             <span className="w-px h-5 bg-primary-foreground/20 mx-1 hidden md:block" />
 
             <button className="p-2 rounded-md text-primary-foreground bg-primary-foreground/10 transition-colors cursor-default" title="Výroba">
@@ -1520,7 +1650,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
   bundleId: string;
   allItems: { item: ScheduleItem; weekKey: string; weekNum: number }[];
   scheduleData: Map<string, any> | undefined;
-  pushUndo: (action: UndoAction) => void;
+  pushUndo: (entry: Omit<import("@/hooks/useUndoRedo").UndoEntry, "id" | "timestamp">) => void;
   onOpenProjectDetail: () => void;
   dyhaDismissed: boolean;
   onDismissDyha: () => void;
@@ -1794,7 +1924,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
   bundleId: string;
   onOpenExpedice: () => void;
   isMobile: boolean;
-  pushUndo: (action: UndoAction) => void;
+  pushUndo: (entry: Omit<import("@/hooks/useUndoRedo").UndoEntry, "id" | "timestamp">) => void;
 }) {
   const { checks, checkItem, uncheckItem } = useQualityChecks(projectId);
   const { defects, addDefect, resolveDefect } = useQualityDefects(projectId);
@@ -1899,18 +2029,28 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
       // All have QC — mark as hotovo directly
       (async () => {
         const ids = targetItems.flatMap(({ mergedIds }) => mergedIds);
-        // Push undo for each item
-        for (const { mergedIds: mids, item } of targetItems) {
-          for (const mid of mids) {
-            pushUndo({ type: "item_hotovo", itemId: mid, prevStatus: item.status, timestamp: Date.now() });
-          }
-        }
+        const snapshots = targetItems.map(({ mergedIds: mids, item }) => mids.map(mid => ({ id: mid, prevStatus: item.status }))).flat();
+        pushUndo({
+          page: "vyroba",
+          actionType: "item_hotovo",
+          description: `${ids.length} položek dokončeno`,
+          undo: async () => {
+            for (const snap of snapshots) {
+              await supabase.from("production_schedule").update({ status: snap.prevStatus, completed_at: null, completed_by: null }).eq("id", snap.id);
+            }
+            qc.invalidateQueries({ queryKey: ["production-schedule"] });
+          },
+          redo: async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            await supabase.from("production_schedule").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null }).in("id", ids);
+            qc.invalidateQueries({ queryKey: ["production-schedule"] });
+          },
+        });
         const { data: { user } } = await supabase.auth.getUser();
         await supabase.from("production_schedule").update({
           status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null,
         }).in("id", ids);
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
-        toast.success(`${ids.length} položek dokončeno`);
         setSelectedItems(new Set());
         // Check if ALL items are now completed
         const allNowCompleted = dedupedItems.every(({ item }) => item.status === "completed" || ids.includes(item.id));
@@ -1933,7 +2073,26 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
       // Push undo for QC confirm
       const qcItemIds = qcModalItems.filter(({ item }) => !checkMap.has(item.id)).map(({ item }) => item.id);
       if (qcItemIds.length > 0) {
-        pushUndo({ type: "qc_confirm", itemIds: qcItemIds, timestamp: Date.now() });
+        pushUndo({
+          page: "vyroba",
+          actionType: "qc_confirm",
+          description: `QC potvrzení (${qcItemIds.length} položek)`,
+          undo: async () => {
+            const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
+            for (const itemId of qcItemIds) {
+              await (supabase.from("production_quality_checks" as any) as any).delete().eq("item_id", itemId).gte("checked_at", oneMinuteAgo);
+            }
+            qc.invalidateQueries({ queryKey: ["production-schedule"] });
+            qc.invalidateQueries({ queryKey: ["quality-checks", projectId] });
+          },
+          redo: async () => {
+            const { data: { user: u } } = await supabase.auth.getUser();
+            for (const itemId of qcItemIds) {
+              await (supabase.from("production_quality_checks" as any) as any).insert({ item_id: itemId, project_id: projectId, checked_by: u?.id });
+            }
+            qc.invalidateQueries({ queryKey: ["quality-checks", projectId] });
+          },
+        });
       }
       // Record QC for all items in modal
       for (const { item } of qcModalItems) {
@@ -1957,7 +2116,6 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
       }
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["quality-checks", projectId] });
-      toast.success(`${ids.length} položek dokončeno`);
       setSelectedItems(new Set());
       setQcModalOpen(false);
       // Check if ALL items are now completed
@@ -2085,7 +2243,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                                         onClick={async () => {
                                           const { data: { user } } = await supabase.auth.getUser();
                                           resolveDefect.mutate({ defectId: d.id, userId: user?.id || "" });
-                                          toast.success("Vada označená ako opravená");
+                                          
                                         }}>Označiť ako opravenú</button>
                                     </div>
                                   ))}
@@ -2109,7 +2267,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                                         onClick={async () => {
                                           const { data: { user } } = await supabase.auth.getUser();
                                           resolveDefect.mutate({ defectId: d.id, userId: user?.id || "" });
-                                          toast.success("Vada označená ako opravená");
+                                          
                                         }}>Označiť ako opravenú</button>
                                     </div>
                                   ))}
@@ -2181,7 +2339,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   onClick={async () => {
                     const { data: { user } } = await supabase.auth.getUser();
                     resolveDefect.mutate({ defectId: d.id, userId: user?.id || "" });
-                    toast.success("Vada opravená");
+                    
                   }}>Označiť ako opravenú</button>
               </div>
             ))}
@@ -2249,7 +2407,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   photo_url: defectPhotos.length > 0 ? JSON.stringify(defectPhotos) : null,
                   reported_by: user?.id || "",
                 });
-                toast.success("Vada zaznamenaná");
+                
                 setDefectType(""); setDefectDesc(""); setDefectSeverity("minor"); setDefectResolution(""); setDefectItemId("__bundle__"); setDefectPhotos([]); setDefectOpen(false);
               }}
             />
@@ -2317,7 +2475,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   photo_url: defectPhotos.length > 0 ? JSON.stringify(defectPhotos) : null,
                   reported_by: user?.id || "",
                 });
-                toast.success("Vada zaznamenaná");
+                
                 setDefectType(""); setDefectDesc(""); setDefectSeverity("minor"); setDefectResolution(""); setDefectItemId("__bundle__"); setDefectPhotos([]); setDefectOpen(false);
               }}
             />
@@ -2331,7 +2489,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   for (const id of singleQcMergedIds) {
                     if (!checkMap.has(id)) await checkItem(id);
                   }
-                  toast.success(`QC potvrzeno — ${singleQcItem.item_code || singleQcItem.item_name}`);
+                  
                 }
                 setSingleQcModalOpen(false);
                 setSingleQcItem(null);

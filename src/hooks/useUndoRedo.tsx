@@ -2,7 +2,7 @@ import React, { createContext, useContext, useCallback, useRef, useEffect, useSt
 import { toast } from "@/hooks/use-toast";
 
 // ── Types ─────────────────────────────────────────────────────────────
-export type UndoPage = "plan-vyroby" | "tpv-list" | "project-table" | "settings";
+export type UndoPage = "plan-vyroby" | "vyroba" | "project-table" | "tpv-list" | "settings";
 
 export interface UndoEntry {
   id: string;
@@ -20,18 +20,20 @@ interface UndoRedoState {
   redo: (page?: UndoPage) => void;
   canUndo: (page?: UndoPage) => boolean;
   canRedo: (page?: UndoPage) => boolean;
-  /** Current page context — set by each page to scope shortcuts */
   setCurrentPage: (page: UndoPage | null) => void;
   currentPage: UndoPage | null;
-  /** Last undo entry description for the page (for tooltip) */
   lastUndoDescription: (page?: UndoPage) => string | null;
   lastRedoDescription: (page?: UndoPage) => string | null;
 }
 
 const PAGE_MAX_STACK: Record<string, number> = {
   "plan-vyroby": 50,
+  "vyroba": 50,
+  "project-table": 20,
+  "tpv-list": 20,
 };
 const DEFAULT_MAX_STACK = 20;
+const SESSION_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
 
 const UndoRedoContext = createContext<UndoRedoState | null>(null);
 
@@ -51,6 +53,10 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
     setCurrentPageState(page);
   }, []);
 
+  function isExpired(entry: UndoEntry): boolean {
+    return Date.now() - entry.timestamp.getTime() > SESSION_EXPIRY_MS;
+  }
+
   const undo = useCallback(
     async (page?: UndoPage) => {
       if (executingRef.current) return;
@@ -63,6 +69,15 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
       if (idx === -1) return;
 
       const entry = undoStackRef.current[idx];
+
+      // Check session expiry
+      if (isExpired(entry)) {
+        undoStackRef.current = [...undoStackRef.current.slice(0, idx), ...undoStackRef.current.slice(idx + 1)];
+        bump();
+        toast({ title: "Akce již nelze vrátit (vypršel čas)", duration: 3000 });
+        return;
+      }
+
       undoStackRef.current = [...undoStackRef.current.slice(0, idx), ...undoStackRef.current.slice(idx + 1)];
       const maxForPage = PAGE_MAX_STACK[entry.page] ?? DEFAULT_MAX_STACK;
       redoStackRef.current = [...redoStackRef.current, entry].slice(-maxForPage);
@@ -71,7 +86,7 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
       executingRef.current = true;
       try {
         await entry.undo();
-        toast({ title: `↩ Vráceno: ${entry.description}`, duration: 2000 });
+        toast({ title: `← Vráceno: ${entry.description}`, duration: 2000 });
       } catch (err: any) {
         toast({
           title: "Nelze vrátit — data se změnila",
@@ -85,7 +100,6 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
     [bump]
   );
 
-  // Keep ref updated for use in pushUndo toast
   useEffect(() => { undoFnRef.current = undo; }, [undo]);
 
   const redo = useCallback(
@@ -100,6 +114,15 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
       if (idx === -1) return;
 
       const entry = redoStackRef.current[idx];
+
+      // Check session expiry
+      if (isExpired(entry)) {
+        redoStackRef.current = [...redoStackRef.current.slice(0, idx), ...redoStackRef.current.slice(idx + 1)];
+        bump();
+        toast({ title: "Akce již nelze vrátit (vypršel čas)", duration: 3000 });
+        return;
+      }
+
       redoStackRef.current = [...redoStackRef.current.slice(0, idx), ...redoStackRef.current.slice(idx + 1)];
       const maxForPage = PAGE_MAX_STACK[entry.page] ?? DEFAULT_MAX_STACK;
       undoStackRef.current = [...undoStackRef.current, entry].slice(-maxForPage);
@@ -108,7 +131,7 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
       executingRef.current = true;
       try {
         await entry.redo();
-        toast({ title: `↪ Obnoveno: ${entry.description}`, duration: 2000 });
+        toast({ title: `→ Opakováno: ${entry.description}`, duration: 2000 });
       } catch (err: any) {
         toast({
           title: "Nelze obnovit — data se změnila",
@@ -131,7 +154,6 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
       };
       const maxForPage = PAGE_MAX_STACK[entry.page] ?? DEFAULT_MAX_STACK;
       const newStack = [...undoStackRef.current, full];
-      // Trim oldest entries for this specific page if over limit
       let pageCount = newStack.filter(e => e.page === entry.page).length;
       while (pageCount > maxForPage) {
         const oldest = newStack.findIndex(e => e.page === entry.page);
@@ -140,12 +162,11 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
         pageCount--;
       }
       undoStackRef.current = newStack;
-      // New action clears redo for this page
       redoStackRef.current = redoStackRef.current.filter((e) => e.page !== entry.page);
       bump();
 
-      // Show undo toast for plan-vyroby actions
-      if (entry.page === "plan-vyroby") {
+      // Show undo toast for plan-vyroby and vyroba actions
+      if (entry.page === "plan-vyroby" || entry.page === "vyroba") {
         const { dismiss } = toast({
           duration: 6000,
           className: "bg-muted text-foreground border-border shadow-md",
