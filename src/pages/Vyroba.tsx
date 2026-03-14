@@ -1769,7 +1769,9 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
               {latestPct}%
             </div>
             {todayDayIndex >= 0 && (
-              <div className="text-xs" style={{ color: "#99a5a3" }}>Cíl: 100%</div>
+              <div className="text-xs" style={{ color: latestPct >= weeklyGoal ? "#3a8a36" : "#99a5a3" }}>
+                Cíl: {weeklyGoal}%
+              </div>
             )}
           </div>
         </div>
@@ -1778,6 +1780,10 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           <div className="h-1 rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
             <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(latestPct, 100)}%`, background: statusColor }} />
           </div>
+          {/* Weekly goal marker */}
+          {weeklyGoal < 100 && (
+            <div className="absolute top-[-3px] h-[10px] w-[2px] rounded-full" style={{ left: `${weeklyGoal}%`, background: "#d97706", opacity: 0.7 }} />
+          )}
           {todayDayIndex >= 0 && (
             <div className="absolute top-[-2px] h-[8px] w-[2px]" style={{ left: `${expectedPct}%`, background: "#1a1a1a", opacity: 0.2 }} />
           )}
