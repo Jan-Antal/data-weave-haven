@@ -532,7 +532,15 @@ export default function Vyroba() {
       // Log "Nad plán" activity if over weekly goal
       const wGoal = getWeeklyGoal(selectedProject.projectId);
       if (logPercent > wGoal) {
-        logActivity(selectedProject.projectId, "log_nad_plan", `Nad plán: ${logPercent}% (cíl byl ${wGoal}%)`);
+        const { data: { user: logUser } } = await supabase.auth.getUser();
+        if (logUser) {
+          await supabase.from("data_log").insert({
+            project_id: selectedProject.projectId,
+            user_id: logUser.id,
+            action_type: "log_nad_plan",
+            detail: `Nad plán: ${logPercent}% (cíl byl ${wGoal}%)`,
+          });
+        }
       }
       
       setLogModalOpen(false);
