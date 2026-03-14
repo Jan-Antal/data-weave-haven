@@ -338,7 +338,6 @@ export default function Vyroba() {
 
   // Expedice confirmation dialog
   const [expediceDialogOpen, setExpediceDialogOpen] = useState(false);
-  const [expediceDialogOpen, setExpediceDialogOpen] = useState(false);
 
   // Spill dialog
   const [spillDialogOpen, setSpillDialogOpen] = useState(false);
