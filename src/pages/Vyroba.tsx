@@ -1111,6 +1111,7 @@ export default function Vyroba() {
                 onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
                 dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
                 onDismissDyha={() => setDyhaDismissed(prev => new Set(prev).add(selectedProject.projectId))}
+                weeklyGoal={getWeeklyGoal(selectedProject.projectId)}
               />
             )}
           </div>
