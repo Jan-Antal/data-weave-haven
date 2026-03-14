@@ -13,7 +13,7 @@ import { DashboardStats } from "@/components/DashboardStats";
 import { TableFilters, useTableFilters } from "@/components/TableFilters";
 import { ExportButton } from "@/components/ExportButton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Settings, Plus, LogOut, User, Check, ChevronUp, ChevronDown, UserCog, Factory, CalendarRange, LayoutDashboard, MessageCircle, Undo2, Redo2 } from "lucide-react";
+import { Settings, Plus, LogOut, User, Check, ChevronUp, ChevronDown, UserCog, Factory, CalendarRange, LayoutDashboard, MessageCircle, Undo2, Redo2, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AmiAssistant } from "@/components/AmiAssistant";
 import { AdminInboxButton } from "@/components/AdminInbox";
@@ -67,7 +67,7 @@ const Index = () => {
   const [costPresetsOpen, setCostPresetsOpen] = useState(false);
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
   const [dataLogOpen, setDataLogOpen] = useState(() => {
-    try { return sessionStorage.getItem("datalog-open") === "true"; } catch { return false; }
+    try { return localStorage.getItem("datalog-panel-index") === "true"; } catch { return false; }
   });
   const [activeTab, setActiveTab] = useState("project-info");
   const [riskHighlight, setRiskHighlight] = useState<RiskHighlightType>(null);
@@ -99,7 +99,7 @@ const Index = () => {
   const toggleDataLog = useCallback(() => {
     setDataLogOpen(prev => {
       const next = !prev;
-      try { sessionStorage.setItem("datalog-open", String(next)); } catch {}
+      try { localStorage.setItem("datalog-panel-index", String(next)); } catch {}
       return next;
     });
   }, []);
@@ -297,6 +297,25 @@ const Index = () => {
             >
               <LayoutDashboard className="h-5 w-5" />
             </button>
+            {(canAccessSettings || realRole === "owner" || role === "pm") && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={toggleDataLog}
+                    className={cn(
+                      "p-2 rounded-md transition-colors",
+                      dataLogOpen
+                        ? "text-primary-foreground bg-primary-foreground/10"
+                        : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                    )}
+                    title="Data Log"
+                  >
+                    <Clock className="h-5 w-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Data Log</TooltipContent>
+              </Tooltip>
+            )}
             {canAccessSettings && <AdminInboxButton />}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -361,11 +380,7 @@ const Index = () => {
                       Koš
                     </DropdownMenuItem>
                   )}
-                  {(isAdmin || role === "pm" || isOwner) && (
-                    <DropdownMenuItem onClick={toggleDataLog}>
-                      Data Log
-                    </DropdownMenuItem>
-                  )}
+                  
                   {realRole === "owner" && (
                     <>
                       <DropdownMenuSeparator />
@@ -556,12 +571,12 @@ const Index = () => {
           <div
             className={cn(
               "transition-all duration-250 ease-in-out overflow-hidden shrink-0",
-              dataLogOpen ? "w-[340px]" : "w-0"
+              dataLogOpen ? "w-[360px]" : "w-0"
             )}
           >
             <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
               setDataLogOpen(v);
-              try { sessionStorage.setItem("datalog-open", String(v)); } catch {}
+              try { localStorage.setItem("datalog-panel-index", String(v)); } catch {}
             }} />
           </div>
         )}

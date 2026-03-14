@@ -14,7 +14,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList,
   User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange, Factory,
   CheckCircle2, X, Plus, Trash2, Loader2, Download, Printer, FileText,
-  AlertTriangle, Camera, ArrowRight, Shield, Undo2, Redo2
+  AlertTriangle, Camera, ArrowRight, Shield, Undo2, Redo2, Clock
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
@@ -194,7 +194,16 @@ export default function Vyroba() {
   const [statusMgmtOpen, setStatusMgmtOpen] = useState(false);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [costPresetsOpen, setCostPresetsOpen] = useState(false);
-  const [dataLogOpen, setDataLogOpen] = useState(false);
+  const [dataLogOpen, setDataLogOpen] = useState(() => {
+    try { return localStorage.getItem("datalog-panel-vyroba") === "true"; } catch { return false; }
+  });
+  const toggleDataLog = useCallback(() => {
+    setDataLogOpen(prev => {
+      const next = !prev;
+      try { localStorage.setItem("datalog-panel-vyroba", String(next)); } catch {}
+      return next;
+    });
+  }, []);
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
 
   // Owner/Admin guard
@@ -951,6 +960,27 @@ export default function Vyroba() {
             <button onClick={() => navigate("/")} className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors" title="Přehled">
               <LayoutDashboard className="h-5 w-5" />
             </button>
+
+            {/* DataLog icon button */}
+            {(isAdmin || role === "pm" || isOwner) && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={toggleDataLog}
+                    className={cn(
+                      "p-2 rounded-md transition-colors",
+                      dataLogOpen
+                        ? "text-primary-foreground bg-primary-foreground/10"
+                        : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                    )}
+                    title="Data Log"
+                  >
+                    <Clock className="h-5 w-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Data Log</TooltipContent>
+              </Tooltip>
+            )}
 
             <AdminInboxButton />
 

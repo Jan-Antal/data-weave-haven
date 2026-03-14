@@ -4,7 +4,7 @@ import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
-import { LayoutDashboard, Factory, CalendarRange, Settings, Check, User, UserCog, LogOut, Undo2, Redo2 } from "lucide-react";
+import { LayoutDashboard, Factory, CalendarRange, Settings, Check, User, UserCog, LogOut, Undo2, Redo2, Clock } from "lucide-react";
 import { AdminInboxButton } from "@/components/AdminInbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -14,8 +14,8 @@ import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
 import { StatusManagement } from "@/components/StatusManagement";
 import { RecycleBin } from "@/components/RecycleBin";
 import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDialog";
-import { DataLogPanel } from "@/components/DataLogPanel";
 import { CapacitySettings } from "@/components/production/CapacitySettings";
+import { cn } from "@/lib/utils";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
@@ -24,7 +24,7 @@ const ROLE_LABELS: Record<string, string> = {
   viewer: "Viewer",
 };
 
-export function ProductionHeader({ forecastActive }: { forecastActive?: boolean }) {
+export function ProductionHeader({ forecastActive, dataLogOpen, onToggleDataLog }: { forecastActive?: boolean; dataLogOpen?: boolean; onToggleDataLog?: () => void }) {
   const navigate = useNavigate();
   const { data: settings } = useProductionSettings();
   const { canAccessSettings, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, profile, signOut } = useAuth();
@@ -36,11 +36,8 @@ export function ProductionHeader({ forecastActive }: { forecastActive?: boolean 
   const [statusMgmtOpen, setStatusMgmtOpen] = useState(false);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [costPresetsOpen, setCostPresetsOpen] = useState(false);
-  const [dataLogOpen, setDataLogOpen] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
-
-  const toggleDataLog = useCallback(() => setDataLogOpen((p) => !p), []);
 
   const hasUndo = canUndo("plan-vyroby");
   const hasRedo = canRedo("plan-vyroby");
@@ -119,6 +116,27 @@ export function ProductionHeader({ forecastActive }: { forecastActive?: boolean 
               <LayoutDashboard className="h-5 w-5" />
             </button>
 
+            {/* DataLog icon button */}
+            {onToggleDataLog && (isAdmin || role === "pm" || isOwner) && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={onToggleDataLog}
+                    className={cn(
+                      "p-2 rounded-md transition-colors",
+                      dataLogOpen
+                        ? "text-primary-foreground bg-primary-foreground/10"
+                        : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                    )}
+                    title="Data Log"
+                  >
+                    <Clock className="h-5 w-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Data Log</TooltipContent>
+              </Tooltip>
+            )}
+
             <AdminInboxButton />
 
             <DropdownMenu>
@@ -184,11 +202,6 @@ export function ProductionHeader({ forecastActive }: { forecastActive?: boolean 
                       Koš
                     </DropdownMenuItem>
                   )}
-                  {(isAdmin || role === "pm" || isOwner) && (
-                    <DropdownMenuItem onClick={toggleDataLog}>
-                      Data Log
-                    </DropdownMenuItem>
-                  )}
                   {realRole === "owner" && (
                     <>
                       <DropdownMenuSeparator />
@@ -219,7 +232,6 @@ export function ProductionHeader({ forecastActive }: { forecastActive?: boolean 
       <ExchangeRateSettings open={exchangeRateOpen} onOpenChange={setExchangeRateOpen} />
       <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
-      <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} />
       <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
       <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
     </>
