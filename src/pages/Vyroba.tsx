@@ -449,15 +449,21 @@ export default function Vyroba() {
       setLogPhase(existingLog.phase || "Řezání");
       setLogPercent(existingLog.percent);
       setLogNotes(existingLog.note_text || "");
-    } else if (di === todayDayIndex) {
-      // Today with no log yet — pre-fill percent with current progress, rest empty
-      setLogPhase("Řezání");
-      setLogPercent(getLatestPercent(selectedProject.projectId));
-      setLogNotes("");
     } else {
-      // Past/future day with no log — completely empty form
-      setLogPhase("Řezání");
-      setLogPercent(0);
+      // No log for this day — find most recent previous day's log
+      const previousLogs = logs
+        .filter(l => l.day_index < di)
+        .sort((a, b) => b.day_index - a.day_index);
+      const prevLog = previousLogs[0];
+      if (prevLog) {
+        // Pre-fill from previous day's values as starting point
+        setLogPhase(prevLog.phase || "Řezání");
+        setLogPercent(prevLog.percent);
+      } else {
+        // No previous logs at all — use current bundle progress
+        setLogPhase("Řezání");
+        setLogPercent(getLatestPercent(selectedProject.projectId));
+      }
       setLogNotes("");
     }
 
