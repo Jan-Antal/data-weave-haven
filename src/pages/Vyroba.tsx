@@ -392,6 +392,36 @@ export default function Vyroba() {
     return null;
   }
 
+  // Get ALL items for a project across ALL weeks (non-cancelled)
+  function getAllItemsForProject(pid: string): { item: ScheduleItem; weekKey: string; weekNum: number }[] {
+    if (!scheduleData) return [];
+    const items: { item: ScheduleItem; weekKey: string; weekNum: number }[] = [];
+    const seen = new Set<string>();
+    for (const [wk, silo] of scheduleData) {
+      for (const bundle of silo.bundles) {
+        if (bundle.project_id !== pid) continue;
+        for (const item of bundle.items) {
+          if (item.status === "cancelled") continue;
+          const dedupeKey = `${wk}::${item.id}`;
+          if (seen.has(dedupeKey)) continue;
+          seen.add(dedupeKey);
+          items.push({ item, weekKey: wk, weekNum: silo.week_number });
+        }
+      }
+    }
+    return items;
+  }
+
+  // ── BUNDLE PROGRESS: weighted by hours across ALL weeks ──
+  function getBundleProgress(pid: string): { totalHours: number; completedHours: number; bundleProgress: number } {
+    const allItems = getAllItemsForProject(pid);
+    const totalHours = allItems.reduce((s, e) => s + e.item.scheduled_hours, 0);
+    const completedHours = allItems.filter(e => e.item.status === "completed").reduce((s, e) => s + e.item.scheduled_hours, 0);
+    const bundleProgress = totalHours > 0 ? Math.round((completedHours / totalHours) * 100) : 0;
+    return { totalHours, completedHours, bundleProgress };
+  }
+
+  // ── WEEKLY GOAL: this week's hours / total hours across all weeks ──
   function getWeeklyGoal(pid: string): number {
     if (!scheduleData) return 100;
     let thisWeekHours = 0;
@@ -410,39 +440,61 @@ export default function Vyroba() {
     return Math.round((thisWeekHours / totalHours) * 100);
   }
 
+  // ── Check if weekly goal is met (this week's completed hours >= this week's total hours) ──
+  function isWeeklyGoalMet(pid: string): boolean {
+    if (!scheduleData) return false;
+    const silo = scheduleData.get(weekKey);
+    if (!silo) return false;
+    const bundle = silo.bundles.find(b => b.project_id === pid);
+    if (!bundle) return false;
+    const activeItems = bundle.items.filter(i => i.status !== "cancelled");
+    const thisWeekHours = activeItems.reduce((s, i) => s + i.scheduled_hours, 0);
+    const thisWeekCompleted = activeItems.filter(i => i.status === "completed").reduce((s, i) => s + i.scheduled_hours, 0);
+    return thisWeekHours > 0 && thisWeekCompleted >= thisWeekHours;
+  }
+
+  // ── Check if ALL parts of an item_code are completed across ALL weeks ──
+  function areAllPartsCompleted(pid: string, itemCode: string | null, itemName: string): boolean {
+    if (!scheduleData) return false;
+    const allItems = getAllItemsForProject(pid);
+    const stripSuffix = (n: string) => n.replace(/\s*\(\d+\/\d+\)$/, '').trim();
+    const matching = allItems.filter(e => {
+      if (itemCode && e.item.item_code === itemCode) return true;
+      if (!itemCode && stripSuffix(e.item.item_name) === stripSuffix(itemName)) return true;
+      return false;
+    });
+    if (matching.length === 0) return false;
+    return matching.every(e => e.item.status === "completed");
+  }
+
+  // ── Get incomplete parts info for an item_code across ALL weeks ──
+  function getIncompletePartsInfo(pid: string, itemCode: string | null, itemName: string): { incomplete: number; total: number; weekNums: number[] } {
+    if (!scheduleData) return { incomplete: 0, total: 0, weekNums: [] };
+    const allItems = getAllItemsForProject(pid);
+    const stripSuffix = (n: string) => n.replace(/\s*\(\d+\/\d+\)$/, '').trim();
+    const matching = allItems.filter(e => {
+      if (itemCode && e.item.item_code === itemCode) return true;
+      if (!itemCode && stripSuffix(e.item.item_name) === stripSuffix(itemName)) return true;
+      return false;
+    });
+    const incomplete = matching.filter(e => e.item.status !== "completed");
+    const weekNums = [...new Set(incomplete.map(e => e.weekNum))];
+    return { incomplete: incomplete.length, total: matching.length, weekNums };
+  }
+
   function getExpectedPct(dayIndex: number, weeklyGoal: number = 100): number {
     return Math.round(((dayIndex + 1) / 5) * weeklyGoal);
   }
 
   function getProjectStatus(pid: string): "on-track" | "at-risk" | "behind" {
-    const pct = getLatestPercent(pid);
+    const { bundleProgress } = getBundleProgress(pid);
     const goal = getWeeklyGoal(pid);
-    if (pct >= goal) return "on-track";
+    if (bundleProgress >= goal) return "on-track";
     if (todayDayIndex < 0) return "on-track";
     const expected = getExpectedPct(todayDayIndex, goal);
-    if (pct >= expected - 10) return "on-track";
-    if (pct >= expected - 25) return "at-risk";
+    if (bundleProgress >= expected - 10) return "on-track";
+    if (bundleProgress >= expected - 25) return "at-risk";
     return "behind";
-  }
-
-  // Get ALL items for a project across ALL weeks
-  function getAllItemsForProject(pid: string): { item: ScheduleItem; weekKey: string; weekNum: number }[] {
-    if (!scheduleData) return [];
-    const items: { item: ScheduleItem; weekKey: string; weekNum: number }[] = [];
-    const seen = new Set<string>();
-    for (const [wk, silo] of scheduleData) {
-      for (const bundle of silo.bundles) {
-        if (bundle.project_id !== pid) continue;
-        for (const item of bundle.items) {
-          if (item.status === "cancelled") continue;
-          const dedupeKey = `${wk}::${item.id}`;
-          if (seen.has(dedupeKey)) continue;
-          seen.add(dedupeKey);
-          items.push({ item, weekKey: wk, weekNum: silo.week_number });
-        }
-      }
-    }
-    return items;
   }
 
   /* ── Stats ── */
