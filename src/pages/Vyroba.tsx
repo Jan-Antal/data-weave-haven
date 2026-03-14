@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -1017,7 +1018,7 @@ export default function Vyroba() {
                   {isAdmin && <DropdownMenuItem onClick={() => setCapacitySettingsOpen(true)}>Kapacita výroby</DropdownMenuItem>}
                   {canManageStatuses && <DropdownMenuItem onClick={() => setStatusMgmtOpen(true)}>Správa statusů</DropdownMenuItem>}
                   {canAccessRecycleBin && <DropdownMenuItem onClick={() => setRecycleBinOpen(true)}>Koš</DropdownMenuItem>}
-                  {(isAdmin || role === "pm" || isOwner) && <DropdownMenuItem onClick={() => setDataLogOpen(true)}>Data Log</DropdownMenuItem>}
+                  
                   {realRole === "owner" && (
                     <>
                       <DropdownMenuSeparator />
@@ -1088,7 +1089,8 @@ export default function Vyroba() {
       </div>
 
       {/* ═══ BODY ═══ */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-w-0 flex min-h-0">
         {/* ═══ LEFT PANEL ═══ */}
         <div className={`shrink-0 flex flex-col overflow-y-auto ${isMobile ? "w-full" : "w-[252px]"}`} style={{ borderRight: isMobile ? "none" : "1px solid #e5e2dd", background: "#ffffff" }}>
           {/* Capacity bar */}
@@ -1720,8 +1722,11 @@ export default function Vyroba() {
       <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
       <CostBreakdownPresetsDialog open={costPresetsOpen} onOpenChange={setCostPresetsOpen} />
-      <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} />
       <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
+      <div className={cn("transition-all duration-200 ease-in-out overflow-hidden shrink-0", dataLogOpen ? "w-[360px] border-l border-border" : "w-0")}>
+        {dataLogOpen && <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} defaultCategory="vyroba" />}
+      </div>
+      </div>{/* end outer flex */}
     </div>
   );
 }
