@@ -563,7 +563,7 @@ const Index = () => {
                         : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    📅 Plán
+                    📅 Harmonogram
                   </button>
                 </div>
               </div>
