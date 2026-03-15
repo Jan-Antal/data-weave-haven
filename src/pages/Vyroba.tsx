@@ -1185,7 +1185,7 @@ export default function Vyroba() {
               {spilledProjects.map(p => (
                 <ProjectRow key={p.projectId} project={p} isSelected={selectedProjectId === p.projectId}
                   onSelect={handleSelectProject} onContextMenu={handleContextMenu} getProjectStatus={getProjectStatus}
-                  getBundleProgress={() => getBundleProgress(p.projectId)} getLatestPhase={getLatestPhase} statusColors={statusColors} weeklyGoal={getWeeklyGoal(p.projectId)} />
+                  getBundleProgress={() => getBundleProgress(p.projectId)} getLatestPhase={getLatestPhase} statusColors={statusColors} weeklyGoal={getWeeklyGoal(p.projectId)} isMobile={isMobile} />
               ))}
 
               {/* Normal section */}
