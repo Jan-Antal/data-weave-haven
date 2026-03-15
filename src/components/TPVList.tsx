@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useTPVItems, useUpdateTPVItem, useAddTPVItem, useDeleteTPVItems, useBulkUpdateTPVStatus, useBulkInsertTPVItems } from "@/hooks/useTPVItems";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
-import { ArrowLeft, Plus, Upload, Trash2, FileText } from "lucide-react";
+import { ArrowLeft, Plus, Upload, Trash2, FileText, Cog } from "lucide-react";
 import { ProjectDetailDialog } from "./ProjectDetailDialog";
 import { useProjects } from "@/hooks/useProjects";
 import * as XLSX from "xlsx";
@@ -27,6 +27,10 @@ import { formatCurrency } from "@/lib/currency";
 import { useExportContext } from "./ExportContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useProductionStatuses } from "@/hooks/useProductionStatuses";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { logActivity } from "@/lib/activityLog";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
   { key: "item_name", label: "Kód prvku" },
@@ -91,6 +95,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const { statusMap: productionStatusMap } = useProductionStatuses(projectId);
   const [detailOpen, setDetailOpen] = useState(false);
   const currentProject = useMemo(() => allProjects.find(p => p.project_id === projectId), [allProjects, projectId]);
+  const queryClient = useQueryClient();
 
   const updateItem = useUpdateTPVItem();
   const addItem = useAddTPVItem();
@@ -176,6 +181,112 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const [addingInline, setAddingInline] = useState(false);
   const [inlineName, setInlineName] = useState("");
   const inlineRef = useRef<HTMLInputElement>(null);
+
+  // ── Send to production state ────────────────────────────────────
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [notReadyItems, setNotReadyItems] = useState<typeof items>([]);
+  const [readyItems, setReadyItems] = useState<typeof items>([]);
+  const [isSending, setIsSending] = useState(false);
+
+  const handleSendToProduction = useCallback(() => {
+    if (selected.size === 0) {
+      toast({ title: "Vyberte alespoň jednu položku", variant: "destructive", duration: 2000 });
+      return;
+    }
+    const selectedItems = items.filter(i => selected.has(i.id));
+    const ready = selectedItems.filter(i => i.status === "Schváleno");
+    const notReady = selectedItems.filter(i => i.status !== "Schváleno");
+
+    if (ready.length === 0) {
+      toast({ title: 'Žádná vybraná položka nemá status "Schváleno"', variant: "destructive", duration: 4000 });
+      return;
+    }
+
+    if (notReady.length > 0) {
+      setReadyItems(ready);
+      setNotReadyItems(notReady);
+      setSendDialogOpen(true);
+    } else {
+      executeSendToProduction(ready);
+    }
+  }, [selected, items]);
+
+  const executeSendToProduction = useCallback(async (itemsToSend: typeof items) => {
+    setIsSending(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Nepřihlášený uživatel");
+
+      let sentCount = 0;
+      const skipped: string[] = [];
+
+      for (const item of itemsToSend) {
+        // Check if already in inbox
+        const { data: existing } = await supabase
+          .from("production_inbox")
+          .select("id")
+          .eq("project_id", projectId)
+          .eq("item_code", item.item_name)
+          .eq("status", "pending")
+          .limit(1);
+
+        if (existing && existing.length > 0) {
+          skipped.push(item.item_name);
+          continue;
+        }
+
+        // Insert into production_inbox
+        const { error } = await supabase.from("production_inbox").insert({
+          project_id: projectId,
+          item_name: item.item_type || item.item_name,
+          item_code: item.item_name,
+          estimated_hours: item.cena ? Math.round(item.cena / 550) : 8,
+          estimated_czk: item.cena || 0,
+          status: "pending",
+          sent_by: user.id,
+        } as any);
+
+        if (error) {
+          console.error("Inbox insert error:", error);
+          continue;
+        }
+
+        // Production status is derived from production_inbox/schedule lookup — no direct tpv_items update needed
+
+        // Log activity
+        logActivity({
+          projectId,
+          actionType: "item_scheduled",
+          newValue: item.item_name,
+          detail: "Odesláno do výroby z TPV",
+        });
+
+        sentCount++;
+      }
+
+      // Show skipped warnings
+      for (const code of skipped) {
+        toast({ title: `${code} již je v Inboxu výroby`, duration: 4000 });
+      }
+
+      if (sentCount > 0) {
+        toast({ title: `${sentCount} položek odesláno do výroby`, duration: 2000 });
+      }
+
+      // Invalidate queries
+      await queryClient.invalidateQueries({ queryKey: ["production-statuses", projectId] });
+      await queryClient.invalidateQueries({ queryKey: ["production_inbox"] });
+      await queryClient.invalidateQueries({ queryKey: ["production-inbox"] });
+      await queryClient.invalidateQueries({ queryKey: ["tpv_items"] });
+
+      setSelected(new Set());
+      setSendDialogOpen(false);
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSending(false);
+    }
+  }, [projectId, queryClient]);
 
   const tpvBodyScrollRef = useRef<HTMLDivElement>(null);
 
@@ -351,6 +462,11 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         {canManageTPV && (
           <Button size="sm" variant="outline" onClick={() => setWizardOpen(true)}>
             <Upload className="h-3 w-3 mr-1" /> Import z Excelu
+          </Button>
+        )}
+        {canManageTPV && (
+          <Button size="sm" variant="outline" onClick={handleSendToProduction} disabled={isSending}>
+            <Cog className="h-3 w-3 mr-1" /> Odeslat do výroby
           </Button>
         )}
 
@@ -572,7 +688,36 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         description={deleteIds && deleteIds.length > 1 ? `Chystáte se smazat ${deleteIds.length} položek. Tato akce je nevratná.` : "Tato akce je nevratná."}
       />
 
-      {/* Excel Import Wizard */}
+      {/* Send to Production Warning Dialog */}
+      <Dialog open={sendDialogOpen} onOpenChange={setSendDialogOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Některé položky nejsou připraveny</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2 max-h-[300px] overflow-auto">
+            {notReadyItems.map(item => (
+              <div key={item.id} className="flex items-center gap-2 text-sm py-1 px-2 rounded bg-destructive/5">
+                <span className="font-mono text-xs font-semibold">{item.item_name}</span>
+                <span className="text-muted-foreground truncate flex-1">{item.item_type || ""}</span>
+                <span className="text-xs text-destructive font-medium shrink-0">{item.status || "Bez statusu"}</span>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setSendDialogOpen(false)}>
+              Zrušit
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => executeSendToProduction(readyItems)}
+              disabled={isSending}
+            >
+              {isSending ? "Odesílám..." : `Odeslat jen schválené (${readyItems.length})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <ExcelImportWizard
         projectId={projectId}
         projectName={projectName}
