@@ -253,61 +253,91 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     return impacts;
   }, [holidays, weekMap, calculatedHoursPerDay]);
 
-  const handleStandardCapacityChange = async (value: number) => {
-    if (value <= 0 || isNaN(value)) return;
-    try {
-      await updateSettings.mutateAsync({ weekly_capacity_hours: value, monthly_capacity_hours: value * 4 });
-      // Only clear non-manual FUTURE weeks (current week + 1 onward)
-      const futureFromWeek = selectedYear < currentYear ? 53 : (selectedYear === currentYear ? currentWeek + 1 : 1);
-      if (futureFromWeek <= 52) {
-        await bulkUpdate.mutateAsync({ year: selectedYear, fromWeek: futureFromWeek, capacity: value, workingDays: workingDaysPerWeek });
-      }
-      toast({ title: "✓ Kapacita aktualizována" });
-    } catch (e: any) {
-      toast({ title: "Chyba", description: e.message, variant: "destructive" });
-    }
+  // Buffer week capacity changes locally
+  const handleWeekCapacityUpdate = (weeks: number[], capacity: number, workingDays: number) => {
+    setPendingWeekOverrides(prev => {
+      const next = new Map(prev);
+      for (const wn of weeks) next.set(wn, { cap: capacity, days: workingDays });
+      return next;
+    });
+    // Remove from resets if previously marked for reset
+    setPendingWeekResets(prev => {
+      const next = new Set(prev);
+      for (const wn of weeks) next.delete(wn);
+      return next;
+    });
   };
 
-  const handleWeekCapacityUpdate = async (weeks: number[], capacity: number, workingDays: number) => {
+  // Buffer week resets locally
+  const handleResetWeeks = (weeks: number[]) => {
+    setPendingWeekResets(prev => {
+      const next = new Set(prev);
+      for (const wn of weeks) next.add(wn);
+      return next;
+    });
+    // Remove from overrides if previously overridden
+    setPendingWeekOverrides(prev => {
+      const next = new Map(prev);
+      for (const wn of weeks) next.delete(wn);
+      return next;
+    });
+    setSelectedWeeks(new Set());
+  };
+
+  // Save ALL pending changes to DB
+  const handleSaveAll = async () => {
     try {
-      for (const wn of weeks) {
+      // 1. Save standard capacity if changed
+      if (localStandardCapacity !== dbStandardCapacity) {
+        await updateSettings.mutateAsync({ weekly_capacity_hours: localStandardCapacity, monthly_capacity_hours: localStandardCapacity * 4 });
+        const futureFromWeek = selectedYear < currentYear ? 53 : (selectedYear === currentYear ? currentWeek + 1 : 1);
+        if (futureFromWeek <= 52) {
+          await bulkUpdate.mutateAsync({ year: selectedYear, fromWeek: futureFromWeek, capacity: localStandardCapacity, workingDays: workingDaysPerWeek });
+        }
+      }
+
+      // 2. Apply week overrides
+      for (const [wn, { cap, days }] of pendingWeekOverrides) {
         const week = weekMap.get(wn);
         if (!week) continue;
-        // Only save as manual override if capacity differs from what it would be without override
-        const isActuallyDifferent = capacity !== standardCapacity || week.holiday_name;
+        const isActuallyDifferent = cap !== localStandardCapacity || week.holiday_name;
         await upsertWeek.mutateAsync({
           week_year: selectedYear,
           week_number: wn,
           week_start: week.week_start,
-          capacity_hours: capacity,
-          working_days: workingDays,
+          capacity_hours: cap,
+          working_days: days,
           is_manual_override: isActuallyDifferent ? true : false,
           holiday_name: week.holiday_name,
         });
       }
-      toast({ title: `✓ ${weeks.length > 1 ? `${weeks.length} týdnů` : `T${weeks[0]}`} aktualizován` });
+
+      // 3. Apply week resets
+      if (pendingWeekResets.size > 0) {
+        const { supabase } = await import("@/integrations/supabase/client");
+        for (const wn of pendingWeekResets) {
+          await supabase
+            .from("production_capacity")
+            .delete()
+            .eq("week_year", selectedYear)
+            .eq("week_number", wn);
+        }
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["production-capacity", selectedYear] });
+      toast({ title: "✓ Nastavení kapacity uloženo" });
+      onOpenChange(false);
     } catch (e: any) {
-      toast({ title: "Chyba", description: e.message, variant: "destructive" });
+      toast({ title: "Chyba při ukládání", description: e.message, variant: "destructive" });
     }
   };
 
-  const handleResetWeeks = async (weeks: number[]) => {
-    try {
-      const { supabase } = await import("@/integrations/supabase/client");
-      for (const wn of weeks) {
-        const { error } = await supabase
-          .from("production_capacity")
-          .delete()
-          .eq("week_year", selectedYear)
-          .eq("week_number", wn);
-        if (error) throw error;
-      }
-      await queryClient.invalidateQueries({ queryKey: ["production-capacity", selectedYear] });
-      toast({ title: `✓ ${weeks.length > 1 ? `${weeks.length} týdnů` : `T${weeks[0]}`} obnoveno na standard` });
-      setSelectedWeeks(new Set());
-    } catch {
-      toast({ title: "Chyba při resetování", variant: "destructive" });
-    }
+  const handleCancel = () => {
+    setLocalStandardCapacity(dbStandardCapacity);
+    setStandardCapacityInput(String(dbStandardCapacity));
+    setPendingWeekOverrides(new Map());
+    setPendingWeekResets(new Set());
+    onOpenChange(false);
   };
 
   const handleAddCompanyHoliday = async () => {
