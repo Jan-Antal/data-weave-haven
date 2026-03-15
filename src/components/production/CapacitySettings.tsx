@@ -151,12 +151,12 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const commitCapacityInput = () => {
     const evaluated = safeEvalExpr(standardCapacityInput);
     if (evaluated !== null && evaluated > 0) {
-      handleStandardCapacityChange(evaluated);
+      setLocalStandardCapacity(evaluated);
       setStandardCapacityInput(String(evaluated));
     } else {
       const v = parseInt(standardCapacityInput);
       if (v > 0) {
-        handleStandardCapacityChange(v);
+        setLocalStandardCapacity(v);
         setStandardCapacityInput(String(v));
       } else {
         setStandardCapacityInput(String(standardCapacity));
