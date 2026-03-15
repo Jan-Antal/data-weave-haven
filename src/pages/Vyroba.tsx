@@ -3165,12 +3165,10 @@ function QualityCheckBadgeEmpty() {
         background: "#fef3c7",
         color: "#92400e",
         border: "1px solid #f59e0b",
-        padding: "6px 12px",
-        minHeight: 36,
-        minWidth: 60,
+        padding: "3px 10px",
         borderRadius: "9999px",
-        fontSize: "12px",
-        fontWeight: 500,
+        fontSize: "13px",
+        fontWeight: 600,
         lineHeight: 1,
       }}
     >
