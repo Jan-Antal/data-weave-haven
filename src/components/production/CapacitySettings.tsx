@@ -392,7 +392,13 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const anyManualOverride = editingWeeks.some(wn => weekMap.get(wn)?.is_manual_override);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(val) => {
+        if (!val && hasPendingChanges) {
+          const confirmed = window.confirm("Máte neuložené změny. Opravdu chcete odejít bez uložení?");
+          if (!confirmed) return;
+        }
+        onOpenChange(val);
+      }}>
       <DialogContent className="max-w-[900px] max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
         <div className="px-6 pt-6 pb-2">
           <DialogHeader>
@@ -710,26 +716,22 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
         </div>{/* end scrollable content */}
 
         {/* Sticky footer */}
-        <div className="shrink-0" style={{ borderTop: "0.5px solid #e5e3df" }}>
-          <div className="flex items-center justify-between px-6 py-2">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="text-xs text-muted-foreground hover:text-foreground hover:underline transition-colors"
-            >
-              Zrušit změny
-            </button>
-            <span className="text-[10px] text-muted-foreground">
-              {hasPendingChanges ? "Neuložené změny" : ""}
-            </span>
-          </div>
+        <div className="shrink-0 flex" style={{ borderTop: "0.5px solid #e5e3df" }}>
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="flex-1 text-sm font-medium transition-opacity hover:opacity-80"
+            style={{ background: "#e5e3df", color: "#555", height: 48, borderRadius: "0 0 0 12px" }}
+          >
+            Zrušit změny
+          </button>
           <button
             type="button"
             onClick={handleSaveAll}
-            className="w-full text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-            style={{ background: "#223937", height: 48, borderRadius: "0 0 12px 12px" }}
+            className="flex-1 text-sm font-medium text-white transition-opacity hover:opacity-90"
+            style={{ background: "#223937", height: 48, borderRadius: "0 0 12px 0" }}
           >
-            Uložit nastavení
+            Uložit změny
           </button>
         </div>
       </DialogContent>
