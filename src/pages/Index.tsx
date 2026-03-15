@@ -113,8 +113,10 @@ const Index = () => {
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const location = useLocation();
   const mobileView = (location.state as any)?.view;
+  const openProjectIdFromState = (location.state as any)?.openProjectId as string | undefined;
   const mobileTab = mobileView === "projects" ? "projects" : mobileView === "dashboard" ? "prehled" : "prehled";
   const { recent: recentProjects, trackOpen: trackRecentOpen } = useRecentlyOpened();
+  const { data: allProjects = [] } = useProjects();
 
   const handleTabChange = useCallback((tab: string) => {
     scrollPositions.current[activeTab] = window.scrollY;
