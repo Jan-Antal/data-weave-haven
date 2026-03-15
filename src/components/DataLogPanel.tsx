@@ -300,6 +300,7 @@ function UserAnalyticsRow({ user, expanded, onToggle, onShowAll }: { user: UserA
 
 export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPanelProps) {
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<PanelTab>("activity");
   const [category, setCategory] = useState<Category>(defaultCategory ?? "all");
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
