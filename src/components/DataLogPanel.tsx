@@ -10,6 +10,33 @@ import { cs } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useDataLogHighlight } from "@/components/DataLogHighlightContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useNavigate } from "react-router-dom";
+
+// Action type → route mapping
+const VYROBA_ACTIONS = new Set([
+  "item_hotovo", "item_qc_confirmed", "item_expedice", "item_moved_next_week",
+  "vyroba_log_saved", "vyroba_no_activity", "phase_changed", "defect_reported",
+  "defect_resolved", "item_paused_vyroba",
+]);
+const PLAN_VYROBY_ACTIONS = new Set([
+  "item_scheduled", "item_moved", "item_completed", "item_paused", "item_split",
+  "item_returned_to_inbox", "forecast_committed", "item_cancelled",
+]);
+const INDEX_ACTIONS = new Set([
+  "status_change", "konstrukter_change", "datum_smluvni_change", "pm_change",
+  "document_uploaded", "document_deleted", "stage_created", "stage_deleted",
+  "stage_status_change", "project_created", "project_restored", "project_deleted",
+  "stage_konstrukter_change", "stage_datum_smluvni_change",
+  "stage_document_uploaded", "stage_document_deleted", "kalkulant_change",
+  "prodejni_cena_change", "project_id_change",
+]);
+
+function getNavigationTarget(actionType: string): { route: string } | null {
+  if (VYROBA_ACTIONS.has(actionType)) return { route: "/vyroba" };
+  if (PLAN_VYROBY_ACTIONS.has(actionType)) return { route: "/plan-vyroby" };
+  if (INDEX_ACTIONS.has(actionType)) return { route: "/" };
+  return null;
+}
 
 interface DataLogPanelProps {
   open: boolean;
