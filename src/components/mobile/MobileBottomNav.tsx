@@ -19,6 +19,13 @@ export function MobileBottomNav() {
     } catch {}
   };
 
+  const handleNav = (e: React.MouseEvent, path: string, state?: Record<string, string>) => {
+    e.stopPropagation();
+    e.preventDefault();
+    closeDataLog();
+    navigate(path, { state, replace: true });
+  };
+
   return (
     <nav
       className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-primary"
@@ -28,7 +35,7 @@ export function MobileBottomNav() {
       }}
     >
       <button
-        onClick={() => { closeDataLog(); navigate("/", { state: { view: "projects" }, replace: true }); }}
+        onClick={(e) => handleNav(e, "/", { view: "projects" })}
         className={cn(
           "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
           isProjectsActive
@@ -40,7 +47,7 @@ export function MobileBottomNav() {
         <span className="text-[10px] font-medium">Projekty</span>
       </button>
       <button
-        onClick={() => { closeDataLog(); navigate("/", { state: { view: "dashboard" }, replace: true }); }}
+        onClick={(e) => handleNav(e, "/", { view: "dashboard" })}
         className={cn(
           "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
           isDashboardActive
@@ -52,7 +59,7 @@ export function MobileBottomNav() {
         <span className="text-[10px] font-medium">Přehled</span>
       </button>
       <button
-        onClick={() => { closeDataLog(); navigate("/vyroba", { replace: true }); }}
+        onClick={(e) => handleNav(e, "/vyroba")}
         className={cn(
           "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
           isVyrobaActive

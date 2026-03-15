@@ -10,7 +10,7 @@ import { cs } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useDataLogHighlight } from "@/components/DataLogHighlightContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 // Action type → route mapping
 const VYROBA_ACTIONS = new Set([
@@ -296,8 +296,17 @@ function UserSessionRow({ user, onShowAll }: { user: UserSessionSummary; onShowA
 export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPanelProps) {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const location = useLocation();
   const [tab, setTab] = useState<PanelTab>("activity");
   const [category, setCategory] = useState<Category>(defaultCategory ?? "all");
+
+  // Auto-close DataLog on route change on mobile
+  useEffect(() => {
+    if (isMobile && open) {
+      onOpenChange(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   const [userFilter, setUserFilter] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>("7d");
