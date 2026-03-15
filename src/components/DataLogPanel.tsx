@@ -357,6 +357,19 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
     }
   };
 
+  const handleEntryNavigate = useCallback((entry: ActivityLogEntry) => {
+    const target = getNavigationTarget(entry.action_type);
+    if (!target || entry.project_id === "_system_") return;
+    onOpenChange(false);
+    // Clear datalog localStorage for all modules
+    try {
+      localStorage.setItem("datalog-panel-index", "false");
+      localStorage.setItem("datalog-panel-vyroba", "false");
+      localStorage.setItem("datalog-panel-plan-vyroby", "false");
+    } catch {}
+    navigate(target.route, { state: { openProjectId: entry.project_id } });
+  }, [navigate, onOpenChange]);
+
   const handleShowUserActivity = useCallback((email: string) => {
     setUserFilter(email);
     setTab("activity");
