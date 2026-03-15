@@ -1051,7 +1051,7 @@ export default function Vyroba() {
       </header>
 
       {/* ═══ STATS BAR ═══ */}
-      <div className="shrink-0 flex items-center gap-3 px-4 text-xs" style={{ height: 40, background: "#f5f3f0", borderBottom: "1px solid #e5e2dd" }}>
+      <div className="shrink-0 flex items-center gap-2 px-3 text-xs overflow-x-auto scrollbar-hide whitespace-nowrap" style={{ height: 40, background: "#f5f3f0", borderBottom: "1px solid #e5e2dd" }}>
         {isMobile ? (
           /* Mobile: compact single row */
           <>
