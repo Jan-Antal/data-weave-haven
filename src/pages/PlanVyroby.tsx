@@ -4,7 +4,7 @@ import { Search, X, Sparkles, Loader2, ChevronLeft, ChevronRight } from "lucide-
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNavigate } from "react-router-dom";
-import { MobileNavBar } from "@/components/mobile/MobileNavBar";
+import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { useAuth } from "@/hooks/useAuth";
 import { ProductionHeader } from "@/components/production/ProductionHeader";
