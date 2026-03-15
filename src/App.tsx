@@ -76,6 +76,20 @@ function RootAuthRoute() {
   );
 }
 
+/** Portrait lock overlay — shown on mobile landscape */
+function PortraitLockOverlay() {
+  return (
+    <div
+      className="portrait-lock-overlay fixed inset-0 z-[9999] bg-primary items-center justify-center text-primary-foreground text-center p-8 hidden"
+    >
+      <div>
+        <p className="text-lg font-semibold mb-2">📱 Otočte telefon</p>
+        <p className="text-sm opacity-80">Tato aplikace funguje pouze na výšku.</p>
+      </div>
+    </div>
+  );
+}
+
 function AppRoutes() {
   const { user, loading, profile } = useAuth();
 
