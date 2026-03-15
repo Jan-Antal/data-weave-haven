@@ -453,12 +453,21 @@ const Index = () => {
                 onOpenTPV={handleMobileOpenTPV}
               />
             )}
-            <MobileProjectDetailSheet
-              project={mobileDetailProject}
-              open={mobileDetailOpen}
-              onOpenChange={setMobileDetailOpen}
-              onOpenTPV={handleMobileOpenTPV}
-            />
+            {mobileDetailProject && (
+              <ProjectDetailDialog
+                project={mobileDetailProject}
+                open={mobileDetailOpen}
+                onOpenChange={(open) => {
+                  setMobileDetailOpen(open);
+                  if (!open) setMobileDetailProject(null);
+                }}
+                onOpenTPVList={(projectId, projectName) => {
+                  setMobileDetailOpen(false);
+                  handleMobileOpenTPV(mobileDetailProject);
+                }}
+                tpvItemCount={0}
+              />
+            )}
             {/* Mobile DataLog full screen */}
             <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
               setDataLogOpen(v);
