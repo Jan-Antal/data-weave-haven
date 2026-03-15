@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import type { SafetyNetProject } from "@/components/production/ForecastSafetyNet";
 
@@ -106,6 +107,7 @@ interface UseForecastModeReturn {
 }
 
 export function useForecastMode(): UseForecastModeReturn {
+  const queryClient = useQueryClient();
   const [forecastActive, setForecastActiveRaw] = useState(false);
   const [planMode, setPlanModeRaw] = useState<ForecastPlanMode>("respect_plan");
   const [forecastBlocks, setForecastBlocks] = useState<ForecastBlock[]>([]);
@@ -382,6 +384,10 @@ export function useForecastMode(): UseForecastModeReturn {
       setForecastActiveRaw(false);
       resetForecastState();
 
+      // Invalidate only affected queries
+      await queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
+      await queryClient.invalidateQueries({ queryKey: ["production-inbox"] });
+
       const desc = blockerCount > 0
         ? `Naplánováno ${normalCount} projektů · ${blockerCount} rezerv kapacity`
         : `${committable.length} bloků naplánováno`;
@@ -389,7 +395,7 @@ export function useForecastMode(): UseForecastModeReturn {
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
-  }, [forecastBlocks, selectedBlockIds, resetForecastState, planMode, realBundleOverrides]);
+  }, [forecastBlocks, selectedBlockIds, resetForecastState, planMode, realBundleOverrides, queryClient]);
 
   const commitInboxOnly = useCallback(async () => {
     const inboxBlocks = forecastBlocks.filter(b => b.source === "inbox_item" && selectedBlockIds.has(b.id));

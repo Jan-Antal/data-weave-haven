@@ -433,7 +433,31 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       // Blocker bundles: only allow "Zrušit rezervu"
       const isBlocker = bundle.items.length > 0 && bundle.items.every(i => i.is_blocker);
       if (isBlocker) {
-        const actions: ContextMenuAction[] = [{
+        const actions: ContextMenuAction[] = [];
+
+        // Header info: project name + week
+        actions.push({
+          label: `${bundle.project_name} · T${weekNum}`,
+          icon: "📋",
+          onClick: () => {},
+        });
+
+        actions.push({
+          label: "Přenést do plánu", icon: "📌",
+          dividerBefore: true,
+          onClick: async () => {
+            const ids = bundle.items.map(i => i.id);
+            const { error } = await supabase.from("production_schedule").update({
+              is_blocker: false,
+              status: "scheduled",
+            } as any).in("id", ids);
+            if (error) { toast({ title: "Chyba", description: error.message, variant: "destructive" }); return; }
+            qc.invalidateQueries({ queryKey: ["production-schedule"] });
+            toast({ title: `📌 ${bundle.project_name} přeneseno do plánu (T${weekNum})` });
+          },
+        });
+
+        actions.push({
           label: "Zrušit rezervu", icon: "🗑",
           danger: true,
           onClick: async () => {
@@ -441,7 +465,6 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
             const { error } = await supabase.from("production_schedule").delete().in("id", ids);
             if (error) { toast({ title: "Chyba", description: error.message, variant: "destructive" }); return; }
             qc.invalidateQueries({ queryKey: ["production-schedule"] });
-            // In forecast mode, convert to forecast block at same position
             if (forecastDarkMode && onConvertReserveToForecast) {
               onConvertReserveToForecast(bundle, weekKey);
               toast({ title: `⏳ Rezerva → Forecast: ${bundle.project_name} (T${weekNum})` });
@@ -449,7 +472,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               toast({ title: `🗑 Rezerva pro ${bundle.project_name} zrušena` });
             }
           },
-        }];
+        });
+
         setContextMenu({ x: Math.min(e.clientX, window.innerWidth - 200), y: Math.min(e.clientY, window.innerHeight - 200), actions });
         return;
       }
