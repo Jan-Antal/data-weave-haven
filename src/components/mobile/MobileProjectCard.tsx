@@ -111,7 +111,7 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
                 </span>
               )}
               {project.prodejni_cena != null && (
-                <span className="text-xs font-mono text-muted-foreground">
+              <span className="text-[11px] font-mono text-muted-foreground">
                   {formatCurrency(project.prodejni_cena, project.currency || "CZK")}
                 </span>
               )}
