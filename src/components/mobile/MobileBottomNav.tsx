@@ -19,7 +19,7 @@ export function MobileBottomNav() {
       }}
     >
       <button
-        onClick={() => navigate("/", { state: { view: "projects" }, replace: false })}
+        onClick={() => navigate("/", { state: { view: "projects" }, replace: true })}
         className={cn(
           "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
           isProjectsActive
