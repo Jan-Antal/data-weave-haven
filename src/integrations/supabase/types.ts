@@ -1206,6 +1206,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_sessions: {
+        Row: {
+          id: string
+          last_activity: string | null
+          session_end: string | null
+          session_start: string | null
+          user_email: string | null
+          user_id: string
+          user_name: string | null
+        }
+        Insert: {
+          id?: string
+          last_activity?: string | null
+          session_end?: string | null
+          session_start?: string | null
+          user_email?: string | null
+          user_id: string
+          user_name?: string | null
+        }
+        Update: {
+          id?: string
+          last_activity?: string | null
+          session_end?: string | null
+          session_start?: string | null
+          user_email?: string | null
+          user_id?: string
+          user_name?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

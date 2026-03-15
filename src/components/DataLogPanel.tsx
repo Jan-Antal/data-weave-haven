@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useActivityLog, useActivityLogUsers, type ActivityLogEntry, type DateRange } from "@/hooks/useActivityLog";
-import { useUserAnalytics, useUserRecentActions, formatSessionDuration, type UserAnalytics } from "@/hooks/useUserAnalytics";
+import { useUserSessions, formatSessionDuration, formatRelativeTime, type UserSessionSummary } from "@/hooks/useUserAnalytics";
 import { useProjects } from "@/hooks/useProjects";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -44,7 +44,7 @@ interface DataLogPanelProps {
   defaultCategory?: Category;
 }
 
-type Category = "all" | "status" | "terminy" | "documents" | "projects" | "users" | "vyroba";
+type Category = "all" | "status" | "terminy" | "documents" | "projects" | "vyroba";
 type PanelTab = "activity" | "users";
 
 const CATEGORY_PILLS: { value: Category; label: string }[] = [
@@ -54,7 +54,6 @@ const CATEGORY_PILLS: { value: Category; label: string }[] = [
   { value: "documents", label: "Dokumenty" },
   { value: "projects", label: "Projekty" },
   { value: "vyroba", label: "Výroba" },
-  { value: "users", label: "Uživatelé" },
 ];
 
 const DOT_COLORS: Record<string, string> = {
@@ -180,6 +179,8 @@ function ActivityItem({
 }
 
 function renderSubContent(entry: ActivityLogEntry) {
+  // Never display JSON detail
+  const isJson = entry.detail && entry.detail.trim().startsWith("{");
   if (entry.action_type === "status_change" || entry.action_type === "stage_status_change") {
     if (entry.old_value && entry.new_value) {
       return (
@@ -198,7 +199,7 @@ function renderSubContent(entry: ActivityLogEntry) {
       );
     }
   }
-  if (entry.detail) {
+  if (entry.detail && !isJson) {
     return <p className="text-[10px] text-muted-foreground/80 mt-0.5 italic">{entry.detail}</p>;
   }
   return null;
@@ -237,10 +238,8 @@ function getActionLabel(actionType: string, newValue: string | null, projectId: 
   }
 }
 
-function UserAnalyticsTab({ onShowUserActivity }: { onShowUserActivity: (email: string) => void }) {
-  const { data, isLoading } = useUserAnalytics(true);
-  const users = data?.users ?? [];
-  const [expandedUser, setExpandedUser] = useState<string | null>(null);
+function UserSessionsTab({ onShowUserActivity }: { onShowUserActivity: (email: string) => void }) {
+  const { data: users = [], isLoading } = useUserSessions();
 
   if (isLoading) return <p className="text-xs text-muted-foreground p-4 text-center">Načítání…</p>;
   if (users.length === 0) return <p className="text-xs text-muted-foreground p-4 text-center">Žádní uživatelé</p>;
@@ -248,53 +247,49 @@ function UserAnalyticsTab({ onShowUserActivity }: { onShowUserActivity: (email: 
   return (
     <div className="flex-1 overflow-y-auto">
       {users.map(user => (
-        <UserAnalyticsRow
-          key={user.user_email}
-          user={user}
-          expanded={expandedUser === user.user_email}
-          onToggle={() => setExpandedUser(prev => prev === user.user_email ? null : user.user_email)}
-          onShowAll={() => onShowUserActivity(user.user_email)}
-        />
+        <UserSessionRow key={user.user_email} user={user} onShowAll={() => onShowUserActivity(user.user_email)} />
       ))}
     </div>
   );
 }
 
-function UserAnalyticsRow({ user, expanded, onToggle, onShowAll }: { user: UserAnalytics; expanded: boolean; onToggle: () => void; onShowAll: () => void }) {
-  const { data: recentActions = [] } = useUserRecentActions(expanded ? user.user_email : null, expanded);
-
+function UserSessionRow({ user, onShowAll }: { user: UserSessionSummary; onShowAll: () => void }) {
   return (
-    <div className="border-b border-border">
-      <button onClick={onToggle} className="w-full px-3 py-2.5 flex items-center gap-2 hover:bg-muted/30 transition-colors">
-        <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[11px] font-bold shrink-0">
-          {user.user_email[0].toUpperCase()}
+    <button
+      onClick={onShowAll}
+      className="w-full border-b border-border px-3 py-2.5 flex items-center gap-2.5 hover:bg-muted/30 transition-colors text-left"
+    >
+      {/* Avatar with online indicator */}
+      <div className="relative shrink-0">
+        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[12px] font-bold">
+          {(user.user_name || user.user_email)[0].toUpperCase()}
         </div>
-        <div className="min-w-0 flex-1 text-left">
-          <p className="text-[11px] font-medium truncate">{user.full_name || user.user_email.split("@")[0]}</p>
-          <p className="text-[10px] text-muted-foreground">
-            {user.total_actions_30d} akcí · {user.last_activity ? formatSmartTimestamp(user.last_activity) : "–"}
-          </p>
-        </div>
-        {expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-      </button>
-      {expanded && (
-        <div className="px-3 pb-2.5">
-          {recentActions.length > 0 ? (
-            <div className="space-y-1.5 mb-2">
-              {recentActions.map((a, i) => (
-                <div key={i} className="flex items-baseline justify-between text-[10px]">
-                  <span className="text-muted-foreground truncate">{a.action_type.replace(/_/g, " ")}</span>
-                  <span className="text-muted-foreground/70 shrink-0 ml-2">{formatSmartTimestamp(a.created_at)}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-[10px] text-muted-foreground mb-2">Žádné akce</p>
+        <span
+          className={cn(
+            "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-background",
+            user.is_online ? "bg-emerald-500" : "bg-muted-foreground/40"
           )}
-          <button onClick={onShowAll} className="text-[10px] text-primary hover:underline">Zobrazit vše →</button>
+        />
+      </div>
+      {/* Info */}
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-medium truncate">{user.user_name || user.user_email.split("@")[0]}</p>
+        <p className="text-[10px] text-muted-foreground truncate">{user.user_email}</p>
+        <div className="flex items-center gap-2 mt-0.5">
+          {user.last_activity && (
+            <span className="text-[9px] text-muted-foreground/70">
+              Aktivní: {formatRelativeTime(user.last_activity)}
+            </span>
+          )}
+          {user.total_session_minutes > 0 && (
+            <span className="text-[9px] text-muted-foreground/70">
+              · {formatSessionDuration(user.total_session_minutes)}
+            </span>
+          )}
         </div>
-      )}
-    </div>
+      </div>
+      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+    </button>
   );
 }
 
@@ -508,7 +503,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
             </div>
           </>
         ) : (
-          <UserAnalyticsTab onShowUserActivity={handleShowUserActivity} />
+          <UserSessionsTab onShowUserActivity={handleShowUserActivity} />
         )}
       </div>
     );
@@ -669,7 +664,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
           </div>
         </>
       ) : (
-        <UserAnalyticsTab onShowUserActivity={handleShowUserActivity} />
+        <UserSessionsTab onShowUserActivity={handleShowUserActivity} />
       )}
     </div>
   );
