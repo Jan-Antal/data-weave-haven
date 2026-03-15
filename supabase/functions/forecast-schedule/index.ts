@@ -428,23 +428,23 @@ serve(async (req) => {
 
         const dl = resolveDeadline(proj);
         const projTpv = tpvItems.filter(t => t.project_id === proj.project_id);
-        const estimatedHours = estimateProjectHours(proj, projTpv);
+        const est = estimateProjectHours(proj, projTpv);
 
         if (!dl.date) {
-          safetyNet.push({ project_id: proj.project_id, project_name: proj.project_name, estimated_hours: estimatedHours, source: "unplanned" });
+          safetyNet.push({ project_id: proj.project_id, project_name: proj.project_name, estimated_hours: est.hours, source: "unplanned" });
           continue;
         }
 
-        const confidence = projTpv.some(t => (Number(t.cena) || 0) > 0) ? "medium" : "low";
+        const confidence = est.level <= 2 ? "medium" : "low";
         const tpvCount = projTpv.length || 1;
-        const { allocated, overflow } = distributeHours(estimatedHours, trackUsage, dl.date);
+        const { allocated, overflow } = distributeHours(est.hours, trackUsage, dl.date);
 
         for (const alloc of allocated) {
           blocks.push({
             id: `forecast-${Date.now()}-${blockIdx++}`,
             project_id: proj.project_id,
             project_name: proj.project_name,
-            bundle_description: `~Výroba — odhad`,
+            bundle_description: est.badge || `~Výroba — odhad`,
             week: alloc.week,
             estimated_hours: Math.round(alloc.hours),
             tpv_item_count: tpvCount,
@@ -454,6 +454,9 @@ serve(async (req) => {
             deadline_source: dl.source,
             tpv_expected_date: proj.datum_tpv || null,
             is_forecast: true,
+            estimation_level: est.level,
+            estimation_badge: est.badge,
+            estimation_preset: est.usedPreset,
           });
         }
 
