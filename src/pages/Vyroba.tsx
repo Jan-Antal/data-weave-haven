@@ -3249,15 +3249,9 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
         <>
           <div className="flex items-center justify-between">
             <div className={`font-mono font-bold ${isMobile ? "text-lg" : "text-xl"}`} style={{ color: isNoProduction ? "#99a5a3" : pct >= 100 ? "#3a8a36" : "#1a1a1a" }}>{pct}%</div>
-            {isRetroactive && !isMobile && (
-              <span className="text-[7px] font-bold px-1 py-[1px] rounded" style={{ background: "rgba(220,38,38,0.1)", color: "#dc2626" }}>doplněno</span>
-            )}
           </div>
           {cumulative?.phase && !isNoProduction && (
-            <div className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: PHASES.find(p => p.name === cumulative.phase)?.color || "#6b7280" }} />
-              {!isMobile && <span className="text-[9px]" style={{ color: "#6b7280" }}>{cumulative.phase}</span>}
-           </div>
+            <p className="text-[10px] text-muted-foreground truncate" title={cumulative.phase}>{cumulative.phase}</p>
           )}
           {isToday && !isMobile && (
             <span className="mt-0.5 w-full text-[9px] font-medium py-0.5 rounded transition-colors text-center"
