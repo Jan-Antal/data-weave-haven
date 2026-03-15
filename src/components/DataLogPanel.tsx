@@ -179,6 +179,8 @@ function ActivityItem({
 }
 
 function renderSubContent(entry: ActivityLogEntry) {
+  // Never display JSON detail
+  const isJson = entry.detail && entry.detail.trim().startsWith("{");
   if (entry.action_type === "status_change" || entry.action_type === "stage_status_change") {
     if (entry.old_value && entry.new_value) {
       return (
