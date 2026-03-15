@@ -32,7 +32,10 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
         style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 12px)" }}
       >
         <div className="flex items-center justify-between">
-          <h1 className="text-lg font-serif text-primary-foreground tracking-wide">
+          <h1
+            className="text-lg font-serif text-primary-foreground tracking-wide cursor-pointer"
+            onClick={() => navigate("/", { state: { view: "dashboard" } })}
+          >
             A→M <span className="font-sans font-normal text-sm opacity-80">Interior</span>
           </h1>
           <button
