@@ -156,8 +156,7 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
   return (
     <div
       ref={containerRef}
-      className="flex flex-col h-full"
-      style={{ background: "#ffffff" }}
+      className="flex flex-col h-full bg-background"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
