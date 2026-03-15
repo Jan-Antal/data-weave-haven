@@ -30,6 +30,12 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
       <header
         className="md:hidden border-b bg-primary px-4 pb-3 shrink-0 z-50"
         style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 12px)" }}
+        ref={(el) => {
+          if (el) {
+            const h = el.getBoundingClientRect().height;
+            document.documentElement.style.setProperty('--mobile-header-height', `${h}px`);
+          }
+        }}
       >
         <div className="flex items-center justify-between">
           <h1
