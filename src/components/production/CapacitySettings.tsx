@@ -88,6 +88,11 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const [newHolidayEnd, setNewHolidayEnd] = useState("");
   const [newHolidayCap, setNewHolidayCap] = useState("0");
   const [autoApplyHolidays, setAutoApplyHolidays] = useState(true);
+  const [cleanupConfirmOpen, setCleanupConfirmOpen] = useState(false);
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
+  const { role } = useAuth();
+  const isAdmin = role === "admin" || role === "owner";
+  const queryClient = useQueryClient();
   const VISIBLE_WEEKS = 12;
   const SCROLL_STEP = 4;
   const getDefaultViewStart = useCallback(() => {
