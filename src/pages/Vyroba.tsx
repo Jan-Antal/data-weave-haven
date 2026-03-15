@@ -1149,13 +1149,28 @@ export default function Vyroba() {
       <div
         className="flex flex-1 min-h-0 overflow-hidden"
         {...(isMobile ? {
-          onTouchStart: (e: React.TouchEvent) => { (e.currentTarget as any)._swipeX = e.touches[0].clientX; },
+          onTouchStart: (e: React.TouchEvent) => {
+            const t = e.touches[0];
+            if (t.clientX < 30) return;
+            (e.currentTarget as any)._swipeX = t.clientX;
+            (e.currentTarget as any)._swipeT = Date.now();
+          },
           onTouchEnd: (e: React.TouchEvent) => {
             const startX = (e.currentTarget as any)._swipeX;
+            const startT = (e.currentTarget as any)._swipeT;
             if (startX == null) return;
             const diff = e.changedTouches[0].clientX - startX;
-            if (Math.abs(diff) > 60) {
-              setWeekOffset(w => diff > 0 ? w - 1 : w + 1);
+            const elapsed = Date.now() - startT;
+            if (Math.abs(diff) > 80 && elapsed < 400) {
+              const dir = diff > 0 ? -1 : 1;
+              const el = e.currentTarget.querySelector('.week-content-area') as HTMLElement;
+              if (el) {
+                el.style.setProperty('--slide-dir', dir > 0 ? '30px' : '-30px');
+                el.classList.remove('week-slide-enter');
+                void el.offsetWidth;
+                el.classList.add('week-slide-enter');
+              }
+              setWeekOffset(w => w + dir);
             }
             (e.currentTarget as any)._swipeX = null;
           },
@@ -1163,7 +1178,7 @@ export default function Vyroba() {
       >
       <div className="flex-1 min-w-0 flex min-h-0">
         {/* ═══ LEFT PANEL ═══ */}
-        <div className={`shrink-0 flex flex-col overflow-y-auto ${isMobile ? "w-full" : "w-[252px]"}`} style={{ borderRight: isMobile ? "none" : "1px solid #e5e2dd", background: isMobile ? "hsl(var(--background))" : "#ffffff", paddingTop: isMobile ? 8 : 0, paddingBottom: isMobile ? 80 : 0 }}>
+        <div className={`shrink-0 flex flex-col overflow-y-auto ${isMobile ? "w-full" : "w-[252px]"}`} style={{ borderRight: isMobile ? "none" : "1px solid #e5e2dd", background: isMobile ? "hsl(var(--background))" : "#ffffff", paddingTop: isMobile ? 8 : 0, paddingBottom: isMobile ? 100 : 0 }}>
           {/* Capacity bar — hidden on mobile */}
           {!isMobile && (
             <div className="px-3 py-2 flex items-center gap-2" style={{ borderBottom: "1px solid #f0eeea", background: "#fafaf8" }}>
