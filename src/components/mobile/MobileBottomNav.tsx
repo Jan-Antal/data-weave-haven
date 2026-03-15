@@ -10,6 +10,15 @@ export function MobileBottomNav() {
   const isDashboardActive = location.pathname === "/" && (location.state as any)?.view !== "projects";
   const isVyrobaActive = location.pathname === "/vyroba";
 
+  // Close DataLog panels on all modules when navigating via bottom nav
+  const closeDataLog = () => {
+    try {
+      localStorage.setItem("datalog-panel-index", "false");
+      localStorage.setItem("datalog-panel-vyroba", "false");
+      localStorage.setItem("datalog-panel-plan-vyroby", "false");
+    } catch {}
+  };
+
   return (
     <nav
       className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-primary"
