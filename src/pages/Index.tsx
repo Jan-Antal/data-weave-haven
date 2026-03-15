@@ -105,7 +105,7 @@ const Index = () => {
     });
   }, []);
 
-  const { profile, signOut, canAccessSettings, canCreateProject, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, isKonstrukter, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, defaultTab } = useAuth();
+  const { profile, signOut, canAccessSettings, canCreateProject, isAdmin, isOwner, isTestUser, realRole, simulatedRole, setSimulatedRole, role, isKonstrukter, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, defaultTab } = useAuth();
 
   const { data: userPrefs } = useUserPreferences();
   const achievementChecker = useAchievementChecker();
