@@ -75,7 +75,7 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
         style={{ borderLeft: `4px solid ${riskColor || 'hsl(var(--border))'}` }}
       >
         <button
-          className="flex-1 text-left p-3 min-h-[44px] overflow-hidden min-w-0"
+          className="flex-1 text-left px-3 py-3 min-h-[44px] overflow-hidden min-w-0"
           onClick={() => onTap(project)}
         >
           <div className="flex items-start gap-2">
