@@ -118,25 +118,36 @@ serve(async (req) => {
       return { date: null, source: "none" };
     }
 
-    // Helper: estimate hours for a project from TPV/vyroba/prodejni_cena
-    function estimateProjectHours(proj: any, projTpv: any[]): number {
-      // 1. TPV-based: sum(cena * pocet) / hourly rate
-      const tpvTotal = projTpv.reduce((s, t) => {
-        const cena = Number(t.cena) || 0;
-        const pocet = Number(t.pocet) || 1;
-        return s + cena * pocet;
-      }, 0);
-      if (tpvTotal > 0) return clampHours(tpvTotal / HOURLY_RATE);
+    // Helper: estimate hours for a project using DB-driven cost breakdown
+    interface EstimationResult {
+      hours: number;
+      level: number; // 1=rozpad, 2=odhad s marží, 3=odhad s def. marží, 4=chybí podklady
+      badge: string;
+      usedPreset?: string;
+    }
 
-      // 2. vyroba field
-      const vyroba = Number(proj.vyroba);
-      if (vyroba > 0) return clampHours(vyroba / HOURLY_RATE);
+    function estimateProjectHours(proj: any, projTpv: any[]): EstimationResult {
+      const prodejniCena = Number(proj.prodejni_cena) || 0;
+      const marze = proj.marze != null ? Number(proj.marze) : null;
 
-      // 3. prodejni_cena fallback (35% is production cost)
-      const cena = Number(proj.prodejni_cena);
-      if (cena > 0) return clampHours(cena * 0.35 / HOURLY_RATE);
+      // Which preset to use
+      const preset = proj.cost_preset_id
+        ? costPresets.find((p: any) => p.id === proj.cost_preset_id)
+        : defaultPreset;
 
-      return MIN_HOURS;
+      if (!preset || prodejniCena === 0) {
+        return { hours: MIN_HOURS, level: 4, badge: "⚠ Chybí podklady" };
+      }
+
+      const effectiveMarze = marze ?? 15; // default 15% if not set
+      const naklady = prodejniCena * (1 - effectiveMarze / 100);
+      const vyrobaNaklady = naklady * (Number(preset.production_pct) / 100);
+      const hours = clampHours(vyrobaNaklady / hourlyRate);
+
+      const level = proj.cost_preset_id ? 1 : (marze != null ? 2 : 3);
+      const badge = level === 1 ? "Rozpad" : level === 2 ? "Výroba – odhad" : "Výroba – odhad (def. marže)";
+
+      return { hours, level, badge, usedPreset: preset.name };
     }
 
     // Helper: distribute totalHours across weeks
