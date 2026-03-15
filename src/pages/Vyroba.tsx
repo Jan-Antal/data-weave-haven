@@ -2563,8 +2563,8 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
               return (
                 <div key={mids.join("-")}>
                   <div
-                    className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-pointer transition-colors"
-                    style={{ border: rowBorder, background: rowBg }}
+                    className="flex items-center gap-2 px-2.5 rounded-md cursor-pointer transition-colors"
+                    style={{ border: rowBorder, background: rowBg, height: 42 }}
                     onClick={() => toggleSelect(mids)}
                   >
                     {/* Select checkbox */}
@@ -2664,13 +2664,13 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                     {/* QC badge — clickable only if ALL parts completed across all weeks */}
                     <div onClick={(e) => e.stopPropagation()}>
                       {hasQC ? (
-                        <button style={{ minHeight: '36px', minWidth: '60px', padding: '6px 12px', cursor: 'pointer' }} onClick={() => { setUncheckConfirmItemId(mids[0]); setUncheckConfirmCode(`${item.item_code || ""} ${item.item_name}`.trim()); }}>
+                        <button className="cursor-pointer" onClick={() => { setUncheckConfirmItemId(mids[0]); setUncheckConfirmCode(`${item.item_code || ""} ${item.item_name}`.trim()); }}>
                           <QualityCheckDisplay check={checkMap.get(mids[0])} />
                         </button>
                       ) : (() => {
                         const allDone = areAllPartsCompleted(item.item_code, item.item_name);
                         return (
-                          <button style={{ minHeight: '36px', minWidth: '60px', padding: '6px 12px', cursor: 'pointer' }} onClick={() => {
+                          <button className="cursor-pointer" onClick={() => {
                             // Pre-select this item if not already selected
                             setSelectedItems(prev => {
                               const next = new Set(prev);
