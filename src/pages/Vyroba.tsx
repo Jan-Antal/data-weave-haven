@@ -2658,25 +2658,31 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                         </button>
                       ) : (() => {
                         const allDone = areAllPartsCompleted(item.item_code, item.item_name);
-                        if (!allDone) {
-                          const info = getIncompletePartsInfo(item.item_code, item.item_name);
-                          return (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="inline-flex items-center gap-1 shrink-0 cursor-not-allowed opacity-50"
-                                  style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #f59e0b", padding: "6px 12px", minHeight: '36px', minWidth: '60px', borderRadius: "9999px", fontSize: "12px", fontWeight: 500, lineHeight: 1 }}>
-                                  <Shield className="h-3 w-3" /> QC
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-[250px] text-xs">
-                                Čeká na dokončení části {info.total - info.incomplete}/{info.total} v T{info.weekNums.join(", T")} — QC nelze provést
-                              </TooltipContent>
-                            </Tooltip>
-                          );
-                        }
                         return (
-                          <button style={{ minHeight: '36px', minWidth: '60px', padding: '6px 12px', cursor: 'pointer' }} onClick={() => { setSingleQcItem(item); setSingleQcMergedIds(mids); setSingleQcModalOpen(true); setDefectItemId(item.id); setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectPhotos([]); }}>
-                            <QualityCheckBadgeEmpty />
+                          <button style={{ minHeight: '36px', minWidth: '60px', padding: '6px 12px', cursor: 'pointer' }} onClick={() => {
+                            // Pre-select this item if not already selected
+                            setSelectedItems(prev => {
+                              const next = new Set(prev);
+                              for (const id of mids) next.add(id);
+                              return next;
+                            });
+                            setSingleQcItem(item); setSingleQcMergedIds(mids); setSingleQcModalOpen(true); setDefectItemId(item.id); setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectPhotos([]);
+                          }}>
+                            {!allDone ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex items-center gap-1 shrink-0"
+                                    style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #f59e0b", padding: "2px 8px", borderRadius: "9999px", fontSize: "12px", fontWeight: 500, lineHeight: 1 }}>
+                                    <Shield className="h-3 w-3" /> QC
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-[250px] text-xs">
+                                  {(() => { const info = getIncompletePartsInfo(item.item_code, item.item_name); return `Čeká na dokončení části ${info.total - info.incomplete}/${info.total} v T${info.weekNums.join(", T")} — QC lze zahájit`; })()}
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <QualityCheckBadgeEmpty />
+                            )}
                           </button>
                         );
                       })()}
@@ -2822,71 +2828,99 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
         </DialogContent>
       </Dialog>
 
-      {/* Single-item QC modal */}
-      <Dialog open={singleQcModalOpen} onOpenChange={setSingleQcModalOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Kontrola kvality — {singleQcItem?.item_code} {singleQcItem?.item_name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <QcWarningBox />
+      {/* Single-item QC modal (also shows other selected items) */}
+      {(() => {
+        // Gather all selected items that need QC
+        const selectedQcItems = selectedItems.size > 0
+          ? dedupedItems.filter(d => d.mergedIds.some(id => selectedItems.has(id)) && !d.mergedIds.every(id => checkMap.has(id)))
+          : [];
+        const showMultiple = selectedQcItems.length > 1;
+        const modalTitle = showMultiple
+          ? `Kontrola kvality — ${selectedQcItems.length} položek`
+          : `Kontrola kvality — ${singleQcItem?.item_code || ""} ${singleQcItem?.item_name || ""}`;
 
-            {/* Defect section */}
-            <QcDefectForm
-              defectOpen={defectOpen}
-              setDefectOpen={setDefectOpen}
-              defectType={defectType} setDefectType={setDefectType}
-              defectDesc={defectDesc} setDefectDesc={setDefectDesc}
-              defectSeverity={defectSeverity} setDefectSeverity={setDefectSeverity}
-              defectResolution={defectResolution} setDefectResolution={setDefectResolution}
-              defectItemId={defectItemId} setDefectItemId={setDefectItemId}
-              defectPhotos={defectPhotos} setDefectPhotos={setDefectPhotos}
-              availableItems={singleQcItem ? [singleQcItem] : []}
-              projectId={projectId}
-              onSave={async () => {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (!singleQcItem) return;
-                const selectedItem = defectItemId === "__bundle__" ? null : (defectItemId === singleQcItem.id ? singleQcItem : null);
-                await addDefect.mutateAsync({
-                  project_id: projectId,
-                  item_id: selectedItem?.id || singleQcItem.id,
-                  item_code: selectedItem?.item_code || singleQcItem.item_code || null,
-                  defect_type: defectType,
-                  description: defectDesc,
-                  severity: defectSeverity as "minor" | "blocking",
-                  resolution_type: defectSeverity === "blocking" ? defectResolution : null,
-                  photo_url: defectPhotos.length > 0 ? JSON.stringify(defectPhotos) : null,
-                  reported_by: user?.id || "",
-                });
-                
-                logActivity({ projectId, actionType: "defect_reported", newValue: defectType, detail: `${selectedItem?.item_code || singleQcItem.item_code || "item"} — ${defectSeverity}` });
-                setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectItemId("__bundle__"); setDefectPhotos([]); setDefectOpen(false);
-              }}
-              singleItemMode
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setSingleQcModalOpen(false); setDefectOpen(false); }}>Zrušit</Button>
-            <Button
-              style={{ background: "#3a8a36" }}
-              onClick={async () => {
-                if (singleQcItem && singleQcMergedIds.length > 0) {
-                  for (const id of singleQcMergedIds) {
-                    if (!checkMap.has(id)) await checkItem(id);
-                  }
-                  
-                }
-                setSingleQcModalOpen(false);
-                setSingleQcItem(null);
-                setSingleQcMergedIds([]);
-                setDefectOpen(false);
-              }}
-            >
-              Potvrdit QC — {qcUserFirstName}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        return (
+          <Dialog open={singleQcModalOpen} onOpenChange={setSingleQcModalOpen}>
+            <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{modalTitle}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                {showMultiple && (
+                  <div className="space-y-1 text-[12px]">
+                    <div className="font-semibold text-muted-foreground">Položky k QC kontrole:</div>
+                    {selectedQcItems.map(({ item }) => (
+                      <div key={item.id} className="flex items-center gap-2 px-2 py-1 rounded" style={{ background: "hsl(var(--muted))" }}>
+                        <Check className="h-3 w-3" style={{ color: "hsl(var(--success))" }} />
+                        <span>{item.item_code} {item.item_name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <QcWarningBox />
+
+                {/* Defect section */}
+                <QcDefectForm
+                  defectOpen={defectOpen}
+                  setDefectOpen={setDefectOpen}
+                  defectType={defectType} setDefectType={setDefectType}
+                  defectDesc={defectDesc} setDefectDesc={setDefectDesc}
+                  defectSeverity={defectSeverity} setDefectSeverity={setDefectSeverity}
+                  defectResolution={defectResolution} setDefectResolution={setDefectResolution}
+                  defectItemId={defectItemId} setDefectItemId={setDefectItemId}
+                  defectPhotos={defectPhotos} setDefectPhotos={setDefectPhotos}
+                  availableItems={singleQcItem ? [singleQcItem] : []}
+                  projectId={projectId}
+                  onSave={async () => {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (!singleQcItem) return;
+                    const selectedItem = defectItemId === "__bundle__" ? null : (defectItemId === singleQcItem.id ? singleQcItem : null);
+                    await addDefect.mutateAsync({
+                      project_id: projectId,
+                      item_id: selectedItem?.id || singleQcItem.id,
+                      item_code: selectedItem?.item_code || singleQcItem.item_code || null,
+                      defect_type: defectType,
+                      description: defectDesc,
+                      severity: defectSeverity as "minor" | "blocking",
+                      resolution_type: defectSeverity === "blocking" ? defectResolution : null,
+                      photo_url: defectPhotos.length > 0 ? JSON.stringify(defectPhotos) : null,
+                      reported_by: user?.id || "",
+                    });
+                    
+                    logActivity({ projectId, actionType: "defect_reported", newValue: defectType, detail: `${selectedItem?.item_code || singleQcItem.item_code || "item"} — ${defectSeverity}` });
+                    setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectItemId("__bundle__"); setDefectPhotos([]); setDefectOpen(false);
+                  }}
+                  singleItemMode
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setSingleQcModalOpen(false); setDefectOpen(false); }}>Zrušit</Button>
+                <Button
+                  style={{ background: "#3a8a36" }}
+                  onClick={async () => {
+                    // QC all selected items (or just the single one)
+                    const itemsToQc = showMultiple ? selectedQcItems : (singleQcItem ? [{ item: singleQcItem, mergedIds: singleQcMergedIds }] : []);
+                    for (const { mergedIds: ids } of itemsToQc) {
+                      for (const id of ids) {
+                        if (!checkMap.has(id)) await checkItem(id);
+                      }
+                    }
+                    const qcNames = itemsToQc.map(({ item }) => item.item_code || item.item_name).join(", ");
+                    logActivity({ projectId, actionType: "item_qc_confirmed", newValue: qcNames, detail: profile?.full_name || profile?.email || "" });
+                    setSingleQcModalOpen(false);
+                    setSingleQcItem(null);
+                    setSingleQcMergedIds([]);
+                    setSelectedItems(new Set());
+                    setDefectOpen(false);
+                  }}
+                >
+                  Potvrdit QC — {qcUserFirstName}{showMultiple ? ` (${selectedQcItems.length})` : ""}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </>
   );
 }
