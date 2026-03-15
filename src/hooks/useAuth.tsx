@@ -227,6 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     linkedPersonName,
     isTestUser,
+    isTester,
     signIn,
     signOut,
     isOwner,
