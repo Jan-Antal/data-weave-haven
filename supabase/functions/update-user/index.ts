@@ -128,7 +128,10 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const { error: pwError } = await adminClient.auth.admin.updateUserById(user_id, { password });
+      const { error: pwError } = await adminClient.auth.admin.updateUserById(user_id, {
+        password,
+        email_confirm: true,
+      });
       if (pwError) {
         console.error("Password update failed:", pwError);
         const pwMsg = pwError.message?.includes("easily guessed")
@@ -139,6 +142,8 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      // Mark password as set in profile
+      await adminClient.from("profiles").update({ password_set: true }).eq("id", user_id);
     }
 
     // Update profile
