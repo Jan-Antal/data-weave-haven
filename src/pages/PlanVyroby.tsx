@@ -157,6 +157,17 @@ export default function PlanVyroby() {
   const { data: settings } = useProductionSettings();
   const { data: inboxProjects = [] } = useProductionInbox();
 
+  // Handle openProjectId from DataLog navigation
+  const openProjectIdHandled = useRef(false);
+  useEffect(() => {
+    if (openProjectIdFromState && !openProjectIdHandled.current) {
+      openProjectIdHandled.current = true;
+      setDetailProjectId(openProjectIdFromState);
+      setSelectedProjectId(openProjectIdFromState);
+      window.history.replaceState({}, "");
+    }
+  }, [openProjectIdFromState]);
+
   // Compute weekKeys for search navigation
   const searchWeekKeys = useMemo(() => {
     const keys = new Set<string>();
