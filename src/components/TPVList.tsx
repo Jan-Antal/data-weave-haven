@@ -688,7 +688,36 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         description={deleteIds && deleteIds.length > 1 ? `Chystáte se smazat ${deleteIds.length} položek. Tato akce je nevratná.` : "Tato akce je nevratná."}
       />
 
-      {/* Excel Import Wizard */}
+      {/* Send to Production Warning Dialog */}
+      <Dialog open={sendDialogOpen} onOpenChange={setSendDialogOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Některé položky nejsou připraveny</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2 max-h-[300px] overflow-auto">
+            {notReadyItems.map(item => (
+              <div key={item.id} className="flex items-center gap-2 text-sm py-1 px-2 rounded bg-destructive/5">
+                <span className="font-mono text-xs font-semibold">{item.item_name}</span>
+                <span className="text-muted-foreground truncate flex-1">{item.item_type || ""}</span>
+                <span className="text-xs text-destructive font-medium shrink-0">{item.status || "Bez statusu"}</span>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setSendDialogOpen(false)}>
+              Zrušit
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => executeSendToProduction(readyItems)}
+              disabled={isSending}
+            >
+              {isSending ? "Odesílám..." : `Odeslat jen schválené (${readyItems.length})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <ExcelImportWizard
         projectId={projectId}
         projectName={projectName}
