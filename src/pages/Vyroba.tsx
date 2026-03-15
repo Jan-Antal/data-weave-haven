@@ -181,6 +181,8 @@ export default function Vyroba() {
   const { isOwner, isAdmin, isTestUser, loading, profile, signOut, canAccessSettings, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, realRole, simulatedRole, setSimulatedRole, role } = useAuth();
   const { openPeopleManagement } = usePeopleManagement();
   const navigate = useNavigate();
+  const location = useLocation();
+  const openProjectIdFromState = (location.state as any)?.openProjectId as string | undefined;
   const qc = useQueryClient();
   const { pushUndo, undo, redo, canUndo, canRedo, lastUndoDescription, lastRedoDescription, setCurrentPage } = useUndoRedo();
   const isMobile = useIsMobile();
