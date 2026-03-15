@@ -264,7 +264,7 @@ function ForecastCard({
               id: row.id,
               item_name: row.item_type || row.item_name,
               item_code: row.item_name,
-              hours: row.cena ? Math.round(row.cena / 550) : 0,
+              hours: row.cena ? Math.round(row.cena / (hourlyRate || 550)) : 0,
               source: "tpv"
             });
           }
