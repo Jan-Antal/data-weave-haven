@@ -54,6 +54,7 @@ const ROLE_LABELS: Record<string, string> = {
   pm: "PM",
   konstrukter: "Konstruktér",
   viewer: "Viewer",
+  tester: "Tester",
 };
 
 const Index = () => {
