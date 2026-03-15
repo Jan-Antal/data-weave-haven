@@ -637,6 +637,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
                     entry={entry}
                     isSelected={selectedEntryId === entry.id}
                     onSelect={handleEntrySelect}
+                    onNavigate={handleEntryNavigate}
                   />
                 ))}
               </div>
