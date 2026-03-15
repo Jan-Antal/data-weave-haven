@@ -22,7 +22,6 @@ const ROLE_LABELS: Record<string, string> = {
   pm: "PM",
   konstrukter: "Konstruktér",
   viewer: "Viewer",
-  tester: "Tester",
 };
 
 export function ProductionHeader({ forecastActive, dataLogOpen, onToggleDataLog }: { forecastActive?: boolean; dataLogOpen?: boolean; onToggleDataLog?: () => void }) {

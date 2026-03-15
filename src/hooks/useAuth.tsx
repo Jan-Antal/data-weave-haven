@@ -4,7 +4,7 @@ import type { User, Session } from "@supabase/supabase-js";
 import { logLoginEvent, resetLoginTracking, hasLoginLoggedInCurrentTab } from "@/hooks/useLoginTracking";
 import { startSession, endSession, resetSessionTracking } from "@/hooks/useSessionTracking";
 
-export type AppRole = "owner" | "admin" | "pm" | "konstrukter" | "viewer" | "tester";
+export type AppRole = "owner" | "admin" | "pm" | "konstrukter" | "viewer";
 
 interface AuthContextType {
   user: User | null;
@@ -16,7 +16,6 @@ interface AuthContextType {
   loading: boolean;
   linkedPersonName: string | null;
   isTestUser: boolean;
-  isTester: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   isOwner: boolean;
@@ -173,14 +172,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Effective role: use simulated if set (only owner can simulate)
   const effectiveRole = (simulatedRole && (realRole === "owner")) ? simulatedRole : realRole;
 
-  const isTester = effectiveRole === "tester";
-  const isTestUser = user?.email === "alfred@ami-test.cz" || isTester;
+  const isTestUser = user?.email === "alfred@ami-test.cz";
 
   const isOwner = effectiveRole === "owner";
   const isAdmin = effectiveRole === "admin" || isOwner;
   const isPM = effectiveRole === "pm";
   const isKonstrukter = effectiveRole === "konstrukter";
-  const isViewer = effectiveRole === "viewer" || isTester;
+  const isViewer = effectiveRole === "viewer";
 
   // Granular permissions
   const canEdit = !isViewer;
@@ -228,7 +226,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     linkedPersonName,
     isTestUser,
-    isTester,
     signIn,
     signOut,
     isOwner,

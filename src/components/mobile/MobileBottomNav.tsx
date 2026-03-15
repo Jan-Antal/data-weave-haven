@@ -1,23 +1,14 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Factory, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useCallback, useRef } from "react";
 
 export function MobileBottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
-  const lastNav = useRef<string>("");
 
   const isProjectsActive = location.pathname === "/" && (location.state as any)?.view === "projects";
   const isDashboardActive = location.pathname === "/" && (location.state as any)?.view !== "projects";
   const isVyrobaActive = location.pathname === "/vyroba";
-
-  // Use replace to avoid building up history stack causing glitches
-  const navTo = useCallback((path: string, state?: any) => {
-    const key = path + JSON.stringify(state || {});
-    navigate(path, { state, replace: true });
-    lastNav.current = key;
-  }, [navigate]);
 
   return (
     <nav
@@ -28,7 +19,7 @@ export function MobileBottomNav() {
       }}
     >
       <button
-        onClick={() => navTo("/", { view: "projects" })}
+        onClick={() => navigate("/", { state: { view: "projects" }, replace: false })}
         className={cn(
           "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
           isProjectsActive
@@ -40,7 +31,7 @@ export function MobileBottomNav() {
         <span className="text-[10px] font-medium">Projekty</span>
       </button>
       <button
-        onClick={() => navTo("/", { view: "dashboard" })}
+        onClick={() => navigate("/", { state: { view: "dashboard" }, replace: false })}
         className={cn(
           "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
           isDashboardActive
@@ -52,7 +43,7 @@ export function MobileBottomNav() {
         <span className="text-[10px] font-medium">Přehled</span>
       </button>
       <button
-        onClick={() => navTo("/vyroba")}
+        onClick={() => navigate("/vyroba")}
         className={cn(
           "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
           isVyrobaActive

@@ -912,7 +912,7 @@ export default function Vyroba() {
 
   /* ═══ RENDER ═══ */
   return (
-    <div className="h-screen flex flex-col overflow-hidden" style={{ background: "#f8f7f4", paddingBottom: isMobile ? 'calc(56px + env(safe-area-inset-bottom, 0px))' : undefined }}>
+    <div className={cn("h-screen flex flex-col overflow-hidden", isMobile && "pb-14")} style={{ background: "#f8f7f4" }}>
       {/* ═══ MOBILE HEADER ═══ */}
       {isMobile && (
         <MobileHeader
@@ -1059,14 +1059,9 @@ export default function Vyroba() {
               <button onClick={() => setWeekOffset(w => w - 1)} className="p-1 rounded hover:bg-muted transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center" style={{ color: "#223937" }}>
                 <ChevronLeft className="h-4 w-4" />
               </button>
-               <button
-                onClick={() => {
-                  if (weekOffset !== 0) {
-                    setWeekOffset(0);
-                  } else {
-                    setWeekPickerOpen(o => !o);
-                  }
-                }}
+              <button
+                onClick={() => setWeekPickerOpen(o => !o)}
+                onDoubleClick={() => setWeekOffset(0)}
                 className={cn(
                   "font-mono select-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer font-bold",
                   weekOffset !== 0 && "underline decoration-dotted underline-offset-2"
@@ -1149,17 +1144,12 @@ export default function Vyroba() {
       <div
         className="flex flex-1 min-h-0 overflow-hidden"
         {...(isMobile ? {
-          onTouchStart: (e: React.TouchEvent) => {
-            (e.currentTarget as any)._swipeX = e.touches[0].clientX;
-            (e.currentTarget as any)._swipeStartTime = Date.now();
-          },
+          onTouchStart: (e: React.TouchEvent) => { (e.currentTarget as any)._swipeX = e.touches[0].clientX; },
           onTouchEnd: (e: React.TouchEvent) => {
             const startX = (e.currentTarget as any)._swipeX;
             if (startX == null) return;
             const diff = e.changedTouches[0].clientX - startX;
-            const elapsed = Date.now() - ((e.currentTarget as any)._swipeStartTime || 0);
-            // Only accept intentional horizontal swipes (not from screen edge, enough distance, not too slow)
-            if (Math.abs(diff) > 80 && startX > 30 && elapsed < 400) {
+            if (Math.abs(diff) > 60) {
               setWeekOffset(w => diff > 0 ? w - 1 : w + 1);
             }
             (e.currentTarget as any)._swipeX = null;
@@ -1168,7 +1158,7 @@ export default function Vyroba() {
       >
       <div className="flex-1 min-w-0 flex min-h-0">
         {/* ═══ LEFT PANEL ═══ */}
-        <div className={`shrink-0 flex flex-col overflow-y-auto ${isMobile ? "w-full" : "w-[252px]"}`} style={{ borderRight: isMobile ? "none" : "1px solid #e5e2dd", background: isMobile ? "hsl(var(--background))" : "#ffffff", paddingTop: isMobile ? 8 : 0 }}>
+        <div className={`shrink-0 flex flex-col overflow-y-auto ${isMobile ? "w-full" : "w-[252px]"}`} style={{ borderRight: isMobile ? "none" : "1px solid #e5e2dd", background: isMobile ? "hsl(var(--background))" : "#ffffff", paddingTop: isMobile ? 8 : 0, paddingBottom: isMobile ? 80 : 0 }}>
           {/* Capacity bar — hidden on mobile */}
           {!isMobile && (
             <div className="px-3 py-2 flex items-center gap-2" style={{ borderBottom: "1px solid #f0eeea", background: "#fafaf8" }}>
@@ -2653,14 +2643,13 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                           return (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <button className="inline-flex items-center gap-1 shrink-0"
-                                  style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #f59e0b", padding: "6px 12px", minHeight: '36px', minWidth: '60px', borderRadius: "9999px", fontSize: "12px", fontWeight: 500, lineHeight: 1, cursor: 'pointer', opacity: 0.7 }}
-                                  onClick={() => { setSingleQcItem(item); setSingleQcMergedIds(mids); setSingleQcModalOpen(true); setDefectItemId(item.id); setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectPhotos([]); }}>
+                                <span className="inline-flex items-center gap-1 shrink-0 cursor-not-allowed opacity-50"
+                                  style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #f59e0b", padding: "6px 12px", minHeight: '36px', minWidth: '60px', borderRadius: "9999px", fontSize: "12px", fontWeight: 500, lineHeight: 1 }}>
                                   <Shield className="h-3 w-3" /> QC
-                                </button>
+                                </span>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="max-w-[250px] text-xs">
-                                Čeká na dokončení části {info.total - info.incomplete}/{info.total} v T{info.weekNums.join(", T")} — klikněte pro QC
+                                Čeká na dokončení části {info.total - info.incomplete}/{info.total} v T{info.weekNums.join(", T")} — QC nelze provést
                               </TooltipContent>
                             </Tooltip>
                           );

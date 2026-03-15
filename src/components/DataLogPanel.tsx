@@ -330,7 +330,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
   // Mobile: full screen overlay
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-[100] bg-background flex flex-col" style={{ top: 'var(--mobile-header-height, 52px)', bottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' }}>
+      <div className="fixed inset-0 z-[100] bg-background flex flex-col">
         {/* Mobile header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
           <button onClick={() => onOpenChange(false)} className="flex items-center gap-1 text-sm text-muted-foreground min-h-[44px]">

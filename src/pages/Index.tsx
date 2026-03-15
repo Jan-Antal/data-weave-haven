@@ -54,7 +54,6 @@ const ROLE_LABELS: Record<string, string> = {
   pm: "PM",
   konstrukter: "Konstruktér",
   viewer: "Viewer",
-  tester: "Tester",
 };
 
 const Index = () => {
@@ -106,7 +105,7 @@ const Index = () => {
     });
   }, []);
 
-  const { profile, signOut, canAccessSettings, canCreateProject, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, isKonstrukter, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, defaultTab, isTestUser } = useAuth();
+  const { profile, signOut, canAccessSettings, canCreateProject, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, isKonstrukter, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, defaultTab } = useAuth();
 
   const { data: userPrefs } = useUserPreferences();
   const achievementChecker = useAchievementChecker();
@@ -194,9 +193,9 @@ const Index = () => {
     <ColumnVisibilityProvider>
     <ExportProvider>
     <DataLogHighlightProvider>
-    <div className={cn("h-screen bg-background flex flex-col overflow-hidden")} style={isMobile ? { paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' } : undefined}>
+    <div className={cn("h-screen bg-background flex flex-col overflow-hidden", isMobile && "pb-14")}>
       {/* TEST MODE banner */}
-      {isTestUser && (
+      {profile?.email === "alfred@ami-test.cz" && (
         <div className="bg-orange-500 text-white px-6 flex items-center justify-center gap-2 font-bold tracking-wide shrink-0" style={{ height: 32 }}>
           <span>⚠ TEST MODE — Testovací prostředí — data nejsou produkční</span>
         </div>
