@@ -44,7 +44,7 @@ interface DataLogPanelProps {
   defaultCategory?: Category;
 }
 
-type Category = "all" | "status" | "terminy" | "documents" | "projects" | "users" | "vyroba";
+type Category = "all" | "status" | "terminy" | "documents" | "projects" | "vyroba";
 type PanelTab = "activity" | "users";
 
 const CATEGORY_PILLS: { value: Category; label: string }[] = [
@@ -54,7 +54,6 @@ const CATEGORY_PILLS: { value: Category; label: string }[] = [
   { value: "documents", label: "Dokumenty" },
   { value: "projects", label: "Projekty" },
   { value: "vyroba", label: "Výroba" },
-  { value: "users", label: "Uživatelé" },
 ];
 
 const DOT_COLORS: Record<string, string> = {
