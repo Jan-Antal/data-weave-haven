@@ -197,47 +197,10 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
           )}
         </div>
 
-        {/* Filter chips row with count + sort pill */}
-        <div className="flex items-center gap-2 mt-2">
-        <div className="flex-1 min-w-0 overflow-x-auto scrollbar-hide">
-          <div className="flex items-center gap-2">
-            <span className="text-[13px] text-muted-foreground shrink-0">{displayProjects.length}</span>
-            <MobileFilterChips activeChip={activeChip} onChipChange={setActiveChip} />
-          </div>
+        {/* Filter chips row */}
+        <div className="mt-2 overflow-x-auto scrollbar-hide">
+          <MobileFilterChips activeChip={activeChip} onChipChange={setActiveChip} />
         </div>
-        <Popover open={sortPopoverOpen} onOpenChange={setSortPopoverOpen}>
-          <PopoverTrigger asChild>
-            <button
-              className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border border-border bg-card text-foreground min-h-[28px]"
-            >
-              {currentSortLabel} {sortAsc ? "↑" : "↓"}
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-[160px] p-1">
-            {SORT_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => {
-                  if (sortBy === opt.value) {
-                    setSortAsc(v => !v);
-                  } else {
-                    setSortBy(opt.value);
-                    setSortAsc(true);
-                  }
-                  setSortPopoverOpen(false);
-                }}
-                className="flex items-center justify-between w-full px-3 py-2 text-[12px] rounded-md hover:bg-accent transition-colors"
-              >
-                <span>{opt.label}</span>
-                {sortBy === opt.value && (
-                  <span className="text-primary text-[11px] font-medium">{sortAsc ? "↑" : "↓"}</span>
-                )}
-              </button>
-            ))}
-          </PopoverContent>
-        </Popover>
-      </div>
       </div>
 
       {/* Scrollable cards */}
