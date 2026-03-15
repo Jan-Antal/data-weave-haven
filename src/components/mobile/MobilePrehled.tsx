@@ -189,8 +189,16 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
     return m ? `${m[1]} dní` : "";
   }
 
+  function formatDateCz(dateStr: string | null | undefined): string {
+    if (!dateStr) return "—";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "—";
+    return `${d.getDate().toString().padStart(2, "0")}.${(d.getMonth() + 1).toString().padStart(2, "0")}.${d.getFullYear()}`;
+  }
+
   return (
-    <div className="flex flex-col pb-20 px-4 pt-3">
+    <div className="flex flex-col pb-20 pt-3" style={{ background: "#ffffff" }}>
+      <div style={{ padding: "0 12px" }}>
       {/* Section 1: Po termínu */}
       {overdueItems.length > 0 && (
         <section>
@@ -204,22 +212,22 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
                 onClick={() => onProjectTap(item.project)}
                 className="w-full text-left active:scale-[0.98] transition-transform"
                 style={{
-                  background: "#FCEBEB",
+                  background: "#ffffff",
                   border: "0.5px solid #F09595",
                   borderLeft: "3px solid #E24B4A",
                   borderRadius: 10,
-                  padding: "10px 12px",
+                  padding: 12,
                 }}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-[13px] font-medium truncate" style={{ color: "#501313" }}>
+                  <p className="text-[13px] font-bold truncate" style={{ color: "#501313" }}>
                     {item.project.project_name}
                   </p>
                   <span
                     className="shrink-0 text-[11px] font-medium px-2 py-0.5"
                     style={{ background: "#F7C1C1", color: "#791F1F", borderRadius: 20 }}
                   >
-                    {extractDays(item.message)}
+                    {extractDays(item.message)} po termínu
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-1">
@@ -231,6 +239,12 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
                   )}
                   {item.project.status && <StatusBadge status={item.project.status} />}
                 </div>
+                {item.project.pm && (
+                  <p className="text-[11px] mt-1 text-muted-foreground">PM: {item.project.pm}</p>
+                )}
+                <p className="text-[11px] mt-0.5" style={{ color: "#DC2626" }}>
+                  Datum smluvní: {formatDateCz(item.project.datum_smluvni)}
+                </p>
               </button>
             ))}
             {!showAllOverdue && hiddenCount > 0 && (
@@ -256,27 +270,27 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
                 ↑ Skrýt
               </button>
             )}
-          </div>
-        </section>
-      )}
+      </div>
+    </section>
+  )}
 
-      {overdueItems.length > 0 && <div className="mx-0 my-3 border-t" style={{ borderColor: "#e5e3df" }} />}
+  {overdueItems.length > 0 && <div className="my-3 border-t" style={{ borderColor: "#e5e3df" }} />}
 
-      {/* Section 2: Výroba tento týden */}
-      <section>
-        <h3 className="uppercase text-[13px] font-medium tracking-[0.04em] mb-2" style={{ color: "#223937" }}>
-          Výroba tento týden
-        </h3>
-        <button
-          onClick={() => navigate("/vyroba")}
-          className="w-full text-left active:scale-[0.98] transition-transform"
-          style={{
-            background: "#E1F5EE",
-            border: "0.5px solid #5DCAA5",
-            borderRadius: 10,
-            padding: "12px 14px",
-          }}
-        >
+  {/* Section 2: Výroba tento týden */}
+  <section>
+    <h3 className="uppercase text-[13px] font-medium tracking-[0.04em] mb-2" style={{ color: "#223937" }}>
+      Výroba tento týden
+    </h3>
+    <button
+      onClick={() => navigate("/vyroba")}
+      className="w-full text-left active:scale-[0.98] transition-transform"
+      style={{
+        background: "#ffffff",
+        border: "0.5px solid #e5e3df",
+        borderRadius: 10,
+        padding: 12,
+      }}
+    >
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[13px] font-medium" style={{ color: "#085041" }}>
@@ -306,7 +320,7 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
         </button>
       </section>
 
-      <div className="mx-0 my-3 border-t" style={{ borderColor: "#e5e3df" }} />
+      <div className="my-3 border-t" style={{ borderColor: "#e5e3df" }} />
 
       {/* Section 3: Poslední aktivita */}
       <section>
@@ -352,6 +366,7 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
           </button>
         )}
       </section>
+      </div>
     </div>
   );
 });
