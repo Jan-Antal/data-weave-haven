@@ -1079,15 +1079,9 @@ export default function Vyroba() {
               )}
             </div>
             <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
-            <span style={{ color: "#1a1a1a", fontWeight: 500 }}>{stats.total} projektů</span>
+            <span style={{ color: "#3a8a36", fontSize: 12 }}>✓ {stats.onTrack} on track</span>
             <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
-            <span className="font-mono" style={{ color: "#2563eb" }}>ø {stats.avgPct}%</span>
-            {stats.behind > 0 && (
-              <>
-                <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
-                <span style={{ color: "#dc2626" }}>⚠ {stats.behind} pozadu</span>
-              </>
-            )}
+            <span style={{ color: "#dc2626", fontSize: 12 }}>⚠ {stats.behind} pozadu</span>
             <div className="flex-1" />
             {weekOffset !== 0 && (
               <button
