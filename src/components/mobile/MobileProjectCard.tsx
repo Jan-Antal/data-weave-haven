@@ -68,14 +68,15 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
   const diffCount = countDifferentStatuses(stages, project.status);
 
   return (
-    <div className={cn("bg-card rounded-[10px] overflow-hidden transition-all active:scale-[0.98] active:opacity-90", dimmed && "opacity-40")} style={{ border: "0.5px solid hsl(var(--border))" }}>
+    <div className={cn("overflow-hidden transition-all active:scale-[0.98] active:opacity-90", dimmed && "opacity-40")} style={{ borderRadius: 10, border: "0.5px solid #e5e3df", background: "#ffffff" }}>
       {/* Main card area */}
       <div
         className="flex items-stretch"
-        style={{ borderLeft: `4px solid ${riskColor || 'hsl(var(--border))'}` }}
+        style={{ borderLeft: `4px solid ${riskColor || '#e5e3df'}` }}
       >
         <button
-          className="flex-1 text-left px-3 py-3 min-h-[44px] overflow-hidden min-w-0"
+          className="flex-1 text-left min-h-[44px] overflow-hidden min-w-0"
+          style={{ padding: 12 }}
           onClick={() => onTap(project)}
         >
           <div className="flex items-start gap-2">

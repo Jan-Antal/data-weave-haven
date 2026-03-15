@@ -113,7 +113,7 @@ export function MobileTPVCardList({
       </div>
 
       {/* Card list */}
-      <div className="flex-1 overflow-y-auto px-3 pt-2 pb-20">
+      <div className="flex-1 overflow-y-auto pt-2 pb-20" style={{ padding: "8px 12px 80px 12px", background: "#ffffff" }}>
         <div className="space-y-2">
           {filteredItems.map(item => {
             const statusOpt = statusOptions.find(o => o.label === item.status);
@@ -125,8 +125,8 @@ export function MobileTPVCardList({
             return (
               <button
                 key={item.id}
-                className="w-full text-left rounded-lg border border-border bg-card overflow-hidden transition-colors active:bg-muted/40"
-                style={{ borderLeftWidth: 4, borderLeftColor: borderColor }}
+                className="w-full text-left overflow-hidden transition-colors active:bg-muted/40"
+                style={{ borderRadius: 10, border: "0.5px solid #e5e3df", borderLeftWidth: 4, borderLeftColor: borderColor, background: "#ffffff" }}
                 onClick={() => setExpandedId(isExpanded ? null : item.id)}
               >
                 {/* Compact view: 3 fields */}
