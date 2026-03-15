@@ -169,7 +169,7 @@ serve(async (req) => {
     }
 
     const statusFallbackWeeks: Record<string, number> = {
-      "Výroba": 4, "TPV": 8, "Engineering": 12, "Příprava": 16,
+      "Výroba IN": 4, "Výroba": 4, "Expedice": 2, "Montáž": 3, "TPV": 8, "Engineering": 12, "Příprava": 16, "On Hold": 12, "Reklamace": 4, "VaN": 8,
     };
 
     const workItems: ProjectWork[] = [];
