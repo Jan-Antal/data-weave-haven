@@ -6,9 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const HOURLY_RATE = 850;
 const MIN_HOURS = 20;
-const MAX_HOURS = 800;
+const MAX_HOURS = 2000;
 
 function clampHours(h: number): number {
   return Math.max(MIN_HOURS, Math.min(MAX_HOURS, Math.round(h)));
