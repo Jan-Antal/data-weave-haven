@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectInfoTable } from "@/components/ProjectInfoTable";
 import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
-import { MobileProjectDetailSheet } from "@/components/mobile/MobileProjectDetailSheet";
+
 import { PMStatusTable } from "@/components/PMStatusTable";
 import { TPVStatusTable } from "@/components/TPVStatusTable";
 import { PlanView } from "@/components/PlanView";
