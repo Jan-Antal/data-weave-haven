@@ -118,7 +118,7 @@ function AppRoutes() {
     <UndoRedoProvider>
       <PeopleManagementProvider>
         <BrowserRouter>
-          
+          <RealtimeSyncProvider />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/plan-vyroby" element={<PlanVyroby />} />
@@ -132,6 +132,12 @@ function AppRoutes() {
       </PeopleManagementProvider>
     </UndoRedoProvider>
   );
+}
+
+/** Invisible component that activates global realtime sync */
+function RealtimeSyncProvider() {
+  useRealtimeSync();
+  return null;
 }
 
 
