@@ -238,6 +238,9 @@ serve(async (req) => {
         tpvCount: number;
         confidence: string;
         startFromIdx: number;
+        estimation_level?: number;
+        estimation_badge?: string;
+        estimation_preset?: string;
       }
 
       const allWork: ProjectWork[] = [];
