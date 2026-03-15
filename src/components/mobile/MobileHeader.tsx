@@ -20,7 +20,7 @@ interface MobileHeaderProps {
 export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const { user, profile, effectiveRole, signOut } = useAuth();
+  const { user, profile, role, signOut } = useAuth();
 
   return (
     <>
