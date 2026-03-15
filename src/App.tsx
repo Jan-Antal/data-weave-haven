@@ -8,6 +8,7 @@ import { PeopleManagementProvider } from "@/components/PeopleManagementContext";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { UndoRedoProvider } from "@/hooks/useUndoRedo";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
+import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -23,7 +24,7 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
-      staleTime: 5 * 60 * 1000,
+      staleTime: 2 * 60 * 1000,
     },
   },
 });
@@ -117,7 +118,7 @@ function AppRoutes() {
     <UndoRedoProvider>
       <PeopleManagementProvider>
         <BrowserRouter>
-          
+          <RealtimeSyncProvider />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/plan-vyroby" element={<PlanVyroby />} />
@@ -131,6 +132,12 @@ function AppRoutes() {
       </PeopleManagementProvider>
     </UndoRedoProvider>
   );
+}
+
+/** Invisible component that activates global realtime sync */
+function RealtimeSyncProvider() {
+  useRealtimeSync();
+  return null;
 }
 
 
