@@ -393,9 +393,27 @@ function ForecastCard({
                 })()}
               </div>
               <div className="flex items-center justify-between mt-0.5">
-                <span className="text-[11px] truncate" style={{ color: style.codeColor }}>
-                  {block.bundle_description}
-                </span>
+                <div className="flex items-center gap-1 min-w-0">
+                  <span className="text-[11px] truncate" style={{ color: style.codeColor }}>
+                    {block.bundle_description}
+                  </span>
+                  {block.estimation_level != null && block.source === "project_estimate" && (() => {
+                    const level = block.estimation_level!;
+                    const bg = level === 1 ? "#14532d" : level <= 3 ? "#451a03" : "#7f1d1d";
+                    const color = level === 1 ? "#86efac" : level <= 3 ? "#fcd34d" : "#fca5a5";
+                    const label = block.estimation_badge || "odhad";
+                    const tooltip = level === 3 ? "Použita výchozí marže 15%" : block.estimation_preset ? `Preset: ${block.estimation_preset}` : undefined;
+                    return (
+                      <span
+                        className="shrink-0 rounded-full px-1.5 py-px text-[8px] font-semibold"
+                        style={{ backgroundColor: bg, color }}
+                        title={tooltip}
+                      >
+                        {label}
+                      </span>
+                    );
+                  })()}
+                </div>
                 <span
                   className="text-[13px] font-bold shrink-0 ml-2"
                   style={{ color: style.hoursColor }}>
