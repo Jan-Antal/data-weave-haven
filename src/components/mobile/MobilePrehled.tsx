@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,11 +9,11 @@ import { useProjects, type Project } from "@/hooks/useProjects";
 import { useProductionSchedule } from "@/hooks/useProductionSchedule";
 import { StatusBadge } from "@/components/StatusBadge";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
 
 interface MobilePrehledProps {
   recentProjects: RecentProject[];
   onProjectTap: (project: Project) => void;
+  onOpenDataLog?: () => void;
 }
 
 function getISOWeekNumber(d: Date): number {
@@ -103,14 +103,23 @@ function formatRelativeTime(dateStr: string): string {
   return `${diffDays} d`;
 }
 
-export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onProjectTap }: MobilePrehledProps) {
+function formatUserShort(email: string): string {
+  const name = email.split("@")[0];
+  const parts = name.split(/[._-]/);
+  if (parts.length >= 2) {
+    return `${parts[0].charAt(0).toUpperCase()}${parts[0].slice(1)} ${parts[1].charAt(0).toUpperCase()}.`;
+  }
+  return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+}
+
+export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onProjectTap, onOpenDataLog }: MobilePrehledProps) {
   const navigate = useNavigate();
   const { profile, linkedPersonName } = useAuth();
   const pmName = linkedPersonName || null;
   const { attentionItems } = useProjectAttention(pmName);
   const { data: allProjects = [] } = useProjects();
 
-  // Overdue items (critical severity with "Po termínu" message)
+  // Overdue items
   const overdueItems = useMemo(() => {
     const seen = new Set<string>();
     return attentionItems.filter(item => {
@@ -157,7 +166,7 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
     return { activeBundles: silo.bundles.length, avgPercent, onTrack, behind };
   }, [scheduleMap, currentWeek]);
 
-  // Recent activity
+  // Recent activity — 10 entries with user info
   const { data: recentActivity = [] } = useQuery({
     queryKey: ["mobile-recent-activity"],
     queryFn: async () => {
@@ -168,27 +177,24 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
         .neq("action_type", "session_end")
         .neq("action_type", "page_view")
         .order("created_at", { ascending: false })
-        .limit(3);
+        .limit(10);
       if (error) throw error;
       return data || [];
     },
     staleTime: 2 * 60 * 1000,
   });
 
-  // Extract days from overdue message
   function extractDays(msg: string): string {
     const m = msg.match(/(\d+)\s*dní/);
     return m ? `${m[1]} dní` : "";
   }
 
-  const dividerClass = "mx-4 border-t border-[#e5e3df]";
-
   return (
-    <div className="flex flex-col gap-3 pb-20 px-4 pt-3">
+    <div className="flex flex-col pb-20 px-4 pt-3">
       {/* Section 1: Po termínu */}
       {overdueItems.length > 0 && (
         <section>
-          <h3 className="uppercase text-[13px] font-medium tracking-wide mb-2" style={{ color: "#223937" }}>
+          <h3 className="uppercase text-[13px] font-medium tracking-[0.04em] mb-2" style={{ color: "#223937" }}>
             Po termínu ({overdueItems.length})
           </h3>
           <div className="flex flex-col gap-2">
@@ -241,15 +247,24 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
                 Zobrazit dalších {hiddenCount} →
               </button>
             )}
+            {showAllOverdue && overdueItems.length > 3 && (
+              <button
+                onClick={() => setShowAllOverdue(false)}
+                className="w-full text-center text-[12px] font-medium py-2 active:scale-[0.98] transition-transform"
+                style={{ color: "#A32D2D" }}
+              >
+                ↑ Skrýt
+              </button>
+            )}
           </div>
         </section>
       )}
 
-      {overdueItems.length > 0 && <div className={dividerClass} />}
+      {overdueItems.length > 0 && <div className="mx-0 my-3 border-t" style={{ borderColor: "#e5e3df" }} />}
 
       {/* Section 2: Výroba tento týden */}
       <section>
-        <h3 className="uppercase text-[13px] font-medium tracking-wide mb-2" style={{ color: "#223937" }}>
+        <h3 className="uppercase text-[13px] font-medium tracking-[0.04em] mb-2" style={{ color: "#223937" }}>
           Výroba tento týden
         </h3>
         <button
@@ -291,11 +306,11 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
         </button>
       </section>
 
-      <div className={dividerClass} />
+      <div className="mx-0 my-3 border-t" style={{ borderColor: "#e5e3df" }} />
 
       {/* Section 3: Poslední aktivita */}
       <section>
-        <h3 className="uppercase text-[13px] font-medium tracking-wide mb-2" style={{ color: "#223937" }}>
+        <h3 className="uppercase text-[13px] font-medium tracking-[0.04em] mb-2" style={{ color: "#223937" }}>
           Poslední aktivita
         </h3>
         {recentActivity.length === 0 ? (
@@ -305,6 +320,7 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
             {recentActivity.map((entry: any) => {
               const { label, color } = getActionLabel(entry.action_type);
               const projectName = allProjects.find(p => p.project_id === entry.project_id)?.project_name || entry.project_id;
+              const userName = formatUserShort(entry.user_email || "");
               return (
                 <div key={entry.id} className="flex items-center gap-3">
                   <div
@@ -315,7 +331,9 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[12px] font-medium truncate text-foreground">{projectName}</p>
-                    <p className="text-[11px] text-muted-foreground">{label}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {userName} · {label}
+                    </p>
                   </div>
                   <span className="text-[10px] text-muted-foreground shrink-0">
                     {formatRelativeTime(entry.created_at)}
@@ -324,6 +342,14 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
               );
             })}
           </div>
+        )}
+        {recentActivity.length > 0 && onOpenDataLog && (
+          <button
+            onClick={onOpenDataLog}
+            className="w-full text-center text-[12px] font-medium py-2.5 mt-3 active:scale-[0.98] transition-transform text-muted-foreground"
+          >
+            Zobrazit vše →
+          </button>
         )}
       </section>
     </div>
