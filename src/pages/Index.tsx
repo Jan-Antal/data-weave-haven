@@ -562,27 +562,7 @@ const Index = () => {
       </div>
 
       {/* Mobile Bottom Nav */}
-      {isMobile && (
-        <>
-          <MobileBottomNav
-            onNewProject={() => document.dispatchEvent(new CustomEvent("open-add-project"))}
-            canCreateProject={canCreateProject}
-            activeTab={mobileTab}
-            onTabChange={setMobileTab}
-            isInTPVList={!!mobileTPVProject}
-            onExitTPVList={handleMobileTPVBack}
-          >
-            <button
-              onClick={() => window.dispatchEvent(new Event("ami-toggle"))}
-              className={cn("flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center text-muted-foreground")}
-            >
-              <MessageCircle className="h-5 w-5" strokeWidth={1.75} />
-              <span className="text-[10px]">Asistent</span>
-            </button>
-          </MobileBottomNav>
-          <MobileNavBar />
-        </>
-      )}
+      {isMobile && <MobileBottomNav />}
 
       <ExchangeRateSettings open={exchangeRateOpen} onOpenChange={setExchangeRateOpen} />
       <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />
