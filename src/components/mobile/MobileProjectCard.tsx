@@ -68,7 +68,7 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
   const diffCount = countDifferentStatuses(stages, project.status);
 
   return (
-    <div className={cn("bg-card rounded-lg border shadow-sm overflow-hidden transition-all active:scale-[0.98] active:opacity-90", dimmed && "opacity-40")}>
+    <div className={cn("bg-card rounded-[10px] overflow-hidden transition-all active:scale-[0.98] active:opacity-90", dimmed && "opacity-40")} style={{ border: "0.5px solid hsl(var(--border))" }}>
       {/* Main card area */}
       <div
         className="flex items-stretch"
