@@ -1154,7 +1154,7 @@ export default function Vyroba() {
       <div className="flex flex-1 min-h-0 overflow-hidden">
       <div className="flex-1 min-w-0 flex min-h-0">
         {/* ═══ LEFT PANEL ═══ */}
-        <div className={`shrink-0 flex flex-col overflow-y-auto ${isMobile ? "w-full" : "w-[252px]"}`} style={{ borderRight: isMobile ? "none" : "1px solid #e5e2dd", background: "#ffffff" }}>
+        <div className={`shrink-0 flex flex-col overflow-y-auto ${isMobile ? "w-full" : "w-[252px]"}`} style={{ borderRight: isMobile ? "none" : "1px solid #e5e2dd", background: "#ffffff", paddingTop: isMobile ? 8 : 0, paddingBottom: isMobile ? 80 : 0 }}>
           {/* Capacity bar — hidden on mobile */}
           {!isMobile && (
             <div className="px-3 py-2 flex items-center gap-2" style={{ borderBottom: "1px solid #f0eeea", background: "#fafaf8" }}>
@@ -1185,7 +1185,7 @@ export default function Vyroba() {
               {spilledProjects.map(p => (
                 <ProjectRow key={p.projectId} project={p} isSelected={selectedProjectId === p.projectId}
                   onSelect={handleSelectProject} onContextMenu={handleContextMenu} getProjectStatus={getProjectStatus}
-                  getBundleProgress={() => getBundleProgress(p.projectId)} getLatestPhase={getLatestPhase} statusColors={statusColors} weeklyGoal={getWeeklyGoal(p.projectId)} />
+                  getBundleProgress={() => getBundleProgress(p.projectId)} getLatestPhase={getLatestPhase} statusColors={statusColors} weeklyGoal={getWeeklyGoal(p.projectId)} isMobile={isMobile} />
               ))}
 
               {/* Normal section */}
@@ -1197,7 +1197,7 @@ export default function Vyroba() {
               {normalProjects.map(p => (
                 <ProjectRow key={p.projectId} project={p} isSelected={selectedProjectId === p.projectId}
                   onSelect={handleSelectProject} onContextMenu={handleContextMenu} getProjectStatus={getProjectStatus}
-                  getBundleProgress={() => getBundleProgress(p.projectId)} getLatestPhase={getLatestPhase} statusColors={statusColors} weeklyGoal={getWeeklyGoal(p.projectId)} />
+                  getBundleProgress={() => getBundleProgress(p.projectId)} getLatestPhase={getLatestPhase} statusColors={statusColors} weeklyGoal={getWeeklyGoal(p.projectId)} isMobile={isMobile} />
               ))}
 
               {/* Paused section */}
@@ -1796,7 +1796,7 @@ export default function Vyroba() {
 /* PROJECT ROW (left panel)                */
 /* ═══════════════════════════════════════ */
 
-function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectStatus, getBundleProgress: getBP, getLatestPhase, statusColors, weeklyGoal = 100 }: {
+function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectStatus, getBundleProgress: getBP, getLatestPhase, statusColors, weeklyGoal = 100, isMobile = false }: {
   project: VyrobaProject;
   isSelected: boolean;
   onSelect: (pid: string) => void;
@@ -1806,6 +1806,7 @@ function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectSt
   getLatestPhase: (pid: string) => string | null;
   statusColors: Record<string, string>;
   weeklyGoal?: number;
+  isMobile?: boolean;
 }) {
   const status = getProjectStatus(project.projectId);
   const { bundleProgress: pct } = getBP();
@@ -1823,21 +1824,24 @@ function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectSt
   const nameColor = deadlinePast ? "#dc2626" : deadlineSoon ? "#d97706" : "#1a1a1a";
 
   return (
-    <div className="rounded-lg overflow-hidden mx-1.5 mb-1" style={{
+    <div className="overflow-hidden" style={{
+      borderRadius: isMobile ? 10 : 8,
+      margin: isMobile ? "0 12px 8px 12px" : "0 6px 4px 6px",
       backgroundColor: isSelected ? "rgba(217,119,6,0.04)" : "#ffffff",
-      borderTop: isSelected ? "2px solid #d97706" : "1px solid hsl(var(--border))",
-      borderRight: isSelected ? "2px solid #d97706" : "1px solid hsl(var(--border))",
-      borderBottom: isSelected ? "2px solid #d97706" : "1px solid hsl(var(--border))",
+      border: isMobile
+        ? (isSelected ? "2px solid #d97706" : "0.5px solid #e5e3df")
+        : (isSelected ? "2px solid #d97706" : "1px solid hsl(var(--border))"),
       borderLeft: isSelected ? "4px solid #d97706" : `4px solid ${borderColor}`,
-      boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
+      boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : "none",
       transition: "border-color 150ms, box-shadow 150ms",
     }}>
       <button
         onClick={() => onSelect(project.projectId)}
         onContextMenu={(e) => onContextMenu(e, project.projectId)}
-        className="w-full flex items-center gap-1.5 px-2.5 py-[5px] text-left transition-colors"
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
-        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+        className="w-full flex items-center gap-1.5 text-left transition-colors"
+        style={{ padding: isMobile ? 12 : "5px 10px" }}
+        onMouseEnter={(e) => !isMobile && (e.currentTarget.style.backgroundColor = "#f8f7f5")}
+        onMouseLeave={(e) => !isMobile && (e.currentTarget.style.backgroundColor = "transparent")}
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-1">
