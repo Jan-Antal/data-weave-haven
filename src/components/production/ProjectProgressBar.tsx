@@ -45,7 +45,7 @@ export function ProjectProgressBar({ progress, compact }: Props) {
           {tpvCount === 0 && progress.missing === 0 && total > 0 && (
             <span className="flex items-center gap-0.5" style={{ color: "#3a8a36" }}>
               <span>✓</span>
-              <span>vše odesláno</span>
+              <span>vše přijato</span>
             </span>
           )}
           {progress.completed > 0 && (
