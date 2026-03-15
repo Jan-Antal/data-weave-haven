@@ -2658,25 +2658,31 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                         </button>
                       ) : (() => {
                         const allDone = areAllPartsCompleted(item.item_code, item.item_name);
-                        if (!allDone) {
-                          const info = getIncompletePartsInfo(item.item_code, item.item_name);
-                          return (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="inline-flex items-center gap-1 shrink-0 cursor-not-allowed opacity-50"
-                                  style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #f59e0b", padding: "6px 12px", minHeight: '36px', minWidth: '60px', borderRadius: "9999px", fontSize: "12px", fontWeight: 500, lineHeight: 1 }}>
-                                  <Shield className="h-3 w-3" /> QC
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-[250px] text-xs">
-                                Čeká na dokončení části {info.total - info.incomplete}/{info.total} v T{info.weekNums.join(", T")} — QC nelze provést
-                              </TooltipContent>
-                            </Tooltip>
-                          );
-                        }
                         return (
-                          <button style={{ minHeight: '36px', minWidth: '60px', padding: '6px 12px', cursor: 'pointer' }} onClick={() => { setSingleQcItem(item); setSingleQcMergedIds(mids); setSingleQcModalOpen(true); setDefectItemId(item.id); setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectPhotos([]); }}>
-                            <QualityCheckBadgeEmpty />
+                          <button style={{ minHeight: '36px', minWidth: '60px', padding: '6px 12px', cursor: 'pointer' }} onClick={() => {
+                            // Pre-select this item if not already selected
+                            setSelectedItems(prev => {
+                              const next = new Set(prev);
+                              for (const id of mids) next.add(id);
+                              return next;
+                            });
+                            setSingleQcItem(item); setSingleQcMergedIds(mids); setSingleQcModalOpen(true); setDefectItemId(item.id); setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectPhotos([]);
+                          }}>
+                            {!allDone ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex items-center gap-1 shrink-0"
+                                    style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #f59e0b", padding: "2px 8px", borderRadius: "9999px", fontSize: "12px", fontWeight: 500, lineHeight: 1 }}>
+                                    <Shield className="h-3 w-3" /> QC
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-[250px] text-xs">
+                                  {(() => { const info = getIncompletePartsInfo(item.item_code, item.item_name); return `Čeká na dokončení části ${info.total - info.incomplete}/${info.total} v T${info.weekNums.join(", T")} — QC lze zahájit`; })()}
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <QualityCheckBadgeEmpty />
+                            )}
                           </button>
                         );
                       })()}
