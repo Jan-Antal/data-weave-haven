@@ -35,12 +35,17 @@ export function ProjectProgressBar({ progress, compact }: Props) {
         {pctInbox > 0 && <div className="h-full" style={{ width: `${pctInbox}%`, backgroundColor: "#c4bfb8" }} />}
         {pctMissing > 0 && <div className="h-full" style={{ width: `${pctMissing}%`, backgroundColor: "#d4908e" }} />}
       </div>
-      {(hasActivity || tpvCount > 0) && (
-        <div className="flex gap-2 mt-1 text-[10px] leading-none">
+      <div className="flex gap-2 mt-1 text-[10px] leading-none">
           {tpvCount > 0 && (
             <span className="flex items-center gap-0.5" style={{ color: "#8a8578" }}>
               <span>◇</span>
               <span>{tpvCount} v TPV</span>
+            </span>
+          )}
+          {tpvCount === 0 && progress.missing === 0 && total > 0 && (
+            <span className="flex items-center gap-0.5" style={{ color: "#3a8a36" }}>
+              <span>✓</span>
+              <span>vše odesláno</span>
             </span>
           )}
           {progress.completed > 0 && (
@@ -68,7 +73,6 @@ export function ProjectProgressBar({ progress, compact }: Props) {
             </span>
           )}
         </div>
-      )}
     </div>
   );
 }
