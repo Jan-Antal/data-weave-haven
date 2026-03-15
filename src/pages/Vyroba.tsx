@@ -1082,6 +1082,8 @@ export default function Vyroba() {
             <span style={{ color: "#3a8a36", fontSize: 12 }}>✓ {stats.onTrack} on track</span>
             <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
             <span style={{ color: "#dc2626", fontSize: 12 }}>⚠ {stats.behind} pozadu</span>
+            <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
+            <span className="font-mono" style={{ color: "#2563eb", fontSize: 12 }}>ø {stats.avgPct}%</span>
             <div className="flex-1" />
             {weekOffset !== 0 && (
               <button
