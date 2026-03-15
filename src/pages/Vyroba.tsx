@@ -1060,8 +1060,13 @@ export default function Vyroba() {
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <button
-                onClick={() => setWeekPickerOpen(o => !o)}
-                onDoubleClick={() => setWeekOffset(0)}
+                onClick={() => {
+                  if (weekOffset !== 0) {
+                    setWeekOffset(0);
+                  } else {
+                    setWeekPickerOpen(o => !o);
+                  }
+                }}
                 className={cn(
                   "font-mono select-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer font-bold",
                   weekOffset !== 0 && "underline decoration-dotted underline-offset-2"
