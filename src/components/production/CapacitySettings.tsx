@@ -722,10 +722,57 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
         </div>{/* end scrollable content */}
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-6 py-3 border-t border-border shrink-0">
-          <Button variant="outline" onClick={handleCancel}>Zrušit změny</Button>
-          <Button onClick={handleSaveAll}>Uložit změny</Button>
+        <div className="flex items-center justify-between px-6 py-3 border-t border-border shrink-0">
+          <div>
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={() => setCleanupConfirmOpen(true)}
+                disabled={isCleaningUp}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                {isCleaningUp ? "Mazání…" : "Vyčistit testovací data"}
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleCancel}>Zrušit změny</Button>
+            <Button onClick={handleSaveAll}>Uložit změny</Button>
+          </div>
         </div>
+
+        <ConfirmDialog
+          open={cleanupConfirmOpen}
+          onOpenChange={setCleanupConfirmOpen}
+          title="Vyčistit testovací data"
+          description="Smaže osiřelé záznamy z výrobních tabulek (production_schedule, inbox, logy, QC). Živé projekty NEBUDOU dotčeny."
+          confirmLabel="Vyčistit"
+          onConfirm={async () => {
+            setIsCleaningUp(true);
+            try {
+              const { data, error } = await supabase.rpc("clean_test_production_data" as any);
+              if (error) throw error;
+              const result = data as Record<string, number>;
+              const parts = Object.entries(result)
+                .filter(([, count]) => count > 0)
+                .map(([table, count]) => `${count} z ${table}`);
+              if (parts.length > 0) {
+                toast({ title: "Testovací data vyčištěna", description: `Smazáno: ${parts.join(", ")}` });
+              } else {
+                toast({ title: "Žádná testovací data k vyčištění" });
+              }
+              queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
+              queryClient.invalidateQueries({ queryKey: ["production-inbox"] });
+            } catch (err: any) {
+              toast({ title: "Chyba", description: err.message, variant: "destructive" });
+            } finally {
+              setIsCleaningUp(false);
+              setCleanupConfirmOpen(false);
+            }
+          }}
+        />
       </DialogContent>
     </Dialog>
   );
