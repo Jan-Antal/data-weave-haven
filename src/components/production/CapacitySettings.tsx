@@ -745,7 +745,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
         <ConfirmDialog
           open={cleanupConfirmOpen}
-          onOpenChange={setCleanupConfirmOpen}
+          onCancel={() => setCleanupConfirmOpen(false)}
           title="Vyčistit testovací data"
           description="Smaže osiřelé záznamy z výrobních tabulek (production_schedule, inbox, logy, QC). Živé projekty NEBUDOU dotčeny."
           confirmLabel="Vyčistit"
