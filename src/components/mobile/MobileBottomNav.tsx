@@ -11,31 +11,34 @@ export function MobileBottomNav() {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-primary"
       style={{
         height: "calc(56px + env(safe-area-inset-bottom, 0px))",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
-        background: "#223937",
       }}
     >
       <button
         onClick={() => navigate("/", { state: { view: "projects" }, replace: false })}
         className={cn(
-          "flex flex-col items-center justify-center gap-0.5 min-w-[64px] min-h-[44px] transition-colors relative",
-          isProjectsActive ? "text-white" : "text-[#7aa8a4]"
+          "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
+          isProjectsActive
+            ? "text-primary-foreground bg-primary-foreground/10"
+            : "text-primary-foreground/70"
         )}
       >
-        <LayoutDashboard className="h-5 w-5" strokeWidth={isProjectsActive ? 2 : 1.75} />
+        <LayoutDashboard className="h-5 w-5" />
         <span className="text-[10px] font-medium">Projekty</span>
       </button>
       <button
         onClick={() => navigate("/vyroba")}
         className={cn(
-          "flex flex-col items-center justify-center gap-0.5 min-w-[64px] min-h-[44px] transition-colors relative",
-          isVyrobaActive ? "text-white" : "text-[#7aa8a4]"
+          "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
+          isVyrobaActive
+            ? "text-primary-foreground bg-primary-foreground/10"
+            : "text-primary-foreground/70"
         )}
       >
-        <Factory className="h-5 w-5" strokeWidth={isVyrobaActive ? 2 : 1.75} />
+        <Factory className="h-5 w-5" />
         <span className="text-[10px] font-medium">Výroba</span>
       </button>
     </nav>
