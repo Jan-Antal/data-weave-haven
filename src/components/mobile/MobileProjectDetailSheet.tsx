@@ -251,10 +251,28 @@ function TPVTabContent({ items, currency }: { items: any[]; currency: string }) 
   );
 }
 
-function DocsTabContent({ projectId }: { projectId: string }) {
-  const { files = [], isLoading } = useSharePointDocs(projectId);
+const CATEGORY_LABELS: Record<string, string> = {
+  cenova_nabidka: "Cenová nabídka",
+  smlouva: "Smlouva",
+  zadani: "Zadání",
+  vykresy: "Výkresy",
+  dokumentace: "Dokumentace",
+  dodaci_list: "Dodací list",
+  fotky: "Fotky",
+};
 
-  if (isLoading) {
+function DocsTabContent({ projectId }: { projectId: string }) {
+  const sp = useSharePointDocs(projectId);
+  const { filesByCategory, initialLoading } = sp;
+
+  // Load all categories on mount
+  useEffect(() => {
+    for (const catKey of Object.keys(CATEGORY_FOLDER_MAP)) {
+      sp.listFiles(catKey);
+    }
+  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (initialLoading) {
     return (
       <div className="flex items-center justify-center py-8">
         <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -262,26 +280,42 @@ function DocsTabContent({ projectId }: { projectId: string }) {
     );
   }
 
-  if (files.length === 0) {
+  const allFiles = Object.entries(filesByCategory).flatMap(([cat, files]) =>
+    files.map(f => ({ ...f, category: cat }))
+  );
+
+  if (allFiles.length === 0) {
     return <p className="text-[12px] text-muted-foreground text-center py-8">Žádné dokumenty</p>;
   }
 
   return (
-    <div className="bg-card rounded-[10px] overflow-hidden" style={{ border: "0.5px solid hsl(var(--border))" }}>
-      {files.map((file: SPFile, idx: number) => (
-        <a
-          key={file.itemId || file.name}
-          href={file.downloadUrl || "#"}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors"
-          style={{ borderBottom: idx < files.length - 1 ? "0.5px solid hsl(var(--border))" : undefined }}
-        >
-          <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-[12px] font-medium text-foreground truncate flex-1">{file.name}</span>
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
-        </a>
-      ))}
+    <div className="flex flex-col gap-3">
+      {Object.entries(filesByCategory).map(([catKey, files]) => {
+        if (files.length === 0) return null;
+        return (
+          <div key={catKey}>
+            <h4 className="uppercase text-[11px] font-semibold tracking-wide text-muted-foreground mb-1">
+              {CATEGORY_LABELS[catKey] || catKey} ({files.length})
+            </h4>
+            <div className="bg-card rounded-[10px] overflow-hidden" style={{ border: "0.5px solid hsl(var(--border))" }}>
+              {files.map((file: SPFile, idx: number) => (
+                <a
+                  key={file.itemId || file.name}
+                  href={file.downloadUrl || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors"
+                  style={{ borderBottom: idx < files.length - 1 ? "0.5px solid hsl(var(--border))" : undefined }}
+                >
+                  <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-[12px] font-medium text-foreground truncate flex-1">{file.name}</span>
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+                </a>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
