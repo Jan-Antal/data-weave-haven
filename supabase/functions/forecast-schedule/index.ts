@@ -50,9 +50,11 @@ serve(async (req) => {
     ]);
 
     const projects = projectsRes.data || [];
-    const tpvItems = tpvRes.data || [];
-    const scheduleItems = scheduleRes.data || [];
-    const inboxItems = inboxRes.data || [];
+    // Build set of valid (non-test, non-deleted) project IDs to filter related data
+    const validProjectIds = new Set(projects.map(p => p.project_id));
+    const tpvItems = (tpvRes.data || []).filter(t => validProjectIds.has(t.project_id));
+    const scheduleItems = (scheduleRes.data || []).filter(s => validProjectIds.has(s.project_id));
+    const inboxItems = (inboxRes.data || []).filter(i => validProjectIds.has(i.project_id));
 
     // Dynamic settings from DB
     const hourlyRate = Number(settingsRes.data?.hourly_rate) || 550;
