@@ -706,6 +706,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               <Plus className="h-3 w-3 mr-1" /> Přidat
             </Button>
           </div>
+        </div>
         </div>{/* end scrollable content */}
 
         {/* Sticky footer */}
