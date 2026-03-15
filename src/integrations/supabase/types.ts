@@ -1241,6 +1241,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      clean_test_production_data: { Args: never; Returns: Json }
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
       get_user_role: {
         Args: { _user_id: string }
