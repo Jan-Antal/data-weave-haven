@@ -393,7 +393,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[900px] max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-[900px] max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             📊 Kapacita výroby
