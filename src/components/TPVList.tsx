@@ -288,6 +288,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     }
   }, [projectId, queryClient]);
 
+  const tpvBodyScrollRef = useRef<HTMLDivElement>(null);
 
   const visibleColCount = renderKeys.length + 2; // +checkbox +actions
 
