@@ -172,13 +172,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Effective role: use simulated if set (only owner can simulate)
   const effectiveRole = (simulatedRole && (realRole === "owner")) ? simulatedRole : realRole;
 
-  const isTestUser = user?.email === "alfred@ami-test.cz";
+  const isTestUser = user?.email === "alfred@ami-test.cz" || effectiveRole === "tester";
+  const isTester = effectiveRole === "tester";
 
   const isOwner = effectiveRole === "owner";
   const isAdmin = effectiveRole === "admin" || isOwner;
   const isPM = effectiveRole === "pm";
   const isKonstrukter = effectiveRole === "konstrukter";
-  const isViewer = effectiveRole === "viewer";
+  const isViewer = effectiveRole === "viewer" || isTester;
 
   // Granular permissions
   const canEdit = !isViewer;
