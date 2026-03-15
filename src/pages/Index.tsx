@@ -15,7 +15,7 @@ import { ExportButton } from "@/components/ExportButton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Settings, Plus, LogOut, User, Check, ChevronUp, ChevronDown, UserCog, Factory, CalendarRange, LayoutDashboard, MessageCircle, Undo2, Redo2, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { AmiAssistant } from "@/components/AmiAssistant";
+
 import { AdminInboxButton } from "@/components/AdminInbox";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -39,7 +39,6 @@ import { useAchievementChecker } from "@/hooks/useAchievements";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
-import { MobileNavBar } from "@/components/mobile/MobileNavBar";
 import { MobileCardList } from "@/components/mobile/MobileCardList";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { MobilePrehled } from "@/components/mobile/MobilePrehled";
@@ -563,27 +562,7 @@ const Index = () => {
       </div>
 
       {/* Mobile Bottom Nav */}
-      {isMobile && (
-        <>
-          <MobileBottomNav
-            onNewProject={() => document.dispatchEvent(new CustomEvent("open-add-project"))}
-            canCreateProject={canCreateProject}
-            activeTab={mobileTab}
-            onTabChange={setMobileTab}
-            isInTPVList={!!mobileTPVProject}
-            onExitTPVList={handleMobileTPVBack}
-          >
-            <button
-              onClick={() => window.dispatchEvent(new Event("ami-toggle"))}
-              className={cn("flex flex-col items-center gap-0.5 min-w-[56px] min-h-[44px] justify-center text-muted-foreground")}
-            >
-              <MessageCircle className="h-5 w-5" strokeWidth={1.75} />
-              <span className="text-[10px]">Asistent</span>
-            </button>
-          </MobileBottomNav>
-          <MobileNavBar />
-        </>
-      )}
+      {isMobile && <MobileBottomNav />}
 
       <ExchangeRateSettings open={exchangeRateOpen} onOpenChange={setExchangeRateOpen} />
       <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />
@@ -592,7 +571,7 @@ const Index = () => {
       <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
       <CostBreakdownPresetsDialog open={costPresetsOpen} onOpenChange={setCostPresetsOpen} />
       <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
-      <AmiAssistant />
+      
       <AchievementCelebration />
     </div>
     </DataLogHighlightProvider>
