@@ -238,31 +238,36 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
           </PopoverContent>
         </Popover>
       </div>
+      </div>
 
-      {/* Cards */}
-      {displayProjects.map((project) => (
-        <MobileProjectCard
-          key={project.id}
-          project={project}
-          onTap={onProjectTap}
-          onOpenTPV={onOpenTPV}
-          onStageTap={handleStageTap}
-          stages={stagesByProject.get(project.project_id) || []}
-          urgency={urgencyMap.get(project.project_id) || null}
-        />
-      ))}
+      {/* Scrollable cards */}
+      <div className="flex-1 overflow-y-auto" style={{ padding: "8px 12px 12px 12px" }}>
+        <div className="flex flex-col gap-2">
+          {displayProjects.map((project) => (
+            <MobileProjectCard
+              key={project.id}
+              project={project}
+              onTap={onProjectTap}
+              onOpenTPV={onOpenTPV}
+              onStageTap={handleStageTap}
+              stages={stagesByProject.get(project.project_id) || []}
+              urgency={urgencyMap.get(project.project_id) || null}
+            />
+          ))}
 
-      {displayProjects.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground text-sm">
-          Žádné výsledky
+          {displayProjects.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground text-sm">
+              Žádné výsledky
+            </div>
+          )}
         </div>
-      )}
 
-      <MobileStageDetailSheet
-        stage={selectedStage}
-        open={stageSheetOpen}
-        onOpenChange={setStageSheetOpen}
-      />
+        <MobileStageDetailSheet
+          stage={selectedStage}
+          open={stageSheetOpen}
+          onOpenChange={setStageSheetOpen}
+        />
+      </div>
     </div>
   );
 }
