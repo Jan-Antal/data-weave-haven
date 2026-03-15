@@ -20,6 +20,7 @@ interface MobileHeaderProps {
 }
 
 export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderProps) {
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const { user, profile, role, signOut } = useAuth();
