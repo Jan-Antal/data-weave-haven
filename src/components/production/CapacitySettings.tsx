@@ -706,6 +706,30 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               <Plus className="h-3 w-3 mr-1" /> Přidat
             </Button>
           </div>
+        </div>{/* end scrollable content */}
+
+        {/* Sticky footer */}
+        <div className="shrink-0" style={{ borderTop: "0.5px solid #e5e3df" }}>
+          <div className="flex items-center justify-between px-6 py-2">
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="text-xs text-muted-foreground hover:text-foreground hover:underline transition-colors"
+            >
+              Zrušit změny
+            </button>
+            <span className="text-[10px] text-muted-foreground">
+              {hasPendingChanges ? "Neuložené změny" : ""}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleSaveAll}
+            className="w-full text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            style={{ background: "#223937", height: 48, borderRadius: "0 0 12px 12px" }}
+          >
+            Uložit nastavení
+          </button>
         </div>
       </DialogContent>
     </Dialog>
