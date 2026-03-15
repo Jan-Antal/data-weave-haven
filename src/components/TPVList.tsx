@@ -251,10 +251,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           continue;
         }
 
-        // Update tpv_item custom_fields or direct field
-        await supabase.from("tpv_items").update({
-          // We don't have a 'vyroba' column on tpv_items — production status comes from production_inbox/schedule lookup
-        } as any).eq("id", item.id);
+        // Production status is derived from production_inbox/schedule lookup — no direct tpv_items update needed
 
         // Log activity
         logActivity({
