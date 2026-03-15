@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { Clock, Menu, UserCog, LogOut, BarChart3 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Clock, Menu, UserCog, LogOut, BarChart3, Home } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
 import { AccountSettings } from "@/components/AccountSettings";
 
