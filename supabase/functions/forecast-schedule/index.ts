@@ -182,10 +182,12 @@ serve(async (req) => {
       // Determine tpv_start (earliest possible production start)
       let tpvStart: Date;
       if (proj.datum_tpv) {
-        tpvStart = new Date(proj.datum_tpv);
+        const parsed = new Date(proj.datum_tpv);
+        tpvStart = isNaN(parsed.getTime()) ? addWeeks(today, 2) : parsed;
       } else if (proj.datum_objednavky) {
+        const parsed = new Date(proj.datum_objednavky);
         const tpvWeeks = estimateTpvWeeks(tpvCount);
-        tpvStart = addWeeks(new Date(proj.datum_objednavky), tpvWeeks);
+        tpvStart = isNaN(parsed.getTime()) ? addWeeks(today, 2) : addWeeks(parsed, tpvWeeks);
       } else {
         tpvStart = addWeeks(today, 2);
       }
