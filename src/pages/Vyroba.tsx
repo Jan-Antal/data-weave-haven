@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
@@ -181,6 +181,8 @@ export default function Vyroba() {
   const { isOwner, isAdmin, isTestUser, loading, profile, signOut, canAccessSettings, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, realRole, simulatedRole, setSimulatedRole, role } = useAuth();
   const { openPeopleManagement } = usePeopleManagement();
   const navigate = useNavigate();
+  const location = useLocation();
+  const openProjectIdFromState = (location.state as any)?.openProjectId as string | undefined;
   const qc = useQueryClient();
   const { pushUndo, undo, redo, canUndo, canRedo, lastUndoDescription, lastRedoDescription, setCurrentPage } = useUndoRedo();
   const isMobile = useIsMobile();
@@ -351,6 +353,19 @@ export default function Vyroba() {
       setSelectedProjectId(enrichedProjects[0].projectId);
     }
   }, [enrichedProjects, selectedProjectId]);
+
+  // Handle openProjectId from DataLog navigation
+  const openProjectIdHandled = useRef(false);
+  useEffect(() => {
+    if (openProjectIdFromState && !openProjectIdHandled.current && enrichedProjects.length > 0) {
+      openProjectIdHandled.current = true;
+      setSelectedProjectId(openProjectIdFromState);
+      if (isMobile) {
+        setMobileDetailOpen(true);
+      }
+      window.history.replaceState({}, "");
+    }
+  }, [openProjectIdFromState, enrichedProjects, isMobile]);
 
   // Log modal
   const [logModalOpen, setLogModalOpen] = useState(false);

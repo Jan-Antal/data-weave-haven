@@ -10,6 +10,33 @@ import { cs } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useDataLogHighlight } from "@/components/DataLogHighlightContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useNavigate } from "react-router-dom";
+
+// Action type → route mapping
+const VYROBA_ACTIONS = new Set([
+  "item_hotovo", "item_qc_confirmed", "item_expedice", "item_moved_next_week",
+  "vyroba_log_saved", "vyroba_no_activity", "phase_changed", "defect_reported",
+  "defect_resolved", "item_paused_vyroba",
+]);
+const PLAN_VYROBY_ACTIONS = new Set([
+  "item_scheduled", "item_moved", "item_completed", "item_paused", "item_split",
+  "item_returned_to_inbox", "forecast_committed", "item_cancelled",
+]);
+const INDEX_ACTIONS = new Set([
+  "status_change", "konstrukter_change", "datum_smluvni_change", "pm_change",
+  "document_uploaded", "document_deleted", "stage_created", "stage_deleted",
+  "stage_status_change", "project_created", "project_restored", "project_deleted",
+  "stage_konstrukter_change", "stage_datum_smluvni_change",
+  "stage_document_uploaded", "stage_document_deleted", "kalkulant_change",
+  "prodejni_cena_change", "project_id_change",
+]);
+
+function getNavigationTarget(actionType: string): { route: string } | null {
+  if (VYROBA_ACTIONS.has(actionType)) return { route: "/vyroba" };
+  if (PLAN_VYROBY_ACTIONS.has(actionType)) return { route: "/plan-vyroby" };
+  if (INDEX_ACTIONS.has(actionType)) return { route: "/" };
+  return null;
+}
 
 interface DataLogPanelProps {
   open: boolean;
@@ -94,22 +121,34 @@ function ActivityItem({
   entry,
   isSelected,
   onSelect,
+  onNavigate,
 }: {
   entry: ActivityLogEntry;
   isSelected: boolean;
   onSelect: (entry: ActivityLogEntry) => void;
+  onNavigate?: (entry: ActivityLogEntry) => void;
 }) {
   const { data: projects = [] } = useProjects();
   const project = projects.find(p => p.project_id === entry.project_id);
   const projectName = project?.project_name || entry.project_id;
   const dotClass = DOT_COLORS[entry.action_type] || "bg-gray-400";
   const actionLabel = getActionLabel(entry.action_type, entry.new_value, entry.project_id, entry.detail);
+  const navTarget = getNavigationTarget(entry.action_type);
+  const isNavigable = !!navTarget && entry.project_id !== "_system_";
+
+  const handleClick = () => {
+    onSelect(entry);
+    if (isNavigable && onNavigate) {
+      onNavigate(entry);
+    }
+  };
 
   return (
     <button
-      onClick={() => onSelect(entry)}
+      onClick={handleClick}
       className={cn(
-        "w-full text-left px-3 py-2 flex items-start gap-2.5 hover:bg-muted/50 transition-colors border-l-2",
+        "w-full text-left px-3 py-2 flex items-start gap-2.5 transition-colors border-l-2 group",
+        isNavigable ? "cursor-pointer hover:bg-muted/50" : "cursor-default hover:bg-muted/30",
         isSelected ? "border-l-primary bg-muted/30" : "border-l-transparent"
       )}
     >
@@ -117,9 +156,14 @@ function ActivityItem({
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-[11px] font-medium text-foreground truncate">{projectName}</span>
-          <span className="text-[10px] text-muted-foreground shrink-0">
-            {formatSmartTimestamp(entry.created_at)}
-          </span>
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="text-[10px] text-muted-foreground">
+              {formatSmartTimestamp(entry.created_at)}
+            </span>
+            {isNavigable && (
+              <ChevronRight className="h-3 w-3 text-muted-foreground/0 group-hover:text-muted-foreground transition-colors" />
+            )}
+          </div>
         </div>
         <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">
           {actionLabel}
@@ -256,6 +300,7 @@ function UserAnalyticsRow({ user, expanded, onToggle, onShowAll }: { user: UserA
 
 export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPanelProps) {
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<PanelTab>("activity");
   const [category, setCategory] = useState<Category>(defaultCategory ?? "all");
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
@@ -311,6 +356,19 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
       highlightProject(entry.project_id);
     }
   };
+
+  const handleEntryNavigate = useCallback((entry: ActivityLogEntry) => {
+    const target = getNavigationTarget(entry.action_type);
+    if (!target || entry.project_id === "_system_") return;
+    onOpenChange(false);
+    // Clear datalog localStorage for all modules
+    try {
+      localStorage.setItem("datalog-panel-index", "false");
+      localStorage.setItem("datalog-panel-vyroba", "false");
+      localStorage.setItem("datalog-panel-plan-vyroby", "false");
+    } catch {}
+    navigate(target.route, { state: { openProjectId: entry.project_id } });
+  }, [navigate, onOpenChange]);
 
   const handleShowUserActivity = useCallback((email: string) => {
     setUserFilter(email);
@@ -436,7 +494,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
                     </p>
                   </div>
                   {group.items.map(entry => (
-                    <ActivityItem key={entry.id} entry={entry} isSelected={selectedEntryId === entry.id} onSelect={handleEntrySelect} />
+                    <ActivityItem key={entry.id} entry={entry} isSelected={selectedEntryId === entry.id} onSelect={handleEntrySelect} onNavigate={handleEntryNavigate} />
                   ))}
                 </div>
               ))}
@@ -579,6 +637,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
                     entry={entry}
                     isSelected={selectedEntryId === entry.id}
                     onSelect={handleEntrySelect}
+                    onNavigate={handleEntryNavigate}
                   />
                 ))}
               </div>

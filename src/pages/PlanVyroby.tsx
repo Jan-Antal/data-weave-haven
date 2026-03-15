@@ -3,7 +3,7 @@ import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
 import { Search, X, Sparkles, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { useAuth } from "@/hooks/useAuth";
@@ -98,6 +98,8 @@ interface MergeState {
 export default function PlanVyroby() {
   const { isAdmin, isOwner, isTestUser, loading, profile, role } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const openProjectIdFromState = (location.state as any)?.openProjectId as string | undefined;
   const { setCurrentPage } = useUndoRedo();
   const [displayMode, setDisplayMode] = useState<DisplayMode>("hours");
   const [viewTab, setViewTab] = useState<ViewTab>("kanban");
@@ -154,6 +156,17 @@ export default function PlanVyroby() {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { data: inboxProjects = [] } = useProductionInbox();
+
+  // Handle openProjectId from DataLog navigation
+  const openProjectIdHandled = useRef(false);
+  useEffect(() => {
+    if (openProjectIdFromState && !openProjectIdHandled.current) {
+      openProjectIdHandled.current = true;
+      setDetailProjectId(openProjectIdFromState);
+      setSelectedProjectId(openProjectIdFromState);
+      window.history.replaceState({}, "");
+    }
+  }, [openProjectIdFromState]);
 
   // Compute weekKeys for search navigation
   const searchWeekKeys = useMemo(() => {
