@@ -195,7 +195,7 @@ const Index = () => {
     <DataLogHighlightProvider>
     <div className={cn("h-screen bg-background flex flex-col overflow-hidden")} style={isMobile ? { paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' } : undefined}>
       {/* TEST MODE banner */}
-      {profile?.email === "alfred@ami-test.cz" && (
+      {isTestUser && (
         <div className="bg-orange-500 text-white px-6 flex items-center justify-center gap-2 font-bold tracking-wide shrink-0" style={{ height: 32 }}>
           <span>⚠ TEST MODE — Testovací prostředí — data nejsou produkční</span>
         </div>
