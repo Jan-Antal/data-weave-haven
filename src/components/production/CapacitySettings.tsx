@@ -353,7 +353,6 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       setNewHolidayStart("");
       setNewHolidayEnd("");
       setNewHolidayCap("0");
-      toast({ title: "✓ Firemní dovolená přidána" });
     } catch (e: any) {
       toast({ title: "Chyba", description: e.message, variant: "destructive" });
     }
