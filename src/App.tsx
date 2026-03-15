@@ -18,7 +18,15 @@ import NotFound from "./pages/NotFound";
 import PlanVyroby from "./pages/PlanVyroby";
 import Vyroba from "./pages/Vyroba";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      staleTime: 5 * 60 * 1000,
+    },
+  },
+});
 
 const BUILD_HASH = typeof __BUILD_HASH__ !== "undefined" ? __BUILD_HASH__ : "dev";
 const STORED_HASH_KEY = "ami_build_hash";
