@@ -194,7 +194,8 @@ function getActionLabel(actionType: string, newValue: string | null, projectId: 
 }
 
 function UserAnalyticsTab({ onShowUserActivity }: { onShowUserActivity: (email: string) => void }) {
-  const { data: users = [], isLoading } = useUserAnalytics();
+  const { data, isLoading } = useUserAnalytics(true);
+  const users = data?.users ?? [];
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
 
   if (isLoading) return <p className="text-xs text-muted-foreground p-4 text-center">Načítání…</p>;
@@ -204,11 +205,11 @@ function UserAnalyticsTab({ onShowUserActivity }: { onShowUserActivity: (email: 
     <div className="flex-1 overflow-y-auto">
       {users.map(user => (
         <UserAnalyticsRow
-          key={user.email}
+          key={user.user_email}
           user={user}
-          expanded={expandedUser === user.email}
-          onToggle={() => setExpandedUser(prev => prev === user.email ? null : user.email)}
-          onShowAll={() => onShowUserActivity(user.email)}
+          expanded={expandedUser === user.user_email}
+          onToggle={() => setExpandedUser(prev => prev === user.user_email ? null : user.user_email)}
+          onShowAll={() => onShowUserActivity(user.user_email)}
         />
       ))}
     </div>
