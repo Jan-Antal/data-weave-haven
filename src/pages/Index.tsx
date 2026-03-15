@@ -110,7 +110,9 @@ const Index = () => {
   const achievementChecker = useAchievementChecker();
   const isMobile = useIsMobile();
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
-  const [mobileTab, setMobileTab] = useState("projects");
+  const location = useLocation();
+  const mobileView = (location.state as any)?.view;
+  const mobileTab = mobileView === "projects" ? "projects" : mobileView === "dashboard" ? "prehled" : "prehled";
   const { recent: recentProjects, trackOpen: trackRecentOpen } = useRecentlyOpened();
 
   const handleTabChange = useCallback((tab: string) => {

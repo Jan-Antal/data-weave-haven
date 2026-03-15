@@ -57,6 +57,14 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
             </p>
           </div>
           <div className="py-2">
+            <button
+              onClick={() => { setMenuOpen(false); navigate("/", { state: { view: "dashboard" } }); }}
+              className="flex items-center gap-3 w-full px-5 py-3 text-sm hover:bg-accent min-h-[44px]"
+            >
+              <Home className="h-4 w-4 text-muted-foreground" />
+              <span>Přehled</span>
+            </button>
+            <Separator className="my-1" />
             {showDataLog && onDataLog && (
               <button
                 onClick={() => { setMenuOpen(false); onDataLog(); }}

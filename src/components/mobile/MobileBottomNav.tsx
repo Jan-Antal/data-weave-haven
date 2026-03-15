@@ -26,7 +26,7 @@ export function MobileBottomNav() {
         return (
           <button
             key={tab.path}
-            onClick={() => navigate(tab.path)}
+            onClick={() => tab.path === "/" ? navigate("/", { state: { view: "projects" } }) : navigate(tab.path)}
             className={cn(
               "flex flex-col items-center justify-center gap-0.5 min-w-[64px] min-h-[44px] transition-colors relative",
               isActive ? "text-white" : "text-[#7aa8a4]"
