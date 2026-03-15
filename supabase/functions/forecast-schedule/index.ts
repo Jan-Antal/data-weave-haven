@@ -24,10 +24,10 @@ serve(async (req) => {
     const { mode, weeklyCapacityHours } = await req.json();
     const capacity = Number(weeklyCapacityHours) || 875;
 
-    // 1. Fetch all data in parallel
-    const [projectsRes, tpvRes, scheduleRes, inboxRes] = await Promise.all([
+    // 1. Fetch all data in parallel (including settings & presets)
+    const [projectsRes, tpvRes, scheduleRes, inboxRes, settingsRes, presetsRes] = await Promise.all([
       sb.from("projects")
-        .select("project_id, project_name, status, expedice, montaz, predani, datum_smluvni, prodejni_cena, datum_tpv, vyroba")
+        .select("project_id, project_name, status, expedice, montaz, predani, datum_smluvni, prodejni_cena, datum_tpv, vyroba, marze, cost_preset_id")
         .is("deleted_at", null)
         .not("status", "in", '("Fakturace","Dokončeno")'),
       sb.from("tpv_items")
@@ -39,12 +39,24 @@ serve(async (req) => {
       sb.from("production_inbox")
         .select("id, project_id, item_name, item_code, estimated_hours, estimated_czk, status")
         .eq("status", "pending"),
+      sb.from("production_settings")
+        .select("hourly_rate")
+        .limit(1)
+        .single(),
+      sb.from("cost_breakdown_presets")
+        .select("id, name, production_pct, is_default, sort_order")
+        .order("sort_order", { ascending: true }),
     ]);
 
     const projects = projectsRes.data || [];
     const tpvItems = tpvRes.data || [];
     const scheduleItems = scheduleRes.data || [];
     const inboxItems = inboxRes.data || [];
+
+    // Dynamic settings from DB
+    const hourlyRate = Number(settingsRes.data?.hourly_rate) || 550;
+    const costPresets = presetsRes.data || [];
+    const defaultPreset = costPresets.find((p: any) => p.is_default) || costPresets[0] || null;
 
     // 2. Generate week keys (next N weeks from current Monday)
     const today = new Date();
