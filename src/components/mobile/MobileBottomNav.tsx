@@ -34,9 +34,6 @@ export function MobileBottomNav() {
           >
             <Icon className="h-5 w-5" strokeWidth={isActive ? 2 : 1.75} />
             <span className="text-[10px] font-medium">{tab.label}</span>
-            {isActive && (
-              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-[2px] rounded-full bg-white" />
-            )}
           </button>
         );
       })}
