@@ -96,7 +96,7 @@ interface MergeState {
 }
 
 export default function PlanVyroby() {
-  const { isAdmin, isOwner, loading, profile } = useAuth();
+  const { isAdmin, isOwner, isTestUser, loading, profile } = useAuth();
   const navigate = useNavigate();
   const { setCurrentPage } = useUndoRedo();
   const [displayMode, setDisplayMode] = useState<DisplayMode>("hours");
@@ -583,7 +583,7 @@ export default function PlanVyroby() {
         style={{ backgroundColor: forecast.forecastActive ? "#1a2422" : "#f4f2f0" }}
       >
         {isMobile && <MobileHeader />}
-        {profile?.email === "alfred@ami-test.cz" && (
+        {isTestUser && (
           <div className="bg-orange-500 text-white px-6 flex items-center justify-center gap-2 font-bold tracking-wide shrink-0" style={{ height: 32 }}>
             <span>⚠ TEST MODE — Testovací prostředí — data nejsou produkční</span>
           </div>
