@@ -23,6 +23,9 @@ export interface ForecastBlock {
   tpv_expected_date?: string | null;
   is_forecast: true;
   selected?: boolean;
+  estimation_level?: number;  // 1=rozpad, 2=odhad s marží, 3=odhad def marže, 4=chybí podklady
+  estimation_badge?: string;
+  estimation_preset?: string;
 }
 
 /** Tracks a real bundle move that only lives in forecast state */
