@@ -197,7 +197,7 @@ export function RecycleBin({ open, onOpenChange }: RecycleBinProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[650px]">
+      <DialogContent className="sm:max-w-[750px] max-h-[85vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle>Koš</DialogTitle>
           <p className="text-xs text-muted-foreground">Položky se automaticky mažou po 30 dnech</p>
