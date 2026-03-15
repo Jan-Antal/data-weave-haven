@@ -114,9 +114,26 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const bulkUpdate = useBulkUpdateFutureCapacity();
   const queryClient = useQueryClient();
 
-  const standardCapacity = settings?.weekly_capacity_hours ?? 875;
-  const [standardCapacityInput, setStandardCapacityInput] = useState<string>(String(standardCapacity));
+  const dbStandardCapacity = settings?.weekly_capacity_hours ?? 875;
+  const [localStandardCapacity, setLocalStandardCapacity] = useState(dbStandardCapacity);
+  const standardCapacity = localStandardCapacity;
+  const [standardCapacityInput, setStandardCapacityInput] = useState<string>(String(dbStandardCapacity));
   const [capacityInputFocused, setCapacityInputFocused] = useState(false);
+
+  // Pending local changes for week overrides/resets
+  const [pendingWeekOverrides, setPendingWeekOverrides] = useState<Map<number, { cap: number; days: number }>>(new Map());
+  const [pendingWeekResets, setPendingWeekResets] = useState<Set<number>>(new Set());
+  const hasPendingChanges = localStandardCapacity !== dbStandardCapacity || pendingWeekOverrides.size > 0 || pendingWeekResets.size > 0;
+
+  // Reset local state when dialog opens
+  useEffect(() => {
+    if (open) {
+      setLocalStandardCapacity(dbStandardCapacity);
+      setStandardCapacityInput(String(dbStandardCapacity));
+      setPendingWeekOverrides(new Map());
+      setPendingWeekResets(new Set());
+    }
+  }, [open, dbStandardCapacity]);
 
   // Safe math expression evaluator
   const safeEvalExpr = (expr: string): number | null => {
