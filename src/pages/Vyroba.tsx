@@ -1932,10 +1932,20 @@ function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectSt
             <div className="h-[3px] rounded-full overflow-hidden" style={{ background: "hsl(var(--border))" }}>
               <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: progressColor }} />
             </div>
-            {/* Weekly goal marker */}
+            {/* Weekly goal marker — teal */}
             {weeklyGoal < 100 && (
-              <div className="absolute top-[-1px] h-[5px] w-[1.5px] rounded-full" style={{ left: `${weeklyGoal}%`, background: "#d97706", opacity: 0.8 }} />
+              <div className="absolute top-[-1px] h-[5px] w-[1.5px] rounded-full" style={{ left: `${weeklyGoal}%`, background: "#0d9488", opacity: 0.8 }} />
             )}
+            {/* Expected progress marker — blue/muted */}
+            {(() => {
+              const now = new Date();
+              const dow = now.getDay();
+              const wde = (dow === 0 || dow === 6) ? 5 : dow;
+              const exp = Math.round(weeklyGoal * (wde / 5));
+              return exp > 0 && exp < 100 ? (
+                <div className="absolute top-[-1px] h-[5px] w-[1.5px] rounded-full" style={{ left: `${exp}%`, background: "#6b7280", opacity: 0.5 }} />
+              ) : null;
+            })()}
           </div>
         </div>
       </button>
