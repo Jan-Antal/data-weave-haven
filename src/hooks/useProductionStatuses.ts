@@ -15,13 +15,18 @@ export function useProductionStatuses(projectId: string) {
   const query = useQuery({
     queryKey: ["production-statuses", projectId],
     queryFn: async () => {
-      const [inboxRes, scheduleRes] = await Promise.all([
+      const [inboxRes, scheduleRes, projectRes] = await Promise.all([
         supabase.from("production_inbox").select("item_name, item_code, status").eq("project_id", projectId),
-        supabase.from("production_schedule").select("item_name, item_code, status, scheduled_week, split_part, split_total, pause_reason, pause_expected_date, cancel_reason").eq("project_id", projectId),
+        supabase.from("production_schedule").select("item_name, item_code, status, scheduled_week, split_part, split_total, pause_reason, pause_expected_date, cancel_reason, expediced_at").eq("project_id", projectId),
+        supabase.from("projects").select("status").eq("project_id", projectId).maybeSingle(),
       ]);
       if (inboxRes.error) throw inboxRes.error;
       if (scheduleRes.error) throw scheduleRes.error;
-      return { inbox: inboxRes.data || [], schedule: scheduleRes.data || [] };
+      return {
+        inbox: inboxRes.data || [],
+        schedule: scheduleRes.data || [],
+        projectStatus: projectRes.data?.status || null,
+      };
     },
     enabled: !!projectId,
   });
@@ -37,6 +42,8 @@ export function useProductionStatuses(projectId: string) {
     monday.setHours(0, 0, 0, 0);
     const currentWeekKey = monday.toISOString().split("T")[0];
 
+    const projectStatus = query.data.projectStatus;
+
     for (const row of query.data.inbox) {
       const key = row.item_code || row.item_name;
       if (!map.has(key)) map.set(key, []);
@@ -51,7 +58,13 @@ export function useProductionStatuses(projectId: string) {
 
       let status: ProductionStatus;
       if (row.status === "completed") {
-        status = { label: "K expedici", color: "#3a8a36" };
+        // Check if item has been expedited or project is in Expedice status
+        const isExpedited = !!(row as any).expediced_at || projectStatus === "Expedice";
+        if (isExpedited) {
+          status = { label: "Expedováno", color: "#223937" };
+        } else {
+          status = { label: "Čeká na expedici", color: "#3a8a36" };
+        }
       } else if (row.status === "paused") {
         const pauseReason = (row as any).pause_reason || "Pozastaveno";
         const expDate = (row as any).pause_expected_date;
@@ -78,7 +91,7 @@ export function useProductionStatuses(projectId: string) {
         } else if (weekKey > currentWeekKey) {
           status = { label: `Naplánováno T${weekNum}`, color: "#3b82f6", weekLabel: `T${weekNum}` };
         } else {
-          status = { label: "⚠ Zpoždění", color: "#dc3545" };
+          status = { label: "△ Zpoždění ve výrobě", color: "#dc3545" };
         }
       }
 
