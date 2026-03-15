@@ -115,9 +115,9 @@ serve(async (req) => {
     const [projectsRes, tpvRes, settingsRes, presetsRes] = await Promise.all([
       sb.from("projects")
         .select("project_id, project_name, status, risk, expedice, montaz, predani, datum_smluvni, datum_objednavky, datum_tpv, prodejni_cena, marze, cost_preset_id")
-        .in("status", ["Příprava", "Engineering", "TPV", "Výroba"])
         .is("deleted_at", null)
         .eq("is_test", false)
+        .not("status", "in", '("Fakturace","Dokončeno")')
         .not("project_id", "like", "TEST%"),
       sb.from("tpv_items")
         .select("project_id, id")
@@ -169,7 +169,7 @@ serve(async (req) => {
     }
 
     const statusFallbackWeeks: Record<string, number> = {
-      "Výroba": 4, "TPV": 8, "Engineering": 12, "Příprava": 16,
+      "Výroba IN": 4, "Výroba": 4, "Expedice": 2, "Montáž": 3, "TPV": 8, "Engineering": 12, "Příprava": 16, "On Hold": 12, "Reklamace": 4, "VaN": 8,
     };
 
     const workItems: ProjectWork[] = [];
@@ -182,23 +182,32 @@ serve(async (req) => {
       // Determine tpv_start (earliest possible production start)
       let tpvStart: Date;
       if (proj.datum_tpv) {
-        tpvStart = new Date(proj.datum_tpv);
+        const parsed = new Date(proj.datum_tpv);
+        tpvStart = isNaN(parsed.getTime()) ? addWeeks(today, 2) : parsed;
       } else if (proj.datum_objednavky) {
+        const parsed = new Date(proj.datum_objednavky);
         const tpvWeeks = estimateTpvWeeks(tpvCount);
-        tpvStart = addWeeks(new Date(proj.datum_objednavky), tpvWeeks);
+        tpvStart = isNaN(parsed.getTime()) ? addWeeks(today, 2) : addWeeks(parsed, tpvWeeks);
       } else {
         tpvStart = addWeeks(today, 2);
       }
-      // tpvStart must not be in the past
-      if (tpvStart < today) tpvStart = new Date(today);
+      // tpvStart must not be in the past and must be valid
+      if (isNaN(tpvStart.getTime()) || tpvStart < today) tpvStart = new Date(today);
 
       // Determine deadline
       const deadlineStr = proj.expedice || proj.montaz || proj.predani || proj.datum_smluvni;
       let deadline: Date;
       let deadlineSource: string;
       if (deadlineStr) {
-        deadline = new Date(deadlineStr);
-        deadlineSource = proj.expedice ? "expedice" : proj.montaz ? "montaz" : proj.predani ? "predani" : "smluvni";
+        const parsed = new Date(deadlineStr);
+        if (!isNaN(parsed.getTime())) {
+          deadline = parsed;
+          deadlineSource = proj.expedice ? "expedice" : proj.montaz ? "montaz" : proj.predani ? "predani" : "smluvni";
+        } else {
+          const fbWeeks = statusFallbackWeeks[proj.status] || 8;
+          deadline = addWeeks(tpvStart, fbWeeks);
+          deadlineSource = "fallback";
+        }
       } else {
         const fbWeeks = statusFallbackWeeks[proj.status] || 8;
         deadline = addWeeks(tpvStart, fbWeeks);
