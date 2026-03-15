@@ -503,7 +503,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
             </div>
           </>
         ) : (
-          <UserAnalyticsTab onShowUserActivity={handleShowUserActivity} />
+          <UserSessionsTab onShowUserActivity={handleShowUserActivity} />
         )}
       </div>
     );
