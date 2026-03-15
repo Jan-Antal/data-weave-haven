@@ -217,7 +217,6 @@ export function useUserAnalytics(enabled: boolean) {
       };
     },
     enabled,
-    refetchInterval: 60_000,
   });
 }
 

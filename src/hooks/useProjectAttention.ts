@@ -45,8 +45,7 @@ export function useProjectAttention(pmName?: string | null) {
       if (error) throw error;
       return data || [];
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   });
 
   const today = new Date();
