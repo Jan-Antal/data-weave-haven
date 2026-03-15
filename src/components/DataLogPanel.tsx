@@ -121,22 +121,34 @@ function ActivityItem({
   entry,
   isSelected,
   onSelect,
+  onNavigate,
 }: {
   entry: ActivityLogEntry;
   isSelected: boolean;
   onSelect: (entry: ActivityLogEntry) => void;
+  onNavigate?: (entry: ActivityLogEntry) => void;
 }) {
   const { data: projects = [] } = useProjects();
   const project = projects.find(p => p.project_id === entry.project_id);
   const projectName = project?.project_name || entry.project_id;
   const dotClass = DOT_COLORS[entry.action_type] || "bg-gray-400";
   const actionLabel = getActionLabel(entry.action_type, entry.new_value, entry.project_id, entry.detail);
+  const navTarget = getNavigationTarget(entry.action_type);
+  const isNavigable = !!navTarget && entry.project_id !== "_system_";
+
+  const handleClick = () => {
+    onSelect(entry);
+    if (isNavigable && onNavigate) {
+      onNavigate(entry);
+    }
+  };
 
   return (
     <button
-      onClick={() => onSelect(entry)}
+      onClick={handleClick}
       className={cn(
-        "w-full text-left px-3 py-2 flex items-start gap-2.5 hover:bg-muted/50 transition-colors border-l-2",
+        "w-full text-left px-3 py-2 flex items-start gap-2.5 transition-colors border-l-2 group",
+        isNavigable ? "cursor-pointer hover:bg-muted/50" : "cursor-default hover:bg-muted/30",
         isSelected ? "border-l-primary bg-muted/30" : "border-l-transparent"
       )}
     >
@@ -144,9 +156,14 @@ function ActivityItem({
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-[11px] font-medium text-foreground truncate">{projectName}</span>
-          <span className="text-[10px] text-muted-foreground shrink-0">
-            {formatSmartTimestamp(entry.created_at)}
-          </span>
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="text-[10px] text-muted-foreground">
+              {formatSmartTimestamp(entry.created_at)}
+            </span>
+            {isNavigable && (
+              <ChevronRight className="h-3 w-3 text-muted-foreground/0 group-hover:text-muted-foreground transition-colors" />
+            )}
+          </div>
         </div>
         <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">
           {actionLabel}
