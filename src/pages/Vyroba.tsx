@@ -902,7 +902,7 @@ export default function Vyroba() {
   if (loading) {
     return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">Načítání...</p></div>;
   }
-  if (!isOwner && !isAdmin) return null;
+  if (!isOwner && !isAdmin && !isTester) return null;
 
   const statusColors = { "on-track": "#3a8a36", "at-risk": "#d97706", "behind": "#dc2626" };
 

@@ -555,7 +555,7 @@ export default function PlanVyroby() {
     );
   }
 
-  if (!isAdmin) return null;
+  if (!isAdmin && !isTester) return null;
 
   if (isMobile) {
     return (
