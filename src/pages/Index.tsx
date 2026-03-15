@@ -418,7 +418,7 @@ const Index = () => {
       <div className="flex flex-1 overflow-hidden">
         {/* Mobile: Přehled or Projekty */}
         {isMobile ? (
-          <main className="flex-1 min-w-0 flex flex-col overflow-y-auto px-3 pt-3 pb-16">
+          <main className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-3 pb-16">
             {mobileTPVProject ? (
               <MobileTPVCardList
                 items={mobileTPVItems}
@@ -440,6 +440,7 @@ const Index = () => {
               <MobilePrehled
                 recentProjects={recentProjects}
                 onProjectTap={handleMobileProjectTap}
+                onOpenDataLog={toggleDataLog}
               />
             ) : (
               <MobileCardList
@@ -452,20 +453,17 @@ const Index = () => {
                 onOpenTPV={handleMobileOpenTPV}
               />
             )}
-            {isMobile ? (
-              <MobileProjectDetailSheet
-                project={mobileDetailProject}
-                open={mobileDetailOpen}
-                onOpenChange={setMobileDetailOpen}
-                onOpenTPV={handleMobileOpenTPV}
-              />
-            ) : (
-              <ProjectDetailDialog
-                project={mobileDetailProject}
-                open={mobileDetailOpen}
-                onOpenChange={setMobileDetailOpen}
-              />
-            )}
+            <MobileProjectDetailSheet
+              project={mobileDetailProject}
+              open={mobileDetailOpen}
+              onOpenChange={setMobileDetailOpen}
+              onOpenTPV={handleMobileOpenTPV}
+            />
+            {/* Mobile DataLog full screen */}
+            <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
+              setDataLogOpen(v);
+              try { localStorage.setItem("datalog-panel-index", String(v)); } catch {}
+            }} />
           </main>
         ) : (
           /* Desktop: table view */
