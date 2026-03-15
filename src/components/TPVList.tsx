@@ -198,7 +198,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     const notReady = selectedItems.filter(i => i.status !== "Schváleno");
 
     if (ready.length === 0) {
-      toast({ title: "Žádná vybraná položka nemá status „Schváleno"", variant: "destructive", duration: 4000 });
+      toast({ title: 'Žádná vybraná položka nemá status "Schváleno"', variant: "destructive", duration: 4000 });
       return;
     }
 
