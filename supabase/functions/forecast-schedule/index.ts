@@ -30,7 +30,8 @@ serve(async (req) => {
         .select("project_id, project_name, status, expedice, montaz, predani, datum_smluvni, prodejni_cena, datum_tpv, vyroba, marze, cost_preset_id")
         .is("deleted_at", null)
         .eq("is_test", false)
-        .not("status", "in", '("Fakturace","Dokončeno")'),
+        .not("status", "in", '("Fakturace","Dokončeno")')
+        .not("project_id", "like", "TEST%"),
       sb.from("tpv_items")
         .select("project_id, item_name, pocet, cena")
         .is("deleted_at", null),
