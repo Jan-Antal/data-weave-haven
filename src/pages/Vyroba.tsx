@@ -912,7 +912,7 @@ export default function Vyroba() {
 
   /* ═══ RENDER ═══ */
   return (
-    <div className={cn("h-screen flex flex-col overflow-hidden", isMobile && "pb-14")} style={{ background: "#f8f7f4" }}>
+    <div className="h-screen flex flex-col overflow-hidden" style={{ background: "#f8f7f4", paddingBottom: isMobile ? 'calc(56px + env(safe-area-inset-bottom, 0px))' : undefined }}>
       {/* ═══ MOBILE HEADER ═══ */}
       {isMobile && (
         <MobileHeader
