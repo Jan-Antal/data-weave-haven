@@ -15,10 +15,13 @@ export interface ActivityLogEntry {
 
 const PAGE_SIZE = 30;
 
+// Action types to always exclude from activity feed
+const EXCLUDED_ACTION_TYPES = ["user_login", "session_end", "user_session", "page_view"];
+
 export type DateRange = "today" | "yesterday" | "7d" | "30d" | "all";
 
 interface Filters {
-  category: "all" | "status" | "terminy" | "documents" | "projects" | "users" | "vyroba";
+  category: "all" | "status" | "terminy" | "documents" | "projects" | "vyroba";
   projectId: string | null;
   userEmail: string | null;
   dateRange?: DateRange;
@@ -31,7 +34,6 @@ function getActionTypes(category: Filters["category"]): string[] | null {
     case "terminy": return ["datum_smluvni_change", "stage_datum_smluvni_change"];
     case "documents": return ["document_uploaded", "document_deleted", "stage_document_uploaded", "stage_document_deleted"];
     case "projects": return ["project_created", "project_deleted", "project_restored", "stage_created", "stage_deleted", "prodejni_cena_change", "forecast_committed"];
-    case "users": return ["user_login", "session_end"];
     case "vyroba": return ["item_scheduled", "item_moved", "item_completed", "item_paused", "item_cancelled", "item_returned_to_inbox", "item_split", "item_hotovo", "item_qc_confirmed", "item_expedice", "item_moved_next_week", "item_paused_vyroba", "vyroba_log_saved", "vyroba_no_activity", "defect_reported", "defect_resolved", "phase_changed"];
     default: return null;
   }
@@ -71,8 +73,14 @@ export function useActivityLog(filters: Filters) {
         .range(pageParam, pageParam + PAGE_SIZE - 1);
 
       const types = getActionTypes(filters.category);
-      if (types) q = q.in("action_type", types);
-      else q = q.neq("action_type", "user_session");
+      if (types) {
+        q = q.in("action_type", types);
+      } else {
+        // "all" category: exclude noise
+        for (const excl of EXCLUDED_ACTION_TYPES) {
+          q = q.neq("action_type", excl);
+        }
+      }
       if (filters.projectId) q = q.eq("project_id", filters.projectId);
       if (filters.userEmail) q = q.eq("user_email", filters.userEmail);
 
@@ -100,6 +108,8 @@ export function useActivityLogUsers() {
       const { data, error } = await (supabase.from("data_log") as any)
         .select("user_email")
         .neq("action_type", "user_session")
+        .neq("action_type", "user_login")
+        .neq("action_type", "session_end")
         .neq("user_email", "")
         .order("user_email");
       if (error) throw error;
