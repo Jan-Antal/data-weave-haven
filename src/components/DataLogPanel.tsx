@@ -217,18 +217,18 @@ function UserAnalyticsTab({ onShowUserActivity }: { onShowUserActivity: (email: 
 }
 
 function UserAnalyticsRow({ user, expanded, onToggle, onShowAll }: { user: UserAnalytics; expanded: boolean; onToggle: () => void; onShowAll: () => void }) {
-  const { data: recentActions = [] } = useUserRecentActions(expanded ? user.email : null);
+  const { data: recentActions = [] } = useUserRecentActions(expanded ? user.user_email : null);
 
   return (
     <div className="border-b border-border">
       <button onClick={onToggle} className="w-full px-3 py-2.5 flex items-center gap-2 hover:bg-muted/30 transition-colors">
         <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[11px] font-bold shrink-0">
-          {user.email[0].toUpperCase()}
+          {user.user_email[0].toUpperCase()}
         </div>
         <div className="min-w-0 flex-1 text-left">
-          <p className="text-[11px] font-medium truncate">{user.email.split("@")[0]}</p>
+          <p className="text-[11px] font-medium truncate">{user.full_name || user.user_email.split("@")[0]}</p>
           <p className="text-[10px] text-muted-foreground">
-            {user.totalActions} akcí · {user.lastActive ? formatSmartTimestamp(user.lastActive) : "–"}
+            {user.total_actions_30d} akcí · {user.last_activity ? formatSmartTimestamp(user.last_activity) : "–"}
           </p>
         </div>
         {expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
