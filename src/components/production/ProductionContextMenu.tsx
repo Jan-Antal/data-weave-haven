@@ -56,19 +56,30 @@ export function ProductionContextMenu({ x, y, actions, onClose, darkMode }: Prod
     <div ref={ref} style={style}>
       {actions.map((action, i) => (
         <div key={i}>
-          <button
-            className="w-full flex items-center gap-2 px-3 py-[6px] text-left transition-colors"
-            style={{ fontSize: 11, color: action.danger ? "#dc3545" : darkMode ? "#c8d0e0" : "#223937" }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = action.danger ? "rgba(220,53,69,0.08)" : darkMode ? "#252a35" : "#f0eee9")}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-            onClick={() => {
-              action.onClick();
-              onClose();
-            }}
-          >
-            <span style={{ fontSize: 12, width: 16, textAlign: "center" }}>{action.icon}</span>
-            {action.label}
-          </button>
+          {action.dividerBefore && <div style={{ height: 1, backgroundColor: darkMode ? "#3d4558" : "#e2ddd6", margin: "4px 0" }} />}
+          {i === 0 && !action.danger && !action.dividerBefore ? (
+            <div
+              className="flex items-center gap-2 px-3 py-[6px]"
+              style={{ fontSize: 10, color: darkMode ? "#8899aa" : "#8a8578", fontWeight: 600, letterSpacing: 0.3, cursor: "default" }}
+            >
+              <span style={{ fontSize: 11, width: 16, textAlign: "center" }}>{action.icon}</span>
+              {action.label}
+            </div>
+          ) : (
+            <button
+              className="w-full flex items-center gap-2 px-3 py-[6px] text-left transition-colors"
+              style={{ fontSize: 11, color: action.danger ? "#dc3545" : darkMode ? "#c8d0e0" : "#223937" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = action.danger ? "rgba(220,53,69,0.08)" : darkMode ? "#252a35" : "#f0eee9")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              onClick={() => {
+                action.onClick();
+                onClose();
+              }}
+            >
+              <span style={{ fontSize: 12, width: 16, textAlign: "center" }}>{action.icon}</span>
+              {action.label}
+            </button>
+          )}
         </div>
       ))}
     </div>
