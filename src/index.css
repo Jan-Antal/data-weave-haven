@@ -234,6 +234,27 @@
   button:not([role="checkbox"]):not([data-slot="switch"]):not(.shrink-0), [role="button"], a {
     min-height: 36px;
   }
+
+  /* Block browser back-swipe gesture */
+  html, body {
+    overscroll-behavior-x: none;
+  }
+}
+
+/* Portrait lock overlay for mobile */
+@media (max-width: 767px) and (orientation: landscape) {
+  .portrait-lock-overlay {
+    display: flex !important;
+  }
+}
+
+/* Week swipe transition */
+.week-slide-enter {
+  animation: weekSlideIn 0.25s ease-out;
+}
+@keyframes weekSlideIn {
+  from { opacity: 0.4; transform: translateX(var(--slide-dir, 30px)); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 /* File drag & drop visual feedback */
