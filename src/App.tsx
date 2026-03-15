@@ -110,6 +110,7 @@ function AppRoutes() {
           <Route path="/" element={<RootAuthRoute />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/set-password" element={<SetPassword />} />
+          <Route path="/invite" element={<InviteLanding />} />
           <Route path="/login" element={<Login />} />
           <Route path="*" element={<Login />} />
         </Routes>
