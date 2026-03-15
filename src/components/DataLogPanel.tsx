@@ -10,7 +10,7 @@ import { cs } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useDataLogHighlight } from "@/components/DataLogHighlightContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 // Action type → route mapping
 const VYROBA_ACTIONS = new Set([
