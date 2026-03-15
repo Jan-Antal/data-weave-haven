@@ -2113,23 +2113,33 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           <div className="h-1 rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
             <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(bundleProgress.bundleProgress, 100)}%`, background: statusColor }} />
           </div>
-          {/* Weekly goal marker */}
+          {/* Weekly goal marker — teal/green */}
           {weeklyGoal < 100 && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="absolute top-[-3px] h-[10px] w-[2px] rounded-full cursor-help" style={{ left: `${weeklyGoal}%`, background: "#d97706", opacity: 0.7 }} />
+                <div className="absolute top-[-3px] h-[10px] w-[2px] rounded-full cursor-help" style={{ left: `${weeklyGoal}%`, background: "#0d9488", opacity: 0.7 }} />
               </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">Týdenní cíl: {weeklyGoal.toFixed(0)}%</TooltipContent>
+              <TooltipContent side="top" className="text-xs">Cíl pro tento týden: {weeklyGoal.toFixed(0)}%</TooltipContent>
             </Tooltip>
           )}
-          {todayDayIndex >= 0 && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="absolute top-[-2px] h-[8px] w-[2px] cursor-help" style={{ left: `${expectedPct}%`, background: "#1a1a1a", opacity: 0.2 }} />
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">Očekávaný postup k dnešku: {expectedPct.toFixed(0)}%</TooltipContent>
-            </Tooltip>
-          )}
+          {/* Expected progress marker — blue/muted */}
+          {(() => {
+            const DAY_NAMES = ["neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota"];
+            const now = new Date();
+            const dow = now.getDay();
+            const wde = (dow === 0 || dow === 6) ? 5 : dow;
+            const exp = Math.round(weeklyGoal * (wde / 5));
+            const dayName = DAY_NAMES[dow] || "dnes";
+            if (exp <= 0) return null;
+            return (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="absolute top-[-2px] h-[8px] w-[2px] cursor-help" style={{ left: `${exp}%`, background: "#6b7280", opacity: 0.35 }} />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">Očekávaný stav k {dayName}: {exp}%</TooltipContent>
+              </Tooltip>
+            );
+          })()}
         </div>
 
         {/* ── Výkresy inline ── */}
