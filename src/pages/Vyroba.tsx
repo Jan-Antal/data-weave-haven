@@ -2665,7 +2665,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                     {/* QC badge — clickable only if ALL parts completed across all weeks */}
                     <div onClick={(e) => e.stopPropagation()}>
                       {hasQC ? (
-                        <button style={{ minHeight: '36px', minWidth: '60px', padding: '6px 12px', cursor: 'pointer' }} onClick={() => { setUncheckConfirmItemId(mids[0]); setUncheckConfirmCode(`${item.item_code || ""} ${item.item_name}`.trim()); }}>
+                        <button className="cursor-pointer" onClick={() => { setUncheckConfirmItemId(mids[0]); setUncheckConfirmCode(`${item.item_code || ""} ${item.item_name}`.trim()); }}>
                           <QualityCheckDisplay check={checkMap.get(mids[0])} />
                         </button>
                       ) : (() => {
