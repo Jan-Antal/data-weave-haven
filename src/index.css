@@ -84,6 +84,16 @@
     --sidebar-border: 175 18% 20%;
     --sidebar-ring: 15 82% 54%;
   }
+
+  /* Mobile: keep page background consistent to avoid a “grey strip” when overscrolling
+     or when content ends above the bottom safe-area/navigation. */
+  @media (max-width: 767px) {
+    :root {
+      --background: 0 0% 100%;
+      --card: 0 0% 100%;
+      --popover: 0 0% 100%;
+    }
+  }
 }
 
 @layer base {
