@@ -715,24 +715,10 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
         </div>
         </div>{/* end scrollable content */}
 
-        {/* Sticky footer */}
-        <div className="shrink-0 flex" style={{ borderTop: "0.5px solid #e5e3df" }}>
-          <button
-            type="button"
-            onClick={handleCancel}
-            className="flex-1 text-sm font-medium transition-opacity hover:opacity-80"
-            style={{ background: "#e5e3df", color: "#555", height: 48, borderRadius: "0 0 0 12px" }}
-          >
-            Zrušit změny
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveAll}
-            className="flex-1 text-sm font-medium text-white transition-opacity hover:opacity-90"
-            style={{ background: "#223937", height: 48, borderRadius: "0 0 12px 0" }}
-          >
-            Uložit změny
-          </button>
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-6 py-3 border-t border-border shrink-0">
+          <Button variant="outline" onClick={handleCancel}>Zrušit změny</Button>
+          <Button onClick={handleSaveAll}>Uložit změny</Button>
         </div>
       </DialogContent>
     </Dialog>
