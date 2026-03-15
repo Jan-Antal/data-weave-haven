@@ -156,47 +156,49 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
   return (
     <div
       ref={containerRef}
-      className="flex flex-col gap-2"
-      style={{ background: "#ffffff", padding: "0 12px 12px 12px" }}
+      className="flex flex-col h-full"
+      style={{ background: "#ffffff" }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Pull-to-refresh indicator */}
-      {(pullDistance > 0 || refreshing) && (
-        <div
-          className="flex items-center justify-center overflow-hidden transition-all"
-          style={{ height: refreshing ? 40 : pullDistance * 0.6 }}
-        >
-          <Loader2
-            className="h-5 w-5 text-primary"
-            style={{
-              opacity: refreshing ? 1 : Math.min(pullDistance / PULL_THRESHOLD, 1),
-              animation: refreshing ? "spin 1s linear infinite" : "none",
-              transform: refreshing ? undefined : `rotate(${pullDistance * 3}deg)`,
-            }}
-          />
-        </div>
-      )}
-
-      {/* Search bar */}
-      <div className="relative">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          value={localSearch}
-          onChange={(e) => setLocalSearch(e.target.value)}
-          placeholder="Hledat projekt..."
-          className="pl-8 h-9 text-sm rounded-[10px]"
-        />
-        {localSearch && (
-          <button onClick={() => setLocalSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-1">
-            <X className="h-3.5 w-3.5 text-muted-foreground" />
-          </button>
+      {/* Sticky header: search + filter chips */}
+      <div className="sticky top-0 z-10 bg-background border-b border-border" style={{ padding: "8px 12px" }}>
+        {/* Pull-to-refresh indicator */}
+        {(pullDistance > 0 || refreshing) && (
+          <div
+            className="flex items-center justify-center overflow-hidden transition-all"
+            style={{ height: refreshing ? 40 : pullDistance * 0.6 }}
+          >
+            <Loader2
+              className="h-5 w-5 text-primary"
+              style={{
+                opacity: refreshing ? 1 : Math.min(pullDistance / PULL_THRESHOLD, 1),
+                animation: refreshing ? "spin 1s linear infinite" : "none",
+                transform: refreshing ? undefined : `rotate(${pullDistance * 3}deg)`,
+              }}
+            />
+          </div>
         )}
-      </div>
 
-      {/* Filter chips row with count + sort pill */}
-      <div className="flex items-center gap-2">
+        {/* Search bar */}
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
+            placeholder="Hledat projekt..."
+            className="pl-8 h-9 text-sm rounded-[10px]"
+          />
+          {localSearch && (
+            <button onClick={() => setLocalSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-1">
+              <X className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          )}
+        </div>
+
+        {/* Filter chips row with count + sort pill */}
+        <div className="flex items-center gap-2 mt-2">
         <div className="flex-1 min-w-0 overflow-x-auto scrollbar-hide">
           <div className="flex items-center gap-2">
             <span className="text-[13px] text-muted-foreground shrink-0">{displayProjects.length}</span>
