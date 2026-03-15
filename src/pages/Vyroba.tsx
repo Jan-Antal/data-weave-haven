@@ -1061,7 +1061,11 @@ export default function Vyroba() {
               </button>
               <button
                 onClick={() => setWeekPickerOpen(o => !o)}
-                className="font-mono select-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer font-bold"
+                onDoubleClick={() => setWeekOffset(0)}
+                className={cn(
+                  "font-mono select-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer font-bold",
+                  weekOffset !== 0 && "underline decoration-dotted underline-offset-2"
+                )}
                 style={{ fontSize: 13, color: "#223937" }}
               >
                 T{weekNum}
@@ -1084,16 +1088,6 @@ export default function Vyroba() {
             <span style={{ color: "#dc2626", fontSize: 12 }}>⚠ {stats.behind} pozadu</span>
             <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
             <span className="font-mono" style={{ color: "#2563eb", fontSize: 12 }}>ø {stats.avgPct}%</span>
-            <div className="flex-1" />
-            {weekOffset !== 0 && (
-              <button
-                onClick={() => setWeekOffset(0)}
-                className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors"
-                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", fontSize: 11 }}
-              >
-                Dnes
-              </button>
-            )}
           </>
         ) : (
           /* Desktop: full stats */
