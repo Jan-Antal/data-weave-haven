@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format } from "date-fns";
+import { differenceInDays, format } from "date-fns";
 import { RotateCcw, Trash2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { TestModeBanner } from "./TestModeBanner";
@@ -20,6 +20,32 @@ function useDeletedRecords(table: string) {
   return useQuery({
     queryKey: ["deleted", table],
     queryFn: async () => {
+      if (table === "tpv_items") {
+        const { data, error } = await (supabase
+          .from("tpv_items")
+          .select("*") as any)
+          .not("deleted_at", "is", null)
+          .order("deleted_at", { ascending: false });
+        if (error) throw error;
+        // Fetch project names for each unique project_id
+        const projectIds = [...new Set((data as any[]).map((r: any) => r.project_id))];
+        let projectMap: Record<string, string> = {};
+        if (projectIds.length > 0) {
+          const { data: projects } = await supabase
+            .from("projects")
+            .select("project_id, project_name")
+            .in("project_id", projectIds);
+          if (projects) {
+            for (const p of projects) {
+              projectMap[p.project_id] = p.project_name;
+            }
+          }
+        }
+        return (data as any[]).map((r: any) => ({
+          ...r,
+          _project_name: projectMap[r.project_id] || r.project_id,
+        }));
+      }
       const { data, error } = await (supabase
         .from(table as any)
         .select("*") as any)
@@ -31,12 +57,33 @@ function useDeletedRecords(table: string) {
   });
 }
 
-function RecordRow({ record, table, nameField, idField, canPermanentDelete }: { record: any; table: string; nameField: string; idField?: string; canPermanentDelete: boolean }) {
+function getExpiryInfo(deletedAt: string) {
+  const daysLeft = 30 - differenceInDays(new Date(), new Date(deletedAt));
+  if (daysLeft <= 1) return { text: "⚠ Vymaže se zítra", className: "text-destructive font-medium" };
+  if (daysLeft <= 7) return { text: `⚠ Vymaže se za ${daysLeft} dní`, className: "text-amber-600 font-medium" };
+  return { text: `Vymaže se za ${daysLeft} dní`, className: "text-muted-foreground" };
+}
+
+function RecordRow({
+  record,
+  table,
+  nameField,
+  idField,
+  canPermanentDelete,
+  isTPV,
+}: {
+  record: any;
+  table: string;
+  nameField: string;
+  idField?: string;
+  canPermanentDelete: boolean;
+  isTPV?: boolean;
+}) {
   const qc = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const displayName = idField ? `${record[idField]} — ${record[nameField]}` : record[nameField];
   const deletedAt = record.deleted_at ? format(new Date(record.deleted_at), "dd-MMM-yy HH:mm") : "";
+  const expiry = record.deleted_at ? getExpiryInfo(record.deleted_at) : null;
 
   const handleRestore = async () => {
     const { error } = await supabase.from(table as any).update({ deleted_at: null } as any).eq("id", record.id);
@@ -62,29 +109,76 @@ function RecordRow({ record, table, nameField, idField, canPermanentDelete }: { 
     }
   };
 
+  // TPV-specific layout
+  if (isTPV) {
+    return (
+      <div className="flex items-center justify-between py-3 px-3 border-b last:border-b-0">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium truncate">
+            {record.item_name && <span className="font-bold">{record.item_name}</span>}
+            {record.item_type && <span className="text-muted-foreground"> — {record.item_type}</span>}
+          </p>
+          {record._project_name && (
+            <p className="text-xs text-muted-foreground mt-0.5">Projekt: {record._project_name}</p>
+          )}
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className="text-xs text-muted-foreground">Smazáno: {deletedAt}</p>
+            {expiry && <span className={`text-xs ${expiry.className}`}>{expiry.text}</span>}
+          </div>
+        </div>
+        <div className="flex items-center gap-1 ml-2 shrink-0">
+          {!confirmDelete ? (
+            <>
+              <Button variant="outline" size="sm" className="h-9 text-xs min-w-[80px]" onClick={handleRestore}>
+                <RotateCcw className="h-3 w-3 mr-1" /> Obnovit
+              </Button>
+              {canPermanentDelete && (
+                <Button size="sm" className="h-9 text-xs min-w-[110px] bg-destructive hover:bg-destructive/90 text-destructive-foreground" onClick={() => setConfirmDelete(true)}>
+                  <Trash2 className="h-3 w-3 mr-1" /> Trvale smazat
+                </Button>
+              )}
+            </>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-destructive">Opravdu smazat?</span>
+              <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setConfirmDelete(false)}>Zrušit</Button>
+              <Button size="sm" className="h-9 text-xs bg-destructive hover:bg-destructive/90 text-destructive-foreground" onClick={handlePermanentDelete}>Potvrdit</Button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Default layout for projects/stages
+  const displayName = idField ? `${record[idField]} — ${record[nameField]}` : record[nameField];
+
   return (
-    <div className="flex items-center justify-between py-2 px-3 border-b last:border-b-0">
+    <div className="flex items-center justify-between py-3 px-3 border-b last:border-b-0">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium truncate">{displayName}</p>
-        <p className="text-xs text-muted-foreground">Smazáno: {deletedAt}</p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <p className="text-xs text-muted-foreground">Smazáno: {deletedAt}</p>
+          {expiry && <span className={`text-xs ${expiry.className}`}>{expiry.text}</span>}
+        </div>
       </div>
       <div className="flex items-center gap-1 ml-2 shrink-0">
         {!confirmDelete ? (
           <>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleRestore}>
+            <Button variant="outline" size="sm" className="h-9 text-xs min-w-[80px]" onClick={handleRestore}>
               <RotateCcw className="h-3 w-3 mr-1" /> Obnovit
             </Button>
             {canPermanentDelete && (
-              <Button size="sm" className="h-7 text-xs bg-[#EA592A] hover:bg-[#EA592A]/90 text-white" onClick={() => setConfirmDelete(true)}>
+              <Button size="sm" className="h-9 text-xs min-w-[110px] bg-destructive hover:bg-destructive/90 text-destructive-foreground" onClick={() => setConfirmDelete(true)}>
                 <Trash2 className="h-3 w-3 mr-1" /> Trvale smazat
               </Button>
             )}
           </>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#EA592A]">Opravdu smazat?</span>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setConfirmDelete(false)}>Zrušit</Button>
-            <Button size="sm" className="h-7 text-xs bg-[#EA592A] hover:bg-[#EA592A]/90 text-white" onClick={handlePermanentDelete}>Potvrdit</Button>
+            <span className="text-xs text-destructive">Opravdu smazat?</span>
+            <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setConfirmDelete(false)}>Zrušit</Button>
+            <Button size="sm" className="h-9 text-xs bg-destructive hover:bg-destructive/90 text-destructive-foreground" onClick={handlePermanentDelete}>Potvrdit</Button>
           </div>
         )}
       </div>
@@ -92,7 +186,21 @@ function RecordRow({ record, table, nameField, idField, canPermanentDelete }: { 
   );
 }
 
-function RecordList({ table, nameField, idField, emptyText, canPermanentDelete }: { table: string; nameField: string; idField?: string; emptyText: string; canPermanentDelete: boolean }) {
+function RecordList({
+  table,
+  nameField,
+  idField,
+  emptyText,
+  canPermanentDelete,
+  isTPV,
+}: {
+  table: string;
+  nameField: string;
+  idField?: string;
+  emptyText: string;
+  canPermanentDelete: boolean;
+  isTPV?: boolean;
+}) {
   const { data: records = [], isLoading } = useDeletedRecords(table);
 
   if (isLoading) return <p className="text-sm text-muted-foreground p-4">Načítání...</p>;
@@ -101,19 +209,16 @@ function RecordList({ table, nameField, idField, emptyText, canPermanentDelete }
   return (
     <div className="border rounded-lg max-h-[400px] overflow-y-auto">
       {records.map((r) => (
-        <RecordRow key={r.id} record={r} table={table} nameField={nameField} idField={idField} canPermanentDelete={canPermanentDelete} />
+        <RecordRow key={r.id} record={r} table={table} nameField={nameField} idField={idField} canPermanentDelete={canPermanentDelete} isTPV={isTPV} />
       ))}
     </div>
   );
 }
 
 export function RecycleBin({ open, onOpenChange }: RecycleBinProps) {
-  const { canPermanentDelete, isKonstrukter, isPM, isAdmin, isTestUser } = useAuth();
+  const { canPermanentDelete, isKonstrukter, isAdmin, isTestUser } = useAuth();
 
-  // Konstruktér only sees TPV items
   const defaultTab = isKonstrukter ? "tpv" : "projects";
-
-  // PM can see projects/stages but cannot permanently delete them — only Admin/Owner can
   const canPermDeleteProjectsStages = isAdmin && !isTestUser;
 
   return (
@@ -121,6 +226,7 @@ export function RecycleBin({ open, onOpenChange }: RecycleBinProps) {
       <DialogContent className="sm:max-w-[650px]">
         <DialogHeader>
           <DialogTitle>Koš</DialogTitle>
+          <p className="text-xs text-muted-foreground">Položky se automaticky mažou po 30 dnech</p>
         </DialogHeader>
         {isTestUser && <TestModeBanner />}
         <div className={isTestUser ? "pointer-events-none opacity-80" : ""}>
@@ -141,7 +247,7 @@ export function RecycleBin({ open, onOpenChange }: RecycleBinProps) {
               </TabsContent>
             )}
             <TabsContent value="tpv">
-              <RecordList table="tpv_items" nameField="item_name" emptyText="Žádné smazané TPV položky" canPermanentDelete={canPermanentDelete && !isTestUser} />
+              <RecordList table="tpv_items" nameField="item_name" emptyText="Žádné smazané TPV položky" canPermanentDelete={canPermanentDelete && !isTestUser} isTPV />
             </TabsContent>
           </Tabs>
         </div>
