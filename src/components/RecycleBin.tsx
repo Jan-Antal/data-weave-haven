@@ -205,10 +205,10 @@ export function RecycleBin({ open, onOpenChange }: RecycleBinProps) {
         {isTestUser && <TestModeBanner />}
         <div className={isTestUser ? "pointer-events-none opacity-80" : ""}>
           <Tabs defaultValue={defaultTab} className="space-y-3">
-            <TabsList className={`w-full ${isKonstrukter ? '' : 'grid grid-cols-3'}`}>
-              {!isKonstrukter && <TabsTrigger value="projects">Projekty</TabsTrigger>}
-              {!isKonstrukter && <TabsTrigger value="stages">Etapy</TabsTrigger>}
-              <TabsTrigger value="tpv" className={isKonstrukter ? 'flex-1' : ''}>TPV položky</TabsTrigger>
+            <TabsList className="w-full flex">
+              {!isKonstrukter && <TabsTrigger value="projects" className="flex-1">Projekty</TabsTrigger>}
+              {!isKonstrukter && <TabsTrigger value="stages" className="flex-1">Etapy</TabsTrigger>}
+              <TabsTrigger value="tpv" className="flex-1">TPV položky</TabsTrigger>
             </TabsList>
             {!isKonstrukter && (
               <TabsContent value="projects">
