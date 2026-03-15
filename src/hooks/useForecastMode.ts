@@ -23,6 +23,9 @@ export interface ForecastBlock {
   tpv_expected_date?: string | null;
   is_forecast: true;
   selected?: boolean;
+  estimation_level?: number;  // 1=rozpad, 2=odhad s marží, 3=odhad def marže, 4=chybí podklady
+  estimation_badge?: string;
+  estimation_preset?: string;
 }
 
 /** Tracks a real bundle move that only lives in forecast state */
@@ -349,7 +352,14 @@ export function useForecastMode(): UseForecastModeReturn {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || "forecast-ai";
-      const hourlyRate = 550;
+
+      // Fetch hourly rate from production_settings
+      const { data: settings } = await supabase
+        .from("production_settings")
+        .select("hourly_rate")
+        .limit(1)
+        .single();
+      const hourlyRate = Number(settings?.hourly_rate) || 550;
 
       // Build all rows for batch insert
       const rows = committable.map(block => {

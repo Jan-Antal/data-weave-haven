@@ -6,9 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const HOURLY_RATE = 850;
 const MIN_HOURS = 20;
-const MAX_HOURS = 800;
+const MAX_HOURS = 2000;
 
 function clampHours(h: number): number {
   return Math.max(MIN_HOURS, Math.min(MAX_HOURS, Math.round(h)));
@@ -25,10 +24,10 @@ serve(async (req) => {
     const { mode, weeklyCapacityHours } = await req.json();
     const capacity = Number(weeklyCapacityHours) || 875;
 
-    // 1. Fetch all data in parallel
-    const [projectsRes, tpvRes, scheduleRes, inboxRes] = await Promise.all([
+    // 1. Fetch all data in parallel (including settings & presets)
+    const [projectsRes, tpvRes, scheduleRes, inboxRes, settingsRes, presetsRes] = await Promise.all([
       sb.from("projects")
-        .select("project_id, project_name, status, expedice, montaz, predani, datum_smluvni, prodejni_cena, datum_tpv, vyroba")
+        .select("project_id, project_name, status, expedice, montaz, predani, datum_smluvni, prodejni_cena, datum_tpv, vyroba, marze, cost_preset_id")
         .is("deleted_at", null)
         .not("status", "in", '("Fakturace","Dokončeno")'),
       sb.from("tpv_items")
@@ -40,12 +39,24 @@ serve(async (req) => {
       sb.from("production_inbox")
         .select("id, project_id, item_name, item_code, estimated_hours, estimated_czk, status")
         .eq("status", "pending"),
+      sb.from("production_settings")
+        .select("hourly_rate")
+        .limit(1)
+        .single(),
+      sb.from("cost_breakdown_presets")
+        .select("id, name, production_pct, is_default, sort_order")
+        .order("sort_order", { ascending: true }),
     ]);
 
     const projects = projectsRes.data || [];
     const tpvItems = tpvRes.data || [];
     const scheduleItems = scheduleRes.data || [];
     const inboxItems = inboxRes.data || [];
+
+    // Dynamic settings from DB
+    const hourlyRate = Number(settingsRes.data?.hourly_rate) || 550;
+    const costPresets = presetsRes.data || [];
+    const defaultPreset = costPresets.find((p: any) => p.is_default) || costPresets[0] || null;
 
     // 2. Generate week keys (next N weeks from current Monday)
     const today = new Date();
@@ -107,25 +118,36 @@ serve(async (req) => {
       return { date: null, source: "none" };
     }
 
-    // Helper: estimate hours for a project from TPV/vyroba/prodejni_cena
-    function estimateProjectHours(proj: any, projTpv: any[]): number {
-      // 1. TPV-based: sum(cena * pocet) / hourly rate
-      const tpvTotal = projTpv.reduce((s, t) => {
-        const cena = Number(t.cena) || 0;
-        const pocet = Number(t.pocet) || 1;
-        return s + cena * pocet;
-      }, 0);
-      if (tpvTotal > 0) return clampHours(tpvTotal / HOURLY_RATE);
+    // Helper: estimate hours for a project using DB-driven cost breakdown
+    interface EstimationResult {
+      hours: number;
+      level: number; // 1=rozpad, 2=odhad s marží, 3=odhad s def. marží, 4=chybí podklady
+      badge: string;
+      usedPreset?: string;
+    }
 
-      // 2. vyroba field
-      const vyroba = Number(proj.vyroba);
-      if (vyroba > 0) return clampHours(vyroba / HOURLY_RATE);
+    function estimateProjectHours(proj: any, projTpv: any[]): EstimationResult {
+      const prodejniCena = Number(proj.prodejni_cena) || 0;
+      const marze = proj.marze != null ? Number(proj.marze) : null;
 
-      // 3. prodejni_cena fallback (35% is production cost)
-      const cena = Number(proj.prodejni_cena);
-      if (cena > 0) return clampHours(cena * 0.35 / HOURLY_RATE);
+      // Which preset to use
+      const preset = proj.cost_preset_id
+        ? costPresets.find((p: any) => p.id === proj.cost_preset_id)
+        : defaultPreset;
 
-      return MIN_HOURS;
+      if (!preset || prodejniCena === 0) {
+        return { hours: MIN_HOURS, level: 4, badge: "⚠ Chybí podklady" };
+      }
+
+      const effectiveMarze = marze ?? 15; // default 15% if not set
+      const naklady = prodejniCena * (1 - effectiveMarze / 100);
+      const vyrobaNaklady = naklady * (Number(preset.production_pct) / 100);
+      const hours = clampHours(vyrobaNaklady / hourlyRate);
+
+      const level = proj.cost_preset_id ? 1 : (marze != null ? 2 : 3);
+      const badge = level === 1 ? "Rozpad" : level === 2 ? "Výroba – odhad" : "Výroba – odhad (def. marže)";
+
+      return { hours, level, badge, usedPreset: preset.name };
     }
 
     // Helper: distribute totalHours across weeks
@@ -216,6 +238,9 @@ serve(async (req) => {
         tpvCount: number;
         confidence: string;
         startFromIdx: number;
+        estimation_level?: number;
+        estimation_badge?: string;
+        estimation_preset?: string;
       }
 
       const allWork: ProjectWork[] = [];
@@ -281,23 +306,26 @@ serve(async (req) => {
         if (processedProjects.has(proj.project_id)) continue;
         const dl = resolveDeadline(proj);
         const projTpv = tpvItems.filter(t => t.project_id === proj.project_id);
-        const estH = estimateProjectHours(proj, projTpv);
+        const est = estimateProjectHours(proj, projTpv);
 
         if (!dl.date) {
-          safetyNet.push({ project_id: proj.project_id, project_name: proj.project_name, estimated_hours: estH, source: "unplanned" });
+          safetyNet.push({ project_id: proj.project_id, project_name: proj.project_name, estimated_hours: est.hours, source: "unplanned" });
           continue;
         }
 
         allWork.push({
           projectId: proj.project_id,
           projectName: proj.project_name,
-          totalHours: estH,
+          totalHours: est.hours,
           source: "project_estimate",
           deadline: dl.date,
           deadlineSource: dl.source,
           tpvCount: projTpv.length || 1,
-          confidence: projTpv.some(t => (Number(t.cena) || 0) > 0) ? "medium" : "low",
+          confidence: est.level <= 2 ? "medium" : "low",
           startFromIdx: 0,
+          estimation_level: est.level,
+          estimation_badge: est.badge,
+          estimation_preset: est.usedPreset,
         });
       }
 
@@ -315,7 +343,7 @@ serve(async (req) => {
             project_id: work.projectId,
             project_name: work.projectName,
             bundle_description: work.source === "existing_plan" ? "Plán — přeplánováno" :
-              work.source === "inbox_item" ? "Inbox — přeplánováno" : "~Výroba — odhad",
+              work.source === "inbox_item" ? "Inbox — přeplánováno" : work.estimation_badge || "~Výroba — odhad",
             week: alloc.week,
             estimated_hours: Math.round(alloc.hours),
             tpv_item_count: work.tpvCount,
@@ -325,6 +353,9 @@ serve(async (req) => {
             deadline_source: work.deadlineSource,
             tpv_expected_date: work.source === "project_estimate" ? (proj?.datum_tpv || null) : null,
             is_forecast: true,
+            estimation_level: work.estimation_level,
+            estimation_badge: work.estimation_badge,
+            estimation_preset: work.estimation_preset,
           });
         }
 
@@ -397,23 +428,23 @@ serve(async (req) => {
 
         const dl = resolveDeadline(proj);
         const projTpv = tpvItems.filter(t => t.project_id === proj.project_id);
-        const estimatedHours = estimateProjectHours(proj, projTpv);
+        const est = estimateProjectHours(proj, projTpv);
 
         if (!dl.date) {
-          safetyNet.push({ project_id: proj.project_id, project_name: proj.project_name, estimated_hours: estimatedHours, source: "unplanned" });
+          safetyNet.push({ project_id: proj.project_id, project_name: proj.project_name, estimated_hours: est.hours, source: "unplanned" });
           continue;
         }
 
-        const confidence = projTpv.some(t => (Number(t.cena) || 0) > 0) ? "medium" : "low";
+        const confidence = est.level <= 2 ? "medium" : "low";
         const tpvCount = projTpv.length || 1;
-        const { allocated, overflow } = distributeHours(estimatedHours, trackUsage, dl.date);
+        const { allocated, overflow } = distributeHours(est.hours, trackUsage, dl.date);
 
         for (const alloc of allocated) {
           blocks.push({
             id: `forecast-${Date.now()}-${blockIdx++}`,
             project_id: proj.project_id,
             project_name: proj.project_name,
-            bundle_description: `~Výroba — odhad`,
+            bundle_description: est.badge || `~Výroba — odhad`,
             week: alloc.week,
             estimated_hours: Math.round(alloc.hours),
             tpv_item_count: tpvCount,
@@ -423,6 +454,9 @@ serve(async (req) => {
             deadline_source: dl.source,
             tpv_expected_date: proj.datum_tpv || null,
             is_forecast: true,
+            estimation_level: est.level,
+            estimation_badge: est.badge,
+            estimation_preset: est.usedPreset,
           });
         }
 
@@ -439,7 +473,7 @@ serve(async (req) => {
 
     console.log(`Forecast generated: ${blocks.length} blocks (${blocks.filter(b => b.source === "existing_plan").length} real, ${blocks.filter(b => b.source === "inbox_item").length} inbox, ${blocks.filter(b => b.source === "project_estimate").length} AI), safetyNet: ${safetyNet.length}`);
 
-    return new Response(JSON.stringify({ blocks, weekKeys, weekUsage, safetyNet }), {
+    return new Response(JSON.stringify({ blocks, weekKeys, weekUsage, safetyNet, hourlyRate }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
