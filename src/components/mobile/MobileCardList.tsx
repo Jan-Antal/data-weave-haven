@@ -2,17 +2,16 @@ import { useState, useMemo, useCallback, useRef } from "react";
 import { MobileProjectCard } from "./MobileProjectCard";
 import { MobileFilterChips } from "./MobileFilterChips";
 import { MobileStageDetailSheet } from "./MobileStageDetailSheet";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useProjects, type Project } from "@/hooks/useProjects";
 import { useStagesByProject } from "@/hooks/useAllProjectStages";
 import { useProjectAttention } from "@/hooks/useProjectAttention";
 import type { ProjectStage } from "@/hooks/useProjectStages";
 import { useAuth } from "@/hooks/useAuth";
-import { useSortFilter } from "@/hooks/useSortFilter";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, ArrowUp, ArrowDown, Search, X } from "lucide-react";
+import { Loader2, Search, X, ChevronDown, Check } from "lucide-react";
 
 interface MobileCardListProps {
   personFilter: string | null;
@@ -46,6 +45,7 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
   const [sortAsc, setSortAsc] = useState(true);
   const [activeChip, setActiveChip] = useState("active");
   const [localSearch, setLocalSearch] = useState("");
+  const [sortPopoverOpen, setSortPopoverOpen] = useState(false);
   // Pull-to-refresh state
   const [pullDistance, setPullDistance] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -76,14 +76,13 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
       case "everything":
         break;
       default:
-        // Status filter
         filtered = projects.filter(p => p.status === activeChip);
         break;
     }
     return filtered;
   }, [projects, activeChip, urgencyMap, pmName]);
 
-  // Apply search — match across all project detail fields
+  // Apply search
   const searchFiltered = useMemo(() => {
     const q = localSearch.trim().toLowerCase();
     if (!q) return chipFiltered;
@@ -110,6 +109,8 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
       return sortAsc ? cmp : -cmp;
     });
   }, [searchFiltered, sortBy, sortAsc]);
+
+  const currentSortLabel = SORT_OPTIONS.find(o => o.value === sortBy)?.label || "Název";
 
   // Pull-to-refresh touch handlers
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -155,7 +156,7 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
   return (
     <div
       ref={containerRef}
-      className="flex flex-col gap-2 pb-16"
+      className="flex flex-col gap-2 pb-20"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -184,7 +185,7 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
           value={localSearch}
           onChange={(e) => setLocalSearch(e.target.value)}
           placeholder="Hledat projekt..."
-          className="pl-8 h-9 text-sm"
+          className="pl-8 h-9 text-sm rounded-[10px]"
         />
         {localSearch && (
           <button onClick={() => setLocalSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-1">
@@ -193,34 +194,46 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
         )}
       </div>
 
-      {/* Filter chips */}
-      <MobileFilterChips activeChip={activeChip} onChipChange={setActiveChip} />
-
-      {/* Sort control */}
-      <div className="flex items-center justify-between px-1 gap-2">
-        <span className="text-xs text-muted-foreground shrink-0">{displayProjects.length} projektů</span>
-        <div className="flex items-center gap-1">
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[110px] h-8 text-xs">
-              <SelectValue placeholder="Řadit dle" />
-            </SelectTrigger>
-            <SelectContent>
-              {SORT_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <button
-            onClick={() => setSortAsc(v => !v)}
-            className="h-8 w-8 flex items-center justify-center rounded-md border border-border shrink-0"
-            style={{ color: "#223937" }}
-            title={sortAsc ? "Vzestupně" : "Sestupně"}
-          >
-            {sortAsc ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-          </button>
+      {/* Filter chips row with count + sort pill */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0 overflow-x-auto scrollbar-hide">
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] text-muted-foreground shrink-0">{displayProjects.length}</span>
+            <MobileFilterChips activeChip={activeChip} onChipChange={setActiveChip} />
+          </div>
         </div>
+        <Popover open={sortPopoverOpen} onOpenChange={setSortPopoverOpen}>
+          <PopoverTrigger asChild>
+            <button
+              className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border border-border bg-card text-foreground min-h-[28px]"
+            >
+              {currentSortLabel} {sortAsc ? "↑" : "↓"}
+              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-[160px] p-1">
+            {SORT_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  if (sortBy === opt.value) {
+                    setSortAsc(v => !v);
+                  } else {
+                    setSortBy(opt.value);
+                    setSortAsc(true);
+                  }
+                  setSortPopoverOpen(false);
+                }}
+                className="flex items-center justify-between w-full px-3 py-2 text-[12px] rounded-md hover:bg-accent transition-colors"
+              >
+                <span>{opt.label}</span>
+                {sortBy === opt.value && (
+                  <span className="text-primary text-[11px] font-medium">{sortAsc ? "↑" : "↓"}</span>
+                )}
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Cards */}

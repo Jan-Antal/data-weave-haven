@@ -68,25 +68,25 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
   const diffCount = countDifferentStatuses(stages, project.status);
 
   return (
-    <div className={cn("bg-card rounded-lg border shadow-sm overflow-hidden transition-all active:scale-[0.98] active:opacity-90", dimmed && "opacity-40")}>
+    <div className={cn("bg-card rounded-[10px] overflow-hidden transition-all active:scale-[0.98] active:opacity-90", dimmed && "opacity-40")} style={{ border: "0.5px solid hsl(var(--border))" }}>
       {/* Main card area */}
       <div
         className="flex items-stretch"
         style={{ borderLeft: `4px solid ${riskColor || 'hsl(var(--border))'}` }}
       >
         <button
-          className="flex-1 text-left p-3 min-h-[44px] overflow-hidden min-w-0"
+          className="flex-1 text-left px-3 py-3 min-h-[44px] overflow-hidden min-w-0"
           onClick={() => onTap(project)}
         >
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
-              <p className="text-xs text-muted-foreground font-mono truncate">{project.project_id}</p>
-              <p className="font-medium text-sm truncate">{project.project_name}</p>
+              <p className="text-[11px] text-muted-foreground font-mono truncate">{project.project_id}</p>
+              <p className="font-medium text-[13px] truncate">{project.project_name}</p>
               {project.klient && (
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">Klient: {project.klient}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{project.klient}</p>
               )}
               {project.pm && (
-                <p className="text-xs text-muted-foreground truncate">PM: {project.pm}</p>
+                <p className="text-[11px] text-muted-foreground truncate">PM: {project.pm}</p>
               )}
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0 w-[110px]">
@@ -111,14 +111,14 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
                 </span>
               )}
               {project.prodejni_cena != null && (
-                <span className="text-xs font-mono text-muted-foreground">
+              <span className="text-[11px] font-mono text-muted-foreground">
                   {formatCurrency(project.prodejni_cena, project.currency || "CZK")}
                 </span>
               )}
             </div>
           </div>
           {project.datum_smluvni && (
-            <p className="text-xs text-muted-foreground mt-1">Datum S.: {(() => { const d = parseAppDate(project.datum_smluvni); return d ? formatAppDate(d) : project.datum_smluvni; })()}</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Datum S.: {(() => { const d = parseAppDate(project.datum_smluvni); return d ? formatAppDate(d) : project.datum_smluvni; })()}</p>
           )}
         </button>
 

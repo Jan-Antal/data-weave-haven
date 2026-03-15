@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectInfoTable } from "@/components/ProjectInfoTable";
 import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
+import { MobileProjectDetailSheet } from "@/components/mobile/MobileProjectDetailSheet";
 import { PMStatusTable } from "@/components/PMStatusTable";
 import { TPVStatusTable } from "@/components/TPVStatusTable";
 import { PlanView } from "@/components/PlanView";
@@ -451,11 +452,20 @@ const Index = () => {
                 onOpenTPV={handleMobileOpenTPV}
               />
             )}
-            <ProjectDetailDialog
-              project={mobileDetailProject}
-              open={mobileDetailOpen}
-              onOpenChange={setMobileDetailOpen}
-            />
+            {isMobile ? (
+              <MobileProjectDetailSheet
+                project={mobileDetailProject}
+                open={mobileDetailOpen}
+                onOpenChange={setMobileDetailOpen}
+                onOpenTPV={handleMobileOpenTPV}
+              />
+            ) : (
+              <ProjectDetailDialog
+                project={mobileDetailProject}
+                open={mobileDetailOpen}
+                onOpenChange={setMobileDetailOpen}
+              />
+            )}
           </main>
         ) : (
           /* Desktop: table view */
