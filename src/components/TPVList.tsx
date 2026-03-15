@@ -182,7 +182,115 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const [inlineName, setInlineName] = useState("");
   const inlineRef = useRef<HTMLInputElement>(null);
 
-  const tpvBodyScrollRef = useRef<HTMLDivElement>(null);
+  // ── Send to production state ────────────────────────────────────
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [notReadyItems, setNotReadyItems] = useState<typeof items>([]);
+  const [readyItems, setReadyItems] = useState<typeof items>([]);
+  const [isSending, setIsSending] = useState(false);
+
+  const handleSendToProduction = useCallback(() => {
+    if (selected.size === 0) {
+      toast({ title: "Vyberte alespoň jednu položku", variant: "destructive", duration: 2000 });
+      return;
+    }
+    const selectedItems = items.filter(i => selected.has(i.id));
+    const ready = selectedItems.filter(i => i.status === "Schváleno");
+    const notReady = selectedItems.filter(i => i.status !== "Schváleno");
+
+    if (ready.length === 0) {
+      toast({ title: "Žádná vybraná položka nemá status „Schváleno"", variant: "destructive", duration: 4000 });
+      return;
+    }
+
+    if (notReady.length > 0) {
+      setReadyItems(ready);
+      setNotReadyItems(notReady);
+      setSendDialogOpen(true);
+    } else {
+      executeSendToProduction(ready);
+    }
+  }, [selected, items]);
+
+  const executeSendToProduction = useCallback(async (itemsToSend: typeof items) => {
+    setIsSending(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Nepřihlášený uživatel");
+
+      let sentCount = 0;
+      const skipped: string[] = [];
+
+      for (const item of itemsToSend) {
+        // Check if already in inbox
+        const { data: existing } = await supabase
+          .from("production_inbox")
+          .select("id")
+          .eq("project_id", projectId)
+          .eq("item_code", item.item_name)
+          .eq("status", "pending")
+          .limit(1);
+
+        if (existing && existing.length > 0) {
+          skipped.push(item.item_name);
+          continue;
+        }
+
+        // Insert into production_inbox
+        const { error } = await supabase.from("production_inbox").insert({
+          project_id: projectId,
+          item_name: item.item_type || item.item_name,
+          item_code: item.item_name,
+          estimated_hours: item.cena ? Math.round(item.cena / 550) : 8,
+          estimated_czk: item.cena || 0,
+          status: "pending",
+          sent_by: user.id,
+        } as any);
+
+        if (error) {
+          console.error("Inbox insert error:", error);
+          continue;
+        }
+
+        // Update tpv_item custom_fields or direct field
+        await supabase.from("tpv_items").update({
+          // We don't have a 'vyroba' column on tpv_items — production status comes from production_inbox/schedule lookup
+        } as any).eq("id", item.id);
+
+        // Log activity
+        logActivity({
+          projectId,
+          actionType: "item_scheduled",
+          newValue: item.item_name,
+          detail: "Odesláno do výroby z TPV",
+        });
+
+        sentCount++;
+      }
+
+      // Show skipped warnings
+      for (const code of skipped) {
+        toast({ title: `${code} již je v Inboxu výroby`, duration: 4000 });
+      }
+
+      if (sentCount > 0) {
+        toast({ title: `${sentCount} položek odesláno do výroby`, duration: 2000 });
+      }
+
+      // Invalidate queries
+      await queryClient.invalidateQueries({ queryKey: ["production-statuses", projectId] });
+      await queryClient.invalidateQueries({ queryKey: ["production_inbox"] });
+      await queryClient.invalidateQueries({ queryKey: ["production-inbox"] });
+      await queryClient.invalidateQueries({ queryKey: ["tpv_items"] });
+
+      setSelected(new Set());
+      setSendDialogOpen(false);
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSending(false);
+    }
+  }, [projectId, queryClient]);
+
 
   const visibleColCount = renderKeys.length + 2; // +checkbox +actions
 
