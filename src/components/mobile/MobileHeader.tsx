@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { Clock, Menu, UserCog, LogOut, BarChart3 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Clock, Menu, UserCog, LogOut, BarChart3, Home } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
 import { AccountSettings } from "@/components/AccountSettings";
 
@@ -18,6 +20,7 @@ interface MobileHeaderProps {
 }
 
 export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderProps) {
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const { user, profile, role, signOut } = useAuth();
@@ -29,7 +32,10 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
         style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 12px)" }}
       >
         <div className="flex items-center justify-between">
-          <h1 className="text-lg font-serif text-primary-foreground tracking-wide">
+          <h1
+            className="text-lg font-serif text-primary-foreground tracking-wide cursor-pointer"
+            onClick={() => navigate("/", { state: { view: "dashboard" } })}
+          >
             A→M <span className="font-sans font-normal text-sm opacity-80">Interior</span>
           </h1>
           <button
@@ -51,6 +57,14 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
             </p>
           </div>
           <div className="py-2">
+            <button
+              onClick={() => { setMenuOpen(false); navigate("/", { state: { view: "dashboard" } }); }}
+              className="flex items-center gap-3 w-full px-5 py-3 text-sm hover:bg-accent min-h-[44px]"
+            >
+              <Home className="h-4 w-4 text-muted-foreground" />
+              <span>Přehled</span>
+            </button>
+            <Separator className="my-1" />
             {showDataLog && onDataLog && (
               <button
                 onClick={() => { setMenuOpen(false); onDataLog(); }}
