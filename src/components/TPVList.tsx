@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useTPVItems, useUpdateTPVItem, useAddTPVItem, useDeleteTPVItems, useBulkUpdateTPVStatus, useBulkInsertTPVItems } from "@/hooks/useTPVItems";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
-import { ArrowLeft, Plus, Upload, Trash2, FileText } from "lucide-react";
+import { ArrowLeft, Plus, Upload, Trash2, FileText, Cog } from "lucide-react";
 import { ProjectDetailDialog } from "./ProjectDetailDialog";
 import { useProjects } from "@/hooks/useProjects";
 import * as XLSX from "xlsx";
@@ -27,6 +27,10 @@ import { formatCurrency } from "@/lib/currency";
 import { useExportContext } from "./ExportContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useProductionStatuses } from "@/hooks/useProductionStatuses";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { logActivity } from "@/lib/activityLog";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
   { key: "item_name", label: "Kód prvku" },
