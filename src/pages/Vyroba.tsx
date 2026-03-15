@@ -2671,7 +2671,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                       ) : (() => {
                         const allDone = areAllPartsCompleted(item.item_code, item.item_name);
                         return (
-                          <button style={{ minHeight: '36px', minWidth: '60px', padding: '6px 12px', cursor: 'pointer' }} onClick={() => {
+                          <button className="cursor-pointer" onClick={() => {
                             // Pre-select this item if not already selected
                             setSelectedItems(prev => {
                               const next = new Set(prev);
