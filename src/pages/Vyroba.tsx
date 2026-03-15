@@ -2565,7 +2565,6 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   <div
                     className="flex items-center gap-2 px-2.5 rounded-md cursor-pointer transition-colors"
                     style={{ border: rowBorder, background: rowBg, height: 42 }}
-                    style={{ border: rowBorder, background: rowBg }}
                     onClick={() => toggleSelect(mids)}
                   >
                     {/* Select checkbox */}
