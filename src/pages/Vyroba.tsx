@@ -209,10 +209,11 @@ export default function Vyroba() {
   }, []);
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
 
-  // Owner/Admin guard
+  // Owner/Admin/Tester guard
+  const isTester = role === "tester";
   useEffect(() => {
-    if (!loading && !isOwner && !isAdmin) navigate("/", { replace: true });
-  }, [loading, isOwner, isAdmin, navigate]);
+    if (!loading && !isOwner && !isAdmin && !isTester) navigate("/", { replace: true });
+  }, [loading, isOwner, isAdmin, isTester, navigate]);
 
   // Week navigation
   const [weekOffset, setWeekOffset] = useState(0);

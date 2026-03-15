@@ -197,11 +197,12 @@ export default function PlanVyroby() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: isMobile ? 99999 : 10 } }));
 
+  const isTester = role === "tester";
   useEffect(() => {
-    if (!loading && !isAdmin) {
+    if (!loading && !isAdmin && !isTester) {
       navigate("/", { replace: true });
     }
-  }, [isAdmin, loading, navigate]);
+  }, [isAdmin, isTester, loading, navigate]);
 
 
   const tpvProject = tpvProjectId ? allProjects.find(p => p.project_id === tpvProjectId) : null;
