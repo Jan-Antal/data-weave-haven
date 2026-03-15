@@ -3213,13 +3213,16 @@ function DayCell({ dayIndex, todayDayIndex, cumulative, onOpenLog, statusColor, 
     bg = "#f5f3f0";
     border = "#d0cdc8";
   } else if (isPast && cumulative?.hasLog && !isRetroactive) {
-    bg = "#ffffff";
+    // On-time log: green tint
+    bg = "#f0faf0";
     border = "#86c083";
   } else if (isPast && cumulative?.hasLog && isRetroactive) {
-    bg = "#ffffff";
+    // Retroactive or edited log: orange tint
+    bg = "#fef9f0";
     border = "#d97706";
   } else if (isPast && !cumulative?.hasLog) {
-    bg = "#ffffff";
+    // Missing log: red tint
+    bg = "#fef2f2";
     border = "#e5a8a8";
     borderWidth = "1px";
   }
