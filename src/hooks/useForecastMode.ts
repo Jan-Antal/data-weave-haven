@@ -55,17 +55,26 @@ function saveToStorage(mode: ForecastPlanMode, blocks: ForecastBlock[], selected
   } catch { /* ignore */ }
 }
 
+function isTestProjectId(pid: string): boolean {
+  return /^TEST/i.test(pid) || /^Z-22\d{2}-/i.test(pid);
+}
+
 function loadFromStorage(mode: ForecastPlanMode): { blocks: ForecastBlock[]; selectedIds: Set<string>; overrides: RealBundleOverride[]; safetyNet: SafetyNetProject[] } | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS[mode]);
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (!Array.isArray(data.blocks) || data.blocks.length === 0) return null;
+    // Filter out stale test/demo project data from cached sessions
+    const blocks = data.blocks.filter((b: ForecastBlock) => !isTestProjectId(b.project_id));
+    const safetyNet = (Array.isArray(data.safetyNetProjects) ? data.safetyNetProjects : [])
+      .filter((s: SafetyNetProject) => !isTestProjectId(s.project_id));
+    if (blocks.length === 0) return null;
     return {
-      blocks: data.blocks,
+      blocks,
       selectedIds: new Set<string>(data.selectedBlockIds || []),
-      overrides: Array.from(data.realBundleOverrides || []),
-      safetyNet: Array.isArray(data.safetyNetProjects) ? data.safetyNetProjects : [],
+      overrides: (data.realBundleOverrides || []).filter((o: RealBundleOverride) => !isTestProjectId(o.projectId)),
+      safetyNet,
     };
   } catch {
     return null;
