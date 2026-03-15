@@ -4,7 +4,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { formatCurrency } from "@/lib/currency";
 import { parseAppDate, formatAppDate } from "@/lib/dateFormat";
 import { useTPVItems } from "@/hooks/useTPVItems";
-import { useSharePointDocs, type SPFile } from "@/hooks/useSharePointDocs";
+import { useSharePointDocs, type SPFile, CATEGORY_FOLDER_MAP } from "@/hooks/useSharePointDocs";
 import { ChevronRight, FileText, Package, Info, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
