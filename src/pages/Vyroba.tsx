@@ -49,7 +49,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQualityDefects, type QualityDefect } from "@/hooks/useQualityDefects";
 import { logActivity } from "@/lib/activityLog";
-import { MobileNavBar } from "@/components/mobile/MobileNavBar";
+import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 
 /* ═══ helpers ═══ */
