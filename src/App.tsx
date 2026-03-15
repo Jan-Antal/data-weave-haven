@@ -163,6 +163,7 @@ const App = () => {
         <AuthProvider>
           <Toaster />
           <Sonner />
+          <PortraitLockOverlay />
           <AppRoutes />
         </AuthProvider>
       </TooltipProvider>
