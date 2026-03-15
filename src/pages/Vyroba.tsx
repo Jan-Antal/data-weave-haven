@@ -3071,7 +3071,6 @@ function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, de
 
 function QualityCheckDisplay({ check }: { check: any }) {
   const name = useProfileName(check.checked_by);
-  const isMobile = useIsMobile();
   const firstName = name ? name.split(" ")[0].slice(0, 8) : "–";
   return (
     <span
