@@ -1229,7 +1229,7 @@ export type Database = {
       purge_soft_deleted_records: { Args: never; Returns: undefined }
     }
     Enums: {
-      app_role: "owner" | "admin" | "pm" | "konstrukter" | "viewer"
+      app_role: "owner" | "admin" | "pm" | "konstrukter" | "viewer" | "tester"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1357,7 +1357,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["owner", "admin", "pm", "konstrukter", "viewer"],
+      app_role: ["owner", "admin", "pm", "konstrukter", "viewer", "tester"],
     },
   },
 } as const
