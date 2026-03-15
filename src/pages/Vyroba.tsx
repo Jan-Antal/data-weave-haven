@@ -776,6 +776,7 @@ export default function Vyroba() {
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
     qc.invalidateQueries({ queryKey: ["projects"] });
     qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
+    qc.invalidateQueries({ queryKey: ["production-statuses", pid] });
     toast.success(`✓ ${pName} odoslaný do Expedice`, { duration: 4000 });
     logActivity({ projectId: pid, actionType: "item_expedice", detail: "Odesláno do Expedice" });
     setExpediceDialogOpen(false);
