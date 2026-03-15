@@ -77,7 +77,8 @@ export function useProductionInbox() {
   });
 }
 
-/** Auto-reduce blocker rows when new inbox items arrive for the same project */
+/** Auto-reduce blocker rows when new inbox items arrive for the same project.
+ *  Uses ONE batched query for all project blockers instead of N individual queries. */
 export function useBlockerAutoReduce(inboxProjects: InboxProject[] | undefined) {
   const qc = useQueryClient();
   const prevProjectIds = useRef<Set<string>>(new Set());
@@ -92,39 +93,66 @@ export function useBlockerAutoReduce(inboxProjects: InboxProject[] | undefined) 
     if (newProjects.length === 0) return;
 
     (async () => {
-      for (const project of newProjects) {
-        // Check if there are blocker rows for this project
-        const { data: blockers } = await supabase
-          .from("production_schedule")
-          .select("id, scheduled_hours, scheduled_week")
-          .eq("project_id", project.project_id)
-          .eq("is_blocker", true)
-          .in("status", ["scheduled", "in_progress"])
-          .order("scheduled_week", { ascending: true });
+      const projectIds = newProjects.map(p => p.project_id);
 
+      // ONE batched query for all projects' blockers
+      const { data: allBlockers } = await supabase
+        .from("production_schedule")
+        .select("id, scheduled_hours, scheduled_week, project_id")
+        .in("project_id", projectIds)
+        .eq("is_blocker", true)
+        .in("status", ["scheduled", "in_progress"])
+        .order("scheduled_week", { ascending: true });
+
+      if (!allBlockers || allBlockers.length === 0) return;
+
+      // Group blockers by project_id
+      const blockersByProject = new Map<string, typeof allBlockers>();
+      for (const b of allBlockers) {
+        const pid = b.project_id;
+        if (!blockersByProject.has(pid)) blockersByProject.set(pid, []);
+        blockersByProject.get(pid)!.push(b);
+      }
+
+      // Collect all IDs to delete and updates to make in batch
+      const idsToDelete: string[] = [];
+      const updates: { id: string; hours: number }[] = [];
+
+      for (const project of newProjects) {
+        const blockers = blockersByProject.get(project.project_id);
         if (!blockers || blockers.length === 0) continue;
 
         const totalBlockerHours = blockers.reduce((s, b) => s + Number(b.scheduled_hours), 0);
         const inboxHours = project.total_hours;
 
         if (inboxHours >= totalBlockerHours) {
-          // Delete all blocker rows
-          const ids = blockers.map(b => b.id);
-          await supabase.from("production_schedule").delete().in("id", ids);
+          // Delete all blocker rows for this project
+          idsToDelete.push(...blockers.map(b => b.id));
           toast({ title: `${project.project_name}: Rezerva nahrazena reálnými položkami` });
         } else {
           // Reduce lowest-week blocker
           const lowest = blockers[0];
           const newHours = Number(lowest.scheduled_hours) - inboxHours;
           if (newHours <= 0) {
-            await supabase.from("production_schedule").delete().eq("id", lowest.id);
+            idsToDelete.push(lowest.id);
           } else {
-            await supabase.from("production_schedule").update({ scheduled_hours: newHours } as any).eq("id", lowest.id);
+            updates.push({ id: lowest.id, hours: newHours });
           }
           toast({ title: `${project.project_name}: Rezerva snížena na ${Math.round(newHours > 0 ? newHours : totalBlockerHours - inboxHours)}h` });
         }
-        qc.invalidateQueries({ queryKey: ["production-schedule"] });
       }
+
+      // Execute batched deletes
+      if (idsToDelete.length > 0) {
+        await supabase.from("production_schedule").delete().in("id", idsToDelete);
+      }
+
+      // Execute updates (can't batch different values, but typically only 1-2)
+      for (const u of updates) {
+        await supabase.from("production_schedule").update({ scheduled_hours: u.hours } as any).eq("id", u.id);
+      }
+
+      qc.invalidateQueries({ queryKey: ["production-schedule"] });
     })();
   }, [inboxProjects, qc]);
 }

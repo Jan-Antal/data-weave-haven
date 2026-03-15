@@ -349,15 +349,10 @@ export function useForecastMode(): UseForecastModeReturn {
       const userId = user?.id || "forecast-ai";
       const hourlyRate = 550;
 
-      let blockerCount = 0;
-      let normalCount = 0;
-
-      for (const block of committable) {
+      // Build all rows for batch insert
+      const rows = committable.map(block => {
         const isBlocker = block.source === "project_estimate";
-        if (isBlocker) blockerCount++;
-        else normalCount++;
-
-        const { error } = await supabase.from("production_schedule").insert({
+        return {
           project_id: block.project_id,
           item_name: isBlocker
             ? `${block.project_name} — Rezerva kapacity`
@@ -370,7 +365,15 @@ export function useForecastMode(): UseForecastModeReturn {
           created_by: userId,
           is_blocker: isBlocker,
           tpv_expected_date: isBlocker ? (block.tpv_expected_date || null) : null,
-        } as any);
+        };
+      });
+
+      const blockerCount = rows.filter(r => r.is_blocker).length;
+      const normalCount = rows.filter(r => !r.is_blocker).length;
+
+      // Single batch insert for ALL blocks
+      if (rows.length > 0) {
+        const { error } = await supabase.from("production_schedule").insert(rows as any);
         if (error) throw error;
       }
 
