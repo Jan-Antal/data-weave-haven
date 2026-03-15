@@ -27,7 +27,6 @@ function useDeletedRecords(table: string) {
           .not("deleted_at", "is", null)
           .order("deleted_at", { ascending: false });
         if (error) throw error;
-        // Fetch project names for each unique project_id
         const projectIds = [...new Set((data as any[]).map((r: any) => r.project_id))];
         let projectMap: Record<string, string> = {};
         if (projectIds.length > 0) {
@@ -109,74 +108,49 @@ function RecordRow({
     }
   };
 
-  // TPV-specific layout
+  // Build display name
+  let displayName: React.ReactNode;
   if (isTPV) {
-    return (
-      <div className="flex items-center justify-between py-3 px-3 border-b last:border-b-0">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium truncate">
-            {record.item_name && <span className="font-bold">{record.item_name}</span>}
-            {record.item_type && <span className="text-muted-foreground"> — {record.item_type}</span>}
-          </p>
-          {record._project_name && (
-            <p className="text-xs text-muted-foreground mt-0.5">Projekt: {record._project_name}</p>
-          )}
-          <div className="flex items-center gap-2 mt-0.5">
-            <p className="text-xs text-muted-foreground">Smazáno: {deletedAt}</p>
-            {expiry && <span className={`text-xs ${expiry.className}`}>{expiry.text}</span>}
-          </div>
-        </div>
-        <div className="flex items-center gap-1 ml-2 shrink-0">
-          {!confirmDelete ? (
-            <>
-              <Button variant="outline" size="sm" className="h-9 text-xs min-w-[80px]" onClick={handleRestore}>
-                <RotateCcw className="h-3 w-3 mr-1" /> Obnovit
-              </Button>
-              {canPermanentDelete && (
-                <Button size="sm" className="h-9 text-xs min-w-[110px] bg-destructive hover:bg-destructive/90 text-destructive-foreground" onClick={() => setConfirmDelete(true)}>
-                  <Trash2 className="h-3 w-3 mr-1" /> Trvale smazat
-                </Button>
-              )}
-            </>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-destructive">Opravdu smazat?</span>
-              <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setConfirmDelete(false)}>Zrušit</Button>
-              <Button size="sm" className="h-9 text-xs bg-destructive hover:bg-destructive/90 text-destructive-foreground" onClick={handlePermanentDelete}>Potvrdit</Button>
-            </div>
-          )}
-        </div>
-      </div>
+    displayName = (
+      <>
+        <span className="font-bold">{record.item_name}</span>
+        {record.item_type && <span className="text-muted-foreground"> — {record.item_type}</span>}
+      </>
     );
+  } else {
+    displayName = idField ? `${record[idField]} — ${record[nameField]}` : record[nameField];
   }
 
-  // Default layout for projects/stages
-  const displayName = idField ? `${record[idField]} — ${record[nameField]}` : record[nameField];
-
   return (
-    <div className="flex items-center justify-between py-3 px-3 border-b last:border-b-0">
+    <div className="flex items-start gap-3 py-3 px-3 border-b last:border-b-0">
+      {/* Left: info */}
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium truncate">{displayName}</p>
-        <div className="flex items-center gap-2 mt-0.5">
-          <p className="text-xs text-muted-foreground">Smazáno: {deletedAt}</p>
+        {isTPV && record._project_name && (
+          <p className="text-xs text-muted-foreground mt-0.5">Projekt: {record._project_name}</p>
+        )}
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          <span className="text-xs text-muted-foreground">Smazáno: {deletedAt}</span>
           {expiry && <span className={`text-xs ${expiry.className}`}>{expiry.text}</span>}
         </div>
       </div>
-      <div className="flex items-center gap-1 ml-2 shrink-0">
+
+      {/* Right: actions */}
+      <div className="flex items-center gap-1 shrink-0 pt-1">
         {!confirmDelete ? (
           <>
-            <Button variant="outline" size="sm" className="h-9 text-xs min-w-[80px]" onClick={handleRestore}>
+            <Button variant="outline" size="sm" className="h-9 text-xs" onClick={handleRestore}>
               <RotateCcw className="h-3 w-3 mr-1" /> Obnovit
             </Button>
             {canPermanentDelete && (
-              <Button size="sm" className="h-9 text-xs min-w-[110px] bg-destructive hover:bg-destructive/90 text-destructive-foreground" onClick={() => setConfirmDelete(true)}>
+              <Button size="sm" className="h-9 text-xs bg-destructive hover:bg-destructive/90 text-destructive-foreground" onClick={() => setConfirmDelete(true)}>
                 <Trash2 className="h-3 w-3 mr-1" /> Trvale smazat
               </Button>
             )}
           </>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-destructive">Opravdu smazat?</span>
+            <span className="text-xs text-destructive whitespace-nowrap">Opravdu smazat?</span>
             <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setConfirmDelete(false)}>Zrušit</Button>
             <Button size="sm" className="h-9 text-xs bg-destructive hover:bg-destructive/90 text-destructive-foreground" onClick={handlePermanentDelete}>Potvrdit</Button>
           </div>
@@ -231,10 +205,10 @@ export function RecycleBin({ open, onOpenChange }: RecycleBinProps) {
         {isTestUser && <TestModeBanner />}
         <div className={isTestUser ? "pointer-events-none opacity-80" : ""}>
           <Tabs defaultValue={defaultTab} className="space-y-3">
-            <TabsList className="w-full">
-              {!isKonstrukter && <TabsTrigger value="projects" className="flex-1">Projekty</TabsTrigger>}
-              {!isKonstrukter && <TabsTrigger value="stages" className="flex-1">Etapy</TabsTrigger>}
-              <TabsTrigger value="tpv" className="flex-1">TPV položky</TabsTrigger>
+            <TabsList className="w-full grid grid-cols-3">
+              {!isKonstrukter && <TabsTrigger value="projects">Projekty</TabsTrigger>}
+              {!isKonstrukter && <TabsTrigger value="stages">Etapy</TabsTrigger>}
+              <TabsTrigger value="tpv">TPV položky</TabsTrigger>
             </TabsList>
             {!isKonstrukter && (
               <TabsContent value="projects">
