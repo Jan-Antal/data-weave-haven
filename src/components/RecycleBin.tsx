@@ -122,9 +122,9 @@ function RecordRow({
   }
 
   return (
-    <div className="py-3 px-3 border-b last:border-b-0 space-y-2">
-      {/* Top: info */}
-      <div className="min-w-0">
+    <div className="flex items-center justify-between py-3 px-3 border-b last:border-b-0 gap-3">
+      {/* Left: info */}
+      <div className="min-w-0 flex-1">
         <p className="text-sm font-medium truncate">{displayName}</p>
         {isTPV && record._project_name && (
           <p className="text-xs text-muted-foreground mt-0.5">Projekt: {record._project_name}</p>
@@ -135,8 +135,8 @@ function RecordRow({
         </div>
       </div>
 
-      {/* Bottom: actions */}
-      <div className="flex items-center gap-1">
+      {/* Right: actions stacked */}
+      <div className="flex flex-col items-stretch gap-1 shrink-0">
         {!confirmDelete ? (
           <>
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleRestore}>
@@ -150,9 +150,8 @@ function RecordRow({
           </>
         ) : (
           <>
-            <span className="text-xs text-destructive whitespace-nowrap">Opravdu smazat?</span>
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setConfirmDelete(false)}>Zrušit</Button>
-            <Button size="sm" className="h-8 text-xs bg-destructive hover:bg-destructive/90 text-destructive-foreground" onClick={handlePermanentDelete}>Potvrdit</Button>
+            <Button size="sm" className="h-8 text-xs bg-destructive hover:bg-destructive/90 text-destructive-foreground" onClick={handlePermanentDelete}>Potvrdit smazání</Button>
           </>
         )}
       </div>
