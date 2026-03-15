@@ -164,6 +164,26 @@ const Index = () => {
   useEffect(() => {
     setActiveTab(defaultTab);
   }, [defaultTab]);
+
+  // Handle openProjectId from DataLog navigation
+  const openProjectIdHandled = useRef(false);
+  useEffect(() => {
+    if (openProjectIdFromState && !openProjectIdHandled.current && allProjects.length > 0) {
+      openProjectIdHandled.current = true;
+      const project = allProjects.find(p => p.project_id === openProjectIdFromState);
+      if (project) {
+        if (isMobile) {
+          setMobileDetailProject(project);
+          setMobileDetailOpen(true);
+        } else {
+          setMobileDetailProject(project);
+          setMobileDetailOpen(true);
+        }
+      }
+      // Clear the state to prevent re-opening on re-render
+      window.history.replaceState({}, "");
+    }
+  }, [openProjectIdFromState, allProjects, isMobile]);
   const handleOpenSettings = useCallback(() => {
     // Open a settings sheet on mobile — reuse existing settings dialogs
     setSettingsMenuOpen(true);
