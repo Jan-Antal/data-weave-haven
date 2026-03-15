@@ -1,14 +1,23 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Factory, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCallback, useRef } from "react";
 
 export function MobileBottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
+  const lastNav = useRef<string>("");
 
   const isProjectsActive = location.pathname === "/" && (location.state as any)?.view === "projects";
   const isDashboardActive = location.pathname === "/" && (location.state as any)?.view !== "projects";
   const isVyrobaActive = location.pathname === "/vyroba";
+
+  // Use replace to avoid building up history stack causing glitches
+  const navTo = useCallback((path: string, state?: any) => {
+    const key = path + JSON.stringify(state || {});
+    navigate(path, { state, replace: true });
+    lastNav.current = key;
+  }, [navigate]);
 
   return (
     <nav
