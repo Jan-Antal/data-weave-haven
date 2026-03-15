@@ -354,6 +354,19 @@ export default function Vyroba() {
     }
   }, [enrichedProjects, selectedProjectId]);
 
+  // Handle openProjectId from DataLog navigation
+  const openProjectIdHandled = useRef(false);
+  useEffect(() => {
+    if (openProjectIdFromState && !openProjectIdHandled.current && enrichedProjects.length > 0) {
+      openProjectIdHandled.current = true;
+      setSelectedProjectId(openProjectIdFromState);
+      if (isMobile) {
+        setMobileDetailOpen(true);
+      }
+      window.history.replaceState({}, "");
+    }
+  }, [openProjectIdFromState, enrichedProjects, isMobile]);
+
   // Log modal
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [logDayIndex, setLogDayIndex] = useState(-1);

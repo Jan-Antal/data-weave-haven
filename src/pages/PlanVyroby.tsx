@@ -98,6 +98,8 @@ interface MergeState {
 export default function PlanVyroby() {
   const { isAdmin, isOwner, isTestUser, loading, profile, role } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const openProjectIdFromState = (location.state as any)?.openProjectId as string | undefined;
   const { setCurrentPage } = useUndoRedo();
   const [displayMode, setDisplayMode] = useState<DisplayMode>("hours");
   const [viewTab, setViewTab] = useState<ViewTab>("kanban");
