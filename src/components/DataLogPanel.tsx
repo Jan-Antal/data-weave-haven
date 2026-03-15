@@ -494,7 +494,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
                     </p>
                   </div>
                   {group.items.map(entry => (
-                    <ActivityItem key={entry.id} entry={entry} isSelected={selectedEntryId === entry.id} onSelect={handleEntrySelect} />
+                    <ActivityItem key={entry.id} entry={entry} isSelected={selectedEntryId === entry.id} onSelect={handleEntrySelect} onNavigate={handleEntryNavigate} />
                   ))}
                 </div>
               ))}
