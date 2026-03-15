@@ -179,24 +179,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = effectiveRole === "admin" || isOwner;
   const isPM = effectiveRole === "pm";
   const isKonstrukter = effectiveRole === "konstrukter";
-  const isViewer = effectiveRole === "viewer" || isTester;
+  const isViewer = effectiveRole === "viewer";
 
-  // Granular permissions
+  // Granular permissions — tester gets edit rights (scoped to test projects via RLS)
   const canEdit = !isViewer;
-  const canCreateProject = isAdmin || isPM;
-  const canDeleteProject = isAdmin || isPM;
-  const canManageTPV = isAdmin || isPM || isKonstrukter;
-  const canAccessSettings = isAdmin || isPM || isKonstrukter; // at least Koš
+  const canCreateProject = isAdmin || isPM || isTester;
+  const canDeleteProject = isAdmin || isPM || isTester;
+  const canManageTPV = isAdmin || isPM || isKonstrukter || isTester;
+  const canAccessSettings = isAdmin || isPM || isKonstrukter; // no tester
   const canEditColumns = (isAdmin || isPM) && !isTestUser;
   const canUploadDocuments = !isViewer;
-  const canPermanentDelete = isAdmin || isPM;
+  const canPermanentDelete = isAdmin || isPM || isTester;
 
   // Settings menu item visibility
   const canManageUsers = isAdmin;
   const canManagePeople = isAdmin || isPM || isKonstrukter;
   const canManageExchangeRates = isAdmin;
   const canManageStatuses = isAdmin || isPM;
-  const canAccessRecycleBin = isAdmin || isPM || isKonstrukter;
+  const canAccessRecycleBin = isAdmin || isPM || isKonstrukter || isTester;
 
   // Fields that are read-only for Konstruktér
   const konstrukterReadOnlyFields = new Set([
