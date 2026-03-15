@@ -178,7 +178,7 @@ function useProfileName(userId: string | null) {
 
 /* ═══ MAIN PAGE ═══ */
 export default function Vyroba() {
-  const { isOwner, isAdmin, loading, profile, signOut, canAccessSettings, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, realRole, simulatedRole, setSimulatedRole, role } = useAuth();
+  const { isOwner, isAdmin, isTestUser, loading, profile, signOut, canAccessSettings, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, realRole, simulatedRole, setSimulatedRole, role } = useAuth();
   const { openPeopleManagement } = usePeopleManagement();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -1051,7 +1051,13 @@ export default function Vyroba() {
         </div>
       </header>
 
-      {/* ═══ STATS BAR ═══ */}
+      {/* TEST MODE banner */}
+      {isTestUser && (
+        <div className="bg-orange-500 text-white px-6 flex items-center justify-center gap-2 font-bold tracking-wide shrink-0" style={{ height: 32 }}>
+          <span>⚠ TEST MODE — Testovací prostředí — data nejsou produkční</span>
+        </div>
+      )}
+
       <div className="shrink-0 flex items-center gap-2 px-3 text-xs overflow-x-auto scrollbar-hide whitespace-nowrap" style={{ height: 40, background: "#f5f3f0", borderBottom: "1px solid #e5e2dd" }}>
         {isMobile ? (
           /* Mobile: compact single row */
