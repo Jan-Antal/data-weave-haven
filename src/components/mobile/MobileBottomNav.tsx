@@ -28,7 +28,7 @@ export function MobileBottomNav() {
       }}
     >
       <button
-        onClick={() => navigate("/", { state: { view: "projects" }, replace: false })}
+        onClick={() => navTo("/", { view: "projects" })}
         className={cn(
           "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
           isProjectsActive
@@ -40,7 +40,7 @@ export function MobileBottomNav() {
         <span className="text-[10px] font-medium">Projekty</span>
       </button>
       <button
-        onClick={() => navigate("/", { state: { view: "dashboard" }, replace: false })}
+        onClick={() => navTo("/", { view: "dashboard" })}
         className={cn(
           "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
           isDashboardActive
@@ -52,7 +52,7 @@ export function MobileBottomNav() {
         <span className="text-[10px] font-medium">Přehled</span>
       </button>
       <button
-        onClick={() => navigate("/vyroba")}
+        onClick={() => navTo("/vyroba")}
         className={cn(
           "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
           isVyrobaActive

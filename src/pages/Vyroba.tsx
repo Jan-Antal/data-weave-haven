@@ -1149,12 +1149,17 @@ export default function Vyroba() {
       <div
         className="flex flex-1 min-h-0 overflow-hidden"
         {...(isMobile ? {
-          onTouchStart: (e: React.TouchEvent) => { (e.currentTarget as any)._swipeX = e.touches[0].clientX; },
+          onTouchStart: (e: React.TouchEvent) => {
+            (e.currentTarget as any)._swipeX = e.touches[0].clientX;
+            (e.currentTarget as any)._swipeStartTime = Date.now();
+          },
           onTouchEnd: (e: React.TouchEvent) => {
             const startX = (e.currentTarget as any)._swipeX;
             if (startX == null) return;
             const diff = e.changedTouches[0].clientX - startX;
-            if (Math.abs(diff) > 60) {
+            const elapsed = Date.now() - ((e.currentTarget as any)._swipeStartTime || 0);
+            // Only accept intentional horizontal swipes (not from screen edge, enough distance, not too slow)
+            if (Math.abs(diff) > 80 && startX > 30 && elapsed < 400) {
               setWeekOffset(w => diff > 0 ? w - 1 : w + 1);
             }
             (e.currentTarget as any)._swipeX = null;
