@@ -96,7 +96,7 @@ interface MergeState {
 }
 
 export default function PlanVyroby() {
-  const { isAdmin, isOwner, loading, profile } = useAuth();
+  const { isAdmin, isOwner, isTestUser, loading, profile } = useAuth();
   const navigate = useNavigate();
   const { setCurrentPage } = useUndoRedo();
   const [displayMode, setDisplayMode] = useState<DisplayMode>("hours");
