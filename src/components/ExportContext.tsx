@@ -45,6 +45,12 @@ export function ExportProvider({ children }: { children: ReactNode }) {
 
 export function useExportContext() {
   const ctx = useContext(ExportCtx);
-  if (!ctx) throw new Error("ExportProvider missing");
+  if (!ctx) {
+    // Return a no-op fallback when used outside ExportProvider (e.g. TPVList in Dialog)
+    return {
+      registerExport: (() => {}) as ExportContextType["registerExport"],
+      getExportMeta: (() => null) as ExportContextType["getExportMeta"],
+    };
+  }
   return ctx;
 }
