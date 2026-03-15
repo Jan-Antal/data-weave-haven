@@ -2653,13 +2653,14 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                           return (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className="inline-flex items-center gap-1 shrink-0 cursor-not-allowed opacity-50"
-                                  style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #f59e0b", padding: "6px 12px", minHeight: '36px', minWidth: '60px', borderRadius: "9999px", fontSize: "12px", fontWeight: 500, lineHeight: 1 }}>
+                                <button className="inline-flex items-center gap-1 shrink-0"
+                                  style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #f59e0b", padding: "6px 12px", minHeight: '36px', minWidth: '60px', borderRadius: "9999px", fontSize: "12px", fontWeight: 500, lineHeight: 1, cursor: 'pointer', opacity: 0.7 }}
+                                  onClick={() => { setSingleQcItem(item); setSingleQcMergedIds(mids); setSingleQcModalOpen(true); setDefectItemId(item.id); setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectPhotos([]); }}>
                                   <Shield className="h-3 w-3" /> QC
-                                </span>
+                                </button>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="max-w-[250px] text-xs">
-                                Čeká na dokončení části {info.total - info.incomplete}/{info.total} v T{info.weekNums.join(", T")} — QC nelze provést
+                                Čeká na dokončení části {info.total - info.incomplete}/{info.total} v T{info.weekNums.join(", T")} — klikněte pro QC
                               </TooltipContent>
                             </Tooltip>
                           );
