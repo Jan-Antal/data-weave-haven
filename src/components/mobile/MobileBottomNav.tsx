@@ -10,6 +10,15 @@ export function MobileBottomNav() {
   const isDashboardActive = location.pathname === "/" && (location.state as any)?.view !== "projects";
   const isVyrobaActive = location.pathname === "/vyroba";
 
+  // Close DataLog panels on all modules when navigating via bottom nav
+  const closeDataLog = () => {
+    try {
+      localStorage.setItem("datalog-panel-index", "false");
+      localStorage.setItem("datalog-panel-vyroba", "false");
+      localStorage.setItem("datalog-panel-plan-vyroby", "false");
+    } catch {}
+  };
+
   return (
     <nav
       className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-primary"
@@ -19,7 +28,7 @@ export function MobileBottomNav() {
       }}
     >
       <button
-        onClick={() => navigate("/", { state: { view: "projects" }, replace: true })}
+        onClick={() => { closeDataLog(); navigate("/", { state: { view: "projects" }, replace: true }); }}
         className={cn(
           "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
           isProjectsActive
@@ -31,7 +40,7 @@ export function MobileBottomNav() {
         <span className="text-[10px] font-medium">Projekty</span>
       </button>
       <button
-        onClick={() => navigate("/", { state: { view: "dashboard" }, replace: true })}
+        onClick={() => { closeDataLog(); navigate("/", { state: { view: "dashboard" }, replace: true }); }}
         className={cn(
           "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
           isDashboardActive
@@ -43,7 +52,7 @@ export function MobileBottomNav() {
         <span className="text-[10px] font-medium">Přehled</span>
       </button>
       <button
-        onClick={() => navigate("/vyroba", { replace: true })}
+        onClick={() => { closeDataLog(); navigate("/vyroba", { replace: true }); }}
         className={cn(
           "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
           isVyrobaActive
