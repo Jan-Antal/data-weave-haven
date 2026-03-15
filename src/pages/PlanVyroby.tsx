@@ -96,7 +96,7 @@ interface MergeState {
 }
 
 export default function PlanVyroby() {
-  const { isAdmin, isOwner, isTestUser, loading, profile } = useAuth();
+  const { isAdmin, isOwner, isTestUser, loading, profile, role } = useAuth();
   const navigate = useNavigate();
   const { setCurrentPage } = useUndoRedo();
   const [displayMode, setDisplayMode] = useState<DisplayMode>("hours");
@@ -197,11 +197,12 @@ export default function PlanVyroby() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: isMobile ? 99999 : 10 } }));
 
+  const isTester = role === "tester";
   useEffect(() => {
-    if (!loading && !isAdmin) {
+    if (!loading && !isAdmin && !isTester) {
       navigate("/", { replace: true });
     }
-  }, [isAdmin, loading, navigate]);
+  }, [isAdmin, isTester, loading, navigate]);
 
 
   const tpvProject = tpvProjectId ? allProjects.find(p => p.project_id === tpvProjectId) : null;
