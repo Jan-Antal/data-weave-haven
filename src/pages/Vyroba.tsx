@@ -1147,7 +1147,21 @@ export default function Vyroba() {
       </div>
 
       {/* ═══ BODY ═══ */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div
+        className="flex flex-1 min-h-0 overflow-hidden"
+        {...(isMobile ? {
+          onTouchStart: (e: React.TouchEvent) => { (e.currentTarget as any)._swipeX = e.touches[0].clientX; },
+          onTouchEnd: (e: React.TouchEvent) => {
+            const startX = (e.currentTarget as any)._swipeX;
+            if (startX == null) return;
+            const diff = e.changedTouches[0].clientX - startX;
+            if (Math.abs(diff) > 60) {
+              setWeekOffset(w => diff > 0 ? w - 1 : w + 1);
+            }
+            (e.currentTarget as any)._swipeX = null;
+          },
+        } : {})}
+      >
       <div className="flex-1 min-w-0 flex min-h-0">
         {/* ═══ LEFT PANEL ═══ */}
         <div className={`shrink-0 flex flex-col overflow-y-auto ${isMobile ? "w-full" : "w-[252px]"}`} style={{ borderRight: isMobile ? "none" : "1px solid #e5e2dd", background: isMobile ? "hsl(var(--background))" : "#ffffff", paddingTop: isMobile ? 8 : 0, paddingBottom: isMobile ? 80 : 0 }}>
