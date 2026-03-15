@@ -12,6 +12,7 @@ const ROLE_LABELS: Record<string, string> = {
   pm: "Projektový manažer",
   konstrukter: "Konstruktér",
   viewer: "Čtenář",
+  tester: "Tester",
 };
 
 interface MobileHeaderProps {
