@@ -22,7 +22,8 @@ import {
   type WeekCapacity,
 } from "@/hooks/useWeeklyCapacity";
 import { toast } from "@/hooks/use-toast";
-
+import { useAuth } from "@/hooks/useAuth";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
