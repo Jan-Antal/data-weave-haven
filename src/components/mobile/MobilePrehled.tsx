@@ -1,196 +1,331 @@
 import { memo, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjectAttention, type AttentionItem } from "@/hooks/useProjectAttention";
 import { type RecentProject } from "@/hooks/useRecentlyOpened";
 import { useProjects, type Project } from "@/hooks/useProjects";
-import { useExchangeRates } from "@/hooks/useExchangeRates";
+import { useProductionSchedule } from "@/hooks/useProductionSchedule";
 import { StatusBadge } from "@/components/StatusBadge";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 interface MobilePrehledProps {
   recentProjects: RecentProject[];
   onProjectTap: (project: Project) => void;
 }
 
-const CZECH_MONTHS = [
-  "ledna", "února", "března", "dubna", "května", "června",
-  "července", "srpna", "září", "října", "listopadu", "prosince",
-];
-
-function formatCzechDate(d: Date): string {
-  return `${d.getDate()}. ${CZECH_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+function getISOWeekNumber(d: Date): number {
+  const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = dt.getUTCDay() || 7;
+  dt.setUTCDate(dt.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
+  return Math.ceil(((dt.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
-function formatCZK(v: number): string {
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)} M Kč`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(0)} tis. Kč`;
-  return `${v.toFixed(0)} Kč`;
+function getMonday(d: Date): string {
+  const dt = new Date(d);
+  const day = dt.getDay() || 7;
+  dt.setDate(dt.getDate() - day + 1);
+  return dt.toISOString().slice(0, 10);
+}
+
+function getActionLabel(actionType: string): { label: string; color: string } {
+  switch (actionType) {
+    case "status_change":
+    case "stage_status_change":
+      return { label: "Změna statusu", color: "#D97706" };
+    case "konstrukter_change":
+    case "stage_konstrukter_change":
+      return { label: "Změna konstruktéra", color: "#D97706" };
+    case "pm_change":
+      return { label: "Změna PM", color: "#D97706" };
+    case "kalkulant_change":
+      return { label: "Změna kalkulanta", color: "#D97706" };
+    case "datum_smluvni_change":
+    case "stage_datum_smluvni_change":
+      return { label: "Změna termínu", color: "#D97706" };
+    case "document_uploaded":
+    case "stage_document_uploaded":
+      return { label: "Dokument nahrán", color: "#2563EB" };
+    case "document_deleted":
+    case "stage_document_deleted":
+      return { label: "Dokument smazán", color: "#2563EB" };
+    case "project_created":
+      return { label: "Projekt vytvořen", color: "#059669" };
+    case "project_deleted":
+      return { label: "Projekt smazán", color: "#DC2626" };
+    case "project_restored":
+      return { label: "Projekt obnoven", color: "#059669" };
+    case "item_completed":
+    case "item_hotovo":
+      return { label: "Položka dokončena", color: "#059669" };
+    case "item_scheduled":
+      return { label: "Položka naplánována", color: "#059669" };
+    case "item_moved":
+    case "item_moved_next_week":
+      return { label: "Položka přesunuta", color: "#D97706" };
+    case "item_paused":
+    case "item_paused_vyroba":
+      return { label: "Položka pozastavena", color: "#D97706" };
+    case "item_cancelled":
+      return { label: "Položka zrušena", color: "#DC2626" };
+    case "item_qc_confirmed":
+      return { label: "QC potvrzeno", color: "#059669" };
+    case "item_expedice":
+      return { label: "Expedováno", color: "#059669" };
+    case "prodejni_cena_change":
+      return { label: "Změna ceny", color: "#D97706" };
+    case "forecast_committed":
+      return { label: "Forecast zapsán", color: "#059669" };
+    case "defect_reported":
+      return { label: "Vada zaznamenaná", color: "#DC2626" };
+    case "defect_resolved":
+      return { label: "Vada opravena", color: "#059669" };
+    case "vyroba_log_saved":
+      return { label: "Log výroby", color: "#059669" };
+    default:
+      return { label: actionType.replace(/_/g, " "), color: "#6B7280" };
+  }
+}
+
+function formatRelativeTime(dateStr: string): string {
+  const now = new Date();
+  const d = new Date(dateStr);
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "teď";
+  if (diffMin < 60) return `${diffMin} min`;
+  const diffHrs = Math.floor(diffMin / 60);
+  if (diffHrs < 24) return `${diffHrs} h`;
+  const diffDays = Math.floor(diffHrs / 24);
+  return `${diffDays} d`;
 }
 
 export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onProjectTap }: MobilePrehledProps) {
+  const navigate = useNavigate();
   const { profile, linkedPersonName } = useAuth();
   const pmName = linkedPersonName || null;
-  const { attentionItems, upcomingDates, projects } = useProjectAttention(pmName);
+  const { attentionItems } = useProjectAttention(pmName);
   const { data: allProjects = [] } = useProjects();
-  const { data: rates = [] } = useExchangeRates();
 
-  const today = new Date();
-  const firstName = profile?.full_name?.split(" ")[0] || profile?.email?.split("@")[0] || "Uživatel";
+  // Overdue items (critical severity with "Po termínu" message)
+  const overdueItems = useMemo(() => {
+    const seen = new Set<string>();
+    return attentionItems.filter(item => {
+      if (item.severity !== "critical" || !item.message.startsWith("Po termínu")) return false;
+      if (seen.has(item.project.project_id)) return false;
+      seen.add(item.project.project_id);
+      return true;
+    });
+  }, [attentionItems]);
 
-  const DONE_STATUSES = new Set(["Fakturace", "Dokončeno"]);
+  const [showAllOverdue, setShowAllOverdue] = useState(false);
+  const visibleOverdue = showAllOverdue ? overdueItems : overdueItems.slice(0, 3);
+  const hiddenCount = overdueItems.length - 3;
 
-  // My projects stats — if no person assigned, show all active (exclude done statuses)
-  const myProjects = useMemo(() => {
-    if (!pmName) return allProjects.filter(p => !p.status || !DONE_STATUSES.has(p.status));
-    return allProjects.filter(p => p.pm === pmName);
-  }, [allProjects, pmName]);
+  // Production this week
+  const { data: scheduleMap } = useProductionSchedule();
+  const currentWeek = getMonday(new Date());
+  const weekNumber = getISOWeekNumber(new Date());
 
-  const statusBreakdown = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const p of myProjects) {
-      const s = p.status || "Bez statusu";
-      counts[s] = (counts[s] || 0) + 1;
-    }
-    return counts;
-  }, [myProjects]);
+  const weekStats = useMemo(() => {
+    if (!scheduleMap) return { activeBundles: 0, avgPercent: 0, onTrack: 0, behind: 0 };
+    const silo = scheduleMap.get(currentWeek);
+    if (!silo) return { activeBundles: 0, avgPercent: 0, onTrack: 0, behind: 0 };
 
-  const totalValue = useMemo(() => {
-    let sum = 0;
-    for (const p of myProjects) {
-      if (p.prodejni_cena) {
-        if (p.currency === "EUR") {
-          const year = p.datum_smluvni ? new Date(p.datum_smluvni).getFullYear() : new Date().getFullYear();
-          const rate = rates.find(r => r.year === year)?.eur_czk || 25;
-          sum += p.prodejni_cena * rate;
-        } else {
-          sum += p.prodejni_cena;
-        }
+    let totalItems = 0;
+    let completedItems = 0;
+    let onTrack = 0;
+    let behind = 0;
+
+    for (const bundle of silo.bundles) {
+      const active = bundle.items.filter(i => i.status === "scheduled" || i.status === "in_progress" || i.status === "completed");
+      totalItems += active.length;
+      completedItems += active.filter(i => i.status === "completed").length;
+
+      const bundleComplete = active.length > 0 ? active.filter(i => i.status === "completed").length / active.length : 0;
+      if (bundleComplete >= 0.5 || active.every(i => i.status === "completed")) {
+        onTrack++;
+      } else {
+        behind++;
       }
     }
-    return sum;
-  }, [myProjects, rates]);
 
-  // Resolve recent projects to full project objects
-  const recentFull = useMemo(() => {
-    return recentProjects.slice(0, 5).map(r => {
-      const proj = allProjects.find(p => p.project_id === r.project_id);
-      return { ...r, project: proj };
-    }).filter(r => r.project);
-  }, [recentProjects, allProjects]);
+    const avgPercent = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+    return { activeBundles: silo.bundles.length, avgPercent, onTrack, behind };
+  }, [scheduleMap, currentWeek]);
+
+  // Recent activity
+  const { data: recentActivity = [] } = useQuery({
+    queryKey: ["mobile-recent-activity"],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("data_log") as any)
+        .select("*")
+        .neq("action_type", "user_session")
+        .neq("action_type", "user_login")
+        .neq("action_type", "session_end")
+        .neq("action_type", "page_view")
+        .order("created_at", { ascending: false })
+        .limit(3);
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Extract days from overdue message
+  function extractDays(msg: string): string {
+    const m = msg.match(/(\d+)\s*dní/);
+    return m ? `${m[1]} dní` : "";
+  }
+
+  const dividerClass = "mx-4 border-t border-[#e5e3df]";
 
   return (
-    <div className="flex flex-col gap-4 pb-20">
-      {/* Greeting */}
-      <div className="pt-1">
-        <h2 className="text-lg font-semibold text-foreground">Ahoj {firstName} 👋</h2>
-        <p className="text-sm text-muted-foreground">{formatCzechDate(today)}</p>
-      </div>
-
-      {/* Attention section */}
-      <section>
-        <h3 className="text-xs font-bold uppercase text-muted-foreground tracking-wide mb-2">⚠ Vyžaduje pozornost</h3>
-        {attentionItems.length === 0 ? (
-          <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg px-4 py-3 text-sm text-green-700 dark:text-green-400">
-            ✅ Vše v pořádku — žádné urgentní položky
-          </div>
-        ) : (
+    <div className="flex flex-col gap-3 pb-20 px-4 pt-3">
+      {/* Section 1: Po termínu */}
+      {overdueItems.length > 0 && (
+        <section>
+          <h3 className="uppercase text-[13px] font-medium tracking-wide mb-2" style={{ color: "#223937" }}>
+            Po termínu ({overdueItems.length})
+          </h3>
           <div className="flex flex-col gap-2">
-            {attentionItems.slice(0, 8).map((item, i) => (
-              <AttentionCard key={`${item.project.project_id}-${i}`} item={item} onTap={onProjectTap} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* My overview */}
-      <section>
-        <h3 className="text-xs font-bold uppercase text-muted-foreground tracking-wide mb-2">📊 Můj přehled</h3>
-        <div className="bg-card border rounded-lg p-3 space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Celkem projektů</span>
-            <span className="text-sm font-semibold">{myProjects.length}</span>
-          </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            {Object.entries(statusBreakdown).map(([s, count]) => (
-              <span key={s}>{s}: <strong className="text-foreground">{count}</strong></span>
-            ))}
-          </div>
-          <div className="flex justify-between items-center pt-1 border-t">
-            <span className="text-sm text-muted-foreground">Celková hodnota</span>
-            <span className="text-sm font-semibold font-mono">{formatCZK(totalValue)}</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Recently opened */}
-      {recentFull.length > 0 && (
-        <section>
-          <h3 className="text-xs font-bold uppercase text-muted-foreground tracking-wide mb-2">🕐 Nedávno otevřené</h3>
-          <div className="bg-card border rounded-lg divide-y">
-            {recentFull.map(r => (
+            {visibleOverdue.map((item) => (
               <button
-                key={r.project_id}
-                onClick={() => r.project && onProjectTap(r.project)}
-                className="w-full flex items-center justify-between px-3 py-2.5 text-left min-h-[44px] hover:bg-accent/50 transition-colors"
+                key={item.project.project_id}
+                onClick={() => onProjectTap(item.project)}
+                className="w-full text-left active:scale-[0.98] transition-transform"
+                style={{
+                  background: "#FCEBEB",
+                  border: "0.5px solid #F09595",
+                  borderLeft: "3px solid #E24B4A",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                }}
               >
-                <span className="text-sm truncate mr-2">{r.project_name}</span>
-                {r.project?.status && <StatusBadge status={r.project.status} />}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Upcoming dates */}
-      {upcomingDates.length > 0 && (
-        <section>
-          <h3 className="text-xs font-bold uppercase text-muted-foreground tracking-wide mb-2">📅 Blížící se termíny (7 dní)</h3>
-          <div className="bg-card border rounded-lg divide-y">
-            {upcomingDates.map((ud, i) => (
-              <button
-                key={`${ud.projectId}-${ud.milestone}-${i}`}
-                onClick={() => onProjectTap(ud.project)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 text-left min-h-[44px] hover:bg-accent/50 transition-colors"
-              >
-                <span className="text-xs font-mono text-muted-foreground shrink-0 w-[60px]">
-                  {ud.date.getDate()}.{ud.date.getMonth() + 1}.
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm truncate">{ud.projectName}</p>
-                  <p className="text-xs text-muted-foreground">{ud.milestone}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-[13px] font-medium truncate" style={{ color: "#501313" }}>
+                    {item.project.project_name}
+                  </p>
+                  <span
+                    className="shrink-0 text-[11px] font-medium px-2 py-0.5"
+                    style={{ background: "#F7C1C1", color: "#791F1F", borderRadius: 20 }}
+                  >
+                    {extractDays(item.message)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="text-[11px] font-mono" style={{ color: "#A32D2D" }}>
+                    {item.project.project_id}
+                  </span>
+                  {item.project.status && (
+                    <span className="text-[11px]" style={{ color: "#A32D2D" }}>·</span>
+                  )}
+                  {item.project.status && <StatusBadge status={item.project.status} />}
                 </div>
               </button>
             ))}
+            {!showAllOverdue && hiddenCount > 0 && (
+              <button
+                onClick={() => setShowAllOverdue(true)}
+                className="w-full text-center text-[12px] font-medium py-2.5 active:scale-[0.98] transition-transform"
+                style={{
+                  border: "0.5px solid #F09595",
+                  borderRadius: 10,
+                  color: "#A32D2D",
+                  background: "transparent",
+                }}
+              >
+                Zobrazit dalších {hiddenCount} →
+              </button>
+            )}
           </div>
         </section>
       )}
+
+      {overdueItems.length > 0 && <div className={dividerClass} />}
+
+      {/* Section 2: Výroba tento týden */}
+      <section>
+        <h3 className="uppercase text-[13px] font-medium tracking-wide mb-2" style={{ color: "#223937" }}>
+          Výroba tento týden
+        </h3>
+        <button
+          onClick={() => navigate("/vyroba")}
+          className="w-full text-left active:scale-[0.98] transition-transform"
+          style={{
+            background: "#E1F5EE",
+            border: "0.5px solid #5DCAA5",
+            borderRadius: 10,
+            padding: "12px 14px",
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[13px] font-medium" style={{ color: "#085041" }}>
+                {weekStats.activeBundles} aktivní{weekStats.activeBundles === 1 ? " bundle" : weekStats.activeBundles >= 2 && weekStats.activeBundles <= 4 ? " bundly" : " bundlů"}
+              </p>
+              <p className="text-[11px] mt-0.5" style={{ color: "#0F6E56" }}>
+                T{weekNumber} · ø {weekStats.avgPercent}% dokončeno
+              </p>
+            </div>
+            <div className="flex flex-col gap-1 items-end">
+              <span
+                className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                style={{ background: "#A7F3D0", color: "#065F46" }}
+              >
+                {weekStats.onTrack} on track
+              </span>
+              {weekStats.behind > 0 && (
+                <span
+                  className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                  style={{ background: "#FECACA", color: "#991B1B" }}
+                >
+                  {weekStats.behind} pozadu
+                </span>
+              )}
+            </div>
+          </div>
+        </button>
+      </section>
+
+      <div className={dividerClass} />
+
+      {/* Section 3: Poslední aktivita */}
+      <section>
+        <h3 className="uppercase text-[13px] font-medium tracking-wide mb-2" style={{ color: "#223937" }}>
+          Poslední aktivita
+        </h3>
+        {recentActivity.length === 0 ? (
+          <p className="text-[12px] text-muted-foreground">Žádná nedávná aktivita</p>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {recentActivity.map((entry: any) => {
+              const { label, color } = getActionLabel(entry.action_type);
+              const projectName = allProjects.find(p => p.project_id === entry.project_id)?.project_name || entry.project_id;
+              return (
+                <div key={entry.id} className="flex items-center gap-3">
+                  <div
+                    className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center"
+                    style={{ background: `${color}20` }}
+                  >
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[12px] font-medium truncate text-foreground">{projectName}</p>
+                    <p className="text-[11px] text-muted-foreground">{label}</p>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground shrink-0">
+                    {formatRelativeTime(entry.created_at)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 });
-
-function AttentionCard({ item, onTap }: { item: AttentionItem; onTap: (p: Project) => void }) {
-  const isCritical = item.severity === "critical";
-  return (
-    <button
-      onClick={() => onTap(item.project)}
-      className={cn(
-        "w-full text-left rounded-lg border overflow-hidden active:scale-[0.98] transition-all",
-        isCritical
-          ? "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20"
-          : "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20"
-      )}
-      style={{ borderLeftWidth: 4, borderLeftColor: isCritical ? "hsl(0 70% 50%)" : "hsl(35 90% 55%)" }}
-    >
-      <div className="px-3 py-2.5">
-        <p className="text-sm font-medium truncate">{item.project.project_name}</p>
-        <p className={cn("text-xs mt-0.5", isCritical ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400")}>
-          {item.icon} {item.message}
-        </p>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-[11px] font-mono text-muted-foreground">{item.project.project_id}</span>
-          {item.project.status && <StatusBadge status={item.project.status} />}
-        </div>
-      </div>
-    </button>
-  );
-}
