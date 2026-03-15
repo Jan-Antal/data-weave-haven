@@ -47,7 +47,7 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
           <div className="p-5 border-b border-border">
             <p className="font-medium text-sm text-foreground">{profile?.full_name || user?.email}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {ROLE_LABELS[effectiveRole || ""] || effectiveRole}
+              {ROLE_LABELS[role || ""] || role}
             </p>
           </div>
           <div className="py-2">
