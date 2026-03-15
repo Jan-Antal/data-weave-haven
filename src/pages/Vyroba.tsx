@@ -1318,19 +1318,19 @@ export default function Vyroba() {
       {/* ═══ MOBILE BOTTOM SHEET ═══ */}
       {isMobile && selectedProject && (
         <Sheet open={mobileDetailOpen} onOpenChange={setMobileDetailOpen}>
-          <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl p-0 overflow-hidden">
-            <div className="flex flex-col h-full overflow-y-auto">
-              <div className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0">
-                <button
-                  onClick={() => setMobileDetailOpen(false)}
-                  className="text-xs font-medium flex items-center gap-1 min-h-[36px]"
-                  style={{ color: "#6b7280" }}
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" /> Zpět
-                </button>
-                <div className="w-10 h-1 rounded-full" style={{ background: "#d0cdc8" }} />
-                <div className="w-[50px]" /> {/* spacer for centering drag handle */}
-              </div>
+          <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0">
+              <button
+                onClick={() => setMobileDetailOpen(false)}
+                className="text-xs font-medium flex items-center gap-1 min-h-[36px]"
+                style={{ color: "#6b7280" }}
+              >
+                <ChevronLeft className="h-3.5 w-3.5" /> Zpět
+              </button>
+              <div className="w-10 h-1 rounded-full" style={{ background: "#d0cdc8" }} />
+              <div className="w-[50px]" /> {/* spacer for centering drag handle */}
+            </div>
+            <div className="flex-1 overflow-y-auto">
               <DetailPanel
                 project={selectedProject}
                 weekKey={weekKey}
@@ -1361,8 +1361,21 @@ export default function Vyroba() {
                 isWeeklyGoalMet={isWeeklyGoalMet(selectedProject.projectId)}
                 areAllPartsCompleted={(itemCode, itemName) => areAllPartsCompleted(selectedProject.projectId, itemCode, itemName)}
                 getIncompletePartsInfo={(itemCode, itemName) => getIncompletePartsInfo(selectedProject.projectId, itemCode, itemName)}
+                hideLogButton
               />
             </div>
+            {/* Fixed bottom Log button */}
+            {todayDayIndex >= 0 && (
+              <div className="shrink-0 px-4 py-3 border-t border-border bg-background safe-area-bottom">
+                <button
+                  onClick={() => openLogModal()}
+                  className="w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90 min-h-[44px]"
+                  style={{ background: "#3a8a36" }}
+                >
+                  + Log dnes ({DAY_SHORT[todayDayIndex]})
+                </button>
+              </div>
+            )}
           </SheetContent>
         </Sheet>
       )}
