@@ -306,23 +306,26 @@ serve(async (req) => {
         if (processedProjects.has(proj.project_id)) continue;
         const dl = resolveDeadline(proj);
         const projTpv = tpvItems.filter(t => t.project_id === proj.project_id);
-        const estH = estimateProjectHours(proj, projTpv);
+        const est = estimateProjectHours(proj, projTpv);
 
         if (!dl.date) {
-          safetyNet.push({ project_id: proj.project_id, project_name: proj.project_name, estimated_hours: estH, source: "unplanned" });
+          safetyNet.push({ project_id: proj.project_id, project_name: proj.project_name, estimated_hours: est.hours, source: "unplanned" });
           continue;
         }
 
         allWork.push({
           projectId: proj.project_id,
           projectName: proj.project_name,
-          totalHours: estH,
+          totalHours: est.hours,
           source: "project_estimate",
           deadline: dl.date,
           deadlineSource: dl.source,
           tpvCount: projTpv.length || 1,
-          confidence: projTpv.some(t => (Number(t.cena) || 0) > 0) ? "medium" : "low",
+          confidence: est.level <= 2 ? "medium" : "low",
           startFromIdx: 0,
+          estimation_level: est.level,
+          estimation_badge: est.badge,
+          estimation_preset: est.usedPreset,
         });
       }
 
