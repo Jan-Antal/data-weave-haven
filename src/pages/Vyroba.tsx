@@ -2080,10 +2080,20 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
           </div>
           {/* Weekly goal marker */}
           {weeklyGoal < 100 && (
-            <div className="absolute top-[-3px] h-[10px] w-[2px] rounded-full" style={{ left: `${weeklyGoal}%`, background: "#d97706", opacity: 0.7 }} />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="absolute top-[-3px] h-[10px] w-[2px] rounded-full cursor-help" style={{ left: `${weeklyGoal}%`, background: "#d97706", opacity: 0.7 }} />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">Týdenní cíl: {weeklyGoal.toFixed(0)}%</TooltipContent>
+            </Tooltip>
           )}
           {todayDayIndex >= 0 && (
-            <div className="absolute top-[-2px] h-[8px] w-[2px]" style={{ left: `${expectedPct}%`, background: "#1a1a1a", opacity: 0.2 }} />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="absolute top-[-2px] h-[8px] w-[2px] cursor-help" style={{ left: `${expectedPct}%`, background: "#1a1a1a", opacity: 0.2 }} />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">Očekávaný postup k dnešku: {expectedPct.toFixed(0)}%</TooltipContent>
+            </Tooltip>
           )}
         </div>
 
