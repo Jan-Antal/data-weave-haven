@@ -464,6 +464,11 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             <Upload className="h-3 w-3 mr-1" /> Import z Excelu
           </Button>
         )}
+        {canManageTPV && (
+          <Button size="sm" variant="outline" onClick={handleSendToProduction} disabled={isSending}>
+            <Cog className="h-3 w-3 mr-1" /> Odeslat do výroby
+          </Button>
+        )}
 
         {selected.size > 0 && canManageTPV && (
           <div className="flex items-center gap-2 ml-4 border-l pl-4">
