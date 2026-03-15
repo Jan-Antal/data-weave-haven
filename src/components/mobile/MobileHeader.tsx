@@ -30,6 +30,12 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
       <header
         className="md:hidden border-b bg-primary px-4 pb-3 shrink-0 z-50"
         style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 12px)" }}
+        ref={(el) => {
+          if (el) {
+            const h = el.getBoundingClientRect().height;
+            document.documentElement.style.setProperty('--mobile-header-height', `${h}px`);
+          }
+        }}
       >
         <div className="flex items-center justify-between">
           <h1
@@ -48,7 +54,7 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
       </header>
 
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-        <SheetContent side="right" className="w-[280px] p-0">
+        <SheetContent side="right" className="w-[280px] p-0" style={{ top: 'var(--mobile-header-height, 52px)' }}>
           <SheetTitle className="sr-only">Menu</SheetTitle>
           <div className="p-5 border-b border-border">
             <p className="font-medium text-sm text-foreground">{profile?.full_name || user?.email}</p>
