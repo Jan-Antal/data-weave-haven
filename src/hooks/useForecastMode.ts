@@ -107,6 +107,7 @@ interface UseForecastModeReturn {
 }
 
 export function useForecastMode(): UseForecastModeReturn {
+  const queryClient = useQueryClient();
   const [forecastActive, setForecastActiveRaw] = useState(false);
   const [planMode, setPlanModeRaw] = useState<ForecastPlanMode>("respect_plan");
   const [forecastBlocks, setForecastBlocks] = useState<ForecastBlock[]>([]);
