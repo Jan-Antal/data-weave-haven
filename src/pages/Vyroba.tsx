@@ -514,8 +514,11 @@ export default function Vyroba() {
     return { incomplete: incomplete.length, total: matching.length, weekNums };
   }
 
-  function getExpectedPct(dayIndex: number, weeklyGoal: number = 100): number {
-    return Math.round(((dayIndex + 1) / 5) * weeklyGoal);
+  function getExpectedPct(_dayIndex: number, weeklyGoal: number = 100): number {
+    const today = new Date();
+    const dow = today.getDay(); // 0=Sun..6=Sat
+    const workingDaysElapsed = (dow === 0 || dow === 6) ? 5 : dow; // weekend → treat as Friday
+    return Math.round(weeklyGoal * (workingDaysElapsed / 5));
   }
 
   function getProjectStatus(pid: string): "on-track" | "at-risk" | "behind" {
