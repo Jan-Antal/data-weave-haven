@@ -217,7 +217,7 @@ function UserAnalyticsTab({ onShowUserActivity }: { onShowUserActivity: (email: 
 }
 
 function UserAnalyticsRow({ user, expanded, onToggle, onShowAll }: { user: UserAnalytics; expanded: boolean; onToggle: () => void; onShowAll: () => void }) {
-  const { data: recentActions = [] } = useUserRecentActions(expanded ? user.user_email : null);
+  const { data: recentActions = [] } = useUserRecentActions(expanded ? user.user_email : null, expanded);
 
   return (
     <div className="border-b border-border">
