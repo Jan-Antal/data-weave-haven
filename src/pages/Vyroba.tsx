@@ -2667,7 +2667,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   {uncheckConfirmItemId === mids[0] && (
                     <div className="flex items-center gap-2 px-3 py-2 mt-1 rounded-md text-[12px]" style={{ background: "rgba(220,38,38,0.05)", border: "1px solid rgba(220,38,38,0.15)" }}>
                       <span style={{ color: "#92400e" }}>Zrušit QC kontrolu pro <strong>{uncheckConfirmCode}</strong>?</span>
-                      <button className="px-2 py-0.5 rounded text-[11px] font-medium" style={{ background: "#dc2626", color: "#fff" }}
+                      <button className="px-3 py-1 rounded text-[12px] font-medium" style={{ background: "#dc2626", color: "#fff", minHeight: '44px', minWidth: '44px' }}
                         onClick={async () => {
                           for (const mid of mids) {
                             const check = checkMap.get(mid);
@@ -2675,7 +2675,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                           }
                           setUncheckConfirmItemId(null);
                         }}>Ano</button>
-                      <button className="px-2 py-0.5 rounded text-[11px] font-medium" style={{ background: "hsl(var(--muted))", color: "hsl(var(--foreground))" }}
+                      <button className="px-3 py-1 rounded text-[12px] font-medium" style={{ background: "hsl(var(--muted))", color: "hsl(var(--foreground))", minHeight: '44px', minWidth: '44px' }}
                         onClick={() => setUncheckConfirmItemId(null)}>Ne</button>
                     </div>
                   )}
