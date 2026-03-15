@@ -394,11 +394,15 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[900px] max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            📊 Kapacita výroby
-          </DialogTitle>
-        </DialogHeader>
+        <div className="px-6 pt-6 pb-2">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              📊 Kapacita výroby
+            </DialogTitle>
+          </DialogHeader>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-4">
 
         {/* Standard Capacity */}
         <div className="border border-border rounded-lg p-4 space-y-3">
