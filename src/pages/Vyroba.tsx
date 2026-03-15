@@ -3094,7 +3094,7 @@ function QualityCheckDisplay({ check }: { check: any }) {
 }
 
 function QualityCheckBadgeEmpty() {
-  const isMobile = useIsMobile();
+  return (
   return (
     <span
       className="inline-flex items-center gap-1 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
