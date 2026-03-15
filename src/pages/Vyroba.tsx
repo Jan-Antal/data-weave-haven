@@ -2655,7 +2655,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                           );
                         }
                         return (
-                          <button onClick={() => { setSingleQcItem(item); setSingleQcMergedIds(mids); setSingleQcModalOpen(true); setDefectItemId(item.id); setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectPhotos([]); }}>
+                          <button style={{ minHeight: '36px', minWidth: '60px', padding: '6px 12px', cursor: 'pointer' }} onClick={() => { setSingleQcItem(item); setSingleQcMergedIds(mids); setSingleQcModalOpen(true); setDefectItemId(item.id); setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectPhotos([]); }}>
                             <QualityCheckBadgeEmpty />
                           </button>
                         );
