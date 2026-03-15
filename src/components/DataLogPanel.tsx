@@ -370,13 +370,14 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
           <>
             {/* Filters */}
             <div className="px-4 py-2.5 border-b space-y-2 shrink-0">
-              <div className="flex flex-wrap gap-1">
+              <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
+                <div className="flex gap-1 w-max">
                 {CATEGORY_PILLS.map(p => (
                   <button
                     key={p.value}
                     onClick={() => setCategory(p.value)}
                     className={cn(
-                      "px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors",
+                      "px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors whitespace-nowrap",
                       category === p.value
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-background text-muted-foreground border-border hover:bg-muted"
@@ -385,6 +386,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
                     {p.label}
                   </button>
                 ))}
+                </div>
               </div>
               <div className="flex gap-1.5">
                 <Select value={userFilter ?? "__all__"} onValueChange={v => setUserFilter(v === "__all__" ? null : v)}>
