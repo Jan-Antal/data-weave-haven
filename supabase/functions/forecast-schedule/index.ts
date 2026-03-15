@@ -343,7 +343,7 @@ serve(async (req) => {
             project_id: work.projectId,
             project_name: work.projectName,
             bundle_description: work.source === "existing_plan" ? "Plán — přeplánováno" :
-              work.source === "inbox_item" ? "Inbox — přeplánováno" : "~Výroba — odhad",
+              work.source === "inbox_item" ? "Inbox — přeplánováno" : work.estimation_badge || "~Výroba — odhad",
             week: alloc.week,
             estimated_hours: Math.round(alloc.hours),
             tpv_item_count: work.tpvCount,
@@ -353,6 +353,9 @@ serve(async (req) => {
             deadline_source: work.deadlineSource,
             tpv_expected_date: work.source === "project_estimate" ? (proj?.datum_tpv || null) : null,
             is_forecast: true,
+            estimation_level: work.estimation_level,
+            estimation_badge: work.estimation_badge,
+            estimation_preset: work.estimation_preset,
           });
         }
 
