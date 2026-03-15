@@ -102,12 +102,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Wrap the raw auth link in an intermediate landing page so that
+    // chat-app link previews (Slack, Teams, etc.) don't consume the
+    // one-time token during unfurling.
+    const wrappedLink = `${PRODUCTION_ORIGIN}/invite?link=${encodeURIComponent(actionLink)}`;
+
     if (mode === "send_email") {
-      // For "send_email" mode: generate link and return it for the frontend to copy
-      // We return the link so the admin can share it manually
       return new Response(JSON.stringify({
         mode: "link_generated",
-        link: actionLink,
+        link: wrappedLink,
         email: profile.email,
       }), {
         status: 200,
@@ -115,8 +118,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Default "link" mode — just return the link
-    return new Response(JSON.stringify({ link: actionLink }), {
+    // Default "link" mode — return the wrapped link
+    return new Response(JSON.stringify({ link: wrappedLink }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

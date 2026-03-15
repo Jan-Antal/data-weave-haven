@@ -16,6 +16,7 @@ import Login from "./pages/Login";
 import SetPassword from "./pages/SetPassword";
 import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
+import InviteLanding from "./pages/InviteLanding";
 import PlanVyroby from "./pages/PlanVyroby";
 import Vyroba from "./pages/Vyroba";
 
@@ -110,6 +111,7 @@ function AppRoutes() {
           <Route path="/" element={<RootAuthRoute />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/set-password" element={<SetPassword />} />
+          <Route path="/invite" element={<InviteLanding />} />
           <Route path="/login" element={<Login />} />
           <Route path="*" element={<Login />} />
         </Routes>
