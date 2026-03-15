@@ -119,7 +119,7 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
             </div>
           </div>
           {project.datum_smluvni && (
-            <p className="text-[11px] text-muted-foreground mt-1">Datum S.: {(() => { const d = parseAppDate(project.datum_smluvni); return d ? formatAppDate(d) : project.datum_smluvni; })()}</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Datum S.: <span className="font-mono">{(() => { const d = parseAppDate(project.datum_smluvni); return d ? formatAppDate(d) : project.datum_smluvni; })()}</span></p>
           )}
         </button>
 
