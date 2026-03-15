@@ -199,7 +199,7 @@ function renderSubContent(entry: ActivityLogEntry) {
       );
     }
   }
-  if (entry.detail) {
+  if (entry.detail && !isJson) {
     return <p className="text-[10px] text-muted-foreground/80 mt-0.5 italic">{entry.detail}</p>;
   }
   return null;
