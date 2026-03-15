@@ -189,16 +189,23 @@ serve(async (req) => {
       } else {
         tpvStart = addWeeks(today, 2);
       }
-      // tpvStart must not be in the past
-      if (tpvStart < today) tpvStart = new Date(today);
+      // tpvStart must not be in the past and must be valid
+      if (isNaN(tpvStart.getTime()) || tpvStart < today) tpvStart = new Date(today);
 
       // Determine deadline
       const deadlineStr = proj.expedice || proj.montaz || proj.predani || proj.datum_smluvni;
       let deadline: Date;
       let deadlineSource: string;
       if (deadlineStr) {
-        deadline = new Date(deadlineStr);
-        deadlineSource = proj.expedice ? "expedice" : proj.montaz ? "montaz" : proj.predani ? "predani" : "smluvni";
+        const parsed = new Date(deadlineStr);
+        if (!isNaN(parsed.getTime())) {
+          deadline = parsed;
+          deadlineSource = proj.expedice ? "expedice" : proj.montaz ? "montaz" : proj.predani ? "predani" : "smluvni";
+        } else {
+          const fbWeeks = statusFallbackWeeks[proj.status] || 8;
+          deadline = addWeeks(tpvStart, fbWeeks);
+          deadlineSource = "fallback";
+        }
       } else {
         const fbWeeks = statusFallbackWeeks[proj.status] || 8;
         deadline = addWeeks(tpvStart, fbWeeks);
