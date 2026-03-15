@@ -452,11 +452,20 @@ const Index = () => {
                 onOpenTPV={handleMobileOpenTPV}
               />
             )}
-            <ProjectDetailDialog
-              project={mobileDetailProject}
-              open={mobileDetailOpen}
-              onOpenChange={setMobileDetailOpen}
-            />
+            {isMobile ? (
+              <MobileProjectDetailSheet
+                project={mobileDetailProject}
+                open={mobileDetailOpen}
+                onOpenChange={setMobileDetailOpen}
+                onOpenTPV={handleMobileOpenTPV}
+              />
+            ) : (
+              <ProjectDetailDialog
+                project={mobileDetailProject}
+                open={mobileDetailOpen}
+                onOpenChange={setMobileDetailOpen}
+              />
+            )}
           </main>
         ) : (
           /* Desktop: table view */
