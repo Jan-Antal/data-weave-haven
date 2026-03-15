@@ -384,6 +384,10 @@ export function useForecastMode(): UseForecastModeReturn {
       setForecastActiveRaw(false);
       resetForecastState();
 
+      // Invalidate only affected queries
+      await queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
+      await queryClient.invalidateQueries({ queryKey: ["production-inbox"] });
+
       const desc = blockerCount > 0
         ? `Naplánováno ${normalCount} projektů · ${blockerCount} rezerv kapacity`
         : `${committable.length} bloků naplánováno`;
@@ -391,7 +395,7 @@ export function useForecastMode(): UseForecastModeReturn {
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
-  }, [forecastBlocks, selectedBlockIds, resetForecastState, planMode, realBundleOverrides]);
+  }, [forecastBlocks, selectedBlockIds, resetForecastState, planMode, realBundleOverrides, queryClient]);
 
   const commitInboxOnly = useCallback(async () => {
     const inboxBlocks = forecastBlocks.filter(b => b.source === "inbox_item" && selectedBlockIds.has(b.id));
