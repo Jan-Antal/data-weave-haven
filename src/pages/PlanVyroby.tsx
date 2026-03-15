@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
 import { Search, X, Sparkles, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -99,6 +100,14 @@ export default function PlanVyroby() {
   const { isAdmin, isOwner, isTestUser, loading, profile, role } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const qc = useQueryClient();
+
+  // Refresh production data on mount (global refetchOnMount is false)
+  useEffect(() => {
+    qc.invalidateQueries({ queryKey: ["production-inbox"] });
+    qc.invalidateQueries({ queryKey: ["production-schedule"] });
+    qc.invalidateQueries({ queryKey: ["production-expedice"] });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const openProjectIdFromState = (location.state as any)?.openProjectId as string | undefined;
   const { setCurrentPage } = useUndoRedo();
   const [displayMode, setDisplayMode] = useState<DisplayMode>("hours");
