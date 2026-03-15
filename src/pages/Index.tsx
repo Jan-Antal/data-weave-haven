@@ -15,7 +15,7 @@ import { ExportButton } from "@/components/ExportButton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Settings, Plus, LogOut, User, Check, ChevronUp, ChevronDown, UserCog, Factory, CalendarRange, LayoutDashboard, MessageCircle, Undo2, Redo2, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { AmiAssistant } from "@/components/AmiAssistant";
+
 import { AdminInboxButton } from "@/components/AdminInbox";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useState, useRef, useCallback, useEffect } from "react";

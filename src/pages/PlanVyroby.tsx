@@ -862,7 +862,7 @@ export default function PlanVyroby() {
         open={!!detailProjectId}
         onOpenChange={(open) => { if (!open) setDetailProjectId(null); }}
       />
-      {isMobile && <MobileNavBar />}
+      {isMobile && <MobileBottomNav />}
     </DndContext>
   );
 }
