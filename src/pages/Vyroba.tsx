@@ -2633,7 +2633,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                     {/* QC badge — clickable only if ALL parts completed across all weeks */}
                     <div onClick={(e) => e.stopPropagation()}>
                       {hasQC ? (
-                        <button style={{ minHeight: '36px', minWidth: '60px', padding: '6px 12px', cursor: 'pointer' }} onClick={() => { setUncheckConfirmItemId(mids[0]); setUncheckConfirmCode(`${item.item_code || ""} ${item.item_name}`.trim()); }}>
+                        <button onClick={() => { setUncheckConfirmItemId(mids[0]); setUncheckConfirmCode(`${item.item_code || ""} ${item.item_name}`.trim()); }}>
                           <QualityCheckDisplay check={checkMap.get(mids[0])} />
                         </button>
                       ) : (() => {
@@ -2644,7 +2644,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span className="inline-flex items-center gap-1 shrink-0 cursor-not-allowed opacity-50"
-                                  style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #f59e0b", padding: "6px 12px", minHeight: '36px', minWidth: '60px', borderRadius: "9999px", fontSize: "12px", fontWeight: 500, lineHeight: 1 }}>
+                                  style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #f59e0b", padding: "4px 10px", borderRadius: "9999px", fontSize: "12px", fontWeight: 500, lineHeight: 1 }}>
                                   <Shield className="h-3 w-3" /> QC
                                 </span>
                               </TooltipTrigger>
@@ -2655,7 +2655,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                           );
                         }
                         return (
-                          <button style={{ minHeight: '36px', minWidth: '60px', padding: '6px 12px', cursor: 'pointer' }} onClick={() => { setSingleQcItem(item); setSingleQcMergedIds(mids); setSingleQcModalOpen(true); setDefectItemId(item.id); setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectPhotos([]); }}>
+                          <button onClick={() => { setSingleQcItem(item); setSingleQcMergedIds(mids); setSingleQcModalOpen(true); setDefectItemId(item.id); setDefectOpen(false); setDefectType(""); setDefectDesc(""); setDefectSeverity(""); setDefectResolution(""); setDefectPhotos([]); }}>
                             <QualityCheckBadgeEmpty />
                           </button>
                         );
@@ -2667,7 +2667,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                   {uncheckConfirmItemId === mids[0] && (
                     <div className="flex items-center gap-2 px-3 py-2 mt-1 rounded-md text-[12px]" style={{ background: "rgba(220,38,38,0.05)", border: "1px solid rgba(220,38,38,0.15)" }}>
                       <span style={{ color: "#92400e" }}>Zrušit QC kontrolu pro <strong>{uncheckConfirmCode}</strong>?</span>
-                      <button className="px-3 py-1 rounded text-[12px] font-medium" style={{ background: "#dc2626", color: "#fff", minHeight: '44px', minWidth: '44px' }}
+                      <button className="px-2 py-0.5 rounded text-[11px] font-medium" style={{ background: "#dc2626", color: "#fff" }}
                         onClick={async () => {
                           for (const mid of mids) {
                             const check = checkMap.get(mid);
@@ -2675,7 +2675,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                           }
                           setUncheckConfirmItemId(null);
                         }}>Ano</button>
-                      <button className="px-3 py-1 rounded text-[12px] font-medium" style={{ background: "hsl(var(--muted))", color: "hsl(var(--foreground))", minHeight: '44px', minWidth: '44px' }}
+                      <button className="px-2 py-0.5 rounded text-[11px] font-medium" style={{ background: "hsl(var(--muted))", color: "hsl(var(--foreground))" }}
                         onClick={() => setUncheckConfirmItemId(null)}>Ne</button>
                     </div>
                   )}
@@ -3071,6 +3071,7 @@ function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, de
 
 function QualityCheckDisplay({ check }: { check: any }) {
   const name = useProfileName(check.checked_by);
+  const isMobile = useIsMobile();
   const firstName = name ? name.split(" ")[0].slice(0, 8) : "–";
   return (
     <span
@@ -3079,9 +3080,9 @@ function QualityCheckDisplay({ check }: { check: any }) {
         background: "#dcfce7",
         color: "#166534",
         border: "1px solid #16a34a",
-        padding: "6px 12px",
-        minHeight: 36,
-        minWidth: 60,
+        padding: isMobile ? "10px 12px" : "4px 10px",
+        minHeight: isMobile ? 44 : undefined,
+        minWidth: isMobile ? 44 : undefined,
         borderRadius: "9999px",
         fontSize: "12px",
         fontWeight: 500,
@@ -3094,6 +3095,7 @@ function QualityCheckDisplay({ check }: { check: any }) {
 }
 
 function QualityCheckBadgeEmpty() {
+  const isMobile = useIsMobile();
   return (
     <span
       className="inline-flex items-center gap-1 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
@@ -3101,9 +3103,9 @@ function QualityCheckBadgeEmpty() {
         background: "#fef3c7",
         color: "#92400e",
         border: "1px solid #f59e0b",
-        padding: "6px 12px",
-        minHeight: 36,
-        minWidth: 60,
+        padding: isMobile ? "10px 12px" : "4px 10px",
+        minHeight: isMobile ? 44 : undefined,
+        minWidth: isMobile ? 44 : undefined,
         borderRadius: "9999px",
         fontSize: "12px",
         fontWeight: 500,
