@@ -241,8 +241,9 @@
   }
 }
 
-/* Portrait lock overlay for mobile */
-@media (max-width: 767px) and (orientation: landscape) {
+/* Portrait lock overlay for mobile — use aspect-ratio to avoid
+   false trigger when Android keyboard shrinks viewport height */
+@media (max-width: 767px) and (min-aspect-ratio: 13/10) {
   .portrait-lock-overlay {
     display: flex !important;
   }
