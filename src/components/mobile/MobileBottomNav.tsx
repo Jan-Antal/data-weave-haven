@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Factory } from "lucide-react";
+import { LayoutDashboard, Factory, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function MobileBottomNav() {
@@ -7,6 +7,7 @@ export function MobileBottomNav() {
   const navigate = useNavigate();
 
   const isProjectsActive = location.pathname === "/" && (location.state as any)?.view === "projects";
+  const isDashboardActive = location.pathname === "/" && (location.state as any)?.view !== "projects";
   const isVyrobaActive = location.pathname === "/vyroba";
 
   return (
@@ -28,6 +29,18 @@ export function MobileBottomNav() {
       >
         <LayoutDashboard className="h-5 w-5" />
         <span className="text-[10px] font-medium">Projekty</span>
+      </button>
+      <button
+        onClick={() => navigate("/", { state: { view: "dashboard" }, replace: false })}
+        className={cn(
+          "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
+          isDashboardActive
+            ? "text-primary-foreground bg-primary-foreground/10"
+            : "text-primary-foreground/70"
+        )}
+      >
+        <Home className="h-5 w-5" />
+        <span className="text-[10px] font-medium">Přehled</span>
       </button>
       <button
         onClick={() => navigate("/vyroba")}
