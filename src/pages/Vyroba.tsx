@@ -1364,9 +1364,6 @@ export default function Vyroba() {
             <DialogTitle className="flex items-center gap-2">
               <span className="font-mono text-xs" style={{ color: "#6b7280" }}>{selectedProject?.projectId}</span>
               <span>{selectedProject?.projectName}</span>
-              {logDayIndex >= 0 && logDayIndex !== todayDayIndex && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(220,38,38,0.1)", color: "#dc2626" }}>doplněno</span>
-              )}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-5 py-2">
