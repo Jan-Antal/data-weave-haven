@@ -571,7 +571,7 @@ const Index = () => {
       <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
       <CostBreakdownPresetsDialog open={costPresetsOpen} onOpenChange={setCostPresetsOpen} />
       <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
-      <AmiAssistant />
+      
       <AchievementCelebration />
     </div>
     </DataLogHighlightProvider>
