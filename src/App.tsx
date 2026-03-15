@@ -16,6 +16,7 @@ import Login from "./pages/Login";
 import SetPassword from "./pages/SetPassword";
 import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
+import InviteLanding from "./pages/InviteLanding";
 import PlanVyroby from "./pages/PlanVyroby";
 import Vyroba from "./pages/Vyroba";
 
