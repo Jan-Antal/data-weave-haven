@@ -320,7 +320,7 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
         </button>
       </section>
 
-      <div className="mx-0 my-3 border-t" style={{ borderColor: "#e5e3df" }} />
+      <div className="my-3 border-t" style={{ borderColor: "#e5e3df" }} />
 
       {/* Section 3: Poslední aktivita */}
       <section>
@@ -366,6 +366,7 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
           </button>
         )}
       </section>
+      </div>
     </div>
   );
 });
