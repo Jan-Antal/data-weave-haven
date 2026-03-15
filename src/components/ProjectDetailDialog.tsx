@@ -1719,7 +1719,21 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
             {/* Footer */}
             <div className="flex items-center justify-between px-6 py-3 border-t border-border shrink-0 max-md:sticky max-md:bottom-0 max-md:bg-background max-md:z-10 max-md:flex-wrap max-md:gap-2">
 
-              <div className="hidden md:flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                {/* Mobile: TPV list link */}
+                {onOpenTPVList && project && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="md:hidden gap-1.5 text-primary"
+                    onClick={() => { onOpenChange(false); onOpenTPVList(project.project_id, project.project_name); }}
+                  >
+                    <List className="h-3.5 w-3.5" />
+                    Zobrazit položky
+                  </Button>
+                )}
+                {/* Desktop: delete */}
+                <div className="hidden md:flex items-center gap-2">
                 {canDeleteProject && !isViewer && (
                   <>
                     {deleteStep === 0 && (
@@ -1753,6 +1767,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                     )}
                   </>
                 )}
+                </div>
               </div>
 
               {/* Right side — actions */}
