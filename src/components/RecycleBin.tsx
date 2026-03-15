@@ -122,9 +122,9 @@ function RecordRow({
   }
 
   return (
-    <div className="flex items-start gap-3 py-3 px-3 border-b last:border-b-0">
-      {/* Left: info */}
-      <div className="min-w-0 flex-1">
+    <div className="py-3 px-3 border-b last:border-b-0 space-y-2">
+      {/* Top: info */}
+      <div className="min-w-0">
         <p className="text-sm font-medium truncate">{displayName}</p>
         {isTPV && record._project_name && (
           <p className="text-xs text-muted-foreground mt-0.5">Projekt: {record._project_name}</p>
@@ -135,25 +135,25 @@ function RecordRow({
         </div>
       </div>
 
-      {/* Right: actions */}
-      <div className="flex items-center gap-1 shrink-0 pt-1">
+      {/* Bottom: actions */}
+      <div className="flex items-center gap-1">
         {!confirmDelete ? (
           <>
-            <Button variant="outline" size="sm" className="h-9 text-xs" onClick={handleRestore}>
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleRestore}>
               <RotateCcw className="h-3 w-3 mr-1" /> Obnovit
             </Button>
             {canPermanentDelete && (
-              <Button size="sm" className="h-9 text-xs bg-destructive hover:bg-destructive/90 text-destructive-foreground" onClick={() => setConfirmDelete(true)}>
+              <Button size="sm" className="h-8 text-xs bg-destructive hover:bg-destructive/90 text-destructive-foreground" onClick={() => setConfirmDelete(true)}>
                 <Trash2 className="h-3 w-3 mr-1" /> Trvale smazat
               </Button>
             )}
           </>
         ) : (
-          <div className="flex items-center gap-2">
+          <>
             <span className="text-xs text-destructive whitespace-nowrap">Opravdu smazat?</span>
-            <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setConfirmDelete(false)}>Zrušit</Button>
-            <Button size="sm" className="h-9 text-xs bg-destructive hover:bg-destructive/90 text-destructive-foreground" onClick={handlePermanentDelete}>Potvrdit</Button>
-          </div>
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setConfirmDelete(false)}>Zrušit</Button>
+            <Button size="sm" className="h-8 text-xs bg-destructive hover:bg-destructive/90 text-destructive-foreground" onClick={handlePermanentDelete}>Potvrdit</Button>
+          </>
         )}
       </div>
     </div>
@@ -197,32 +197,34 @@ export function RecycleBin({ open, onOpenChange }: RecycleBinProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[750px] max-h-[85vh] overflow-hidden">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Koš</DialogTitle>
           <p className="text-xs text-muted-foreground">Položky se automaticky mažou po 30 dnech</p>
         </DialogHeader>
         {isTestUser && <TestModeBanner />}
-        <div className={isTestUser ? "pointer-events-none opacity-80" : ""}>
-          <Tabs defaultValue={defaultTab} className="space-y-3">
-            <TabsList className="w-full flex">
+        <div className={`min-h-0 flex-1 overflow-hidden ${isTestUser ? "pointer-events-none opacity-80" : ""}`}>
+          <Tabs defaultValue={defaultTab} className="flex flex-col h-full">
+            <TabsList className="w-full shrink-0">
               {!isKonstrukter && <TabsTrigger value="projects" className="flex-1">Projekty</TabsTrigger>}
               {!isKonstrukter && <TabsTrigger value="stages" className="flex-1">Etapy</TabsTrigger>}
               <TabsTrigger value="tpv" className="flex-1">TPV položky</TabsTrigger>
             </TabsList>
-            {!isKonstrukter && (
-              <TabsContent value="projects">
-                <RecordList table="projects" nameField="project_name" idField="project_id" emptyText="Žádné smazané projekty" canPermanentDelete={canPermDeleteProjectsStages} />
+            <div className="mt-3 min-h-0 flex-1 overflow-auto">
+              {!isKonstrukter && (
+                <TabsContent value="projects" className="mt-0">
+                  <RecordList table="projects" nameField="project_name" idField="project_id" emptyText="Žádné smazané projekty" canPermanentDelete={canPermDeleteProjectsStages} />
+                </TabsContent>
+              )}
+              {!isKonstrukter && (
+                <TabsContent value="stages" className="mt-0">
+                  <RecordList table="project_stages" nameField="stage_name" emptyText="Žádné smazané etapy" canPermanentDelete={canPermDeleteProjectsStages} />
+                </TabsContent>
+              )}
+              <TabsContent value="tpv" className="mt-0">
+                <RecordList table="tpv_items" nameField="item_name" emptyText="Žádné smazané TPV položky" canPermanentDelete={canPermanentDelete && !isTestUser} isTPV />
               </TabsContent>
-            )}
-            {!isKonstrukter && (
-              <TabsContent value="stages">
-                <RecordList table="project_stages" nameField="stage_name" emptyText="Žádné smazané etapy" canPermanentDelete={canPermDeleteProjectsStages} />
-              </TabsContent>
-            )}
-            <TabsContent value="tpv">
-              <RecordList table="tpv_items" nameField="item_name" emptyText="Žádné smazané TPV položky" canPermanentDelete={canPermanentDelete && !isTestUser} isTPV />
-            </TabsContent>
+            </div>
           </Tabs>
         </div>
       </DialogContent>
