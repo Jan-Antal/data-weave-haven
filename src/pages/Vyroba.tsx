@@ -2644,7 +2644,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span className="inline-flex items-center gap-1 shrink-0 cursor-not-allowed opacity-50"
-                                  style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #f59e0b", padding: "4px 10px", borderRadius: "9999px", fontSize: "12px", fontWeight: 500, lineHeight: 1 }}>
+                                  style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #f59e0b", padding: "6px 12px", minHeight: '36px', minWidth: '60px', borderRadius: "9999px", fontSize: "12px", fontWeight: 500, lineHeight: 1 }}>
                                   <Shield className="h-3 w-3" /> QC
                                 </span>
                               </TooltipTrigger>
