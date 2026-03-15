@@ -2,14 +2,12 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Factory } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const TABS = [
-  { path: "/", label: "Projekty", icon: LayoutDashboard },
-  { path: "/vyroba", label: "Výroba", icon: Factory },
-] as const;
-
 export function MobileBottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
+
+  const isProjectsActive = location.pathname === "/" && (location.state as any)?.view === "projects";
+  const isVyrobaActive = location.pathname === "/vyroba";
 
   return (
     <nav
@@ -20,23 +18,26 @@ export function MobileBottomNav() {
         background: "#223937",
       }}
     >
-      {TABS.map((tab) => {
-        const isActive = location.pathname === tab.path;
-        const Icon = tab.icon;
-        return (
-          <button
-            key={tab.path}
-            onClick={() => tab.path === "/" ? navigate("/", { state: { view: "projects" } }) : navigate(tab.path)}
-            className={cn(
-              "flex flex-col items-center justify-center gap-0.5 min-w-[64px] min-h-[44px] transition-colors relative",
-              isActive ? "text-white" : "text-[#7aa8a4]"
-            )}
-          >
-            <Icon className="h-5 w-5" strokeWidth={isActive ? 2 : 1.75} />
-            <span className="text-[10px] font-medium">{tab.label}</span>
-          </button>
-        );
-      })}
+      <button
+        onClick={() => navigate("/", { state: { view: "projects" }, replace: false })}
+        className={cn(
+          "flex flex-col items-center justify-center gap-0.5 min-w-[64px] min-h-[44px] transition-colors relative",
+          isProjectsActive ? "text-white" : "text-[#7aa8a4]"
+        )}
+      >
+        <LayoutDashboard className="h-5 w-5" strokeWidth={isProjectsActive ? 2 : 1.75} />
+        <span className="text-[10px] font-medium">Projekty</span>
+      </button>
+      <button
+        onClick={() => navigate("/vyroba")}
+        className={cn(
+          "flex flex-col items-center justify-center gap-0.5 min-w-[64px] min-h-[44px] transition-colors relative",
+          isVyrobaActive ? "text-white" : "text-[#7aa8a4]"
+        )}
+      >
+        <Factory className="h-5 w-5" strokeWidth={isVyrobaActive ? 2 : 1.75} />
+        <span className="text-[10px] font-medium">Výroba</span>
+      </button>
     </nav>
   );
 }

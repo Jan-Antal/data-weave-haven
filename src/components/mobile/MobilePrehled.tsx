@@ -270,27 +270,27 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
                 ↑ Skrýt
               </button>
             )}
-          </div>
-        </section>
-      )}
+      </div>
+    </section>
+  )}
 
-      {overdueItems.length > 0 && <div className="mx-0 my-3 border-t" style={{ borderColor: "#e5e3df" }} />}
+  {overdueItems.length > 0 && <div className="my-3 border-t" style={{ borderColor: "#e5e3df" }} />}
 
-      {/* Section 2: Výroba tento týden */}
-      <section>
-        <h3 className="uppercase text-[13px] font-medium tracking-[0.04em] mb-2" style={{ color: "#223937" }}>
-          Výroba tento týden
-        </h3>
-        <button
-          onClick={() => navigate("/vyroba")}
-          className="w-full text-left active:scale-[0.98] transition-transform"
-          style={{
-            background: "#E1F5EE",
-            border: "0.5px solid #5DCAA5",
-            borderRadius: 10,
-            padding: "12px 14px",
-          }}
-        >
+  {/* Section 2: Výroba tento týden */}
+  <section>
+    <h3 className="uppercase text-[13px] font-medium tracking-[0.04em] mb-2" style={{ color: "#223937" }}>
+      Výroba tento týden
+    </h3>
+    <button
+      onClick={() => navigate("/vyroba")}
+      className="w-full text-left active:scale-[0.98] transition-transform"
+      style={{
+        background: "#ffffff",
+        border: "0.5px solid #e5e3df",
+        borderRadius: 10,
+        padding: 12,
+      }}
+    >
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[13px] font-medium" style={{ color: "#085041" }}>
