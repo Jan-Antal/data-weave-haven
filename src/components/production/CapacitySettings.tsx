@@ -392,7 +392,13 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const anyManualOverride = editingWeeks.some(wn => weekMap.get(wn)?.is_manual_override);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(val) => {
+        if (!val && hasPendingChanges) {
+          const confirmed = window.confirm("Máte neuložené změny. Opravdu chcete odejít bez uložení?");
+          if (!confirmed) return;
+        }
+        onOpenChange(val);
+      }}>
       <DialogContent className="max-w-[900px] max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
         <div className="px-6 pt-6 pb-2">
           <DialogHeader>
