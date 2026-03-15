@@ -193,7 +193,7 @@ const Index = () => {
     <ColumnVisibilityProvider>
     <ExportProvider>
     <DataLogHighlightProvider>
-    <div className={cn("h-screen bg-background flex flex-col overflow-hidden", isMobile && "pb-[126px]")}>
+    <div className={cn("h-screen bg-background flex flex-col overflow-hidden", isMobile && "pb-14")}>
       {/* TEST MODE banner */}
       {profile?.email === "alfred@ami-test.cz" && (
         <div className="bg-orange-500 text-white px-6 flex items-center justify-center gap-2 font-bold tracking-wide shrink-0" style={{ height: 32 }}>
@@ -418,7 +418,7 @@ const Index = () => {
       <div className="flex flex-1 overflow-hidden">
         {/* Mobile: Přehled or Projekty */}
         {isMobile ? (
-          <main className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-3 pb-16">
+          <main className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-3">
             {mobileTPVProject ? (
               <MobileTPVCardList
                 items={mobileTPVItems}

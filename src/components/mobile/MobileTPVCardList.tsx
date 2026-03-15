@@ -113,7 +113,7 @@ export function MobileTPVCardList({
       </div>
 
       {/* Card list */}
-      <div className="flex-1 overflow-y-auto pt-2 pb-20" style={{ padding: "8px 12px 80px 12px", background: "#ffffff" }}>
+      <div className="flex-1 overflow-y-auto pt-2" style={{ padding: "8px 12px 12px 12px", background: "#ffffff" }}>
         <div className="space-y-2">
           {filteredItems.map(item => {
             const statusOpt = statusOptions.find(o => o.label === item.status);
