@@ -329,7 +329,40 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   // ── Bulk-aware field save ────────────────────────────────────────
   const BULK_FIELDS = new Set(["status", "konstrukter", "sent_date", "accepted_date"]);
 
-  const saveField = (itemId: string, field: string, value: string, oldValue: string) => {
+  const saveField = async (itemId: string, field: string, value: string, oldValue: string) => {
+    // Intercept pocet changes — check if item is in production
+    if (field === "pocet" && value !== oldValue) {
+      const newPocet = Number(value) || 0;
+      const oldPocetNum = Number(oldValue) || 0;
+      if (newPocet !== oldPocetNum && newPocet > 0) {
+        // Check if this item exists in production_inbox or production_schedule
+        const item = items.find(i => i.id === itemId);
+        const itemCode = item?.item_name || "";
+        const itemName = item?.item_type || item?.item_name || "";
+
+        const { data: inboxHits } = await supabase
+          .from("production_inbox")
+          .select("id")
+          .eq("project_id", projectId)
+          .eq("item_name", itemCode)
+          .in("status", ["pending", "scheduled"])
+          .limit(1);
+
+        const { data: scheduleHits } = await supabase
+          .from("production_schedule")
+          .select("id")
+          .eq("project_id", projectId)
+          .eq("item_name", itemCode)
+          .in("status", ["scheduled", "in_progress"])
+          .limit(1);
+
+        if ((inboxHits && inboxHits.length > 0) || (scheduleHits && scheduleHits.length > 0)) {
+          setPocetWarning({ itemId, itemName: `${itemCode} ${itemName}`, itemCode, oldPocet: oldPocetNum, newPocet });
+          return; // Don't save yet — wait for dialog confirmation
+        }
+      }
+    }
+
     if (BULK_FIELDS.has(field) && selected.size > 1 && selected.has(itemId)) {
       for (const id of selected) {
         updateItem.mutate({ id, field, value, projectId });
@@ -339,7 +372,67 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     }
   };
 
-  // ── Header helpers ──────────────────────────────────────────────
+  const confirmPocetChange = async () => {
+    if (!pocetWarning) return;
+    const { itemId, itemCode, itemName, oldPocet, newPocet } = pocetWarning;
+    const item = items.find(i => i.id === itemId);
+    const itemKey = item?.item_name || "";
+
+    // 1. Save the new pocet to tpv_items
+    updateItem.mutate({ id: itemId, field: "pocet", value: String(newPocet), projectId, oldValue: String(oldPocet) });
+
+    // 2. Update production_inbox
+    const { data: inboxRows } = await supabase
+      .from("production_inbox")
+      .select("id, estimated_hours")
+      .eq("project_id", projectId)
+      .eq("item_name", itemKey)
+      .in("status", ["pending", "scheduled"]);
+
+    if (inboxRows && inboxRows.length > 0) {
+      for (const row of inboxRows) {
+        const newHours = Math.round(Number(row.estimated_hours) * (newPocet / oldPocet));
+        await supabase
+          .from("production_inbox")
+          .update({ estimated_hours: newHours } as any)
+          .eq("id", row.id);
+      }
+    }
+
+    // 3. Update production_schedule
+    const { data: scheduleRows } = await supabase
+      .from("production_schedule")
+      .select("id, scheduled_hours")
+      .eq("project_id", projectId)
+      .eq("item_name", itemKey)
+      .in("status", ["scheduled", "in_progress"]);
+
+    if (scheduleRows && scheduleRows.length > 0) {
+      for (const row of scheduleRows) {
+        const newHours = Math.round(Number(row.scheduled_hours) * (newPocet / oldPocet));
+        await supabase
+          .from("production_schedule")
+          .update({ scheduled_hours: newHours } as any)
+          .eq("id", row.id);
+      }
+    }
+
+    // 4. Log activity
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await logActivity({ projectId, userId: user.id, actionType: "item_scheduled", detail: `Počet upraven z ${oldPocet} na ${newPocet} ks (${itemName})` });
+      }
+    } catch { /* ignore logging errors */ }
+
+    // 5. Toast + invalidate
+    toast({ title: "Počet aktualizován — výrobní plán byl upraven" });
+    queryClient.invalidateQueries({ queryKey: ["production-inbox"] });
+    queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
+    queryClient.invalidateQueries({ queryKey: ["tpv-items"] });
+
+    setPocetWarning(null);
+  };
   // Build list of all current column labels for duplicate detection
   const allCurrentLabels = useMemo(() => {
     return renderKeys.map(key => {
