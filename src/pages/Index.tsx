@@ -281,20 +281,24 @@ const Index = () => {
 
             <span className="w-px h-5 bg-primary-foreground/20 mx-1" />
 
-            <button
-              onClick={() => navigate("/vyroba")}
-              className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
-              title="Výroba"
-            >
-              <Factory className="h-5 w-5" />
-            </button>
-            <button
-              onClick={() => navigate("/plan-vyroby")}
-              className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
-              title="Plán Výroby"
-            >
-              <CalendarRange className="h-5 w-5" />
-            </button>
+            {(isAdmin || isOwner) && (
+              <button
+                onClick={() => navigate("/vyroba")}
+                className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+                title="Výroba"
+              >
+                <Factory className="h-5 w-5" />
+              </button>
+            )}
+            {(isAdmin || isOwner) && (
+              <button
+                onClick={() => navigate("/plan-vyroby")}
+                className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+                title="Plán Výroby"
+              >
+                <CalendarRange className="h-5 w-5" />
+              </button>
+            )}
             <button
               className="p-2 rounded-md text-primary-foreground bg-primary-foreground/10 transition-colors cursor-default"
               title="Přehled projektů"

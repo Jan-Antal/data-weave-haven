@@ -1,14 +1,18 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Factory, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 export function MobileBottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { isAdmin, isOwner } = useAuth();
 
   const isProjectsActive = location.pathname === "/" && (location.state as any)?.view === "projects";
   const isDashboardActive = location.pathname === "/" && (location.state as any)?.view !== "projects";
   const isVyrobaActive = location.pathname === "/vyroba";
+
+  const canAccessProduction = isAdmin || isOwner;
 
   // Close DataLog panels on all modules when navigating via bottom nav
   const closeDataLog = () => {
@@ -58,18 +62,20 @@ export function MobileBottomNav() {
         <Home className="h-5 w-5" />
         <span className="text-[10px] font-medium">Přehled</span>
       </button>
-      <button
-        onClick={(e) => handleNav(e, "/vyroba")}
-        className={cn(
-          "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
-          isVyrobaActive
-            ? "text-primary-foreground bg-primary-foreground/10"
-            : "text-primary-foreground/70"
-        )}
-      >
-        <Factory className="h-5 w-5" />
-        <span className="text-[10px] font-medium">Výroba</span>
-      </button>
+      {canAccessProduction && (
+        <button
+          onClick={(e) => handleNav(e, "/vyroba")}
+          className={cn(
+            "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
+            isVyrobaActive
+              ? "text-primary-foreground bg-primary-foreground/10"
+              : "text-primary-foreground/70"
+          )}
+        >
+          <Factory className="h-5 w-5" />
+          <span className="text-[10px] font-medium">Výroba</span>
+        </button>
+      )}
     </nav>
   );
 }
