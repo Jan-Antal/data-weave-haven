@@ -269,33 +269,40 @@ serve(async (req) => {
       // Determine tpv_start (earliest possible production start)
       let tpvStart: Date;
       if (proj.datum_tpv) {
-        const parsed = new Date(proj.datum_tpv);
-        tpvStart = isNaN(parsed.getTime()) ? addWeeks(today, 2) : parsed;
+        const parsed = parseFlexDate(proj.datum_tpv);
+        tpvStart = parsed ?? addWeeks(today, 2);
       } else if (proj.datum_objednavky) {
-        const parsed = new Date(proj.datum_objednavky);
+        const parsed = parseFlexDate(proj.datum_objednavky);
         const tpvWeeks = estimateTpvWeeks(tpvCount);
-        tpvStart = isNaN(parsed.getTime()) ? addWeeks(today, 2) : addWeeks(parsed, tpvWeeks);
+        tpvStart = parsed ? addWeeks(parsed, tpvWeeks) : addWeeks(today, 2);
       } else {
         tpvStart = addWeeks(today, 2);
       }
       // tpvStart must not be in the past and must be valid
       if (isNaN(tpvStart.getTime()) || tpvStart < today) tpvStart = new Date(today);
 
-      // Determine deadline
-      const deadlineStr = proj.expedice || proj.montaz || proj.predani || proj.datum_smluvni;
+      // Determine deadline — use parseFlexDate for robust parsing
+      const deadlineFields = [
+        { val: proj.expedice, src: "expedice" },
+        { val: proj.montaz, src: "montaz" },
+        { val: proj.predani, src: "predani" },
+        { val: proj.datum_smluvni, src: "smluvni" },
+      ];
       let deadline: Date;
       let deadlineSource: string;
-      if (deadlineStr) {
-        const parsed = new Date(deadlineStr);
-        if (!isNaN(parsed.getTime())) {
-          deadline = parsed;
-          deadlineSource = proj.expedice ? "expedice" : proj.montaz ? "montaz" : proj.predani ? "predani" : "smluvni";
-        } else {
-          const fbWeeks = statusFallbackWeeks[proj.status] || 8;
-          deadline = addWeeks(tpvStart, fbWeeks);
-          deadlineSource = "fallback";
+      let foundDeadline = false;
+      for (const f of deadlineFields) {
+        if (f.val) {
+          const parsed = parseFlexDate(f.val);
+          if (parsed) {
+            deadline = parsed;
+            deadlineSource = f.src;
+            foundDeadline = true;
+            break;
+          }
         }
-      } else {
+      }
+      if (!foundDeadline) {
         const fbWeeks = statusFallbackWeeks[proj.status] || 8;
         deadline = addWeeks(tpvStart, fbWeeks);
         deadlineSource = "fallback";
