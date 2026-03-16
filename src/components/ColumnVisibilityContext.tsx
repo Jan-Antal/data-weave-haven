@@ -116,8 +116,21 @@ export function ColumnVisibilityProvider({ children }: { children: ReactNode }) 
   );
 }
 
+const EMPTY_VIS: ColumnVisibilityState = {
+  isVisible: () => true,
+  toggleColumn: () => {},
+  columns: [],
+  hiddenColumns: new Set(),
+};
+
+const EMPTY_CTX: ColumnVisibilityContextType = {
+  projectInfo: EMPTY_VIS,
+  pmStatus: EMPTY_VIS,
+  tpvStatus: EMPTY_VIS,
+};
+
 export function useAllColumnVisibility() {
   const ctx = useContext(Ctx);
-  if (!ctx) throw new Error("ColumnVisibilityProvider missing");
-  return ctx;
+  // Return empty fallback when used outside provider (e.g. TPVList in Dialog)
+  return ctx ?? EMPTY_CTX;
 }
