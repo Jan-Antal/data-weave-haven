@@ -1389,7 +1389,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                       >
                         {proj.inboxTotalHours > 0 && (
                           <div className="rounded-md px-2 py-0.5 text-center text-[10px] font-mono font-bold" style={{ backgroundColor: "#ffedd5", color: "#c2410c" }}>
-                            {formatInboxValue(proj.inboxTotalHours, proj.inboxTotalCzk, proj.totalHours)}
+                            {formatInboxValue(proj.inboxTotalHours, proj.inboxTotalCzk, proj.totalHours, proj.projectId)}
                           </div>
                         )}
                       </div>
