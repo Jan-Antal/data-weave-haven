@@ -645,6 +645,13 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
               defaultExpanded={allExpanded}
               onNavigateToTPV={onNavigateToTPV}
               onOpenProjectDetail={onOpenProjectDetail}
+              onContextMenu={(e) => {
+                e.preventDefault(); e.stopPropagation();
+                const actions: ContextMenuAction[] = [];
+                if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(p.project_id) });
+                if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(p.project_id) });
+                if (actions.length > 0) setContextMenu({ x: e.clientX, y: Math.min(e.clientY, window.innerHeight - 200), actions });
+              }}
             />
           );
         })}
@@ -675,6 +682,13 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
               return (
               <div key={p.project_id} className="flex items-center gap-1.5 px-2 py-[4px] rounded-[5px] cursor-pointer"
                 onClick={(e) => { e.stopPropagation(); onSelectProject?.(p.project_id); }}
+                onContextMenu={(e) => {
+                  e.preventDefault(); e.stopPropagation();
+                  const actions: ContextMenuAction[] = [];
+                  if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(p.project_id) });
+                  if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(p.project_id) });
+                  if (actions.length > 0) setContextMenu({ x: e.clientX, y: Math.min(e.clientY, window.innerHeight - 200), actions });
+                }}
                 style={{
                   backgroundColor: isCompletedSelected ? "rgba(217,119,6,0.05)" : "#f5f3f0",
                   borderTop: isCompletedSelected ? "2px solid #d97706" : "1px solid #e5e2dd",
@@ -931,7 +945,7 @@ function MissingItemsProgressBar({ progress }: { progress: ProjectProgress }) {
   );
 }
 /** Project card for projects with missing items — mirrors InboxProjectGroup layout */
-function MissingItemProjectCard({ progress, projectInfo, urgency, daysLabel, isSelected, onSelectProject, defaultExpanded, onNavigateToTPV, onOpenProjectDetail }: {
+function MissingItemProjectCard({ progress, projectInfo, urgency, daysLabel, isSelected, onSelectProject, defaultExpanded, onNavigateToTPV, onOpenProjectDetail, onContextMenu }: {
   progress: ProjectProgress;
   projectInfo?: { datum_smluvni: string | null; status: string | null; expedice: string | null; montaz: string | null; predani?: string | null };
   urgency: UrgencyLevel;
@@ -941,6 +955,7 @@ function MissingItemProjectCard({ progress, projectInfo, urgency, daysLabel, isS
   defaultExpanded: boolean;
   onNavigateToTPV?: (projectId: string) => void;
   onOpenProjectDetail?: (projectId: string) => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const color = getProjectColor(progress.project_id);
@@ -974,6 +989,7 @@ function MissingItemProjectCard({ progress, projectInfo, urgency, daysLabel, isS
     }}>
       <button
         onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); onSelectProject?.(progress.project_id); }}
+        onContextMenu={onContextMenu}
         className="w-full flex items-center gap-1.5 px-2.5 py-[5px] text-left transition-colors"
         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
