@@ -507,11 +507,23 @@ serve(async (req) => {
       }
     }
 
+    // Aggregate safety net entries by project_id (splitIntoBlocks may create multiple entries for the same project)
+    const safetyNetMap = new Map<string, typeof safetyNet[0]>();
+    for (const entry of safetyNet) {
+      const existing = safetyNetMap.get(entry.project_id);
+      if (existing) {
+        existing.estimated_hours += entry.estimated_hours;
+      } else {
+        safetyNetMap.set(entry.project_id, { ...entry });
+      }
+    }
+    const aggregatedSafetyNet = Array.from(safetyNetMap.values());
+
     // Build weekUsage for frontend compatibility
     const weekUsage: Record<string, number> = {};
     for (const wk of weekKeys) weekUsage[wk] = usage[wk] || 0;
 
-    return new Response(JSON.stringify({ blocks, weekKeys, weekUsage, safetyNet, hourlyRate }), {
+    return new Response(JSON.stringify({ blocks, weekKeys, weekUsage, safetyNet: aggregatedSafetyNet, hourlyRate }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 

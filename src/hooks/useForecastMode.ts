@@ -268,8 +268,14 @@ export function useForecastMode(): UseForecastModeReturn {
       if (block && block.source === "project_estimate") {
         // Move to safety net instead of deleting
         setSafetyNetProjects(sn => {
-          // Avoid duplicates
-          if (sn.some(p => p.project_id === block.project_id)) return sn;
+          const existing = sn.find(p => p.project_id === block.project_id);
+          if (existing) {
+            // Aggregate hours into existing entry
+            return sn.map(p => p.project_id === block.project_id
+              ? { ...p, estimated_hours: p.estimated_hours + block.estimated_hours }
+              : p
+            );
+          }
           return [...sn, {
             project_id: block.project_id,
             project_name: block.project_name,
