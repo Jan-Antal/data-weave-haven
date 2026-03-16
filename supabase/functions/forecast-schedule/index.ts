@@ -173,25 +173,10 @@ function calcPriorityScore(proj: any, deadlineDate: Date | null, today: Date): n
   return score;
 }
 
-// Split hours into meaningful blocks (continuity rule)
-function splitIntoBlocks(totalHours: number, weeklyCapacity: number): number[] {
-  const minBlock = Math.max(100, Math.round(totalHours * 0.20));
-  if (totalHours <= weeklyCapacity * 1.1) return [totalHours];
-  if (totalHours <= weeklyCapacity * 2.2) {
-    const half = Math.round(totalHours / 2);
-    return [half, totalHours - half];
-  }
-  const n = Math.floor(totalHours / minBlock);
-  const blockSize = Math.round(totalHours / n);
-  const blocks: number[] = [];
-  let remaining = totalHours;
-  for (let i = 0; i < n - 1; i++) {
-    blocks.push(blockSize);
-    remaining -= blockSize;
-  }
-  blocks.push(remaining);
-  return blocks;
-}
+// Target utilization: 100-125% of weekly capacity
+const TARGET_MIN = 1.00;
+const TARGET_MAX = 1.25;
+const TARGET_MID = (TARGET_MIN + TARGET_MAX) / 2; // 1.125
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -282,7 +267,6 @@ serve(async (req) => {
       deadline: Date;
       deadlineSource: string;
       priorityScore: number;
-      fillForward: boolean;
       estimationLevel: number;
       estimationBadge: string;
       tpvCount: number;
@@ -346,8 +330,6 @@ serve(async (req) => {
       if (deadline < tpvStart) deadline = addWeeks(tpvStart, 2);
 
       const priorityScore = calcPriorityScore(proj, deadline, today);
-      const weeksUntilDeadline = Math.floor((deadline.getTime() - today.getTime()) / (7 * 86400000));
-      const fillForward = weeksUntilDeadline > 6;
 
       workItems.push({
         projectId: proj.project_id,
@@ -357,7 +339,9 @@ serve(async (req) => {
         deadline,
         deadlineSource,
         priorityScore,
-        fillForward,
+        estimationLevel: estimation.level,
+        estimationBadge: estimation.badge,
+        tpvCount,
         estimationLevel: estimation.level,
         estimationBadge: estimation.badge,
         tpvCount,
@@ -407,75 +391,50 @@ serve(async (req) => {
       group.totalHours += Number(item.estimated_hours) || 0;
     }
 
-    // Schedule inbox projects into the current week (or earliest available)
+    // Schedule inbox projects into earliest available week (respecting 125% max)
     for (const [pid, group] of inboxByProject) {
-      const currentWeekKey = weekKeys[0];
-      // Try to fit in current week, then next weeks
+      let hoursToPlace = group.totalHours;
       let placed = false;
       for (const wk of weekKeys) {
-        const avail = weeklyCapacity - (usage[wk] || 0);
-        if (avail >= Math.min(group.totalHours * 0.5, 50)) {
-          const alloc = Math.min(group.totalHours, avail);
-          blocks.push({
-            id: `inbox-${pid}-${wk}-${blocks.length}`,
-            project_id: pid,
-            project_name: group.projectName,
-            bundle_description: `${group.items.length} položek z Inboxu`,
-            week: wk,
-            estimated_hours: alloc,
-            tpv_item_count: group.items.length,
-            confidence: "high" as const,
-            source: "inbox_item",
-            deadline: group.deadline ? group.deadline.toISOString().split("T")[0] : null,
-            deadline_source: group.deadlineSource,
-            is_forecast: true,
-            estimation_level: 1,
-            estimation_badge: "Inbox",
-            inbox_item_ids: group.items.map(i => i.id),
-          });
-          usage[wk] = (usage[wk] || 0) + alloc;
-          placed = true;
-
-          // If not all hours fit, schedule remainder in next week
-          const remaining = group.totalHours - alloc;
-          if (remaining > 0) {
-            const nextWkIdx = weekKeys.indexOf(wk) + 1;
-            if (nextWkIdx < weekKeys.length) {
-              const nextWk = weekKeys[nextWkIdx];
-              blocks.push({
-                id: `inbox-${pid}-${nextWk}-${blocks.length}`,
-                project_id: pid,
-                project_name: group.projectName,
-                bundle_description: `${group.items.length} položek z Inboxu (pokr.)`,
-                week: nextWk,
-                estimated_hours: remaining,
-                tpv_item_count: group.items.length,
-                confidence: "high" as const,
-                source: "inbox_item",
-                deadline: group.deadline ? group.deadline.toISOString().split("T")[0] : null,
-                deadline_source: group.deadlineSource,
-                is_forecast: true,
-                estimation_level: 1,
-                estimation_badge: "Inbox",
-                inbox_item_ids: group.items.map(i => i.id),
-              });
-              usage[nextWk] = (usage[nextWk] || 0) + remaining;
-            }
-          }
-          break;
-        }
+        if (hoursToPlace <= 0) break;
+        const currentUsage = usage[wk] || 0;
+        const maxCap = weeklyCapacity * TARGET_MAX;
+        const roomToMax = Math.max(0, maxCap - currentUsage);
+        if (roomToMax <= 0) continue;
+        
+        const alloc = Math.min(hoursToPlace, roomToMax);
+        blocks.push({
+          id: `inbox-${pid}-${wk}-${blocks.length}`,
+          project_id: pid,
+          project_name: group.projectName,
+          bundle_description: `${group.items.length} položek z Inboxu`,
+          week: wk,
+          estimated_hours: Math.round(alloc),
+          tpv_item_count: group.items.length,
+          confidence: "high" as const,
+          source: "inbox_item",
+          deadline: group.deadline ? group.deadline.toISOString().split("T")[0] : null,
+          deadline_source: group.deadlineSource,
+          is_forecast: true,
+          estimation_level: 1,
+          estimation_badge: "Inbox",
+          inbox_item_ids: group.items.map(i => i.id),
+        });
+        usage[wk] = currentUsage + alloc;
+        hoursToPlace -= alloc;
+        placed = true;
       }
-      if (!placed) {
+      if (!placed || hoursToPlace > 0) {
         safetyNet.push({
           project_id: pid,
           project_name: group.projectName,
-          estimated_hours: group.totalHours,
+          estimated_hours: Math.round(hoursToPlace),
           estimation_badge: "Inbox – neplánovatelné",
         });
       }
     }
 
-    // 6b. Schedule project estimate blocks
+    // 6b. Schedule project estimate blocks — BACKWARD from deadline, targeting 100-125% capacity
     // Calculate inbox hours already attributed per project to avoid double-counting
     const inboxHoursByProject = new Map<string, number>();
     for (const [pid, group] of inboxByProject) {
@@ -508,49 +467,57 @@ serve(async (req) => {
         continue;
       }
 
-      const blockHours = splitIntoBlocks(remainingHours, weeklyCapacity);
-      const minBlock = Math.max(100, Math.round(remainingHours * 0.20));
+      // Always schedule BACKWARD from deadline — latest possible start
+      const weekRange = weekKeys.slice(startIdx, endIdx + 1).reverse();
 
-      let scheduled = 0;
-      const weekRange = weekKeys.slice(startIdx, endIdx + 1);
-      const orderedWeeks = work.fillForward ? weekRange : [...weekRange].reverse();
-
-      for (const blockH of blockHours) {
-        let placed = false;
-        for (const wk of orderedWeeks) {
-          const avail = weeklyCapacity - (usage[wk] || 0);
-          if (avail >= Math.min(minBlock, blockH * 0.8)) {
-            const alloc = Math.min(blockH, avail);
-            blocks.push({
-              id: `${work.projectId}-${wk}-${blocks.length}`,
-              project_id: work.projectId,
-              project_name: work.projectName,
-              bundle_description: `${work.tpvCount} položek`,
-              week: wk,
-              estimated_hours: alloc,
-              tpv_item_count: work.tpvCount,
-              confidence: work.estimationLevel <= 2 ? "high" : work.estimationLevel === 3 ? "medium" : "low",
-              source: "project_estimate",
-              deadline: work.deadline.toISOString().split("T")[0],
-              deadline_source: work.deadlineSource,
-              is_forecast: true,
-              estimation_level: work.estimationLevel,
-              estimation_badge: work.estimationBadge,
-            });
-            usage[wk] = (usage[wk] || 0) + alloc;
-            scheduled += alloc;
-            placed = true;
-            break;
-          }
-        }
-        if (!placed) {
-          safetyNet.push({
-            project_id: work.projectId,
-            project_name: work.projectName,
-            estimated_hours: blockH,
-            estimation_badge: work.estimationBadge,
-          });
-        }
+      let hoursToPlace = remainingHours;
+      for (const wk of weekRange) {
+        if (hoursToPlace <= 0) break;
+        
+        const currentUsage = usage[wk] || 0;
+        const targetCap = weeklyCapacity * TARGET_MID; // ~112.5%
+        const maxCap = weeklyCapacity * TARGET_MAX;    // 125%
+        
+        // How much room is there to reach the target zone?
+        const roomToTarget = Math.max(0, targetCap - currentUsage);
+        const roomToMax = Math.max(0, maxCap - currentUsage);
+        
+        // Skip weeks already at or above max
+        if (roomToMax <= 0) continue;
+        
+        // Allocate: fill up to target zone, but at least some minimum portion
+        const alloc = Math.min(hoursToPlace, Math.max(roomToTarget, Math.min(hoursToPlace, roomToMax)));
+        
+        if (alloc <= 0) continue;
+        
+        blocks.push({
+          id: `${work.projectId}-${wk}-${blocks.length}`,
+          project_id: work.projectId,
+          project_name: work.projectName,
+          bundle_description: `${work.tpvCount} položek`,
+          week: wk,
+          estimated_hours: Math.round(alloc),
+          tpv_item_count: work.tpvCount,
+          confidence: work.estimationLevel <= 2 ? "high" : work.estimationLevel === 3 ? "medium" : "low",
+          source: "project_estimate",
+          deadline: work.deadline.toISOString().split("T")[0],
+          deadline_source: work.deadlineSource,
+          is_forecast: true,
+          estimation_level: work.estimationLevel,
+          estimation_badge: work.estimationBadge,
+        });
+        usage[wk] = currentUsage + alloc;
+        hoursToPlace -= alloc;
+      }
+      
+      // If hours remain after filling all available weeks, push to safety net
+      if (hoursToPlace > MIN_HOURS * 0.5) {
+        safetyNet.push({
+          project_id: work.projectId,
+          project_name: work.projectName,
+          estimated_hours: Math.round(hoursToPlace),
+          estimation_badge: work.estimationBadge,
+        });
       }
     }
 
@@ -566,9 +533,18 @@ serve(async (req) => {
     }
     const aggregatedSafetyNet = Array.from(safetyNetMap.values());
 
-    // Build weekUsage for frontend compatibility
+    // Build weekUsage for frontend compatibility + log utilization
     const weekUsage: Record<string, number> = {};
-    for (const wk of weekKeys) weekUsage[wk] = usage[wk] || 0;
+    const usedWeeks: string[] = [];
+    for (const wk of weekKeys) {
+      weekUsage[wk] = usage[wk] || 0;
+      if (usage[wk] > 0) {
+        const pct = Math.round((usage[wk] / weeklyCapacity) * 100);
+        usedWeeks.push(`${wk}: ${Math.round(usage[wk])}h (${pct}%)`);
+      }
+    }
+    console.log(`[Forecast] Utilization per week:\n${usedWeeks.join("\n")}`);
+    console.log(`[Forecast] ${blocks.length} blocks, ${aggregatedSafetyNet.length} in safety net`);
 
     return new Response(JSON.stringify({ blocks, weekKeys, weekUsage, safetyNet: aggregatedSafetyNet, hourlyRate }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
