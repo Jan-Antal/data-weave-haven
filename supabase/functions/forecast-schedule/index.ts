@@ -92,6 +92,16 @@ function parseFlexDate(raw: string | null | undefined): Date | null {
   return isNaN(fallback.getTime()) ? null : fallback;
 }
 
+// Normalize margin: stored as decimal (0.25) or whole number (25) — detect and return as fraction (0.25)
+function normalizeMarze(raw: any): number | null {
+  if (raw == null || raw === "") return null;
+  const num = Number(raw);
+  if (isNaN(num)) return null;
+  // If value is >= 1, it's a whole-number percentage (e.g. 25 → 0.25)
+  // If value is < 1 (e.g. 0.25), it's already a decimal fraction
+  return num >= 1 ? num / 100 : num;
+}
+
 function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number, costPresets: any[], defaultPreset: any, eurCzkRate: number): { hours: number; level: number; badge: string } {
   // LEVEL 1 — sum from TPV items that have cena set
   const itemsWithPrice = projTpvItems.filter((t: any) => t.cena && Number(t.cena) > 0);
@@ -101,13 +111,13 @@ function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number
       ? costPresets.find((p: any) => p.id === proj.cost_preset_id)
       : defaultPreset;
     const vyrobaPct = preset?.production_pct ?? 35;
-    const effectiveMarze = proj.marze != null ? Number(proj.marze) : 15;
+    const marzeFraction = normalizeMarze(proj.marze) ?? 0.15;
     const currencyMultiplier = (proj.currency === "EUR") ? eurCzkRate : 1;
 
     let totalHours = 0;
     for (const item of itemsWithPrice) {
       const itemCena = Number(item.cena) * (Number(item.pocet) || 1);
-      const naklady = itemCena * (1 - effectiveMarze / 100);
+      const naklady = itemCena * (1 - marzeFraction);
       totalHours += naklady * (vyrobaPct / 100) / hourlyRate;
     }
 
@@ -117,7 +127,7 @@ function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number
       const totalItems = projTpvItems.length;
       const remainingShare = itemsWithoutPrice.length / totalItems;
       const remainingCena = Number(proj.prodejni_cena) * currencyMultiplier * remainingShare;
-      const naklady = remainingCena * (1 - effectiveMarze / 100);
+      const naklady = remainingCena * (1 - marzeFraction);
       totalHours += naklady * (vyrobaPct / 100) / hourlyRate;
     }
 
@@ -127,7 +137,7 @@ function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number
   // LEVEL 2 — project price + preset
   const currencyMultiplier = (proj.currency === "EUR") ? eurCzkRate : 1;
   const prodejniCena = (Number(proj.prodejni_cena) || 0) * currencyMultiplier;
-  const marze = proj.marze != null ? Number(proj.marze) : null;
+  const marze = normalizeMarze(proj.marze);
   const preset = proj.cost_preset_id
     ? costPresets.find((p: any) => p.id === proj.cost_preset_id)
     : defaultPreset;
@@ -135,8 +145,8 @@ function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number
   if (!preset || prodejniCena === 0) {
     return { hours: MIN_HOURS, level: 4, badge: "⚠ Chybí podklady" };
   }
-  const effectiveMarze = marze ?? 15;
-  const naklady = prodejniCena * (1 - effectiveMarze / 100);
+  const effectiveMarze = marze ?? 0.15;
+  const naklady = prodejniCena * (1 - effectiveMarze);
   const hours = clampHours(naklady * (Number(preset.production_pct) / 100) / hourlyRate);
   const level = proj.cost_preset_id ? 2 : marze != null ? 2 : 3;
   const badge = level === 2 ? "Výroba – odhad" : "Výroba – odhad (def. marže)";
