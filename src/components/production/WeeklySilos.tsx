@@ -954,19 +954,24 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
   showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive }: SiloProps) {
   // Capacity calculation: exclude paused items
   // Active hours (excl. paused), split into blocker and non-blocker
-  const { activeHours, blockerHours } = useMemo(() => {
-    if (!silo) return { activeHours: 0, blockerHours: 0 };
+  const { activeHours, blockerHours, activeSellingCzk, blockerSellingCzk } = useMemo(() => {
+    if (!silo) return { activeHours: 0, blockerHours: 0, activeSellingCzk: 0, blockerSellingCzk: 0 };
     let active = 0;
     let blocker = 0;
+    let activeSelling = 0;
+    let blockerSelling = 0;
     for (const b of silo.bundles) {
+      const proj = projectLookup.get(b.project_id);
       for (const i of b.items) {
         if (i.status === "paused") continue;
-        if (i.is_blocker) blocker += i.scheduled_hours;
-        else active += i.scheduled_hours;
+        const prodCzk = i.scheduled_hours * hourlyRate;
+        const sellCzk = productionCzkToSellingPrice(prodCzk, proj?.cost_production_pct, proj?.marze);
+        if (i.is_blocker) { blocker += i.scheduled_hours; blockerSelling += sellCzk; }
+        else { active += i.scheduled_hours; activeSelling += sellCzk; }
       }
     }
-    return { activeHours: active, blockerHours: blocker };
-  }, [silo]);
+    return { activeHours: active, blockerHours: blocker, activeSellingCzk: activeSelling, blockerSellingCzk: blockerSelling };
+  }, [silo, projectLookup, hourlyRate]);
 
   // Forecast layer is isolated and read-only, rendered separately per week
   const weekForecastBlocks = useMemo(() => {
