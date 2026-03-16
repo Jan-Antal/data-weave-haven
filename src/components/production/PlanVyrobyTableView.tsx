@@ -1762,7 +1762,7 @@ function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCe
               }
             }}
           >
-            {formatCellValue(alloc.hours, alloc.czk, alloc.status, item.totalHours, alloc.splitPart, alloc.splitTotal)}
+            {formatCellValue(alloc.hours, alloc.czk, alloc.status, item.totalHours, alloc.splitPart, alloc.splitTotal, item.projectId)}
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-52 p-0" align="center" sideOffset={4}>
