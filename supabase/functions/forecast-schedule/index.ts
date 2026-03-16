@@ -212,7 +212,8 @@ serve(async (req) => {
 
     for (const proj of projects) {
       const tpvCount = tpvCountByProject.get(proj.project_id) || 0;
-      const estimation = estimateProjectHours(proj, tpvCount, hourlyRate, costPresets, defaultPreset);
+      const projTpv = tpvItems.filter((t: any) => t.project_id === proj.project_id);
+      const estimation = estimateProjectHours(proj, projTpv, hourlyRate, costPresets, defaultPreset);
 
       // Determine tpv_start (earliest possible production start)
       let tpvStart: Date;
