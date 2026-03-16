@@ -723,20 +723,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-3 border-t border-border shrink-0">
-          <div>
-            {isAdmin && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-destructive border-destructive/30 hover:bg-destructive/10"
-                onClick={() => setCleanupConfirmOpen(true)}
-                disabled={isCleaningUp}
-              >
-                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                {isCleaningUp ? "Mazání…" : "Vyčistit testovací data"}
-              </Button>
-            )}
-          </div>
+          <div></div>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={handleCancel}>Zrušit změny</Button>
             <Button onClick={handleSaveAll}>Uložit změny</Button>
