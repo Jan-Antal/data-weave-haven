@@ -370,32 +370,86 @@ export function useForecastMode(): UseForecastModeReturn {
         .single();
       const hourlyRate = Number(settings?.hourly_rate) || 550;
 
-      // Build all rows for batch insert
-      const rows = committable.map(block => {
-        const isBlocker = block.source === "project_estimate";
-        return {
-          project_id: block.project_id,
-          item_name: isBlocker
-            ? `${block.project_name} — Rezerva kapacity`
-            : block.bundle_description,
-          scheduled_week: block.week,
-          scheduled_hours: block.estimated_hours,
-          scheduled_czk: isBlocker ? 0 : block.estimated_hours * hourlyRate,
-          position: 999,
-          status: "scheduled",
-          created_by: userId,
-          is_blocker: isBlocker,
-          tpv_expected_date: isBlocker ? (block.tpv_expected_date || null) : null,
-        };
-      });
+      // Separate inbox blocks from project estimate blocks
+      const inboxBlocks = committable.filter(b => b.source === "inbox_item");
+      const blockerBlocks = committable.filter(b => b.source === "project_estimate");
 
-      const blockerCount = rows.filter(r => r.is_blocker).length;
-      const normalCount = rows.filter(r => !r.is_blocker).length;
+      // Collect all inbox item IDs from inbox blocks
+      const allInboxItemIds: string[] = [];
+      for (const block of inboxBlocks) {
+        const ids = (block as any).inbox_item_ids;
+        if (Array.isArray(ids)) allInboxItemIds.push(...ids);
+      }
+
+      // Fetch actual inbox items to create individual schedule rows
+      let inboxRows: any[] = [];
+      if (allInboxItemIds.length > 0) {
+        const { data: inboxItems } = await supabase
+          .from("production_inbox")
+          .select("id, project_id, item_name, item_code, estimated_hours, estimated_czk, stage_id")
+          .in("id", allInboxItemIds);
+
+        if (inboxItems && inboxItems.length > 0) {
+          // Group inbox items by project, then distribute across the weeks assigned to that project's blocks
+          const inboxBlocksByProject = new Map<string, typeof inboxBlocks>();
+          for (const block of inboxBlocks) {
+            const pid = block.project_id;
+            if (!inboxBlocksByProject.has(pid)) inboxBlocksByProject.set(pid, []);
+            inboxBlocksByProject.get(pid)!.push(block);
+          }
+
+          for (const item of inboxItems) {
+            // Find the first inbox block for this project to get the target week
+            const projectBlocks = inboxBlocksByProject.get(item.project_id);
+            const targetWeek = projectBlocks?.[0]?.week || inboxBlocks[0]?.week;
+
+            inboxRows.push({
+              project_id: item.project_id,
+              item_name: item.item_name,
+              item_code: item.item_code,
+              stage_id: item.stage_id,
+              inbox_item_id: item.id,
+              scheduled_week: targetWeek,
+              scheduled_hours: Number(item.estimated_hours) || 0,
+              scheduled_czk: Number(item.estimated_czk) || 0,
+              position: 999,
+              status: "scheduled",
+              created_by: userId,
+              is_blocker: false,
+            });
+          }
+        }
+      }
+
+      // Build blocker rows
+      const blockerRows = blockerBlocks.map(block => ({
+        project_id: block.project_id,
+        item_name: `${block.project_name} — Rezerva kapacity`,
+        scheduled_week: block.week,
+        scheduled_hours: block.estimated_hours,
+        scheduled_czk: 0,
+        position: 999,
+        status: "scheduled",
+        created_by: userId,
+        is_blocker: true,
+        tpv_expected_date: block.tpv_expected_date || null,
+      }));
+
+      const allRows = [...inboxRows, ...blockerRows];
 
       // Single batch insert for ALL blocks
-      if (rows.length > 0) {
-        const { error } = await supabase.from("production_schedule").insert(rows as any);
+      if (allRows.length > 0) {
+        const { error } = await supabase.from("production_schedule").insert(allRows as any);
         if (error) throw error;
+      }
+
+      // Mark inbox items as "scheduled"
+      if (allInboxItemIds.length > 0) {
+        const { error: inboxError } = await supabase
+          .from("production_inbox")
+          .update({ status: "scheduled" } as any)
+          .in("id", allInboxItemIds);
+        if (inboxError) console.error("Failed to update inbox status:", inboxError);
       }
 
       clearStorage(planMode);
@@ -407,9 +461,9 @@ export function useForecastMode(): UseForecastModeReturn {
       await queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
       await queryClient.invalidateQueries({ queryKey: ["production-inbox"] });
 
-      const desc = blockerCount > 0
-        ? `Naplánováno ${normalCount} projektů · ${blockerCount} rezerv kapacity`
-        : `${committable.length} bloků naplánováno`;
+      const desc = blockerRows.length > 0
+        ? `Naplánováno ${inboxRows.length} položek · ${blockerRows.length} rezerv kapacity`
+        : `${inboxRows.length} položek naplánováno`;
       toast({ title: `✅ ${desc}` });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
