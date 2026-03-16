@@ -188,6 +188,15 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const [readyItems, setReadyItems] = useState<typeof items>([]);
   const [isSending, setIsSending] = useState(false);
 
+  // ── Quantity change warning state ──────────────────────────────
+  const [pocetWarning, setPocetWarning] = useState<{
+    itemId: string;
+    itemName: string;
+    itemCode: string;
+    oldPocet: number;
+    newPocet: number;
+  } | null>(null);
+
   const handleSendToProduction = useCallback(() => {
     if (selected.size === 0) {
       toast({ title: "Vyberte alespoň jednu položku", variant: "destructive", duration: 2000 });
@@ -320,7 +329,40 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   // ── Bulk-aware field save ────────────────────────────────────────
   const BULK_FIELDS = new Set(["status", "konstrukter", "sent_date", "accepted_date"]);
 
-  const saveField = (itemId: string, field: string, value: string, oldValue: string) => {
+  const saveField = async (itemId: string, field: string, value: string, oldValue: string) => {
+    // Intercept pocet changes — check if item is in production
+    if (field === "pocet" && value !== oldValue) {
+      const newPocet = Number(value) || 0;
+      const oldPocetNum = Number(oldValue) || 0;
+      if (newPocet !== oldPocetNum && newPocet > 0) {
+        // Check if this item exists in production_inbox or production_schedule
+        const item = items.find(i => i.id === itemId);
+        const itemCode = item?.item_name || "";
+        const itemName = item?.item_type || item?.item_name || "";
+
+        const { data: inboxHits } = await supabase
+          .from("production_inbox")
+          .select("id")
+          .eq("project_id", projectId)
+          .eq("item_name", itemCode)
+          .in("status", ["pending", "scheduled"])
+          .limit(1);
+
+        const { data: scheduleHits } = await supabase
+          .from("production_schedule")
+          .select("id")
+          .eq("project_id", projectId)
+          .eq("item_name", itemCode)
+          .in("status", ["scheduled", "in_progress"])
+          .limit(1);
+
+        if ((inboxHits && inboxHits.length > 0) || (scheduleHits && scheduleHits.length > 0)) {
+          setPocetWarning({ itemId, itemName: `${itemCode} ${itemName}`, itemCode, oldPocet: oldPocetNum, newPocet });
+          return; // Don't save yet — wait for dialog confirmation
+        }
+      }
+    }
+
     if (BULK_FIELDS.has(field) && selected.size > 1 && selected.has(itemId)) {
       for (const id of selected) {
         updateItem.mutate({ id, field, value, projectId });
@@ -330,7 +372,64 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     }
   };
 
-  // ── Header helpers ──────────────────────────────────────────────
+  const confirmPocetChange = async () => {
+    if (!pocetWarning) return;
+    const { itemId, itemCode, itemName, oldPocet, newPocet } = pocetWarning;
+    const item = items.find(i => i.id === itemId);
+    const itemKey = item?.item_name || "";
+
+    // 1. Save the new pocet to tpv_items
+    updateItem.mutate({ id: itemId, field: "pocet", value: String(newPocet), projectId, oldValue: String(oldPocet) });
+
+    // 2. Update production_inbox
+    const { data: inboxRows } = await supabase
+      .from("production_inbox")
+      .select("id, estimated_hours")
+      .eq("project_id", projectId)
+      .eq("item_name", itemKey)
+      .in("status", ["pending", "scheduled"]);
+
+    if (inboxRows && inboxRows.length > 0) {
+      for (const row of inboxRows) {
+        const newHours = Math.round(Number(row.estimated_hours) * (newPocet / oldPocet));
+        await supabase
+          .from("production_inbox")
+          .update({ estimated_hours: newHours } as any)
+          .eq("id", row.id);
+      }
+    }
+
+    // 3. Update production_schedule
+    const { data: scheduleRows } = await supabase
+      .from("production_schedule")
+      .select("id, scheduled_hours")
+      .eq("project_id", projectId)
+      .eq("item_name", itemKey)
+      .in("status", ["scheduled", "in_progress"]);
+
+    if (scheduleRows && scheduleRows.length > 0) {
+      for (const row of scheduleRows) {
+        const newHours = Math.round(Number(row.scheduled_hours) * (newPocet / oldPocet));
+        await supabase
+          .from("production_schedule")
+          .update({ scheduled_hours: newHours } as any)
+          .eq("id", row.id);
+      }
+    }
+
+    // 4. Log activity
+    try {
+      await logActivity({ projectId, actionType: "item_scheduled", detail: `Počet upraven z ${oldPocet} na ${newPocet} ks (${itemName})` });
+    } catch { /* ignore logging errors */ }
+
+    // 5. Toast + invalidate
+    toast({ title: "Počet aktualizován — výrobní plán byl upraven" });
+    queryClient.invalidateQueries({ queryKey: ["production-inbox"] });
+    queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
+    queryClient.invalidateQueries({ queryKey: ["tpv-items"] });
+
+    setPocetWarning(null);
+  };
   // Build list of all current column labels for duplicate detection
   const allCurrentLabels = useMemo(() => {
     return renderKeys.map(key => {
@@ -713,6 +812,30 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
               disabled={isSending}
             >
               {isSending ? "Odesílám..." : `Odeslat jen schválené (${readyItems.length})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quantity Change Warning Dialog */}
+      <Dialog open={!!pocetWarning} onOpenChange={(open) => { if (!open) setPocetWarning(null); }}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Položka je již v plánu výroby</DialogTitle>
+          </DialogHeader>
+          {pocetWarning && (
+            <p className="text-sm text-muted-foreground py-2">
+              Tato položka ({pocetWarning.itemName}) je aktuálně v plánu výroby s počtem{" "}
+              <strong>{pocetWarning.oldPocet} ks</strong>. Změna na{" "}
+              <strong>{pocetWarning.newPocet} ks</strong> vyžaduje aktualizaci výrobního plánu.
+            </p>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setPocetWarning(null)}>
+              Zrušit změnu
+            </Button>
+            <Button size="sm" onClick={confirmPocetChange}>
+              Uložit a aktualizovat výrobu
             </Button>
           </DialogFooter>
         </DialogContent>
