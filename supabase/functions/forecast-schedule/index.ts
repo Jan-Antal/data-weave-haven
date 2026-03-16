@@ -330,8 +330,6 @@ serve(async (req) => {
       if (deadline < tpvStart) deadline = addWeeks(tpvStart, 2);
 
       const priorityScore = calcPriorityScore(proj, deadline, today);
-      const weeksUntilDeadline = Math.floor((deadline.getTime() - today.getTime()) / (7 * 86400000));
-      const fillForward = weeksUntilDeadline > 6;
 
       workItems.push({
         projectId: proj.project_id,
@@ -341,7 +339,9 @@ serve(async (req) => {
         deadline,
         deadlineSource,
         priorityScore,
-        fillForward,
+        estimationLevel: estimation.level,
+        estimationBadge: estimation.badge,
+        tpvCount,
         estimationLevel: estimation.level,
         estimationBadge: estimation.badge,
         tpvCount,
