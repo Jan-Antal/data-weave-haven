@@ -1028,7 +1028,7 @@ function MissingItemProjectCard({ progress, projectInfo, urgency, daysLabel, isS
   );
 }
 
-
+function InboxResizeHandle({ onWidthChange, containerWidth }: { onWidthChange?: (w: number) => void; containerWidth: number }) {
   const dragRef = useRef(false);
   const startX = useRef(0);
   const startW = useRef(0);
