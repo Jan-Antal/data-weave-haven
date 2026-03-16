@@ -642,8 +642,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     const headers = ["Projekt", "ID projektu", "Položka", "Kód položky", "Celkem hodin", ...weekHeaders, "Expedice"];
     const rows: (string | number)[][] = [];
 
-    const formatVal = (hours: number, czk: number, totalH: number) => {
-      if (displayMode === "czk") return Math.round(czk);
+    const formatVal = (hours: number, czk: number, totalH: number, projectId?: string) => {
+      if (displayMode === "czk") return Math.round(projectId ? toSellingCzk(czk, projectId) : czk);
       if (displayMode === "percent") return totalH > 0 ? Math.round((hours / totalH) * 100) : 0;
       return Math.round(hours);
     };
