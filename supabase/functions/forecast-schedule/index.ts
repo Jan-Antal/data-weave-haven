@@ -533,9 +533,18 @@ serve(async (req) => {
     }
     const aggregatedSafetyNet = Array.from(safetyNetMap.values());
 
-    // Build weekUsage for frontend compatibility
+    // Build weekUsage for frontend compatibility + log utilization
     const weekUsage: Record<string, number> = {};
-    for (const wk of weekKeys) weekUsage[wk] = usage[wk] || 0;
+    const usedWeeks: string[] = [];
+    for (const wk of weekKeys) {
+      weekUsage[wk] = usage[wk] || 0;
+      if (usage[wk] > 0) {
+        const pct = Math.round((usage[wk] / weeklyCapacity) * 100);
+        usedWeeks.push(`${wk}: ${Math.round(usage[wk])}h (${pct}%)`);
+      }
+    }
+    console.log(`[Forecast] Utilization per week:\n${usedWeeks.join("\n")}`);
+    console.log(`[Forecast] ${blocks.length} blocks, ${aggregatedSafetyNet.length} in safety net`);
 
     return new Response(JSON.stringify({ blocks, weekKeys, weekUsage, safetyNet: aggregatedSafetyNet, hourlyRate }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
