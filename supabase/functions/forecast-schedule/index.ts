@@ -391,69 +391,44 @@ serve(async (req) => {
       group.totalHours += Number(item.estimated_hours) || 0;
     }
 
-    // Schedule inbox projects into the current week (or earliest available)
+    // Schedule inbox projects into earliest available week (respecting 125% max)
     for (const [pid, group] of inboxByProject) {
-      const currentWeekKey = weekKeys[0];
-      // Try to fit in current week, then next weeks
+      let hoursToPlace = group.totalHours;
       let placed = false;
       for (const wk of weekKeys) {
-        const avail = weeklyCapacity - (usage[wk] || 0);
-        if (avail >= Math.min(group.totalHours * 0.5, 50)) {
-          const alloc = Math.min(group.totalHours, avail);
-          blocks.push({
-            id: `inbox-${pid}-${wk}-${blocks.length}`,
-            project_id: pid,
-            project_name: group.projectName,
-            bundle_description: `${group.items.length} položek z Inboxu`,
-            week: wk,
-            estimated_hours: alloc,
-            tpv_item_count: group.items.length,
-            confidence: "high" as const,
-            source: "inbox_item",
-            deadline: group.deadline ? group.deadline.toISOString().split("T")[0] : null,
-            deadline_source: group.deadlineSource,
-            is_forecast: true,
-            estimation_level: 1,
-            estimation_badge: "Inbox",
-            inbox_item_ids: group.items.map(i => i.id),
-          });
-          usage[wk] = (usage[wk] || 0) + alloc;
-          placed = true;
-
-          // If not all hours fit, schedule remainder in next week
-          const remaining = group.totalHours - alloc;
-          if (remaining > 0) {
-            const nextWkIdx = weekKeys.indexOf(wk) + 1;
-            if (nextWkIdx < weekKeys.length) {
-              const nextWk = weekKeys[nextWkIdx];
-              blocks.push({
-                id: `inbox-${pid}-${nextWk}-${blocks.length}`,
-                project_id: pid,
-                project_name: group.projectName,
-                bundle_description: `${group.items.length} položek z Inboxu (pokr.)`,
-                week: nextWk,
-                estimated_hours: remaining,
-                tpv_item_count: group.items.length,
-                confidence: "high" as const,
-                source: "inbox_item",
-                deadline: group.deadline ? group.deadline.toISOString().split("T")[0] : null,
-                deadline_source: group.deadlineSource,
-                is_forecast: true,
-                estimation_level: 1,
-                estimation_badge: "Inbox",
-                inbox_item_ids: group.items.map(i => i.id),
-              });
-              usage[nextWk] = (usage[nextWk] || 0) + remaining;
-            }
-          }
-          break;
-        }
+        if (hoursToPlace <= 0) break;
+        const currentUsage = usage[wk] || 0;
+        const maxCap = weeklyCapacity * TARGET_MAX;
+        const roomToMax = Math.max(0, maxCap - currentUsage);
+        if (roomToMax <= 0) continue;
+        
+        const alloc = Math.min(hoursToPlace, roomToMax);
+        blocks.push({
+          id: `inbox-${pid}-${wk}-${blocks.length}`,
+          project_id: pid,
+          project_name: group.projectName,
+          bundle_description: `${group.items.length} položek z Inboxu`,
+          week: wk,
+          estimated_hours: Math.round(alloc),
+          tpv_item_count: group.items.length,
+          confidence: "high" as const,
+          source: "inbox_item",
+          deadline: group.deadline ? group.deadline.toISOString().split("T")[0] : null,
+          deadline_source: group.deadlineSource,
+          is_forecast: true,
+          estimation_level: 1,
+          estimation_badge: "Inbox",
+          inbox_item_ids: group.items.map(i => i.id),
+        });
+        usage[wk] = currentUsage + alloc;
+        hoursToPlace -= alloc;
+        placed = true;
       }
-      if (!placed) {
+      if (!placed || hoursToPlace > 0) {
         safetyNet.push({
           project_id: pid,
           project_name: group.projectName,
-          estimated_hours: group.totalHours,
+          estimated_hours: Math.round(hoursToPlace),
           estimation_badge: "Inbox – neplánovatelné",
         });
       }
