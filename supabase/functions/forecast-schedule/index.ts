@@ -460,7 +460,7 @@ serve(async (req) => {
       }
     }
 
-    // 6b. Schedule project estimate blocks
+    // 6b. Schedule project estimate blocks — BACKWARD from deadline, targeting 100-125% capacity
     // Calculate inbox hours already attributed per project to avoid double-counting
     const inboxHoursByProject = new Map<string, number>();
     for (const [pid, group] of inboxByProject) {
@@ -493,49 +493,57 @@ serve(async (req) => {
         continue;
       }
 
-      const blockHours = splitIntoBlocks(remainingHours, weeklyCapacity);
-      const minBlock = Math.max(100, Math.round(remainingHours * 0.20));
+      // Always schedule BACKWARD from deadline — latest possible start
+      const weekRange = weekKeys.slice(startIdx, endIdx + 1).reverse();
 
-      let scheduled = 0;
-      const weekRange = weekKeys.slice(startIdx, endIdx + 1);
-      const orderedWeeks = work.fillForward ? weekRange : [...weekRange].reverse();
-
-      for (const blockH of blockHours) {
-        let placed = false;
-        for (const wk of orderedWeeks) {
-          const avail = weeklyCapacity - (usage[wk] || 0);
-          if (avail >= Math.min(minBlock, blockH * 0.8)) {
-            const alloc = Math.min(blockH, avail);
-            blocks.push({
-              id: `${work.projectId}-${wk}-${blocks.length}`,
-              project_id: work.projectId,
-              project_name: work.projectName,
-              bundle_description: `${work.tpvCount} položek`,
-              week: wk,
-              estimated_hours: alloc,
-              tpv_item_count: work.tpvCount,
-              confidence: work.estimationLevel <= 2 ? "high" : work.estimationLevel === 3 ? "medium" : "low",
-              source: "project_estimate",
-              deadline: work.deadline.toISOString().split("T")[0],
-              deadline_source: work.deadlineSource,
-              is_forecast: true,
-              estimation_level: work.estimationLevel,
-              estimation_badge: work.estimationBadge,
-            });
-            usage[wk] = (usage[wk] || 0) + alloc;
-            scheduled += alloc;
-            placed = true;
-            break;
-          }
-        }
-        if (!placed) {
-          safetyNet.push({
-            project_id: work.projectId,
-            project_name: work.projectName,
-            estimated_hours: blockH,
-            estimation_badge: work.estimationBadge,
-          });
-        }
+      let hoursToPlace = remainingHours;
+      for (const wk of weekRange) {
+        if (hoursToPlace <= 0) break;
+        
+        const currentUsage = usage[wk] || 0;
+        const targetCap = weeklyCapacity * TARGET_MID; // ~112.5%
+        const maxCap = weeklyCapacity * TARGET_MAX;    // 125%
+        
+        // How much room is there to reach the target zone?
+        const roomToTarget = Math.max(0, targetCap - currentUsage);
+        const roomToMax = Math.max(0, maxCap - currentUsage);
+        
+        // Skip weeks already at or above max
+        if (roomToMax <= 0) continue;
+        
+        // Allocate: fill up to target zone, but at least some minimum portion
+        const alloc = Math.min(hoursToPlace, Math.max(roomToTarget, Math.min(hoursToPlace, roomToMax)));
+        
+        if (alloc <= 0) continue;
+        
+        blocks.push({
+          id: `${work.projectId}-${wk}-${blocks.length}`,
+          project_id: work.projectId,
+          project_name: work.projectName,
+          bundle_description: `${work.tpvCount} položek`,
+          week: wk,
+          estimated_hours: Math.round(alloc),
+          tpv_item_count: work.tpvCount,
+          confidence: work.estimationLevel <= 2 ? "high" : work.estimationLevel === 3 ? "medium" : "low",
+          source: "project_estimate",
+          deadline: work.deadline.toISOString().split("T")[0],
+          deadline_source: work.deadlineSource,
+          is_forecast: true,
+          estimation_level: work.estimationLevel,
+          estimation_badge: work.estimationBadge,
+        });
+        usage[wk] = currentUsage + alloc;
+        hoursToPlace -= alloc;
+      }
+      
+      // If hours remain after filling all available weeks, push to safety net
+      if (hoursToPlace > MIN_HOURS * 0.5) {
+        safetyNet.push({
+          project_id: work.projectId,
+          project_name: work.projectName,
+          estimated_hours: Math.round(hoursToPlace),
+          estimation_badge: work.estimationBadge,
+        });
       }
     }
 
