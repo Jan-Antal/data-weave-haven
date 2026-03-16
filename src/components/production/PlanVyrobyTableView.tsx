@@ -1569,7 +1569,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                                   className="rounded-md px-2 py-0.5 text-center text-[9px] font-mono font-semibold"
                                   style={{ backgroundColor: "#dcfce7", color: "#15803d" }}
                                 >
-                                  ✓ {formatExpediceValue(item.expediceHours, item.expediceCzk, item.totalHours)}
+                                  ✓ {formatExpediceValue(item.expediceHours, item.expediceCzk, item.totalHours, item.projectId)}
                                 </div>
                               )}
                             </div>
