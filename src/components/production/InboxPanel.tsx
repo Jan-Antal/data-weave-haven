@@ -675,6 +675,13 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
               return (
               <div key={p.project_id} className="flex items-center gap-1.5 px-2 py-[4px] rounded-[5px] cursor-pointer"
                 onClick={(e) => { e.stopPropagation(); onSelectProject?.(p.project_id); }}
+                onContextMenu={(e) => {
+                  e.preventDefault(); e.stopPropagation();
+                  const actions: ContextMenuAction[] = [];
+                  if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(p.project_id) });
+                  if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(p.project_id) });
+                  if (actions.length > 0) setContextMenu({ x: e.clientX, y: Math.min(e.clientY, window.innerHeight - 200), actions });
+                }}
                 style={{
                   backgroundColor: isCompletedSelected ? "rgba(217,119,6,0.05)" : "#f5f3f0",
                   borderTop: isCompletedSelected ? "2px solid #d97706" : "1px solid #e5e2dd",
