@@ -533,7 +533,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     return { bg: base.border, text: "#ffffff", border: base.border };
   };
 
-  const formatCellValue = (hours: number, czk: number, status: string, totalItemHours: number, splitPart?: number, splitTotal?: number) => {
+  const formatCellValue = (hours: number, czk: number, status: string, totalItemHours: number, splitPart?: number, splitTotal?: number, projectId?: string) => {
     const splitLabel = splitPart && splitTotal
       ? ` ${["½", "²⁄₂", "⅓", "²⁄₃", "¼", "²⁄₄", "¾"][splitPart === 1 && splitTotal === 2 ? 0 : splitPart === 2 && splitTotal === 2 ? 1 : 0] || `${splitPart}/${splitTotal}`}`
       : "";
@@ -542,7 +542,10 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
       const pct = totalItemHours > 0 ? Math.round((hours / totalItemHours) * 100) : 0;
       return `${prefix}${pct}%${splitLabel}`;
     }
-    if (displayMode === "czk") return `${prefix}${formatCzkShort(Math.round(czk))} Kč${splitLabel}`;
+    if (displayMode === "czk") {
+      const sellCzk = projectId ? toSellingCzk(czk, projectId) : czk;
+      return `${prefix}${formatCzkShort(Math.round(sellCzk))} Kč${splitLabel}`;
+    }
     return `${prefix}${Math.round(hours)}h${splitLabel}`;
   };
 
@@ -554,7 +557,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   };
 
   const formatProjectTotal = (row: ProjectRow) => {
-    if (displayMode === "czk") return formatCzk(Math.round(row.totalCzk));
+    if (displayMode === "czk") return formatCzk(Math.round(toSellingCzk(row.totalCzk, row.projectId)));
     if (displayMode === "percent") {
       const completedItems = row.items.filter(i => i.expediceHours > 0).length;
       const totalItems = row.items.length;
@@ -564,8 +567,11 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     return `${Math.round(row.totalHours)}h`;
   };
 
-  const formatWeekTotal = (hours: number, czk: number, weekKey?: string) => {
-    if (displayMode === "czk") return `${formatCzkShort(Math.round(czk))} Kč`;
+  const formatWeekTotal = (hours: number, czk: number, weekKey?: string, projectId?: string) => {
+    if (displayMode === "czk") {
+      const sellCzk = projectId ? toSellingCzk(czk, projectId) : czk;
+      return `${formatCzkShort(Math.round(sellCzk))} Kč`;
+    }
     if (displayMode === "percent") {
       const cap = weekKey ? getWeekCapacity(weekKey) : 0;
       return `${cap > 0 ? Math.round((hours / cap) * 100) : 0}%`;
@@ -573,23 +579,31 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     return `${Math.round(hours)}h`;
   };
 
-  const formatInboxValue = (hours: number, czk: number, totalProjectHours?: number) => {
-    if (displayMode === "czk") return `${formatCzkShort(Math.round(czk))} Kč`;
+  const formatInboxValue = (hours: number, czk: number, totalProjectHours?: number, projectId?: string) => {
+    if (displayMode === "czk") {
+      const sellCzk = projectId ? toSellingCzk(czk, projectId) : czk;
+      return `${formatCzkShort(Math.round(sellCzk))} Kč`;
+    }
     if (displayMode === "percent" && totalProjectHours && totalProjectHours > 0) return `${Math.round((hours / totalProjectHours) * 100)}%`;
     return `${Math.round(hours)}h`;
   };
 
-  const formatExpediceValue = (hours: number, czk: number, totalProjectHours?: number) => {
-    if (displayMode === "czk") return `${formatCzkShort(Math.round(czk))} Kč`;
+  const formatExpediceValue = (hours: number, czk: number, totalProjectHours?: number, projectId?: string) => {
+    if (displayMode === "czk") {
+      const sellCzk = projectId ? toSellingCzk(czk, projectId) : czk;
+      return `${formatCzkShort(Math.round(sellCzk))} Kč`;
+    }
     if (displayMode === "percent" && totalProjectHours && totalProjectHours > 0) return `${Math.round((hours / totalProjectHours) * 100)}%`;
     return `${Math.round(hours)}h`;
   };
 
-  const formatItemTotal = (item: ItemRow) => {
-    if (displayMode === "czk") return formatCzkShort(Math.round(item.totalCzk)) + " Kč";
+  const formatItemTotal = (item: ItemRow, projectId?: string) => {
+    if (displayMode === "czk") {
+      const sellCzk = projectId ? toSellingCzk(item.totalCzk, projectId) : item.totalCzk;
+      return formatCzkShort(Math.round(sellCzk)) + " Kč";
+    }
     if (displayMode === "percent") {
       const totalProjectHours = item.totalHours;
-      // Show as % of total weekly capacity across all weeks
       const totalCap = weeks.reduce((s, w) => s + getWeekCapacity(w.key), 0);
       return `${totalCap > 0 ? Math.round((totalProjectHours / totalCap) * 100) : 0}%`;
     }
