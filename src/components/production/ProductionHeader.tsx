@@ -234,6 +234,7 @@ export function ProductionHeader({ forecastActive, dataLogOpen, onToggleDataLog 
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
       <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
       <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
+      <CostBreakdownPresetsDialog open={costPresetsOpen} onOpenChange={setCostPresetsOpen} />
     </>
   );
 }
