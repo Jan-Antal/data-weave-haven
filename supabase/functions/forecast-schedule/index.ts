@@ -41,7 +41,38 @@ function addWeeks(date: Date, n: number): Date {
   return d;
 }
 
-function estimateProjectHours(proj: any, tpvCount: number, hourlyRate: number, costPresets: any[], defaultPreset: any): { hours: number; level: number; badge: string } {
+function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number, costPresets: any[], defaultPreset: any): { hours: number; level: number; badge: string } {
+  // LEVEL 1 — sum from TPV items that have cena set
+  const itemsWithPrice = projTpvItems.filter((t: any) => t.cena && Number(t.cena) > 0);
+
+  if (itemsWithPrice.length > 0) {
+    const preset = proj.cost_preset_id
+      ? costPresets.find((p: any) => p.id === proj.cost_preset_id)
+      : defaultPreset;
+    const vyrobaPct = preset?.production_pct ?? 35;
+    const effectiveMarze = proj.marze != null ? Number(proj.marze) : 15;
+
+    let totalHours = 0;
+    for (const item of itemsWithPrice) {
+      const itemCena = Number(item.cena) * (Number(item.pocet) || 1);
+      const naklady = itemCena * (1 - effectiveMarze / 100);
+      totalHours += naklady * (vyrobaPct / 100) / hourlyRate;
+    }
+
+    // If only some items have price, add estimate for the rest
+    const itemsWithoutPrice = projTpvItems.filter((t: any) => !t.cena || Number(t.cena) === 0);
+    if (itemsWithoutPrice.length > 0 && Number(proj.prodejni_cena) > 0) {
+      const totalItems = projTpvItems.length;
+      const remainingShare = itemsWithoutPrice.length / totalItems;
+      const remainingCena = Number(proj.prodejni_cena) * remainingShare;
+      const naklady = remainingCena * (1 - effectiveMarze / 100);
+      totalHours += naklady * (vyrobaPct / 100) / hourlyRate;
+    }
+
+    return { hours: clampHours(totalHours), level: 1, badge: "TPV ceny" };
+  }
+
+  // LEVEL 2 — project price + preset
   const prodejniCena = Number(proj.prodejni_cena) || 0;
   const marze = proj.marze != null ? Number(proj.marze) : null;
   const preset = proj.cost_preset_id
@@ -53,10 +84,9 @@ function estimateProjectHours(proj: any, tpvCount: number, hourlyRate: number, c
   }
   const effectiveMarze = marze ?? 15;
   const naklady = prodejniCena * (1 - effectiveMarze / 100);
-  const vyrobaNaklady = naklady * (Number(preset.production_pct) / 100);
-  const hours = clampHours(vyrobaNaklady / hourlyRate);
-  const level = proj.cost_preset_id ? 1 : marze != null ? 2 : 3;
-  const badge = level === 1 ? "Rozpad" : level === 2 ? "Výroba – odhad" : "Výroba – odhad (def. marže)";
+  const hours = clampHours(naklady * (Number(preset.production_pct) / 100) / hourlyRate);
+  const level = proj.cost_preset_id ? 2 : marze != null ? 2 : 3;
+  const badge = level === 2 ? "Výroba – odhad" : "Výroba – odhad (def. marže)";
   return { hours, level, badge };
 }
 
@@ -120,7 +150,7 @@ serve(async (req) => {
         .not("status", "in", '("Fakturace","Dokončeno")')
         .not("project_id", "like", "TEST%"),
       sb.from("tpv_items")
-        .select("project_id, id")
+        .select("project_id, id, cena, pocet, status")
         .is("deleted_at", null),
       sb.from("production_settings").select("*").limit(1).single(),
       sb.from("cost_breakdown_presets").select("*").order("sort_order"),
@@ -182,7 +212,8 @@ serve(async (req) => {
 
     for (const proj of projects) {
       const tpvCount = tpvCountByProject.get(proj.project_id) || 0;
-      const estimation = estimateProjectHours(proj, tpvCount, hourlyRate, costPresets, defaultPreset);
+      const projTpv = tpvItems.filter((t: any) => t.project_id === proj.project_id);
+      const estimation = estimateProjectHours(proj, projTpv, hourlyRate, costPresets, defaultPreset);
 
       // Determine tpv_start (earliest possible production start)
       let tpvStart: Date;
