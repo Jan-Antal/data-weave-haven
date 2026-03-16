@@ -442,7 +442,20 @@ serve(async (req) => {
     }
 
     // 6b. Schedule project estimate blocks
+    // Calculate inbox hours already attributed per project to avoid double-counting
+    const inboxHoursByProject = new Map<string, number>();
+    for (const [pid, group] of inboxByProject) {
+      inboxHoursByProject.set(pid, group.totalHours);
+    }
+
     for (const work of workItems) {
+      // Subtract hours already scheduled from inbox to avoid double-counting
+      const inboxHours = inboxHoursByProject.get(work.projectId) || 0;
+      const remainingHours = Math.max(0, work.totalHours - inboxHours);
+      
+      // Skip if inbox already covers the full estimate
+      if (remainingHours < MIN_HOURS) continue;
+
       const tpvStartKey = getWeekKey(work.tpvStart);
       const deadlineKey = getWeekKey(work.deadline);
 
@@ -455,14 +468,14 @@ serve(async (req) => {
         safetyNet.push({
           project_id: work.projectId,
           project_name: work.projectName,
-          estimated_hours: work.totalHours,
+          estimated_hours: remainingHours,
           estimation_badge: work.estimationBadge,
         });
         continue;
       }
 
-      const blockHours = splitIntoBlocks(work.totalHours, weeklyCapacity);
-      const minBlock = Math.max(100, Math.round(work.totalHours * 0.20));
+      const blockHours = splitIntoBlocks(remainingHours, weeklyCapacity);
+      const minBlock = Math.max(100, Math.round(remainingHours * 0.20));
 
       let scheduled = 0;
       const weekRange = weekKeys.slice(startIdx, endIdx + 1);
