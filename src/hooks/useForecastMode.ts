@@ -458,8 +458,11 @@ export function useForecastMode(): UseForecastModeReturn {
       resetForecastState();
 
       // Invalidate only affected queries
-      await queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
-      await queryClient.invalidateQueries({ queryKey: ["production-inbox"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["production-schedule"] }),
+        queryClient.invalidateQueries({ queryKey: ["production-inbox"] }),
+        queryClient.invalidateQueries({ queryKey: ["production-progress"] }),
+      ]);
 
       const desc = blockerRows.length > 0
         ? `Naplánováno ${inboxRows.length} položek · ${blockerRows.length} rezerv kapacity`
