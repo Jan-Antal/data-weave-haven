@@ -70,7 +70,7 @@ export default function SetPassword() {
       setSuccess(true);
       toast({ title: "Účet byl úspěšně nastaven" });
       setTimeout(() => {
-        window.location.href = "/";
+        navigate("/");
       }, 500);
     } catch (err: any) {
       console.error("SetPassword unexpected error:", err);

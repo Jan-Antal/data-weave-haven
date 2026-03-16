@@ -226,7 +226,11 @@ export function useRealtimeSync() {
         }
       )
 
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') console.info('[Realtime] Connected');
+        if (status === 'CHANNEL_ERROR') console.warn('[Realtime] Channel error, will reconnect automatically');
+        if (status === 'TIMED_OUT') console.warn('[Realtime] Timed out, will retry');
+      });
 
     return () => {
       supabase.removeChannel(channel);

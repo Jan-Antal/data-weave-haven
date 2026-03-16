@@ -1,6 +1,9 @@
 import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 export function useVersionCheck() {
+  const queryClient = useQueryClient();
+
   useEffect(() => {
     const getScriptHash = () =>
       Array.from(document.querySelectorAll('script[src]'))
@@ -22,7 +25,8 @@ export function useVersionCheck() {
         const newHash = matches.sort().join(',');
 
         if (originalHash && newHash && originalHash !== newHash) {
-          window.location.reload();
+          console.info('[VersionCheck] New build detected, invalidating queries');
+          queryClient.invalidateQueries();
         }
       } catch {
         // Network error — skip silently
@@ -31,5 +35,5 @@ export function useVersionCheck() {
 
     const interval = setInterval(checkAndReload, 2 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [queryClient]);
 }
