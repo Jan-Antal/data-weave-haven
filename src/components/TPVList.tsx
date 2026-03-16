@@ -188,6 +188,15 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const [readyItems, setReadyItems] = useState<typeof items>([]);
   const [isSending, setIsSending] = useState(false);
 
+  // ── Quantity change warning state ──────────────────────────────
+  const [pocetWarning, setPocetWarning] = useState<{
+    itemId: string;
+    itemName: string;
+    itemCode: string;
+    oldPocet: number;
+    newPocet: number;
+  } | null>(null);
+
   const handleSendToProduction = useCallback(() => {
     if (selected.size === 0) {
       toast({ title: "Vyberte alespoň jednu položku", variant: "destructive", duration: 2000 });
