@@ -865,11 +865,6 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
         >
           <Plus className="h-3 w-3" /> Nová položka
         </button>
-        {projects.length === 0 && !isLoading && (
-          <button onClick={handleSeedData} disabled={loading} className="text-[9px] hover:underline transition-colors" style={{ color: "#99a5a3" }}>
-            🧪 {loading ? "Vkládám..." : "Testovací data"}
-          </button>
-        )}
       </div>
 
       {/* Context menu */}
