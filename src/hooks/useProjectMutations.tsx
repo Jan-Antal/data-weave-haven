@@ -53,10 +53,12 @@ export function useUpdateProject() {
       return { id, field, value, oldValue, updatedProject: data as Project };
     },
     onSuccess: ({ id, field, value, oldValue, updatedProject }) => {
-      // Patch single project in cache instead of full refetch
-      qc.setQueryData<Project[]>(["projects"], (old) => {
-        if (!old) return old;
-        return old.map((p) => (p.id === id ? { ...p, ...updatedProject } : p));
+      // Patch project in all cached query variants (key includes isTester flag)
+      qc.getQueriesData<Project[]>({ queryKey: ["projects"] }).forEach(([key]) => {
+        qc.setQueryData<Project[]>(key, (old) => {
+          if (!old) return old;
+          return old.map((p) => (p.id === id ? { ...p, ...updatedProject } : p));
+        });
       });
 
       // Push to undo stack
