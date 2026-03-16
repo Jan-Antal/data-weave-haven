@@ -419,10 +419,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
 
     // 4. Log activity
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await logActivity({ projectId, userId: user.id, actionType: "item_scheduled", detail: `Počet upraven z ${oldPocet} na ${newPocet} ks (${itemName})` });
-      }
+      await logActivity({ projectId, actionType: "item_scheduled", detail: `Počet upraven z ${oldPocet} na ${newPocet} ks (${itemName})` });
     } catch { /* ignore logging errors */ }
 
     // 5. Toast + invalidate
