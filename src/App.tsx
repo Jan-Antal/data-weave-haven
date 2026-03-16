@@ -93,6 +93,13 @@ function PortraitLockOverlay() {
   );
 }
 
+/** Route guard for admin/owner-only pages */
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { isAdmin, isOwner } = useAuth();
+  if (!isAdmin && !isOwner) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   const { user, loading, profile } = useAuth();
 
