@@ -817,6 +817,30 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         </DialogContent>
       </Dialog>
 
+      {/* Quantity Change Warning Dialog */}
+      <Dialog open={!!pocetWarning} onOpenChange={(open) => { if (!open) setPocetWarning(null); }}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Položka je již v plánu výroby</DialogTitle>
+          </DialogHeader>
+          {pocetWarning && (
+            <p className="text-sm text-muted-foreground py-2">
+              Tato položka ({pocetWarning.itemName}) je aktuálně v plánu výroby s počtem{" "}
+              <strong>{pocetWarning.oldPocet} ks</strong>. Změna na{" "}
+              <strong>{pocetWarning.newPocet} ks</strong> vyžaduje aktualizaci výrobního plánu.
+            </p>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setPocetWarning(null)}>
+              Zrušit změnu
+            </Button>
+            <Button size="sm" onClick={confirmPocetChange}>
+              Uložit a aktualizovat výrobu
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <ExcelImportWizard
         projectId={projectId}
         projectName={projectName}
