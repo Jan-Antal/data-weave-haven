@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const MIN_HOURS = 20;
-const MAX_HOURS = 2000;
+const MAX_HOURS = 20000;
 
 function clampHours(h: number): number {
   return Math.max(MIN_HOURS, Math.min(MAX_HOURS, Math.round(h)));
