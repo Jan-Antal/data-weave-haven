@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { productionCzkToSellingPrice } from "@/lib/currency";
 import { useProductionSchedule, useProductionExpedice, getISOWeekNumber, type ScheduleItem, type ScheduleBundle } from "@/hooks/useProductionSchedule";
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
@@ -198,6 +199,13 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   }, [allProjects]);
 
   const hourlyRate = settings?.hourly_rate ?? 550;
+
+  // Convert production CZK to selling price for a given project
+  const toSellingCzk = useCallback((czk: number, projectId: string) => {
+    const proj = projectDateLookup.get(projectId);
+    if (!proj) return czk;
+    return productionCzkToSellingPrice(czk, proj.cost_production_pct, proj.marze);
+  }, [projectDateLookup]);
 
   const toggleProject = (pid: string) => {
     setExpandedProjects(prev => {
@@ -525,7 +533,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     return { bg: base.border, text: "#ffffff", border: base.border };
   };
 
-  const formatCellValue = (hours: number, czk: number, status: string, totalItemHours: number, splitPart?: number, splitTotal?: number) => {
+  const formatCellValue = (hours: number, czk: number, status: string, totalItemHours: number, splitPart?: number, splitTotal?: number, projectId?: string) => {
     const splitLabel = splitPart && splitTotal
       ? ` ${["½", "²⁄₂", "⅓", "²⁄₃", "¼", "²⁄₄", "¾"][splitPart === 1 && splitTotal === 2 ? 0 : splitPart === 2 && splitTotal === 2 ? 1 : 0] || `${splitPart}/${splitTotal}`}`
       : "";
@@ -534,7 +542,10 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
       const pct = totalItemHours > 0 ? Math.round((hours / totalItemHours) * 100) : 0;
       return `${prefix}${pct}%${splitLabel}`;
     }
-    if (displayMode === "czk") return `${prefix}${formatCzkShort(Math.round(czk))} Kč${splitLabel}`;
+    if (displayMode === "czk") {
+      const sellCzk = projectId ? toSellingCzk(czk, projectId) : czk;
+      return `${prefix}${formatCzkShort(Math.round(sellCzk))} Kč${splitLabel}`;
+    }
     return `${prefix}${Math.round(hours)}h${splitLabel}`;
   };
 
@@ -546,7 +557,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   };
 
   const formatProjectTotal = (row: ProjectRow) => {
-    if (displayMode === "czk") return formatCzk(Math.round(row.totalCzk));
+    if (displayMode === "czk") return formatCzk(Math.round(toSellingCzk(row.totalCzk, row.projectId)));
     if (displayMode === "percent") {
       const completedItems = row.items.filter(i => i.expediceHours > 0).length;
       const totalItems = row.items.length;
@@ -556,8 +567,11 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     return `${Math.round(row.totalHours)}h`;
   };
 
-  const formatWeekTotal = (hours: number, czk: number, weekKey?: string) => {
-    if (displayMode === "czk") return `${formatCzkShort(Math.round(czk))} Kč`;
+  const formatWeekTotal = (hours: number, czk: number, weekKey?: string, projectId?: string) => {
+    if (displayMode === "czk") {
+      const sellCzk = projectId ? toSellingCzk(czk, projectId) : czk;
+      return `${formatCzkShort(Math.round(sellCzk))} Kč`;
+    }
     if (displayMode === "percent") {
       const cap = weekKey ? getWeekCapacity(weekKey) : 0;
       return `${cap > 0 ? Math.round((hours / cap) * 100) : 0}%`;
@@ -565,23 +579,31 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     return `${Math.round(hours)}h`;
   };
 
-  const formatInboxValue = (hours: number, czk: number, totalProjectHours?: number) => {
-    if (displayMode === "czk") return `${formatCzkShort(Math.round(czk))} Kč`;
+  const formatInboxValue = (hours: number, czk: number, totalProjectHours?: number, projectId?: string) => {
+    if (displayMode === "czk") {
+      const sellCzk = projectId ? toSellingCzk(czk, projectId) : czk;
+      return `${formatCzkShort(Math.round(sellCzk))} Kč`;
+    }
     if (displayMode === "percent" && totalProjectHours && totalProjectHours > 0) return `${Math.round((hours / totalProjectHours) * 100)}%`;
     return `${Math.round(hours)}h`;
   };
 
-  const formatExpediceValue = (hours: number, czk: number, totalProjectHours?: number) => {
-    if (displayMode === "czk") return `${formatCzkShort(Math.round(czk))} Kč`;
+  const formatExpediceValue = (hours: number, czk: number, totalProjectHours?: number, projectId?: string) => {
+    if (displayMode === "czk") {
+      const sellCzk = projectId ? toSellingCzk(czk, projectId) : czk;
+      return `${formatCzkShort(Math.round(sellCzk))} Kč`;
+    }
     if (displayMode === "percent" && totalProjectHours && totalProjectHours > 0) return `${Math.round((hours / totalProjectHours) * 100)}%`;
     return `${Math.round(hours)}h`;
   };
 
-  const formatItemTotal = (item: ItemRow) => {
-    if (displayMode === "czk") return formatCzkShort(Math.round(item.totalCzk)) + " Kč";
+  const formatItemTotal = (item: ItemRow, projectId?: string) => {
+    if (displayMode === "czk") {
+      const sellCzk = projectId ? toSellingCzk(item.totalCzk, projectId) : item.totalCzk;
+      return formatCzkShort(Math.round(sellCzk)) + " Kč";
+    }
     if (displayMode === "percent") {
       const totalProjectHours = item.totalHours;
-      // Show as % of total weekly capacity across all weeks
       const totalCap = weeks.reduce((s, w) => s + getWeekCapacity(w.key), 0);
       return `${totalCap > 0 ? Math.round((totalProjectHours / totalCap) * 100) : 0}%`;
     }
@@ -620,8 +642,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     const headers = ["Projekt", "ID projektu", "Položka", "Kód položky", "Celkem hodin", ...weekHeaders, "Expedice"];
     const rows: (string | number)[][] = [];
 
-    const formatVal = (hours: number, czk: number, totalH: number) => {
-      if (displayMode === "czk") return Math.round(czk);
+    const formatVal = (hours: number, czk: number, totalH: number, projectId?: string) => {
+      if (displayMode === "czk") return Math.round(projectId ? toSellingCzk(czk, projectId) : czk);
       if (displayMode === "percent") return totalH > 0 ? Math.round((hours / totalH) * 100) : 0;
       return Math.round(hours);
     };
@@ -633,9 +655,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
         const row: (string | number)[] = [proj.projectName, proj.projectId, "", "", Math.round(proj.totalHours)];
         for (const week of weeks) {
           const wt = proj.weekTotals.get(week.key);
-          row.push(wt ? formatVal(wt.hours, wt.czk, proj.totalHours) : "");
+          row.push(wt ? formatVal(wt.hours, wt.czk, proj.totalHours, proj.projectId) : "");
         }
-        row.push(proj.expediceTotalHours > 0 ? formatVal(proj.expediceTotalHours, proj.expediceTotalCzk, proj.totalHours) : "");
+        row.push(proj.expediceTotalHours > 0 ? formatVal(proj.expediceTotalHours, proj.expediceTotalCzk, proj.totalHours, proj.projectId) : "");
         rows.push(row);
       } else {
         // Expanded: item rows
@@ -643,9 +665,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
           const row: (string | number)[] = [proj.projectName, proj.projectId, item.itemName, item.itemCode || "", Math.round(item.totalHours)];
           for (const week of weeks) {
             const alloc = item.weekAllocations.get(week.key);
-            row.push(alloc ? formatVal(alloc.hours, alloc.czk, item.totalHours) : "");
+            row.push(alloc ? formatVal(alloc.hours, alloc.czk, item.totalHours, proj.projectId) : "");
           }
-          row.push(item.expediceHours > 0 ? formatVal(item.expediceHours, item.expediceCzk, item.totalHours) : "");
+          row.push(item.expediceHours > 0 ? formatVal(item.expediceHours, item.expediceCzk, item.totalHours, proj.projectId) : "");
           rows.push(row);
         }
       }
@@ -1367,7 +1389,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                       >
                         {proj.inboxTotalHours > 0 && (
                           <div className="rounded-md px-2 py-0.5 text-center text-[10px] font-mono font-bold" style={{ backgroundColor: "#ffedd5", color: "#c2410c" }}>
-                            {formatInboxValue(proj.inboxTotalHours, proj.inboxTotalCzk, proj.totalHours)}
+                            {formatInboxValue(proj.inboxTotalHours, proj.inboxTotalCzk, proj.totalHours, proj.projectId)}
                           </div>
                         )}
                       </div>
@@ -1394,7 +1416,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                                 className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-bold"
                                 style={{ backgroundColor: cellStyle.bg, color: cellStyle.text, border: `1px solid ${cellStyle.border}` }}
                               >
-                                {formatWeekTotal(wt.hours, wt.czk, week.key)}
+                                {formatWeekTotal(wt.hours, wt.czk, week.key, proj.projectId)}
                               </div>
                             );
                           })()}
@@ -1417,7 +1439,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                       >
                         {proj.expediceTotalHours > 0 && (
                           <div className="rounded-md px-2 py-0.5 text-center text-[10px] font-mono font-bold" style={{ backgroundColor: "#dcfce7", color: "#15803d" }}>
-                            ✓ {formatExpediceValue(proj.expediceTotalHours, proj.expediceTotalCzk, proj.totalHours)}
+                            ✓ {formatExpediceValue(proj.expediceTotalHours, proj.expediceTotalCzk, proj.totalHours, proj.projectId)}
                           </div>
                         )}
                       </div>
@@ -1472,7 +1494,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                               <span className="font-mono font-bold text-[11px] shrink-0" style={{ color: "#223937" }}>{item.itemCode}</span>
                             )}
                             <span className="text-[12px] truncate text-foreground">{item.itemName}</span>
-                            <span className="text-[10px] font-mono shrink-0 ml-auto" style={{ color: "#99a5a3" }}>{formatItemTotal(item)}</span>
+                            <span className="text-[10px] font-mono shrink-0 ml-auto" style={{ color: "#99a5a3" }}>{formatItemTotal(item, item.projectId)}</span>
                           </div>
                           {/* Inbox cell */}
                           {hasAnyInbox && (
@@ -1483,7 +1505,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                             >
                               {item.inboxHours > 0 && (
                                 <div className="rounded-md px-2 py-0.5 text-center text-[9px] font-mono font-semibold" style={{ backgroundColor: "#ffedd5", color: "#c2410c" }}>
-                                  {formatInboxValue(item.inboxHours, item.inboxCzk, item.totalHours)}
+                                  {formatInboxValue(item.inboxHours, item.inboxCzk, item.totalHours, item.projectId)}
                                 </div>
                               )}
                             </div>
@@ -1547,7 +1569,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                                   className="rounded-md px-2 py-0.5 text-center text-[9px] font-mono font-semibold"
                                   style={{ backgroundColor: "#dcfce7", color: "#15803d" }}
                                 >
-                                  ✓ {formatExpediceValue(item.expediceHours, item.expediceCzk, item.totalHours)}
+                                  ✓ {formatExpediceValue(item.expediceHours, item.expediceCzk, item.totalHours, item.projectId)}
                                 </div>
                               )}
                             </div>
@@ -1689,7 +1711,7 @@ function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCe
   alloc: WeekAlloc;
   item: ItemRow;
   displayMode: DisplayMode;
-  formatCellValue: (hours: number, czk: number, status: string, totalItemHours: number, splitPart?: number, splitTotal?: number) => string;
+  formatCellValue: (hours: number, czk: number, status: string, totalItemHours: number, splitPart?: number, splitTotal?: number, projectId?: string) => string;
   getCellStyle: (status: string) => { bg: string; text: string; border: string };
   moveTargetWeeks: { key: string; weekNum: number; label: string }[];
   getWeekCapacity: (weekKey: string) => number;
@@ -1740,7 +1762,7 @@ function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCe
               }
             }}
           >
-            {formatCellValue(alloc.hours, alloc.czk, alloc.status, item.totalHours, alloc.splitPart, alloc.splitTotal)}
+            {formatCellValue(alloc.hours, alloc.czk, alloc.status, item.totalHours, alloc.splitPart, alloc.splitTotal, item.projectId)}
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-52 p-0" align="center" sideOffset={4}>

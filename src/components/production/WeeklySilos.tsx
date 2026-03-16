@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { productionCzkToSellingPrice } from "@/lib/currency";
 import { GripVertical, ChevronRight, AlertTriangle } from "lucide-react";
 import type { ForecastBlock } from "@/hooks/useForecastMode";
 import { differenceInDays, format } from "date-fns";
@@ -180,7 +181,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const getWeekCapacity = useWeekCapacityLookup();
 
   const projectLookup = useMemo(() => {
-    const map = new Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null }>();
+    const map = new Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null; cost_production_pct?: number | null; marze?: string | null }>();
     for (const p of allProjects) map.set(p.project_id, p);
     return map;
   }, [allProjects]);
@@ -918,7 +919,7 @@ function ToolbarButton({ active, disabled, label, onClick }: { active?: boolean;
   );
 }
 
-type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null }>;
+type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null; cost_production_pct?: number | null; marze?: string | null }>;
 
 interface SiloProps {
   weekKey: string; weekNum: number; startDate: Date; endDate: Date;
@@ -953,19 +954,24 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
   showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive }: SiloProps) {
   // Capacity calculation: exclude paused items
   // Active hours (excl. paused), split into blocker and non-blocker
-  const { activeHours, blockerHours } = useMemo(() => {
-    if (!silo) return { activeHours: 0, blockerHours: 0 };
+  const { activeHours, blockerHours, activeSellingCzk, blockerSellingCzk } = useMemo(() => {
+    if (!silo) return { activeHours: 0, blockerHours: 0, activeSellingCzk: 0, blockerSellingCzk: 0 };
     let active = 0;
     let blocker = 0;
+    let activeSelling = 0;
+    let blockerSelling = 0;
     for (const b of silo.bundles) {
+      const proj = projectLookup.get(b.project_id);
       for (const i of b.items) {
         if (i.status === "paused") continue;
-        if (i.is_blocker) blocker += i.scheduled_hours;
-        else active += i.scheduled_hours;
+        const prodCzk = i.scheduled_hours * hourlyRate;
+        const sellCzk = productionCzkToSellingPrice(prodCzk, proj?.cost_production_pct, proj?.marze);
+        if (i.is_blocker) { blocker += i.scheduled_hours; blockerSelling += sellCzk; }
+        else { active += i.scheduled_hours; activeSelling += sellCzk; }
       }
     }
-    return { activeHours: active, blockerHours: blocker };
-  }, [silo]);
+    return { activeHours: active, blockerHours: blocker, activeSellingCzk: activeSelling, blockerSellingCzk: blockerSelling };
+  }, [silo, projectLookup, hourlyRate]);
 
   // Forecast layer is isolated and read-only, rendered separately per week
   const weekForecastBlocks = useMemo(() => {
@@ -1043,8 +1049,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
            <div className="flex items-baseline justify-between mt-[3px]">
             {displayMode === "czk" ? (
               <>
-                <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{formatCompactCzk((forecastDarkMode ? totalHours : activeHours) * hourlyRate)}</span>
-                {!forecastDarkMode && blockerHours > 0 && <span className="font-mono text-[9px]" style={{ color: "#6b7280" }}>+~{formatCompactCzk(blockerHours * hourlyRate)}</span>}
+                <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{formatCompactCzk(forecastDarkMode ? (totalHours * hourlyRate) : (activeSellingCzk))}</span>
+                {!forecastDarkMode && blockerHours > 0 && <span className="font-mono text-[9px]" style={{ color: "#6b7280" }}>+~{formatCompactCzk(blockerSellingCzk)}</span>}
                 <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }}>/ {formatCompactCzk(weeklyCapacity * hourlyRate)}</span>
                 <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
               </>
@@ -1303,7 +1309,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
         <div className="flex items-center justify-between mt-0.5">
           <span className="text-[9px] rounded-full px-1.5 py-0.5" style={{ backgroundColor: "#374151", color: "#9ca3af", fontWeight: 600 }}>⏳ Rezerva</span>
           <span className="font-mono text-[11px] font-bold" style={{ color: "#6b7280" }}>
-            ~{displayMode === "czk" ? formatCompactCzk(bundle.total_hours * hourlyRate) : `${Math.round(bundle.total_hours)}h`}
+            ~{displayMode === "czk" ? formatCompactCzk(productionCzkToSellingPrice(bundle.total_hours * hourlyRate, projectLookup.get(bundle.project_id)?.cost_production_pct, projectLookup.get(bundle.project_id)?.marze)) : `${Math.round(bundle.total_hours)}h`}
           </span>
         </div>
         {tpvWeekLabel && (
@@ -1410,7 +1416,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
             })()}
             {completedCount > 0 && <span className="text-[9px]" style={{ color: "#3a8a36", fontWeight: 600 }}>{completedCount}/{totalCount} ✓</span>}
             {displayMode === "czk" ? (
-              <span className="font-mono" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{formatCompactCzk(bundle.total_hours * hourlyRate)}</span>
+              <span className="font-mono" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{formatCompactCzk(productionCzkToSellingPrice(bundle.total_hours * hourlyRate, projectLookup.get(bundle.project_id)?.cost_production_pct, projectLookup.get(bundle.project_id)?.marze))}</span>
             ) : displayMode === "percent" ? (
               <span className="font-mono" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{weeklyCapacity > 0 ? Math.round((bundle.total_hours / weeklyCapacity) * 100) : 0}%</span>
             ) : (

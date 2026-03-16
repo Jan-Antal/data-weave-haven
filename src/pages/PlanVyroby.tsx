@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { productionCzkToSellingPrice } from "@/lib/currency";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
 import { Search, X, Sparkles, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
@@ -915,6 +916,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   const { data: settings } = useProductionSettings();
   const { data: scheduleData } = useProductionSchedule();
   const { data: inboxProjects = [] } = useProductionInbox();
+  const { data: allProjects = [] } = useProjects();
   const getWeekCapacity = useWeekCapacityLookup();
 
    type StatsScope = "week" | "month" | "all";
@@ -971,6 +973,10 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   const { capacityHours, scheduledHours, scheduledCzk } = useMemo(() => {
     if (!scheduleData) return { capacityHours: 0, scheduledHours: 0, scheduledCzk: 0 };
 
+    // Build project lookup for selling price conversion
+    const projMap = new Map<string, { cost_production_pct?: number | null; marze?: string | null }>();
+    for (const p of (allProjects ?? [])) projMap.set(p.project_id, p);
+
     let cap = 0;
     let hours = 0;
     let czk = 0;
@@ -979,11 +985,17 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       const silo = scheduleData.get(wk);
       if (silo) {
         hours += silo.total_hours;
-        czk += silo.bundles.reduce((s, b) => s + b.items.reduce((ss, i) => ss + i.scheduled_czk, 0), 0);
+        for (const b of silo.bundles) {
+          const proj = projMap.get(b.project_id);
+          for (const i of b.items) {
+            const prodCzk = i.scheduled_hours * hourlyRate;
+            czk += productionCzkToSellingPrice(prodCzk, proj?.cost_production_pct, proj?.marze);
+          }
+        }
       }
     }
     return { capacityHours: cap, scheduledHours: hours, scheduledCzk: czk };
-  }, [scheduleData, currentMonthWeekKeys, getWeekCapacity]);
+  }, [scheduleData, currentMonthWeekKeys, getWeekCapacity, allProjects, hourlyRate]);
 
   const isOverCapacity = scheduledHours > capacityHours;
   const displayCzk = scheduledCzk;
@@ -1087,7 +1099,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
         <div className="flex items-center gap-1 text-xs font-mono whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: forecastActive ? "#a8c5c2" : undefined }}>
           <span>{forecastActive ? "Kap." : "Kapacita"} <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{Math.round(capacityHours).toLocaleString("cs-CZ")}h</span></span>
           <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
-          <span>{forecastActive ? "CZK" : "CZK"} <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{formatCzk(displayCzk, forecastActive)}</span></span>
+          <span>{forecastActive ? "Prodej" : "Prodej"} <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{formatCzk(displayCzk, forecastActive)}</span></span>
           <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
           <span>{forecastActive ? "Nap." : "Naplánováno"} <span style={{ fontWeight: 600, color: isOverCapacity ? "hsl(var(--destructive))" : "hsl(142 76% 36%)" }}>{Math.round(scheduledHours).toLocaleString("cs-CZ")}h</span></span>
           <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
@@ -1106,7 +1118,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
         }}>
           {([
             { key: "hours" as DisplayMode, label: "Hodiny" },
-            { key: "czk" as DisplayMode, label: "Hodnota" },
+            { key: "czk" as DisplayMode, label: "Prodej" },
             { key: "percent" as DisplayMode, label: "%" },
           ]).map(m => (
             <button
