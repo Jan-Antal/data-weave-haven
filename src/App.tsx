@@ -93,6 +93,13 @@ function PortraitLockOverlay() {
   );
 }
 
+/** Route guard for admin/owner-only pages */
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { isAdmin, isOwner } = useAuth();
+  if (!isAdmin && !isOwner) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   const { user, loading, profile } = useAuth();
 
@@ -139,8 +146,8 @@ function AppRoutes() {
           <RealtimeSyncProvider />
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/plan-vyroby" element={<PlanVyroby />} />
-            <Route path="/vyroba" element={<Vyroba />} />
+            <Route path="/plan-vyroby" element={<AdminRoute><PlanVyroby /></AdminRoute>} />
+            <Route path="/vyroba" element={<AdminRoute><Vyroba /></AdminRoute>} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/set-password" element={<SetPassword />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
