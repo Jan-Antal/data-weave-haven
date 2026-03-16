@@ -664,6 +664,9 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
                   <div className="truncate" style={{ fontSize: 12, fontWeight: 500, color: "#6b7280" }}>{p.project_name}</div>
                   <div className="flex items-center gap-1.5">
                     <span className="font-mono" style={{ fontSize: 10, color: "#9ca3af" }}>{p.project_id}</span>
+                    {p.missing > 0 && (
+                      <span style={{ fontSize: 10, color: "#d97706", fontWeight: 500 }}>· chybí {p.missing} pol.</span>
+                    )}
                     {completedDeadlineDisplay && (
                       <span style={{ fontSize: 10, color: completedDeadlineDisplay.color }}>· {completedDeadlineDisplay.label}: {completedDeadlineDisplay.dateStr}</span>
                     )}
