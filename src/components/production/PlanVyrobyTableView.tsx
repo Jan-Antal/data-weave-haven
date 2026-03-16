@@ -1494,7 +1494,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                               <span className="font-mono font-bold text-[11px] shrink-0" style={{ color: "#223937" }}>{item.itemCode}</span>
                             )}
                             <span className="text-[12px] truncate text-foreground">{item.itemName}</span>
-                            <span className="text-[10px] font-mono shrink-0 ml-auto" style={{ color: "#99a5a3" }}>{formatItemTotal(item)}</span>
+                            <span className="text-[10px] font-mono shrink-0 ml-auto" style={{ color: "#99a5a3" }}>{formatItemTotal(item, item.projectId)}</span>
                           </div>
                           {/* Inbox cell */}
                           {hasAnyInbox && (
