@@ -195,9 +195,9 @@ serve(async (req) => {
     const weeklyCapacity = Number(weeklyCapacityHours) || 760;
 
     // 1. Fetch all data in parallel (including inbox items)
-    const [projectsRes, tpvRes, settingsRes, presetsRes, inboxRes] = await Promise.all([
+    const [projectsRes, tpvRes, settingsRes, presetsRes, inboxRes, ratesRes] = await Promise.all([
       sb.from("projects")
-        .select("project_id, project_name, status, risk, expedice, montaz, predani, datum_smluvni, datum_objednavky, datum_tpv, prodejni_cena, marze, cost_preset_id")
+        .select("project_id, project_name, status, risk, expedice, montaz, predani, datum_smluvni, datum_objednavky, datum_tpv, prodejni_cena, marze, cost_preset_id, currency")
         .is("deleted_at", null)
         .eq("is_test", false)
         .not("status", "in", '("Fakturace","Dokončeno")')
@@ -211,6 +211,11 @@ serve(async (req) => {
         .select("id, project_id, item_name, item_code, estimated_hours, estimated_czk, stage_id, projects!production_inbox_project_id_fkey(project_name, expedice, montaz, predani, datum_smluvni)")
         .eq("status", "pending")
         .order("sent_at", { ascending: true }),
+      sb.from("exchange_rates")
+        .select("eur_czk, year")
+        .order("year", { ascending: false })
+        .limit(1)
+        .single(),
     ]);
 
     const projects = projectsRes.data || [];
@@ -219,6 +224,7 @@ serve(async (req) => {
     const costPresets = presetsRes.data || [];
     const defaultPreset = costPresets.find((p: any) => p.is_default) || costPresets[0] || null;
     const inboxItems = inboxRes.data || [];
+    const eurCzkRate = Number(ratesRes.data?.eur_czk) || 25;
 
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
