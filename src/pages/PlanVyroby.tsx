@@ -1118,7 +1118,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
         }}>
           {([
             { key: "hours" as DisplayMode, label: "Hodiny" },
-            { key: "czk" as DisplayMode, label: "Hodnota" },
+            { key: "czk" as DisplayMode, label: "Prodej" },
             { key: "percent" as DisplayMode, label: "%" },
           ]).map(m => (
             <button
