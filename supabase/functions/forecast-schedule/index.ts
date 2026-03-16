@@ -150,7 +150,7 @@ serve(async (req) => {
         .not("status", "in", '("Fakturace","Dokončeno")')
         .not("project_id", "like", "TEST%"),
       sb.from("tpv_items")
-        .select("project_id, id")
+        .select("project_id, id, cena, pocet, status")
         .is("deleted_at", null),
       sb.from("production_settings").select("*").limit(1).single(),
       sb.from("cost_breakdown_presets").select("*").order("sort_order"),
