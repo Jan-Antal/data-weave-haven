@@ -930,8 +930,105 @@ function MissingItemsProgressBar({ progress }: { progress: ProjectProgress }) {
     </div>
   );
 }
+/** Project card for projects with missing items — mirrors InboxProjectGroup layout */
+function MissingItemProjectCard({ progress, projectInfo, urgency, daysLabel, isSelected, onSelectProject, defaultExpanded, onNavigateToTPV, onOpenProjectDetail }: {
+  progress: ProjectProgress;
+  projectInfo?: { datum_smluvni: string | null; status: string | null; expedice: string | null; montaz: string | null; predani?: string | null };
+  urgency: UrgencyLevel;
+  daysLabel: string | null;
+  isSelected?: boolean;
+  onSelectProject?: (projectId: string) => void;
+  defaultExpanded: boolean;
+  onNavigateToTPV?: (projectId: string) => void;
+  onOpenProjectDetail?: (projectId: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const color = getProjectColor(progress.project_id);
+  const uColors = URGENCY_COLORS[urgency];
+  const leftBorderColor = urgency !== "ok" ? uColors.border : color;
+  const leftBorderWidth = urgency !== "ok" ? 3 : 4;
 
-function InboxResizeHandle({ onWidthChange, containerWidth }: { onWidthChange?: (w: number) => void; containerWidth: number }) {
+  const deadline = useMemo(() => {
+    if (!projectInfo) return null;
+    return resolveDeadline({ expedice: projectInfo.expedice, montaz: projectInfo.montaz, datum_smluvni: projectInfo.datum_smluvni });
+  }, [projectInfo]);
+
+  const deadlineDisplay = useMemo(() => {
+    if (!deadline) return null;
+    const days = differenceInDays(deadline.date, new Date());
+    const dateStr = `${deadline.date.getDate()}.${deadline.date.getMonth() + 1}.${deadline.date.getFullYear()}`;
+    const label = deadline.fieldName === "expedice" ? "Exp" : deadline.fieldName === "montaz" ? "Montáž" : "Sml";
+    const dlColor = days < 0 ? "#dc2626" : days <= 14 ? "#d97706" : "#6b7280";
+    return { label, dateStr, color: dlColor };
+  }, [deadline]);
+
+  return (
+    <div className="rounded-lg overflow-hidden" style={{
+      backgroundColor: isSelected ? "rgba(217,119,6,0.04)" : "#ffffff",
+      borderTop: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+      borderRight: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+      borderBottom: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+      borderLeft: `${leftBorderWidth}px solid ${leftBorderColor}`,
+      boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
+      transition: "border-color 150ms, box-shadow 150ms",
+    }}>
+      <button
+        onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); onSelectProject?.(progress.project_id); }}
+        className="w-full flex items-center gap-1.5 px-2.5 py-[5px] text-left transition-colors"
+        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
+        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+      >
+        <ChevronRight className="h-3 w-3 shrink-0 transition-transform duration-150"
+          style={{ color: "#99a5a3", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate" style={{ fontSize: 14, color: urgency === "ok" ? "#1a1a1a" : uColors.text, fontWeight: 500 }}>{progress.project_name}</span>
+            {urgency === "overdue" && (
+              <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(220,38,38,0.1)", color: "#DC2626" }}>
+                PO TERMÍNU
+              </span>
+            )}
+            {urgency === "urgent" && daysLabel && (
+              <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.1)", color: "#D97706" }}>
+                {daysLabel}
+              </span>
+            )}
+            <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.12)", color: "#d97706" }}>
+              CHYBÍ {progress.missing}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono" style={{ fontSize: 11, color: "#6b7280" }}>{progress.project_id}</span>
+            {deadlineDisplay && (
+              <span style={{ fontSize: 11, color: deadlineDisplay.color }}>· {deadlineDisplay.label}: {deadlineDisplay.dateStr}</span>
+            )}
+          </div>
+          <div className="mt-1"><MissingItemsProgressBar progress={progress} /></div>
+        </div>
+      </button>
+      {expanded && (
+        <div className="px-2 pb-2 space-y-[2px]">
+          {progress.scheduled_items.map(si => (
+            <div key={si.id} className="flex items-center gap-1.5 px-2 py-[3px] rounded-[5px]" style={{ opacity: si.status === "completed" ? 0.6 : 0.7 }}>
+              <span style={{ fontSize: 11, color: si.status === "completed" ? "#3a8a36" : "#3b82f6" }}>{si.status === "completed" ? "✓" : "→"}</span>
+              {si.item_code && <span className="font-mono shrink-0" style={{ fontSize: 11, color: si.status === "completed" ? "#9ca3af" : "#223937", fontWeight: 500 }}>{si.item_code}</span>}
+              <span className="flex-1 truncate" style={{ fontSize: 12, color: si.status === "completed" ? "#9ca3af" : "#4b5563" }}>{si.item_name}</span>
+              <span className="font-mono shrink-0" style={{ fontSize: 11, color: "#6b7280" }}>{si.week_label}</span>
+            </div>
+          ))}
+          {progress.missing > 0 && (
+            <div className="flex items-center gap-1.5 px-2 py-[3px] rounded-[5px]" style={{ opacity: 0.8 }}>
+              <span style={{ fontSize: 11, color: "#d97706" }}>⚠</span>
+              <span style={{ fontSize: 12, color: "#d97706" }}>{progress.missing} položek čeká na odeslání z TPV</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
   const dragRef = useRef(false);
   const startX = useRef(0);
   const startW = useRef(0);
