@@ -982,6 +982,7 @@ function MissingItemProjectCard({ progress, projectInfo, urgency, daysLabel, isS
     }}>
       <button
         onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); onSelectProject?.(progress.project_id); }}
+        onContextMenu={onContextMenu}
         className="w-full flex items-center gap-1.5 px-2.5 py-[5px] text-left transition-colors"
         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
