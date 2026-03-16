@@ -655,9 +655,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
         const row: (string | number)[] = [proj.projectName, proj.projectId, "", "", Math.round(proj.totalHours)];
         for (const week of weeks) {
           const wt = proj.weekTotals.get(week.key);
-          row.push(wt ? formatVal(wt.hours, wt.czk, proj.totalHours) : "");
+          row.push(wt ? formatVal(wt.hours, wt.czk, proj.totalHours, proj.projectId) : "");
         }
-        row.push(proj.expediceTotalHours > 0 ? formatVal(proj.expediceTotalHours, proj.expediceTotalCzk, proj.totalHours) : "");
+        row.push(proj.expediceTotalHours > 0 ? formatVal(proj.expediceTotalHours, proj.expediceTotalCzk, proj.totalHours, proj.projectId) : "");
         rows.push(row);
       } else {
         // Expanded: item rows
