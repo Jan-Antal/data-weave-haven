@@ -697,7 +697,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                     if (key === "accepted_date") return <TableCell key={key} style={cellStyle}><InlineEditableCell value={item.accepted_date || ""} type="date" onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>;
                     if (key === "notes") return <TableCell key={key} style={cellStyle}><InlineEditableCell value={item.notes || ""} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} readOnly={!canManageTPV} /></TableCell>;
                     if (key === "pocet") return <TableCell key={key} style={cellStyle}><InlineEditableCell value={String(item.pocet ?? "")} type="number" onSave={(v) => saveField(item.id, "pocet", v, String(item.pocet ?? ""))} readOnly={!canManageTPV} /></TableCell>;
-                    if (key === "cena") return <TableCell key={key} style={cellStyle} className="text-right"><span className="text-xs font-mono">{formatCurrency(item.cena, currency)}</span></TableCell>;
+                    if (key === "cena") return <TableCell key={key} style={cellStyle} className="text-right"><InlineEditableCell value={String(item.cena ?? "")} type="number" onSave={(v) => saveField(item.id, "cena", v, String(item.cena ?? ""))} readOnly={!canManageTPV} /></TableCell>;
                     // Custom columns
                     if (key.startsWith("custom_") && customColumns) {
                       const def = customColumns.find(c => c.column_key === key);
