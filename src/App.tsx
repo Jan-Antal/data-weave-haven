@@ -167,10 +167,15 @@ function RealtimeSyncProvider() {
 }
 
 
-const App = () => {
+function VersionCheckBootstrap() {
   useVersionCheck();
+  return null;
+}
+
+const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
+      <VersionCheckBootstrap />
       <TooltipProvider>
         <AuthProvider>
           <Toaster />

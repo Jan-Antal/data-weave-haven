@@ -235,7 +235,7 @@ function ExpiredLinkHandler({ errorMessage }: { errorMessage: string }) {
         )}
 
         <div className="flex flex-col items-center gap-1 pt-2 border-t">
-          <Button type="button" variant="ghost" size="sm" onClick={() => window.location.reload()}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/login", { replace: true })}>
             Zkusit znovu
           </Button>
           <button
