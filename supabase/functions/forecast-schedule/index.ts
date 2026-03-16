@@ -41,6 +41,57 @@ function addWeeks(date: Date, n: number): Date {
   return d;
 }
 
+// Robust date parser for various formats stored in DB
+const MONTH_MAP: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
+
+function parseFlexDate(raw: string | null | undefined): Date | null {
+  if (!raw || typeof raw !== "string") return null;
+  const s = raw.trim();
+  if (!s) return null;
+
+  // 1. ISO: "2026-05-04" or "2026-03-19"
+  const isoMatch = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoMatch) {
+    const d = new Date(Date.UTC(+isoMatch[1], +isoMatch[2] - 1, +isoMatch[3]));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // 2. Czech: "25. 3. 2026" or "4. 5. 2026" or "30. 1. 2026"
+  const czMatch = s.match(/^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})$/);
+  if (czMatch) {
+    const d = new Date(Date.UTC(+czMatch[3], +czMatch[2] - 1, +czMatch[1]));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // 3. DD-Mon-YY: "02-Mar-26", "10-Nov-25"
+  const dMyMatch = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
+  if (dMyMatch) {
+    const month = MONTH_MAP[dMyMatch[2].toLowerCase()];
+    if (month !== undefined) {
+      let year = +dMyMatch[3];
+      if (year < 100) year += 2000;
+      const d = new Date(Date.UTC(year, month, +dMyMatch[1]));
+      return isNaN(d.getTime()) ? null : d;
+    }
+  }
+
+  // 4. US slash: "1/23/26" or "2/16/26" (M/D/YY)
+  const usMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (usMatch) {
+    let year = +usMatch[3];
+    if (year < 100) year += 2000;
+    const d = new Date(Date.UTC(year, +usMatch[1] - 1, +usMatch[2]));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // 5. Fallback: try native parser
+  const fallback = new Date(s);
+  return isNaN(fallback.getTime()) ? null : fallback;
+}
+
 function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number, costPresets: any[], defaultPreset: any): { hours: number; level: number; badge: string } {
   // LEVEL 1 — sum from TPV items that have cena set
   const itemsWithPrice = projTpvItems.filter((t: any) => t.cena && Number(t.cena) > 0);
@@ -218,33 +269,40 @@ serve(async (req) => {
       // Determine tpv_start (earliest possible production start)
       let tpvStart: Date;
       if (proj.datum_tpv) {
-        const parsed = new Date(proj.datum_tpv);
-        tpvStart = isNaN(parsed.getTime()) ? addWeeks(today, 2) : parsed;
+        const parsed = parseFlexDate(proj.datum_tpv);
+        tpvStart = parsed ?? addWeeks(today, 2);
       } else if (proj.datum_objednavky) {
-        const parsed = new Date(proj.datum_objednavky);
+        const parsed = parseFlexDate(proj.datum_objednavky);
         const tpvWeeks = estimateTpvWeeks(tpvCount);
-        tpvStart = isNaN(parsed.getTime()) ? addWeeks(today, 2) : addWeeks(parsed, tpvWeeks);
+        tpvStart = parsed ? addWeeks(parsed, tpvWeeks) : addWeeks(today, 2);
       } else {
         tpvStart = addWeeks(today, 2);
       }
       // tpvStart must not be in the past and must be valid
       if (isNaN(tpvStart.getTime()) || tpvStart < today) tpvStart = new Date(today);
 
-      // Determine deadline
-      const deadlineStr = proj.expedice || proj.montaz || proj.predani || proj.datum_smluvni;
+      // Determine deadline — use parseFlexDate for robust parsing
+      const deadlineFields = [
+        { val: proj.expedice, src: "expedice" },
+        { val: proj.montaz, src: "montaz" },
+        { val: proj.predani, src: "predani" },
+        { val: proj.datum_smluvni, src: "smluvni" },
+      ];
       let deadline: Date;
       let deadlineSource: string;
-      if (deadlineStr) {
-        const parsed = new Date(deadlineStr);
-        if (!isNaN(parsed.getTime())) {
-          deadline = parsed;
-          deadlineSource = proj.expedice ? "expedice" : proj.montaz ? "montaz" : proj.predani ? "predani" : "smluvni";
-        } else {
-          const fbWeeks = statusFallbackWeeks[proj.status] || 8;
-          deadline = addWeeks(tpvStart, fbWeeks);
-          deadlineSource = "fallback";
+      let foundDeadline = false;
+      for (const f of deadlineFields) {
+        if (f.val) {
+          const parsed = parseFlexDate(f.val);
+          if (parsed) {
+            deadline = parsed;
+            deadlineSource = f.src;
+            foundDeadline = true;
+            break;
+          }
         }
-      } else {
+      }
+      if (!foundDeadline) {
         const fbWeeks = statusFallbackWeeks[proj.status] || 8;
         deadline = addWeeks(tpvStart, fbWeeks);
         deadlineSource = "fallback";
@@ -289,15 +347,23 @@ serve(async (req) => {
       if (!inboxByProject.has(pid)) {
         const projInfo = (item as any).projects;
         const projectName = projInfo?.project_name || pid;
-        // Get deadline from project
-        const deadlineStr = projInfo?.expedice || projInfo?.montaz || projInfo?.predani || projInfo?.datum_smluvni;
+        // Get deadline from project — use robust parser
+        const deadlineFields = [
+          { val: projInfo?.expedice, src: "expedice" },
+          { val: projInfo?.montaz, src: "montaz" },
+          { val: projInfo?.predani, src: "predani" },
+          { val: projInfo?.datum_smluvni, src: "smluvni" },
+        ];
         let deadline: Date | null = null;
         let deadlineSource = "none";
-        if (deadlineStr) {
-          const parsed = new Date(deadlineStr);
-          if (!isNaN(parsed.getTime())) {
-            deadline = parsed;
-            deadlineSource = projInfo?.expedice ? "expedice" : projInfo?.montaz ? "montaz" : projInfo?.predani ? "predani" : "smluvni";
+        for (const f of deadlineFields) {
+          if (f.val) {
+            const parsed = parseFlexDate(f.val);
+            if (parsed) {
+              deadline = parsed;
+              deadlineSource = f.src;
+              break;
+            }
           }
         }
         inboxByProject.set(pid, { items: [], projectName, totalHours: 0, deadline, deadlineSource });
