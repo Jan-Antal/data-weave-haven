@@ -200,6 +200,13 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
 
   const hourlyRate = settings?.hourly_rate ?? 550;
 
+  // Convert production CZK to selling price for a given project
+  const toSellingCzk = useCallback((czk: number, projectId: string) => {
+    const proj = projectDateLookup.get(projectId);
+    if (!proj) return czk;
+    return productionCzkToSellingPrice(czk, proj.cost_production_pct, proj.marze);
+  }, [projectDateLookup]);
+
   const toggleProject = (pid: string) => {
     setExpandedProjects(prev => {
       const next = new Set(prev);
