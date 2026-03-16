@@ -111,8 +111,8 @@ serve(async (req) => {
     const { mode, weeklyCapacityHours } = await req.json();
     const weeklyCapacity = Number(weeklyCapacityHours) || 760;
 
-    // 1. Fetch all data in parallel
-    const [projectsRes, tpvRes, settingsRes, presetsRes] = await Promise.all([
+    // 1. Fetch all data in parallel (including inbox items)
+    const [projectsRes, tpvRes, settingsRes, presetsRes, inboxRes] = await Promise.all([
       sb.from("projects")
         .select("project_id, project_name, status, risk, expedice, montaz, predani, datum_smluvni, datum_objednavky, datum_tpv, prodejni_cena, marze, cost_preset_id")
         .is("deleted_at", null)
@@ -124,6 +124,10 @@ serve(async (req) => {
         .is("deleted_at", null),
       sb.from("production_settings").select("*").limit(1).single(),
       sb.from("cost_breakdown_presets").select("*").order("sort_order"),
+      sb.from("production_inbox")
+        .select("id, project_id, item_name, item_code, estimated_hours, estimated_czk, stage_id, projects!production_inbox_project_id_fkey(project_name, expedice, montaz, predani, datum_smluvni)")
+        .eq("status", "pending")
+        .order("sent_at", { ascending: true }),
     ]);
 
     const projects = projectsRes.data || [];
@@ -131,6 +135,7 @@ serve(async (req) => {
     const hourlyRate = Number(settingsRes.data?.hourly_rate) || 550;
     const costPresets = presetsRes.data || [];
     const defaultPreset = costPresets.find((p: any) => p.is_default) || costPresets[0] || null;
+    const inboxItems = inboxRes.data || [];
 
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
