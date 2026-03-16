@@ -215,7 +215,7 @@ serve(async (req) => {
       sb.from("tpv_items")
         .select("project_id, id, cena, pocet, status")
         .is("deleted_at", null)
-        .not("status", "eq", "Zrušeno"),
+        .or("status.is.null,status.neq.Zrušeno"),
       sb.from("production_settings").select("*").limit(1).single(),
       sb.from("cost_breakdown_presets").select("*").order("sort_order"),
       sb.from("production_inbox")
