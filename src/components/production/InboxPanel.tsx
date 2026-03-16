@@ -938,7 +938,7 @@ function MissingItemsProgressBar({ progress }: { progress: ProjectProgress }) {
   );
 }
 /** Project card for projects with missing items — mirrors InboxProjectGroup layout */
-function MissingItemProjectCard({ progress, projectInfo, urgency, daysLabel, isSelected, onSelectProject, defaultExpanded, onNavigateToTPV, onOpenProjectDetail }: {
+function MissingItemProjectCard({ progress, projectInfo, urgency, daysLabel, isSelected, onSelectProject, defaultExpanded, onNavigateToTPV, onOpenProjectDetail, onContextMenu }: {
   progress: ProjectProgress;
   projectInfo?: { datum_smluvni: string | null; status: string | null; expedice: string | null; montaz: string | null; predani?: string | null };
   urgency: UrgencyLevel;
@@ -948,6 +948,7 @@ function MissingItemProjectCard({ progress, projectInfo, urgency, daysLabel, isS
   defaultExpanded: boolean;
   onNavigateToTPV?: (projectId: string) => void;
   onOpenProjectDetail?: (projectId: string) => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const color = getProjectColor(progress.project_id);
