@@ -92,7 +92,7 @@ function parseFlexDate(raw: string | null | undefined): Date | null {
   return isNaN(fallback.getTime()) ? null : fallback;
 }
 
-function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number, costPresets: any[], defaultPreset: any): { hours: number; level: number; badge: string } {
+function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number, costPresets: any[], defaultPreset: any, eurCzkRate: number): { hours: number; level: number; badge: string } {
   // LEVEL 1 — sum from TPV items that have cena set
   const itemsWithPrice = projTpvItems.filter((t: any) => t.cena && Number(t.cena) > 0);
 
@@ -102,6 +102,7 @@ function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number
       : defaultPreset;
     const vyrobaPct = preset?.production_pct ?? 35;
     const effectiveMarze = proj.marze != null ? Number(proj.marze) : 15;
+    const currencyMultiplier = (proj.currency === "EUR") ? eurCzkRate : 1;
 
     let totalHours = 0;
     for (const item of itemsWithPrice) {
@@ -115,7 +116,7 @@ function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number
     if (itemsWithoutPrice.length > 0 && Number(proj.prodejni_cena) > 0) {
       const totalItems = projTpvItems.length;
       const remainingShare = itemsWithoutPrice.length / totalItems;
-      const remainingCena = Number(proj.prodejni_cena) * remainingShare;
+      const remainingCena = Number(proj.prodejni_cena) * currencyMultiplier * remainingShare;
       const naklady = remainingCena * (1 - effectiveMarze / 100);
       totalHours += naklady * (vyrobaPct / 100) / hourlyRate;
     }
@@ -124,7 +125,8 @@ function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number
   }
 
   // LEVEL 2 — project price + preset
-  const prodejniCena = Number(proj.prodejni_cena) || 0;
+  const currencyMultiplier = (proj.currency === "EUR") ? eurCzkRate : 1;
+  const prodejniCena = (Number(proj.prodejni_cena) || 0) * currencyMultiplier;
   const marze = proj.marze != null ? Number(proj.marze) : null;
   const preset = proj.cost_preset_id
     ? costPresets.find((p: any) => p.id === proj.cost_preset_id)
@@ -193,9 +195,9 @@ serve(async (req) => {
     const weeklyCapacity = Number(weeklyCapacityHours) || 760;
 
     // 1. Fetch all data in parallel (including inbox items)
-    const [projectsRes, tpvRes, settingsRes, presetsRes, inboxRes] = await Promise.all([
+    const [projectsRes, tpvRes, settingsRes, presetsRes, inboxRes, ratesRes] = await Promise.all([
       sb.from("projects")
-        .select("project_id, project_name, status, risk, expedice, montaz, predani, datum_smluvni, datum_objednavky, datum_tpv, prodejni_cena, marze, cost_preset_id")
+        .select("project_id, project_name, status, risk, expedice, montaz, predani, datum_smluvni, datum_objednavky, datum_tpv, prodejni_cena, marze, cost_preset_id, currency")
         .is("deleted_at", null)
         .eq("is_test", false)
         .not("status", "in", '("Fakturace","Dokončeno")')
@@ -209,6 +211,11 @@ serve(async (req) => {
         .select("id, project_id, item_name, item_code, estimated_hours, estimated_czk, stage_id, projects!production_inbox_project_id_fkey(project_name, expedice, montaz, predani, datum_smluvni)")
         .eq("status", "pending")
         .order("sent_at", { ascending: true }),
+      sb.from("exchange_rates")
+        .select("eur_czk, year")
+        .order("year", { ascending: false })
+        .limit(1)
+        .single(),
     ]);
 
     const projects = projectsRes.data || [];
@@ -217,6 +224,7 @@ serve(async (req) => {
     const costPresets = presetsRes.data || [];
     const defaultPreset = costPresets.find((p: any) => p.is_default) || costPresets[0] || null;
     const inboxItems = inboxRes.data || [];
+    const eurCzkRate = Number(ratesRes.data?.eur_czk) || 25;
 
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
@@ -264,7 +272,7 @@ serve(async (req) => {
     for (const proj of projects) {
       const tpvCount = tpvCountByProject.get(proj.project_id) || 0;
       const projTpv = tpvItems.filter((t: any) => t.project_id === proj.project_id);
-      const estimation = estimateProjectHours(proj, projTpv, hourlyRate, costPresets, defaultPreset);
+      const estimation = estimateProjectHours(proj, projTpv, hourlyRate, costPresets, defaultPreset, eurCzkRate);
 
       // Determine tpv_start (earliest possible production start)
       let tpvStart: Date;
