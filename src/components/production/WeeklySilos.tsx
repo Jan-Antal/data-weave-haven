@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { productionCzkToSellingPrice } from "@/lib/currency";
 import { GripVertical, ChevronRight, AlertTriangle } from "lucide-react";
 import type { ForecastBlock } from "@/hooks/useForecastMode";
 import { differenceInDays, format } from "date-fns";
