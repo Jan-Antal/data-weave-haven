@@ -252,13 +252,16 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
 
   const totalItemCount = projects.reduce((s, p) => s + p.items.length, 0);
 
-  const { completedProjects, reserveProjects } = useMemo(() => {
-    if (!progressData) return { completedProjects: [], reserveProjects: [] };
+  const { completedProjects, reserveProjects, missingItemProjects } = useMemo(() => {
+    if (!progressData) return { completedProjects: [], reserveProjects: [], missingItemProjects: [] };
     const activeProjectIds = new Set(projects.map(p => p.project_id));
-    const allCompleted = Array.from(progressData.values()).filter(p => (p.is_complete || p.is_blocker_only) && !activeProjectIds.has(p.project_id));
+    const allFromProgress = Array.from(progressData.values()).filter(p => !activeProjectIds.has(p.project_id));
+    // Projects with missing items stay in active inbox area
+    const missing = allFromProgress.filter(p => p.missing > 0 && !p.is_blocker_only && !p.is_complete);
+    const allCompleted = allFromProgress.filter(p => (p.is_complete || p.is_blocker_only));
     const regular = allCompleted.filter(p => !p.is_blocker_only);
     const reserve = allCompleted.filter(p => p.is_blocker_only);
-    return { completedProjects: regular, reserveProjects: reserve };
+    return { completedProjects: regular, reserveProjects: reserve, missingItemProjects: missing };
   }, [progressData, projects]);
 
   const allProjectOptions = useMemo(() => {
@@ -597,7 +600,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
 
       {/* Items */}
       <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5">
-        {projects.length === 0 && completedProjects.length === 0 && reserveProjects.length === 0 && !isLoading && (
+        {projects.length === 0 && completedProjects.length === 0 && reserveProjects.length === 0 && missingItemProjects.length === 0 && !isLoading && (
           <div className="text-center py-8">
             <p className="text-[10px] mb-3" style={{ color: "#99a5a3" }}>Inbox je prázdný</p>
           </div>
@@ -623,6 +626,44 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
               allInboxItemsMap={allInboxItemsMap}
               searchQuery={searchQuery}
             />
+          );
+        })}
+
+        {/* Projects with missing items - stay in active inbox */}
+        {missingItemProjects.map(p => {
+          const missingColor = getProjectColor(p.project_id);
+          const isMissingSelected = selectedProjectId === p.project_id;
+          const missingInfo = projectInfoMap.get(p.project_id);
+          const missingUrgency = getUrgency(missingInfo);
+          const missingUColors = URGENCY_COLORS[missingUrgency];
+          const leftColor = missingUrgency !== "ok" ? missingUColors.border : missingColor;
+          return (
+            <div key={p.project_id} className="rounded-lg overflow-hidden" style={{
+              backgroundColor: isMissingSelected ? "rgba(217,119,6,0.04)" : "#ffffff",
+              borderTop: isMissingSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+              borderRight: isMissingSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+              borderBottom: isMissingSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+              borderLeft: `4px solid ${leftColor}`,
+              boxShadow: isMissingSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
+            }}>
+              <button
+                onClick={() => onSelectProject?.(p.project_id)}
+                className="w-full flex items-center gap-1.5 px-2.5 py-[5px] text-left transition-colors"
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate" style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 500 }}>{p.project_name}</span>
+                    <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.12)", color: "#d97706" }}>
+                      CHYBÍ {p.missing}
+                    </span>
+                  </div>
+                  <span className="font-mono" style={{ fontSize: 10, color: "#9ca3af" }}>{p.project_id}</span>
+                  <MissingItemsProgressBar progress={p} />
+                </div>
+              </button>
+            </div>
           );
         })}
 
@@ -880,6 +921,35 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
         />
       )}
       <InboxResizeHandle onWidthChange={onWidthChange} containerWidth={width} />
+    </div>
+  );
+}
+
+/** Compact progress bar for projects with missing items in active inbox */
+function MissingItemsProgressBar({ progress }: { progress: ProjectProgress }) {
+  const total = progress.completed + progress.scheduled + (progress.paused || 0) + progress.in_inbox + progress.missing;
+  if (total === 0) return null;
+  const pctCompleted = (progress.completed / total) * 100;
+  const pctScheduled = (progress.scheduled / total) * 100;
+  const pctPaused = ((progress.paused || 0) / total) * 100;
+  const pctInbox = (progress.in_inbox / total) * 100;
+  const pctMissing = (progress.missing / total) * 100;
+  return (
+    <div className="mt-1">
+      <div className="h-[4px] w-full rounded-full overflow-hidden flex" style={{ backgroundColor: "#e5e7eb" }}>
+        {pctCompleted > 0 && <div className="h-full" style={{ width: `${pctCompleted}%`, backgroundColor: "#6aab68" }} />}
+        {pctScheduled > 0 && <div className="h-full" style={{ width: `${pctScheduled}%`, backgroundColor: "#a8d5a6" }} />}
+        {pctPaused > 0 && <div className="h-full" style={{ width: `${pctPaused}%`, backgroundColor: "#e0c97a" }} />}
+        {pctInbox > 0 && <div className="h-full" style={{ width: `${pctInbox}%`, backgroundColor: "#c4bfb8" }} />}
+        {pctMissing > 0 && <div className="h-full" style={{ width: `${pctMissing}%`, backgroundColor: "#e8a048" }} />}
+      </div>
+      <div className="flex gap-1.5 mt-[2px] text-[9px] leading-none">
+        {progress.completed > 0 && <span style={{ color: "#3a8a36" }}>✓{progress.completed}</span>}
+        {progress.scheduled > 0 && <span style={{ color: "#6b7280" }}>⊙{progress.scheduled}</span>}
+        {(progress.paused || 0) > 0 && <span style={{ color: "#b8a44a" }}>⏸{progress.paused}</span>}
+        {progress.in_inbox > 0 && <span style={{ color: "#9ca3af" }}>◇{progress.in_inbox}</span>}
+        {progress.missing > 0 && <span style={{ color: "#d97706", fontWeight: 500 }}>⚠{progress.missing} chybí</span>}
+      </div>
     </div>
   );
 }
