@@ -645,6 +645,13 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
               defaultExpanded={allExpanded}
               onNavigateToTPV={onNavigateToTPV}
               onOpenProjectDetail={onOpenProjectDetail}
+              onContextMenu={(e) => {
+                e.preventDefault(); e.stopPropagation();
+                const actions: ContextMenuAction[] = [];
+                if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(p.project_id) });
+                if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(p.project_id) });
+                if (actions.length > 0) setContextMenu({ x: e.clientX, y: Math.min(e.clientY, window.innerHeight - 200), actions });
+              }}
             />
           );
         })}
