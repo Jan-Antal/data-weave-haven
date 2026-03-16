@@ -252,13 +252,16 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
 
   const totalItemCount = projects.reduce((s, p) => s + p.items.length, 0);
 
-  const { completedProjects, reserveProjects } = useMemo(() => {
-    if (!progressData) return { completedProjects: [], reserveProjects: [] };
+  const { completedProjects, reserveProjects, missingItemProjects } = useMemo(() => {
+    if (!progressData) return { completedProjects: [], reserveProjects: [], missingItemProjects: [] };
     const activeProjectIds = new Set(projects.map(p => p.project_id));
-    const allCompleted = Array.from(progressData.values()).filter(p => (p.is_complete || p.is_blocker_only) && !activeProjectIds.has(p.project_id));
+    const allFromProgress = Array.from(progressData.values()).filter(p => !activeProjectIds.has(p.project_id));
+    // Projects with missing items stay in active inbox area
+    const missing = allFromProgress.filter(p => p.missing > 0 && !p.is_blocker_only && !p.is_complete);
+    const allCompleted = allFromProgress.filter(p => (p.is_complete || p.is_blocker_only));
     const regular = allCompleted.filter(p => !p.is_blocker_only);
     const reserve = allCompleted.filter(p => p.is_blocker_only);
-    return { completedProjects: regular, reserveProjects: reserve };
+    return { completedProjects: regular, reserveProjects: reserve, missingItemProjects: missing };
   }, [progressData, projects]);
 
   const allProjectOptions = useMemo(() => {

@@ -105,7 +105,7 @@ export function useProductionProgress() {
         result.set(pid, {
           project_id: pid, project_name: projectNames.get(pid) || pid, total_tpv: totalTpv,
           in_inbox: inInbox, scheduled, completed, paused, missing,
-          is_complete: inInbox === 0 && paused === 0 && hasScheduledOrCompleted,
+          is_complete: missing === 0 && inInbox === 0 && paused === 0 && hasScheduledOrCompleted,
           is_blocker_only: isBlockerOnly,
           scheduled_items: scheduledItemsByProject.get(pid) || [],
         });
