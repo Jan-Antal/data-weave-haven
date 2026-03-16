@@ -173,25 +173,10 @@ function calcPriorityScore(proj: any, deadlineDate: Date | null, today: Date): n
   return score;
 }
 
-// Split hours into meaningful blocks (continuity rule)
-function splitIntoBlocks(totalHours: number, weeklyCapacity: number): number[] {
-  const minBlock = Math.max(100, Math.round(totalHours * 0.20));
-  if (totalHours <= weeklyCapacity * 1.1) return [totalHours];
-  if (totalHours <= weeklyCapacity * 2.2) {
-    const half = Math.round(totalHours / 2);
-    return [half, totalHours - half];
-  }
-  const n = Math.floor(totalHours / minBlock);
-  const blockSize = Math.round(totalHours / n);
-  const blocks: number[] = [];
-  let remaining = totalHours;
-  for (let i = 0; i < n - 1; i++) {
-    blocks.push(blockSize);
-    remaining -= blockSize;
-  }
-  blocks.push(remaining);
-  return blocks;
-}
+// Target utilization: 100-125% of weekly capacity
+const TARGET_MIN = 1.00;
+const TARGET_MAX = 1.25;
+const TARGET_MID = (TARGET_MIN + TARGET_MAX) / 2; // 1.125
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
