@@ -916,6 +916,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   const { data: settings } = useProductionSettings();
   const { data: scheduleData } = useProductionSchedule();
   const { data: inboxProjects = [] } = useProductionInbox();
+  const { data: allProjects = [] } = useProjects();
   const getWeekCapacity = useWeekCapacityLookup();
 
    type StatsScope = "week" | "month" | "all";
