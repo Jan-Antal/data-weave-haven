@@ -629,6 +629,44 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
           );
         })}
 
+        {/* Projects with missing items - stay in active inbox */}
+        {missingItemProjects.map(p => {
+          const missingColor = getProjectColor(p.project_id);
+          const isMissingSelected = selectedProjectId === p.project_id;
+          const missingInfo = projectInfoMap.get(p.project_id);
+          const missingUrgency = getUrgency(missingInfo);
+          const missingUColors = URGENCY_COLORS[missingUrgency];
+          const leftColor = missingUrgency !== "ok" ? missingUColors.border : missingColor;
+          return (
+            <div key={p.project_id} className="rounded-lg overflow-hidden" style={{
+              backgroundColor: isMissingSelected ? "rgba(217,119,6,0.04)" : "#ffffff",
+              borderTop: isMissingSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+              borderRight: isMissingSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+              borderBottom: isMissingSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+              borderLeft: `4px solid ${leftColor}`,
+              boxShadow: isMissingSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
+            }}>
+              <button
+                onClick={() => onSelectProject?.(p.project_id)}
+                className="w-full flex items-center gap-1.5 px-2.5 py-[5px] text-left transition-colors"
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#f8f7f5")}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate" style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 500 }}>{p.project_name}</span>
+                    <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.12)", color: "#d97706" }}>
+                      CHYBÍ {p.missing}
+                    </span>
+                  </div>
+                  <span className="font-mono" style={{ fontSize: 10, color: "#9ca3af" }}>{p.project_id}</span>
+                  <MissingItemsProgressBar progress={p} />
+                </div>
+              </button>
+            </div>
+          );
+        })}
+
         {completedProjects.length > 0 && (
           <div className="mt-3 space-y-[2px]">
             {/* Section divider */}
