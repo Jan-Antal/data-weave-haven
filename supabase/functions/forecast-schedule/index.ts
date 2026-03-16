@@ -347,15 +347,23 @@ serve(async (req) => {
       if (!inboxByProject.has(pid)) {
         const projInfo = (item as any).projects;
         const projectName = projInfo?.project_name || pid;
-        // Get deadline from project
-        const deadlineStr = projInfo?.expedice || projInfo?.montaz || projInfo?.predani || projInfo?.datum_smluvni;
+        // Get deadline from project — use robust parser
+        const deadlineFields = [
+          { val: projInfo?.expedice, src: "expedice" },
+          { val: projInfo?.montaz, src: "montaz" },
+          { val: projInfo?.predani, src: "predani" },
+          { val: projInfo?.datum_smluvni, src: "smluvni" },
+        ];
         let deadline: Date | null = null;
         let deadlineSource = "none";
-        if (deadlineStr) {
-          const parsed = new Date(deadlineStr);
-          if (!isNaN(parsed.getTime())) {
-            deadline = parsed;
-            deadlineSource = projInfo?.expedice ? "expedice" : projInfo?.montaz ? "montaz" : projInfo?.predani ? "predani" : "smluvni";
+        for (const f of deadlineFields) {
+          if (f.val) {
+            const parsed = parseFlexDate(f.val);
+            if (parsed) {
+              deadline = parsed;
+              deadlineSource = f.src;
+              break;
+            }
           }
         }
         inboxByProject.set(pid, { items: [], projectName, totalHours: 0, deadline, deadlineSource });
