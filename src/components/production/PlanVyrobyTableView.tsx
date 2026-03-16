@@ -1711,7 +1711,7 @@ function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCe
   alloc: WeekAlloc;
   item: ItemRow;
   displayMode: DisplayMode;
-  formatCellValue: (hours: number, czk: number, status: string, totalItemHours: number, splitPart?: number, splitTotal?: number) => string;
+  formatCellValue: (hours: number, czk: number, status: string, totalItemHours: number, splitPart?: number, splitTotal?: number, projectId?: string) => string;
   getCellStyle: (status: string) => { bg: string; text: string; border: string };
   moveTargetWeeks: { key: string; weekNum: number; label: string }[];
   getWeekCapacity: (weekKey: string) => number;
