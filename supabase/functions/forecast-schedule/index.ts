@@ -41,6 +41,57 @@ function addWeeks(date: Date, n: number): Date {
   return d;
 }
 
+// Robust date parser for various formats stored in DB
+const MONTH_MAP: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
+
+function parseFlexDate(raw: string | null | undefined): Date | null {
+  if (!raw || typeof raw !== "string") return null;
+  const s = raw.trim();
+  if (!s) return null;
+
+  // 1. ISO: "2026-05-04" or "2026-03-19"
+  const isoMatch = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoMatch) {
+    const d = new Date(Date.UTC(+isoMatch[1], +isoMatch[2] - 1, +isoMatch[3]));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // 2. Czech: "25. 3. 2026" or "4. 5. 2026" or "30. 1. 2026"
+  const czMatch = s.match(/^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})$/);
+  if (czMatch) {
+    const d = new Date(Date.UTC(+czMatch[3], +czMatch[2] - 1, +czMatch[1]));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // 3. DD-Mon-YY: "02-Mar-26", "10-Nov-25"
+  const dMyMatch = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
+  if (dMyMatch) {
+    const month = MONTH_MAP[dMyMatch[2].toLowerCase()];
+    if (month !== undefined) {
+      let year = +dMyMatch[3];
+      if (year < 100) year += 2000;
+      const d = new Date(Date.UTC(year, month, +dMyMatch[1]));
+      return isNaN(d.getTime()) ? null : d;
+    }
+  }
+
+  // 4. US slash: "1/23/26" or "2/16/26" (M/D/YY)
+  const usMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (usMatch) {
+    let year = +usMatch[3];
+    if (year < 100) year += 2000;
+    const d = new Date(Date.UTC(year, +usMatch[1] - 1, +usMatch[2]));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // 5. Fallback: try native parser
+  const fallback = new Date(s);
+  return isNaN(fallback.getTime()) ? null : fallback;
+}
+
 function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number, costPresets: any[], defaultPreset: any): { hours: number; level: number; badge: string } {
   // LEVEL 1 — sum from TPV items that have cena set
   const itemsWithPrice = projTpvItems.filter((t: any) => t.cena && Number(t.cena) > 0);
