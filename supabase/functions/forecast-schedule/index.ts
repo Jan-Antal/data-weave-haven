@@ -240,17 +240,32 @@ serve(async (req) => {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
-    // 2. Generate week keys (current + 26 weeks ahead)
+    // 2. Generate week keys dynamically — extend to cover the latest project deadline
     const currentMonday = new Date(today);
     const dayOfWeek = currentMonday.getUTCDay();
     const offset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
     currentMonday.setUTCDate(currentMonday.getUTCDate() + offset);
     currentMonday.setUTCHours(0, 0, 0, 0);
 
+    // Find the latest deadline across all active projects
+    let latestDeadline = addWeeks(currentMonday, 26); // minimum 26 weeks
+    for (const proj of projects) {
+      for (const field of [proj.expedice, proj.montaz, proj.predani, proj.datum_smluvni]) {
+        if (field) {
+          const parsed = parseFlexDate(field);
+          if (parsed && parsed > latestDeadline) latestDeadline = parsed;
+        }
+      }
+    }
+    // Add 2 extra weeks buffer past the latest deadline
+    const endDate = addWeeks(latestDeadline, 2);
+    const totalWeeks = Math.max(26, Math.ceil((endDate.getTime() - currentMonday.getTime()) / (7 * 86400000)));
+
     const weekKeys: string[] = [];
-    for (let i = 0; i < 26; i++) {
+    for (let i = 0; i < totalWeeks; i++) {
       weekKeys.push(getWeekKey(addWeeks(currentMonday, i)));
     }
+    console.log(`[Forecast] Dynamic horizon: ${totalWeeks} weeks (latest deadline: ${latestDeadline.toISOString().split("T")[0]})`);
 
     // 3. Count TPV items per project
     const tpvCountByProject = new Map<string, number>();
