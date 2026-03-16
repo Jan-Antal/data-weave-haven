@@ -111,8 +111,8 @@ serve(async (req) => {
     const { mode, weeklyCapacityHours } = await req.json();
     const weeklyCapacity = Number(weeklyCapacityHours) || 760;
 
-    // 1. Fetch all data in parallel
-    const [projectsRes, tpvRes, settingsRes, presetsRes] = await Promise.all([
+    // 1. Fetch all data in parallel (including inbox items)
+    const [projectsRes, tpvRes, settingsRes, presetsRes, inboxRes] = await Promise.all([
       sb.from("projects")
         .select("project_id, project_name, status, risk, expedice, montaz, predani, datum_smluvni, datum_objednavky, datum_tpv, prodejni_cena, marze, cost_preset_id")
         .is("deleted_at", null)
@@ -124,6 +124,10 @@ serve(async (req) => {
         .is("deleted_at", null),
       sb.from("production_settings").select("*").limit(1).single(),
       sb.from("cost_breakdown_presets").select("*").order("sort_order"),
+      sb.from("production_inbox")
+        .select("id, project_id, item_name, item_code, estimated_hours, estimated_czk, stage_id, projects!production_inbox_project_id_fkey(project_name, expedice, montaz, predani, datum_smluvni)")
+        .eq("status", "pending")
+        .order("sent_at", { ascending: true }),
     ]);
 
     const projects = projectsRes.data || [];
@@ -131,6 +135,7 @@ serve(async (req) => {
     const hourlyRate = Number(settingsRes.data?.hourly_rate) || 550;
     const costPresets = presetsRes.data || [];
     const defaultPreset = costPresets.find((p: any) => p.is_default) || costPresets[0] || null;
+    const inboxItems = inboxRes.data || [];
 
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
@@ -245,6 +250,101 @@ serve(async (req) => {
 
     const blocks: any[] = [];
 
+    // 6a. Schedule INBOX items first (highest priority — real items waiting to be planned)
+    // Group inbox items by project
+    const inboxByProject = new Map<string, { items: typeof inboxItems; projectName: string; totalHours: number; deadline: Date | null; deadlineSource: string }>();
+    for (const item of inboxItems) {
+      const pid = item.project_id;
+      if (!inboxByProject.has(pid)) {
+        const projInfo = (item as any).projects;
+        const projectName = projInfo?.project_name || pid;
+        // Get deadline from project
+        const deadlineStr = projInfo?.expedice || projInfo?.montaz || projInfo?.predani || projInfo?.datum_smluvni;
+        let deadline: Date | null = null;
+        let deadlineSource = "none";
+        if (deadlineStr) {
+          const parsed = new Date(deadlineStr);
+          if (!isNaN(parsed.getTime())) {
+            deadline = parsed;
+            deadlineSource = projInfo?.expedice ? "expedice" : projInfo?.montaz ? "montaz" : projInfo?.predani ? "predani" : "smluvni";
+          }
+        }
+        inboxByProject.set(pid, { items: [], projectName, totalHours: 0, deadline, deadlineSource });
+      }
+      const group = inboxByProject.get(pid)!;
+      group.items.push(item);
+      group.totalHours += Number(item.estimated_hours) || 0;
+    }
+
+    // Schedule inbox projects into the current week (or earliest available)
+    for (const [pid, group] of inboxByProject) {
+      const currentWeekKey = weekKeys[0];
+      // Try to fit in current week, then next weeks
+      let placed = false;
+      for (const wk of weekKeys) {
+        const avail = weeklyCapacity - (usage[wk] || 0);
+        if (avail >= Math.min(group.totalHours * 0.5, 50)) {
+          const alloc = Math.min(group.totalHours, avail);
+          blocks.push({
+            id: `inbox-${pid}-${wk}-${blocks.length}`,
+            project_id: pid,
+            project_name: group.projectName,
+            bundle_description: `${group.items.length} položek z Inboxu`,
+            week: wk,
+            estimated_hours: alloc,
+            tpv_item_count: group.items.length,
+            confidence: "high" as const,
+            source: "inbox_item",
+            deadline: group.deadline ? group.deadline.toISOString().split("T")[0] : null,
+            deadline_source: group.deadlineSource,
+            is_forecast: true,
+            estimation_level: 1,
+            estimation_badge: "Inbox",
+            inbox_item_ids: group.items.map(i => i.id),
+          });
+          usage[wk] = (usage[wk] || 0) + alloc;
+          placed = true;
+
+          // If not all hours fit, schedule remainder in next week
+          const remaining = group.totalHours - alloc;
+          if (remaining > 0) {
+            const nextWkIdx = weekKeys.indexOf(wk) + 1;
+            if (nextWkIdx < weekKeys.length) {
+              const nextWk = weekKeys[nextWkIdx];
+              blocks.push({
+                id: `inbox-${pid}-${nextWk}-${blocks.length}`,
+                project_id: pid,
+                project_name: group.projectName,
+                bundle_description: `${group.items.length} položek z Inboxu (pokr.)`,
+                week: nextWk,
+                estimated_hours: remaining,
+                tpv_item_count: group.items.length,
+                confidence: "high" as const,
+                source: "inbox_item",
+                deadline: group.deadline ? group.deadline.toISOString().split("T")[0] : null,
+                deadline_source: group.deadlineSource,
+                is_forecast: true,
+                estimation_level: 1,
+                estimation_badge: "Inbox",
+                inbox_item_ids: group.items.map(i => i.id),
+              });
+              usage[nextWk] = (usage[nextWk] || 0) + remaining;
+            }
+          }
+          break;
+        }
+      }
+      if (!placed) {
+        safetyNet.push({
+          project_id: pid,
+          project_name: group.projectName,
+          estimated_hours: group.totalHours,
+          estimation_badge: "Inbox – neplánovatelné",
+        });
+      }
+    }
+
+    // 6b. Schedule project estimate blocks
     for (const work of workItems) {
       const tpvStartKey = getWeekKey(work.tpvStart);
       const deadlineKey = getWeekKey(work.deadline);
