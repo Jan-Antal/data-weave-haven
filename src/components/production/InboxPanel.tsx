@@ -925,6 +925,35 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   );
 }
 
+/** Compact progress bar for projects with missing items in active inbox */
+function MissingItemsProgressBar({ progress }: { progress: ProjectProgress }) {
+  const total = progress.completed + progress.scheduled + (progress.paused || 0) + progress.in_inbox + progress.missing;
+  if (total === 0) return null;
+  const pctCompleted = (progress.completed / total) * 100;
+  const pctScheduled = (progress.scheduled / total) * 100;
+  const pctPaused = ((progress.paused || 0) / total) * 100;
+  const pctInbox = (progress.in_inbox / total) * 100;
+  const pctMissing = (progress.missing / total) * 100;
+  return (
+    <div className="mt-1">
+      <div className="h-[4px] w-full rounded-full overflow-hidden flex" style={{ backgroundColor: "#e5e7eb" }}>
+        {pctCompleted > 0 && <div className="h-full" style={{ width: `${pctCompleted}%`, backgroundColor: "#6aab68" }} />}
+        {pctScheduled > 0 && <div className="h-full" style={{ width: `${pctScheduled}%`, backgroundColor: "#a8d5a6" }} />}
+        {pctPaused > 0 && <div className="h-full" style={{ width: `${pctPaused}%`, backgroundColor: "#e0c97a" }} />}
+        {pctInbox > 0 && <div className="h-full" style={{ width: `${pctInbox}%`, backgroundColor: "#c4bfb8" }} />}
+        {pctMissing > 0 && <div className="h-full" style={{ width: `${pctMissing}%`, backgroundColor: "#e8a048" }} />}
+      </div>
+      <div className="flex gap-1.5 mt-[2px] text-[9px] leading-none">
+        {progress.completed > 0 && <span style={{ color: "#3a8a36" }}>✓{progress.completed}</span>}
+        {progress.scheduled > 0 && <span style={{ color: "#6b7280" }}>⊙{progress.scheduled}</span>}
+        {(progress.paused || 0) > 0 && <span style={{ color: "#b8a44a" }}>⏸{progress.paused}</span>}
+        {progress.in_inbox > 0 && <span style={{ color: "#9ca3af" }}>◇{progress.in_inbox}</span>}
+        {progress.missing > 0 && <span style={{ color: "#d97706", fontWeight: 500 }}>⚠{progress.missing} chybí</span>}
+      </div>
+    </div>
+  );
+}
+
 function InboxResizeHandle({ onWidthChange, containerWidth }: { onWidthChange?: (w: number) => void; containerWidth: number }) {
   const dragRef = useRef(false);
   const startX = useRef(0);
