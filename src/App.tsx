@@ -139,8 +139,8 @@ function AppRoutes() {
           <RealtimeSyncProvider />
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/plan-vyroby" element={<PlanVyroby />} />
-            <Route path="/vyroba" element={<Vyroba />} />
+            <Route path="/plan-vyroby" element={<AdminRoute><PlanVyroby /></AdminRoute>} />
+            <Route path="/vyroba" element={<AdminRoute><Vyroba /></AdminRoute>} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/set-password" element={<SetPassword />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
