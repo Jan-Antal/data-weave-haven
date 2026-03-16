@@ -267,7 +267,6 @@ serve(async (req) => {
       deadline: Date;
       deadlineSource: string;
       priorityScore: number;
-      fillForward: boolean;
       estimationLevel: number;
       estimationBadge: string;
       tpvCount: number;
