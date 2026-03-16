@@ -102,6 +102,7 @@ function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number
       : defaultPreset;
     const vyrobaPct = preset?.production_pct ?? 35;
     const effectiveMarze = proj.marze != null ? Number(proj.marze) : 15;
+    const currencyMultiplier = (proj.currency === "EUR") ? eurCzkRate : 1;
 
     let totalHours = 0;
     for (const item of itemsWithPrice) {
@@ -115,7 +116,7 @@ function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number
     if (itemsWithoutPrice.length > 0 && Number(proj.prodejni_cena) > 0) {
       const totalItems = projTpvItems.length;
       const remainingShare = itemsWithoutPrice.length / totalItems;
-      const remainingCena = Number(proj.prodejni_cena) * remainingShare;
+      const remainingCena = Number(proj.prodejni_cena) * currencyMultiplier * remainingShare;
       const naklady = remainingCena * (1 - effectiveMarze / 100);
       totalHours += naklady * (vyrobaPct / 100) / hourlyRate;
     }
