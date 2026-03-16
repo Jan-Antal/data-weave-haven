@@ -125,7 +125,8 @@ function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number
   }
 
   // LEVEL 2 — project price + preset
-  const prodejniCena = Number(proj.prodejni_cena) || 0;
+  const currencyMultiplier = (proj.currency === "EUR") ? eurCzkRate : 1;
+  const prodejniCena = (Number(proj.prodejni_cena) || 0) * currencyMultiplier;
   const marze = proj.marze != null ? Number(proj.marze) : null;
   const preset = proj.cost_preset_id
     ? costPresets.find((p: any) => p.id === proj.cost_preset_id)
