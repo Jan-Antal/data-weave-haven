@@ -141,7 +141,7 @@ export function useUserSessions() {
           return a.user_name.localeCompare(b.user_name);
         });
     },
-    refetchInterval: 60_000, // Refresh every minute
+    refetchInterval: false,
   });
 }
 
