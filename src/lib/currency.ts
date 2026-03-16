@@ -57,3 +57,32 @@ export function marzeStorageToInput(stored: string | null | undefined): string {
   // Avoid floating point issues
   return String(Math.round(percent * 100) / 100);
 }
+
+/**
+ * Convert production CZK (hours × hourly_rate) to selling price including margin.
+ * Formula: selling = (productionCzk / (productionPct / 100)) × (1 + maržeDecimal)
+ * Falls back to productionCzk if data is missing.
+ */
+export function productionCzkToSellingPrice(
+  productionCzk: number,
+  costProductionPct: number | null | undefined,
+  marze: string | number | null | undefined,
+): number {
+  if (!productionCzk || productionCzk <= 0) return 0;
+
+  // Parse marže — stored as decimal string e.g. "0.22" = 22%
+  let marzeDecimal = 0;
+  if (marze != null && marze !== "") {
+    const parsed = typeof marze === "string" ? parseFloat(marze.replace(",", ".")) : marze;
+    if (!isNaN(parsed)) marzeDecimal = parsed;
+  }
+
+  // If we know the production percentage, compute full costs then add margin
+  if (costProductionPct && costProductionPct > 0) {
+    const totalCosts = productionCzk / (costProductionPct / 100);
+    return totalCosts * (1 + marzeDecimal);
+  }
+
+  // Fallback: just apply margin on top of production value
+  return productionCzk * (1 + marzeDecimal);
+}
