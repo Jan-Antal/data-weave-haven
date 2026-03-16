@@ -75,9 +75,11 @@ export function useUpdateProject() {
             .select()
             .single();
           if (data) {
-            qc.setQueryData<Project[]>(["projects"], (old) => {
-              if (!old) return old;
-              return old.map((p) => (p.id === id ? { ...p, ...data } : p));
+            qc.getQueriesData<Project[]>({ queryKey: ["projects"] }).forEach(([key]) => {
+              qc.setQueryData<Project[]>(key, (old) => {
+                if (!old) return old;
+                return old.map((p) => (p.id === id ? { ...p, ...data } : p));
+              });
             });
           } else {
             qc.invalidateQueries({ queryKey: ["projects"] });
@@ -92,9 +94,11 @@ export function useUpdateProject() {
             .select()
             .single();
           if (data) {
-            qc.setQueryData<Project[]>(["projects"], (old) => {
-              if (!old) return old;
-              return old.map((p) => (p.id === id ? { ...p, ...data } : p));
+            qc.getQueriesData<Project[]>({ queryKey: ["projects"] }).forEach(([key]) => {
+              qc.setQueryData<Project[]>(key, (old) => {
+                if (!old) return old;
+                return old.map((p) => (p.id === id ? { ...p, ...data } : p));
+              });
             });
           } else {
             qc.invalidateQueries({ queryKey: ["projects"] });

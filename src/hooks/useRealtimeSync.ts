@@ -24,13 +24,15 @@ export function useRealtimeSync() {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "projects" },
         (payload) => {
-          queryClient.setQueryData(["projects"], (old: any[] | undefined) =>
-            old?.map((p) =>
-              p.project_id === (payload.new as any)?.project_id
-                ? { ...p, ...payload.new }
-                : p
-            ) ?? old
-          );
+          queryClient.getQueriesData({ queryKey: ["projects"] }).forEach(([key]) => {
+            queryClient.setQueryData(key, (old: any[] | undefined) =>
+              old?.map((p: any) =>
+                p.project_id === (payload.new as any)?.project_id
+                  ? { ...p, ...payload.new }
+                  : p
+              ) ?? old
+            );
+          });
         }
       )
       .on(
