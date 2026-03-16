@@ -166,7 +166,6 @@ export default function PlanVyroby() {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { data: inboxProjects = [] } = useProductionInbox();
-  const { data: allProjects = [] } = useProjects();
 
   // Handle openProjectId from DataLog navigation
   const openProjectIdHandled = useRef(false);
