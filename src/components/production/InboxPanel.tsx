@@ -600,7 +600,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
 
       {/* Items */}
       <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5">
-        {projects.length === 0 && completedProjects.length === 0 && reserveProjects.length === 0 && !isLoading && (
+        {projects.length === 0 && completedProjects.length === 0 && reserveProjects.length === 0 && missingItemProjects.length === 0 && !isLoading && (
           <div className="text-center py-8">
             <p className="text-[10px] mb-3" style={{ color: "#99a5a3" }}>Inbox je prázdný</p>
           </div>
