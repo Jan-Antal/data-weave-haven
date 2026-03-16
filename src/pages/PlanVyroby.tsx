@@ -971,6 +971,10 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   const { capacityHours, scheduledHours, scheduledCzk } = useMemo(() => {
     if (!scheduleData) return { capacityHours: 0, scheduledHours: 0, scheduledCzk: 0 };
 
+    // Build project lookup for selling price conversion
+    const projMap = new Map<string, { cost_production_pct?: number | null; marze?: string | null }>();
+    for (const p of (allProjects ?? [])) projMap.set(p.project_id, p);
+
     let cap = 0;
     let hours = 0;
     let czk = 0;
@@ -979,11 +983,17 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       const silo = scheduleData.get(wk);
       if (silo) {
         hours += silo.total_hours;
-        czk += silo.bundles.reduce((s, b) => s + b.items.reduce((ss, i) => ss + i.scheduled_czk, 0), 0);
+        for (const b of silo.bundles) {
+          const proj = projMap.get(b.project_id);
+          for (const i of b.items) {
+            const prodCzk = i.scheduled_hours * hourlyRate;
+            czk += productionCzkToSellingPrice(prodCzk, proj?.cost_production_pct, proj?.marze);
+          }
+        }
       }
     }
     return { capacityHours: cap, scheduledHours: hours, scheduledCzk: czk };
-  }, [scheduleData, currentMonthWeekKeys, getWeekCapacity]);
+  }, [scheduleData, currentMonthWeekKeys, getWeekCapacity, allProjects, hourlyRate]);
 
   const isOverCapacity = scheduledHours > capacityHours;
   const displayCzk = scheduledCzk;
