@@ -14,6 +14,7 @@ import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
 import { StatusManagement } from "@/components/StatusManagement";
 import { RecycleBin } from "@/components/RecycleBin";
 import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDialog";
+import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDialog";
 import { CapacitySettings } from "@/components/production/CapacitySettings";
 import { cn } from "@/lib/utils";
 
