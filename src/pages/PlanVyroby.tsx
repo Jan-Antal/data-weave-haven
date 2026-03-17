@@ -679,7 +679,7 @@ export default function PlanVyroby() {
               if (loaded) {
                 // session restored silently
               } else {
-                await forecast.generateForecast(weeklyCapacity, m);
+                await forecast.generateForecast(weeklyCapacity, m, weekCapacityMap);
               }
             }
           }}
