@@ -62,9 +62,10 @@ export function OverbookWarningDialog({ open, onOpenChange, overbookedWeeks }: O
         <div className="px-5 pb-3 overflow-auto max-h-[400px]">
           <table className="w-full text-sm" style={{ color: "#d4c68a" }}>
             <thead>
-            <tr style={{ borderBottom: "1px solid #3d3400" }}>
+              <tr style={{ borderBottom: "1px solid #3d3400" }}>
                 <th className="text-left py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>Týden</th>
-                <th className="text-right py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>Vytížení</th>
+                <th className="text-right py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>Využití</th>
+                <th className="text-right py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>Hodiny</th>
                 <th className="text-left py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>Projekty</th>
               </tr>
             </thead>
@@ -79,9 +80,12 @@ export function OverbookWarningDialog({ open, onOpenChange, overbookedWeeks }: O
                       <span className="font-bold" style={{ color }}>T{wn}</span>
                       <span className="ml-1.5 opacity-70">{range}</span>
                     </td>
+                    <td className="py-2 px-2 text-right font-bold font-mono text-xs" style={{ color }}>
+                      {w.utilizationPct}%
+                      <span className="ml-1 font-normal opacity-70">({w.hoursScheduled}h / {w.capacity}h)</span>
+                    </td>
                     <td className="py-2 px-2 text-right font-mono text-xs">
-                      <span className="font-bold" style={{ color }}>{w.utilizationPct}%</span>
-                      <span className="ml-1.5 opacity-70">({w.hoursScheduled}h / {w.capacity}h)</span>
+                      {w.hoursScheduled}h / {w.capacity}h
                     </td>
                     <td className="py-2 px-2 text-xs max-w-[200px] truncate" title={w.projectsInWeek.join(", ")}>
                       {w.projectsInWeek.join(", ")}
