@@ -584,6 +584,7 @@ serve(async (req) => {
           is_forecast: true,
           estimation_level: work.estimationLevel,
           estimation_badge: work.estimationBadge,
+          calculation_detail: work.calculation_detail,
         });
         usage[wk] = currentUsage + alloc;
         hoursToPlace -= alloc;
