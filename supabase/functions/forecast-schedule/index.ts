@@ -211,8 +211,8 @@ serve(async (req) => {
     }
 
     const overbookedWeeks = weekKeys
-      .filter(k=>{const c=getWeekCapacity(k,capacityRows,defaultCapacity);return (usage[k]||0)>c*OVERBOOK_THRESHOLD;})
-      .map(k=>{const c=getWeekCapacity(k,capacityRows,defaultCapacity);return {week:k,utilizationPct:Math.round(((usage[k]||0)/c)*100),hoursScheduled:Math.round(usage[k]||0),capacity:c,projectsInWeek:[...new Set(blocks.filter(b=>b.week===k).map(b=>b.project_name))]};})
+      .filter(k=>{const c=getWeekCapacity(k,capacityRows,defaultCapacity,clientMap);return (usage[k]||0)>c*OVERBOOK_THRESHOLD;})
+      .map(k=>{const c=getWeekCapacity(k,capacityRows,defaultCapacity,clientMap);return {week:k,utilizationPct:Math.round(((usage[k]||0)/c)*100),hoursScheduled:Math.round(usage[k]||0),capacity:c,projectsInWeek:[...new Set(blocks.filter(b=>b.week===k).map(b=>b.project_name))]};})
       .sort((a,b)=>b.utilizationPct-a.utilizationPct);
 
     let ai = {forecastSummary:null as string|null,criticalWeek:null as string|null,weekInsights:null as any[]|null,generatedAt:new Date().toISOString()};
