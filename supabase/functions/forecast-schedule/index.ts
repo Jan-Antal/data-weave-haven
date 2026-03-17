@@ -318,7 +318,12 @@ serve(async (req) => {
     }
 
     const statusFallbackWeeks: Record<string, number> = {
-      "Výroba IN": 4, "Výroba": 4, "Expedice": 2, "Montáž": 3, "TPV": 8, "Engineering": 12, "Příprava": 16, "On Hold": 12, "Reklamace": 4, "VaN": 8,
+      "Výroba IN": 4, "Výroba": 4, "TPV": 8, "Engineering": 12, "Příprava": 16,
+    };
+
+    // Minimum delay for projects without dates, by status
+    const statusMinDelayWeeks: Record<string, number> = {
+      "Příprava": 12, "Engineering": 8, "TPV": 4, "Výroba IN": 0, "Výroba": 0,
     };
 
     const workItems: ProjectWork[] = [];
