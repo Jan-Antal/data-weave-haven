@@ -95,9 +95,7 @@ function estimateHours(
   tpvItems: any[],
   hourlyRate: number,
   vyrobaPct: number,   // fraction e.g. 0.35
-  eurRate: number
 ): { hours: number; badge: string; base: string; sellingBase: number } {
-  const currency = proj.currency || "CZK";
   const marze = normalizeMarze(proj.marze);
 
   // Filter: only active items, exclude Zrušeno
@@ -111,15 +109,15 @@ function estimateHours(
   let base = "";
 
   if (itemsWithPrice.length > 0) {
-    // Level 1: sum from TPV items
+    // Level 1: sum from TPV items (all prices treated as CZK)
     sellingBase = itemsWithPrice.reduce((sum, t) => {
-      return sum + toCzk(Number(t.cena), currency, eurRate) * (Number(t.pocet) || 1);
+      return sum + Number(t.cena) * (Number(t.pocet) || 1);
     }, 0);
     badge = "TPV ceny";
     base = "tpv_items";
   } else {
-    // Level 2: use prodejni_cena
-    const pc = toCzk(Number(proj.prodejni_cena) || 0, currency, eurRate);
+    // Level 2: use prodejni_cena (treated as CZK)
+    const pc = Number(proj.prodejni_cena) || 0;
     if (pc <= 0) {
       return { hours: 20, badge: "⚠ Chybí podklady", base: "none", sellingBase: 0 };
     }
