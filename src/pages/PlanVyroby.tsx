@@ -1101,6 +1101,9 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
           >
             ↺ Reset
           </button>
+          {overbookedWeekCount > 0 && (
+            <OverbookBadge count={overbookedWeekCount} onClick={() => onOverbookBadgeClick?.()} />
+          )}
         </div>
       )}
 
