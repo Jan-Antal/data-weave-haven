@@ -222,6 +222,24 @@ export default function PlanVyroby() {
   const weeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
 
+  // Build weekCapacityMap for forecast edge function
+  const currentYear = new Date().getFullYear();
+  const { weekMap: capMapCurrent } = useWeeklyCapacity(currentYear);
+  const { weekMap: capMapNext } = useWeeklyCapacity(currentYear + 1);
+  const weekCapacityMap = useMemo(() => {
+    const result: Record<string, number> = {};
+    const addFromMap = (map: Map<number, any>, year: number) => {
+      map.forEach((entry) => {
+        if (entry.week_start) {
+          result[entry.week_start] = entry.capacity_hours;
+        }
+      });
+    };
+    addFromMap(capMapCurrent, currentYear);
+    addFromMap(capMapNext, currentYear + 1);
+    return result;
+  }, [capMapCurrent, capMapNext, currentYear]);
+
   useEffect(() => {
     setCurrentPage("plan-vyroby");
     return () => setCurrentPage(null);
