@@ -216,7 +216,7 @@ serve(async (req) => {
 
     const { weeklyCapacityHours } = await req.json();
     const weeklyCapacity = Number(weeklyCapacityHours) || 760;
-    const TARGET_MAX = 1.25; // 125% max per week
+    const TARGET_MAX = 1.10; // max 110% of weekly capacity
 
     const today = new Date();
     today.setUTCHours(0,0,0,0);
