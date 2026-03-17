@@ -100,8 +100,9 @@ serve(async (req) => {
   if (req.method==="OPTIONS") return new Response(null,{headers:corsHeaders});
   try {
     const sb = createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { weeklyCapacityHours } = await req.json();
+    const { weeklyCapacityHours, weeklyCapacityMap } = await req.json();
     const defaultCapacity = Number(weeklyCapacityHours)||760;
+    const clientMap: Record<string,number>|undefined = weeklyCapacityMap && typeof weeklyCapacityMap === 'object' ? weeklyCapacityMap : undefined;
     const SCHEDULE_CAP = 1.15;
     const OVERBOOK_THRESHOLD = 1.10;
     const today = new Date(); today.setUTCHours(0,0,0,0);
