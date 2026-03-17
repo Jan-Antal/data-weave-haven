@@ -204,6 +204,8 @@ function CalculationTooltipContent({ detail }: { detail: ForecastCalculationDeta
     </div>
   );
 }
+
+function ForecastCard({
   block,
   isSelected,
   onToggleSelect,
