@@ -47,6 +47,7 @@ import { ForecastCommitBar } from "@/components/production/ForecastCommitBar";
 import { Switch } from "@/components/ui/switch";
 import { useSearchNavigation } from "@/hooks/useSearchNavigation";
 import { DataLogPanel } from "@/components/DataLogPanel";
+import { OverbookWarningDialog, OverbookBadge } from "@/components/production/OverbookWarningDialog";
 
 
 export type DisplayMode = "hours" | "czk" | "percent";
@@ -114,6 +115,8 @@ export default function PlanVyroby() {
   const [displayMode, setDisplayMode] = useState<DisplayMode>("hours");
   const [viewTab, setViewTab] = useState<ViewTab>("kanban");
   const forecast = useForecastMode();
+  const [overbookDialogOpen, setOverbookDialogOpen] = useState(false);
+  const prevOverbookedRef = useRef(0);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -123,6 +126,14 @@ export default function PlanVyroby() {
     searchTimerRef.current = setTimeout(() => setSearchQuery(v), 300);
   }, []);
   useEffect(() => () => clearTimeout(searchTimerRef.current), []);
+
+  // Auto-show overbook dialog when forecast generates overbooked weeks
+  useEffect(() => {
+    if (forecast.overbookedWeeks.length > 0 && forecast.overbookedWeeks.length !== prevOverbookedRef.current) {
+      setOverbookDialogOpen(true);
+    }
+    prevOverbookedRef.current = forecast.overbookedWeeks.length;
+  }, [forecast.overbookedWeeks]);
 
   const [inboxWidth, setInboxWidth] = useState(() => {
     const saved = localStorage.getItem("inbox-panel-width");
@@ -677,6 +688,8 @@ export default function PlanVyroby() {
               ai: forecast.forecastBlocks.filter(b => b.source === "project_estimate").length,
             };
           })() : undefined}
+          overbookedWeekCount={forecast.forecastActive ? forecast.overbookedWeeks.length : 0}
+          onOverbookBadgeClick={() => setOverbookDialogOpen(true)}
         />
         )}
 
@@ -868,6 +881,12 @@ export default function PlanVyroby() {
         />
       )}
 
+      <OverbookWarningDialog
+        open={overbookDialogOpen}
+        onOpenChange={setOverbookDialogOpen}
+        overbookedWeeks={forecast.overbookedWeeks}
+      />
+
       {!!tpvProjectId && (
         <Dialog open={!!tpvProjectId} onOpenChange={(open) => { if (!open) setTpvProjectId(null); }}>
           <DialogContent className="max-w-[95vw] w-[95vw] max-h-[90vh] overflow-auto p-0">
@@ -892,7 +911,7 @@ export default function PlanVyroby() {
 }
 
 
-function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchNavActive = false, searchNavTotalCount = 0, searchNavCurrentIndex = 0, searchNavGoNext, searchNavGoPrev }: {
+function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchNavActive = false, searchNavTotalCount = 0, searchNavCurrentIndex = 0, searchNavGoNext, searchNavGoPrev, overbookedWeekCount = 0, onOverbookBadgeClick }: {
   viewTab: "kanban" | "table";
   setViewTab: (v: "kanban" | "table") => void;
   displayMode: DisplayMode;
@@ -907,6 +926,8 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   isGenerating: boolean;
   onResetForecast?: () => void;
   forecastBlockCounts?: { real: number; inbox: number; ai: number };
+  overbookedWeekCount?: number;
+  onOverbookBadgeClick?: () => void;
   searchNavActive?: boolean;
   searchNavTotalCount?: number;
   searchNavCurrentIndex?: number;
@@ -1088,6 +1109,9 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
           >
             ↺ Reset
           </button>
+          {overbookedWeekCount > 0 && (
+            <OverbookBadge count={overbookedWeekCount} onClick={() => onOverbookBadgeClick?.()} />
+          )}
         </div>
       )}
 

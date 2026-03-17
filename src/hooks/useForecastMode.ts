@@ -4,6 +4,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import type { SafetyNetProject } from "@/components/production/ForecastSafetyNet";
 
+export interface OverbookedWeek {
+  week: string;
+  utilizationPct: number;
+  hoursScheduled: number;
+  capacity: number;
+  projectsInWeek: string[];
+}
+
 export type ForecastConfidence = "high" | "medium" | "low";
 export type ForecastSource = "existing_plan" | "inbox_item" | "project_estimate";
 export type ForecastPlanMode = "respect_plan" | "from_scratch";
@@ -116,6 +124,7 @@ interface UseForecastModeReturn {
   safetyNetProjects: SafetyNetProject[];
   restoreFromSafetyNet: (projectId: string) => void;
   restoreToWeek: (projectId: string, targetWeek: string) => void;
+  overbookedWeeks: OverbookedWeek[];
 }
 
 export function useForecastMode(): UseForecastModeReturn {
@@ -127,6 +136,7 @@ export function useForecastMode(): UseForecastModeReturn {
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
   const [realBundleOverrides, setRealBundleOverrides] = useState<RealBundleOverride[]>([]);
   const [safetyNetProjects, setSafetyNetProjects] = useState<SafetyNetProject[]>([]);
+  const [overbookedWeeks, setOverbookedWeeks] = useState<OverbookedWeek[]>([]);
   const generationTokenRef = useRef(0);
 
   // Persist to localStorage whenever blocks or selection changes
@@ -141,6 +151,7 @@ export function useForecastMode(): UseForecastModeReturn {
     setSelectedBlockIds(new Set());
     setRealBundleOverrides([]);
     setSafetyNetProjects([]);
+    setOverbookedWeeks([]);
     setIsGenerating(false);
   }, []);
 
@@ -239,6 +250,7 @@ export function useForecastMode(): UseForecastModeReturn {
       setForecastBlocks(blocks);
       setSelectedBlockIds(new Set(blocks.filter(b => b.source === "inbox_item").map(b => b.id)));
       setSafetyNetProjects(Array.isArray(data?.safetyNet) ? data.safetyNet : []);
+      setOverbookedWeeks(Array.isArray(data?.overbookedWeeks) ? data.overbookedWeeks : []);
 
       if (blocks.length === 0) {
         toast({ title: "Forecast", description: "Žádné položky k naplánování." });
@@ -566,5 +578,6 @@ export function useForecastMode(): UseForecastModeReturn {
     safetyNetProjects,
     restoreFromSafetyNet,
     restoreToWeek,
+    overbookedWeeks,
   };
 }
