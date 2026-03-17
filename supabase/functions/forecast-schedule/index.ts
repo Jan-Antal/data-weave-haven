@@ -232,8 +232,8 @@ serve(async (req) => {
     }
 
     const overbookedWeeks = weekKeys
-      .filter(k=>(usage[k]||0)>weeklyCapacity*TARGET_MAX)
-      .map(k=>({ week:k, utilizationPct:Math.round((usage[k]/weeklyCapacity)*100), hoursScheduled:Math.round(usage[k]), capacity:weeklyCapacity, projectsInWeek:[...new Set(blocks.filter(b=>b.week===k).map(b=>b.project_name))] }))
+      .filter(k=>{const wCap=getWeekCapacity(k);return (usage[k]||0)>wCap*OVERBOOK_THRESHOLD;})
+      .map(k=>{const wCap=getWeekCapacity(k);return { week:k, utilizationPct:Math.round((usage[k]/wCap)*100), hoursScheduled:Math.round(usage[k]), capacity:wCap, projectsInWeek:[...new Set(blocks.filter(b=>b.week===k).map(b=>b.project_name))] };})
       .sort((a,b)=>b.utilizationPct-a.utilizationPct);
 
     // ─── AI INSIGHTS ──────────────────────────────────────────────────────
