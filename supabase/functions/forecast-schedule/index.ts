@@ -39,7 +39,9 @@ function isoWeekFromKey(weekKey: string): { week: number; year: number } {
   const week = Math.ceil(((thu.getTime()-jan1.getTime())/86400000+1)/7);
   return { week, year };
 }
-function getWeekCapacity(weekKey: string, capacityRows: any[], defaultCap: number): number {
+function getWeekCapacity(weekKey: string, capacityRows: any[], defaultCap: number, clientMap?: Record<string,number>): number {
+  // Prefer client-side capacity map (includes holidays, company holidays, manual overrides)
+  if (clientMap && clientMap[weekKey] !== undefined) return Number(clientMap[weekKey]);
   const { week, year } = isoWeekFromKey(weekKey);
   const row = capacityRows.find(r => Number(r.week_number)===week && Number(r.week_year)===year);
   return row ? Number(row.capacity_hours) : defaultCap;
@@ -98,8 +100,9 @@ serve(async (req) => {
   if (req.method==="OPTIONS") return new Response(null,{headers:corsHeaders});
   try {
     const sb = createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { weeklyCapacityHours } = await req.json();
+    const { weeklyCapacityHours, weeklyCapacityMap } = await req.json();
     const defaultCapacity = Number(weeklyCapacityHours)||760;
+    const clientMap: Record<string,number>|undefined = weeklyCapacityMap && typeof weeklyCapacityMap === 'object' ? weeklyCapacityMap : undefined;
     const SCHEDULE_CAP = 1.15;
     const OVERBOOK_THRESHOLD = 1.10;
     const today = new Date(); today.setUTCHours(0,0,0,0);
@@ -186,7 +189,7 @@ serve(async (req) => {
         let placed = false;
         for (let i=searchFrom; i<=clampEnd; i++) {
           const key = weekKeys[i];
-          const weekCap = getWeekCapacity(key,capacityRows,defaultCapacity);
+          const weekCap = getWeekCapacity(key,capacityRows,defaultCapacity,clientMap);
           const currentUsage = usage[key]||0;
           const softCap = weekCap*1.0;
           const hardCap = weekCap*SCHEDULE_CAP;
@@ -208,15 +211,15 @@ serve(async (req) => {
     }
 
     const overbookedWeeks = weekKeys
-      .filter(k=>{const c=getWeekCapacity(k,capacityRows,defaultCapacity);return (usage[k]||0)>c*OVERBOOK_THRESHOLD;})
-      .map(k=>{const c=getWeekCapacity(k,capacityRows,defaultCapacity);return {week:k,utilizationPct:Math.round(((usage[k]||0)/c)*100),hoursScheduled:Math.round(usage[k]||0),capacity:c,projectsInWeek:[...new Set(blocks.filter(b=>b.week===k).map(b=>b.project_name))]};})
+      .filter(k=>{const c=getWeekCapacity(k,capacityRows,defaultCapacity,clientMap);return (usage[k]||0)>c*OVERBOOK_THRESHOLD;})
+      .map(k=>{const c=getWeekCapacity(k,capacityRows,defaultCapacity,clientMap);return {week:k,utilizationPct:Math.round(((usage[k]||0)/c)*100),hoursScheduled:Math.round(usage[k]||0),capacity:c,projectsInWeek:[...new Set(blocks.filter(b=>b.week===k).map(b=>b.project_name))]};})
       .sort((a,b)=>b.utilizationPct-a.utilizationPct);
 
     let ai = {forecastSummary:null as string|null,criticalWeek:null as string|null,weekInsights:null as any[]|null,generatedAt:new Date().toISOString()};
     try {
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (LOVABLE_API_KEY && workItems.length>0) {
-        const busiestWeeks = weekKeys.map(k=>({week:k,pct:Math.round(((usage[k]||0)/getWeekCapacity(k,capacityRows,defaultCapacity))*100)})).sort((a,b)=>b.pct-a.pct).slice(0,5).map(w=>`${w.week}:${w.pct}%`).join(",");
+        const busiestWeeks = weekKeys.map(k=>({week:k,pct:Math.round(((usage[k]||0)/getWeekCapacity(k,capacityRows,defaultCapacity,clientMap))*100)})).sort((a,b)=>b.pct-a.pct).slice(0,5).map(w=>`${w.week}:${w.pct}%`).join(",");
         const projectLines = workItems.map(w=>`${w.projectName}|${w.badge}|deadline:${w.deadline.toISOString().substring(0,10)}|${Math.round(w.totalHours)}h`).join("\n");
         const contextStr = `Kapacita:${defaultCapacity}h/tyden\nProjekty:\n${projectLines}\nSafetyNet:${Array.from(safetyNetMap.values()).map(s=>s.project_name).join(",")}\nZatizene:${busiestWeeks}`;
         const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${LOVABLE_API_KEY}`},body:JSON.stringify({model:"google/gemini-2.0-flash-001",max_tokens:600,messages:[{role:"system",content:"Si planvaoci asistent AMI. Vrat IBA JSON bez markdown: {forecastSummary:string cesky 2-3 vety,criticalWeek:string weekKey,weekInsights:array max 4 {week,insight 1 veta cesky}}"},{role:"user",content:contextStr}]}),signal:AbortSignal.timeout(8000)});

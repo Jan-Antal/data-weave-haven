@@ -118,7 +118,7 @@ interface UseForecastModeReturn {
   selectInboxOnly: () => void;
   toggleInboxSelection: () => void;
   deselectAll: () => void;
-  generateForecast: (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => Promise<void>;
+  generateForecast: (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode, weekCapacityMap?: Record<string, number>) => Promise<void>;
   clearForecast: () => void;
   commitBlocks: (blockIds?: string[]) => Promise<void>;
   commitInboxOnly: () => Promise<void>;
@@ -126,7 +126,7 @@ interface UseForecastModeReturn {
   removeForecastBlock: (blockId: string) => void;
   addForecastBlock: (block: ForecastBlock) => void;
   splitForecastBlock: (blockId: string, keepHours: number, splitWeek: string) => void;
-  resetAndRegenerate: (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => Promise<void>;
+  resetAndRegenerate: (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode, weekCapacityMap?: Record<string, number>) => Promise<void>;
   loadSavedSession: (modeOverride?: ForecastPlanMode) => boolean;
   /** Track a real bundle drag as a forecast-only override */
   realBundleOverrides: RealBundleOverride[];
@@ -234,14 +234,18 @@ export function useForecastMode(): UseForecastModeReturn {
     setSelectedBlockIds(new Set());
   }, []);
 
-  const generateForecast = useCallback(async (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => {
+  const generateForecast = useCallback(async (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode, weekCapacityMap?: Record<string, number>) => {
     const generationToken = ++generationTokenRef.current;
     setIsGenerating(true);
 
     try {
       const mode = modeOverride ?? planMode;
+      const body: any = { mode, weeklyCapacityHours };
+      if (weekCapacityMap && Object.keys(weekCapacityMap).length > 0) {
+        body.weeklyCapacityMap = weekCapacityMap;
+      }
       const { data, error } = await supabase.functions.invoke("forecast-schedule", {
-        body: { mode, weeklyCapacityHours },
+        body,
       });
 
       if (generationToken !== generationTokenRef.current) return;
@@ -343,11 +347,11 @@ export function useForecastMode(): UseForecastModeReturn {
     toast({ title: "✂ Forecast blok rozdělen" });
   }, []);
 
-  const resetAndRegenerate = useCallback(async (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => {
+  const resetAndRegenerate = useCallback(async (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode, weekCapacityMap?: Record<string, number>) => {
     const mode = modeOverride ?? planMode;
     clearStorage(mode);
     resetForecastState();
-    await generateForecast(weeklyCapacityHours, mode);
+    await generateForecast(weeklyCapacityHours, mode, weekCapacityMap);
   }, [planMode, resetForecastState, generateForecast]);
 
   // --- Real bundle override logic ---
