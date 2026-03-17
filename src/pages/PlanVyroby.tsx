@@ -903,7 +903,7 @@ export default function PlanVyroby() {
 }
 
 
-function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchNavActive = false, searchNavTotalCount = 0, searchNavCurrentIndex = 0, searchNavGoNext, searchNavGoPrev }: {
+function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchNavActive = false, searchNavTotalCount = 0, searchNavCurrentIndex = 0, searchNavGoNext, searchNavGoPrev, overbookedWeekCount = 0, onOverbookBadgeClick }: {
   viewTab: "kanban" | "table";
   setViewTab: (v: "kanban" | "table") => void;
   displayMode: DisplayMode;
@@ -918,6 +918,8 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   isGenerating: boolean;
   onResetForecast?: () => void;
   forecastBlockCounts?: { real: number; inbox: number; ai: number };
+  overbookedWeekCount?: number;
+  onOverbookBadgeClick?: () => void;
   searchNavActive?: boolean;
   searchNavTotalCount?: number;
   searchNavCurrentIndex?: number;
