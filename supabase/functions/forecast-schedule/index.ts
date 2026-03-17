@@ -68,8 +68,9 @@ function estimateHours(proj: any, tpvItems: any[], hourlyRate: number, vyrobaPct
     const hours = Math.max(20, Math.min(20000, Math.round(tpvSum*(1-marze)*vyrobaPct/hourlyRate)));
     return { hours, badge: "TPV ceny", base: "tpv_items" };
   }
-  const pc = Number(proj.prodejni_cena) || 0;
+  let pc = Number(proj.prodejni_cena) || 0;
   if (pc <= 0) return { hours: 20, badge: "⚠ Chybí podklady", base: "none" };
+  if (proj.currency === "EUR") pc = pc * eurRate;
   const hours = Math.max(20, Math.min(20000, Math.round(pc*(1-marze)*vyrobaPct/hourlyRate)));
   return { hours, badge: proj.cost_preset_id ? "Rozpad" : "Výroba – odhad", base: "prodejni_cena" };
 }
