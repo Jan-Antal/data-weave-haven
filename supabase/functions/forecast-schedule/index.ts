@@ -218,7 +218,80 @@ serve(async (req) => {
       .map(k=>({ week:k, utilizationPct:Math.round((usage[k]/weeklyCapacity)*100), hoursScheduled:Math.round(usage[k]), capacity:weeklyCapacity, projectsInWeek:[...new Set(blocks.filter(b=>b.week===k).map(b=>b.project_name))] }))
       .sort((a,b)=>b.utilizationPct-a.utilizationPct);
 
-    return new Response(JSON.stringify({ blocks, safetyNet:Array.from(safetyNetMap.values()), overbookedWeeks }),
+    // ─── AI INSIGHTS ──────────────────────────────────────────────────────
+    let ai: { forecastSummary: string|null; criticalWeek: string|null; weekInsights: {week:string;insight:string}[]|null; generatedAt: string } = {
+      forecastSummary: null, criticalWeek: null, weekInsights: null, generatedAt: new Date().toISOString(),
+    };
+
+    try {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (LOVABLE_API_KEY && workItems.length > 0) {
+        // Build compact context
+        const projectLines = workItems.map(w =>
+          `${w.projectName}|st:${projects.find((p:any)=>p.project_id===w.projectId)?.status}|risk:${projects.find((p:any)=>p.project_id===w.projectId)?.risk||"–"}|tpv:${w.tpvCount}|h:${w.totalHours}|start:${w.tpvStart.toISOString().split("T")[0]}|dl:${w.deadline.toISOString().split("T")[0]}|dlSrc:${w.deadlineSource}|badge:${w.badge}`
+        ).join("\n");
+
+        const safetyNetLines = Array.from(safetyNetMap.values())
+          .map((s:any) => `${s.project_name}: ${s.estimated_hours}h (${s.estimation_badge})`)
+          .join("; ");
+
+        const busiestWeeks = weekKeys
+          .map(k => ({ week: k, pct: Math.round(((usage[k]||0)/weeklyCapacity)*100) }))
+          .sort((a,b) => b.pct - a.pct)
+          .slice(0, 5)
+          .map(w => `${w.week}: ${w.pct}%`)
+          .join(", ");
+
+        const contextStr = `Kapacita: ${weeklyCapacity}h/týden, max ${Math.round(TARGET_MAX*100)}%\n\nProjekty (${workItems.length}):\n${projectLines}\n\nSafety Net: ${safetyNetLines || "žádné"}\n\nNejvytíženější týdny: ${busiestWeeks}`;
+
+        const systemPrompt = `Si plánovací asistent výrobného závodu na nábytok AMI. Analyzuj týždenný rozvrh výroby a vráť JSON (iba JSON, bez markdown) s týmito poľami:
+forecastSummary: jeden odstavec v češtine zhrňujúci celkový stav forecastu, kritické riziká a odporúčania pre PM
+criticalWeek: weekKey najkritickejšieho týždňa (najvyššia kapacita + high risk projekty)
+weekInsights: pole objektov { week, insight } pre max 4 najdôležitejšie týždne, insight je 1 veta v češtine o riziku alebo poznamke pre daný týždeň
+Nezopakuj čísla ktoré sú už viditeľné v UI. Zameraj sa na riziká a odporúčania.`;
+
+        const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3-flash-preview",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: contextStr },
+            ],
+            max_tokens: 600,
+          }),
+        });
+
+        if (aiResp.ok) {
+          const aiData = await aiResp.json();
+          const raw = aiData.choices?.[0]?.message?.content || "";
+          // Strip markdown code fences if present
+          const cleaned = raw.replace(/^```json?\s*/i, "").replace(/\s*```$/i, "").trim();
+          const parsed = JSON.parse(cleaned);
+          ai.forecastSummary = parsed.forecastSummary || null;
+          ai.criticalWeek = parsed.criticalWeek || null;
+          ai.weekInsights = Array.isArray(parsed.weekInsights) ? parsed.weekInsights : null;
+        }
+      }
+    } catch (aiErr) {
+      console.error("AI insights error (non-fatal):", aiErr);
+      // ai fields remain null — forecast still works
+    }
+
+    // Attach per-block ai_insight from weekInsights
+    if (ai.weekInsights) {
+      const insightMap = new Map(ai.weekInsights.map(wi => [wi.week, wi.insight]));
+      for (const block of blocks) {
+        const insight = insightMap.get(block.week);
+        if (insight) block.ai_insight = insight;
+      }
+    }
+
+    return new Response(JSON.stringify({ blocks, safetyNet:Array.from(safetyNetMap.values()), overbookedWeeks, ai }),
       { headers:{...corsHeaders,"Content-Type":"application/json"} });
   } catch(err:any) {
     return new Response(JSON.stringify({error:err.message||"Unknown error"}),
