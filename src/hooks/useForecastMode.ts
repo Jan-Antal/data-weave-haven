@@ -578,5 +578,6 @@ export function useForecastMode(): UseForecastModeReturn {
     safetyNetProjects,
     restoreFromSafetyNet,
     restoreToWeek,
+    overbookedWeeks,
   };
 }
