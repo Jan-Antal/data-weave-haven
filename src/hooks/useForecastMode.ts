@@ -250,6 +250,7 @@ export function useForecastMode(): UseForecastModeReturn {
       setForecastBlocks(blocks);
       setSelectedBlockIds(new Set(blocks.filter(b => b.source === "inbox_item").map(b => b.id)));
       setSafetyNetProjects(Array.isArray(data?.safetyNet) ? data.safetyNet : []);
+      setOverbookedWeeks(Array.isArray(data?.overbookedWeeks) ? data.overbookedWeeks : []);
 
       if (blocks.length === 0) {
         toast({ title: "Forecast", description: "Žádné položky k naplánování." });
