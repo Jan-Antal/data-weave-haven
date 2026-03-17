@@ -127,6 +127,14 @@ export default function PlanVyroby() {
   }, []);
   useEffect(() => () => clearTimeout(searchTimerRef.current), []);
 
+  // Auto-show overbook dialog when forecast generates overbooked weeks
+  useEffect(() => {
+    if (forecast.overbookedWeeks.length > 0 && forecast.overbookedWeeks.length !== prevOverbookedRef.current) {
+      setOverbookDialogOpen(true);
+    }
+    prevOverbookedRef.current = forecast.overbookedWeeks.length;
+  }, [forecast.overbookedWeeks]);
+
   const [inboxWidth, setInboxWidth] = useState(() => {
     const saved = localStorage.getItem("inbox-panel-width");
     return saved ? Math.max(180, Math.min(500, Number(saved))) : 252;
