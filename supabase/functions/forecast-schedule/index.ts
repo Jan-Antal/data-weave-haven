@@ -189,7 +189,7 @@ serve(async (req) => {
         let placed = false;
         for (let i=searchFrom; i<=clampEnd; i++) {
           const key = weekKeys[i];
-          const weekCap = getWeekCapacity(key,capacityRows,defaultCapacity);
+          const weekCap = getWeekCapacity(key,capacityRows,defaultCapacity,clientMap);
           const currentUsage = usage[key]||0;
           const softCap = weekCap*1.0;
           const hardCap = weekCap*SCHEDULE_CAP;
