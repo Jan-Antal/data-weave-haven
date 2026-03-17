@@ -118,7 +118,7 @@ interface UseForecastModeReturn {
   selectInboxOnly: () => void;
   toggleInboxSelection: () => void;
   deselectAll: () => void;
-  generateForecast: (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => Promise<void>;
+  generateForecast: (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode, weekCapacityMap?: Record<string, number>) => Promise<void>;
   clearForecast: () => void;
   commitBlocks: (blockIds?: string[]) => Promise<void>;
   commitInboxOnly: () => Promise<void>;
