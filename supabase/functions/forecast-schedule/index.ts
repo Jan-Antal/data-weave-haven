@@ -412,6 +412,7 @@ serve(async (req) => {
         tpvCount,
         risk: proj.risk || "Low",
         status: proj.status || "",
+        calculation_detail: estimation.calculation_detail,
       });
     }
 
