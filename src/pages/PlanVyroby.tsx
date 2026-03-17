@@ -688,6 +688,8 @@ export default function PlanVyroby() {
               ai: forecast.forecastBlocks.filter(b => b.source === "project_estimate").length,
             };
           })() : undefined}
+          overbookedWeekCount={forecast.forecastActive ? forecast.overbookedWeeks.length : 0}
+          onOverbookBadgeClick={() => setOverbookDialogOpen(true)}
         />
         )}
 
