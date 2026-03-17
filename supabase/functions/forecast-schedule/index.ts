@@ -197,11 +197,12 @@ serve(async (req) => {
       let lastGlobalIdx = clampedStart-1;
 
       while (remaining>0) {
-        const maxCap = weeklyCapacity*TARGET_MAX;
         let placed = false;
         const searchFrom = Math.max(clampedStart, lastGlobalIdx+1);
         for (let i=searchFrom; i<=clampedEnd; i++) {
           const weekKey = weekKeys[i];
+          const wCap = getWeekCapacity(weekKey);
+          const maxCap = wCap*SCHEDULE_CAP;
           const avail = maxCap-(usage[weekKey]||0);
           if (avail>1) {
             const alloc = Math.min(remaining,avail);
