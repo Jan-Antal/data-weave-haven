@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Sparkles, Inbox, ChevronRight, GripVertical } from "lucide-react";
-import type { ForecastBlock, ForecastSource } from "@/hooks/useForecastMode";
+import type { ForecastBlock, ForecastSource, ForecastCalculationDetail } from "@/hooks/useForecastMode";
 import { getProjectColor } from "@/lib/projectColors";
 import { useDraggable } from "@dnd-kit/core";
 import { supabase } from "@/integrations/supabase/client";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ForecastOverlayProps {
   blocks: ForecastBlock[];
