@@ -347,11 +347,11 @@ export function useForecastMode(): UseForecastModeReturn {
     toast({ title: "✂ Forecast blok rozdělen" });
   }, []);
 
-  const resetAndRegenerate = useCallback(async (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => {
+  const resetAndRegenerate = useCallback(async (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode, weekCapacityMap?: Record<string, number>) => {
     const mode = modeOverride ?? planMode;
     clearStorage(mode);
     resetForecastState();
-    await generateForecast(weeklyCapacityHours, mode);
+    await generateForecast(weeklyCapacityHours, mode, weekCapacityMap);
   }, [planMode, resetForecastState, generateForecast]);
 
   // --- Real bundle override logic ---

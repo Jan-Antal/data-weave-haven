@@ -39,7 +39,9 @@ function isoWeekFromKey(weekKey: string): { week: number; year: number } {
   const week = Math.ceil(((thu.getTime()-jan1.getTime())/86400000+1)/7);
   return { week, year };
 }
-function getWeekCapacity(weekKey: string, capacityRows: any[], defaultCap: number): number {
+function getWeekCapacity(weekKey: string, capacityRows: any[], defaultCap: number, clientMap?: Record<string,number>): number {
+  // Prefer client-side capacity map (includes holidays, company holidays, manual overrides)
+  if (clientMap && clientMap[weekKey] !== undefined) return Number(clientMap[weekKey]);
   const { week, year } = isoWeekFromKey(weekKey);
   const row = capacityRows.find(r => Number(r.week_number)===week && Number(r.week_year)===year);
   return row ? Number(row.capacity_hours) : defaultCap;
