@@ -304,11 +304,12 @@ serve(async (req) => {
       const orderDate = parseDate(proj.datum_objednavky);
       const eurRate = getEurRate(orderDate);
 
-      // Get vyroba_pct from preset
+      // Get production_pct: project-level override > preset > default
+      const projProductionPct = proj.cost_production_pct ? Number(proj.cost_production_pct) : null;
       const preset = proj.cost_preset_id
         ? presets.find((p:any) => p.id === proj.cost_preset_id)
         : defaultPreset;
-      const vyrobaPct = (preset?.vyroba_pct ?? 35) / 100;
+      const vyrobaPct = (projProductionPct ?? preset?.production_pct ?? 35) / 100;
 
       const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct, eurRate);
 
