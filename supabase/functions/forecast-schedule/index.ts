@@ -345,6 +345,7 @@ serve(async (req) => {
       tpvCount: number;
       risk: string;
       status: string;
+      calculation_detail: any;
     }
 
     const statusFallbackWeeks: Record<string, number> = {
