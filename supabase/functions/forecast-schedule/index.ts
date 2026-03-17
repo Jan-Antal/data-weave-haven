@@ -82,7 +82,7 @@ function resolveDeadline(proj: any, itemCount: number): { date: Date|null; sourc
   return { date: null, source: "none" };
 }
 function resolveTpvStart(proj: any, itemCount: number, today: Date): Date {
-  const tpv = parseDate(proj.datum_tpv);
+  const tpv = parseDate(proj.tpv_date);
   if (tpv) return tpv < today ? today : tpv;
   const ord = parseDate(proj.datum_objednavky);
   if (ord) { const est = addWeeks(ord, tpvWeeksEstimate(itemCount)); return est < today ? today : est; }
