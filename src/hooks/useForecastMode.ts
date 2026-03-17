@@ -150,6 +150,7 @@ export function useForecastMode(): UseForecastModeReturn {
     setSelectedBlockIds(new Set());
     setRealBundleOverrides([]);
     setSafetyNetProjects([]);
+    setOverbookedWeeks([]);
     setIsGenerating(false);
   }, []);
 
