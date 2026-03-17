@@ -145,22 +145,24 @@ serve(async (req) => {
     }
 
     // Per-week capacity overrides from production_capacity table
-    const weekCapacityMap = new Map<string, number>();
+    let capacityRows: any[] = [];
     try {
-      const capRes = await sb.from("production_capacity").select("week_start,capacity_hours");
-      if (capRes.data) {
-        for (const row of capRes.data) {
-          if (row.week_start && row.capacity_hours != null) {
-            // week_start may be date or timestamp — normalize to YYYY-MM-DD
-            const weekKey = String(row.week_start).substring(0, 10);
-            weekCapacityMap.set(weekKey, Number(row.capacity_hours));
-          }
-        }
-      }
+      const capRes = await sb.from("production_capacity").select("week_number,week_year,capacity_hours");
+      if (capRes.data) capacityRows = capRes.data;
     } catch (_) {
       // Table may not exist — fall back to weeklyCapacity for all weeks
     }
-    const getWeekCapacity = (weekKey: string): number => weekCapacityMap.get(weekKey) ?? weeklyCapacity;
+    function getWeekCapacity(weekKey: string): number {
+      // weekKey format: "2026-03-23" (Monday of that week)
+      const d = new Date(weekKey + "T00:00:00Z");
+      const jan4 = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+      const startOfWeek1 = new Date(jan4);
+      startOfWeek1.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() + 6) % 7));
+      const weekNum = Math.floor((d.getTime() - startOfWeek1.getTime()) / (7 * 86400000)) + 1;
+      const year = d.getUTCFullYear();
+      const row = capacityRows.find(r => r.week_number === weekNum && r.week_year === year);
+      return row ? Number(row.capacity_hours) : weeklyCapacity;
+    }
 
     const projects = projRes.data || [];
     const hourlyRate = Number(settingsRes.data?.hourly_rate) || 550;
