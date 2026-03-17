@@ -415,11 +415,28 @@ function ForecastCard({
                     );
                   })()}
                 </div>
-                <span
-                  className="text-[13px] font-bold shrink-0 ml-2"
-                  style={{ color: style.hoursColor }}>
-                  {style.hoursPrefix}{displayMode === "czk" ? formatCompactCzk(block.estimated_hours * hourlyRate) : displayMode === "percent" ? `${weeklyCapacity > 0 ? Math.round(block.estimated_hours / weeklyCapacity * 100) : 0}%` : `${block.estimated_hours}h`}
-                </span>
+                {block.calculation_detail && block.source !== "existing_plan" ? (
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          className="text-[13px] font-bold shrink-0 ml-2 cursor-help"
+                          style={{ color: style.hoursColor }}>
+                          {style.hoursPrefix}{displayMode === "czk" ? formatCompactCzk(block.estimated_hours * hourlyRate) : displayMode === "percent" ? `${weeklyCapacity > 0 ? Math.round(block.estimated_hours / weeklyCapacity * 100) : 0}%` : `${block.estimated_hours}h`}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="max-w-xs p-3 text-xs font-mono leading-relaxed" style={{ backgroundColor: "#1C1F26", borderColor: "#2a2d35", color: "#e5e5e5" }}>
+                        <CalculationTooltipContent detail={block.calculation_detail} />
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : (
+                  <span
+                    className="text-[13px] font-bold shrink-0 ml-2"
+                    style={{ color: style.hoursColor }}>
+                    {style.hoursPrefix}{displayMode === "czk" ? formatCompactCzk(block.estimated_hours * hourlyRate) : displayMode === "percent" ? `${weeklyCapacity > 0 ? Math.round(block.estimated_hours / weeklyCapacity * 100) : 0}%` : `${block.estimated_hours}h`}
+                  </span>
+                )}
               </div>
             </div>
           </div>
