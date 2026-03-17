@@ -593,7 +593,36 @@ serve(async (req) => {
     console.log(`[Forecast] Utilization per week:\n${usedWeeks.join("\n")}`);
     console.log(`[Forecast] ${blocks.length} blocks, ${aggregatedSafetyNet.length} in safety net`);
 
-    return new Response(JSON.stringify({ blocks, weekKeys, weekUsage, safetyNet: aggregatedSafetyNet, hourlyRate }), {
+    // Detect overbooked weeks (> 125% capacity)
+    const overbookedWeeks: Array<{
+      week: string;
+      utilizationPct: number;
+      hoursScheduled: number;
+      capacity: number;
+      projectsInWeek: string[];
+    }> = [];
+    for (const wk of weekKeys) {
+      const used = usage[wk] || 0;
+      const pct = used / weeklyCapacity;
+      if (pct > TARGET_MAX) {
+        const projectsInWeek = blocks
+          .filter((b: any) => b.week === wk)
+          .map((b: any) => b.project_name)
+          .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
+        overbookedWeeks.push({
+          week: wk,
+          utilizationPct: Math.round(pct * 100),
+          hoursScheduled: Math.round(used),
+          capacity: weeklyCapacity,
+          projectsInWeek,
+        });
+      }
+    }
+    if (overbookedWeeks.length > 0) {
+      console.log(`[Forecast] ⚠ ${overbookedWeeks.length} overbooked weeks detected`);
+    }
+
+    return new Response(JSON.stringify({ blocks, weekKeys, weekUsage, safetyNet: aggregatedSafetyNet, hourlyRate, overbookedWeeks }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
