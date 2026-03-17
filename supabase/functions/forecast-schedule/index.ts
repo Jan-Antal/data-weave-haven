@@ -82,7 +82,7 @@ function resolveDeadline(proj: any, itemCount: number): { date: Date|null; sourc
   return { date: null, source: "none" };
 }
 function resolveTpvStart(proj: any, itemCount: number, today: Date): Date {
-  const tpv = parseDate(proj.datum_tpv);
+  const tpv = parseDate(proj.tpv_date);
   if (tpv) return tpv < today ? today : tpv;
   const ord = parseDate(proj.datum_objednavky);
   if (ord) { const est = addWeeks(ord, tpvWeeksEstimate(itemCount)); return est < today ? today : est; }
@@ -115,7 +115,7 @@ serve(async (req) => {
     currentMonday.setUTCDate(currentMonday.getUTCDate()+(dow===0?-6:1-dow));
 
     const [projRes,tpvRes,settingsRes,presetsRes,capacityRes,ratesRes,inboxRes] = await Promise.all([
-      sb.from("projects").select("project_id,project_name,status,risk,prodejni_cena,marze,cost_preset_id,cost_production_pct,datum_objednavky,datum_tpv,expedice,montaz,predani,datum_smluvni,currency").in("status",["Příprava","Engineering","TPV","Výroba IN","Výroba"]).is("deleted_at",null).eq("is_test",false),
+      sb.from("projects").select("project_id,project_name,status,risk,prodejni_cena,marze,cost_preset_id,cost_production_pct,datum_objednavky,tpv_date,expedice,montaz,predani,datum_smluvni,currency").in("status",["Příprava","Engineering","TPV","Výroba IN","Výroba"]).is("deleted_at",null).eq("is_test",false),
       sb.from("tpv_items").select("project_id,cena,pocet,status").is("deleted_at",null),
       sb.from("production_settings").select("hourly_rate").limit(1).single(),
       sb.from("cost_breakdown_presets").select("id,is_default,production_pct").order("sort_order"),
@@ -152,7 +152,7 @@ serve(async (req) => {
       const est = estimateHours(proj,projTpv,hourlyRate,vyrobaPct,eurRate);
       const inboxH = inboxByProject.get(proj.project_id)||0;
       const remainingHours = Math.max(20,est.hours-inboxH);
-      const hasAnyDate = proj.datum_tpv||proj.datum_objednavky||proj.expedice||proj.montaz||proj.predani||proj.datum_smluvni;
+      const hasAnyDate = proj.tpv_date||proj.datum_objednavky||proj.expedice||proj.montaz||proj.predani||proj.datum_smluvni;
       if (!hasAnyDate) {
         safetyNetMap.set(proj.project_id,{project_id:proj.project_id,project_name:proj.project_name,estimated_hours:remainingHours,estimation_badge:est.badge+" – chybí termíny"});
         continue;
