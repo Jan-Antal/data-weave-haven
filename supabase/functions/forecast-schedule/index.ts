@@ -344,7 +344,9 @@ serve(async (req) => {
         const tpvWeeks = estimateTpvWeeks(tpvCount);
         tpvStart = parsed ? addWeeks(parsed, tpvWeeks) : addWeeks(today, 2);
       } else {
-        tpvStart = addWeeks(today, 2);
+        // No dates — apply status-based minimum delay
+        const minDelay = statusMinDelayWeeks[proj.status] ?? 8;
+        tpvStart = addWeeks(today, minDelay);
       }
       if (isNaN(tpvStart.getTime()) || tpvStart < today) tpvStart = new Date(today);
 
