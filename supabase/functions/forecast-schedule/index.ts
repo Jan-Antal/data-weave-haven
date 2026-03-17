@@ -317,6 +317,20 @@ serve(async (req) => {
       const inboxH = inboxHoursByProject.get(proj.project_id) || 0;
       const remainingHours = Math.max(20, est.hours - inboxH);
 
+      // Check if project has ANY scheduling dates — if not, push to safety net
+      const hasAnyDate = proj.datum_tpv || proj.datum_objednavky ||
+                         proj.expedice || proj.montaz ||
+                         proj.predani || proj.datum_smluvni;
+      if (!hasAnyDate) {
+        safetyNetMap.set(proj.project_id, {
+          project_id: proj.project_id,
+          project_name: proj.project_name || proj.project_id,
+          estimated_hours: remainingHours,
+          estimation_badge: est.badge + " – chybí termíny",
+        });
+        continue;
+      }
+
       const tpvStart = resolveTpvStart(proj, tpvCount, today);
       const dl = resolveDeadline(proj, tpvCount);
 
