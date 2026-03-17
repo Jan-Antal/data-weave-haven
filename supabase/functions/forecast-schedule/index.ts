@@ -244,7 +244,7 @@ serve(async (req) => {
 
     const projects = projRes.data || [];
     const allTpvItems = tpvRes.data || [];
-    const hourlyRate = Number(settingsRes.data?.hodinova_sazba) || 550;
+    const hourlyRate = Number(settingsRes.data?.hourly_rate) || 550;
     const presets = presetsRes.data || [];
     const defaultPreset = presets.find((p:any) => p.is_default) || presets[0];
     const rateByYear: Record<number,number> = {};
