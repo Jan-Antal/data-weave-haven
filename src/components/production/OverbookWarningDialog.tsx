@@ -62,10 +62,9 @@ export function OverbookWarningDialog({ open, onOpenChange, overbookedWeeks }: O
         <div className="px-5 pb-3 overflow-auto max-h-[400px]">
           <table className="w-full text-sm" style={{ color: "#d4c68a" }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid #3d3400" }}>
+            <tr style={{ borderBottom: "1px solid #3d3400" }}>
                 <th className="text-left py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>Týden</th>
-                <th className="text-right py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>Využití</th>
-                <th className="text-right py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>Hodiny</th>
+                <th className="text-right py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>Vytížení</th>
                 <th className="text-left py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>Projekty</th>
               </tr>
             </thead>
