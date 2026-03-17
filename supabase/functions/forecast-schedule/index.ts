@@ -219,7 +219,7 @@ serve(async (req) => {
     try {
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (LOVABLE_API_KEY && workItems.length>0) {
-        const busiestWeeks = weekKeys.map(k=>({week:k,pct:Math.round(((usage[k]||0)/getWeekCapacity(k,capacityRows,defaultCapacity))*100)})).sort((a,b)=>b.pct-a.pct).slice(0,5).map(w=>`${w.week}:${w.pct}%`).join(",");
+        const busiestWeeks = weekKeys.map(k=>({week:k,pct:Math.round(((usage[k]||0)/getWeekCapacity(k,capacityRows,defaultCapacity,clientMap))*100)})).sort((a,b)=>b.pct-a.pct).slice(0,5).map(w=>`${w.week}:${w.pct}%`).join(",");
         const projectLines = workItems.map(w=>`${w.projectName}|${w.badge}|deadline:${w.deadline.toISOString().substring(0,10)}|${Math.round(w.totalHours)}h`).join("\n");
         const contextStr = `Kapacita:${defaultCapacity}h/tyden\nProjekty:\n${projectLines}\nSafetyNet:${Array.from(safetyNetMap.values()).map(s=>s.project_name).join(",")}\nZatizene:${busiestWeeks}`;
         const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${LOVABLE_API_KEY}`},body:JSON.stringify({model:"google/gemini-2.0-flash-001",max_tokens:600,messages:[{role:"system",content:"Si planvaoci asistent AMI. Vrat IBA JSON bez markdown: {forecastSummary:string cesky 2-3 vety,criticalWeek:string weekKey,weekInsights:array max 4 {week,insight 1 veta cesky}}"},{role:"user",content:contextStr}]}),signal:AbortSignal.timeout(8000)});
