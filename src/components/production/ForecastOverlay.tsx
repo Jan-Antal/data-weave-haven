@@ -185,7 +185,25 @@ function formatCompactCzk(v: number): string {
 
 type DisplayMode = "hours" | "czk" | "percent";
 
-function ForecastCard({
+function CalculationTooltipContent({ detail }: { detail: ForecastCalculationDetail }) {
+  const baseLabel = detail.base === "tpv_items" ? "Ceny TPV položek" : "Prodejní cena projektu";
+  const baseValue = detail.base === "tpv_items"
+    ? `TPV suma: ${detail.tpv_sum_czk.toLocaleString("cs-CZ")} Kč`
+    : `Prodejní cena: ${detail.prodejni_cena_czk.toLocaleString("cs-CZ")} Kč`;
+
+  return (
+    <div className="space-y-1">
+      <div className="font-semibold text-amber-400">📊 Výpočet hodin</div>
+      <div>Základ: {baseLabel}</div>
+      <div>{baseValue}</div>
+      <div>Marže: {detail.marze_pct}%</div>
+      <div>Výroba: {detail.vyroba_pct}%</div>
+      <div>Sazba: {detail.hodinova_sazba} Kč/h</div>
+      <div className="border-t border-gray-600 my-1" />
+      <div className="text-amber-300">{detail.formula}</div>
+    </div>
+  );
+}
   block,
   isSelected,
   onToggleSelect,
