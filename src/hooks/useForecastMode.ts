@@ -4,6 +4,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import type { SafetyNetProject } from "@/components/production/ForecastSafetyNet";
 
+export interface OverbookedWeek {
+  week: string;
+  utilizationPct: number;
+  hoursScheduled: number;
+  capacity: number;
+  projectsInWeek: string[];
+}
+
 export type ForecastConfidence = "high" | "medium" | "low";
 export type ForecastSource = "existing_plan" | "inbox_item" | "project_estimate";
 export type ForecastPlanMode = "respect_plan" | "from_scratch";
