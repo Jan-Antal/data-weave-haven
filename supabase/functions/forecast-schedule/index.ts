@@ -299,8 +299,6 @@ serve(async (req) => {
     for (const proj of projects) {
       const projTpv = tpvByProject.get(proj.project_id) || [];
       const tpvCount = projTpv.length;
-      const orderDate = parseDate(proj.datum_objednavky);
-      const eurRate = getEurRate(orderDate);
 
       // Get production_pct: project-level override > preset > default
       const projProductionPct = proj.cost_production_pct ? Number(proj.cost_production_pct) : null;
@@ -309,7 +307,7 @@ serve(async (req) => {
         : defaultPreset;
       const vyrobaPct = (projProductionPct ?? preset?.production_pct ?? 35) / 100;
 
-      const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct, eurRate);
+      const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct);
 
       // Subtract hours already in inbox
       const inboxH = inboxHoursByProject.get(proj.project_id) || 0;
