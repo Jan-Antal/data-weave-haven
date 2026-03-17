@@ -881,6 +881,12 @@ export default function PlanVyroby() {
         />
       )}
 
+      <OverbookWarningDialog
+        open={overbookDialogOpen}
+        onOpenChange={setOverbookDialogOpen}
+        overbookedWeeks={forecast.overbookedWeeks}
+      />
+
       {!!tpvProjectId && (
         <Dialog open={!!tpvProjectId} onOpenChange={(open) => { if (!open) setTpvProjectId(null); }}>
           <DialogContent className="max-w-[95vw] w-[95vw] max-h-[90vh] overflow-auto p-0">
