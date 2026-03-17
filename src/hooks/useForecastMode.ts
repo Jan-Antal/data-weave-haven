@@ -126,7 +126,7 @@ interface UseForecastModeReturn {
   removeForecastBlock: (blockId: string) => void;
   addForecastBlock: (block: ForecastBlock) => void;
   splitForecastBlock: (blockId: string, keepHours: number, splitWeek: string) => void;
-  resetAndRegenerate: (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => Promise<void>;
+  resetAndRegenerate: (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode, weekCapacityMap?: Record<string, number>) => Promise<void>;
   loadSavedSession: (modeOverride?: ForecastPlanMode) => boolean;
   /** Track a real bundle drag as a forecast-only override */
   realBundleOverrides: RealBundleOverride[];
