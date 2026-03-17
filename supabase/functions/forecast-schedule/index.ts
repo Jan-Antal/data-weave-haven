@@ -421,9 +421,9 @@ serve(async (req) => {
       for (const wk of weekKeys) {
         if (hoursToPlace <= 0) break;
         const currentUsage = usage[wk] || 0;
-        const maxCap = weeklyCapacity * TARGET_MAX;
-        const roomToMax = Math.max(0, maxCap - currentUsage);
-        if (roomToMax <= 0) continue;
+        const maxCap = weeklyCapacity * TARGET_MAX; // 125% cap for inbox too
+        if (currentUsage >= maxCap) continue;
+        const roomToMax = maxCap - currentUsage;
 
         const alloc = Math.min(hoursToPlace, roomToMax);
         blocks.push({
