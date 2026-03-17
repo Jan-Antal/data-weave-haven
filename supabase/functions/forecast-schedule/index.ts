@@ -64,8 +64,7 @@ function estimateHours(proj: any, tpvItems: any[], hourlyRate: number, vyrobaPct
   const withPrice = active.filter(t => t.cena && Number(t.cena) > 0);
   if (withPrice.length > 0) {
     let tpvSum = withPrice.reduce((s,t) => s + Number(t.cena)*(Number(t.pocet)||1), 0);
-    const prodejni = Number(proj.prodejni_cena) || 0;
-    if (prodejni > 0 && tpvSum < prodejni * 0.15) tpvSum = tpvSum * eurRate;
+    if (proj.currency === "EUR") tpvSum = tpvSum * eurRate;
     const hours = Math.max(20, Math.min(20000, Math.round(tpvSum*(1-marze)*vyrobaPct/hourlyRate)));
     return { hours, badge: "TPV ceny", base: "tpv_items" };
   }
