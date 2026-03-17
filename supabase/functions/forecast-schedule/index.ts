@@ -114,6 +114,22 @@ serve(async (req) => {
       sb.from("production_inbox").select("project_id,estimated_hours").eq("status","pending"),
     ]);
 
+    // Per-week capacity overrides from production_capacity table
+    const weekCapacityMap = new Map<string, number>();
+    try {
+      const capRes = await sb.from("production_capacity").select("week_start,capacity_hours");
+      if (capRes.data) {
+        for (const row of capRes.data) {
+          if (row.week_start && row.capacity_hours != null) {
+            weekCapacityMap.set(String(row.week_start), Number(row.capacity_hours));
+          }
+        }
+      }
+    } catch (_) {
+      // Table may not exist — fall back to weeklyCapacity for all weeks
+    }
+    const getWeekCapacity = (weekKey: string): number => weekCapacityMap.get(weekKey) ?? weeklyCapacity;
+
     const projects = projRes.data || [];
     const hourlyRate = Number(settingsRes.data?.hourly_rate) || 550;
     const presets = presetsRes.data || [];
