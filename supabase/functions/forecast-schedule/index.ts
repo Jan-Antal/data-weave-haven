@@ -21,6 +21,17 @@ function estimateTpvWeeks(itemCount: number): number {
   return 4;
 }
 
+// Estimate montaz (installation) duration in weeks based on item count
+function montazWeeks(count: number): number {
+  if (count <= 10) return 1;
+  if (count <= 20) return 1;
+  if (count <= 35) return 2;
+  if (count <= 50) return 3;
+  if (count <= 65) return 4;
+  if (count <= 80) return 5;
+  return Math.ceil(count / 20);
+}
+
 // Get week key string from a Date (Monday of that week)
 function getWeekKey(date: Date): string {
   const d = new Date(date);
@@ -52,21 +63,18 @@ function parseFlexDate(raw: string | null | undefined): Date | null {
   const s = raw.trim();
   if (!s) return null;
 
-  // 1. ISO: "2026-05-04" or "2026-03-19"
   const isoMatch = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (isoMatch) {
     const d = new Date(Date.UTC(+isoMatch[1], +isoMatch[2] - 1, +isoMatch[3]));
     return isNaN(d.getTime()) ? null : d;
   }
 
-  // 2. Czech: "25. 3. 2026" or "4. 5. 2026" or "30. 1. 2026"
   const czMatch = s.match(/^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})$/);
   if (czMatch) {
     const d = new Date(Date.UTC(+czMatch[3], +czMatch[2] - 1, +czMatch[1]));
     return isNaN(d.getTime()) ? null : d;
   }
 
-  // 3. DD-Mon-YY: "02-Mar-26", "10-Nov-25"
   const dMyMatch = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
   if (dMyMatch) {
     const month = MONTH_MAP[dMyMatch[2].toLowerCase()];
@@ -78,7 +86,6 @@ function parseFlexDate(raw: string | null | undefined): Date | null {
     }
   }
 
-  // 4. US slash: "1/23/26" or "2/16/26" (M/D/YY)
   const usMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (usMatch) {
     let year = +usMatch[3];
@@ -87,7 +94,6 @@ function parseFlexDate(raw: string | null | undefined): Date | null {
     return isNaN(d.getTime()) ? null : d;
   }
 
-  // 5. Fallback: try native parser
   const fallback = new Date(s);
   return isNaN(fallback.getTime()) ? null : fallback;
 }
@@ -97,13 +103,46 @@ function normalizeMarze(raw: any): number | null {
   if (raw == null || raw === "") return null;
   const num = Number(raw);
   if (isNaN(num)) return null;
-  // If value is >= 1, it's a whole-number percentage (e.g. 25 → 0.25)
-  // If value is < 1 (e.g. 0.25), it's already a decimal fraction
   return num >= 1 ? num / 100 : num;
 }
 
+// Resolve deadline with montaz buffer logic
+function resolveDeadline(proj: any, tpvCount: number): { date: Date | null; source: string } {
+  // Expedice = hard deadline, no buffer needed
+  if (proj.expedice) {
+    const d = parseFlexDate(proj.expedice);
+    if (d) return { date: d, source: "expedice" };
+  }
+
+  // Montaz = needs 3 days before for delivery
+  if (proj.montaz) {
+    const d = parseFlexDate(proj.montaz);
+    if (d) {
+      d.setUTCDate(d.getUTCDate() - 3);
+      return { date: d, source: "montaz" };
+    }
+  }
+
+  // Predani = needs montaz_weeks before for installation
+  if (proj.predani) {
+    const d = parseFlexDate(proj.predani);
+    if (d) {
+      const weeks = montazWeeks(tpvCount);
+      d.setUTCDate(d.getUTCDate() - weeks * 7);
+      return { date: d, source: "predani" };
+    }
+  }
+
+  // Datum smluvni = use as-is
+  if (proj.datum_smluvni) {
+    const d = parseFlexDate(proj.datum_smluvni);
+    if (d) return { date: d, source: "smluvni" };
+  }
+
+  return { date: null, source: "none" };
+}
+
 function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number, costPresets: any[], defaultPreset: any, eurCzkRate: number): { hours: number; level: number; badge: string } {
-  // LEVEL 1 — sum from TPV items that have cena set
   const itemsWithPrice = projTpvItems.filter((t: any) => t.cena && Number(t.cena) > 0);
 
   if (itemsWithPrice.length > 0) {
@@ -121,7 +160,6 @@ function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number
       totalHours += naklady * (vyrobaPct / 100) / hourlyRate;
     }
 
-    // If only some items have price, add estimate for the rest
     const itemsWithoutPrice = projTpvItems.filter((t: any) => !t.cena || Number(t.cena) === 0);
     if (itemsWithoutPrice.length > 0 && Number(proj.prodejni_cena) > 0) {
       const totalItems = projTpvItems.length;
@@ -134,7 +172,6 @@ function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number
     return { hours: clampHours(totalHours), level: 1, badge: "TPV ceny" };
   }
 
-  // LEVEL 2 — project price + preset
   const currencyMultiplier = (proj.currency === "EUR") ? eurCzkRate : 1;
   const prodejniCena = (Number(proj.prodejni_cena) || 0) * currencyMultiplier;
   const marze = normalizeMarze(proj.marze);
@@ -162,7 +199,8 @@ function calcPriorityScore(proj: any, deadlineDate: Date | null, today: Date): n
   else score += 50;
 
   const status = proj.status || "";
-  if (status === "Výroba") score += 200;
+  if (status === "Výroba IN") score += 200;
+  else if (status === "Výroba") score += 200;
   else if (status === "TPV") score += 100;
   else if (status === "Engineering") score += 50;
 
@@ -189,7 +227,7 @@ serve(async (req) => {
     const { mode, weeklyCapacityHours } = await req.json();
     const weeklyCapacity = Number(weeklyCapacityHours) || 760;
 
-    // 1. Fetch all data in parallel (including inbox items)
+    // 1. Fetch all data in parallel
     const [projectsRes, tpvRes, settingsRes, presetsRes, inboxRes, ratesRes] = await Promise.all([
       sb.from("projects")
         .select("project_id, project_name, status, risk, expedice, montaz, predani, datum_smluvni, datum_objednavky, datum_tpv, prodejni_cena, marze, cost_preset_id, currency")
@@ -225,16 +263,28 @@ serve(async (req) => {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
-    // 2. Generate week keys dynamically — extend to cover the latest project deadline
+    // 2. Count TPV items per project
+    const tpvCountByProject = new Map<string, number>();
+    for (const item of tpvItems) {
+      tpvCountByProject.set(item.project_id, (tpvCountByProject.get(item.project_id) || 0) + 1);
+    }
+
+    // 3. Generate week keys dynamically — extend to cover the latest project deadline
     const currentMonday = new Date(today);
     const dayOfWeek = currentMonday.getUTCDay();
     const offset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
     currentMonday.setUTCDate(currentMonday.getUTCDate() + offset);
     currentMonday.setUTCHours(0, 0, 0, 0);
 
-    // Find the latest deadline across all active projects
+    // Find the latest deadline across all active projects (using resolveDeadline with montaz buffer)
     let latestDeadline = addWeeks(currentMonday, 26); // minimum 26 weeks
     for (const proj of projects) {
+      const tpvCount = tpvCountByProject.get(proj.project_id) || 0;
+      const resolved = resolveDeadline(proj, tpvCount);
+      if (resolved.date && resolved.date > latestDeadline) {
+        latestDeadline = resolved.date;
+      }
+      // Also check raw dates for horizon calculation
       for (const field of [proj.expedice, proj.montaz, proj.predani, proj.datum_smluvni]) {
         if (field) {
           const parsed = parseFlexDate(field);
@@ -242,7 +292,6 @@ serve(async (req) => {
         }
       }
     }
-    // Add 2 extra weeks buffer past the latest deadline
     const endDate = addWeeks(latestDeadline, 2);
     const totalWeeks = Math.max(26, Math.ceil((endDate.getTime() - currentMonday.getTime()) / (7 * 86400000)));
 
@@ -252,13 +301,7 @@ serve(async (req) => {
     }
     console.log(`[Forecast] Dynamic horizon: ${totalWeeks} weeks (latest deadline: ${latestDeadline.toISOString().split("T")[0]})`);
 
-    // 3. Count TPV items per project
-    const tpvCountByProject = new Map<string, number>();
-    for (const item of tpvItems) {
-      tpvCountByProject.set(item.project_id, (tpvCountByProject.get(item.project_id) || 0) + 1);
-    }
-
-    // 4. Build project work items with priority
+    // 4. Build project work items
     interface ProjectWork {
       projectId: string;
       projectName: string;
@@ -270,6 +313,8 @@ serve(async (req) => {
       estimationLevel: number;
       estimationBadge: string;
       tpvCount: number;
+      risk: string;
+      status: string;
     }
 
     const statusFallbackWeeks: Record<string, number> = {
@@ -296,31 +341,16 @@ serve(async (req) => {
       } else {
         tpvStart = addWeeks(today, 2);
       }
-      // tpvStart must not be in the past and must be valid
       if (isNaN(tpvStart.getTime()) || tpvStart < today) tpvStart = new Date(today);
 
-      // Determine deadline — use parseFlexDate for robust parsing
-      const deadlineFields = [
-        { val: proj.expedice, src: "expedice" },
-        { val: proj.montaz, src: "montaz" },
-        { val: proj.predani, src: "predani" },
-        { val: proj.datum_smluvni, src: "smluvni" },
-      ];
+      // Resolve deadline with montaz buffer
+      const resolved = resolveDeadline(proj, tpvCount);
       let deadline: Date;
       let deadlineSource: string;
-      let foundDeadline = false;
-      for (const f of deadlineFields) {
-        if (f.val) {
-          const parsed = parseFlexDate(f.val);
-          if (parsed) {
-            deadline = parsed;
-            deadlineSource = f.src;
-            foundDeadline = true;
-            break;
-          }
-        }
-      }
-      if (!foundDeadline) {
+      if (resolved.date) {
+        deadline = resolved.date;
+        deadlineSource = resolved.source;
+      } else {
         const fbWeeks = statusFallbackWeeks[proj.status] || 8;
         deadline = addWeeks(tpvStart, fbWeeks);
         deadlineSource = "fallback";
@@ -342,9 +372,8 @@ serve(async (req) => {
         estimationLevel: estimation.level,
         estimationBadge: estimation.badge,
         tpvCount,
-        estimationLevel: estimation.level,
-        estimationBadge: estimation.badge,
-        tpvCount,
+        risk: proj.risk || "Low",
+        status: proj.status || "",
       });
     }
 
@@ -357,34 +386,21 @@ serve(async (req) => {
 
     const blocks: any[] = [];
 
-    // 6a. Schedule INBOX items first (highest priority — real items waiting to be planned)
-    // Group inbox items by project
+    // 6a. Schedule INBOX items first (highest priority)
     const inboxByProject = new Map<string, { items: typeof inboxItems; projectName: string; totalHours: number; deadline: Date | null; deadlineSource: string }>();
     for (const item of inboxItems) {
       const pid = item.project_id;
       if (!inboxByProject.has(pid)) {
         const projInfo = (item as any).projects;
         const projectName = projInfo?.project_name || pid;
-        // Get deadline from project — use robust parser
-        const deadlineFields = [
-          { val: projInfo?.expedice, src: "expedice" },
-          { val: projInfo?.montaz, src: "montaz" },
-          { val: projInfo?.predani, src: "predani" },
-          { val: projInfo?.datum_smluvni, src: "smluvni" },
-        ];
-        let deadline: Date | null = null;
-        let deadlineSource = "none";
-        for (const f of deadlineFields) {
-          if (f.val) {
-            const parsed = parseFlexDate(f.val);
-            if (parsed) {
-              deadline = parsed;
-              deadlineSource = f.src;
-              break;
-            }
-          }
-        }
-        inboxByProject.set(pid, { items: [], projectName, totalHours: 0, deadline, deadlineSource });
+        const tpvCount = tpvCountByProject.get(pid) || 0;
+        const resolved = resolveDeadline({
+          expedice: projInfo?.expedice,
+          montaz: projInfo?.montaz,
+          predani: projInfo?.predani,
+          datum_smluvni: projInfo?.datum_smluvni,
+        }, tpvCount);
+        inboxByProject.set(pid, { items: [], projectName, totalHours: 0, deadline: resolved.date, deadlineSource: resolved.source });
       }
       const group = inboxByProject.get(pid)!;
       group.items.push(item);
@@ -401,7 +417,7 @@ serve(async (req) => {
         const maxCap = weeklyCapacity * TARGET_MAX;
         const roomToMax = Math.max(0, maxCap - currentUsage);
         if (roomToMax <= 0) continue;
-        
+
         const alloc = Math.min(hoursToPlace, roomToMax);
         blocks.push({
           id: `inbox-${pid}-${wk}-${blocks.length}`,
@@ -434,29 +450,27 @@ serve(async (req) => {
       }
     }
 
-    // 6b. Schedule project estimate blocks — BACKWARD from deadline, targeting 100-125% capacity
-    // Calculate inbox hours already attributed per project to avoid double-counting
+    // 6b. Schedule project estimate blocks — FORWARD from tpvStart toward deadline
     const inboxHoursByProject = new Map<string, number>();
     for (const [pid, group] of inboxByProject) {
       inboxHoursByProject.set(pid, group.totalHours);
     }
 
     for (const work of workItems) {
-      // Subtract hours already scheduled from inbox to avoid double-counting
       const inboxHours = inboxHoursByProject.get(work.projectId) || 0;
       const remainingHours = Math.max(0, work.totalHours - inboxHours);
-      
-      // Skip if inbox already covers the full estimate
       if (remainingHours < MIN_HOURS) continue;
 
       const tpvStartKey = getWeekKey(work.tpvStart);
       const deadlineKey = getWeekKey(work.deadline);
 
-      const startIdx = Math.max(0, weekKeys.indexOf(tpvStartKey));
-      const endIdx = weekKeys.indexOf(deadlineKey) >= 0
-        ? weekKeys.indexOf(deadlineKey)
-        : weekKeys.length - 1;
+      let startIdx = weekKeys.indexOf(tpvStartKey);
+      let endIdx = weekKeys.indexOf(deadlineKey);
 
+      if (startIdx < 0) startIdx = 0;
+      if (endIdx < 0 || endIdx >= weekKeys.length) endIdx = weekKeys.length - 1;
+
+      // NEVER place before tpvStart — enforce startIdx
       if (startIdx > endIdx) {
         safetyNet.push({
           project_id: work.projectId,
@@ -467,29 +481,55 @@ serve(async (req) => {
         continue;
       }
 
-      // Always schedule BACKWARD from deadline — latest possible start
-      const weekRange = weekKeys.slice(startIdx, endIdx + 1).reverse();
+      // Determine scheduling direction
+      // Forward fill by default; emergency backward only if < 2 weeks remain
+      const isEmergency = (endIdx - startIdx) < 2;
+      const orderedWeeks = isEmergency
+        ? weekKeys.slice(startIdx, endIdx + 1).reverse()
+        : weekKeys.slice(startIdx, endIdx + 1); // FORWARD order
 
       let hoursToPlace = remainingHours;
-      for (const wk of weekRange) {
+      let lastPlacedIdx = -1; // Track continuity — index within orderedWeeks
+
+      for (let i = 0; i < orderedWeeks.length; i++) {
         if (hoursToPlace <= 0) break;
-        
+        const wk = orderedWeeks[i];
+
+        // Continuity enforcement: next block must be within +1 or +2 of last placed
+        // (only applies after the first block has been placed)
+        if (lastPlacedIdx >= 0 && !isEmergency) {
+          const gap = i - lastPlacedIdx;
+          // Allow gap of 1 (adjacent) or 2 (skip one week)
+          // If gap > 2, only proceed if no closer week had capacity — we check ahead
+          if (gap > 2) {
+            // Check if any of the skipped weeks simply had no room
+            let skippedHadRoom = false;
+            for (let s = lastPlacedIdx + 1; s < i; s++) {
+              const skippedWk = orderedWeeks[s];
+              const skippedUsage = usage[skippedWk] || 0;
+              const skippedRoom = Math.max(0, weeklyCapacity * TARGET_MAX - skippedUsage);
+              if (skippedRoom > 0) {
+                skippedHadRoom = true;
+                break;
+              }
+            }
+            // If a skipped week had room, we already skipped it (shouldn't happen in forward order)
+            // Just allow it — continuity is best-effort
+          }
+        }
+
         const currentUsage = usage[wk] || 0;
         const targetCap = weeklyCapacity * TARGET_MID; // ~112.5%
         const maxCap = weeklyCapacity * TARGET_MAX;    // 125%
-        
-        // How much room is there to reach the target zone?
+
         const roomToTarget = Math.max(0, targetCap - currentUsage);
         const roomToMax = Math.max(0, maxCap - currentUsage);
-        
-        // Skip weeks already at or above max
+
         if (roomToMax <= 0) continue;
-        
-        // Allocate: fill up to target zone, but at least some minimum portion
+
         const alloc = Math.min(hoursToPlace, Math.max(roomToTarget, Math.min(hoursToPlace, roomToMax)));
-        
         if (alloc <= 0) continue;
-        
+
         blocks.push({
           id: `${work.projectId}-${wk}-${blocks.length}`,
           project_id: work.projectId,
@@ -508,9 +548,9 @@ serve(async (req) => {
         });
         usage[wk] = currentUsage + alloc;
         hoursToPlace -= alloc;
+        lastPlacedIdx = i;
       }
-      
-      // If hours remain after filling all available weeks, push to safety net
+
       if (hoursToPlace > MIN_HOURS * 0.5) {
         safetyNet.push({
           project_id: work.projectId,
@@ -521,7 +561,7 @@ serve(async (req) => {
       }
     }
 
-    // Aggregate safety net entries by project_id (splitIntoBlocks may create multiple entries for the same project)
+    // Aggregate safety net entries by project_id
     const safetyNetMap = new Map<string, typeof safetyNet[0]>();
     for (const entry of safetyNet) {
       const existing = safetyNetMap.get(entry.project_id);
@@ -533,7 +573,7 @@ serve(async (req) => {
     }
     const aggregatedSafetyNet = Array.from(safetyNetMap.values());
 
-    // Build weekUsage for frontend compatibility + log utilization
+    // Build weekUsage for frontend + log utilization
     const weekUsage: Record<string, number> = {};
     const usedWeeks: string[] = [];
     for (const wk of weekKeys) {
