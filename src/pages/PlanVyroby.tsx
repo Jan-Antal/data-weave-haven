@@ -115,6 +115,8 @@ export default function PlanVyroby() {
   const [displayMode, setDisplayMode] = useState<DisplayMode>("hours");
   const [viewTab, setViewTab] = useState<ViewTab>("kanban");
   const forecast = useForecastMode();
+  const [overbookDialogOpen, setOverbookDialogOpen] = useState(false);
+  const prevOverbookedRef = useRef(0);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
