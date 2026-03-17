@@ -124,6 +124,7 @@ interface UseForecastModeReturn {
   safetyNetProjects: SafetyNetProject[];
   restoreFromSafetyNet: (projectId: string) => void;
   restoreToWeek: (projectId: string, targetWeek: string) => void;
+  overbookedWeeks: OverbookedWeek[];
 }
 
 export function useForecastMode(): UseForecastModeReturn {
