@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { productionCzkToSellingPrice } from "@/lib/currency";
 import { useQueryClient } from "@tanstack/react-query";
-import { useWeekCapacityLookup, useWeeklyCapacity } from "@/hooks/useWeeklyCapacity";
+import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
 import { Search, X, Sparkles, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -221,24 +221,6 @@ export default function PlanVyroby() {
 
   const weeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
-
-  // Build weekCapacityMap for forecast edge function
-  const currentYear = new Date().getFullYear();
-  const { weekMap: capMapCurrent } = useWeeklyCapacity(currentYear);
-  const { weekMap: capMapNext } = useWeeklyCapacity(currentYear + 1);
-  const weekCapacityMap = useMemo(() => {
-    const result: Record<string, number> = {};
-    const addFromMap = (map: Map<number, any>, year: number) => {
-      map.forEach((entry) => {
-        if (entry.week_start) {
-          result[entry.week_start] = entry.capacity_hours;
-        }
-      });
-    };
-    addFromMap(capMapCurrent, currentYear);
-    addFromMap(capMapNext, currentYear + 1);
-    return result;
-  }, [capMapCurrent, capMapNext, currentYear]);
 
   useEffect(() => {
     setCurrentPage("plan-vyroby");
@@ -666,7 +648,7 @@ export default function PlanVyroby() {
               if (loaded) {
                 // session restored silently
               } else {
-                await forecast.generateForecast(weeklyCapacity, undefined, weekCapacityMap);
+                await forecast.generateForecast(weeklyCapacity);
               }
             }
           }}
@@ -679,13 +661,13 @@ export default function PlanVyroby() {
               if (loaded) {
                 // session restored silently
               } else {
-                await forecast.generateForecast(weeklyCapacity, m, weekCapacityMap);
+                await forecast.generateForecast(weeklyCapacity, m);
               }
             }
           }}
           onResetForecast={async () => {
             if (window.confirm("Smazat uložený forecast a začít znovu?")) {
-              await forecast.resetAndRegenerate(weeklyCapacity, undefined, weekCapacityMap);
+              await forecast.resetAndRegenerate(weeklyCapacity);
             }
           }}
           isOwner={isOwner}
