@@ -115,7 +115,7 @@ serve(async (req) => {
     currentMonday.setUTCDate(currentMonday.getUTCDate()+(dow===0?-6:1-dow));
 
     const [projRes,tpvRes,settingsRes,presetsRes,capacityRes,ratesRes,inboxRes] = await Promise.all([
-      sb.from("projects").select("project_id,project_name,status,risk,prodejni_cena,marze,cost_preset_id,cost_production_pct,datum_objednavky,datum_tpv,expedice,montaz,predani,datum_smluvni,currency").in("status",["Příprava","Engineering","TPV","Výroba IN","Výroba"]).is("deleted_at",null).eq("is_test",false),
+      sb.from("projects").select("project_id,project_name,status,risk,prodejni_cena,marze,cost_preset_id,cost_production_pct,datum_objednavky,tpv_date,expedice,montaz,predani,datum_smluvni,currency").in("status",["Příprava","Engineering","TPV","Výroba IN","Výroba"]).is("deleted_at",null).eq("is_test",false),
       sb.from("tpv_items").select("project_id,cena,pocet,status").is("deleted_at",null),
       sb.from("production_settings").select("hourly_rate").limit(1).single(),
       sb.from("cost_breakdown_presets").select("id,is_default,production_pct").order("sort_order"),
