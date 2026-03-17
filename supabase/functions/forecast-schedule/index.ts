@@ -165,7 +165,7 @@ function resolveDeadline(proj: any, itemCount: number): { date: Date | null; sou
 // ─── TPV START ───────────────────────────────────────────────────────────────
 function resolveTpvStart(proj: any, itemCount: number, today: Date): Date {
   // Explicit TPV deadline set by PM
-  const tpv = parseDate(proj.termin_tpv);
+  const tpv = parseDate(proj.datum_tpv);
   if (tpv) return tpv < today ? today : tpv;
 
   // Estimate from order date
