@@ -168,8 +168,9 @@ function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number
       const totalItems = projTpvItems.length;
       const remainingShare = itemsWithoutPrice.length / totalItems;
       const remainingCena = Number(proj.prodejni_cena) * currencyMultiplier * remainingShare;
-      const naklady = remainingCena * (1 - marzeFraction);
-      totalHours += naklady * (vyrobaPct / 100) / hourlyRate;
+      // Same formula: výrobná cena = cena × (1 - marže) × výroba_pct%
+      const vyrobnaCena = remainingCena * (1 - marzeFraction) * (vyrobaPct / 100);
+      totalHours += vyrobnaCena / hourlyRate;
     }
 
     return { hours: clampHours(totalHours), level: 1, badge: "TPV ceny" };
