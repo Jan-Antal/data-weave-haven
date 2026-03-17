@@ -211,7 +211,7 @@ serve(async (req) => {
     currentMonday.setUTCDate(currentMonday.getUTCDate() + (dow === 0 ? -6 : 1 - dow));
 
     // 1. Fetch all data in parallel
-    const [projRes, tpvRes, settingsRes, presetsRes, ratesRes, inboxRes] = await Promise.all([
+    const [projRes, tpvRes, settingsRes, presetsRes, inboxRes] = await Promise.all([
       sb.from("projects")
         .select("project_id,project_name,status,risk,prodejni_cena,marze,cost_preset_id,cost_production_pct,datum_objednavky,datum_tpv,expedice,montaz,predani,datum_smluvni")
         .in("status", ["Příprava","Engineering","TPV","Výroba IN","Výroba"])
@@ -222,7 +222,6 @@ serve(async (req) => {
         .is("deleted_at", null),
       sb.from("production_settings").select("hourly_rate").limit(1).single(),
       sb.from("cost_breakdown_presets").select("id,is_default,production_pct").order("sort_order"),
-      sb.from("exchange_rates").select("year,eur_czk").order("year"),
       sb.from("production_inbox")
         .select("project_id,estimated_hours")
         .eq("status","pending"),
@@ -233,11 +232,6 @@ serve(async (req) => {
     const hourlyRate = Number(settingsRes.data?.hourly_rate) || 550;
     const presets = presetsRes.data || [];
     const defaultPreset = presets.find((p:any) => p.is_default) || presets[0];
-    const rateByYear: Record<number,number> = {};
-    for (const r of ratesRes.data || []) rateByYear[r.year] = Number(r.eur_czk);
-
-    // EUR rate resolver
-    const getEurRate = (orderDate: Date | null) => getRate(orderDate, rateByYear);
 
     // Group TPV items and inbox hours by project
     const tpvByProject = new Map<string, any[]>();
