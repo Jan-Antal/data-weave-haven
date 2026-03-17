@@ -157,10 +157,12 @@ serve(async (req) => {
         safetyNetMap.set(proj.project_id,{project_id:proj.project_id,project_name:proj.project_name,estimated_hours:remainingHours,estimation_badge:est.badge+" – chybí termíny"});
         continue;
       }
-      const tpvStart = resolveTpvStart(proj,tpvCount,today);
+      let tpvStart = resolveTpvStart(proj,tpvCount,today);
       const dl = resolveDeadline(proj,tpvCount);
       const statusFallback:Record<string,number> = {"Výroba IN":4,"Výroba":4,"TPV":8,"Engineering":12,"Příprava":16};
-      const deadline = dl.date?(dl.date<tpvStart?addWeeks(tpvStart,2):dl.date):addWeeks(tpvStart,statusFallback[proj.status]??8);
+      const deadline = dl.date ? dl.date : addWeeks(tpvStart,statusFallback[proj.status]??8);
+      // If deadline is before computed tpvStart, pull tpvStart back to today — deadline is a hard constraint
+      if (dl.date && tpvStart > deadline) tpvStart = today;
       if (deadline < today) {
         safetyNetMap.set(proj.project_id,{project_id:proj.project_id,project_name:proj.project_name,estimated_hours:remainingHours,estimation_badge:"⚠ Termín v minulosti"});
         continue;
