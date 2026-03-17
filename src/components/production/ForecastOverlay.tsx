@@ -400,10 +400,13 @@ function ForecastCard({
                         ⚠ BEZ TERMÍNU
                       </span>);
                   }
+                  const label = srcMap[block.deadline_source ?? ""] ?? "Termín";
+                  // Parse ISO date string directly to avoid timezone issues
+                  const [y, m, day] = block.deadline.substring(0, 10).split("-");
+                  if (!y || !m || !day) return null;
+                  const formatted = `${day}.${m}.${y.substring(2)}`;
                   const d = new Date(block.deadline);
                   if (isNaN(d.getTime())) return null;
-                  const label = srcMap[block.deadline_source ?? ""] ?? "Termín";
-                  const formatted = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getFullYear()).slice(2)}`;
                   const now = new Date(); now.setHours(0, 0, 0, 0);
                   const diffDays = Math.ceil((d.getTime() - now.getTime()) / 86400000);
                   const color = diffDays < 0 ? "#DC2626" : diffDays <= 14 ? "#D97706" : diffDays <= 30 ? "#2563EB" : "#7aa8a4";

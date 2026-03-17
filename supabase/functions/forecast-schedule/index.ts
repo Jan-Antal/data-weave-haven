@@ -249,8 +249,10 @@ serve(async (req) => {
         for (let i=searchFrom; i<=clampedEnd; i++) {
           const weekKey = weekKeys[i];
           const wCap = getWeekCapacity(weekKey);
-          const maxCap = wCap*SCHEDULE_CAP;
-          const avail = maxCap-(usage[weekKey]||0);
+          const hardCap = wCap*SCHEDULE_CAP;
+          const hardAvail = hardCap-(usage[weekKey]||0);
+          const targetAvail = wCap-(usage[weekKey]||0); // prefer filling to 100% first
+          const avail = targetAvail > 0 ? targetAvail : hardAvail;
           if (avail>1) {
             const alloc = Math.min(remaining,avail);
             blocks.push({
