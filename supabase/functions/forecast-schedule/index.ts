@@ -64,13 +64,13 @@ function estimateHours(proj: any, tpvItems: any[], hourlyRate: number, vyrobaPct
   const withPrice = active.filter(t => t.cena && Number(t.cena) > 0);
   if (withPrice.length > 0) {
     let tpvSum = withPrice.reduce((s,t) => s + Number(t.cena)*(Number(t.pocet)||1), 0);
-    const prodejni = Number(proj.prodejni_cena) || 0;
-    if (prodejni > 0 && tpvSum < prodejni * 0.15) tpvSum = tpvSum * eurRate;
+    if (proj.currency === "EUR") tpvSum = tpvSum * eurRate;
     const hours = Math.max(20, Math.min(20000, Math.round(tpvSum*(1-marze)*vyrobaPct/hourlyRate)));
     return { hours, badge: "TPV ceny", base: "tpv_items" };
   }
-  const pc = Number(proj.prodejni_cena) || 0;
+  let pc = Number(proj.prodejni_cena) || 0;
   if (pc <= 0) return { hours: 20, badge: "⚠ Chybí podklady", base: "none" };
+  if (proj.currency === "EUR") pc = pc * eurRate;
   const hours = Math.max(20, Math.min(20000, Math.round(pc*(1-marze)*vyrobaPct/hourlyRate)));
   return { hours, badge: proj.cost_preset_id ? "Rozpad" : "Výroba – odhad", base: "prodejni_cena" };
 }
@@ -115,7 +115,7 @@ serve(async (req) => {
     currentMonday.setUTCDate(currentMonday.getUTCDate()+(dow===0?-6:1-dow));
 
     const [projRes,tpvRes,settingsRes,presetsRes,capacityRes,ratesRes,inboxRes] = await Promise.all([
-      sb.from("projects").select("project_id,project_name,status,risk,prodejni_cena,marze,cost_preset_id,cost_production_pct,datum_objednavky,datum_tpv,expedice,montaz,predani,datum_smluvni").in("status",["Příprava","Engineering","TPV","Výroba IN","Výroba"]).is("deleted_at",null).eq("is_test",false),
+      sb.from("projects").select("project_id,project_name,status,risk,prodejni_cena,marze,cost_preset_id,cost_production_pct,datum_objednavky,datum_tpv,expedice,montaz,predani,datum_smluvni,currency").in("status",["Příprava","Engineering","TPV","Výroba IN","Výroba"]).is("deleted_at",null).eq("is_test",false),
       sb.from("tpv_items").select("project_id,cena,pocet,status").is("deleted_at",null),
       sb.from("production_settings").select("hourly_rate").limit(1).single(),
       sb.from("cost_breakdown_presets").select("id,is_default,production_pct").order("sort_order"),
