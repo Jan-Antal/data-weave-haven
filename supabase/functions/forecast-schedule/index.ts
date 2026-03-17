@@ -97,7 +97,7 @@ function estimateHours(
   vyrobaPct: number,   // fraction e.g. 0.35
   eurRate: number
 ): { hours: number; badge: string; base: string; sellingBase: number } {
-  const currency = proj.currency || proj.mena || "CZK";
+  const currency = proj.currency || "CZK";
   const marze = normalizeMarze(proj.marze);
 
   // Filter: only active items, exclude Zrušeno
@@ -165,7 +165,7 @@ function resolveDeadline(proj: any, itemCount: number): { date: Date | null; sou
 // ─── TPV START ───────────────────────────────────────────────────────────────
 function resolveTpvStart(proj: any, itemCount: number, today: Date): Date {
   // Explicit TPV deadline set by PM
-  const tpv = parseDate(proj.termin_tpv);
+  const tpv = parseDate(proj.datum_tpv);
   if (tpv) return tpv < today ? today : tpv;
 
   // Estimate from order date
@@ -227,15 +227,15 @@ serve(async (req) => {
     // 1. Fetch all data in parallel
     const [projRes, tpvRes, settingsRes, presetsRes, ratesRes, inboxRes] = await Promise.all([
       sb.from("projects")
-        .select("project_id,project_name,status,risk,currency,mena,prodejni_cena,marze,cost_preset_id,datum_objednavky,termin_tpv,expedice,montaz,predani,datum_smluvni")
+        .select("project_id,project_name,status,risk,currency,prodejni_cena,marze,cost_preset_id,cost_production_pct,datum_objednavky,datum_tpv,expedice,montaz,predani,datum_smluvni")
         .in("status", ["Příprava","Engineering","TPV","Výroba IN","Výroba"])
         .is("deleted_at", null)
         .eq("is_test", false),
       sb.from("tpv_items")
         .select("project_id,id,cena,pocet,status")
         .is("deleted_at", null),
-      sb.from("production_settings").select("hodinova_sazba").limit(1).single(),
-      sb.from("cost_breakdown_presets").select("id,is_default,vyroba_pct").order("sort_order"),
+      sb.from("production_settings").select("hourly_rate").limit(1).single(),
+      sb.from("cost_breakdown_presets").select("id,is_default,production_pct").order("sort_order"),
       sb.from("exchange_rates").select("year,eur_czk").order("year"),
       sb.from("production_inbox")
         .select("project_id,estimated_hours")
@@ -244,7 +244,7 @@ serve(async (req) => {
 
     const projects = projRes.data || [];
     const allTpvItems = tpvRes.data || [];
-    const hourlyRate = Number(settingsRes.data?.hodinova_sazba) || 550;
+    const hourlyRate = Number(settingsRes.data?.hourly_rate) || 550;
     const presets = presetsRes.data || [];
     const defaultPreset = presets.find((p:any) => p.is_default) || presets[0];
     const rateByYear: Record<number,number> = {};
@@ -304,11 +304,12 @@ serve(async (req) => {
       const orderDate = parseDate(proj.datum_objednavky);
       const eurRate = getEurRate(orderDate);
 
-      // Get vyroba_pct from preset
+      // Get production_pct: project-level override > preset > default
+      const projProductionPct = proj.cost_production_pct ? Number(proj.cost_production_pct) : null;
       const preset = proj.cost_preset_id
         ? presets.find((p:any) => p.id === proj.cost_preset_id)
         : defaultPreset;
-      const vyrobaPct = (preset?.vyroba_pct ?? 35) / 100;
+      const vyrobaPct = (projProductionPct ?? preset?.production_pct ?? 35) / 100;
 
       const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct, eurRate);
 
