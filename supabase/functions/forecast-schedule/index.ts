@@ -97,7 +97,7 @@ function estimateHours(
   vyrobaPct: number,   // fraction e.g. 0.35
   eurRate: number
 ): { hours: number; badge: string; base: string; sellingBase: number } {
-  const currency = proj.currency || proj.mena || "CZK";
+  const currency = proj.currency || "CZK";
   const marze = normalizeMarze(proj.marze);
 
   // Filter: only active items, exclude Zrušeno
