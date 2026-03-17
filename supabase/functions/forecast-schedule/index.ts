@@ -142,7 +142,7 @@ function resolveDeadline(proj: any, tpvCount: number): { date: Date | null; sour
   return { date: null, source: "none" };
 }
 
-function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number, costPresets: any[], defaultPreset: any, eurCzkRate: number): { hours: number; level: number; badge: string } {
+function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number, costPresets: any[], defaultPreset: any, eurCzkRate: number): { hours: number; level: number; badge: string; calculation_detail: any } {
   const itemsWithPrice = projTpvItems.filter((t: any) => t.cena && Number(t.cena) > 0);
 
   if (itemsWithPrice.length > 0) {
@@ -154,12 +154,11 @@ function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number
     const currencyMultiplier = (proj.currency === "EUR") ? eurCzkRate : 1;
 
     let totalHours = 0;
+    let tpvSum = 0;
     for (const item of itemsWithPrice) {
-      // TPV cena = predajná cena (čo platí zákazník), per-item × počet, converted to CZK
       const itemCena = Number(item.cena) * (Number(item.pocet) || 1) * currencyMultiplier;
-      // Výrobná cena = TPV cena × (1 - marže) × výroba_pct%
+      tpvSum += itemCena;
       const vyrobnaCena = itemCena * (1 - marzeFraction) * (vyrobaPct / 100);
-      // Hodiny = výrobná cena / hodinová sadzba
       totalHours += vyrobnaCena / hourlyRate;
     }
 
@@ -168,12 +167,26 @@ function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number
       const totalItems = projTpvItems.length;
       const remainingShare = itemsWithoutPrice.length / totalItems;
       const remainingCena = Number(proj.prodejni_cena) * currencyMultiplier * remainingShare;
-      // Same formula: výrobná cena = cena × (1 - marže) × výroba_pct%
+      tpvSum += remainingCena;
       const vyrobnaCena = remainingCena * (1 - marzeFraction) * (vyrobaPct / 100);
       totalHours += vyrobnaCena / hourlyRate;
     }
 
-    return { hours: clampHours(totalHours), level: 1, badge: "TPV ceny" };
+    const prodejniCenaCzk = (Number(proj.prodejni_cena) || 0) * currencyMultiplier;
+    const clamped = clampHours(totalHours);
+    return {
+      hours: clamped, level: 1, badge: "TPV ceny",
+      calculation_detail: {
+        base: "tpv_items",
+        tpv_sum_czk: Math.round(tpvSum),
+        prodejni_cena_czk: Math.round(prodejniCenaCzk),
+        marze_pct: Math.round(marzeFraction * 100),
+        vyroba_pct: Math.round(vyrobaPct),
+        hodinova_sazba: hourlyRate,
+        total_hours: Math.round(clamped),
+        formula: `${Math.round(tpvSum).toLocaleString()} × ${Math.round((1 - marzeFraction) * 100)}% × ${Math.round(vyrobaPct)}% / ${hourlyRate} = ${Math.round(clamped)}h`
+      }
+    };
   }
 
   const currencyMultiplier = (proj.currency === "EUR") ? eurCzkRate : 1;
@@ -184,14 +197,27 @@ function estimateProjectHours(proj: any, projTpvItems: any[], hourlyRate: number
     : defaultPreset;
 
   if (!preset || prodejniCena === 0) {
-    return { hours: MIN_HOURS, level: 4, badge: "⚠ Chybí podklady" };
+    return { hours: MIN_HOURS, level: 4, badge: "⚠ Chybí podklady", calculation_detail: { base: "none", tpv_sum_czk: 0, prodejni_cena_czk: 0, marze_pct: 0, vyroba_pct: 0, hodinova_sazba: hourlyRate, total_hours: MIN_HOURS, formula: "Chybí podklady" } };
   }
   const effectiveMarze = marze ?? 0.15;
   const naklady = prodejniCena * (1 - effectiveMarze);
   const hours = clampHours(naklady * (Number(preset.production_pct) / 100) / hourlyRate);
   const level = proj.cost_preset_id ? 2 : marze != null ? 2 : 3;
   const badge = level === 2 ? "Výroba – odhad" : "Výroba – odhad (def. marže)";
-  return { hours, level, badge };
+  const vyrobaPct = Number(preset.production_pct);
+  return {
+    hours, level, badge,
+    calculation_detail: {
+      base: "prodejni_cena",
+      tpv_sum_czk: 0,
+      prodejni_cena_czk: Math.round(prodejniCena),
+      marze_pct: Math.round(effectiveMarze * 100),
+      vyroba_pct: Math.round(vyrobaPct),
+      hodinova_sazba: hourlyRate,
+      total_hours: Math.round(hours),
+      formula: `${Math.round(prodejniCena).toLocaleString()} × ${Math.round((1 - effectiveMarze) * 100)}% × ${Math.round(vyrobaPct)}% / ${hourlyRate} = ${Math.round(hours)}h`
+    }
+  };
 }
 
 // Priority score — higher = schedule first
