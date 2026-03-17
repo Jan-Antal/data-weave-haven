@@ -685,7 +685,7 @@ export default function PlanVyroby() {
           }}
           onResetForecast={async () => {
             if (window.confirm("Smazat uložený forecast a začít znovu?")) {
-              await forecast.resetAndRegenerate(weeklyCapacity);
+              await forecast.resetAndRegenerate(weeklyCapacity, undefined, weekCapacityMap);
             }
           }}
           isOwner={isOwner}
