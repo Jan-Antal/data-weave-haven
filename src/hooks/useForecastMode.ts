@@ -16,6 +16,17 @@ export type ForecastConfidence = "high" | "medium" | "low";
 export type ForecastSource = "existing_plan" | "inbox_item" | "project_estimate";
 export type ForecastPlanMode = "respect_plan" | "from_scratch";
 
+export interface ForecastCalculationDetail {
+  base: "tpv_items" | "prodejni_cena" | "none";
+  tpv_sum_czk: number;
+  prodejni_cena_czk: number;
+  marze_pct: number;
+  vyroba_pct: number;
+  hodinova_sazba: number;
+  total_hours: number;
+  formula: string;
+}
+
 export interface ForecastBlock {
   id: string;
   project_id: string;
@@ -31,9 +42,10 @@ export interface ForecastBlock {
   tpv_expected_date?: string | null;
   is_forecast: true;
   selected?: boolean;
-  estimation_level?: number;  // 1=rozpad, 2=odhad s marží, 3=odhad def marže, 4=chybí podklady
+  estimation_level?: number;
   estimation_badge?: string;
   estimation_preset?: string;
+  calculation_detail?: ForecastCalculationDetail;
 }
 
 /** Tracks a real bundle move that only lives in forecast state */

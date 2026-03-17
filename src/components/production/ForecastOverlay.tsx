@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Sparkles, Inbox, ChevronRight, GripVertical } from "lucide-react";
-import type { ForecastBlock, ForecastSource } from "@/hooks/useForecastMode";
+import type { ForecastBlock, ForecastSource, ForecastCalculationDetail } from "@/hooks/useForecastMode";
 import { getProjectColor } from "@/lib/projectColors";
 import { useDraggable } from "@dnd-kit/core";
 import { supabase } from "@/integrations/supabase/client";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ForecastOverlayProps {
   blocks: ForecastBlock[];
@@ -183,6 +184,26 @@ function formatCompactCzk(v: number): string {
 }
 
 type DisplayMode = "hours" | "czk" | "percent";
+
+function CalculationTooltipContent({ detail }: { detail: ForecastCalculationDetail }) {
+  const baseLabel = detail.base === "tpv_items" ? "Ceny TPV položek" : "Prodejní cena projektu";
+  const baseValue = detail.base === "tpv_items"
+    ? `TPV suma: ${detail.tpv_sum_czk.toLocaleString("cs-CZ")} Kč`
+    : `Prodejní cena: ${detail.prodejni_cena_czk.toLocaleString("cs-CZ")} Kč`;
+
+  return (
+    <div className="space-y-1">
+      <div className="font-semibold text-amber-400">📊 Výpočet hodin</div>
+      <div>Základ: {baseLabel}</div>
+      <div>{baseValue}</div>
+      <div>Marže: {detail.marze_pct}%</div>
+      <div>Výroba: {detail.vyroba_pct}%</div>
+      <div>Sazba: {detail.hodinova_sazba} Kč/h</div>
+      <div className="border-t border-gray-600 my-1" />
+      <div className="text-amber-300">{detail.formula}</div>
+    </div>
+  );
+}
 
 function ForecastCard({
   block,
@@ -414,11 +435,28 @@ function ForecastCard({
                     );
                   })()}
                 </div>
-                <span
-                  className="text-[13px] font-bold shrink-0 ml-2"
-                  style={{ color: style.hoursColor }}>
-                  {style.hoursPrefix}{displayMode === "czk" ? formatCompactCzk(block.estimated_hours * hourlyRate) : displayMode === "percent" ? `${weeklyCapacity > 0 ? Math.round(block.estimated_hours / weeklyCapacity * 100) : 0}%` : `${block.estimated_hours}h`}
-                </span>
+                {block.calculation_detail && block.source !== "existing_plan" ? (
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          className="text-[13px] font-bold shrink-0 ml-2 cursor-help"
+                          style={{ color: style.hoursColor }}>
+                          {style.hoursPrefix}{displayMode === "czk" ? formatCompactCzk(block.estimated_hours * hourlyRate) : displayMode === "percent" ? `${weeklyCapacity > 0 ? Math.round(block.estimated_hours / weeklyCapacity * 100) : 0}%` : `${block.estimated_hours}h`}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="max-w-xs p-3 text-xs font-mono leading-relaxed" style={{ backgroundColor: "#1C1F26", borderColor: "#2a2d35", color: "#e5e5e5" }}>
+                        <CalculationTooltipContent detail={block.calculation_detail} />
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : (
+                  <span
+                    className="text-[13px] font-bold shrink-0 ml-2"
+                    style={{ color: style.hoursColor }}>
+                    {style.hoursPrefix}{displayMode === "czk" ? formatCompactCzk(block.estimated_hours * hourlyRate) : displayMode === "percent" ? `${weeklyCapacity > 0 ? Math.round(block.estimated_hours / weeklyCapacity * 100) : 0}%` : `${block.estimated_hours}h`}
+                  </span>
+                )}
               </div>
             </div>
           </div>
