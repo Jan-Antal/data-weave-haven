@@ -21,11 +21,27 @@ function addDays(date: Date, n: number): Date {
 }
 function parseDate(raw: any): Date | null {
   if (!raw) return null;
-  const s = String(raw).trim().substring(0, 10);
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (m) { const d = new Date(Date.UTC(+m[1],+m[2]-1,+m[3])); return isNaN(d.getTime())?null:d; }
-  const cz = s.match(/^(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{4})$/);
-  if (cz) { const d = new Date(Date.UTC(+cz[3],+cz[2]-1,+cz[1])); return isNaN(d.getTime())?null:d; }
+  const s = String(raw).trim();
+  // ISO: 2026-03-25
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) { const d = new Date(Date.UTC(+iso[1],+iso[2]-1,+iso[3])); return isNaN(d.getTime())?null:d; }
+  // CZ with spaces: "8. 4. 2026" or "8.4.2026"
+  const czSpace = s.match(/^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})$/);
+  if (czSpace) { const d = new Date(Date.UTC(+czSpace[3],+czSpace[2]-1,+czSpace[1])); return isNaN(d.getTime())?null:d; }
+  // EN with 3-letter month: "02-Jul-26", "24-Mar-26", "15-Dec-25"
+  const MONTHS: Record<string,number> = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  const enMonth = s.match(/^(\d{1,2})[-\/]([A-Za-z]{3})[-\/](\d{2,4})$/);
+  if (enMonth) {
+    const mon = MONTHS[enMonth[2].toLowerCase()];
+    const yr = +enMonth[3] < 100 ? 2000 + +enMonth[3] : +enMonth[3];
+    if (mon) { const d = new Date(Date.UTC(yr,mon-1,+enMonth[1])); return isNaN(d.getTime())?null:d; }
+  }
+  // US slash: M/D/YY or M/D/YYYY
+  const us = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (us) { const yr = +us[3]<100?2000+ +us[3]:+us[3]; const d = new Date(Date.UTC(yr,+us[1]-1,+us[2])); return isNaN(d.getTime())?null:d; }
+  // Dash numeric: DD-MM-YY
+  const dash = s.match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
+  if (dash) { const yr = +dash[3]<100?2000+ +dash[3]:+dash[3]; const d = new Date(Date.UTC(yr,+dash[2]-1,+dash[1])); return isNaN(d.getTime())?null:d; }
   return null;
 }
 function normalizeMarze(raw: any): number {
