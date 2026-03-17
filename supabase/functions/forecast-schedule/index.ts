@@ -47,20 +47,8 @@ function normalizeMarze(raw: any): number {
   return n;                             // already 0.15, 0.22
 }
 
-// EUR→CZK by year of order date
-function getRate(orderDate: Date | null, rateByYear: Record<number, number>): number {
-  const year = orderDate ? orderDate.getUTCFullYear() : new Date().getUTCFullYear();
-  const years = Object.keys(rateByYear).map(Number).sort((a,b) => b-a);
-  for (const y of years) {
-    if (year >= y) return rateByYear[y];
-  }
-  return rateByYear[years[years.length-1]] ?? 25.0;
-}
-
-function toCzk(amount: number, currency: string, rate: number): number {
-  if (!amount || isNaN(amount)) return 0;
-  return currency?.toUpperCase() === "EUR" ? amount * rate : amount;
-}
+// EUR→CZK helpers kept as stubs for future use
+// Currently all prices are treated as CZK
 
 // TPV weeks estimate based on item count
 function tpvWeeksEstimate(count: number): number {
