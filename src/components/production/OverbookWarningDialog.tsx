@@ -82,7 +82,6 @@ export function OverbookWarningDialog({ open, onOpenChange, overbookedWeeks }: O
                     </td>
                     <td className="py-2 px-2 text-right font-bold font-mono text-xs" style={{ color }}>
                       {w.utilizationPct}%
-                      <span className="ml-1 font-normal opacity-70">({w.hoursScheduled}h / {w.capacity}h)</span>
                     </td>
                     <td className="py-2 px-2 text-right font-mono text-xs">
                       {w.hoursScheduled}h / {w.capacity}h
