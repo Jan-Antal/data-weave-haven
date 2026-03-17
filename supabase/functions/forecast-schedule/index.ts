@@ -47,20 +47,8 @@ function normalizeMarze(raw: any): number {
   return n;                             // already 0.15, 0.22
 }
 
-// EUR→CZK by year of order date
-function getRate(orderDate: Date | null, rateByYear: Record<number, number>): number {
-  const year = orderDate ? orderDate.getUTCFullYear() : new Date().getUTCFullYear();
-  const years = Object.keys(rateByYear).map(Number).sort((a,b) => b-a);
-  for (const y of years) {
-    if (year >= y) return rateByYear[y];
-  }
-  return rateByYear[years[years.length-1]] ?? 25.0;
-}
-
-function toCzk(amount: number, currency: string, rate: number): number {
-  if (!amount || isNaN(amount)) return 0;
-  return currency?.toUpperCase() === "EUR" ? amount * rate : amount;
-}
+// EUR→CZK helpers kept as stubs for future use
+// Currently all prices are treated as CZK
 
 // TPV weeks estimate based on item count
 function tpvWeeksEstimate(count: number): number {
@@ -95,9 +83,7 @@ function estimateHours(
   tpvItems: any[],
   hourlyRate: number,
   vyrobaPct: number,   // fraction e.g. 0.35
-  eurRate: number
 ): { hours: number; badge: string; base: string; sellingBase: number } {
-  const currency = proj.currency || "CZK";
   const marze = normalizeMarze(proj.marze);
 
   // Filter: only active items, exclude Zrušeno
@@ -111,15 +97,15 @@ function estimateHours(
   let base = "";
 
   if (itemsWithPrice.length > 0) {
-    // Level 1: sum from TPV items
+    // Level 1: sum from TPV items (all prices treated as CZK)
     sellingBase = itemsWithPrice.reduce((sum, t) => {
-      return sum + toCzk(Number(t.cena), currency, eurRate) * (Number(t.pocet) || 1);
+      return sum + Number(t.cena) * (Number(t.pocet) || 1);
     }, 0);
     badge = "TPV ceny";
     base = "tpv_items";
   } else {
-    // Level 2: use prodejni_cena
-    const pc = toCzk(Number(proj.prodejni_cena) || 0, currency, eurRate);
+    // Level 2: use prodejni_cena (treated as CZK)
+    const pc = Number(proj.prodejni_cena) || 0;
     if (pc <= 0) {
       return { hours: 20, badge: "⚠ Chybí podklady", base: "none", sellingBase: 0 };
     }
@@ -225,9 +211,9 @@ serve(async (req) => {
     currentMonday.setUTCDate(currentMonday.getUTCDate() + (dow === 0 ? -6 : 1 - dow));
 
     // 1. Fetch all data in parallel
-    const [projRes, tpvRes, settingsRes, presetsRes, ratesRes, inboxRes] = await Promise.all([
+    const [projRes, tpvRes, settingsRes, presetsRes, inboxRes] = await Promise.all([
       sb.from("projects")
-        .select("project_id,project_name,status,risk,currency,prodejni_cena,marze,cost_preset_id,cost_production_pct,datum_objednavky,datum_tpv,expedice,montaz,predani,datum_smluvni")
+        .select("project_id,project_name,status,risk,prodejni_cena,marze,cost_preset_id,cost_production_pct,datum_objednavky,datum_tpv,expedice,montaz,predani,datum_smluvni")
         .in("status", ["Příprava","Engineering","TPV","Výroba IN","Výroba"])
         .is("deleted_at", null)
         .eq("is_test", false),
@@ -236,7 +222,6 @@ serve(async (req) => {
         .is("deleted_at", null),
       sb.from("production_settings").select("hourly_rate").limit(1).single(),
       sb.from("cost_breakdown_presets").select("id,is_default,production_pct").order("sort_order"),
-      sb.from("exchange_rates").select("year,eur_czk").order("year"),
       sb.from("production_inbox")
         .select("project_id,estimated_hours")
         .eq("status","pending"),
@@ -247,11 +232,6 @@ serve(async (req) => {
     const hourlyRate = Number(settingsRes.data?.hourly_rate) || 550;
     const presets = presetsRes.data || [];
     const defaultPreset = presets.find((p:any) => p.is_default) || presets[0];
-    const rateByYear: Record<number,number> = {};
-    for (const r of ratesRes.data || []) rateByYear[r.year] = Number(r.eur_czk);
-
-    // EUR rate resolver
-    const getEurRate = (orderDate: Date | null) => getRate(orderDate, rateByYear);
 
     // Group TPV items and inbox hours by project
     const tpvByProject = new Map<string, any[]>();
@@ -301,8 +281,6 @@ serve(async (req) => {
     for (const proj of projects) {
       const projTpv = tpvByProject.get(proj.project_id) || [];
       const tpvCount = projTpv.length;
-      const orderDate = parseDate(proj.datum_objednavky);
-      const eurRate = getEurRate(orderDate);
 
       // Get production_pct: project-level override > preset > default
       const projProductionPct = proj.cost_production_pct ? Number(proj.cost_production_pct) : null;
@@ -311,7 +289,7 @@ serve(async (req) => {
         : defaultPreset;
       const vyrobaPct = (projProductionPct ?? preset?.production_pct ?? 35) / 100;
 
-      const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct, eurRate);
+      const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct);
 
       // Subtract hours already in inbox
       const inboxH = inboxHoursByProject.get(proj.project_id) || 0;
