@@ -96,7 +96,8 @@ serve(async (req) => {
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { weeklyCapacityHours } = await req.json();
     const weeklyCapacity = Number(weeklyCapacityHours) || 760;
-    const TARGET_MAX = 1.10;
+    const SCHEDULE_CAP = 1.15;    // max to fill per week when scheduling
+    const OVERBOOK_THRESHOLD = 1.10;  // warn above this
     const today = new Date(); today.setUTCHours(0,0,0,0);
     const currentMonday = new Date(today);
     const dow = currentMonday.getUTCDay();
@@ -112,6 +113,22 @@ serve(async (req) => {
       sb.from("cost_breakdown_presets").select("id,is_default,production_pct").order("sort_order"),
       sb.from("production_inbox").select("project_id,estimated_hours").eq("status","pending"),
     ]);
+
+    // Per-week capacity overrides from production_capacity table
+    const weekCapacityMap = new Map<string, number>();
+    try {
+      const capRes = await sb.from("production_capacity").select("week_start,capacity_hours");
+      if (capRes.data) {
+        for (const row of capRes.data) {
+          if (row.week_start && row.capacity_hours != null) {
+            weekCapacityMap.set(String(row.week_start), Number(row.capacity_hours));
+          }
+        }
+      }
+    } catch (_) {
+      // Table may not exist — fall back to weeklyCapacity for all weeks
+    }
+    const getWeekCapacity = (weekKey: string): number => weekCapacityMap.get(weekKey) ?? weeklyCapacity;
 
     const projects = projRes.data || [];
     const hourlyRate = Number(settingsRes.data?.hourly_rate) || 550;
@@ -180,11 +197,12 @@ serve(async (req) => {
       let lastGlobalIdx = clampedStart-1;
 
       while (remaining>0) {
-        const maxCap = weeklyCapacity*TARGET_MAX;
         let placed = false;
         const searchFrom = Math.max(clampedStart, lastGlobalIdx+1);
         for (let i=searchFrom; i<=clampedEnd; i++) {
           const weekKey = weekKeys[i];
+          const wCap = getWeekCapacity(weekKey);
+          const maxCap = wCap*SCHEDULE_CAP;
           const avail = maxCap-(usage[weekKey]||0);
           if (avail>1) {
             const alloc = Math.min(remaining,avail);
@@ -214,8 +232,8 @@ serve(async (req) => {
     }
 
     const overbookedWeeks = weekKeys
-      .filter(k=>(usage[k]||0)>weeklyCapacity*TARGET_MAX)
-      .map(k=>({ week:k, utilizationPct:Math.round((usage[k]/weeklyCapacity)*100), hoursScheduled:Math.round(usage[k]), capacity:weeklyCapacity, projectsInWeek:[...new Set(blocks.filter(b=>b.week===k).map(b=>b.project_name))] }))
+      .filter(k=>{const wCap=getWeekCapacity(k);return (usage[k]||0)>wCap*OVERBOOK_THRESHOLD;})
+      .map(k=>{const wCap=getWeekCapacity(k);return { week:k, utilizationPct:Math.round((usage[k]/wCap)*100), hoursScheduled:Math.round(usage[k]), capacity:wCap, projectsInWeek:[...new Set(blocks.filter(b=>b.week===k).map(b=>b.project_name))] };})
       .sort((a,b)=>b.utilizationPct-a.utilizationPct);
 
     // ─── AI INSIGHTS ──────────────────────────────────────────────────────
