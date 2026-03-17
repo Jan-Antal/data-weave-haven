@@ -233,7 +233,7 @@ serve(async (req) => {
         .select("project_id, project_name, status, risk, expedice, montaz, predani, datum_smluvni, datum_objednavky, datum_tpv, prodejni_cena, marze, cost_preset_id, currency")
         .is("deleted_at", null)
         .eq("is_test", false)
-        .not("status", "in", '("Fakturace","Dokončeno")')
+        .in("status", ["Příprava", "Engineering", "TPV", "Výroba IN", "Výroba"])
         .not("project_id", "like", "TEST%"),
       sb.from("tpv_items")
         .select("project_id, id, cena, pocet, status")
@@ -318,7 +318,12 @@ serve(async (req) => {
     }
 
     const statusFallbackWeeks: Record<string, number> = {
-      "Výroba IN": 4, "Výroba": 4, "Expedice": 2, "Montáž": 3, "TPV": 8, "Engineering": 12, "Příprava": 16, "On Hold": 12, "Reklamace": 4, "VaN": 8,
+      "Výroba IN": 4, "Výroba": 4, "TPV": 8, "Engineering": 12, "Příprava": 16,
+    };
+
+    // Minimum delay for projects without dates, by status
+    const statusMinDelayWeeks: Record<string, number> = {
+      "Příprava": 12, "Engineering": 8, "TPV": 4, "Výroba IN": 0, "Výroba": 0,
     };
 
     const workItems: ProjectWork[] = [];
@@ -339,7 +344,9 @@ serve(async (req) => {
         const tpvWeeks = estimateTpvWeeks(tpvCount);
         tpvStart = parsed ? addWeeks(parsed, tpvWeeks) : addWeeks(today, 2);
       } else {
-        tpvStart = addWeeks(today, 2);
+        // No dates — apply status-based minimum delay
+        const minDelay = statusMinDelayWeeks[proj.status] ?? 8;
+        tpvStart = addWeeks(today, minDelay);
       }
       if (isNaN(tpvStart.getTime()) || tpvStart < today) tpvStart = new Date(today);
 
@@ -414,9 +421,9 @@ serve(async (req) => {
       for (const wk of weekKeys) {
         if (hoursToPlace <= 0) break;
         const currentUsage = usage[wk] || 0;
-        const maxCap = weeklyCapacity * TARGET_MAX;
-        const roomToMax = Math.max(0, maxCap - currentUsage);
-        if (roomToMax <= 0) continue;
+        const maxCap = weeklyCapacity * TARGET_MAX; // 125% cap for inbox too
+        if (currentUsage >= maxCap) continue;
+        const roomToMax = maxCap - currentUsage;
 
         const alloc = Math.min(hoursToPlace, roomToMax);
         blocks.push({
