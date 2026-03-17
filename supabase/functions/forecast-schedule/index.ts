@@ -227,15 +227,15 @@ serve(async (req) => {
     // 1. Fetch all data in parallel
     const [projRes, tpvRes, settingsRes, presetsRes, ratesRes, inboxRes] = await Promise.all([
       sb.from("projects")
-        .select("project_id,project_name,status,risk,currency,mena,prodejni_cena,marze,cost_preset_id,datum_objednavky,termin_tpv,expedice,montaz,predani,datum_smluvni")
+        .select("project_id,project_name,status,risk,currency,prodejni_cena,marze,cost_preset_id,cost_production_pct,datum_objednavky,datum_tpv,expedice,montaz,predani,datum_smluvni")
         .in("status", ["Příprava","Engineering","TPV","Výroba IN","Výroba"])
         .is("deleted_at", null)
         .eq("is_test", false),
       sb.from("tpv_items")
         .select("project_id,id,cena,pocet,status")
         .is("deleted_at", null),
-      sb.from("production_settings").select("hodinova_sazba").limit(1).single(),
-      sb.from("cost_breakdown_presets").select("id,is_default,vyroba_pct").order("sort_order"),
+      sb.from("production_settings").select("hourly_rate").limit(1).single(),
+      sb.from("cost_breakdown_presets").select("id,is_default,production_pct").order("sort_order"),
       sb.from("exchange_rates").select("year,eur_czk").order("year"),
       sb.from("production_inbox")
         .select("project_id,estimated_hours")
