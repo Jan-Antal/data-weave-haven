@@ -41,14 +41,37 @@ function montazWeeks(count: number): number {
   if (count <= 65) return 4; if (count <= 80) return 5; return Math.ceil(count / 20);
 }
 
-function estimateHours(proj: any, tpvItems: any[], hourlyRate: number, vyrobaPct: number) {
+function getEurRate(rateByYear: Map<number, number>, orderDate: Date | null): number {
+  if (!orderDate) {
+    // Use latest year available
+    if (rateByYear.size === 0) return 25.0;
+    const maxYear = Math.max(...rateByYear.keys());
+    return rateByYear.get(maxYear) ?? 25.0;
+  }
+  const year = orderDate.getUTCFullYear();
+  if (rateByYear.has(year)) return rateByYear.get(year)!;
+  // Fallback to closest year
+  if (rateByYear.size === 0) return 25.0;
+  const years = [...rateByYear.keys()].sort((a, b) => Math.abs(a - year) - Math.abs(b - year));
+  return rateByYear.get(years[0]) ?? 25.0;
+}
+
+function estimateHours(proj: any, tpvItems: any[], hourlyRate: number, vyrobaPct: number, eurRate: number) {
   const marze = normalizeMarze(proj.marze);
   const activeItems = tpvItems.filter(t => t.status !== "Zrušeno");
   const itemsWithPrice = activeItems.filter(t => t.cena && Number(t.cena) > 0);
   let sellingBase = 0, badge = "", base = "";
   if (itemsWithPrice.length > 0) {
     sellingBase = itemsWithPrice.reduce((s,t) => s + Number(t.cena)*(Number(t.pocet)||1), 0);
-    badge = "TPV ceny"; base = "tpv_items";
+    // EUR detection: if TPV sum is suspiciously small relative to prodejni_cena, items are likely EUR
+    const pc = Number(proj.prodejni_cena) || 0;
+    if (pc > 50000 && sellingBase < pc * 0.1) {
+      sellingBase = sellingBase * eurRate;
+      badge = "TPV ceny (EUR→CZK)";
+    } else {
+      badge = "TPV ceny";
+    }
+    base = "tpv_items";
   } else {
     const pc = Number(proj.prodejni_cena) || 0;
     if (pc <= 0) return { hours: 20, badge: "⚠ Chybí podklady", base: "none", sellingBase: 0 };
@@ -103,7 +126,7 @@ serve(async (req) => {
     const dow = currentMonday.getUTCDay();
     currentMonday.setUTCDate(currentMonday.getUTCDate() + (dow===0?-6:1-dow));
 
-    const [projRes, tpvRes, settingsRes, presetsRes, inboxRes] = await Promise.all([
+    const [projRes, tpvRes, settingsRes, presetsRes, inboxRes, ratesRes] = await Promise.all([
       sb.from("projects")
         .select("project_id,project_name,status,risk,prodejni_cena,marze,cost_preset_id,cost_production_pct,datum_objednavky,datum_tpv,expedice,montaz,predani,datum_smluvni")
         .in("status",["Příprava","Engineering","TPV","Výroba IN","Výroba"])
@@ -112,7 +135,14 @@ serve(async (req) => {
       sb.from("production_settings").select("hourly_rate").limit(1).single(),
       sb.from("cost_breakdown_presets").select("id,is_default,production_pct").order("sort_order"),
       sb.from("production_inbox").select("project_id,estimated_hours").eq("status","pending"),
+      sb.from("exchange_rates").select("year,eur_czk"),
     ]);
+
+    // Build exchange rate lookup by year
+    const rateByYear = new Map<number, number>();
+    for (const row of ratesRes.data || []) {
+      if (row.year && row.eur_czk) rateByYear.set(Number(row.year), Number(row.eur_czk));
+    }
 
     // Per-week capacity overrides from production_capacity table
     const weekCapacityMap = new Map<string, number>();
@@ -121,7 +151,9 @@ serve(async (req) => {
       if (capRes.data) {
         for (const row of capRes.data) {
           if (row.week_start && row.capacity_hours != null) {
-            weekCapacityMap.set(String(row.week_start), Number(row.capacity_hours));
+            // week_start may be date or timestamp — normalize to YYYY-MM-DD
+            const weekKey = String(row.week_start).substring(0, 10);
+            weekCapacityMap.set(weekKey, Number(row.capacity_hours));
           }
         }
       }
@@ -152,7 +184,9 @@ serve(async (req) => {
       const tpvCount = projTpv.length;
       const preset = proj.cost_preset_id ? presets.find((p:any)=>p.id===proj.cost_preset_id) : defaultPreset;
       const vyrobaPct = ((proj.cost_production_pct ? Number(proj.cost_production_pct) : null) ?? preset?.production_pct ?? 35) / 100;
-      const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct);
+      const orderDate = parseDate(proj.datum_objednavky);
+      const eurRate = getEurRate(rateByYear, orderDate);
+      const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct, eurRate);
       const remainingHours = Math.max(20, est.hours - (inboxByProject.get(proj.project_id)||0));
 
       const hasAnyDate = proj.datum_tpv||proj.datum_objednavky||proj.expedice||proj.montaz||proj.predani||proj.datum_smluvni;
@@ -165,6 +199,17 @@ serve(async (req) => {
       const dl = resolveDeadline(proj, tpvCount);
       const statusFallback: Record<string,number> = {"Výroba IN":4,"Výroba":4,"TPV":8,"Engineering":12,"Příprava":16};
       const deadline = dl.date ? (dl.date<tpvStart ? addWeeks(tpvStart,2) : dl.date) : addWeeks(tpvStart, statusFallback[proj.status]??8);
+
+      // Bug fix #3: past deadline projects go directly to safety net
+      if (deadline < today) {
+        safetyNetMap.set(proj.project_id, {
+          project_id: proj.project_id,
+          project_name: proj.project_name || proj.project_id,
+          estimated_hours: remainingHours,
+          estimation_badge: est.badge + " – ⚠ Termín v minulosti",
+        });
+        continue;
+      }
 
       workItems.push({
         projectId:proj.project_id, projectName:proj.project_name||proj.project_id,
@@ -233,7 +278,7 @@ serve(async (req) => {
 
     const overbookedWeeks = weekKeys
       .filter(k=>{const wCap=getWeekCapacity(k);return (usage[k]||0)>wCap*OVERBOOK_THRESHOLD;})
-      .map(k=>{const wCap=getWeekCapacity(k);return { week:k, utilizationPct:Math.round((usage[k]/wCap)*100), hoursScheduled:Math.round(usage[k]), capacity:wCap, projectsInWeek:[...new Set(blocks.filter(b=>b.week===k).map(b=>b.project_name))] };})
+      .map(k=>{const wCap=getWeekCapacity(k);return { week:k, utilizationPct:Math.round((usage[k]/wCap)*100), hoursScheduled:Math.round(usage[k]), capacity:Math.round(wCap), projectsInWeek:[...new Set(blocks.filter(b=>b.week===k).map(b=>b.project_name))] };})
       .sort((a,b)=>b.utilizationPct-a.utilizationPct);
 
     // ─── AI INSIGHTS ──────────────────────────────────────────────────────
@@ -244,7 +289,6 @@ serve(async (req) => {
     try {
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (LOVABLE_API_KEY && workItems.length > 0) {
-        // Build compact context
         const projectLines = workItems.map(w =>
           `${w.projectName}|st:${projects.find((p:any)=>p.project_id===w.projectId)?.status}|risk:${projects.find((p:any)=>p.project_id===w.projectId)?.risk||"–"}|tpv:${w.tpvCount}|h:${w.totalHours}|start:${w.tpvStart.toISOString().split("T")[0]}|dl:${w.deadline.toISOString().split("T")[0]}|dlSrc:${w.deadlineSource}|badge:${w.badge}`
         ).join("\n");
@@ -254,13 +298,13 @@ serve(async (req) => {
           .join("; ");
 
         const busiestWeeks = weekKeys
-          .map(k => ({ week: k, pct: Math.round(((usage[k]||0)/weeklyCapacity)*100) }))
+          .map(k => ({ week: k, pct: Math.round(((usage[k]||0)/getWeekCapacity(k))*100) }))
           .sort((a,b) => b.pct - a.pct)
           .slice(0, 5)
           .map(w => `${w.week}: ${w.pct}%`)
           .join(", ");
 
-        const contextStr = `Kapacita: ${weeklyCapacity}h/týden, max ${Math.round(TARGET_MAX*100)}%\n\nProjekty (${workItems.length}):\n${projectLines}\n\nSafety Net: ${safetyNetLines || "žádné"}\n\nNejvytíženější týdny: ${busiestWeeks}`;
+        const contextStr = `Kapacita: ${weeklyCapacity}h/týden, max ${Math.round(SCHEDULE_CAP*100)}%\n\nProjekty (${workItems.length}):\n${projectLines}\n\nSafety Net: ${safetyNetLines || "žádné"}\n\nNejvytíženější týdny: ${busiestWeeks}`;
 
         const systemPrompt = `Si plánovací asistent výrobného závodu na nábytok AMI. Analyzuj týždenný rozvrh výroby a vráť JSON (iba JSON, bez markdown) s týmito poľami:
 forecastSummary: jeden odstavec v češtine zhrňujúci celkový stav forecastu, kritické riziká a odporúčania pre PM
@@ -287,7 +331,6 @@ Nezopakuj čísla ktoré sú už viditeľné v UI. Zameraj sa na riziká a odpor
         if (aiResp.ok) {
           const aiData = await aiResp.json();
           const raw = aiData.choices?.[0]?.message?.content || "";
-          // Strip markdown code fences if present
           const cleaned = raw.replace(/^```json?\s*/i, "").replace(/\s*```$/i, "").trim();
           const parsed = JSON.parse(cleaned);
           ai.forecastSummary = parsed.forecastSummary || null;
@@ -297,10 +340,8 @@ Nezopakuj čísla ktoré sú už viditeľné v UI. Zameraj sa na riziká a odpor
       }
     } catch (aiErr) {
       console.error("AI insights error (non-fatal):", aiErr);
-      // ai fields remain null — forecast still works
     }
 
-    // Attach per-block ai_insight from weekInsights
     if (ai.weekInsights) {
       const insightMap = new Map(ai.weekInsights.map(wi => [wi.week, wi.insight]));
       for (const block of blocks) {
