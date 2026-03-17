@@ -234,14 +234,18 @@ export function useForecastMode(): UseForecastModeReturn {
     setSelectedBlockIds(new Set());
   }, []);
 
-  const generateForecast = useCallback(async (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => {
+  const generateForecast = useCallback(async (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode, weekCapacityMap?: Record<string, number>) => {
     const generationToken = ++generationTokenRef.current;
     setIsGenerating(true);
 
     try {
       const mode = modeOverride ?? planMode;
+      const body: any = { mode, weeklyCapacityHours };
+      if (weekCapacityMap && Object.keys(weekCapacityMap).length > 0) {
+        body.weeklyCapacityMap = weekCapacityMap;
+      }
       const { data, error } = await supabase.functions.invoke("forecast-schedule", {
-        body: { mode, weeklyCapacityHours },
+        body,
       });
 
       if (generationToken !== generationTokenRef.current) return;
