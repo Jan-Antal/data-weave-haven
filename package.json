@@ -47,7 +47,6 @@
     "@supabase/supabase-js": "^2.97.0",
     "@swc/core": "^1.15.18",
     "@tanstack/react-query": "^5.83.0",
-    "@vitejs/plugin-react": "^6.0.1",
     "@vitejs/plugin-react-swc": "^4.3.0",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
