@@ -10,7 +10,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { useTPVItems, useUpdateTPVItem, useAddTPVItem, useDeleteTPVItems, useBulkUpdateTPVStatus, useBulkInsertTPVItems } from "@/hooks/useTPVItems";
+import {
+  useTPVItems,
+  useUpdateTPVItem,
+  useAddTPVItem,
+  useDeleteTPVItems,
+  useBulkUpdateTPVStatus,
+  useBulkInsertTPVItems,
+} from "@/hooks/useTPVItems";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
 import { ArrowLeft, Plus, Upload, Trash2, FileText, Cog } from "lucide-react";
 import { ProjectDetailDialog } from "./ProjectDetailDialog";
@@ -46,8 +53,8 @@ const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultH
   { key: "cena", label: "Cena", defaultHidden: true },
 ];
 
-const TPV_LIST_LABEL_MAP = Object.fromEntries(TPV_LIST_COLUMNS.map(c => [c.key, c.label]));
-const TPV_LIST_ALL_KEYS = TPV_LIST_COLUMNS.map(c => c.key);
+const TPV_LIST_LABEL_MAP = Object.fromEntries(TPV_LIST_COLUMNS.map((c) => [c.key, c.label]));
+const TPV_LIST_ALL_KEYS = TPV_LIST_COLUMNS.map((c) => c.key);
 
 function getTPVListColumnStyle(key: string, customWidth?: number | null): React.CSSProperties {
   if (customWidth) return { width: customWidth, minWidth: customWidth };
@@ -68,7 +75,13 @@ function getTPVListColumnStyle(key: string, customWidth?: number | null): React.
     case "vyroba_status":
       return { minWidth: 140, maxWidth: 200 };
     case "konstrukter":
-      return { minWidth: 124, maxWidth: 124, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } as React.CSSProperties;
+      return {
+        minWidth: 124,
+        maxWidth: 124,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+      } as React.CSSProperties;
     case "pocet":
       return { width: 80, minWidth: 80, textAlign: "right" } as React.CSSProperties;
     case "cena":
@@ -90,40 +103,55 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const { canManageTPV, canEdit, canEditColumns } = useAuth();
   const { data: items = [], isLoading } = useTPVItems(projectId);
   const { data: statusOptions = [] } = useTPVStatusOptions();
-  const TPV_STATUSES = statusOptions.map(o => o.label);
+  const TPV_STATUSES = statusOptions.map((o) => o.label);
   const { data: allProjects = [] } = useProjects();
   const { statusMap: productionStatusMap } = useProductionStatuses(projectId);
   const [detailOpen, setDetailOpen] = useState(false);
-  const currentProject = useMemo(() => allProjects.find(p => p.project_id === projectId), [allProjects, projectId]);
+  const currentProject = useMemo(() => allProjects.find((p) => p.project_id === projectId), [allProjects, projectId]);
   const queryClient = useQueryClient();
 
   const updateItem = useUpdateTPVItem();
   const addItem = useAddTPVItem();
   const deleteItems = useDeleteTPVItems();
-  
+
   const bulkInsert = useBulkInsertTPVItems();
   const { columns: customColumns } = useAllCustomColumns("tpv_items");
   const updateCustomField = useUpdateCustomField();
 
   const {
-    getLabel, getWidth, updateLabel, updateWidth,
-    getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder,
-    getVisibilityMap, updateVisibility,
+    getLabel,
+    getWidth,
+    updateLabel,
+    updateWidth,
+    getOrderedKeys,
+    getDisplayOrderedKeys,
+    updateDisplayOrder,
+    getVisibilityMap,
+    updateVisibility,
   } = useColumnLabels("tpv-list");
 
   const visMap = useMemo(() => getVisibilityMap(), [getVisibilityMap]);
-  const DEFAULT_HIDDEN_KEYS = useMemo(() => new Set(TPV_LIST_COLUMNS.filter(c => c.defaultHidden).map(c => c.key)), []);
-  const isColVisible = useCallback((key: string) => {
-    if (visMap[key] === undefined) return !DEFAULT_HIDDEN_KEYS.has(key);
-    return visMap[key] !== false;
-  }, [visMap, DEFAULT_HIDDEN_KEYS]);
-  const toggleColVis = useCallback((key: string) => {
-    updateVisibility(key, !isColVisible(key));
-  }, [isColVisible, updateVisibility]);
+  const DEFAULT_HIDDEN_KEYS = useMemo(
+    () => new Set(TPV_LIST_COLUMNS.filter((c) => c.defaultHidden).map((c) => c.key)),
+    [],
+  );
+  const isColVisible = useCallback(
+    (key: string) => {
+      if (visMap[key] === undefined) return !DEFAULT_HIDDEN_KEYS.has(key);
+      return visMap[key] !== false;
+    },
+    [visMap, DEFAULT_HIDDEN_KEYS],
+  );
+  const toggleColVis = useCallback(
+    (key: string) => {
+      updateVisibility(key, !isColVisible(key));
+    },
+    [isColVisible, updateVisibility],
+  );
 
   // Always use TPV_LIST_COLUMNS definition order as source of truth
   const allVisibleKeys = useMemo(() => {
-    return TPV_LIST_ALL_KEYS.filter(k => isColVisible(k));
+    return TPV_LIST_ALL_KEYS.filter((k) => isColVisible(k));
   }, [isColVisible]);
 
   const [editMode, setEditMode] = useState(false);
@@ -157,7 +185,10 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const toggleSort = (col: string) => {
     if (sortCol === col) {
       if (sortDir === "asc") setSortDir("desc");
-      else if (sortDir === "desc") { setSortCol(null); setSortDir(null); }
+      else if (sortDir === "desc") {
+        setSortCol(null);
+        setSortDir(null);
+      }
     } else {
       setSortCol(col);
       setSortDir("asc");
@@ -202,9 +233,9 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       toast({ title: "Vyberte alespoň jednu položku", variant: "destructive", duration: 2000 });
       return;
     }
-    const selectedItems = items.filter(i => selected.has(i.id));
-    const ready = selectedItems.filter(i => i.status === "Schváleno");
-    const notReady = selectedItems.filter(i => i.status !== "Schváleno");
+    const selectedItems = items.filter((i) => selected.has(i.id));
+    const ready = selectedItems.filter((i) => i.status === "Schváleno");
+    const notReady = selectedItems.filter((i) => i.status !== "Schváleno");
 
     if (ready.length === 0) {
       toast({ title: 'Žádná vybraná položka nemá status "Schváleno"', variant: "destructive", duration: 4000 });
@@ -220,117 +251,126 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     }
   }, [selected, items]);
 
-  const executeSendToProduction = useCallback(async (itemsToSend: typeof items) => {
-    setIsSending(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Nepřihlášený uživatel");
+  const executeSendToProduction = useCallback(
+    async (itemsToSend: typeof items) => {
+      setIsSending(true);
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) throw new Error("Nepřihlášený uživatel");
 
-      // Fetch project cost parameters for correct hour estimation
-      const [{ data: projectData }, { data: settingsData }, { data: presetsData }] = await Promise.all([
-        supabase.from("projects").select("marze, cost_production_pct, cost_preset_id").eq("project_id", projectId).single(),
-        supabase.from("production_settings").select("hourly_rate").limit(1).single(),
-        supabase.from("cost_breakdown_presets").select("id, is_default, production_pct").order("sort_order"),
-      ]);
+        // Fetch project cost parameters for correct hour estimation
+        const [{ data: projectData }, { data: settingsData }, { data: presetsData }] = await Promise.all([
+          supabase
+            .from("projects")
+            .select("marze, cost_production_pct, cost_preset_id")
+            .eq("project_id", projectId)
+            .single(),
+          supabase.from("production_settings").select("hourly_rate").limit(1).single(),
+          supabase.from("cost_breakdown_presets").select("id, is_default, production_pct").order("sort_order"),
+        ]);
 
-      const hourlyRate = Number(settingsData?.hourly_rate) || 550;
-      const presets = presetsData || [];
-      const projectPreset = projectData?.cost_preset_id
-        ? presets.find(p => p.id === projectData.cost_preset_id)
-        : presets.find(p => p.is_default) || presets[0];
+        const hourlyRate = Number(settingsData?.hourly_rate) || 550;
+        const presets = presetsData || [];
+        const projectPreset = projectData?.cost_preset_id
+          ? presets.find((p) => p.id === projectData.cost_preset_id)
+          : presets.find((p) => p.is_default) || presets[0];
 
-      // Margin: normalize (detect 0.25 vs 25)
-      const rawMarze = Number(projectData?.marze) || 0;
-      const marze = rawMarze === 0 ? 0.15 : rawMarze > 1 ? rawMarze / 100 : rawMarze;
+        // Margin: normalize (detect 0.25 vs 25)
+        const rawMarze = Number(projectData?.marze) || 0;
+        const marze = rawMarze === 0 ? 0.15 : rawMarze > 1 ? rawMarze / 100 : rawMarze;
 
-      // Production percentage from project override or preset
-      const prodPct = (projectData?.cost_production_pct != null
-        ? Number(projectData.cost_production_pct)
-        : (projectPreset?.production_pct ?? 35)) / 100;
+        // Production percentage from project override or preset
+        const prodPct =
+          (projectData?.cost_production_pct != null
+            ? Number(projectData.cost_production_pct)
+            : (projectPreset?.production_pct ?? 35)) / 100;
 
-      let sentCount = 0;
-      const skipped: string[] = [];
+        let sentCount = 0;
+        const skipped: string[] = [];
 
-      for (const item of itemsToSend) {
-        // Check if already in inbox
-        const { data: existing } = await supabase
-          .from("production_inbox")
-          .select("id")
-          .eq("project_id", projectId)
-          .eq("item_code", item.item_name)
-          .eq("status", "pending")
-          .limit(1);
+        for (const item of itemsToSend) {
+          // Check if already in inbox
+          const { data: existing } = await supabase
+            .from("production_inbox")
+            .select("id")
+            .eq("project_id", projectId)
+            .eq("item_code", item.item_name)
+            .eq("status", "pending")
+            .limit(1);
 
-        if (existing && existing.length > 0) {
-          skipped.push(item.item_name);
-          continue;
+          if (existing && existing.length > 0) {
+            skipped.push(item.item_name);
+            continue;
+          }
+
+          // Hours = (selling price × (1 - margin) × production%) / hourly rate
+          const itemCena = (item.cena || 0) * (Number(item.pocet) || 1);
+          const estimatedHours =
+            itemCena > 0 ? Math.max(1, Math.round((itemCena * (1 - marze) * prodPct) / hourlyRate)) : 8;
+
+          // Insert into production_inbox
+          const { error } = await supabase.from("production_inbox").insert({
+            project_id: projectId,
+            item_name: item.item_type || item.item_name,
+            item_code: item.item_name,
+            estimated_hours: estimatedHours,
+            estimated_czk: itemCena,
+            status: "pending",
+            sent_by: user.id,
+          } as any);
+
+          if (error) {
+            console.error("Inbox insert error:", error);
+            continue;
+          }
+
+          // Production status is derived from production_inbox/schedule lookup — no direct tpv_items update needed
+
+          // Log activity
+          logActivity({
+            projectId,
+            actionType: "item_scheduled",
+            newValue: item.item_name,
+            detail: "Odesláno do výroby z TPV",
+          });
+
+          sentCount++;
         }
 
-        // Hours = (selling price × (1 - margin) × production%) / hourly rate
-        const itemCena = (item.cena || 0) * (Number(item.pocet) || 1);
-        const estimatedHours = itemCena > 0
-          ? Math.max(1, Math.round(itemCena * (1 - marze) * prodPct / hourlyRate))
-          : 8;
-
-        // Insert into production_inbox
-        const { error } = await supabase.from("production_inbox").insert({
-          project_id: projectId,
-          item_name: item.item_type || item.item_name,
-          item_code: item.item_name,
-          estimated_hours: estimatedHours,
-          estimated_czk: itemCena,
-          status: "pending",
-          sent_by: user.id,
-        } as any);
-
-        if (error) {
-          console.error("Inbox insert error:", error);
-          continue;
+        // Show skipped warnings
+        for (const code of skipped) {
+          toast({ title: `${code} již je v Inboxu výroby`, duration: 4000 });
         }
 
-        // Production status is derived from production_inbox/schedule lookup — no direct tpv_items update needed
+        if (sentCount > 0) {
+          toast({ title: `${sentCount} položek odesláno do výroby`, duration: 2000 });
+        }
 
-        // Log activity
-        logActivity({
-          projectId,
-          actionType: "item_scheduled",
-          newValue: item.item_name,
-          detail: "Odesláno do výroby z TPV",
-        });
+        // Invalidate queries
+        await queryClient.invalidateQueries({ queryKey: ["production-statuses", projectId] });
+        await queryClient.invalidateQueries({ queryKey: ["production_inbox"] });
+        await queryClient.invalidateQueries({ queryKey: ["production-inbox"] });
+        await queryClient.invalidateQueries({ queryKey: ["tpv_items"] });
 
-        sentCount++;
+        setSelected(new Set());
+        setSendDialogOpen(false);
+      } catch (err: any) {
+        toast({ title: "Chyba", description: err.message, variant: "destructive" });
+      } finally {
+        setIsSending(false);
       }
-
-      // Show skipped warnings
-      for (const code of skipped) {
-        toast({ title: `${code} již je v Inboxu výroby`, duration: 4000 });
-      }
-
-      if (sentCount > 0) {
-        toast({ title: `${sentCount} položek odesláno do výroby`, duration: 2000 });
-      }
-
-      // Invalidate queries
-      await queryClient.invalidateQueries({ queryKey: ["production-statuses", projectId] });
-      await queryClient.invalidateQueries({ queryKey: ["production_inbox"] });
-      await queryClient.invalidateQueries({ queryKey: ["production-inbox"] });
-      await queryClient.invalidateQueries({ queryKey: ["tpv_items"] });
-
-      setSelected(new Set());
-      setSendDialogOpen(false);
-    } catch (err: any) {
-      toast({ title: "Chyba", description: err.message, variant: "destructive" });
-    } finally {
-      setIsSending(false);
-    }
-  }, [projectId, queryClient]);
+    },
+    [projectId, queryClient],
+  );
 
   const tpvBodyScrollRef = useRef<HTMLDivElement>(null);
 
   const visibleColCount = renderKeys.length + 2; // +checkbox +actions
 
   const toggleSelect = (id: string) => {
-    setSelected(prev => {
+    setSelected((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
@@ -339,12 +379,15 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
 
   const toggleAll = () => {
     if (selected.size === items.length) setSelected(new Set());
-    else setSelected(new Set(items.map(i => i.id)));
+    else setSelected(new Set(items.map((i) => i.id)));
   };
 
   const handleInlineAdd = () => {
     const name = inlineName.trim();
-    if (!name) { setAddingInline(false); return; }
+    if (!name) {
+      setAddingInline(false);
+      return;
+    }
     addItem.mutate({ project_id: projectId, item_name: name });
     setInlineName("");
     setAddingInline(false);
@@ -364,7 +407,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       const oldPocetNum = Number(oldValue) || 0;
       if (newPocet !== oldPocetNum && newPocet > 0) {
         // Check if this item exists in production_inbox or production_schedule
-        const item = items.find(i => i.id === itemId);
+        const item = items.find((i) => i.id === itemId);
         const itemCode = item?.item_name || "";
         const itemName = item?.item_type || item?.item_name || "";
 
@@ -403,7 +446,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const confirmPocetChange = async () => {
     if (!pocetWarning) return;
     const { itemId, itemCode, itemName, oldPocet, newPocet } = pocetWarning;
-    const item = items.find(i => i.id === itemId);
+    const item = items.find((i) => i.id === itemId);
     const itemKey = item?.item_name || "";
 
     // 1. Save the new pocet to tpv_items
@@ -447,8 +490,14 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
 
     // 4. Log activity
     try {
-      await logActivity({ projectId, actionType: "item_scheduled", detail: `Počet upraven z ${oldPocet} na ${newPocet} ks (${itemName})` });
-    } catch { /* ignore logging errors */ }
+      await logActivity({
+        projectId,
+        actionType: "item_scheduled",
+        detail: `Počet upraven z ${oldPocet} na ${newPocet} ks (${itemName})`,
+      });
+    } catch {
+      /* ignore logging errors */
+    }
 
     // 5. Toast + invalidate
     toast({ title: "Počet aktualizován — výrobní plán byl upraven" });
@@ -460,8 +509,8 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   };
   // Build list of all current column labels for duplicate detection
   const allCurrentLabels = useMemo(() => {
-    return renderKeys.map(key => {
-      const customCol = customColumns.find(c => c.column_key === key);
+    return renderKeys.map((key) => {
+      const customCol = customColumns.find((c) => c.column_key === key);
       return customCol ? customCol.label : getLabel(key, TPV_LIST_LABEL_MAP[key] || key);
     });
   }, [renderKeys, getLabel, customColumns]);
@@ -478,40 +527,47 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     onLabelChange: (v: string) => updateLabel(key, v),
     onWidthChange: (w: number) => updateWidth(key, w),
     existingLabels: allCurrentLabels,
-    ...(editMode ? {
-      dragProps: getDragProps(key),
-      dropIndicator: dropTarget?.key === key ? dropTarget.side : null,
-      isDragging: dragKey === key,
-    } : {}),
+    ...(editMode
+      ? {
+          dragProps: getDragProps(key),
+          dropIndicator: dropTarget?.key === key ? dropTarget.side : null,
+          isDragging: dragKey === key,
+        }
+      : {}),
   });
   const { registerExport } = useExportContext();
 
-  const tpvExportMeta = useMemo(() => ({
-    getter: (selectedKeys?: string[]) => {
-      const visKeys = selectedKeys ?? renderKeys;
-      const headers = visKeys.map(k => getLabel(k, TPV_LIST_LABEL_MAP[k] || k));
-      const rows = sortedItems.map(item => visKeys.map(k => {
-        if (k === "vyroba_status") {
-          const itemKey = (item as any).item_name || (item as any).item_type;
-          const statuses = productionStatusMap.get(itemKey);
-          if (!statuses || statuses.length === 0) return "Neodesláno";
-          return statuses.map((s: any) => s.label).join(", ");
-        }
-        if (k === "cena") return formatCurrency((item as any).cena, currency);
-        if (k.startsWith("custom_")) {
-          const cf = (item as any).custom_fields || {};
-          return cf[k] ?? "";
-        }
-        const val = (item as any)[k];
-        return val == null ? "" : String(val);
-      }));
-      return { headers, rows };
-    },
-    groups: [
-      { label: "TPV List", keys: renderKeys, getLabel: (k: string) => getLabel(k, TPV_LIST_LABEL_MAP[k] || k) },
-    ],
-    defaultVisibleKeys: renderKeys,
-  }), [renderKeys, sortedItems, getLabel, productionStatusMap, currency]);
+  const tpvExportMeta = useMemo(
+    () => ({
+      getter: (selectedKeys?: string[]) => {
+        const visKeys = selectedKeys ?? renderKeys;
+        const headers = visKeys.map((k) => getLabel(k, TPV_LIST_LABEL_MAP[k] || k));
+        const rows = sortedItems.map((item) =>
+          visKeys.map((k) => {
+            if (k === "vyroba_status") {
+              const itemKey = (item as any).item_name || (item as any).item_type;
+              const statuses = productionStatusMap.get(itemKey);
+              if (!statuses || statuses.length === 0) return "Neodesláno";
+              return statuses.map((s: any) => s.label).join(", ");
+            }
+            if (k === "cena") return formatCurrency((item as any).cena, currency);
+            if (k.startsWith("custom_")) {
+              const cf = (item as any).custom_fields || {};
+              return cf[k] ?? "";
+            }
+            const val = (item as any)[k];
+            return val == null ? "" : String(val);
+          }),
+        );
+        return { headers, rows };
+      },
+      groups: [
+        { label: "TPV List", keys: renderKeys, getLabel: (k: string) => getLabel(k, TPV_LIST_LABEL_MAP[k] || k) },
+      ],
+      defaultVisibleKeys: renderKeys,
+    }),
+    [renderKeys, sortedItems, getLabel, productionStatusMap, currency],
+  );
 
   useEffect(() => {
     registerExport("tpv-list", tpvExportMeta);
@@ -537,11 +593,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           onOpenImport={() => setWizardOpen(true)}
           canManageTPV={canManageTPV}
         />
-        <ProjectDetailDialog
-          project={currentProject ?? null}
-          open={detailOpen}
-          onOpenChange={setDetailOpen}
-        />
+        <ProjectDetailDialog project={currentProject ?? null} open={detailOpen} onOpenChange={setDetailOpen} />
         <ExcelImportWizard
           open={wizardOpen}
           onClose={() => setWizardOpen(false)}
@@ -555,7 +607,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const renderColGroup = () => (
     <colgroup>
       <col style={{ width: 40, minWidth: 40 }} />
-      {renderKeys.map(key => {
+      {renderKeys.map((key) => {
         const s = getTPVListColumnStyle(key, getWidth(key));
         const w = s.width || s.minWidth || 120;
         return <col key={key} style={{ width: w, minWidth: w }} />;
@@ -611,7 +663,12 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         </div>
       )}
 
-      <div className={cn("rounded-lg border bg-card flex flex-col flex-1 min-h-0", editMode && "rounded-t-none border-t-0")}>
+      <div
+        className={cn(
+          "rounded-lg border bg-card flex flex-col flex-1 min-h-0",
+          editMode && "rounded-t-none border-t-0",
+        )}
+      >
         {/* SINGLE scrollable container with sticky header */}
         <div ref={tpvBodyScrollRef} className="flex-1 overflow-auto always-scrollbar rounded-t-lg">
           <Table style={{ tableLayout: "fixed" }}>
@@ -621,7 +678,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                 <TableHead className="w-10">
                   <Checkbox checked={items.length > 0 && selected.size === items.length} onCheckedChange={toggleAll} />
                 </TableHead>
-                {renderKeys.map(key => (
+                {renderKeys.map((key) => (
                   <SortableHeader key={key} {...headerProps(key)} />
                 ))}
                 <ColumnVisibilityToggle
@@ -640,129 +697,286 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={visibleColCount} className="text-center text-muted-foreground">Načítání...</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={visibleColCount} className="text-center text-muted-foreground">
+                    Načítání...
+                  </TableCell>
+                </TableRow>
               ) : sortedItems.length === 0 ? (
-                <TableRow><TableCell colSpan={visibleColCount} className="text-center text-muted-foreground">Žádné položky</TableCell></TableRow>
-              ) : sortedItems.map(item => (
-                <TableRow key={item.id} className={`hover:bg-muted/50 transition-colors h-9 ${selected.has(item.id) ? "bg-primary/5" : ""}`}>
-                  <TableCell>{canManageTPV && <Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} />}</TableCell>
-                  {renderKeys.map(key => {
-                    const cellStyle = getTPVListColumnStyle(key, getWidth(key));
-                    if (key === "item_name") return (
-                      <TableCell key={key} style={cellStyle}>
-                        <InlineEditableCell value={item.item_name || ""} onSave={(v) => saveField(item.id, "item_name", v, item.item_name || "")} className="font-mono text-xs" readOnly={!canManageTPV} />
-                      </TableCell>
-                    );
-                    if (key === "item_type") return (
-                      <TableCell key={key} style={cellStyle}>
-                        <InlineEditableCell value={item.item_type || ""} onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")} className="font-semibold" readOnly={!canManageTPV} />
-                      </TableCell>
-                    );
-                    if (key === "nazev_prvku") return (
-                      <TableCell key={key} style={cellStyle}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="max-w-[300px] truncate">
-                              <InlineEditableCell value={(item as any).nazev_prvku || ""} onSave={(v) => saveField(item.id, "nazev_prvku", v, (item as any).nazev_prvku || "")} readOnly={!canManageTPV} />
-                            </div>
-                          </TooltipTrigger>
-                          {(item as any).nazev_prvku && (item as any).nazev_prvku.length > 40 && (
-                            <TooltipContent className="max-w-[400px]">{(item as any).nazev_prvku}</TooltipContent>
-                          )}
-                        </Tooltip>
-                      </TableCell>
-                    );
-                    if (key === "konstrukter") return (
-                      <TableCell key={key} style={cellStyle}>
-                        <InlineEditableCell value={item.konstrukter || ""} type="people" peopleRole="Konstruktér" onSave={(v) => saveField(item.id, "konstrukter", v, item.konstrukter || "")} readOnly={!canManageTPV} />
-                      </TableCell>
-                    );
-                    if (key === "status") {
-                      const statusOpt = statusOptions.find(o => o.label === item.status);
-                      const statusColor = statusOpt?.color;
-                      const statusDisplay = item.status && statusColor ? (
-                        <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: `${statusColor}20`, color: statusColor, borderColor: `${statusColor}50` }}>
-                          {item.status}
-                        </span>
-                      ) : undefined;
-                      return <TableCell key={key} style={cellStyle}><InlineEditableCell value={item.status} type="select" options={TPV_STATUSES} displayValue={statusDisplay} onSave={(v) => saveField(item.id, "status", v, item.status || "")} readOnly={!canManageTPV} /></TableCell>;
-                    }
-                    if (key === "vyroba_status") {
-                      const itemKey = item.item_name || item.item_type;
-                      const statuses = productionStatusMap.get(itemKey);
-                      if (!statuses || statuses.length === 0) {
+                <TableRow>
+                  <TableCell colSpan={visibleColCount} className="text-center text-muted-foreground">
+                    Žádné položky
+                  </TableCell>
+                </TableRow>
+              ) : (
+                sortedItems.map((item) => (
+                  <TableRow
+                    key={item.id}
+                    className={`hover:bg-muted/50 transition-colors h-9 ${selected.has(item.id) ? "bg-primary/5" : ""}`}
+                  >
+                    <TableCell>
+                      {canManageTPV && (
+                        <Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} />
+                      )}
+                    </TableCell>
+                    {renderKeys.map((key) => {
+                      const cellStyle = getTPVListColumnStyle(key, getWidth(key));
+                      if (key === "item_name")
                         return (
                           <TableCell key={key} style={cellStyle}>
-                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: "#f0eee9", color: "#99a5a3", borderColor: "#e2ddd6" }}>
-                              Neodesláno
+                            <InlineEditableCell
+                              value={item.item_name || ""}
+                              onSave={(v) => saveField(item.id, "item_name", v, item.item_name || "")}
+                              className="font-mono text-xs"
+                              readOnly={!canManageTPV}
+                            />
+                          </TableCell>
+                        );
+                      if (key === "item_type")
+                        return (
+                          <TableCell key={key} style={cellStyle}>
+                            <InlineEditableCell
+                              value={item.item_type || ""}
+                              onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")}
+                              className="font-semibold"
+                              readOnly={!canManageTPV}
+                            />
+                          </TableCell>
+                        );
+                      if (key === "nazev_prvku")
+                        return (
+                          <TableCell key={key} style={cellStyle}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="max-w-[300px] truncate">
+                                  <InlineEditableCell
+                                    value={(item as any).nazev_prvku || ""}
+                                    onSave={(v) =>
+                                      saveField(item.id, "nazev_prvku", v, (item as any).nazev_prvku || "")
+                                    }
+                                    readOnly={!canManageTPV}
+                                  />
+                                </div>
+                              </TooltipTrigger>
+                              {(item as any).nazev_prvku && (item as any).nazev_prvku.length > 40 && (
+                                <TooltipContent className="max-w-[400px]">{(item as any).nazev_prvku}</TooltipContent>
+                              )}
+                            </Tooltip>
+                          </TableCell>
+                        );
+                      if (key === "konstrukter")
+                        return (
+                          <TableCell key={key} style={cellStyle}>
+                            <InlineEditableCell
+                              value={item.konstrukter || ""}
+                              type="people"
+                              peopleRole="Konstruktér"
+                              onSave={(v) => saveField(item.id, "konstrukter", v, item.konstrukter || "")}
+                              readOnly={!canManageTPV}
+                            />
+                          </TableCell>
+                        );
+                      if (key === "status") {
+                        const statusOpt = statusOptions.find((o) => o.label === item.status);
+                        const statusColor = statusOpt?.color;
+                        const statusDisplay =
+                          item.status && statusColor ? (
+                            <span
+                              className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium"
+                              style={{
+                                backgroundColor: `${statusColor}20`,
+                                color: statusColor,
+                                borderColor: `${statusColor}50`,
+                              }}
+                            >
+                              {item.status}
                             </span>
+                          ) : undefined;
+                        return (
+                          <TableCell key={key} style={cellStyle}>
+                            <InlineEditableCell
+                              value={item.status}
+                              type="select"
+                              options={TPV_STATUSES}
+                              displayValue={statusDisplay}
+                              onSave={(v) => saveField(item.id, "status", v, item.status || "")}
+                              readOnly={!canManageTPV}
+                            />
                           </TableCell>
                         );
                       }
-                      return (
-                        <TableCell key={key} style={cellStyle}>
-                          <div className="flex flex-wrap gap-0.5">
-                            {statuses.map((s, idx) => (
+                      if (key === "vyroba_status") {
+                        const itemKey = item.item_name || item.item_type;
+                        const statuses = productionStatusMap.get(itemKey);
+                        if (!statuses || statuses.length === 0) {
+                          return (
+                            <TableCell key={key} style={cellStyle}>
                               <span
-                                key={idx}
                                 className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
-                                style={{
-                                  backgroundColor: `${s.color}15`,
-                                  color: s.color,
-                                  borderColor: `${s.color}40`,
-                                  textDecoration: s.label.startsWith("✕") ? "line-through" : undefined,
-                                }}
+                                style={{ backgroundColor: "#f0eee9", color: "#99a5a3", borderColor: "#e2ddd6" }}
                               >
-                                {s.label}
+                                Neodesláno
                               </span>
-                            ))}
-                          </div>
-                        </TableCell>
-                      );
-                    }
-                    // remaining columns: sent_date, accepted_date, notes, pocet, cena, custom fields
-                    if (key === "sent_date") return <TableCell key={key} style={cellStyle}><InlineEditableCell value={item.sent_date || ""} type="date" onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")} readOnly={!canManageTPV} /></TableCell>;
-                    if (key === "accepted_date") return <TableCell key={key} style={cellStyle}><InlineEditableCell value={item.accepted_date || ""} type="date" onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")} readOnly={!canManageTPV} /></TableCell>;
-                    if (key === "notes") return <TableCell key={key} style={cellStyle}><InlineEditableCell value={item.notes || ""} type="textarea" onSave={(v) => saveField(item.id, "notes", v, item.notes || "")} readOnly={!canManageTPV} /></TableCell>;
-                    if (key === "pocet") return <TableCell key={key} style={cellStyle}><InlineEditableCell value={String(item.pocet ?? "")} type="number" onSave={(v) => saveField(item.id, "pocet", v, String(item.pocet ?? ""))} readOnly={!canManageTPV} /></TableCell>;
-                    if (key === "cena") return <TableCell key={key} style={cellStyle} className="text-right"><InlineEditableCell value={String(item.cena ?? "")} type="number" onSave={(v) => saveField(item.id, "cena", v, String(item.cena ?? ""))} readOnly={!canManageTPV} /></TableCell>;
-                    // Custom columns
-                    if (key.startsWith("custom_") && customColumns) {
-                      const def = customColumns.find(c => c.column_key === key);
-                      if (!def) return null;
-                      const customFields = (item as any).custom_fields || {};
-                      const val = customFields[key] || "";
-                      const cellType = def.data_type === "date" ? "date" : def.data_type === "number" ? "number" : def.data_type === "select" ? "select" : def.data_type === "people" ? "people" : undefined;
-                      return (
-                        <TableCell key={key}>
-                          <InlineEditableCell
-                            value={val}
-                            type={cellType as any}
-                            options={def.data_type === "select" ? def.select_options : undefined}
-                            peopleRole={def.data_type === "people" ? (def.people_role as any || undefined) : undefined}
-                            onSave={(v) => updateCustomField.mutate({ tableName: "tpv_items", rowId: item.id, columnKey: key, value: v, oldValue: val })}
-                            readOnly={!canManageTPV}
-                          />
-                        </TableCell>
-                      );
-                    }
-                    return null;
-                  })}
-                  <TableCell>
-                    {canManageTPV && (
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
-                        if (selected.size > 1 && selected.has(item.id)) {
-                          setDeleteIds(Array.from(selected));
-                        } else {
-                          setDeleteIds([item.id]);
+                            </TableCell>
+                          );
                         }
-                      }}>
-                        <Trash2 className="h-3 w-3 text-destructive" />
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+                        return (
+                          <TableCell key={key} style={cellStyle}>
+                            <div className="flex flex-wrap gap-0.5">
+                              {statuses.map((s, idx) => (
+                                <span
+                                  key={idx}
+                                  className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                                  style={{
+                                    backgroundColor: `${s.color}15`,
+                                    color: s.color,
+                                    borderColor: `${s.color}40`,
+                                    textDecoration: s.label.startsWith("✕") ? "line-through" : undefined,
+                                  }}
+                                >
+                                  {s.label}
+                                </span>
+                              ))}
+                            </div>
+                          </TableCell>
+                        );
+                      }
+                      // remaining columns: sent_date, accepted_date, notes, pocet, cena, custom fields
+                      if (key === "sent_date")
+                        return (
+                          <TableCell key={key} style={cellStyle}>
+                            <InlineEditableCell
+                              value={item.sent_date || ""}
+                              type="date"
+                              onSave={(v) => saveField(item.id, "sent_date", v, item.sent_date || "")}
+                              readOnly={!canManageTPV}
+                            />
+                          </TableCell>
+                        );
+                      if (key === "accepted_date")
+                        return (
+                          <TableCell key={key} style={cellStyle}>
+                            <InlineEditableCell
+                              value={item.accepted_date || ""}
+                              type="date"
+                              onSave={(v) => saveField(item.id, "accepted_date", v, item.accepted_date || "")}
+                              readOnly={!canManageTPV}
+                            />
+                          </TableCell>
+                        );
+                      if (key === "notes")
+                        return (
+                          <TableCell key={key} style={cellStyle}>
+                            <InlineEditableCell
+                              value={item.notes || ""}
+                              type="textarea"
+                              onSave={(v) => saveField(item.id, "notes", v, item.notes || "")}
+                              readOnly={!canManageTPV}
+                            />
+                          </TableCell>
+                        );
+                      if (key === "cena") {
+                        const cenaNum = Number(item.cena);
+                        const cenaDisplay =
+                          !item.cena || cenaNum === 0
+                            ? "—"
+                            : currency === "EUR"
+                              ? new Intl.NumberFormat("cs-CZ", {
+                                  minimumFractionDigits: 1,
+                                  maximumFractionDigits: 1,
+                                }).format(cenaNum) + " €"
+                              : new Intl.NumberFormat("cs-CZ", {
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 0,
+                                }).format(Math.round(cenaNum)) + " Kč";
+                        return (
+                          <TableCell key={key} style={cellStyle} className="text-right font-mono text-xs">
+                            {canManageTPV ? (
+                              <InlineEditableCell
+                                value={String(item.cena ?? "")}
+                                type="number"
+                                onSave={(v) => saveField(item.id, "cena", v, String(item.cena ?? ""))}
+                                readOnly={false}
+                              />
+                            ) : (
+                              <span>{cenaDisplay}</span>
+                            )}
+                          </TableCell>
+                        );
+                      }
+                      if (key === "cena")
+                        return (
+                          <TableCell key={key} style={cellStyle} className="text-right">
+                            <InlineEditableCell
+                              value={String(item.cena ?? "")}
+                              type="number"
+                              onSave={(v) => saveField(item.id, "cena", v, String(item.cena ?? ""))}
+                              readOnly={!canManageTPV}
+                            />
+                          </TableCell>
+                        );
+                      // Custom columns
+                      if (key.startsWith("custom_") && customColumns) {
+                        const def = customColumns.find((c) => c.column_key === key);
+                        if (!def) return null;
+                        const customFields = (item as any).custom_fields || {};
+                        const val = customFields[key] || "";
+                        const cellType =
+                          def.data_type === "date"
+                            ? "date"
+                            : def.data_type === "number"
+                              ? "number"
+                              : def.data_type === "select"
+                                ? "select"
+                                : def.data_type === "people"
+                                  ? "people"
+                                  : undefined;
+                        return (
+                          <TableCell key={key}>
+                            <InlineEditableCell
+                              value={val}
+                              type={cellType as any}
+                              options={def.data_type === "select" ? def.select_options : undefined}
+                              peopleRole={
+                                def.data_type === "people" ? (def.people_role as any) || undefined : undefined
+                              }
+                              onSave={(v) =>
+                                updateCustomField.mutate({
+                                  tableName: "tpv_items",
+                                  rowId: item.id,
+                                  columnKey: key,
+                                  value: v,
+                                  oldValue: val,
+                                })
+                              }
+                              readOnly={!canManageTPV}
+                            />
+                          </TableCell>
+                        );
+                      }
+                      return null;
+                    })}
+                    <TableCell>
+                      {canManageTPV && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => {
+                            if (selected.size > 1 && selected.has(item.id)) {
+                              setDeleteIds(Array.from(selected));
+                            } else {
+                              setDeleteIds([item.id]);
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
               {/* Inline add row */}
               {canManageTPV && (
                 <TableRow className="h-9 hover:bg-muted/30">
@@ -774,10 +988,13 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                         <Input
                           ref={inlineRef}
                           value={inlineName}
-                          onChange={e => setInlineName(e.target.value)}
-                          onKeyDown={e => {
+                          onChange={(e) => setInlineName(e.target.value)}
+                          onKeyDown={(e) => {
                             if (e.key === "Enter") handleInlineAdd();
-                            if (e.key === "Escape") { setAddingInline(false); setInlineName(""); }
+                            if (e.key === "Escape") {
+                              setAddingInline(false);
+                              setInlineName("");
+                            }
                           }}
                           onBlur={handleInlineAdd}
                           placeholder="Název položky…"
@@ -807,12 +1024,20 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         onConfirm={() => {
           if (deleteIds) {
             deleteItems.mutate({ ids: deleteIds, projectId });
-            setSelected(prev => { const next = new Set(prev); deleteIds.forEach(id => next.delete(id)); return next; });
+            setSelected((prev) => {
+              const next = new Set(prev);
+              deleteIds.forEach((id) => next.delete(id));
+              return next;
+            });
             setDeleteIds(null);
           }
         }}
         onCancel={() => setDeleteIds(null)}
-        description={deleteIds && deleteIds.length > 1 ? `Chystáte se smazat ${deleteIds.length} položek. Tato akce je nevratná.` : "Tato akce je nevratná."}
+        description={
+          deleteIds && deleteIds.length > 1
+            ? `Chystáte se smazat ${deleteIds.length} položek. Tato akce je nevratná.`
+            : "Tato akce je nevratná."
+        }
       />
 
       {/* Send to Production Warning Dialog */}
@@ -822,7 +1047,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             <DialogTitle>Některé položky nejsou připraveny</DialogTitle>
           </DialogHeader>
           <div className="space-y-2 py-2 max-h-[300px] overflow-auto">
-            {notReadyItems.map(item => (
+            {notReadyItems.map((item) => (
               <div key={item.id} className="flex items-center gap-2 text-sm py-1 px-2 rounded bg-destructive/5">
                 <span className="font-mono text-xs font-semibold">{item.item_name}</span>
                 <span className="text-muted-foreground truncate flex-1">{item.item_type || ""}</span>
@@ -834,11 +1059,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             <Button variant="ghost" size="sm" onClick={() => setSendDialogOpen(false)}>
               Zrušit
             </Button>
-            <Button
-              size="sm"
-              onClick={() => executeSendToProduction(readyItems)}
-              disabled={isSending}
-            >
+            <Button size="sm" onClick={() => executeSendToProduction(readyItems)} disabled={isSending}>
               {isSending ? "Odesílám..." : `Odeslat jen schválené (${readyItems.length})`}
             </Button>
           </DialogFooter>
@@ -846,7 +1067,12 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       </Dialog>
 
       {/* Quantity Change Warning Dialog */}
-      <Dialog open={!!pocetWarning} onOpenChange={(open) => { if (!open) setPocetWarning(null); }}>
+      <Dialog
+        open={!!pocetWarning}
+        onOpenChange={(open) => {
+          if (!open) setPocetWarning(null);
+        }}
+      >
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle>Položka je již v plánu výroby</DialogTitle>
@@ -854,8 +1080,8 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           {pocetWarning && (
             <p className="text-sm text-muted-foreground py-2">
               Tato položka ({pocetWarning.itemName}) je aktuálně v plánu výroby s počtem{" "}
-              <strong>{pocetWarning.oldPocet} ks</strong>. Změna na{" "}
-              <strong>{pocetWarning.newPocet} ks</strong> vyžaduje aktualizaci výrobního plánu.
+              <strong>{pocetWarning.oldPocet} ks</strong>. Změna na <strong>{pocetWarning.newPocet} ks</strong> vyžaduje
+              aktualizaci výrobního plánu.
             </p>
           )}
           <DialogFooter className="gap-2">
