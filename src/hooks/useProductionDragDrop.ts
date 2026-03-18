@@ -583,14 +583,20 @@ export function useProductionDragDrop() {
     }
   }, [invalidateAll, pushUndo]);
 
-  const mergeSplitItems = useCallback(async (splitGroupId: string) => {
+  const mergeSplitItems = useCallback(async (splitGroupId: string, onlyInWeek?: string) => {
     try {
-      const { data: parts, error: fetchErr } = await supabase
+      const { data: allParts, error: fetchErr } = await supabase
         .from("production_schedule")
         .select("*")
         .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`)
         .order("split_part", { ascending: true });
       if (fetchErr) throw fetchErr;
+
+      // If scoped to a week, only merge parts in that week
+      const parts = onlyInWeek
+        ? (allParts || []).filter(p => p.scheduled_week === onlyInWeek)
+        : (allParts || []);
+
       if (!parts || parts.length <= 1) {
         toast({ title: "Není co spojit", description: "Nebyla nalezena žádná další část." });
         return;
@@ -599,17 +605,20 @@ export function useProductionDragDrop() {
       const totalHours = parts.reduce((s, p) => s + p.scheduled_hours, 0);
       const totalCzk = parts.reduce((s, p) => s + p.scheduled_czk, 0);
       const primary = parts[0];
+      const remainingParts = (allParts || []).filter(p => !parts.some(mp => mp.id === p.id));
       const cleanName = primary.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
 
+      // If there are remaining parts in other weeks, keep split metadata
+      const hasRemaining = remainingParts.length > 0;
       const { error: updateErr } = await supabase
         .from("production_schedule")
         .update({
           scheduled_hours: totalHours,
           scheduled_czk: totalCzk,
-          item_name: cleanName,
-          split_group_id: null,
-          split_part: null,
-          split_total: null,
+          item_name: hasRemaining ? cleanName : cleanName,
+          split_group_id: hasRemaining ? splitGroupId : null,
+          split_part: hasRemaining ? null : null,
+          split_total: hasRemaining ? null : null,
         })
         .eq("id", primary.id);
       if (updateErr) throw updateErr;
@@ -621,6 +630,33 @@ export function useProductionDragDrop() {
           .delete()
           .in("id", otherIds);
         if (delErr) throw delErr;
+      }
+
+      // Renumber remaining siblings if any
+      if (hasRemaining) {
+        const allRemaining = [primary.id, ...remainingParts.map(p => p.id)];
+        const { data: siblings } = await supabase
+          .from("production_schedule")
+          .select("id, scheduled_week")
+          .in("id", allRemaining)
+          .order("scheduled_week", { ascending: true });
+        if (siblings && siblings.length > 1) {
+          for (let i = 0; i < siblings.length; i++) {
+            await supabase.from("production_schedule").update({
+              item_name: `${cleanName} (${i + 1}/${siblings.length})`,
+              split_part: i + 1,
+              split_total: siblings.length,
+            }).eq("id", siblings[i].id);
+          }
+        } else if (siblings && siblings.length === 1) {
+          // Only one part left — remove split metadata
+          await supabase.from("production_schedule").update({
+            item_name: cleanName,
+            split_group_id: null,
+            split_part: null,
+            split_total: null,
+          }).eq("id", siblings[0].id);
+        }
       }
 
       invalidateAll();

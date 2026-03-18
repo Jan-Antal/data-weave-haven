@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { cn } from "@/lib/utils";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,13 +36,16 @@ export function AutoSplitPopover({
   targetWeekKey, targetWeekNum, availableHours, spillWeekKey, spillWeekNum,
   source, inboxItemId, onInsertWhole,
 }: AutoSplitPopoverProps) {
-  const [choice, setChoice] = useState<"whole" | "split">("split");
-  const [submitting, setSubmitting] = useState(false);
-  const qc = useQueryClient();
-
-  const part1Hours = Math.max(availableHours, 0);
+  const part1Hours = Math.min(Math.max(availableHours, 0), itemHours);
   const part2Hours = itemHours - part1Hours;
   const overloadHours = itemHours - availableHours;
+
+  // Guard: if split would create a 0-hour part, force "whole" only
+  const splitViable = part1Hours > 0 && part2Hours > 0;
+
+  const [choice, setChoice] = useState<"whole" | "split">(splitViable ? "split" : "whole");
+  const [submitting, setSubmitting] = useState(false);
+  const qc = useQueryClient();
 
   const handleConfirm = useCallback(async () => {
     setSubmitting(true);
@@ -192,7 +196,7 @@ export function AutoSplitPopover({
 
           {/* Option 2: Split */}
           <label
-            className="flex items-start gap-2.5 px-3 py-2.5 rounded-md cursor-pointer transition-colors"
+            className={cn("flex items-start gap-2.5 px-3 py-2.5 rounded-md transition-colors", splitViable ? "cursor-pointer" : "cursor-not-allowed opacity-50")}
             style={{
               border: choice === "split" ? "1.5px solid #3a8a36" : "1px solid #ece8e2",
               backgroundColor: choice === "split" ? "rgba(58,138,54,0.04)" : "transparent",
@@ -202,7 +206,8 @@ export function AutoSplitPopover({
               type="radio"
               name="split-choice"
               checked={choice === "split"}
-              onChange={() => setChoice("split")}
+              onChange={() => splitViable && setChoice("split")}
+              disabled={!splitViable}
               className="mt-0.5"
             />
             <div>
@@ -210,8 +215,7 @@ export function AutoSplitPopover({
                 Rozdělit
               </div>
               <div className="text-[10px] font-mono" style={{ color: "#6b7a78" }}>
-                {part1Hours}h → T{targetWeekNum}<br />
-                {part2Hours}h → T{spillWeekNum}
+                {splitViable ? <>{part1Hours}h → T{targetWeekNum}<br />{part2Hours}h → T{spillWeekNum}</> : "Nelze rozdělit (0h)"}
               </div>
             </div>
           </label>
