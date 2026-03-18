@@ -608,15 +608,17 @@ export function useProductionDragDrop() {
       const remainingParts = (allParts || []).filter(p => !parts.some(mp => mp.id === p.id));
       const cleanName = primary.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
 
+      // If there are remaining parts in other weeks, keep split metadata
+      const hasRemaining = remainingParts.length > 0;
       const { error: updateErr } = await supabase
         .from("production_schedule")
         .update({
           scheduled_hours: totalHours,
           scheduled_czk: totalCzk,
-          item_name: cleanName,
-          split_group_id: null,
-          split_part: null,
-          split_total: null,
+          item_name: hasRemaining ? cleanName : cleanName,
+          split_group_id: hasRemaining ? splitGroupId : null,
+          split_part: hasRemaining ? null : null,
+          split_total: hasRemaining ? null : null,
         })
         .eq("id", primary.id);
       if (updateErr) throw updateErr;
@@ -628,6 +630,33 @@ export function useProductionDragDrop() {
           .delete()
           .in("id", otherIds);
         if (delErr) throw delErr;
+      }
+
+      // Renumber remaining siblings if any
+      if (hasRemaining) {
+        const allRemaining = [primary.id, ...remainingParts.map(p => p.id)];
+        const { data: siblings } = await supabase
+          .from("production_schedule")
+          .select("id, scheduled_week")
+          .in("id", allRemaining)
+          .order("scheduled_week", { ascending: true });
+        if (siblings && siblings.length > 1) {
+          for (let i = 0; i < siblings.length; i++) {
+            await supabase.from("production_schedule").update({
+              item_name: `${cleanName} (${i + 1}/${siblings.length})`,
+              split_part: i + 1,
+              split_total: siblings.length,
+            }).eq("id", siblings[i].id);
+          }
+        } else if (siblings && siblings.length === 1) {
+          // Only one part left — remove split metadata
+          await supabase.from("production_schedule").update({
+            item_name: cleanName,
+            split_group_id: null,
+            split_part: null,
+            split_total: null,
+          }).eq("id", siblings[0].id);
+        }
       }
 
       invalidateAll();

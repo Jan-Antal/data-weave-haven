@@ -35,7 +35,7 @@ export function AutoSplitPopover({
   targetWeekKey, targetWeekNum, availableHours, spillWeekKey, spillWeekNum,
   source, inboxItemId, onInsertWhole,
 }: AutoSplitPopoverProps) {
-  const [choice, setChoice] = useState<"whole" | "split">("split");
+  const [choice, setChoice] = useState<"whole" | "split">(splitViable ? "split" : "whole");
   const [submitting, setSubmitting] = useState(false);
   const qc = useQueryClient();
 
