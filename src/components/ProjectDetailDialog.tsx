@@ -33,7 +33,7 @@ import { PhotoLightbox, PhotoTimelineGrid, isImageFile, generatePhotoFilename } 
 import { useFileSelection } from "@/hooks/useFileSelection";
 import { FileSelectionBar, FolderDropTarget, useFileDragVisuals, useDropFlash } from "./DocumentDragDrop";
 
-interface Project {
+export interface ProjectDetailProject {
   id: string;
   project_id: string;
   project_name: string;
@@ -69,7 +69,11 @@ interface Project {
   cost_subcontractors_pct: number | null;
   cost_montaz_pct: number | null;
   cost_is_custom: boolean | null;
+  [key: string]: any;
 }
+
+// Keep backward compat alias
+type Project = ProjectDetailProject;
 
 interface ProjectDetailDialogProps {
   project: Project | null;
@@ -77,6 +81,7 @@ interface ProjectDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   onOpenTPVList?: (projectId: string, projectName: string, autoImport?: boolean) => void;
   tpvItemCount?: number;
+  mode?: "dialog" | "embedded";
 }
 
 const DOC_CATEGORIES = [
@@ -264,7 +269,7 @@ function defaultForm() {
   };
 }
 
-export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList, tpvItemCount }: ProjectDetailDialogProps) {
+export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList, tpvItemCount, mode = "dialog" }: ProjectDetailDialogProps) {
   const qc = useQueryClient();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const { canEdit, canDeleteProject, isViewer, isKonstrukter, isPM, isFieldReadOnly, canUploadDocuments, isAdmin } = useAuth();
@@ -828,11 +833,477 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     }
   }, [openCategory, sp.filesByCategory, fileSelection, handleMoveFiles]);
 
-  if (!project) return null;
+  // ── Extracted form fields (shared between dialog and embedded modes) ──
+  const formFieldsContent = (
+    <>
+      {/* ── ZÁKLADNÍ INFORMACE ────────────────────── */}
+      <SectionHeader icon="📋" label="ZÁKLADNÍ INFORMACE" />
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+        <div>
+          <Label className="text-xs">Project ID</Label>
+          <MobileTapField
+            displayValue={form.project_id}
+            disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_id")}
+          >
+            {({ autoFocus }) => (
+              <Input
+                value={form.project_id}
+                onChange={(e) => setForm(s => ({ ...s, project_id: e.target.value }))}
+                onBlur={() => {
+                  if (form.project_id !== project.project_id) {
+                    checkProjectId(form.project_id);
+                  } else {
+                    resetIdCheck();
+                  }
+                }}
+                disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_id")}
+                className={cn((isSectionReadOnly("basic") || isFieldReadOnly("project_id")) && roClass)}
+                readOnly={isSectionReadOnly("basic") || isFieldReadOnly("project_id")}
+                tabIndex={isSectionReadOnly("basic") || isFieldReadOnly("project_id") ? -1 : undefined}
+                style={(isSectionReadOnly("basic") || isFieldReadOnly("project_id")) ? { cursor: "default" } : undefined}
+                autoFocus={autoFocus}
+              />
+            )}
+          </MobileTapField>
+          {idExists && <p className="text-xs text-destructive mt-1">Toto ID již existuje</p>}
+        </div>
+        <div>
+          <Label className="text-xs">Project Name</Label>
+          <MobileTapField
+            displayValue={form.project_name}
+            disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_name")}
+          >
+            {({ autoFocus }) => (
+              <Input
+                value={form.project_name}
+                onChange={(e) => setForm(s => ({ ...s, project_name: e.target.value }))}
+                disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_name")}
+                className={cn((isSectionReadOnly("basic") || isFieldReadOnly("project_name")) && roClass)}
+                autoFocus={autoFocus}
+              />
+            )}
+          </MobileTapField>
+        </div>
 
-  // ── Read-only style helper ──────────────────────────────────
-  const roClass = "bg-[#f3f4f6] text-muted-foreground cursor-not-allowed opacity-70";
+        <div>
+          <Label className="text-xs">Klient</Label>
+          {isSectionReadOnly("basic") ? (
+            <div className="relative flex items-center gap-1">
+              <Input value={form.klient || "—"} disabled className={roClass} />
+              <button type="button" disabled className={cn("h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input", roClass)}>
+                <MapPin className={cn("h-4 w-4", form.location ? "text-primary" : "text-muted-foreground/30")} />
+              </button>
+            </div>
+          ) : (
+            <div className="relative flex items-center gap-1">
+              <Input value={form.klient} onChange={(e) => setForm(s => ({ ...s, klient: e.target.value }))} />
+              <button
+                type="button"
+                onClick={() => setShowLocation(prev => !prev)}
+                className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent transition-colors"
+                title={form.location ? `Lokace: ${form.location}` : "Přidat lokaci"}
+              >
+                <MapPin className={cn("h-4 w-4", form.location ? "text-primary" : "text-muted-foreground/30")} />
+              </button>
+            </div>
+          )}
+        </div>
+        <div>
+          <Label className="text-xs">Architekt</Label>
+          <MobileTapField displayValue={form.architekt || ""} disabled={isSectionReadOnly("basic")}>
+            {({ autoFocus }) => isSectionReadOnly("basic") ? (
+              <Input value={form.architekt || "—"} disabled className={roClass} />
+            ) : (
+              <Input value={form.architekt} onChange={(e) => setForm(s => ({ ...s, architekt: e.target.value }))} placeholder="Architekt" autoFocus={autoFocus} />
+            )}
+          </MobileTapField>
+        </div>
 
+        {/* Collapsible location row */}
+        <div className={cn("col-span-2 overflow-hidden transition-all duration-300 ease-in-out", showLocation ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0")}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-1">
+            {/* ── KONTAKT sub-section ── */}
+            <div className="col-span-1 md:col-span-2">
+              <div className="relative flex items-center mb-2">
+                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                  <div className="w-full border-t border-border" />
+                </div>
+                <span className="relative bg-background pr-2 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                  Kontakt
+                </span>
+              </div>
+            </div>
+            <div className="col-span-1 md:col-span-2">
+              <Label className="text-xs">Kontaktní osoba</Label>
+              <Input
+                value={form.contact_person}
+                onChange={(e) => setForm(s => ({ ...s, contact_person: e.target.value }))}
+                placeholder="Jméno kontaktní osoby"
+                disabled={isSectionReadOnly("basic")}
+                className={cn("mt-1", isSectionReadOnly("basic") && roClass)}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Kontakt email</Label>
+              <Input
+                value={form.contact_email}
+                onChange={(e) => setForm(s => ({ ...s, contact_email: e.target.value }))}
+                placeholder="email@example.com"
+                disabled={isSectionReadOnly("basic")}
+                className={cn("mt-1", isSectionReadOnly("basic") && roClass)}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Kontakt tel</Label>
+              <Input
+                value={form.contact_tel}
+                onChange={(e) => setForm(s => ({ ...s, contact_tel: e.target.value }))}
+                placeholder="+420 777 000 000"
+                disabled={isSectionReadOnly("basic")}
+                className={cn("mt-1", isSectionReadOnly("basic") && roClass)}
+              />
+            </div>
+
+            {/* ── LOKACE sub-section ── */}
+            <div className="col-span-1 md:col-span-2 mt-2">
+              <div className="relative flex items-center mb-2">
+                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                  <div className="w-full border-t border-border" />
+                </div>
+                <span className="relative bg-background pr-2 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                  Lokace
+                </span>
+              </div>
+            </div>
+            <div className="relative">
+              <Label className="text-xs">Adresa</Label>
+              <Input
+                ref={locInputRef}
+                value={form.location}
+                onChange={(e) => handleLocationInput(e.target.value)}
+                onKeyDown={handleLocationKeyDown}
+                onBlur={() => setTimeout(() => setShowLocDropdown(false), 200)}
+                onFocus={() => { if (locSuggestions.length > 0) setShowLocDropdown(true); }}
+                placeholder="Zadejte adresu..."
+                className="mt-1"
+              />
+              {showLocDropdown && locSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-md border border-border bg-popover shadow-lg max-h-48 overflow-y-auto">
+                  {locSuggestions.map((s, i) => (
+                    <button key={i} type="button" className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors truncate" onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(s); }}>
+                      {s.display_name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col md:-mx-0 -mx-4">
+              <Label className="text-xs opacity-0 hidden md:block">Mapa</Label>
+              <div className="md:mt-1 md:rounded-lg rounded-none border border-input bg-muted/50 overflow-hidden relative" style={{ height: '200px' }}>
+                {form.location ? (
+                  <iframe
+                    title="Map preview"
+                    className="w-full border-0 absolute inset-0 pointer-events-none"
+                    style={{ height: 'calc(100% + 240px)', marginTop: '-120px' }}
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(form.location)}&z=15&t=m&hl=cs&output=embed`}
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-xs text-muted-foreground">Zadejte adresu</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <DateField label="Datum Objednávky" value={form.datum_objednavky} onChange={(v) => setForm(s => ({ ...s, datum_objednavky: v }))} disabled={isSectionReadOnly("basic") || isFieldReadOnly("datum_objednavky")} />
+        <DateField label="Datum Smluvní" value={form.datum_smluvni} onChange={(v) => setForm(s => ({ ...s, datum_smluvni: v }))} disabled={isSectionReadOnly("basic") || isFieldReadOnly("datum_smluvni", project?.datum_smluvni ?? null)} />
+      </div>
+
+      {/* ── FINANCE ──────────────────────────────── */}
+      <SectionHeader icon="💰" label="FINANCE" />
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+        <div>
+          <Label className="text-xs">Prodejní cena</Label>
+          <MobileTapField
+            displayValue={form.prodejni_cena ? `${Number(form.prodejni_cena).toLocaleString("cs-CZ")} ${form.currency}` : ""}
+            disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
+          >
+            {({ autoFocus }) => (
+              <div className="flex items-center gap-1">
+                <Input
+                  type={!isSectionReadOnly("finance") && priceEditing ? "number" : "text"}
+                  className={cn("no-spinners", (isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")) && roClass)}
+                  value={isSectionReadOnly("finance")
+                    ? (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : "—")
+                    : (priceEditing ? form.prodejni_cena : (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : ""))
+                  }
+                  onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))}
+                  onFocus={() => setPriceEditing(true)}
+                  onBlur={() => setPriceEditing(false)}
+                  disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
+                  autoFocus={autoFocus}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={cn("h-10 px-3 font-mono shrink-0", isSectionReadOnly("finance") && "opacity-70 cursor-not-allowed")}
+                  onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
+                  disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
+                >
+                  {form.currency}
+                </Button>
+              </div>
+            )}
+          </MobileTapField>
+        </div>
+        <div>
+          <Label className="text-xs">Marže</Label>
+          <MobileTapField
+            displayValue={form.marze ? `${form.marze} %` : ""}
+            disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
+          >
+            {({ autoFocus }) => (
+              <div className="relative">
+                <Input
+                  type={isSectionReadOnly("finance") ? "text" : "number"}
+                  className={cn("no-spinners pr-8", (isSectionReadOnly("finance") || isFieldReadOnly("marze")) && roClass)}
+                  value={isSectionReadOnly("finance") ? (form.marze ? `${form.marze}` : "—") : form.marze}
+                  onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
+                  placeholder="0"
+                  disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
+                  autoFocus={autoFocus}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
+              </div>
+            )}
+          </MobileTapField>
+        </div>
+
+        {/* Rozpad ceny — admin only */}
+        {isAdmin && (
+          <RozpadCeny
+            projectId={project.project_id}
+            prodejniCena={form.prodejni_cena ? Number(form.prodejni_cena) : null}
+            marze={form.marze ? parseFloat(String(form.marze).replace(",", ".")) : null}
+            costValues={{
+              cost_preset_id: form.cost_preset_id,
+              cost_material_pct: form.cost_material_pct,
+              cost_overhead_pct: form.cost_overhead_pct,
+              cost_doprava_pct: form.cost_doprava_pct,
+              cost_production_pct: form.cost_production_pct,
+              cost_subcontractors_pct: form.cost_subcontractors_pct,
+              cost_montaz_pct: form.cost_montaz_pct,
+              cost_is_custom: form.cost_is_custom,
+            }}
+            onChange={(updates) => setForm((s) => ({ ...s, ...updates }))}
+            readOnly={isSectionReadOnly("finance")}
+            kalkulantSlot={
+              <div>
+                <Label className="text-xs">Kalkulant</Label>
+                {isSectionReadOnly("finance") ? (
+                  <Input value={form.kalkulant || "—"} disabled className={roClass} />
+                ) : (
+                  <PeopleSelectDropdown role="Kalkulant" value={form.kalkulant} onValueChange={(v) => setForm(s => ({ ...s, kalkulant: v }))} placeholder="Vyberte kalkulanta" />
+                )}
+              </div>
+            }
+          />
+        )}
+        {!isAdmin && (
+          <div>
+            <Label className="text-xs">Kalkulant</Label>
+            {isSectionReadOnly("finance") ? (
+              <Input value={form.kalkulant || "—"} disabled className={roClass} />
+            ) : (
+              <PeopleSelectDropdown role="Kalkulant" value={form.kalkulant} onValueChange={(v) => setForm(s => ({ ...s, kalkulant: v }))} placeholder="Vyberte kalkulanta" />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── PM — ŘÍZENÍ PROJEKTU ─────────────────── */}
+      <SectionHeader icon="📊" label="PM — ŘÍZENÍ PROJEKTU" />
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+        <div>
+          <Label className="text-xs">PM</Label>
+          <MobileTapField displayValue={form.pm || ""} disabled={isSectionReadOnly("pm") || isFieldReadOnly("pm")}>
+            {() => isSectionReadOnly("pm") || isFieldReadOnly("pm") ? (
+              <Input value={form.pm || "—"} disabled className={roClass} />
+            ) : (
+              <PeopleSelectDropdown role="PM" value={form.pm} onValueChange={(v) => setForm(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
+            )}
+          </MobileTapField>
+        </div>
+        <div>
+          <Label className="text-xs">Status</Label>
+          <MobileTapField displayValue={form.status || ""} disabled={isSectionReadOnly("pm")}>
+            {() => isSectionReadOnly("pm") ? (
+              <Select value={form.status} disabled>
+                <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              </Select>
+            ) : (
+              <Select value={form.status} onValueChange={(v) => setForm(s => ({ ...s, status: v }))}>
+                <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
+                <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              </Select>
+            )}
+          </MobileTapField>
+        </div>
+
+        <div>
+          <Label className="text-xs">Risk</Label>
+          <MobileTapField displayValue={form.risk || ""} disabled={isSectionReadOnly("pm") || isFieldReadOnly("risk")}>
+            {() => isSectionReadOnly("pm") || isFieldReadOnly("risk") ? (
+              <Select value={form.risk} disabled>
+                <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+              </Select>
+            ) : (
+              <Select value={form.risk} onValueChange={(v) => setForm(s => ({ ...s, risk: v }))}>
+                <SelectTrigger><SelectValue placeholder="Vyberte risk" /></SelectTrigger>
+                <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+              </Select>
+            )}
+          </MobileTapField>
+        </div>
+        <div>{/* empty cell */}</div>
+
+        {/* Sub-section: Milníky */}
+        <div className="col-span-2 mt-1">
+          <span className="text-[9px] uppercase font-semibold text-muted-foreground tracking-wider">Milníky</span>
+          <div className="grid grid-cols-3 gap-2 mt-1.5">
+            <CompactDateField label="Zaměření" value={form.zamereni} onChange={(v) => setForm(s => ({ ...s, zamereni: v }))} disabled={isSectionReadOnly("pm")} />
+            <CompactDateField label="TPV" value={form.tpv_date} onChange={(v) => setForm(s => ({ ...s, tpv_date: v }))} disabled={isSectionReadOnly("pm")} />
+            <CompactDateField label="Expedice" value={form.expedice} onChange={(v) => setForm(s => ({ ...s, expedice: v }))} disabled={isSectionReadOnly("pm")} />
+          </div>
+          <div className="grid grid-cols-3 gap-2 mt-1.5">
+            <CompactDateField label="Montáž" value={form.montaz} onChange={(v) => setForm(s => ({ ...s, montaz: v }))} disabled={isSectionReadOnly("pm")} />
+            <CompactDateField label="Předání" value={form.predani} onChange={(v) => setForm(s => ({ ...s, predani: v }))} disabled={isSectionReadOnly("pm")} />
+            <CompactDateField label="VaN" value={form.van_date} onChange={(v) => setForm(s => ({ ...s, van_date: v }))} disabled={isSectionReadOnly("pm")} />
+          </div>
+        </div>
+
+        <div className="col-span-2">
+          <Label className="text-xs">Poznámka PM</Label>
+          <MobileTapField displayValue={form.pm_poznamka || ""} disabled={isSectionReadOnly("pm")}>
+            {({ autoFocus }) => (
+              <Textarea
+                value={form.pm_poznamka}
+                onChange={(e) => setForm(s => ({ ...s, pm_poznamka: e.target.value }))}
+                disabled={isSectionReadOnly("pm")}
+                className={cn("min-h-[50px] text-sm", isSectionReadOnly("pm") && roClass)}
+                placeholder="Poznámka…"
+                autoFocus={autoFocus}
+              />
+            )}
+          </MobileTapField>
+        </div>
+      </div>
+
+      {/* ── TPV — TECHNICKÁ PŘÍPRAVA ─────────────── */}
+      <SectionHeader icon="🔧" label="TPV — TECHNICKÁ PŘÍPRAVA" />
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 pb-2">
+        <div>
+          <Label className="text-xs">Konstruktér</Label>
+          <MobileTapField displayValue={form.konstrukter || ""} disabled={isSectionReadOnly("tpv")}>
+            {() => isSectionReadOnly("tpv") ? (
+              <Input value={form.konstrukter || "—"} disabled className={roClass} />
+            ) : (
+              <PeopleSelectDropdown role="Konstruktér" value={form.konstrukter} onValueChange={(v) => setForm(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
+            )}
+          </MobileTapField>
+        </div>
+        <div>
+          <Label className="text-xs">Náročnost</Label>
+          <MobileTapField displayValue={form.narocnost || ""} disabled={isSectionReadOnly("tpv")}>
+            {() => isSectionReadOnly("tpv") ? (
+              <Select value={form.narocnost} disabled>
+                <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent className="z-[99999]">{["Low", "Medium", "High"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+              </Select>
+            ) : (
+              <Select value={form.narocnost} onValueChange={(v) => setForm(s => ({ ...s, narocnost: v }))}>
+                <SelectTrigger><SelectValue placeholder="Vyberte náročnost" /></SelectTrigger>
+                <SelectContent className="z-[99999]">{["Low", "Medium", "High"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+              </Select>
+            )}
+          </MobileTapField>
+        </div>
+        <div>
+          <Label className="text-xs">Hodiny TPV</Label>
+          <MobileTapField displayValue={form.hodiny_tpv || ""} disabled={isSectionReadOnly("tpv")}>
+            {({ autoFocus }) => (
+              <Input
+                value={form.hodiny_tpv}
+                onChange={(e) => setForm(s => ({ ...s, hodiny_tpv: e.target.value }))}
+                disabled={isSectionReadOnly("tpv")}
+                className={cn(isSectionReadOnly("tpv") && roClass)}
+                autoFocus={autoFocus}
+              />
+            )}
+          </MobileTapField>
+        </div>
+        <div>
+          <Label className="text-xs">% Rozpracovanost</Label>
+          <MobileTapField displayValue={form.percent_tpv ? `${form.percent_tpv} %` : ""} disabled={isSectionReadOnly("tpv")}>
+            {({ autoFocus }) => (
+              <div className="relative">
+                <Input
+                  type={isSectionReadOnly("tpv") ? "text" : "number"}
+                  className={cn("no-spinners pr-8", isSectionReadOnly("tpv") && roClass)}
+                  value={isSectionReadOnly("tpv") ? (form.percent_tpv ? `${form.percent_tpv}` : "—") : form.percent_tpv}
+                  onChange={(e) => setForm(s => ({ ...s, percent_tpv: e.target.value }))}
+                  placeholder="0"
+                  disabled={isSectionReadOnly("tpv")}
+                  autoFocus={autoFocus}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
+              </div>
+            )}
+          </MobileTapField>
+        </div>
+        <div className="col-span-2">
+          <Label className="text-xs">Poznámka TPV</Label>
+          <MobileTapField displayValue={form.tpv_poznamka || ""} disabled={isSectionReadOnly("tpv")}>
+            {({ autoFocus }) => (
+              <Textarea
+                value={form.tpv_poznamka}
+                onChange={(e) => setForm(s => ({ ...s, tpv_poznamka: e.target.value }))}
+                disabled={isSectionReadOnly("tpv")}
+                className={cn("min-h-[50px] text-sm", isSectionReadOnly("tpv") && roClass)}
+                placeholder="Poznámka…"
+                autoFocus={autoFocus}
+              />
+            )}
+          </MobileTapField>
+        </div>
+      </div>
+    </>
+  );
+
+  // ── Embedded mode: form only, no Dialog shell ──────────────
+  if (mode === "embedded") {
+    return (
+      <>
+        <div className="flex-1 overflow-y-auto px-4 pb-20">
+          {formFieldsContent}
+        </div>
+        <div className="sticky bottom-0 bg-background border-t border-border px-4 py-3 flex items-center justify-end gap-2 z-10">
+          {canEdit && <Button onClick={handleSave} disabled={idExists || !form.project_id} size="sm">Uložit</Button>}
+        </div>
+        <ConfirmDialog
+          open={unsavedConfirmOpen}
+          onConfirm={() => { setUnsavedConfirmOpen(false); }}
+          onCancel={() => setUnsavedConfirmOpen(false)}
+          description="Máte neuložené změny. Opravdu chcete zavřít?"
+        />
+      </>
+    );
+  }
 
   return (
     <>
@@ -846,7 +1317,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
         className={cn(
           "p-0 gap-0 overflow-hidden",
           previewFile ? "sm:max-w-[92vw] h-[88vh]" : "sm:max-w-[920px]",
-          // Mobile: full-screen card from top
           "max-md:!max-w-full max-md:!w-full max-md:!left-0 max-md:!translate-x-0 max-md:!translate-y-0 max-md:!rounded-none max-md:!border-0",
         )}
         style={isMobile ? {
@@ -989,456 +1459,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
 
             <div className="flex max-md:flex-col max-md:overflow-y-auto" style={{ maxHeight: '78vh' }}>
               {/* LEFT PANEL — Form fields */}
-              <div
-                className="flex-1 px-6 pb-4 overflow-y-auto max-md:overflow-visible"
-              >
-                {/* ── ZÁKLADNÍ INFORMACE ────────────────────── */}
-                <SectionHeader icon="📋" label="ZÁKLADNÍ INFORMACE" />
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-                  <div>
-                    <Label className="text-xs">Project ID</Label>
-                    <MobileTapField
-                      displayValue={form.project_id}
-                      disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_id")}
-                    >
-                      {({ autoFocus }) => (
-                        <Input
-                          value={form.project_id}
-                          onChange={(e) => setForm(s => ({ ...s, project_id: e.target.value }))}
-                          onBlur={() => {
-                            if (form.project_id !== project.project_id) {
-                              checkProjectId(form.project_id);
-                            } else {
-                              resetIdCheck();
-                            }
-                          }}
-                          disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_id")}
-                          className={cn((isSectionReadOnly("basic") || isFieldReadOnly("project_id")) && roClass)}
-                          readOnly={isSectionReadOnly("basic") || isFieldReadOnly("project_id")}
-                          tabIndex={isSectionReadOnly("basic") || isFieldReadOnly("project_id") ? -1 : undefined}
-                          style={(isSectionReadOnly("basic") || isFieldReadOnly("project_id")) ? { cursor: "default" } : undefined}
-                          autoFocus={autoFocus}
-                        />
-                      )}
-                    </MobileTapField>
-                    {idExists && <p className="text-xs text-destructive mt-1">Toto ID již existuje</p>}
-                  </div>
-                  <div>
-                    <Label className="text-xs">Project Name</Label>
-                    <MobileTapField
-                      displayValue={form.project_name}
-                      disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_name")}
-                    >
-                      {({ autoFocus }) => (
-                        <Input
-                          value={form.project_name}
-                          onChange={(e) => setForm(s => ({ ...s, project_name: e.target.value }))}
-                          disabled={isSectionReadOnly("basic") || isFieldReadOnly("project_name")}
-                          className={cn((isSectionReadOnly("basic") || isFieldReadOnly("project_name")) && roClass)}
-                          autoFocus={autoFocus}
-                        />
-                      )}
-                    </MobileTapField>
-                  </div>
-
-                  <div>
-                    <Label className="text-xs">Klient</Label>
-                    {isSectionReadOnly("basic") ? (
-                      <div className="relative flex items-center gap-1">
-                        <Input value={form.klient || "—"} disabled className={roClass} />
-                        <button type="button" disabled className={cn("h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input", roClass)}>
-                          <MapPin className={cn("h-4 w-4", form.location ? "text-primary" : "text-muted-foreground/30")} />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="relative flex items-center gap-1">
-                        <Input value={form.klient} onChange={(e) => setForm(s => ({ ...s, klient: e.target.value }))} />
-                        <button
-                          type="button"
-                          onClick={() => setShowLocation(prev => !prev)}
-                          className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent transition-colors"
-                          title={form.location ? `Lokace: ${form.location}` : "Přidat lokaci"}
-                        >
-                          <MapPin className={cn("h-4 w-4", form.location ? "text-primary" : "text-muted-foreground/30")} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <Label className="text-xs">Architekt</Label>
-                    <MobileTapField displayValue={form.architekt || ""} disabled={isSectionReadOnly("basic")}>
-                      {({ autoFocus }) => isSectionReadOnly("basic") ? (
-                        <Input value={form.architekt || "—"} disabled className={roClass} />
-                      ) : (
-                        <Input value={form.architekt} onChange={(e) => setForm(s => ({ ...s, architekt: e.target.value }))} placeholder="Architekt" autoFocus={autoFocus} />
-                      )}
-                    </MobileTapField>
-                  </div>
-
-                  {/* Collapsible location row */}
-                   <div className={cn("col-span-2 overflow-hidden transition-all duration-300 ease-in-out", showLocation ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0")}>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-1">
-                      {/* ── KONTAKT sub-section ── */}
-                      <div className="col-span-1 md:col-span-2">
-                        <div className="relative flex items-center mb-2">
-                          <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                            <div className="w-full border-t border-border" />
-                          </div>
-                          <span className="relative bg-background pr-2 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                            Kontakt
-                          </span>
-                        </div>
-                      </div>
-                      <div className="col-span-1 md:col-span-2">
-                        <Label className="text-xs">Kontaktní osoba</Label>
-                        <Input
-                          value={form.contact_person}
-                          onChange={(e) => setForm(s => ({ ...s, contact_person: e.target.value }))}
-                          placeholder="Jméno kontaktní osoby"
-                          disabled={isSectionReadOnly("basic")}
-                          className={cn("mt-1", isSectionReadOnly("basic") && roClass)}
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">Kontakt email</Label>
-                        <Input
-                          value={form.contact_email}
-                          onChange={(e) => setForm(s => ({ ...s, contact_email: e.target.value }))}
-                          placeholder="email@example.com"
-                          disabled={isSectionReadOnly("basic")}
-                          className={cn("mt-1", isSectionReadOnly("basic") && roClass)}
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">Kontakt tel</Label>
-                        <Input
-                          value={form.contact_tel}
-                          onChange={(e) => setForm(s => ({ ...s, contact_tel: e.target.value }))}
-                          placeholder="+420 777 000 000"
-                          disabled={isSectionReadOnly("basic")}
-                          className={cn("mt-1", isSectionReadOnly("basic") && roClass)}
-                        />
-                      </div>
-
-                      {/* ── LOKACE sub-section ── */}
-                      <div className="col-span-1 md:col-span-2 mt-2">
-                        <div className="relative flex items-center mb-2">
-                          <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                            <div className="w-full border-t border-border" />
-                          </div>
-                          <span className="relative bg-background pr-2 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                            Lokace
-                          </span>
-                        </div>
-                      </div>
-                      <div className="relative">
-                        <Label className="text-xs">Adresa</Label>
-                        <Input
-                          ref={locInputRef}
-                          value={form.location}
-                          onChange={(e) => handleLocationInput(e.target.value)}
-                          onKeyDown={handleLocationKeyDown}
-                          onBlur={() => setTimeout(() => setShowLocDropdown(false), 200)}
-                          onFocus={() => { if (locSuggestions.length > 0) setShowLocDropdown(true); }}
-                          placeholder="Zadejte adresu..."
-                          className="mt-1"
-                        />
-                        {showLocDropdown && locSuggestions.length > 0 && (
-                          <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-md border border-border bg-popover shadow-lg max-h-48 overflow-y-auto">
-                            {locSuggestions.map((s, i) => (
-                              <button key={i} type="button" className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors truncate" onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(s); }}>
-                                {s.display_name}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-col md:-mx-0 -mx-4">
-                        <Label className="text-xs opacity-0 hidden md:block">Mapa</Label>
-                        <div className="md:mt-1 md:rounded-lg rounded-none border border-input bg-muted/50 overflow-hidden relative" style={{ height: '200px' }}>
-                          {form.location ? (
-                            <iframe
-                              title="Map preview"
-                              className="w-full border-0 absolute inset-0 pointer-events-none"
-                              style={{ height: 'calc(100% + 240px)', marginTop: '-120px' }}
-                              src={`https://maps.google.com/maps?q=${encodeURIComponent(form.location)}&z=15&t=m&hl=cs&output=embed`}
-                              loading="lazy"
-                              referrerPolicy="no-referrer-when-downgrade"
-                            />
-                          ) : (
-                            <div className="flex items-center justify-center h-full text-xs text-muted-foreground">Zadejte adresu</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <DateField label="Datum Objednávky" value={form.datum_objednavky} onChange={(v) => setForm(s => ({ ...s, datum_objednavky: v }))} disabled={isSectionReadOnly("basic") || isFieldReadOnly("datum_objednavky")} />
-                  <DateField label="Datum Smluvní" value={form.datum_smluvni} onChange={(v) => setForm(s => ({ ...s, datum_smluvni: v }))} disabled={isSectionReadOnly("basic") || isFieldReadOnly("datum_smluvni", project?.datum_smluvni ?? null)} />
-                </div>
-
-                {/* ── FINANCE ──────────────────────────────── */}
-                <SectionHeader icon="💰" label="FINANCE" />
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-                  <div>
-                    <Label className="text-xs">Prodejní cena</Label>
-                    <MobileTapField
-                      displayValue={form.prodejni_cena ? `${Number(form.prodejni_cena).toLocaleString("cs-CZ")} ${form.currency}` : ""}
-                      disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
-                    >
-                      {({ autoFocus }) => (
-                        <div className="flex items-center gap-1">
-                          <Input
-                            type={!isSectionReadOnly("finance") && priceEditing ? "number" : "text"}
-                            className={cn("no-spinners", (isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")) && roClass)}
-                            value={isSectionReadOnly("finance")
-                              ? (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : "—")
-                              : (priceEditing ? form.prodejni_cena : (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : ""))
-                            }
-                            onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))}
-                            onFocus={() => setPriceEditing(true)}
-                            onBlur={() => setPriceEditing(false)}
-                            disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
-                            autoFocus={autoFocus}
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className={cn("h-10 px-3 font-mono shrink-0", isSectionReadOnly("finance") && "opacity-70 cursor-not-allowed")}
-                            onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
-                            disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
-                          >
-                            {form.currency}
-                          </Button>
-                        </div>
-                      )}
-                    </MobileTapField>
-                  </div>
-                  <div>
-                    <Label className="text-xs">Marže</Label>
-                    <MobileTapField
-                      displayValue={form.marze ? `${form.marze} %` : ""}
-                      disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
-                    >
-                      {({ autoFocus }) => (
-                        <div className="relative">
-                          <Input
-                            type={isSectionReadOnly("finance") ? "text" : "number"}
-                            className={cn("no-spinners pr-8", (isSectionReadOnly("finance") || isFieldReadOnly("marze")) && roClass)}
-                            value={isSectionReadOnly("finance") ? (form.marze ? `${form.marze}` : "—") : form.marze}
-                            onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
-                            placeholder="0"
-                            disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
-                            autoFocus={autoFocus}
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
-                        </div>
-                      )}
-                    </MobileTapField>
-                  </div>
-
-                  {/* Rozpad ceny — admin only */}
-                  {isAdmin && (
-                    <RozpadCeny
-                      projectId={project.project_id}
-                      prodejniCena={form.prodejni_cena ? Number(form.prodejni_cena) : null}
-                      marze={form.marze ? parseFloat(String(form.marze).replace(",", ".")) : null}
-                      costValues={{
-                        cost_preset_id: form.cost_preset_id,
-                        cost_material_pct: form.cost_material_pct,
-                        cost_overhead_pct: form.cost_overhead_pct,
-                        cost_doprava_pct: form.cost_doprava_pct,
-                        cost_production_pct: form.cost_production_pct,
-                        cost_subcontractors_pct: form.cost_subcontractors_pct,
-                        cost_montaz_pct: form.cost_montaz_pct,
-                        cost_is_custom: form.cost_is_custom,
-                      }}
-                      onChange={(updates) => setForm((s) => ({ ...s, ...updates }))}
-                      readOnly={isSectionReadOnly("finance")}
-                      kalkulantSlot={
-                        <div>
-                          <Label className="text-xs">Kalkulant</Label>
-                          {isSectionReadOnly("finance") ? (
-                            <Input value={form.kalkulant || "—"} disabled className={roClass} />
-                          ) : (
-                            <PeopleSelectDropdown role="Kalkulant" value={form.kalkulant} onValueChange={(v) => setForm(s => ({ ...s, kalkulant: v }))} placeholder="Vyberte kalkulanta" />
-                          )}
-                        </div>
-                      }
-                    />
-                  )}
-                  {!isAdmin && (
-                    <div>
-                      <Label className="text-xs">Kalkulant</Label>
-                      {isSectionReadOnly("finance") ? (
-                        <Input value={form.kalkulant || "—"} disabled className={roClass} />
-                      ) : (
-                        <PeopleSelectDropdown role="Kalkulant" value={form.kalkulant} onValueChange={(v) => setForm(s => ({ ...s, kalkulant: v }))} placeholder="Vyberte kalkulanta" />
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* ── PM — ŘÍZENÍ PROJEKTU ─────────────────── */}
-                <SectionHeader icon="📊" label="PM — ŘÍZENÍ PROJEKTU" />
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-                  <div>
-                    <Label className="text-xs">PM</Label>
-                    <MobileTapField displayValue={form.pm || ""} disabled={isSectionReadOnly("pm") || isFieldReadOnly("pm")}>
-                      {() => isSectionReadOnly("pm") || isFieldReadOnly("pm") ? (
-                        <Input value={form.pm || "—"} disabled className={roClass} />
-                      ) : (
-                        <PeopleSelectDropdown role="PM" value={form.pm} onValueChange={(v) => setForm(s => ({ ...s, pm: v }))} placeholder="Vyberte PM" />
-                      )}
-                    </MobileTapField>
-                  </div>
-                  <div>
-                    <Label className="text-xs">Status</Label>
-                    <MobileTapField displayValue={form.status || ""} disabled={isSectionReadOnly("pm")}>
-                      {() => isSectionReadOnly("pm") ? (
-                        <Select value={form.status} disabled>
-                          <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
-                          <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                        </Select>
-                      ) : (
-                        <Select value={form.status} onValueChange={(v) => setForm(s => ({ ...s, status: v }))}>
-                          <SelectTrigger><SelectValue placeholder="Vyberte status" /></SelectTrigger>
-                          <SelectContent className="z-[99999]">{statusLabels.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                        </Select>
-                      )}
-                    </MobileTapField>
-                  </div>
-
-                  <div>
-                    <Label className="text-xs">Risk</Label>
-                    <MobileTapField displayValue={form.risk || ""} disabled={isSectionReadOnly("pm") || isFieldReadOnly("risk")}>
-                      {() => isSectionReadOnly("pm") || isFieldReadOnly("risk") ? (
-                        <Select value={form.risk} disabled>
-                          <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
-                          <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-                        </Select>
-                      ) : (
-                        <Select value={form.risk} onValueChange={(v) => setForm(s => ({ ...s, risk: v }))}>
-                          <SelectTrigger><SelectValue placeholder="Vyberte risk" /></SelectTrigger>
-                          <SelectContent className="z-[99999]">{RISK_OPTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-                        </Select>
-                      )}
-                    </MobileTapField>
-                  </div>
-                  <div>{/* empty cell */}</div>
-
-                  {/* Sub-section: Milníky */}
-                  <div className="col-span-2 mt-1">
-                    <span className="text-[9px] uppercase font-semibold text-muted-foreground tracking-wider">Milníky</span>
-                    <div className="grid grid-cols-3 gap-2 mt-1.5">
-                      <CompactDateField label="Zaměření" value={form.zamereni} onChange={(v) => setForm(s => ({ ...s, zamereni: v }))} disabled={isSectionReadOnly("pm")} />
-                      <CompactDateField label="TPV" value={form.tpv_date} onChange={(v) => setForm(s => ({ ...s, tpv_date: v }))} disabled={isSectionReadOnly("pm")} />
-                      <CompactDateField label="Expedice" value={form.expedice} onChange={(v) => setForm(s => ({ ...s, expedice: v }))} disabled={isSectionReadOnly("pm")} />
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 mt-1.5">
-                      <CompactDateField label="Montáž" value={form.montaz} onChange={(v) => setForm(s => ({ ...s, montaz: v }))} disabled={isSectionReadOnly("pm")} />
-                      <CompactDateField label="Předání" value={form.predani} onChange={(v) => setForm(s => ({ ...s, predani: v }))} disabled={isSectionReadOnly("pm")} />
-                      <CompactDateField label="VaN" value={form.van_date} onChange={(v) => setForm(s => ({ ...s, van_date: v }))} disabled={isSectionReadOnly("pm")} />
-                    </div>
-                  </div>
-
-                  <div className="col-span-2">
-                    <Label className="text-xs">Poznámka PM</Label>
-                    <MobileTapField displayValue={form.pm_poznamka || ""} disabled={isSectionReadOnly("pm")}>
-                      {({ autoFocus }) => (
-                        <Textarea
-                          value={form.pm_poznamka}
-                          onChange={(e) => setForm(s => ({ ...s, pm_poznamka: e.target.value }))}
-                          disabled={isSectionReadOnly("pm")}
-                          className={cn("min-h-[50px] text-sm", isSectionReadOnly("pm") && roClass)}
-                          placeholder="Poznámka…"
-                          autoFocus={autoFocus}
-                        />
-                      )}
-                    </MobileTapField>
-                  </div>
-                </div>
-
-                {/* ── TPV — TECHNICKÁ PŘÍPRAVA ─────────────── */}
-                <SectionHeader icon="🔧" label="TPV — TECHNICKÁ PŘÍPRAVA" />
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 pb-2">
-                  <div>
-                    <Label className="text-xs">Konstruktér</Label>
-                    <MobileTapField displayValue={form.konstrukter || ""} disabled={isSectionReadOnly("tpv")}>
-                      {() => isSectionReadOnly("tpv") ? (
-                        <Input value={form.konstrukter || "—"} disabled className={roClass} />
-                      ) : (
-                        <PeopleSelectDropdown role="Konstruktér" value={form.konstrukter} onValueChange={(v) => setForm(s => ({ ...s, konstrukter: v }))} placeholder="Vyberte konstruktéra" />
-                      )}
-                    </MobileTapField>
-                  </div>
-                  <div>
-                    <Label className="text-xs">Náročnost</Label>
-                    <MobileTapField displayValue={form.narocnost || ""} disabled={isSectionReadOnly("tpv")}>
-                      {() => isSectionReadOnly("tpv") ? (
-                        <Select value={form.narocnost} disabled>
-                          <SelectTrigger className={roClass}><SelectValue placeholder="—" /></SelectTrigger>
-                          <SelectContent className="z-[99999]">{["Low", "Medium", "High"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                        </Select>
-                      ) : (
-                        <Select value={form.narocnost} onValueChange={(v) => setForm(s => ({ ...s, narocnost: v }))}>
-                          <SelectTrigger><SelectValue placeholder="Vyberte náročnost" /></SelectTrigger>
-                          <SelectContent className="z-[99999]">{["Low", "Medium", "High"].map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                        </Select>
-                      )}
-                    </MobileTapField>
-                  </div>
-                  <div>
-                    <Label className="text-xs">Hodiny TPV</Label>
-                    <MobileTapField displayValue={form.hodiny_tpv || ""} disabled={isSectionReadOnly("tpv")}>
-                      {({ autoFocus }) => (
-                        <Input
-                          value={form.hodiny_tpv}
-                          onChange={(e) => setForm(s => ({ ...s, hodiny_tpv: e.target.value }))}
-                          disabled={isSectionReadOnly("tpv")}
-                          className={cn(isSectionReadOnly("tpv") && roClass)}
-                          autoFocus={autoFocus}
-                        />
-                      )}
-                    </MobileTapField>
-                  </div>
-                  <div>
-                    <Label className="text-xs">% Rozpracovanost</Label>
-                    <MobileTapField displayValue={form.percent_tpv ? `${form.percent_tpv} %` : ""} disabled={isSectionReadOnly("tpv")}>
-                      {({ autoFocus }) => (
-                        <div className="relative">
-                          <Input
-                            type={isSectionReadOnly("tpv") ? "text" : "number"}
-                            className={cn("no-spinners pr-8", isSectionReadOnly("tpv") && roClass)}
-                            value={isSectionReadOnly("tpv") ? (form.percent_tpv ? `${form.percent_tpv}` : "—") : form.percent_tpv}
-                            onChange={(e) => setForm(s => ({ ...s, percent_tpv: e.target.value }))}
-                            placeholder="0"
-                            disabled={isSectionReadOnly("tpv")}
-                            autoFocus={autoFocus}
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
-                        </div>
-                      )}
-                    </MobileTapField>
-                  </div>
-                  <div className="col-span-2">
-                    <Label className="text-xs">Poznámka TPV</Label>
-                    <MobileTapField displayValue={form.tpv_poznamka || ""} disabled={isSectionReadOnly("tpv")}>
-                      {({ autoFocus }) => (
-                        <Textarea
-                          value={form.tpv_poznamka}
-                          onChange={(e) => setForm(s => ({ ...s, tpv_poznamka: e.target.value }))}
-                          disabled={isSectionReadOnly("tpv")}
-                          className={cn("min-h-[50px] text-sm", isSectionReadOnly("tpv") && roClass)}
-                          placeholder="Poznámka…"
-                          autoFocus={autoFocus}
-                        />
-                      )}
-                    </MobileTapField>
-                  </div>
-                </div>
-
+              <div className="flex-1 px-6 pb-4 overflow-y-auto max-md:overflow-visible">
+                {formFieldsContent}
               </div>
 
               {/* RIGHT PANEL — Documents (below form on mobile) */}
@@ -1830,7 +1852,6 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       canDelete={canUploadDocuments}
       onDelete={(f) => {
         handleDeleteFile("fotky", f.name);
-        // Update lightbox files
         setPhotoLightbox((prev) => {
           if (!prev) return null;
           const updated = prev.files.filter((pf) => pf.itemId !== f.itemId);
