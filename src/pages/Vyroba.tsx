@@ -203,7 +203,12 @@ export default function Vyroba() {
     try { return localStorage.getItem("datalog-panel-vyroba") === "true"; } catch { return false; }
   });
   useEffect(() => {
-    const handler = () => setDataLogOpen(false);
+    const handler = () => {
+      setDataLogOpen(false);
+      setMobileDetailOpen(false);
+      setDetailDialogOpen(false);
+      setDetailProject(null);
+    };
     window.addEventListener("mobile-nav-change", handler);
     return () => window.removeEventListener("mobile-nav-change", handler);
   }, []);
