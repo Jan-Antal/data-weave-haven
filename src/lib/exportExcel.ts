@@ -57,9 +57,7 @@ export function getProjectCellValue(project: Record<string, any>, key: string): 
   if (key === "prodejni_cena") {
     if (val === "" || val == null) return "";
     const num = Number(val);
-    const currency = project.currency || "CZK";
-    const formatted = new Intl.NumberFormat("cs-CZ", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(num);
-    return currency === "EUR" ? `${formatted} €` : `${formatted} Kč`;
+    return isNaN(num) ? "" : num;
   }
 
   if (key === "percent_tpv") {
