@@ -1726,7 +1726,7 @@ export default function Vyroba() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
                             {item.item_code && <span className="font-mono text-[10px] font-bold" style={{ color: "hsl(var(--foreground))" }}>{item.item_code}</span>}
-                            <span className="text-[12px] truncate" style={{ color: "hsl(var(--foreground))" }}>{item.item_name}</span>
+                            <span className="text-[12px] truncate min-w-0 flex-1" style={{ color: "hsl(var(--foreground))" }}>{item.item_name}</span>
                             {mids.length > 1 && (
                               <span className="text-[9px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(217,119,6,0.1)", color: "#d97706" }}>
                                 {mids.length} částí

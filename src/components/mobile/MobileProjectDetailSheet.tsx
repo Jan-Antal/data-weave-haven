@@ -261,22 +261,19 @@ function TPVTabContent({ items, currency }: { items: any[]; currency: string }) 
           style={{ borderBottom: idx < items.length - 1 ? "0.5px solid hsl(var(--border))" : undefined }}
         >
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] font-mono font-medium text-foreground">{item.item_name}</span>
-              {item.status && <StatusBadge status={item.status} />}
+            <span className="text-[11px] font-mono text-muted-foreground">{item.item_name}</span>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              {item.item_type && (
+                <span className="text-[12px] font-medium text-foreground truncate flex-1">{item.item_type}</span>
+              )}
+              {(item.vyroba_status || item.status) && (
+                <StatusBadge status={item.vyroba_status || item.status} />
+              )}
             </div>
-            {item.nazev_prvku && (
-              <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{item.nazev_prvku}</p>
-            )}
           </div>
           <div className="flex items-center gap-3 shrink-0">
             {item.pocet != null && (
               <span className="text-[11px] text-muted-foreground">{item.pocet} ks</span>
-            )}
-            {item.cena != null && (
-              <span className="text-[11px] font-mono text-muted-foreground">
-                {formatCurrency(item.cena, currency)}
-              </span>
             )}
             <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />
           </div>
