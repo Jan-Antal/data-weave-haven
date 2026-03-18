@@ -41,7 +41,7 @@ type TabKey = "info" | "tpv" | "docs";
 
 const TABS: { key: TabKey; label: string; icon: typeof Info }[] = [
   { key: "info", label: "Info", icon: Info },
-  { key: "tpv", label: "TPV", icon: Package },
+  { key: "tpv", label: "Položky", icon: Package },
   { key: "docs", label: "Dokumenty", icon: FileText },
 ];
 
