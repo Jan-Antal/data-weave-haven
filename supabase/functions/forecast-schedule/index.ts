@@ -75,7 +75,7 @@ function estimateHours(proj: any, tpvItems: any[], hourlyRate: number, vyrobaPct
   return { hours, badge: proj.cost_preset_id ? "Rozpad" : "Výroba – odhad", base: "prodejni_cena" };
 }
 function resolveDeadline(proj: any, itemCount: number): { date: Date|null; source: string } {
-  const exp = parseDate(proj.expedice); if (exp) return { date: exp, source: "expedice" };
+  const exp = parseDate(proj.expedice); if (exp) return { date: addDays(exp, -1), source: "expedice" };
   const mon = parseDate(proj.montaz); if (mon) return { date: addDays(mon,-3), source: "montaz" };
   const pre = parseDate(proj.predani); if (pre) return { date: addWeeks(pre,-montazWeeks(itemCount)), source: "predani" };
   const sml = parseDate(proj.datum_smluvni); if (sml) return { date: sml, source: "smluvni" };
