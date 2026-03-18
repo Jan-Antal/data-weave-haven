@@ -38,7 +38,9 @@ export function OverbookWarningDialog({ open, onOpenChange, overbookedWeeks }: O
     for (const w of sorted) {
       const wn = getWeekNumber(w.week);
       const range = formatWeekRange(w.week);
-      lines.push(`T${wn} ${range}\t${w.utilizationPct}%\t${w.hoursScheduled}h / ${w.capacity}h\t${w.projectsInWeek.join(", ")}`);
+      lines.push(
+        `T${wn} ${range}\t${w.utilizationPct}%\t${w.hoursScheduled}h / ${w.capacity}h\t${w.projectsInWeek.join(", ")}`,
+      );
     }
     lines.push("");
     lines.push("Doporučujeme projednat posunutí termínů u projektů v přetížených týdnech.");
@@ -48,14 +50,19 @@ export function OverbookWarningDialog({ open, onOpenChange, overbookedWeeks }: O
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[700px] p-0 overflow-hidden" style={{ backgroundColor: "#1a1a10", border: "1px solid #4a3d00" }}>
+      <DialogContent
+        className="max-w-[700px] p-0 overflow-hidden"
+        style={{ backgroundColor: "#1a1a10", border: "1px solid #4a3d00" }}
+      >
         <DialogHeader className="px-5 pt-5 pb-3">
           <DialogTitle className="flex items-center gap-2 text-base" style={{ color: "#fbbf24" }}>
             <AlertTriangle className="h-5 w-5" style={{ color: "#f59e0b" }} />
             Přetížení kapacity výroby
           </DialogTitle>
           <p className="text-sm mt-1" style={{ color: "#a8956a" }}>
-            {sorted.length} {sorted.length === 1 ? "týden překračuje" : sorted.length < 5 ? "týdny překračují" : "týdnů překračuje"} 125% kapacity
+            {sorted.length}{" "}
+            {sorted.length === 1 ? "týden překračuje" : sorted.length < 5 ? "týdny překračují" : "týdnů překračuje"}{" "}
+            125% kapacity
           </p>
         </DialogHeader>
 
@@ -63,21 +70,31 @@ export function OverbookWarningDialog({ open, onOpenChange, overbookedWeeks }: O
           <table className="w-full text-sm" style={{ color: "#d4c68a" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #3d3400" }}>
-                <th className="text-left py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>Týden</th>
-                <th className="text-right py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>Využití</th>
-                <th className="text-right py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>Hodiny</th>
-                <th className="text-left py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>Projekty</th>
+                <th className="text-left py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>
+                  Týden
+                </th>
+                <th className="text-right py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>
+                  Využití
+                </th>
+                <th className="text-right py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>
+                  Hodiny
+                </th>
+                <th className="text-left py-2 px-2 font-semibold text-xs" style={{ color: "#a8956a" }}>
+                  Projekty
+                </th>
               </tr>
             </thead>
             <tbody>
               {sorted.map((w) => {
                 const wn = getWeekNumber(w.week);
                 const range = formatWeekRange(w.week);
-                const color = w.utilizationPct > 150 ? "#ef4444" : "#f59e0b";
+                const color = w.utilizationPct > 115 ? "#ef4444" : "#f59e0b";
                 return (
                   <tr key={w.week} style={{ borderBottom: "1px solid #2d2800" }}>
                     <td className="py-2 px-2 font-mono text-xs">
-                      <span className="font-bold" style={{ color }}>T{wn}</span>
+                      <span className="font-bold" style={{ color }}>
+                        T{wn}
+                      </span>
                       <span className="ml-1.5 opacity-70">{range}</span>
                     </td>
                     <td className="py-2 px-2 text-right font-bold font-mono text-xs" style={{ color }}>
@@ -136,8 +153,7 @@ export function OverbookBadge({ count, onClick }: { count: number; onClick: () =
       className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold transition-colors hover:opacity-90"
       style={{ backgroundColor: "#451a03", color: "#fbbf24", border: "1px solid #78350f" }}
     >
-      <AlertTriangle className="h-3 w-3" />
-      ⚠ {count} přetížených týdnů
+      <AlertTriangle className="h-3 w-3" />⚠ {count} přetížených týdnů
     </button>
   );
 }
