@@ -824,6 +824,18 @@ export default function Vyroba() {
     }
   }
 
+  // Close overlays on mobile nav change
+  useEffect(() => {
+    const handler = () => {
+      setDataLogOpen(false);
+      setMobileDetailOpen(false);
+      setDetailDialogOpen(false);
+      setDetailProject(null);
+    };
+    window.addEventListener("mobile-nav-change", handler);
+    return () => window.removeEventListener("mobile-nav-change", handler);
+  }, []);
+
 
 
 
