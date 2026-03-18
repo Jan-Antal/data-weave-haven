@@ -390,20 +390,32 @@ serve(async (req) => {
           rem -= actual;
         }
       } else {
-        // SPREAD (>3w): distribute evenly across available days
-        // hoursPerDay = totalHours / number of days with free capacity
-        // Each day gets hoursPerDay — if day is full, skip and redistribute
-        const freeDays = days.filter((d) => (dayUsage[d] || 0) < dailyCap * THRESHOLD);
-        const hpd = freeDays.length > 0 ? work.totalHours / freeDays.length : work.totalHours / days.length;
-        for (const d of days) {
+        // JIT (>3w): late-start + MIN_BUNDLE=40h
+        const MIN_BUNDLE = 40;
+        const minWeeks = Math.ceil(work.totalHours / (defaultCapacity * 0.8));
+        const lateStartDate = new Date(work.deadline);
+        lateStartDate.setUTCDate(lateStartDate.getUTCDate() - minWeeks * 7);
+        const jitStart = lateStartDate < work.tpvStart ? work.tpvStart : lateStartDate;
+        const jitDays = days.filter((d) => d >= dayKey(jitStart));
+        for (let di = 0; di < jitDays.length; di++) {
           if (rem <= 0) break;
+          const d = jitDays[di];
+          const isLastDay = di === jitDays.length - 1;
           const cur = dayUsage[d] || 0;
           const weekCapD = getWeekCapacity(getWeekKey(new Date(d + "T00:00:00Z")), capacityRows, defaultCapacity);
           const dailyCapD = weekCapD * DAILY_CAP_RATIO;
-          const hardCap = dailyCapD * THRESHOLD;
-          const avail = Math.max(0, hardCap - cur);
-          if (avail <= 0) continue; // day is at hard cap, skip
-          const put = Math.min(rem, Math.min(hpd, avail));
+          const avail = Math.max(0, dailyCapD * THRESHOLD - cur);
+          if (avail <= 0 && !isLastDay) continue;
+          let put: number;
+          if (isLastDay) {
+            put = rem;
+          } else if (rem <= avail) {
+            put = rem;
+          } else if (rem - avail < MIN_BUNDLE) {
+            put = rem;
+          } else {
+            put = avail;
+          }
           if (put <= 0) continue;
           dayAlloc[d][work.projectId] = (dayAlloc[d][work.projectId] || 0) + put;
           dayUsage[d] = (dayUsage[d] || 0) + put;
