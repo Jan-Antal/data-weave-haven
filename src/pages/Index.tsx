@@ -44,6 +44,7 @@ import { MobileCardList } from "@/components/mobile/MobileCardList";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { MobilePrehled } from "@/components/mobile/MobilePrehled";
 import { MobileTPVCardList } from "@/components/mobile/MobileTPVCardList";
+import { MobileProjectDetailSheet } from "@/components/mobile/MobileProjectDetailSheet";
 import { useRecentlyOpened } from "@/hooks/useRecentlyOpened";
 import { useTPVItems, useAddTPVItem } from "@/hooks/useTPVItems";
 import { useProductionStatuses } from "@/hooks/useProductionStatuses";
@@ -490,21 +491,18 @@ const Index = () => {
                 onOpenTPV={handleMobileOpenTPV}
               />
             )}
-            {mobileDetailProject && (
-              <ProjectDetailDialog
-                project={mobileDetailProject}
-                open={mobileDetailOpen}
-                onOpenChange={(open) => {
-                  setMobileDetailOpen(open);
-                  if (!open) setMobileDetailProject(null);
-                }}
-                onOpenTPVList={(projectId, projectName) => {
-                  setMobileDetailOpen(false);
-                  handleMobileOpenTPV(mobileDetailProject);
-                }}
-                tpvItemCount={0}
-              />
-            )}
+            <MobileProjectDetailSheet
+              project={mobileDetailProject}
+              open={mobileDetailOpen}
+              onOpenChange={(open) => {
+                setMobileDetailOpen(open);
+                if (!open) setMobileDetailProject(null);
+              }}
+              onOpenTPV={mobileDetailProject ? (p) => {
+                setMobileDetailOpen(false);
+                handleMobileOpenTPV(p);
+              } : undefined}
+            />
             {/* Mobile DataLog full screen */}
             <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
               setDataLogOpen(v);

@@ -932,7 +932,7 @@ export default function Vyroba() {
 
   /* ═══ RENDER ═══ */
   return (
-    <div className={cn("h-screen flex flex-col overflow-hidden", isMobile && "pb-[72px]")} style={{ background: "#f8f7f4" }}>
+    <div className={cn("h-screen flex flex-col overflow-hidden animate-in fade-in duration-150", isMobile && "pb-[72px]")} style={{ background: "#f8f7f4" }}>
       {/* ═══ MOBILE HEADER ═══ */}
       {isMobile && (
         <MobileHeader
@@ -3146,9 +3146,30 @@ function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, de
                 </div>
               ))}
               {photoUploading && <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#d97706" }} />}
-              <button type="button" onClick={() => photoInputRef.current?.click()} className="flex items-center gap-1 text-[12px] font-medium px-2 py-1 rounded" style={{ color: "#d97706", border: "1px solid #f59e0b", background: "#fef3c7" }}>
+              <label className="flex items-center gap-1 text-[12px] font-medium px-2 py-1 rounded cursor-pointer" style={{ color: "#d97706", border: "1px solid #f59e0b", background: "#fef3c7" }}>
                 <Camera className="h-3.5 w-3.5" /> Pridať foto
-              </button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const files = e.target.files;
+                    if (files && files.length > 0) {
+                      const file = files[0];
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        if (ev.target?.result) {
+                          setDefectPhotos([...defectPhotos, ev.target!.result as string]);
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                    e.target.value = "";
+                  }}
+                  disabled={photoUploading}
+                />
+              </label>
             </div>
           </div>
           {/* Severity — no default */}
