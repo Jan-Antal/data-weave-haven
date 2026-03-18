@@ -472,7 +472,7 @@ const Index = () => {
             {/* Vyroba module — always mounted, shown/hidden via CSS */}
             <div className={mobileModule === "vyroba" ? "flex-1 min-w-0 flex flex-col overflow-y-auto" : "hidden"}>
               <Suspense fallback={<div className="flex-1 flex items-center justify-center text-muted-foreground">Načítání...</div>}>
-                <LazyVyroba />
+                <LazyVyroba embedded />
               </Suspense>
             </div>
 
