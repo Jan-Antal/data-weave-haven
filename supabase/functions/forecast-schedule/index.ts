@@ -471,7 +471,7 @@ serve(async (req) => {
     const overbookedWeeks = Object.keys(weekHours)
       .filter((k) => {
         const c = getWeekCapacity(k, capacityRows, defaultCapacity);
-        return (weekHours[k] || 0) > c * 1.1;
+        return (weekHours[k] || 0) > c * 1.15;
       })
       .map((k) => {
         const c = getWeekCapacity(k, capacityRows, defaultCapacity);
