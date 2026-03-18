@@ -49,6 +49,9 @@ const FUZZY_MAP: { exact: string[]; contains: string[]; target: TargetKey }[] = 
   { exact: ["cena", "price", "cost", "castka"], contains: ["price", "cost"], target: "cena" },
   { exact: ["konstrukter", "engineer", "designer"], contains: ["konstrukt", "engineer"], target: "konstrukter" },
   { exact: ["poznamka", "note", "notes"], contains: ["poznam", "note"], target: "notes" },
+  { exact: ["status", "stav", "stav tpv"], contains: ["status", "stav"], target: "status" },
+  { exact: ["odeslano", "sent", "sent date", "odesláno"], contains: ["odeslan", "sent"], target: "sent_date" },
+  { exact: ["prijato", "accepted", "accepted date", "přijato"], contains: ["prijat", "accept"], target: "accepted_date" },
 ];
 
 function normalize(s: string): string {
