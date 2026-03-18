@@ -390,17 +390,22 @@ serve(async (req) => {
           rem -= actual;
         }
       } else {
-        // JIT (>3w): late-start + MIN_BUNDLE=40h
+        // LEVELING: prefer days closest to target load (95% daily cap)
+        // This smooths peaks across all available weeks
+        const TARGET_LOAD = dailyCap * 0.95;
         const MIN_BUNDLE = 40;
-        const minWeeks = Math.ceil(work.totalHours / (defaultCapacity * 0.8));
-        const lateStartDate = new Date(work.deadline);
-        lateStartDate.setUTCDate(lateStartDate.getUTCDate() - minWeeks * 7);
-        const jitStart = lateStartDate < work.tpvStart ? work.tpvStart : lateStartDate;
-        const jitDays = days.filter((d) => d >= dayKey(jitStart));
-        for (let di = 0; di < jitDays.length; di++) {
+        const sorted = [...days].sort((a, b) => {
+          const ua = dayUsage[a] || 0,
+            ub = dayUsage[b] || 0;
+          const sa = ua < TARGET_LOAD ? TARGET_LOAD - ua : (ua - TARGET_LOAD) * 3;
+          const sb = ub < TARGET_LOAD ? TARGET_LOAD - ub : (ub - TARGET_LOAD) * 3;
+          if (Math.abs(sa - sb) > 5) return sb - sa;
+          return days.indexOf(a) - days.indexOf(b);
+        });
+        for (let di = 0; di < sorted.length; di++) {
           if (rem <= 0) break;
-          const d = jitDays[di];
-          const isLastDay = di === jitDays.length - 1;
+          const d = sorted[di];
+          const isLastDay = di === sorted.length - 1;
           const cur = dayUsage[d] || 0;
           const weekCapD = getWeekCapacity(getWeekKey(new Date(d + "T00:00:00Z")), capacityRows, defaultCapacity);
           const dailyCapD = weekCapD * DAILY_CAP_RATIO;
