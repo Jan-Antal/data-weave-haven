@@ -3160,7 +3160,7 @@ function QcDefectForm({ defectOpen, setDefectOpen, defectType, setDefectType, de
                       const reader = new FileReader();
                       reader.onload = (ev) => {
                         if (ev.target?.result) {
-                          setDefectPhotos(prev => [...prev, ev.target!.result as string]);
+                          setDefectPhotos((prev: string[]) => [...prev, ev.target!.result as string]);
                         }
                       };
                       reader.readAsDataURL(file);

@@ -44,6 +44,7 @@ import { MobileCardList } from "@/components/mobile/MobileCardList";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { MobilePrehled } from "@/components/mobile/MobilePrehled";
 import { MobileTPVCardList } from "@/components/mobile/MobileTPVCardList";
+import { MobileProjectDetailSheet } from "@/components/mobile/MobileProjectDetailSheet";
 import { useRecentlyOpened } from "@/hooks/useRecentlyOpened";
 import { useTPVItems, useAddTPVItem } from "@/hooks/useTPVItems";
 import { useProductionStatuses } from "@/hooks/useProductionStatuses";
