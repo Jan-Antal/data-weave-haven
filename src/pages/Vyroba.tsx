@@ -177,7 +177,7 @@ function useProfileName(userId: string | null) {
 }
 
 /* ═══ MAIN PAGE ═══ */
-export default function Vyroba() {
+export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}) {
   const { isOwner, isAdmin, isTestUser, loading, profile, signOut, canAccessSettings, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, realRole, simulatedRole, setSimulatedRole, role } = useAuth();
   const { openPeopleManagement } = usePeopleManagement();
   const navigate = useNavigate();
@@ -942,9 +942,9 @@ export default function Vyroba() {
 
   /* ═══ RENDER ═══ */
   return (
-    <div className={cn("h-screen flex flex-col overflow-hidden", isMobile && "pb-[72px]")} style={{ background: "#f8f7f4" }}>
+    <div className={cn(embedded ? "h-full flex flex-col overflow-hidden" : "h-screen flex flex-col overflow-hidden", !embedded && isMobile && "pb-[72px]")} style={{ background: "#f8f7f4" }}>
       {/* ═══ MOBILE HEADER ═══ */}
-      {isMobile && (
+      {!embedded && isMobile && (
         <MobileHeader
           onDataLog={toggleDataLog}
           showDataLog={isAdmin || role === "pm" || isOwner}
@@ -1872,7 +1872,7 @@ export default function Vyroba() {
         {dataLogOpen && <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} defaultCategory="vyroba" />}
       </div>
       </div>{/* end outer flex */}
-      {isMobile && <MobileBottomNav />}
+      {!embedded && isMobile && <MobileBottomNav />}
     </div>
   );
 }
