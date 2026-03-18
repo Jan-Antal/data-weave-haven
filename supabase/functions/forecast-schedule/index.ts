@@ -389,17 +389,24 @@ serve(async (req) => {
           rem -= actual;
         }
       } else {
-        // SPREAD (>3w): chronological, fill only available capacity, push overflow forward
+        // SPREAD (>3w): distribute evenly across available days
+        // hoursPerDay = totalHours / number of days with free capacity
+        // Each day gets hoursPerDay — if day is full, skip and redistribute
+        const freeDays = days.filter((d) => (dayUsage[d] || 0) < dailyCap * THRESHOLD);
+        const hpd = freeDays.length > 0 ? work.totalHours / freeDays.length : work.totalHours / days.length;
         for (const d of days) {
           if (rem <= 0) break;
           const cur = dayUsage[d] || 0;
-          const avail = Math.max(0, dailyCap - cur);
-          if (avail > 0) {
-            const put = Math.min(rem, avail);
-            dayAlloc[d][work.projectId] = (dayAlloc[d][work.projectId] || 0) + put;
-            dayUsage[d] = (dayUsage[d] || 0) + put;
-            rem -= put;
-          }
+          const weekCapD = getWeekCapacity(getWeekKey(new Date(d + "T00:00:00Z")), capacityRows, defaultCapacity);
+          const dailyCapD = weekCapD * DAILY_CAP_RATIO;
+          const hardCap = dailyCapD * THRESHOLD;
+          const avail = Math.max(0, hardCap - cur);
+          if (avail <= 0) continue; // day is at hard cap, skip
+          const put = Math.min(rem, Math.min(hpd, avail));
+          if (put <= 0) continue;
+          dayAlloc[d][work.projectId] = (dayAlloc[d][work.projectId] || 0) + put;
+          dayUsage[d] = (dayUsage[d] || 0) + put;
+          rem -= put;
         }
       }
 
