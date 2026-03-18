@@ -177,7 +177,7 @@ function useProfileName(userId: string | null) {
 }
 
 /* ═══ MAIN PAGE ═══ */
-export default function Vyroba() {
+export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}) {
   const { isOwner, isAdmin, isTestUser, loading, profile, signOut, canAccessSettings, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, realRole, simulatedRole, setSimulatedRole, role } = useAuth();
   const { openPeopleManagement } = usePeopleManagement();
   const navigate = useNavigate();
