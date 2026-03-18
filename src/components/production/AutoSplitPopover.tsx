@@ -39,9 +39,12 @@ export function AutoSplitPopover({
   const [submitting, setSubmitting] = useState(false);
   const qc = useQueryClient();
 
-  const part1Hours = Math.max(availableHours, 0);
+  const part1Hours = Math.min(Math.max(availableHours, 0), itemHours);
   const part2Hours = itemHours - part1Hours;
   const overloadHours = itemHours - availableHours;
+
+  // Guard: if split would create a 0-hour part, force "whole" only
+  const splitViable = part1Hours > 0 && part2Hours > 0;
 
   const handleConfirm = useCallback(async () => {
     setSubmitting(true);

@@ -583,14 +583,20 @@ export function useProductionDragDrop() {
     }
   }, [invalidateAll, pushUndo]);
 
-  const mergeSplitItems = useCallback(async (splitGroupId: string) => {
+  const mergeSplitItems = useCallback(async (splitGroupId: string, onlyInWeek?: string) => {
     try {
-      const { data: parts, error: fetchErr } = await supabase
+      const { data: allParts, error: fetchErr } = await supabase
         .from("production_schedule")
         .select("*")
         .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`)
         .order("split_part", { ascending: true });
       if (fetchErr) throw fetchErr;
+
+      // If scoped to a week, only merge parts in that week
+      const parts = onlyInWeek
+        ? (allParts || []).filter(p => p.scheduled_week === onlyInWeek)
+        : (allParts || []);
+
       if (!parts || parts.length <= 1) {
         toast({ title: "Není co spojit", description: "Nebyla nalezena žádná další část." });
         return;
@@ -599,6 +605,7 @@ export function useProductionDragDrop() {
       const totalHours = parts.reduce((s, p) => s + p.scheduled_hours, 0);
       const totalCzk = parts.reduce((s, p) => s + p.scheduled_czk, 0);
       const primary = parts[0];
+      const remainingParts = (allParts || []).filter(p => !parts.some(mp => mp.id === p.id));
       const cleanName = primary.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
 
       const { error: updateErr } = await supabase
