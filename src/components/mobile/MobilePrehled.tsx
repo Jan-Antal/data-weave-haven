@@ -197,7 +197,7 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
   }
 
   return (
-    <div className="flex flex-col pt-3 bg-background">
+    <div className="flex flex-col pt-3 bg-background pb-[calc(80px+env(safe-area-inset-bottom,0px))]">
       <div style={{ padding: "0 12px" }}>
       {/* Section 1: Po termínu */}
       {overdueItems.length > 0 && (

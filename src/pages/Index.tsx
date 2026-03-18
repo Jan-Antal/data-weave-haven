@@ -490,21 +490,18 @@ const Index = () => {
                 onOpenTPV={handleMobileOpenTPV}
               />
             )}
-            {mobileDetailProject && (
-              <ProjectDetailDialog
-                project={mobileDetailProject}
-                open={mobileDetailOpen}
-                onOpenChange={(open) => {
-                  setMobileDetailOpen(open);
-                  if (!open) setMobileDetailProject(null);
-                }}
-                onOpenTPVList={(projectId, projectName) => {
-                  setMobileDetailOpen(false);
-                  handleMobileOpenTPV(mobileDetailProject);
-                }}
-                tpvItemCount={0}
-              />
-            )}
+            <MobileProjectDetailSheet
+              project={mobileDetailProject}
+              open={mobileDetailOpen}
+              onOpenChange={(open) => {
+                setMobileDetailOpen(open);
+                if (!open) setMobileDetailProject(null);
+              }}
+              onOpenTPV={mobileDetailProject ? (p) => {
+                setMobileDetailOpen(false);
+                handleMobileOpenTPV(p);
+              } : undefined}
+            />
             {/* Mobile DataLog full screen */}
             <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
               setDataLogOpen(v);
