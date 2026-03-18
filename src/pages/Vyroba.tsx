@@ -1872,7 +1872,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         {dataLogOpen && <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} defaultCategory="vyroba" />}
       </div>
       </div>{/* end outer flex */}
-      {isMobile && <MobileBottomNav />}
+      {!embedded && isMobile && <MobileBottomNav />}
     </div>
   );
 }
