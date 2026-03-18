@@ -226,6 +226,28 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Nepřihlášený uživatel");
 
+      // Fetch project cost parameters for correct hour estimation
+      const [{ data: projectData }, { data: settingsData }, { data: presetsData }] = await Promise.all([
+        supabase.from("projects").select("marze, cost_production_pct, cost_preset_id").eq("project_id", projectId).single(),
+        supabase.from("production_settings").select("hourly_rate").limit(1).single(),
+        supabase.from("cost_breakdown_presets").select("id, is_default, production_pct").order("sort_order"),
+      ]);
+
+      const hourlyRate = Number(settingsData?.hourly_rate) || 550;
+      const presets = presetsData || [];
+      const projectPreset = projectData?.cost_preset_id
+        ? presets.find(p => p.id === projectData.cost_preset_id)
+        : presets.find(p => p.is_default) || presets[0];
+
+      // Margin: normalize (detect 0.25 vs 25)
+      const rawMarze = Number(projectData?.marze) || 0;
+      const marze = rawMarze > 1 ? rawMarze / 100 : rawMarze;
+
+      // Production percentage from project override or preset
+      const prodPct = (projectData?.cost_production_pct != null
+        ? Number(projectData.cost_production_pct)
+        : (projectPreset?.production_pct ?? 100)) / 100;
+
       let sentCount = 0;
       const skipped: string[] = [];
 
@@ -244,13 +266,19 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           continue;
         }
 
+        // Hours = (selling price × (1 - margin) × production%) / hourly rate
+        const itemCena = (item.cena || 0) * (Number(item.pocet) || 1);
+        const estimatedHours = itemCena > 0
+          ? Math.max(1, Math.round(itemCena * (1 - marze) * prodPct / hourlyRate))
+          : 8;
+
         // Insert into production_inbox
         const { error } = await supabase.from("production_inbox").insert({
           project_id: projectId,
           item_name: item.item_type || item.item_name,
           item_code: item.item_name,
-          estimated_hours: item.cena ? Math.round(item.cena / 550) : 8,
-          estimated_czk: item.cena || 0,
+          estimated_hours: estimatedHours,
+          estimated_czk: itemCena,
           status: "pending",
           sent_by: user.id,
         } as any);
