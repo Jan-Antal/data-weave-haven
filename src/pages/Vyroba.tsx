@@ -942,7 +942,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   /* ═══ RENDER ═══ */
   return (
-    <div className={cn("h-screen flex flex-col overflow-hidden", isMobile && "pb-[72px]")} style={{ background: "#f8f7f4" }}>
+    <div className={cn(embedded ? "h-full flex flex-col overflow-hidden" : "h-screen flex flex-col overflow-hidden", !embedded && isMobile && "pb-[72px]")} style={{ background: "#f8f7f4" }}>
       {/* ═══ MOBILE HEADER ═══ */}
       {isMobile && (
         <MobileHeader
