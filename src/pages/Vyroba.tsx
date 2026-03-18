@@ -202,16 +202,6 @@ export default function Vyroba() {
   const [dataLogOpen, setDataLogOpen] = useState(() => {
     try { return localStorage.getItem("datalog-panel-vyroba") === "true"; } catch { return false; }
   });
-  useEffect(() => {
-    const handler = () => {
-      setDataLogOpen(false);
-      setMobileDetailOpen(false);
-      setDetailDialogOpen(false);
-      setDetailProject(null);
-    };
-    window.addEventListener("mobile-nav-change", handler);
-    return () => window.removeEventListener("mobile-nav-change", handler);
-  }, []);
   const toggleDataLog = useCallback(() => {
     setDataLogOpen(prev => {
       const next = !prev;
