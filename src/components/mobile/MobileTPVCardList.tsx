@@ -139,17 +139,28 @@ export function MobileTPVCardList({
                     }
                   </div>
                   {item.item_type && (
-                    <p className="text-sm font-semibold text-foreground leading-tight">{item.item_type}</p>
+                    <p className="text-sm font-semibold text-foreground leading-tight truncate max-w-[200px]" title={item.item_type}>{item.item_type}</p>
                   )}
-                  {item.status && (
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] h-5"
-                      style={statusColor ? { backgroundColor: `${statusColor}20`, color: statusColor, borderColor: `${statusColor}50` } : undefined}
-                    >
-                      {item.status}
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {item.status && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] h-5"
+                        style={statusColor ? { backgroundColor: `${statusColor}20`, color: statusColor, borderColor: `${statusColor}50` } : undefined}
+                      >
+                        {item.status}
+                      </Badge>
+                    )}
+                    {item.konstrukter && (
+                      <span className="text-[10px] text-muted-foreground">{item.konstrukter}</span>
+                    )}
+                    {item.pocet != null && item.pocet > 0 && (
+                      <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded">{item.pocet} ks</span>
+                    )}
+                    {vyrobaLabel && (
+                      <Badge variant="secondary" className="text-[10px] h-5">{vyrobaLabel}</Badge>
+                    )}
+                  </div>
                 </div>
 
                 {/* Expanded details */}
