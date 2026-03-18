@@ -31,6 +31,9 @@ const TARGET_FIELDS = [
   { key: "cena", label: "Cena", required: false },
   { key: "konstrukter", label: "Konstruktér", required: false },
   { key: "notes", label: "Poznámka", required: false },
+  { key: "status", label: "Status", required: false },
+  { key: "sent_date", label: "Odesláno", required: false },
+  { key: "accepted_date", label: "Přijato", required: false },
 ] as const;
 
 type TargetKey = (typeof TARGET_FIELDS)[number]["key"];
