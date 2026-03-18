@@ -81,13 +81,14 @@ function resolveDeadline(proj: any, itemCount: number): { date: Date|null; sourc
   const sml = parseDate(proj.datum_smluvni); if (sml) return { date: sml, source: "smluvni" };
   return { date: null, source: "none" };
 }
-function resolveTpvStart(proj: any, itemCount: number, today: Date): Date {
+function resolveTpvStart(proj: any, itemCount: number, today: Date, deadline: Date): Date {
   const tpv = parseDate(proj.tpv_date);
-  if (tpv) return tpv < today ? today : tpv;
+  if (tpv) { const r = tpv < today ? today : tpv; return r > deadline ? today : r; }
   const ord = parseDate(proj.datum_objednavky);
-  if (ord) { const est = addWeeks(ord, tpvWeeksEstimate(itemCount)); return est < today ? today : est; }
+  if (ord) { const est = addWeeks(ord, tpvWeeksEstimate(itemCount)); const r = est < today ? today : est; return r > deadline ? today : r; }
   const delays: Record<string,number> = { "Příprava":12,"Engineering":8,"TPV":4,"Výroba IN":0,"Výroba":0 };
-  return addWeeks(today, delays[proj.status] ?? 6);
+  const fallback = addWeeks(today, delays[proj.status] ?? 6);
+  return fallback > deadline ? today : fallback;
 }
 function priorityScore(proj: any, tpvStart: Date, deadline: Date, today: Date): number {
   let score = 0;
