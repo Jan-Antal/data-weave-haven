@@ -229,6 +229,7 @@ serve(async (req) => {
     const { weeklyCapacityHours } = await req.json();
     const defaultCapacity = Number(weeklyCapacityHours) || 760;
     const DAILY_CAP_RATIO = 1.0 / 5;
+    const THRESHOLD = 1.15;
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
     const currentMonday = new Date(today);
