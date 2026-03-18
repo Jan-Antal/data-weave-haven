@@ -195,7 +195,7 @@ export function AutoSplitPopover({
 
           {/* Option 2: Split */}
           <label
-            className="flex items-start gap-2.5 px-3 py-2.5 rounded-md cursor-pointer transition-colors"
+            className={cn("flex items-start gap-2.5 px-3 py-2.5 rounded-md transition-colors", splitViable ? "cursor-pointer" : "cursor-not-allowed opacity-50")}
             style={{
               border: choice === "split" ? "1.5px solid #3a8a36" : "1px solid #ece8e2",
               backgroundColor: choice === "split" ? "rgba(58,138,54,0.04)" : "transparent",
@@ -205,7 +205,8 @@ export function AutoSplitPopover({
               type="radio"
               name="split-choice"
               checked={choice === "split"}
-              onChange={() => setChoice("split")}
+              onChange={() => splitViable && setChoice("split")}
+              disabled={!splitViable}
               className="mt-0.5"
             />
             <div>
@@ -213,8 +214,7 @@ export function AutoSplitPopover({
                 Rozdělit
               </div>
               <div className="text-[10px] font-mono" style={{ color: "#6b7a78" }}>
-                {part1Hours}h → T{targetWeekNum}<br />
-                {part2Hours}h → T{spillWeekNum}
+                {splitViable ? <>{part1Hours}h → T{targetWeekNum}<br />{part2Hours}h → T{spillWeekNum}</> : "Nelze rozdělit (0h)"}
               </div>
             </div>
           </label>
