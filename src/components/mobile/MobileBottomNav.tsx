@@ -1,16 +1,20 @@
-import { useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Factory, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 
-export function MobileBottomNav() {
-  const location = useLocation();
-  const navigate = useNavigate();
+type MobileModule = "prehled" | "projekty" | "vyroba";
+
+interface MobileBottomNavProps {
+  onModuleChange?: (module: MobileModule) => void;
+  activeModule?: MobileModule;
+}
+
+export function MobileBottomNav({ onModuleChange, activeModule }: MobileBottomNavProps) {
   const { isAdmin, isOwner } = useAuth();
 
-  const isProjectsActive = location.pathname === "/" && (location.state as any)?.view === "projects";
-  const isDashboardActive = location.pathname === "/" && (location.state as any)?.view !== "projects";
-  const isVyrobaActive = location.pathname === "/vyroba";
+  const isProjectsActive = activeModule === "projekty";
+  const isDashboardActive = activeModule === "prehled";
+  const isVyrobaActive = activeModule === "vyroba";
 
   const canAccessProduction = isAdmin || isOwner;
 
@@ -23,13 +27,15 @@ export function MobileBottomNav() {
     } catch {}
   };
 
-  const handleNav = (e: React.MouseEvent, path: string, state?: Record<string, string>) => {
+  const handleNav = (e: React.MouseEvent, module: MobileModule) => {
     e.stopPropagation();
     e.preventDefault();
     closeDataLog();
     // Dispatch event to close any open overlays (TPV list, DataLog panel etc.)
     window.dispatchEvent(new CustomEvent("mobile-nav-change"));
-    navigate(path, { state, replace: true });
+    if (onModuleChange) {
+      onModuleChange(module);
+    }
   };
 
   return (
@@ -41,7 +47,7 @@ export function MobileBottomNav() {
       }}
     >
       <button
-        onClick={(e) => handleNav(e, "/", { view: "projects" })}
+        onClick={(e) => handleNav(e, "projekty")}
         className={cn(
           "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
           isProjectsActive
@@ -53,7 +59,7 @@ export function MobileBottomNav() {
         <span className="text-[10px] font-medium">Projekty</span>
       </button>
       <button
-        onClick={(e) => handleNav(e, "/", { view: "dashboard" })}
+        onClick={(e) => handleNav(e, "prehled")}
         className={cn(
           "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
           isDashboardActive
@@ -66,7 +72,7 @@ export function MobileBottomNav() {
       </button>
       {canAccessProduction && (
         <button
-          onClick={(e) => handleNav(e, "/vyroba")}
+          onClick={(e) => handleNav(e, "vyroba")}
           className={cn(
             "flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-md min-h-[44px] transition-colors",
             isVyrobaActive

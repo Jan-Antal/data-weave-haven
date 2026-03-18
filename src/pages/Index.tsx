@@ -466,61 +466,71 @@ const Index = () => {
 
       {/* Split layout: main content + data log panel */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Mobile: Přehled or Projekty */}
+        {/* Mobile: show/hide modules without unmount */}
         {isMobile ? (
-          <main className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-3">
-            {mobileTPVProject ? (
-              <MobileTPVCardList
-                items={mobileTPVItems}
-                projectId={mobileTPVProjectId}
-                projectName={mobileTPVProject.project_name}
-                currency={mobileTPVCurrency}
-                productionStatusMap={mobileProductionStatusMap}
-                onBack={handleMobileTPVBack}
-                onOpenDetail={() => {
-                  handleMobileProjectTap(mobileTPVProject);
+          <>
+            {/* Vyroba module — always mounted, shown/hidden via CSS */}
+            <div className={mobileModule === "vyroba" ? "flex-1 min-w-0 flex flex-col overflow-y-auto" : "hidden"}>
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-muted-foreground">Načítání...</div>}>
+                <LazyVyroba />
+              </Suspense>
+            </div>
+
+            {/* Přehled / Projekty module */}
+            <main className={mobileModule !== "vyroba" ? "flex-1 min-w-0 flex flex-col overflow-y-auto pt-3" : "hidden"}>
+              {mobileTPVProject ? (
+                <MobileTPVCardList
+                  items={mobileTPVItems}
+                  projectId={mobileTPVProjectId}
+                  projectName={mobileTPVProject.project_name}
+                  currency={mobileTPVCurrency}
+                  productionStatusMap={mobileProductionStatusMap}
+                  onBack={handleMobileTPVBack}
+                  onOpenDetail={() => {
+                    handleMobileProjectTap(mobileTPVProject);
+                  }}
+                  onAddItem={(name) => {
+                    addTPVItem.mutate({ project_id: mobileTPVProjectId, item_name: name });
+                  }}
+                  onOpenImport={() => {}}
+                  canManageTPV={canManageTPVMobile}
+                />
+              ) : mobileTab === "prehled" ? (
+                <MobilePrehled
+                  recentProjects={recentProjects}
+                  onProjectTap={handleMobileProjectTap}
+                  onOpenDataLog={toggleDataLog}
+                />
+              ) : (
+                <MobileCardList
+                  personFilter={filters.personFilter}
+                  statusFilter={filters.statusFilter}
+                  search={filters.search}
+                  riskHighlight={riskHighlight}
+                  activeTab={activeTab}
+                  onProjectTap={handleMobileProjectTap}
+                  onOpenTPV={handleMobileOpenTPV}
+                />
+              )}
+              <MobileProjectDetailSheet
+                project={mobileDetailProject}
+                open={mobileDetailOpen}
+                onOpenChange={(open) => {
+                  setMobileDetailOpen(open);
+                  if (!open) setMobileDetailProject(null);
                 }}
-                onAddItem={(name) => {
-                  addTPVItem.mutate({ project_id: mobileTPVProjectId, item_name: name });
-                }}
-                onOpenImport={() => {}}
-                canManageTPV={canManageTPVMobile}
+                onOpenTPV={mobileDetailProject ? (p) => {
+                  setMobileDetailOpen(false);
+                  handleMobileOpenTPV(p);
+                } : undefined}
               />
-            ) : mobileTab === "prehled" ? (
-              <MobilePrehled
-                recentProjects={recentProjects}
-                onProjectTap={handleMobileProjectTap}
-                onOpenDataLog={toggleDataLog}
-              />
-            ) : (
-              <MobileCardList
-                personFilter={filters.personFilter}
-                statusFilter={filters.statusFilter}
-                search={filters.search}
-                riskHighlight={riskHighlight}
-                activeTab={activeTab}
-                onProjectTap={handleMobileProjectTap}
-                onOpenTPV={handleMobileOpenTPV}
-              />
-            )}
-            <MobileProjectDetailSheet
-              project={mobileDetailProject}
-              open={mobileDetailOpen}
-              onOpenChange={(open) => {
-                setMobileDetailOpen(open);
-                if (!open) setMobileDetailProject(null);
-              }}
-              onOpenTPV={mobileDetailProject ? (p) => {
-                setMobileDetailOpen(false);
-                handleMobileOpenTPV(p);
-              } : undefined}
-            />
-            {/* Mobile DataLog full screen */}
-            <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
-              setDataLogOpen(v);
-              try { localStorage.setItem("datalog-panel-index", String(v)); } catch {}
-            }} />
-          </main>
+              {/* Mobile DataLog full screen */}
+              <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
+                setDataLogOpen(v);
+                try { localStorage.setItem("datalog-panel-index", String(v)); } catch {}
+              }} />
+            </main>
+          </>
         ) : (
           /* Desktop: table view */
           <main className="px-6 flex-1 min-w-0 flex flex-col overflow-hidden">
@@ -628,7 +638,7 @@ const Index = () => {
       </div>
 
       {/* Mobile Bottom Nav */}
-      {isMobile && <MobileBottomNav />}
+      {isMobile && <MobileBottomNav onModuleChange={setMobileModule} activeModule={mobileModule} />}
 
       <ExchangeRateSettings open={exchangeRateOpen} onOpenChange={setExchangeRateOpen} />
       <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />
