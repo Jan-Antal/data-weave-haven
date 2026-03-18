@@ -27,6 +27,8 @@ export function MobileBottomNav() {
     e.stopPropagation();
     e.preventDefault();
     closeDataLog();
+    // Dispatch event to close any open overlays (TPV list, DataLog panel etc.)
+    window.dispatchEvent(new CustomEvent("mobile-nav-change"));
     navigate(path, { state, replace: true });
   };
 
