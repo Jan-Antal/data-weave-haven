@@ -200,7 +200,20 @@ function renderSubContent(entry: ActivityLogEntry) {
     }
   }
   if (entry.detail && !isJson) {
-    return <p className="text-[10px] text-muted-foreground/80 mt-0.5 italic">{entry.detail}</p>;
+    const detail = entry.detail.trim();
+    const isImageUrl = detail.startsWith("http") && (/\.(jpe?g|png|webp)/i.test(detail) || detail.includes("supabase"));
+    if (isImageUrl) {
+      return (
+        <a href={detail} target="_blank" rel="noopener noreferrer" className="block mt-1">
+          <img
+            src={detail}
+            alt="Foto"
+            className="max-h-[120px] rounded-md border border-border object-cover"
+          />
+        </a>
+      );
+    }
+    return <p className="text-[10px] text-muted-foreground/80 mt-0.5 italic">{detail}</p>;
   }
   return null;
 }
