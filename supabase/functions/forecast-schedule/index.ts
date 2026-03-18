@@ -1,4 +1,4 @@
-// v6 - spread scheduler with threshold
+// v7 - JIT MIN_BUNDLE scheduler
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
