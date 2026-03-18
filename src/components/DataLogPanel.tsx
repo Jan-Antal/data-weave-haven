@@ -395,14 +395,13 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
       <div className="fixed inset-x-0 z-[100] bg-background flex flex-col" style={{ top: "var(--mobile-header-height, 56px)", bottom: "calc(56px + env(safe-area-inset-bottom, 0px))" }}>
         {/* Mobile header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
-          <button onClick={() => onOpenChange(false)} className="flex items-center gap-1 text-sm text-muted-foreground min-h-[44px]">
-            <ArrowLeft className="h-4 w-4" />
-            <span>Zavřít</span>
-          </button>
           <div className="flex items-center gap-2 flex-1">
             <Clock className="h-4 w-4 text-muted-foreground" />
             <span className="text-[13px] font-semibold">Data Log</span>
           </div>
+          <button onClick={() => onOpenChange(false)} className="rounded-sm p-1.5 hover:bg-muted transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center">
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Tab bar */}
