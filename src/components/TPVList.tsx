@@ -904,17 +904,6 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                           </TableCell>
                         );
                       }
-                      if (key === "cena")
-                        return (
-                          <TableCell key={key} style={cellStyle} className="text-right">
-                            <InlineEditableCell
-                              value={String(item.cena ?? "")}
-                              type="number"
-                              onSave={(v) => saveField(item.id, "cena", v, String(item.cena ?? ""))}
-                              readOnly={!canManageTPV}
-                            />
-                          </TableCell>
-                        );
                       // Custom columns
                       if (key.startsWith("custom_") && customColumns) {
                         const def = customColumns.find((c) => c.column_key === key);
