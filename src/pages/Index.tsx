@@ -125,7 +125,7 @@ const Index = () => {
       setMobileModule(prev => prev === "vyroba" ? prev : "prehled");
     }
   }, [isMobile, mobileView]);
-  const mobileTab = mobileView === "projects" ? "projects" : mobileView === "dashboard" ? "prehled" : "prehled";
+  const mobileTab = mobileModule === "projekty" ? "projects" : "prehled";
   const { recent: recentProjects, trackOpen: trackRecentOpen } = useRecentlyOpened();
   const { data: allProjects = [] } = useProjects();
 
