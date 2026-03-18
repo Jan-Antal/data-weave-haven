@@ -836,6 +836,16 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   // ── Read-only styling class ──
   const roClass = "opacity-70 cursor-default bg-muted/50";
 
+  // ── Guard: don't render form content if project is null ──
+  if (!project) {
+    if (mode === "embedded") return null;
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl"><div /></DialogContent>
+      </Dialog>
+    );
+  }
+
   // ── Extracted form fields (shared between dialog and embedded modes) ──
   const formFieldsContent = (
     <>
