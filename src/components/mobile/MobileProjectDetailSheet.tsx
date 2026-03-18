@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatCurrency } from "@/lib/currency";
@@ -70,10 +70,41 @@ export function MobileProjectDetailSheet({ project, open, onOpenChange, onOpenTP
   const [activeTab, setActiveTab] = useState<TabKey>("info");
   const projectId = project?.project_id || "";
 
-  // Reset tab when project changes
+  // Reset tab when project changes (unless initialTab provided)
   useEffect(() => {
     if (open) setActiveTab("info");
   }, [project?.project_id, open]);
+
+  // Drag-to-close gesture
+  const dragRef = useRef({ startY: 0, currentY: 0, dragging: false });
+  const sheetRef = useRef<HTMLDivElement>(null);
+
+  const handleDragTouchStart = useCallback((e: React.TouchEvent) => {
+    dragRef.current = { startY: e.touches[0].clientY, currentY: 0, dragging: true };
+  }, []);
+
+  const handleDragTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!dragRef.current.dragging || !sheetRef.current) return;
+    const deltaY = e.touches[0].clientY - dragRef.current.startY;
+    if (deltaY > 0) {
+      sheetRef.current.style.transform = `translateY(${deltaY}px)`;
+      sheetRef.current.style.transition = "none";
+    }
+  }, []);
+
+  const handleDragTouchEnd = useCallback(() => {
+    if (!dragRef.current.dragging || !sheetRef.current) return;
+    const finalY = parseFloat(sheetRef.current.style.transform.replace(/[^\d.-]/g, "") || "0");
+    if (finalY > 80) {
+      sheetRef.current.style.transition = "transform 200ms ease-out";
+      sheetRef.current.style.transform = "translateY(100%)";
+      setTimeout(() => onOpenChange(false), 200);
+    } else {
+      sheetRef.current.style.transition = "transform 200ms ease-out";
+      sheetRef.current.style.transform = "translateY(0)";
+    }
+    dragRef.current.dragging = false;
+  }, [onOpenChange]);
 
   const { data: tpvItems = [] } = useTPVItems(projectId);
 
@@ -90,11 +121,17 @@ export function MobileProjectDetailSheet({ project, open, onOpenChange, onOpenTP
       <SheetContent
         side="bottom"
         className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col"
+        ref={sheetRef}
       >
         <SheetTitle className="sr-only">{project.project_name}</SheetTitle>
 
         {/* Drag handle */}
-        <div className="flex justify-center pt-2 pb-1 shrink-0">
+        <div
+          className="flex justify-center pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
+          onTouchStart={handleDragTouchStart}
+          onTouchMove={handleDragTouchMove}
+          onTouchEnd={handleDragTouchEnd}
+        >
           <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
         </div>
 

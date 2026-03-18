@@ -203,6 +203,17 @@ const Index = () => {
     setMobileTPVProject(null);
   }, []);
 
+  // Listen for bottom nav change to close TPV list and DataLog
+  useEffect(() => {
+    const handler = () => {
+      setMobileTPVProject(null);
+      setDataLogOpen(false);
+      try { localStorage.setItem("datalog-panel-index", "false"); } catch {}
+    };
+    window.addEventListener("mobile-nav-change", handler);
+    return () => window.removeEventListener("mobile-nav-change", handler);
+  }, []);
+
   // TPV data for the mobile TPV list
   const mobileTPVProjectId = mobileTPVProject?.project_id || "";
   const { data: mobileTPVItems = [] } = useTPVItems(mobileTPVProjectId);
@@ -215,7 +226,7 @@ const Index = () => {
     <ColumnVisibilityProvider>
     <ExportProvider>
     <DataLogHighlightProvider>
-    <div className={cn("h-screen bg-background flex flex-col overflow-hidden", isMobile && "pb-[72px]")}>
+    <div className={cn("h-screen bg-background flex flex-col overflow-hidden", isMobile && "pb-[calc(56px+env(safe-area-inset-bottom,0px))]")}>
       {/* TEST MODE banner */}
       {isTestUser && (
         <div className="bg-orange-500 text-white px-6 flex items-center justify-center gap-2 font-bold tracking-wide shrink-0" style={{ height: 32 }}>
@@ -444,7 +455,7 @@ const Index = () => {
       <div className="flex flex-1 overflow-hidden">
         {/* Mobile: Přehled or Projekty */}
         {isMobile ? (
-          <main className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-3">
+          <main className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-3 transition-opacity duration-150" key={mobileTPVProject ? "tpv" : mobileTab}>
             {mobileTPVProject ? (
               <MobileTPVCardList
                 items={mobileTPVItems}

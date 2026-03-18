@@ -89,7 +89,7 @@ export function MobileTPVCardList({
             <span className="text-sm font-semibold text-primary truncate">{projectId}</span>
             <span className="text-sm text-muted-foreground truncate">— {projectName}</span>
           </div>
-          <button onClick={onOpenDetail} className="p-1.5 rounded-md hover:bg-accent min-h-[36px] min-w-[36px] flex items-center justify-center">
+          <button onClick={onOpenDetail} className="p-1.5 rounded-md hover:bg-accent min-h-[36px] min-w-[36px] flex items-center justify-center" title="Detail projektu">
             <FileText className="h-4 w-4 text-muted-foreground" />
           </button>
         </div>
@@ -132,24 +132,35 @@ export function MobileTPVCardList({
                 {/* Compact view: 3 fields */}
                 <div className="p-3 space-y-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold font-mono text-primary">{item.item_name || "—"}</span>
+                    <span className="text-[11px] font-bold font-mono text-primary truncate max-w-[160px]" title={item.item_name || "—"}>{item.item_name || "—"}</span>
                     {isExpanded
                       ? <ChevronUp className="h-3 w-3 text-muted-foreground shrink-0" />
                       : <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
                     }
                   </div>
                   {item.item_type && (
-                    <p className="text-sm font-semibold text-foreground leading-tight">{item.item_type}</p>
+                    <p className="text-sm font-semibold text-foreground leading-tight truncate max-w-[200px]" title={item.item_type}>{item.item_type}</p>
                   )}
-                  {item.status && (
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] h-5"
-                      style={statusColor ? { backgroundColor: `${statusColor}20`, color: statusColor, borderColor: `${statusColor}50` } : undefined}
-                    >
-                      {item.status}
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {item.status && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] h-5"
+                        style={statusColor ? { backgroundColor: `${statusColor}20`, color: statusColor, borderColor: `${statusColor}50` } : undefined}
+                      >
+                        {item.status}
+                      </Badge>
+                    )}
+                    {item.konstrukter && (
+                      <span className="text-[10px] text-muted-foreground">{item.konstrukter}</span>
+                    )}
+                    {item.pocet != null && item.pocet > 0 && (
+                      <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded">{item.pocet} ks</span>
+                    )}
+                    {vyrobaLabel && (
+                      <Badge variant="secondary" className="text-[10px] h-5">{vyrobaLabel}</Badge>
+                    )}
+                  </div>
                 </div>
 
                 {/* Expanded details */}

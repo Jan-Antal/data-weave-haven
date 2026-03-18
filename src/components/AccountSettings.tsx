@@ -186,6 +186,7 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="h-9"
+                autoFocus={false}
               />
             </div>
             <div>

@@ -27,12 +27,14 @@ export function MobileBottomNav() {
     e.stopPropagation();
     e.preventDefault();
     closeDataLog();
+    // Dispatch event to close any open overlays (TPV list, DataLog panel etc.)
+    window.dispatchEvent(new CustomEvent("mobile-nav-change"));
     navigate(path, { state, replace: true });
   };
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-primary"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-[200] flex items-center justify-around bg-primary"
       style={{
         height: "calc(56px + env(safe-area-inset-bottom, 0px))",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",

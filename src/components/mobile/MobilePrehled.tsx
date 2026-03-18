@@ -336,7 +336,14 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
               const projectName = allProjects.find(p => p.project_id === entry.project_id)?.project_name || entry.project_id;
               const userName = formatUserShort(entry.user_email || "");
               return (
-                <div key={entry.id} className="flex items-center gap-3">
+              <button
+                key={entry.id}
+                className="flex items-center gap-3 w-full text-left active:bg-muted/40 rounded-lg transition-colors py-1 -mx-1 px-1"
+                onClick={() => {
+                  const project = allProjects.find(p => p.project_id === entry.project_id);
+                  if (project) onProjectTap(project);
+                }}
+              >
                   <div
                     className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center"
                     style={{ background: `${color}20` }}
@@ -352,7 +359,7 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
                   <span className="text-[10px] text-muted-foreground shrink-0">
                     {formatRelativeTime(entry.created_at)}
                   </span>
-                </div>
+              </button>
               );
             })}
           </div>

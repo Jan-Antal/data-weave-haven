@@ -559,7 +559,12 @@ export const PhotoLightbox = memo(function PhotoLightbox({
   const modal = (
     <div
       className="fixed inset-0 z-[100000] flex items-center justify-center select-none"
-      onClick={onClose}
+      onClick={(e) => {
+        // Only close if clicking the outermost div directly (not children)
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
       onMouseMove={resetHideTimer}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -639,7 +644,12 @@ export const PhotoLightbox = memo(function PhotoLightbox({
       <div
         className="relative z-10 flex items-center justify-center"
         style={{ width: "90vw", height: "85vh" }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          // Toggle controls on tap (mobile)
+          setShowControls(prev => !prev);
+          resetHideTimer();
+        }}
       >
         {!mediumReady && (
           <div className="absolute inset-0 flex items-center justify-center z-10">
