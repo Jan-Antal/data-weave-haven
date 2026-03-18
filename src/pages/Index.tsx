@@ -19,7 +19,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 
 import { AdminInboxButton } from "@/components/AdminInbox";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, lazy, Suspense } from "react";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
 import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
 import { StatusManagement } from "@/components/StatusManagement";
