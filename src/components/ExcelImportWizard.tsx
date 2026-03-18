@@ -31,6 +31,9 @@ const TARGET_FIELDS = [
   { key: "cena", label: "Cena", required: false },
   { key: "konstrukter", label: "Konstruktér", required: false },
   { key: "notes", label: "Poznámka", required: false },
+  { key: "status", label: "Status", required: false },
+  { key: "sent_date", label: "Odesláno", required: false },
+  { key: "accepted_date", label: "Přijato", required: false },
 ] as const;
 
 type TargetKey = (typeof TARGET_FIELDS)[number]["key"];
@@ -46,6 +49,9 @@ const FUZZY_MAP: { exact: string[]; contains: string[]; target: TargetKey }[] = 
   { exact: ["cena", "price", "cost", "castka"], contains: ["price", "cost"], target: "cena" },
   { exact: ["konstrukter", "engineer", "designer"], contains: ["konstrukt", "engineer"], target: "konstrukter" },
   { exact: ["poznamka", "note", "notes"], contains: ["poznam", "note"], target: "notes" },
+  { exact: ["status", "stav", "stav tpv"], contains: ["status", "stav"], target: "status" },
+  { exact: ["odeslano", "sent", "sent date", "odesláno"], contains: ["odeslan", "sent"], target: "sent_date" },
+  { exact: ["prijato", "accepted", "accepted date", "přijato"], contains: ["prijat", "accept"], target: "accepted_date" },
 ];
 
 function normalize(s: string): string {
@@ -341,6 +347,9 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
           notes: r.values.notes || null,
           pocet: r.values.pocet ? parseNumericValue(r.values.pocet) : null,
           cena: r.values.cena ? parseNumericValue(r.values.cena) : null,
+          status: r.values.status || null,
+          sent_date: r.values.sent_date || null,
+          accepted_date: r.values.accepted_date || null,
           imported_at: new Date().toISOString(),
           import_source: file?.name || null,
         }));
@@ -358,6 +367,9 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
               notes: r.values.notes || null,
               pocet: r.values.pocet ? parseNumericValue(r.values.pocet) : null,
               cena: r.values.cena ? parseNumericValue(r.values.cena) : null,
+              status: r.values.status || null,
+              sent_date: r.values.sent_date || null,
+              accepted_date: r.values.accepted_date || null,
             } as any)
             .eq("project_id", projectId)
             .eq("item_name", r.values.item_name)
