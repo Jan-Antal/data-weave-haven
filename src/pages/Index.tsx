@@ -215,7 +215,7 @@ const Index = () => {
     <ColumnVisibilityProvider>
     <ExportProvider>
     <DataLogHighlightProvider>
-    <div className={cn("h-screen bg-background flex flex-col overflow-hidden", isMobile && "pb-[72px]")}>
+    <div className={cn("h-screen bg-background flex flex-col overflow-hidden", isMobile && "pb-[calc(56px+env(safe-area-inset-bottom,0px))]")}>
       {/* TEST MODE banner */}
       {isTestUser && (
         <div className="bg-orange-500 text-white px-6 flex items-center justify-center gap-2 font-bold tracking-wide shrink-0" style={{ height: 32 }}>
