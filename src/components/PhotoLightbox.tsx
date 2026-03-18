@@ -644,7 +644,12 @@ export const PhotoLightbox = memo(function PhotoLightbox({
       <div
         className="relative z-10 flex items-center justify-center"
         style={{ width: "90vw", height: "85vh" }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          // Toggle controls on tap (mobile)
+          setShowControls(prev => !prev);
+          resetHideTimer();
+        }}
       >
         {!mediumReady && (
           <div className="absolute inset-0 flex items-center justify-center z-10">

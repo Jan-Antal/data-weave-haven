@@ -3433,6 +3433,10 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSelected, setPickerSelected] = useState<Set<number>>(new Set());
+  const pendingRetryFiles = useRef<File[]>([]);
+  const [retryBannerVisible, setRetryBannerVisible] = useState(false);
 
   useEffect(() => {
     if (projectId) listFiles("fotky");
@@ -3446,6 +3450,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    const failed: File[] = [];
     for (const file of Array.from(files)) {
       const now = new Date();
       const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -3458,11 +3463,52 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
         toast.success(`✓ ${autoName} nahráno`);
       } catch (err: any) {
         toast.error(`Upload selhal: ${err?.message || "neznámá chyba"}`);
+        failed.push(file);
       }
+    }
+    if (failed.length > 0) {
+      pendingRetryFiles.current = failed;
+      setRetryBannerVisible(true);
     }
     listFiles("fotky", true);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
+  }
+
+  async function handleRetry() {
+    const filesToRetry = [...pendingRetryFiles.current];
+    pendingRetryFiles.current = [];
+    setRetryBannerVisible(false);
+    const failed: File[] = [];
+    for (const file of filesToRetry) {
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const timeStr = `${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}`;
+      const ext = file.name.split(".").pop() || "jpg";
+      const autoName = `${projectId}-Log-${dateStr}-${timeStr}.${ext}`;
+      const renamedFile = new File([file], autoName, { type: file.type });
+      try {
+        await uploadFile("fotky", renamedFile);
+        toast.success(`✓ ${autoName} nahráno`);
+      } catch (err: any) {
+        toast.error(`Upload selhal: ${err?.message || "neznámá chyba"}`);
+        failed.push(file);
+      }
+    }
+    if (failed.length > 0) {
+      pendingRetryFiles.current = failed;
+      setRetryBannerVisible(true);
+    }
+    listFiles("fotky", true);
+  }
+
+  async function handlePickerUpload() {
+    const selectedPhotos = Array.from(pickerSelected).map(i => photos[i]).filter(Boolean);
+    // "Upload selected" doesn't really apply to already-uploaded photos
+    // This is more for re-sharing, but close the picker
+    setPickerSelected(new Set());
+    setPickerOpen(false);
+    toast.success(`${selectedPhotos.length} fotek vybráno`);
   }
 
   async function handleDelete(fileName: string) {
@@ -3479,36 +3525,14 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
       <div className="flex items-center justify-between mb-2">
         <span className="text-[11px] uppercase tracking-wider font-medium" style={{ color: "hsl(var(--muted-foreground))" }}>Foto</span>
         {isMobile ? (
-          <div className="flex gap-1.5">
-            <label className="flex items-center justify-center gap-1 px-2 py-1 rounded text-[11px] font-medium cursor-pointer transition-colors min-h-[44px] flex-1"
-              style={{ border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}>
-              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span>📷</span>}
-              Odfotit
-              <input
-                ref={cameraInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={handleUpload}
-                disabled={uploading}
-              />
-            </label>
-            <label className="flex items-center justify-center gap-1 px-2 py-1 rounded text-[11px] font-medium cursor-pointer transition-colors min-h-[44px] flex-1"
-              style={{ border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}>
-              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span>🖼</span>}
-              Z galérie
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={handleUpload}
-                disabled={uploading}
-              />
-            </label>
-          </div>
+          <button
+            onClick={() => { setPickerOpen(true); setPickerSelected(new Set()); }}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors min-h-[44px]"
+            style={{ border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}
+          >
+            <Camera className="h-3.5 w-3.5" />
+            Přidat foto
+          </button>
         ) : (
           <label className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium cursor-pointer transition-colors"
             style={{ background: "hsl(var(--success) / 0.08)", color: "hsl(var(--success))", border: "1px solid hsl(var(--success) / 0.2)" }}>
@@ -3526,6 +3550,18 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
           </label>
         )}
       </div>
+
+      {/* Retry banner */}
+      {retryBannerVisible && pendingRetryFiles.current.length > 0 && (
+        <div className="flex items-center justify-between gap-2 mb-2 px-3 py-2 rounded-lg text-xs"
+          style={{ background: "hsl(var(--destructive) / 0.08)", border: "1px solid hsl(var(--destructive) / 0.2)", color: "hsl(var(--destructive))" }}>
+          <span>{pendingRetryFiles.current.length} fotek se nenahrály</span>
+          <div className="flex gap-2">
+            <button onClick={handleRetry} className="font-semibold underline">Zkusit znovu</button>
+            <button onClick={() => { pendingRetryFiles.current = []; setRetryBannerVisible(false); }} className="opacity-60">✕</button>
+          </div>
+        </div>
+      )}
 
       {photos.length === 0 ? (
         <div className="h-16 rounded-md flex items-center justify-center text-xs border border-dashed border-border" style={{ color: "hsl(var(--muted-foreground))" }}>
@@ -3559,6 +3595,98 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
           })}
         </div>
       )}
+
+      {/* Mobile photo picker bottom sheet */}
+      <Sheet open={pickerOpen} onOpenChange={setPickerOpen}>
+        <SheetContent side="bottom" className="rounded-t-2xl p-0 max-h-[60vh] flex flex-col">
+          <div className="flex justify-center pt-2 pb-1 shrink-0">
+            <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+          </div>
+          <div className="px-4 py-2 shrink-0 border-b">
+            <span className="text-sm font-semibold">Přidat foto</span>
+          </div>
+
+          {/* Recent photos scroll */}
+          {photos.length > 0 && (
+            <div className="px-4 py-3 shrink-0">
+              <span className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1.5 block">Nedávné</span>
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+                {photos.slice(0, 8).map((photo, idx) => {
+                  const isSelected = pickerSelected.has(idx);
+                  return (
+                    <button
+                      key={photo.itemId || photo.name}
+                      onClick={() => {
+                        setPickerSelected(prev => {
+                          const next = new Set(prev);
+                          if (next.has(idx)) next.delete(idx); else next.add(idx);
+                          return next;
+                        });
+                      }}
+                      className="relative shrink-0 rounded-lg overflow-hidden"
+                      style={{ width: 64, height: 64 }}
+                    >
+                      <img
+                        src={photo.thumbnailUrl || photo.downloadUrl || ""}
+                        alt={photo.name}
+                        className="w-full h-full object-cover"
+                      />
+                      {isSelected && (
+                        <div className="absolute inset-0 bg-primary/30 flex items-center justify-center">
+                          <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                            <Check className="h-3 w-3 text-primary-foreground" />
+                          </div>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Upload selected button */}
+          {pickerSelected.size > 0 && (
+            <div className="px-4 pb-2 shrink-0">
+              <Button size="sm" className="w-full" onClick={handlePickerUpload}>
+                Nahrát vybrané ({pickerSelected.size})
+              </Button>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="border-t">
+            <label className="flex items-center gap-3 px-4 py-3 active:bg-muted/40 transition-colors cursor-pointer min-h-[48px]">
+              <span className="text-base">📷</span>
+              <span className="text-sm font-medium">Odfotit</span>
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => { handleUpload(e); setPickerOpen(false); }}
+                disabled={uploading}
+              />
+            </label>
+            <label className="flex items-center gap-3 px-4 py-3 active:bg-muted/40 transition-colors cursor-pointer min-h-[48px] border-t border-border">
+              <span className="text-base">🖼</span>
+              <span className="text-sm font-medium">Vybrat z knihovny</span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => { handleUpload(e); setPickerOpen(false); }}
+                disabled={uploading}
+              />
+            </label>
+          </div>
+
+          <div className="safe-area-bottom" />
+        </SheetContent>
+      </Sheet>
 
       <PhotoLightbox
         open={lightboxOpen}
