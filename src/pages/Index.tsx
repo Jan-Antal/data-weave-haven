@@ -116,6 +116,15 @@ const Index = () => {
   const location = useLocation();
   const mobileView = (location.state as any)?.view;
   const openProjectIdFromState = (location.state as any)?.openProjectId as string | undefined;
+
+  // Sync mobileModule from router state (for non-module-change navigations)
+  useEffect(() => {
+    if (isMobile && mobileView === "projects") {
+      setMobileModule("projekty");
+    } else if (isMobile && mobileView !== "projects") {
+      setMobileModule(prev => prev === "vyroba" ? prev : "prehled");
+    }
+  }, [isMobile, mobileView]);
   const mobileTab = mobileView === "projects" ? "projects" : mobileView === "dashboard" ? "prehled" : "prehled";
   const { recent: recentProjects, trackOpen: trackRecentOpen } = useRecentlyOpened();
   const { data: allProjects = [] } = useProjects();
