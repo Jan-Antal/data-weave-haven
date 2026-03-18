@@ -89,7 +89,7 @@ export function MobileTPVCardList({
             <span className="text-sm font-semibold text-primary truncate">{projectId}</span>
             <span className="text-sm text-muted-foreground truncate">— {projectName}</span>
           </div>
-          <button onClick={onOpenDetail} className="p-1.5 rounded-md hover:bg-accent min-h-[36px] min-w-[36px] flex items-center justify-center">
+          <button onClick={onOpenDetail} className="p-1.5 rounded-md hover:bg-accent min-h-[36px] min-w-[36px] flex items-center justify-center" title="Detail projektu">
             <FileText className="h-4 w-4 text-muted-foreground" />
           </button>
         </div>

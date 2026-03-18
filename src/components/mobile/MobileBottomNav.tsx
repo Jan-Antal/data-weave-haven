@@ -34,7 +34,7 @@ export function MobileBottomNav() {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-primary"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-[200] flex items-center justify-around bg-primary"
       style={{
         height: "calc(56px + env(safe-area-inset-bottom, 0px))",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",

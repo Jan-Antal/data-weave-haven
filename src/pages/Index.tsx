@@ -203,6 +203,17 @@ const Index = () => {
     setMobileTPVProject(null);
   }, []);
 
+  // Listen for bottom nav change to close TPV list and DataLog
+  useEffect(() => {
+    const handler = () => {
+      setMobileTPVProject(null);
+      setDataLogOpen(false);
+      try { localStorage.setItem("datalog-panel-index", "false"); } catch {}
+    };
+    window.addEventListener("mobile-nav-change", handler);
+    return () => window.removeEventListener("mobile-nav-change", handler);
+  }, []);
+
   // TPV data for the mobile TPV list
   const mobileTPVProjectId = mobileTPVProject?.project_id || "";
   const { data: mobileTPVItems = [] } = useTPVItems(mobileTPVProjectId);

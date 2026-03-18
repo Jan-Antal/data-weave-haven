@@ -121,11 +121,17 @@ export function MobileProjectDetailSheet({ project, open, onOpenChange, onOpenTP
       <SheetContent
         side="bottom"
         className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col"
+        ref={sheetRef}
       >
         <SheetTitle className="sr-only">{project.project_name}</SheetTitle>
 
         {/* Drag handle */}
-        <div className="flex justify-center pt-2 pb-1 shrink-0">
+        <div
+          className="flex justify-center pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
+          onTouchStart={handleDragTouchStart}
+          onTouchMove={handleDragTouchMove}
+          onTouchEnd={handleDragTouchEnd}
+        >
           <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
         </div>
 

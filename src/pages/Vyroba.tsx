@@ -1434,7 +1434,17 @@ export default function Vyroba() {
           <div className="space-y-5 py-2">
             <div>
               <div className="text-xs font-semibold mb-2" style={{ color: "#6b7280" }}>
-                {logDayIndex >= 0 ? DAY_NAMES[logDayIndex] : "Dnes"} — Operace
+                {logDayIndex >= 0 ? DAY_NAMES[logDayIndex] : "Dnes"}{" "}
+                {(() => {
+                  if (logDayIndex >= 0) {
+                    const d = new Date(currentMonday);
+                    d.setDate(d.getDate() + logDayIndex);
+                    return `${d.getDate()}.${d.getMonth() + 1}.`;
+                  }
+                  const now = new Date();
+                  return `${now.getDate()}.${now.getMonth() + 1}.`;
+                })()}{" "}
+                — Operace
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {PHASES.map(p => (
