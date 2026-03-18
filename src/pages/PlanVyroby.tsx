@@ -853,7 +853,7 @@ export default function PlanVyroby() {
           onMerge={async () => {
             await mergeState.onKeepSeparate();
             for (const gid of mergeState.splitGroupIds) {
-              await mergeSplitItems(gid);
+              await mergeSplitItems(gid, mergeState.targetWeekKey);
             }
           }}
           onKeepSeparate={mergeState.onKeepSeparate}
