@@ -307,6 +307,15 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
+
+  // Listen for bottom nav changes to auto-close
+  useEffect(() => {
+    const handler = () => {
+      if (open) onOpenChange(false);
+    };
+    window.addEventListener("mobile-nav-change", handler);
+    return () => window.removeEventListener("mobile-nav-change", handler);
+  }, [open, onOpenChange]);
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   const [userFilter, setUserFilter] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>("7d");
