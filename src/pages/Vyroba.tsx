@@ -202,6 +202,11 @@ export default function Vyroba() {
   const [dataLogOpen, setDataLogOpen] = useState(() => {
     try { return localStorage.getItem("datalog-panel-vyroba") === "true"; } catch { return false; }
   });
+  useEffect(() => {
+    const handler = () => setDataLogOpen(false);
+    window.addEventListener("mobile-nav-change", handler);
+    return () => window.removeEventListener("mobile-nav-change", handler);
+  }, []);
   const toggleDataLog = useCallback(() => {
     setDataLogOpen(prev => {
       const next = !prev;
@@ -932,7 +937,7 @@ export default function Vyroba() {
 
   /* ═══ RENDER ═══ */
   return (
-    <div className={cn("h-screen flex flex-col overflow-hidden animate-in fade-in duration-150", isMobile && "pb-[72px]")} style={{ background: "#f8f7f4" }}>
+    <div className={cn("h-screen flex flex-col overflow-hidden", isMobile && "pb-[72px]")} style={{ background: "#f8f7f4" }}>
       {/* ═══ MOBILE HEADER ═══ */}
       {isMobile && (
         <MobileHeader
@@ -1721,7 +1726,7 @@ export default function Vyroba() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
                             {item.item_code && <span className="font-mono text-[10px] font-bold" style={{ color: "hsl(var(--foreground))" }}>{item.item_code}</span>}
-                            <span className="text-[12px] truncate" style={{ color: "hsl(var(--foreground))" }}>{item.item_name}</span>
+                            <span className="text-[12px] truncate min-w-0 flex-1" style={{ color: "hsl(var(--foreground))" }}>{item.item_name}</span>
                             {mids.length > 1 && (
                               <span className="text-[9px] font-medium px-1 py-[1px] rounded shrink-0" style={{ background: "rgba(217,119,6,0.1)", color: "#d97706" }}>
                                 {mids.length} částí
