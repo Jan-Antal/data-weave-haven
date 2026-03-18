@@ -1320,7 +1320,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   }
 
   return (
-    <div data-bundle-key={`${weekKey}::${bundle.project_id}`} className="rounded-[6px] overflow-hidden relative" style={{
+    <div data-bundle-key={`${weekKey}::${bundle.project_id}`} className="rounded-[6px] overflow-hidden relative shrink-0" style={{
       borderTop: forecastDarkMode
         ? (isHighlighted ? "2px solid #d97706" : "1px solid #3d4558")
         : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isHighlighted ? "2px solid #d97706" : "1px solid #ece8e2"),
