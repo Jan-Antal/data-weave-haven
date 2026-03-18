@@ -1,10 +1,9 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { StatusBadge } from "@/components/StatusBadge";
-import { formatCurrency } from "@/lib/currency";
-import { parseAppDate, formatAppDate } from "@/lib/dateFormat";
 import { useTPVItems } from "@/hooks/useTPVItems";
 import { useSharePointDocs, type SPFile, CATEGORY_FOLDER_MAP } from "@/hooks/useSharePointDocs";
+import { ProjectDetailDialog, type ProjectDetailProject } from "@/components/ProjectDetailDialog";
 import { ChevronRight, FileText, Package, Info, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -45,74 +44,16 @@ const TABS: { key: TabKey; label: string; icon: typeof Info }[] = [
   { key: "docs", label: "Dokumenty", icon: FileText },
 ];
 
-function InfoField({ label, value }: { label: string; value: string | null | undefined }) {
-  if (!value) return null;
-  return (
-    <div className="flex items-baseline justify-between py-2" style={{ borderBottom: "0.5px solid hsl(var(--border))" }}>
-      <span className="text-[11px] text-muted-foreground">{label}</span>
-      <span className="text-[12px] font-medium text-foreground text-right max-w-[60%] truncate">{value}</span>
-    </div>
-  );
-}
-
-function InfoSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-4">
-      <h4 className="uppercase text-[11px] font-semibold tracking-wide text-muted-foreground mb-1">{title}</h4>
-      <div className="bg-card rounded-[10px] px-3" style={{ border: "0.5px solid hsl(var(--border))" }}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 export function MobileProjectDetailSheet({ project, open, onOpenChange, onOpenTPV }: MobileProjectDetailSheetProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("info");
   const projectId = project?.project_id || "";
 
-  // Reset tab when project changes (unless initialTab provided)
+  // Reset tab when project changes
   useEffect(() => {
     if (open) setActiveTab("info");
   }, [project?.project_id, open]);
 
-  // Drag-to-close gesture
-  const dragRef = useRef({ startY: 0, currentY: 0, dragging: false });
-  const sheetRef = useRef<HTMLDivElement>(null);
-
-  const handleDragTouchStart = useCallback((e: React.TouchEvent) => {
-    dragRef.current = { startY: e.touches[0].clientY, currentY: 0, dragging: true };
-  }, []);
-
-  const handleDragTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!dragRef.current.dragging || !sheetRef.current) return;
-    const deltaY = e.touches[0].clientY - dragRef.current.startY;
-    if (deltaY > 0) {
-      sheetRef.current.style.transform = `translateY(${deltaY}px)`;
-      sheetRef.current.style.transition = "none";
-    }
-  }, []);
-
-  const handleDragTouchEnd = useCallback(() => {
-    if (!dragRef.current.dragging || !sheetRef.current) return;
-    const finalY = parseFloat(sheetRef.current.style.transform.replace(/[^\d.-]/g, "") || "0");
-    if (finalY > 80) {
-      sheetRef.current.style.transition = "transform 200ms ease-out";
-      sheetRef.current.style.transform = "translateY(100%)";
-      setTimeout(() => onOpenChange(false), 200);
-    } else {
-      sheetRef.current.style.transition = "transform 200ms ease-out";
-      sheetRef.current.style.transform = "translateY(0)";
-    }
-    dragRef.current.dragging = false;
-  }, [onOpenChange]);
-
   const { data: tpvItems = [] } = useTPVItems(projectId);
-
-  const formattedDate = useMemo(() => {
-    if (!project?.datum_smluvni) return null;
-    const d = parseAppDate(project.datum_smluvni);
-    return d ? formatAppDate(d) : project.datum_smluvni;
-  }, [project?.datum_smluvni]);
 
   if (!project) return null;
 
@@ -120,7 +61,7 @@ export function MobileProjectDetailSheet({ project, open, onOpenChange, onOpenTP
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col"
+        className="h-[90vh] rounded-t-2xl p-0 overflow-hidden flex flex-col"
         onPointerDownOutside={(e) => { e.preventDefault(); onOpenChange(false); }}
       >
         <SheetTitle className="sr-only">{project.project_name}</SheetTitle>
@@ -185,65 +126,28 @@ export function MobileProjectDetailSheet({ project, open, onOpenChange, onOpenTP
         </div>
 
         {/* Tab content */}
-        <div className="flex-1 overflow-y-auto px-4 pt-3 pb-6">
+        <div className="flex-1 overflow-hidden flex flex-col">
           {activeTab === "info" && (
-            <InfoTabContent project={project} formattedDate={formattedDate} />
+            <ProjectDetailDialog
+              project={project as ProjectDetailProject}
+              open={true}
+              onOpenChange={onOpenChange}
+              mode="embedded"
+            />
           )}
           {activeTab === "tpv" && (
-            <TPVTabContent items={tpvItems} currency={project.currency || "CZK"} />
+            <div className="flex-1 overflow-y-auto px-4 pt-3 pb-6">
+              <TPVTabContent items={tpvItems} currency={project.currency || "CZK"} />
+            </div>
           )}
           {activeTab === "docs" && (
-            <DocsTabContent projectId={projectId} />
+            <div className="flex-1 overflow-y-auto px-4 pt-3 pb-6">
+              <DocsTabContent projectId={projectId} />
+            </div>
           )}
         </div>
       </SheetContent>
     </Sheet>
-  );
-}
-
-function InfoTabContent({ project, formattedDate }: { project: Project; formattedDate: string | null }) {
-  return (
-    <>
-      <InfoSection title="Základní informace">
-        <InfoField label="Klient" value={project.klient} />
-        <InfoField label="Lokace" value={project.location} />
-        <InfoField label="Náročnost" value={project.narocnost} />
-        <InfoField label="Risk" value={project.risk} />
-        <InfoField label="Datum smluvní" value={formattedDate} />
-      </InfoSection>
-
-      <InfoSection title="Osoby">
-        <InfoField label="PM" value={project.pm} />
-        <InfoField label="Konstruktér" value={project.konstrukter} />
-        <InfoField label="Kalkulant" value={project.kalkulant} />
-        <InfoField label="Architekt" value={project.architekt} />
-      </InfoSection>
-
-      <InfoSection title="Finance">
-        <InfoField
-          label="Prodejní cena"
-          value={project.prodejni_cena != null ? formatCurrency(project.prodejni_cena, project.currency || "CZK") : null}
-        />
-        <InfoField label="Marže" value={project.marze ? `${project.marze}%` : null} />
-      </InfoSection>
-
-      {(project.pm_poznamka || project.tpv_poznamka) && (
-        <InfoSection title="Poznámky">
-          {project.pm_poznamka && (
-            <div className="py-2" style={{ borderBottom: "0.5px solid hsl(var(--border))" }}>
-              <span className="text-[11px] text-muted-foreground block mb-0.5">PM poznámka</span>
-              <p className="text-[12px] text-foreground">{project.pm_poznamka}</p>
-            </div>
-          )}
-          {project.tpv_poznamka && (
-            <div className="py-2">
-              <span className="text-[11px] text-muted-foreground block mb-0.5">TPV poznámka</span>
-              <p className="text-[12px] text-foreground">{project.tpv_poznamka}</p>
-            </div>
-          )}
-        </InfoSection>
-      )}
-    </>
   );
 }
 
@@ -261,21 +165,16 @@ function TPVTabContent({ items, currency }: { items: any[]; currency: string }) 
           style={{ borderBottom: idx < items.length - 1 ? "0.5px solid hsl(var(--border))" : undefined }}
         >
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 min-w-0">
               <span className="text-[11px] font-mono text-muted-foreground shrink-0">{item.item_name}</span>
               {item.item_type && (
                 <span className="text-[12px] font-medium text-foreground truncate">{item.item_type}</span>
               )}
             </div>
-            {(item.vyroba_status || item.status) && (
-              <div className="mt-0.5">
-                <StatusBadge status={item.vyroba_status || item.status} />
-              </div>
-            )}
           </div>
-          <div className="flex items-center gap-3 shrink-0">
-            {item.pocet != null && (
-              <span className="text-[11px] text-muted-foreground">{item.pocet} ks</span>
+          <div className="flex items-center gap-2 shrink-0">
+            {(item.vyroba_status || item.status) && (
+              <StatusBadge status={item.vyroba_status || item.status} />
             )}
             <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />
           </div>
