@@ -727,7 +727,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                             <InlineEditableCell
                               value={item.item_name || ""}
                               onSave={(v) => saveField(item.id, "item_name", v, item.item_name || "")}
-                              className="font-mono text-xs"
+                              className="font-mono text-xs font-bold"
                               readOnly={!canManageTPV}
                             />
                           </TableCell>
