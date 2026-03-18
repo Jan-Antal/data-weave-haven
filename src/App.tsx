@@ -141,22 +141,24 @@ function AppRoutes() {
   }
 
   return (
-    <UndoRedoProvider>
-      <PeopleManagementProvider>
-        <BrowserRouter>
-          <RealtimeSyncProvider />
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/plan-vyroby" element={<AdminRoute><PlanVyroby /></AdminRoute>} />
-            <Route path="/vyroba" element={<AdminRoute><Vyroba /></AdminRoute>} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="/set-password" element={<SetPassword />} />
-            <Route path="/login" element={<Navigate to="/" replace />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </PeopleManagementProvider>
-    </UndoRedoProvider>
+    <div style={{ background: "#f8f7f4", minHeight: "100dvh" }}>
+      <UndoRedoProvider>
+        <PeopleManagementProvider>
+          <BrowserRouter>
+            <RealtimeSyncProvider />
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/plan-vyroby" element={<AdminRoute><PlanVyroby /></AdminRoute>} />
+              <Route path="/vyroba" element={<AdminRoute><Vyroba /></AdminRoute>} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/set-password" element={<SetPassword />} />
+              <Route path="/login" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </PeopleManagementProvider>
+      </UndoRedoProvider>
+    </div>
   );
 }
 
