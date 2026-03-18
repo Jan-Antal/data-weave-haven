@@ -75,19 +75,20 @@ function estimateHours(proj: any, tpvItems: any[], hourlyRate: number, vyrobaPct
   return { hours, badge: proj.cost_preset_id ? "Rozpad" : "Výroba – odhad", base: "prodejni_cena" };
 }
 function resolveDeadline(proj: any, itemCount: number): { date: Date|null; source: string } {
-  const exp = parseDate(proj.expedice); if (exp) return { date: exp, source: "expedice" };
+  const exp = parseDate(proj.expedice); if (exp) return { date: addDays(exp, -1), source: "expedice" };
   const mon = parseDate(proj.montaz); if (mon) return { date: addDays(mon,-3), source: "montaz" };
   const pre = parseDate(proj.predani); if (pre) return { date: addWeeks(pre,-montazWeeks(itemCount)), source: "predani" };
   const sml = parseDate(proj.datum_smluvni); if (sml) return { date: sml, source: "smluvni" };
   return { date: null, source: "none" };
 }
-function resolveTpvStart(proj: any, itemCount: number, today: Date): Date {
+function resolveTpvStart(proj: any, itemCount: number, today: Date, deadline: Date): Date {
   const tpv = parseDate(proj.tpv_date);
-  if (tpv) return tpv < today ? today : tpv;
+  if (tpv) { const r = tpv < today ? today : tpv; return r > deadline ? today : r; }
   const ord = parseDate(proj.datum_objednavky);
-  if (ord) { const est = addWeeks(ord, tpvWeeksEstimate(itemCount)); return est < today ? today : est; }
+  if (ord) { const est = addWeeks(ord, tpvWeeksEstimate(itemCount)); const r = est < today ? today : est; return r > deadline ? today : r; }
   const delays: Record<string,number> = { "Příprava":12,"Engineering":8,"TPV":4,"Výroba IN":0,"Výroba":0 };
-  return addWeeks(today, delays[proj.status] ?? 6);
+  const fallback = addWeeks(today, delays[proj.status] ?? 6);
+  return fallback > deadline ? today : fallback;
 }
 function priorityScore(proj: any, tpvStart: Date, deadline: Date, today: Date): number {
   let score = 0;
@@ -157,12 +158,11 @@ serve(async (req) => {
         safetyNetMap.set(proj.project_id,{project_id:proj.project_id,project_name:proj.project_name,estimated_hours:remainingHours,estimation_badge:est.badge+" – chybí termíny"});
         continue;
       }
-      let tpvStart = resolveTpvStart(proj,tpvCount,today);
       const dl = resolveDeadline(proj,tpvCount);
       const statusFallback:Record<string,number> = {"Výroba IN":4,"Výroba":4,"TPV":8,"Engineering":12,"Příprava":16};
-      const deadline = dl.date ? dl.date : addWeeks(tpvStart,statusFallback[proj.status]??8);
-      // If deadline is before computed tpvStart, pull tpvStart back to today — deadline is a hard constraint
-      if (dl.date && tpvStart > deadline) tpvStart = today;
+      const deadlineFallback = addWeeks(today,statusFallback[proj.status]??8);
+      const deadline = dl.date ? dl.date : deadlineFallback;
+      const tpvStart = resolveTpvStart(proj,tpvCount,today,deadline);
       if (deadline < today) {
         safetyNetMap.set(proj.project_id,{project_id:proj.project_id,project_name:proj.project_name,estimated_hours:remainingHours,estimation_badge:"⚠ Termín v minulosti"});
         continue;

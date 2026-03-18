@@ -241,12 +241,12 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
 
       // Margin: normalize (detect 0.25 vs 25)
       const rawMarze = Number(projectData?.marze) || 0;
-      const marze = rawMarze > 1 ? rawMarze / 100 : rawMarze;
+      const marze = rawMarze === 0 ? 0.15 : rawMarze > 1 ? rawMarze / 100 : rawMarze;
 
       // Production percentage from project override or preset
       const prodPct = (projectData?.cost_production_pct != null
         ? Number(projectData.cost_production_pct)
-        : (projectPreset?.production_pct ?? 100)) / 100;
+        : (projectPreset?.production_pct ?? 35)) / 100;
 
       let sentCount = 0;
       const skipped: string[] = [];
