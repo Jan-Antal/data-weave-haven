@@ -261,15 +261,17 @@ function TPVTabContent({ items, currency }: { items: any[]; currency: string }) 
           style={{ borderBottom: idx < items.length - 1 ? "0.5px solid hsl(var(--border))" : undefined }}
         >
           <div className="min-w-0 flex-1">
-            <span className="text-[11px] font-mono text-muted-foreground">{item.item_name}</span>
-            <div className="flex items-center justify-between gap-2 mt-0.5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-mono text-muted-foreground shrink-0">{item.item_name}</span>
               {item.item_type && (
-                <span className="text-[12px] font-medium text-foreground truncate flex-1">{item.item_type}</span>
-              )}
-              {(item.vyroba_status || item.status) && (
-                <StatusBadge status={item.vyroba_status || item.status} />
+                <span className="text-[12px] font-medium text-foreground truncate">{item.item_type}</span>
               )}
             </div>
+            {(item.vyroba_status || item.status) && (
+              <div className="mt-0.5">
+                <StatusBadge status={item.vyroba_status || item.status} />
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-3 shrink-0">
             {item.pocet != null && (

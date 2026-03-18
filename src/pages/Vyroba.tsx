@@ -202,11 +202,6 @@ export default function Vyroba() {
   const [dataLogOpen, setDataLogOpen] = useState(() => {
     try { return localStorage.getItem("datalog-panel-vyroba") === "true"; } catch { return false; }
   });
-  useEffect(() => {
-    const handler = () => setDataLogOpen(false);
-    window.addEventListener("mobile-nav-change", handler);
-    return () => window.removeEventListener("mobile-nav-change", handler);
-  }, []);
   const toggleDataLog = useCallback(() => {
     setDataLogOpen(prev => {
       const next = !prev;
@@ -341,6 +336,18 @@ export default function Vyroba() {
   // Project detail dialog
   const [detailProject, setDetailProject] = useState<any | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+
+  // Close overlays on mobile nav change
+  useEffect(() => {
+    const handler = () => {
+      setDataLogOpen(false);
+      setMobileDetailOpen(false);
+      setDetailDialogOpen(false);
+      setDetailProject(null);
+    };
+    window.addEventListener("mobile-nav-change", handler);
+    return () => window.removeEventListener("mobile-nav-change", handler);
+  }, []);
 
   // Pause dialog
   const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
@@ -828,8 +835,6 @@ export default function Vyroba() {
       logActivity({ projectId: selectedProject.projectId, actionType: "item_hotovo", newValue: item?.item_code || item?.item_name || itemId, detail: "Označeno jako hotovo" });
     }
   }
-
-
 
 
   /* ── Return from Expedice ── */

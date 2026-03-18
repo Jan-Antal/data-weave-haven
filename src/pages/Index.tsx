@@ -456,7 +456,7 @@ const Index = () => {
       <div className="flex flex-1 overflow-hidden">
         {/* Mobile: Přehled or Projekty */}
         {isMobile ? (
-          <main className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-3 transition-opacity duration-150" key={mobileTPVProject ? "tpv" : mobileTab}>
+          <main className="flex-1 min-w-0 flex flex-col overflow-y-auto pt-3" key={mobileTPVProject ? "tpv" : mobileTab}>
             {mobileTPVProject ? (
               <MobileTPVCardList
                 items={mobileTPVItems}
