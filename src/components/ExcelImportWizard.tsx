@@ -347,6 +347,9 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
           notes: r.values.notes || null,
           pocet: r.values.pocet ? parseNumericValue(r.values.pocet) : null,
           cena: r.values.cena ? parseNumericValue(r.values.cena) : null,
+          status: r.values.status || null,
+          sent_date: r.values.sent_date || null,
+          accepted_date: r.values.accepted_date || null,
           imported_at: new Date().toISOString(),
           import_source: file?.name || null,
         }));
