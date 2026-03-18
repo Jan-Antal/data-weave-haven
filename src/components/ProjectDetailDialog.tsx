@@ -833,6 +833,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     }
   }, [openCategory, sp.filesByCategory, fileSelection, handleMoveFiles]);
 
+  // ── Read-only styling class ──
+  const roClass = "opacity-70 cursor-default bg-muted/50";
+
   // ── Extracted form fields (shared between dialog and embedded modes) ──
   const formFieldsContent = (
     <>
