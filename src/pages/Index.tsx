@@ -83,6 +83,7 @@ const Index = () => {
   const [mobileDetailProject, setMobileDetailProject] = useState<any>(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [mobileTPVProject, setMobileTPVProject] = useState<any>(null);
+  const [mobileModule, setMobileModule] = useState<"prehled" | "projekty" | "vyroba">("prehled");
   const scrollPositions = useRef<Record<string, number>>({});
   const { setCurrentPage, undo, redo, canUndo, canRedo, lastUndoDescription, lastRedoDescription } = useUndoRedo();
 
