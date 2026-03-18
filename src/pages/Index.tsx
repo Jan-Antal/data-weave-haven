@@ -50,7 +50,7 @@ import { useTPVItems, useAddTPVItem } from "@/hooks/useTPVItems";
 import { useProductionStatuses } from "@/hooks/useProductionStatuses";
 import { useProjects } from "@/hooks/useProjects";
 
-const ROLE_LABELS: Record<string, string> = {
+const LazyVyroba = lazy(() => import("@/pages/Vyroba"));: Record<string, string> = {
   admin: "Admin",
   pm: "PM",
   konstrukter: "Konstruktér",
