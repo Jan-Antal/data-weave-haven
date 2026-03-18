@@ -337,6 +337,18 @@ export default function Vyroba() {
   const [detailProject, setDetailProject] = useState<any | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
+  // Close overlays on mobile nav change
+  useEffect(() => {
+    const handler = () => {
+      setDataLogOpen(false);
+      setMobileDetailOpen(false);
+      setDetailDialogOpen(false);
+      setDetailProject(null);
+    };
+    window.addEventListener("mobile-nav-change", handler);
+    return () => window.removeEventListener("mobile-nav-change", handler);
+  }, []);
+
   // Pause dialog
   const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
   const [pauseTarget, setPauseTarget] = useState<{ id: string; name: string; code?: string | null }>({ id: "", name: "" });
