@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import { format } from "date-fns";
-import { parseAppDate } from "./dateFormat";
+import { parseAppDate, formatAppDate } from "./dateFormat";
 import { toast } from "@/hooks/use-toast";
 
 interface ExportOptions {
@@ -41,13 +41,8 @@ export function exportToExcel({ sheetName, fileName, headers, rows }: ExportOpti
 /** Extract a raw value from a project row for a given column key */
 export function getProjectCellValue(project: Record<string, any>, key: string): string | number {
   const DATE_KEYS = new Set([
-    "datum_smluvni",
-    "datum_objednavky",
-    "zamereni",
-    "tpv_date",
-    "expedice",
-    "montaz",
-    "predani",
+    "datum_smluvni", "datum_objednavky", "zamereni",
+    "tpv_date", "expedice", "montaz", "predani",
   ]);
 
   if (key.startsWith("custom_")) {
@@ -65,14 +60,17 @@ export function getProjectCellValue(project: Record<string, any>, key: string): 
     return isNaN(num) ? "" : num;
   }
 
-  if (key === "percent_tpv") {
-    return val === "" || val == null ? "" : Number(val);
+  if (key === "percent_tpv" || key === "marze") {
+    if (val === "" || val == null) return "";
+    const num = Number(val);
+    return isNaN(num) ? "" : num;
   }
 
   if (DATE_KEYS.has(key)) {
     if (!val) return "";
     const d = parseAppDate(String(val));
     if (!d) return String(val);
+    // ISO format YYYY-MM-DD for Excel compatibility
     return d.toISOString().split("T")[0];
   }
 
