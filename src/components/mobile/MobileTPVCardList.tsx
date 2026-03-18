@@ -132,7 +132,7 @@ export function MobileTPVCardList({
                 {/* Compact view: 3 fields */}
                 <div className="p-3 space-y-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold font-mono text-primary">{item.item_name || "—"}</span>
+                    <span className="text-[11px] font-bold font-mono text-primary truncate max-w-[160px]" title={item.item_name || "—"}>{item.item_name || "—"}</span>
                     {isExpanded
                       ? <ChevronUp className="h-3 w-3 text-muted-foreground shrink-0" />
                       : <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
