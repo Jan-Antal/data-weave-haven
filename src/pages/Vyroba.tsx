@@ -1449,153 +1449,180 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
       {/* ═══ LOG MODAL ═══ */}
       <Dialog open={logModalOpen} onOpenChange={setLogModalOpen}>
-        <DialogContent className={isMobile ? "p-0 gap-0" : "sm:max-w-md p-0 gap-0"} style={isMobile ? {
-          position: "fixed",
-          top: "auto",
-          bottom: "calc(56px + env(safe-area-inset-bottom, 0px))",
-          left: 0,
-          right: 0,
-          width: "100%",
-          maxWidth: "100%",
-          maxHeight: "calc(100dvh - 100px)",
-          overflowY: "auto" as const,
-          borderRadius: "16px 16px 0 0",
-          margin: 0,
-          transform: "none"
-        } : undefined}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <span className="font-mono text-xs" style={{ color: "#6b7280" }}>{selectedProject?.projectId}</span>
-              <span>{selectedProject?.projectName}</span>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-5 py-2">
-            <div>
-              <div className="text-xs font-semibold mb-2" style={{ color: "#6b7280" }}>
-                {logDayIndex >= 0 ? DAY_NAMES[logDayIndex] : "Dnes"}{" "}
-                {(() => {
-                  if (logDayIndex >= 0) {
-                    const d = new Date(currentMonday);
-                    d.setDate(d.getDate() + logDayIndex);
-                    return `${d.getDate()}.${d.getMonth() + 1}.`;
-                  }
-                  const now = new Date();
-                  return `${now.getDate()}.${now.getMonth() + 1}.`;
-                })()}{" "}
-                — Operace
+        <DialogContent
+          className={isMobile ? "p-0 gap-0 border-0" : "sm:max-w-md p-0 gap-0"}
+          style={isMobile ? {
+            position: "fixed",
+            top: "auto",
+            bottom: "calc(56px + env(safe-area-inset-bottom, 0px))",
+            left: 0,
+            right: 0,
+            width: "100%",
+            maxWidth: "100%",
+            height: "85vh",
+            maxHeight: "85vh",
+            borderRadius: "16px 16px 0 0",
+            margin: 0,
+            transform: "none",
+            display: "flex",
+            flexDirection: "column" as const,
+            overflow: "hidden",
+          } : undefined}
+        >
+          {/* Mobile header bar matching project detail sheet */}
+          {isMobile && (
+            <div className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0">
+              <button
+                onClick={() => setLogModalOpen(false)}
+                className="text-xs font-medium flex items-center gap-1 min-h-[36px] text-muted-foreground"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" /> Zpět
+              </button>
+              <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+              <div className="w-[50px]" />
+            </div>
+          )}
+
+          {/* Scrollable content */}
+          <div className={isMobile ? "flex-1 overflow-y-auto px-4 pb-4" : ""}>
+            <DialogHeader className={isMobile ? "pb-2" : ""}>
+              <DialogTitle className="flex items-center gap-2">
+                <span className="font-mono text-xs text-muted-foreground">{selectedProject?.projectId}</span>
+                <span>{selectedProject?.projectName}</span>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-5 py-2">
+              <div>
+                <div className="text-xs font-semibold mb-2 text-muted-foreground">
+                  {logDayIndex >= 0 ? DAY_NAMES[logDayIndex] : "Dnes"}{" "}
+                  {(() => {
+                    if (logDayIndex >= 0) {
+                      const d = new Date(currentMonday);
+                      d.setDate(d.getDate() + logDayIndex);
+                      return `${d.getDate()}.${d.getMonth() + 1}.`;
+                    }
+                    const now = new Date();
+                    return `${now.getDate()}.${now.getMonth() + 1}.`;
+                  })()}{" "}
+                  — Operace
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {PHASES.map(p => (
+                    <button key={p.name} onClick={() => {
+                      setLogPhase(p.name);
+                      if (!hotovostTouched) {
+                        setLogPercent(p.pct);
+                      }
+                    }}
+                      className="px-2.5 py-1 rounded-full text-xs font-medium transition-all"
+                      style={{
+                        background: logPhase === p.name ? p.color : "hsl(var(--muted))",
+                        color: logPhase === p.name ? "#fff" : "hsl(var(--foreground))",
+                        border: `1px solid ${logPhase === p.name ? p.color : "hsl(var(--border))"}`,
+                        cursor: "pointer",
+                      }}>
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+                {logPhaseWarning && (
+                  <div className="mt-1.5 text-[11px] font-medium text-destructive">
+                    ⚠ {logPhaseWarning}
+                  </div>
+                )}
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {PHASES.map(p => (
-                  <button key={p.name} onClick={() => {
-                    setLogPhase(p.name);
-                    if (!hotovostTouched) {
-                      setLogPercent(p.pct);
+              {(() => {
+                const logWeeklyGoal = selectedProject ? getWeeklyGoal(selectedProject.projectId) : 100;
+                return (
+                  <div>
+                    <div className="text-xs font-semibold mb-2 text-muted-foreground">Celková hotovost</div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1">
+                        <Slider min={0} max={100} step={5} value={[logPercent]} onValueChange={([v]) => {
+                          setHotovostTouched(true);
+                          setLogPercent(v);
+                        }} />
+                        <div className="flex justify-between text-[9px] mt-1 text-muted-foreground">
+                          <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
+                        </div>
+                      </div>
+                      <span className="text-2xl font-mono font-bold min-w-[60px] text-right" style={{ color: logPercent >= logWeeklyGoal ? "#3a8a36" : "hsl(var(--foreground))" }}>
+                        {logPercent}%
+                      </span>
+                    </div>
+                    <div className="mt-1 text-[10px] text-muted-foreground">
+                      Týdenní cíl: <span className="font-semibold" style={{ color: logPercent >= logWeeklyGoal ? "#3a8a36" : "#d97706" }}>{logWeeklyGoal}%</span> · Celkem: 100%
+                    </div>
+                    {logPercent > logWeeklyGoal && (
+                      <div className="mt-1 text-[10px] font-medium" style={{ color: "#3a8a36" }}>
+                        🎉 Nad plán! Výborně!
+                      </div>
+                    )}
+                    {hotovostTouched && (
+                      <div className="mt-1.5 flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <span>% ručně nastaveno — operace nezmění hodnotu</span>
+                        <button
+                          className="font-medium underline"
+                          style={{ color: "#d97706" }}
+                          onClick={() => {
+                            setHotovostTouched(false);
+                            const phasePct = PHASES.find(p => p.name === logPhase)?.pct || 0;
+                            setLogPercent(phasePct);
+                          }}
+                        >× Reset</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Poznámky section */}
+              <div>
+                <div className="text-[11px] uppercase tracking-wider font-medium mb-1 text-muted-foreground">Poznámky</div>
+                <textarea
+                  value={logNotes}
+                  onChange={e => {
+                    logNotesUndoStack.current = [...logNotesUndoStack.current.slice(-49), logNotes];
+                    setLogNotes(e.target.value);
+                  }}
+                  onKeyDown={e => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (logNotesUndoStack.current.length > 0) {
+                        const prev = logNotesUndoStack.current[logNotesUndoStack.current.length - 1];
+                        logNotesUndoStack.current = logNotesUndoStack.current.slice(0, -1);
+                        setLogNotes(prev);
+                      }
                     }
                   }}
-                    className="px-2.5 py-1 rounded-full text-xs font-medium transition-all"
-                    style={{
-                      background: logPhase === p.name ? p.color : "#f5f3f0",
-                      color: logPhase === p.name ? "#fff" : "#1a1a1a",
-                      border: `1px solid ${logPhase === p.name ? p.color : "#e5e2dd"}`,
-                      cursor: "pointer",
-                    }}>
-                    {p.name}
-                  </button>
-                ))}
+                  placeholder="Čeho jste dnes dosáhli? Problémy, poznámky..."
+                  className="w-full h-20 text-xs rounded-md p-2 resize-none border border-input bg-background"
+                />
               </div>
-              {logPhaseWarning && (
-                <div className="mt-1.5 text-[11px] font-medium" style={{ color: "#dc2626" }}>
-                  ⚠ {logPhaseWarning}
-                </div>
-              )}
-            </div>
-            {(() => {
-              const logWeeklyGoal = selectedProject ? getWeeklyGoal(selectedProject.projectId) : 100;
-              return (
-                <div>
-                  <div className="text-xs font-semibold mb-2" style={{ color: "#6b7280" }}>Celková hotovost</div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <Slider min={0} max={100} step={5} value={[logPercent]} onValueChange={([v]) => {
-                        setHotovostTouched(true);
-                        setLogPercent(v);
-                      }} />
-                      <div className="flex justify-between text-[9px] mt-1" style={{ color: "#99a5a3" }}>
-                        <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
-                      </div>
-                    </div>
-                    <span className="text-2xl font-mono font-bold min-w-[60px] text-right" style={{ color: logPercent >= logWeeklyGoal ? "#3a8a36" : "#1a1a1a" }}>
-                      {logPercent}%
-                    </span>
-                  </div>
-                  <div className="mt-1 text-[10px]" style={{ color: "#99a5a3" }}>
-                    Týdenní cíl: <span className="font-semibold" style={{ color: logPercent >= logWeeklyGoal ? "#3a8a36" : "#d97706" }}>{logWeeklyGoal}%</span> · Celkem: 100%
-                  </div>
-                  {logPercent > logWeeklyGoal && (
-                    <div className="mt-1 text-[10px] font-medium" style={{ color: "#3a8a36" }}>
-                      🎉 Nad plán! Výborně!
-                    </div>
-                  )}
-                  {hotovostTouched && (
-                    <div className="mt-1.5 flex items-center gap-1 text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>
-                      <span>% ručně nastaveno — operace nezmění hodnotu</span>
-                      <button
-                        className="font-medium underline"
-                        style={{ color: "#d97706" }}
-                        onClick={() => {
-                          setHotovostTouched(false);
-                          const phasePct = PHASES.find(p => p.name === logPhase)?.pct || 0;
-                          setLogPercent(phasePct);
-                        }}
-                      >× Reset</button>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
 
-            {/* Poznámky section */}
-            <div>
-              <div className="text-[11px] uppercase tracking-wider font-medium mb-1" style={{ color: "hsl(var(--muted-foreground))" }}>Poznámky</div>
-              <textarea
-                value={logNotes}
-                onChange={e => {
-                  logNotesUndoStack.current = [...logNotesUndoStack.current.slice(-49), logNotes];
-                  setLogNotes(e.target.value);
-                }}
-                onKeyDown={e => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (logNotesUndoStack.current.length > 0) {
-                      const prev = logNotesUndoStack.current[logNotesUndoStack.current.length - 1];
-                      logNotesUndoStack.current = logNotesUndoStack.current.slice(0, -1);
-                      setLogNotes(prev);
-                    }
-                  }
-                }}
-                placeholder="Čeho jste dnes dosáhli? Problémy, poznámky..."
-                className="w-full h-20 text-xs rounded-md p-2 resize-none border border-input bg-background"
-              />
-            </div>
-
-            {/* Foto section */}
-            <div>
-              <VyrobaPhotoTab projectId={selectedProject?.projectId || ""} />
+              {/* Foto section */}
+              <div>
+                <VyrobaPhotoTab projectId={selectedProject?.projectId || ""} />
+              </div>
             </div>
           </div>
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            {logDayIndex === todayDayIndex && (
-              <Button variant="outline" onClick={() => setNoProductionOpen(true)} className="text-xs">
-                Dnes nebyla výroba
+
+          {/* Fixed footer */}
+          <div className={isMobile ? "shrink-0 px-4 py-3 border-t border-border bg-background space-y-2" : ""}>
+            <DialogFooter className={isMobile ? "flex-col gap-2" : "flex-col sm:flex-row gap-2"}>
+              {logDayIndex === todayDayIndex && (
+                <Button variant="outline" onClick={() => setNoProductionOpen(true)} className="text-xs">
+                  Dnes nebyla výroba
+                </Button>
+              )}
+              {!isMobile && <div className="flex-1" />}
+              <Button variant="outline" onClick={() => setLogModalOpen(false)}>Zrušit</Button>
+              <Button onClick={handleSaveLog} style={{ background: "#3a8a36" }} className="text-white">
+                💾 Uložit
               </Button>
-            )}
-            <div className="flex-1" />
-            <Button variant="outline" onClick={() => setLogModalOpen(false)}>Zrušit</Button>
-            <Button onClick={handleSaveLog} style={{ background: "#3a8a36" }}>
-              💾 Uložit
-            </Button>
-          </DialogFooter>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
