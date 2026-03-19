@@ -2457,7 +2457,7 @@ function DetailPanel({ project, weekKey, currentMonday, todayDayIndex, onOpenLog
 
         {/* ── Daily log shortcut ── */}
         {todayDayIndex >= 0 && !hideLogButton && (
-          <button onClick={() => onOpenLog()} className={`w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90 ${isMobile ? "min-h-[44px]" : ""}`} style={{ background: "#3a8a36" }}>
+          <button onClick={() => onOpenLog()} className={`w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90 ${isMobile ? "min-h-[44px] mb-4" : ""}`} style={{ background: "#3a8a36" }}>
             + Log dnes ({DAY_SHORT[todayDayIndex]})
           </button>
         )}
