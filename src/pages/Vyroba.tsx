@@ -3603,10 +3603,6 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const mobileBottomNavOffset = "calc(56px + env(safe-area-inset-bottom, 0px))";
-  const [pickerSelected, setPickerSelected] = useState<Set<number>>(new Set());
-  const dragPicker = useDragToDismiss(useCallback(() => setPickerOpen(false), []));
   const pendingRetryFiles = useRef<File[]>([]);
   const [retryBannerVisible, setRetryBannerVisible] = useState(false);
 
@@ -3674,14 +3670,6 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
     listFiles("fotky", true);
   }
 
-  async function handlePickerUpload() {
-    const selectedPhotos = Array.from(pickerSelected).map(i => photos[i]).filter(Boolean);
-    // "Upload selected" doesn't really apply to already-uploaded photos
-    // This is more for re-sharing, but close the picker
-    setPickerSelected(new Set());
-    setPickerOpen(false);
-    toast.success(`${selectedPhotos.length} fotek vybráno`);
-  }
 
   async function handleDelete(fileName: string) {
     try {
@@ -3697,14 +3685,19 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
       <div className="flex items-center justify-between mb-2">
         <span className="text-[11px] uppercase tracking-wider font-medium" style={{ color: "hsl(var(--muted-foreground))" }}>Foto</span>
         {isMobile ? (
-          <button
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors min-h-[44px]"
-            style={{ border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}
-            onClick={() => { setPickerOpen(true); setPickerSelected(new Set()); }}
-          >
+          <label className="flex items-center gap-1 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors min-h-[44px] cursor-pointer"
+            style={{ border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}>
             <Camera className="h-3.5 w-3.5" />
             Přidat foto
-          </button>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleUpload}
+              disabled={uploading}
+            />
+          </label>
         ) : (
           <label className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium cursor-pointer transition-colors"
             style={{ background: "hsl(var(--success) / 0.08)", color: "hsl(var(--success))", border: "1px solid hsl(var(--success) / 0.2)" }}>
@@ -3788,104 +3781,6 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
         disabled={uploading}
       />
 
-      {/* Mobile Slack-style photo picker Sheet */}
-      <Sheet open={pickerOpen} onOpenChange={setPickerOpen}>
-        <SheetContent
-          side="bottom"
-          className="rounded-t-2xl p-0 flex flex-col"
-          style={{ zIndex: 99999, bottom: mobileBottomNavOffset, maxHeight: "55vh" }}
-        >
-          <div ref={dragPicker.ref} className="flex flex-col" style={{ maxHeight: "55vh" }}>
-            {/* Drag handle */}
-            <div
-              className="flex items-center justify-center pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
-              onTouchStart={dragPicker.onTouchStart}
-              onTouchMove={dragPicker.onTouchMove}
-              onTouchEnd={dragPicker.onTouchEnd}
-            >
-              <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-            </div>
-            {/* Header */}
-            <div className="px-4 pb-2 shrink-0">
-              <span className="text-sm font-semibold" style={{ color: "hsl(var(--foreground))" }}>Photos &amp; Video</span>
-            </div>
-
-            {/* Horizontal scrollable thumbnails */}
-            <div className="px-4 py-2 overflow-x-auto flex gap-2 shrink-0" style={{ scrollbarWidth: "none" }}>
-              {/* Camera button */}
-              <button
-                className="flex-shrink-0 w-[72px] h-[72px] rounded-lg flex items-center justify-center"
-                style={{ background: "hsl(var(--muted))" }}
-                onClick={() => { cameraInputRef.current?.click(); }}
-              >
-                <Camera className="h-6 w-6" style={{ color: "hsl(var(--muted-foreground))" }} />
-              </button>
-
-              {/* Last 8 photos */}
-              {photos.slice(0, 8).map((photo, idx) => {
-                const selected = pickerSelected.has(idx);
-                return (
-                  <button
-                    key={photo.itemId || photo.name}
-                    className="flex-shrink-0 w-[72px] h-[72px] rounded-lg overflow-hidden relative"
-                    onClick={() => {
-                      setPickerSelected(prev => {
-                        const next = new Set(prev);
-                        if (next.has(idx)) next.delete(idx); else next.add(idx);
-                        return next;
-                      });
-                    }}
-                  >
-                    <img
-                      src={photo.thumbnailUrl || photo.downloadUrl || ""}
-                      alt={photo.name}
-                      className="w-full h-full object-cover"
-                    />
-                    {selected && (
-                      <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.35)" }}>
-                        <Check className="h-5 w-5 text-white" />
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Upload selected button */}
-            {pickerSelected.size > 0 && (
-              <div className="px-4 py-2 shrink-0">
-                <button
-                  onClick={handlePickerUpload}
-                  className="w-full py-2.5 rounded-lg text-sm font-medium"
-                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
-                >
-                  Nahrát vybrané ({pickerSelected.size})
-                </button>
-              </div>
-            )}
-
-            {/* Bottom action — always visible */}
-            <div className="px-4 pb-4 pt-1 shrink-0">
-              <label
-                className="flex items-center gap-2 w-full py-3 text-sm font-medium rounded-lg px-3 cursor-pointer"
-                style={{ color: "hsl(var(--foreground))", background: "hsl(var(--muted) / 0.5)" }}
-              >
-                <ImageIcon className="h-4 w-4" style={{ color: "hsl(var(--muted-foreground))" }} />
-                Nahrať z galérie
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => { setPickerOpen(false); handleUpload(e); }}
-                  disabled={uploading}
-                />
-              </label>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
 
       <PhotoLightbox
         open={lightboxOpen}
