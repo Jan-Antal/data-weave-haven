@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { LayoutDashboard, Factory, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,7 +39,7 @@ export function MobileBottomNav({ onModuleChange, activeModule }: MobileBottomNa
     }
   };
 
-  return (
+  return createPortal(
     <nav
       className="md:hidden fixed bottom-0 left-0 right-0 z-[200] flex items-center justify-around bg-primary"
       style={{
@@ -84,6 +85,7 @@ export function MobileBottomNav({ onModuleChange, activeModule }: MobileBottomNa
           <span className="text-[10px] font-medium">Výroba</span>
         </button>
       )}
-    </nav>
+    </nav>,
+    document.body
   );
 }
