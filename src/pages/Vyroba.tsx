@@ -1682,6 +1682,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               </Button>
             </DialogFooter>
           </div>
+          </div>
         </DialogContent>
       </Dialog>
 
