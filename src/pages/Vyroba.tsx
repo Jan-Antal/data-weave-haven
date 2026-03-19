@@ -3789,8 +3789,8 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
 
       {/* Mobile Slack-style photo picker Sheet */}
       <Sheet open={pickerOpen} onOpenChange={setPickerOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl p-0 max-h-[60vh] flex flex-col" style={{ zIndex: 99999 }}>
-          <div ref={dragPicker.ref} className="flex flex-col max-h-[60vh]">
+        <SheetContent side="bottom" className="rounded-t-2xl p-0 flex flex-col" style={{ zIndex: 99999, maxHeight: "55vh" }}>
+          <div ref={dragPicker.ref} className="flex flex-col" style={{ maxHeight: "55vh" }}>
             {/* Drag handle */}
             <div
               className="flex items-center justify-center pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
@@ -3801,12 +3801,12 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
               <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
             </div>
             {/* Header */}
-            <div className="px-4 pb-2">
+            <div className="px-4 pb-2 shrink-0">
               <span className="text-sm font-semibold" style={{ color: "hsl(var(--foreground))" }}>Photos &amp; Video</span>
             </div>
 
             {/* Horizontal scrollable thumbnails */}
-            <div className="px-4 py-2 overflow-x-auto flex gap-2" style={{ scrollbarWidth: "none" }}>
+            <div className="px-4 py-2 overflow-x-auto flex gap-2 shrink-0" style={{ scrollbarWidth: "none" }}>
               {/* Camera button */}
               <button
                 className="flex-shrink-0 w-[72px] h-[72px] rounded-lg flex items-center justify-center"
@@ -3848,7 +3848,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
 
             {/* Upload selected button */}
             {pickerSelected.size > 0 && (
-              <div className="px-4 py-2">
+              <div className="px-4 py-2 shrink-0">
                 <button
                   onClick={handlePickerUpload}
                   className="w-full py-2.5 rounded-lg text-sm font-medium"
@@ -3859,16 +3859,24 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
               </div>
             )}
 
-            {/* Bottom action */}
-            <div className="px-4 pb-4 pt-1">
-              <button
-                onClick={() => { fileInputRef.current?.click(); setPickerOpen(false); }}
-                className="flex items-center gap-2 w-full py-3 text-sm font-medium rounded-lg px-3"
+            {/* Bottom action — always visible */}
+            <div className="px-4 pb-4 pt-1 shrink-0">
+              <label
+                className="flex items-center gap-2 w-full py-3 text-sm font-medium rounded-lg px-3 cursor-pointer"
                 style={{ color: "hsl(var(--foreground))", background: "hsl(var(--muted) / 0.5)" }}
               >
                 <ImageIcon className="h-4 w-4" style={{ color: "hsl(var(--muted-foreground))" }} />
-                Vybrat z knihovny
-              </button>
+                Nahrať z galérie
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => { setPickerOpen(false); handleUpload(e); }}
+                  disabled={uploading}
+                />
+              </label>
             </div>
           </div>
         </SheetContent>
