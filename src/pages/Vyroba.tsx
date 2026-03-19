@@ -1943,9 +1943,10 @@ function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectSt
         onMouseEnter={(e) => !isMobile && (e.currentTarget.style.backgroundColor = "#f8f7f5")}
         onMouseLeave={(e) => !isMobile && (e.currentTarget.style.backgroundColor = "transparent")}
       >
-        <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-1">
             <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-mono shrink-0" style={{ fontSize: 11, color: "#6b7280" }}>{project.projectId}</span>
               <span className="truncate" style={{ fontSize: 14, fontWeight: 500, color: nameColor }}>{project.projectName}</span>
               {project.isSpilled && (
                 <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.1)", color: "#D97706" }}>
@@ -1958,7 +1959,6 @@ function ProjectRow({ project, isSelected, onSelect, onContextMenu, getProjectSt
             </span>
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="font-mono" style={{ fontSize: 11, color: "#6b7280" }}>{project.projectId}</span>
             {project.deadline && (
               <span style={{ fontSize: 11, color: "#6b7280" }}>· {fmtDateFull(project.deadline)}</span>
             )}
