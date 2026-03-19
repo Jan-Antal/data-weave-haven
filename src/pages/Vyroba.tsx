@@ -1385,7 +1385,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       {/* ═══ MOBILE BOTTOM SHEET ═══ */}
       {isMobile && selectedProject && (
         <Sheet open={mobileDetailOpen} onOpenChange={setMobileDetailOpen}>
-          <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col">
+          <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col" style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))" }}>
             <div className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0">
               <button
                 onClick={() => setMobileDetailOpen(false)}
