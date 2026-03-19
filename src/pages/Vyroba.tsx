@@ -177,57 +177,43 @@ function useProfileName(userId: string | null) {
 }
 
 /* ═══ swipe-to-dismiss hook ═══ */
-function useDragToDismiss(onDismiss: () => void) {
-  const ref = useRef<HTMLDivElement>(null);
-  const startY = useRef(0);
-  const currentY = useRef(0);
-  const isDragging = useRef(false);
-
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    startY.current = e.touches[0].clientY;
-    isDragging.current = true;
-    if (ref.current) ref.current.style.transition = "none";
-  }, []);
-
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isDragging.current) return;
-    const delta = Math.max(0, e.touches[0].clientY - startY.current);
-    currentY.current = delta;
-    if (ref.current) {
-      ref.current.style.transform = `translateY(${delta}px)`;
-      const height = ref.current.offsetHeight;
+function useSwipeToDismiss(onDismiss: () => void) {
+  const startYRef = useRef(0);
+  const handlers = {
+    onTouchStart: (e: React.TouchEvent<HTMLElement>) => {
+      startYRef.current = e.touches[0].clientY;
+      const el = e.currentTarget;
+      el.style.transition = "none";
+      const overlay = el.previousElementSibling as HTMLElement | null;
+      if (overlay) overlay.style.transition = "none";
+    },
+    onTouchMove: (e: React.TouchEvent<HTMLElement>) => {
+      const delta = Math.max(0, e.touches[0].clientY - startYRef.current);
+      const el = e.currentTarget;
+      el.style.transform = `translateY(${delta}px)`;
+      const height = el.offsetHeight || 600;
       const progress = Math.min(delta / (height * 0.5), 1);
-      const backdrop = ref.current.closest('[role="dialog"]')?.previousElementSibling as HTMLElement;
-      if (backdrop) backdrop.style.opacity = String(1 - progress);
-    }
-  }, []);
-
-  const onTouchEnd = useCallback(() => {
-    isDragging.current = false;
-    if (!ref.current) return;
-    const height = ref.current.offsetHeight;
-    if (currentY.current > height * 0.3) {
-      ref.current.style.transition = "transform 0.25s ease";
-      ref.current.style.transform = `translateY(${height}px)`;
-      const backdrop = ref.current.closest('[role="dialog"]')?.previousElementSibling as HTMLElement;
-      if (backdrop) {
-        backdrop.style.transition = "opacity 0.25s ease";
-        backdrop.style.opacity = "0";
+      const overlay = el.previousElementSibling as HTMLElement | null;
+      if (overlay) overlay.style.opacity = String(1 - progress);
+    },
+    onTouchEnd: (e: React.TouchEvent<HTMLElement>) => {
+      const delta = e.changedTouches[0].clientY - startYRef.current;
+      const el = e.currentTarget;
+      const height = el.offsetHeight || 600;
+      el.style.transition = "transform 0.25s ease";
+      const overlay = el.previousElementSibling as HTMLElement | null;
+      if (overlay) overlay.style.transition = "opacity 0.25s ease";
+      if (delta > height * 0.3) {
+        el.style.transform = `translateY(${height}px)`;
+        if (overlay) overlay.style.opacity = "0";
+        setTimeout(onDismiss, 250);
+      } else {
+        el.style.transform = "translateY(0)";
+        if (overlay) overlay.style.opacity = "1";
       }
-      setTimeout(onDismiss, 250);
-    } else {
-      ref.current.style.transition = "transform 0.25s ease";
-      ref.current.style.transform = "translateY(0)";
-      const backdrop = ref.current.closest('[role="dialog"]')?.previousElementSibling as HTMLElement;
-      if (backdrop) {
-        backdrop.style.transition = "opacity 0.25s ease";
-        backdrop.style.opacity = "1";
-      }
-    }
-    currentY.current = 0;
-  }, [onDismiss]);
-
-  return { ref, onTouchStart, onTouchMove, onTouchEnd };
+    },
+  };
+  return handlers;
 }
 
 /* ═══ MAIN PAGE ═══ */
