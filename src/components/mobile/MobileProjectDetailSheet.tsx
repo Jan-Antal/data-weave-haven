@@ -76,14 +76,10 @@ export function MobileProjectDetailSheet({ project, open, onOpenChange, onOpenTP
 
         {/* Header */}
         <div className="px-4 pb-3 shrink-0" style={{ borderBottom: "0.5px solid hsl(var(--border))" }}>
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-mono text-muted-foreground">{project.project_id}</p>
-              <p className="text-[15px] font-semibold text-foreground truncate">{project.project_name}</p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {project.status && <StatusBadge status={project.status} />}
-            </div>
+          <p className="text-[11px] font-mono text-muted-foreground">{project.project_id}</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className="text-[15px] font-semibold text-foreground truncate min-w-0 flex-1">{project.project_name}</p>
+            {project.status && <StatusBadge status={project.status} />}
           </div>
         </div>
 
