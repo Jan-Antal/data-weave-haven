@@ -889,6 +889,11 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
+  // Drag-to-dismiss hooks
+  const dragMobileDetail = useDragToDismiss(useCallback(() => setMobileDetailOpen(false), []));
+  const dragLogModal = useDragToDismiss(useCallback(() => setLogModalOpen(false), []));
+  const dragNoProduction = useDragToDismiss(useCallback(() => setNoProductionOpen(false), []));
+
 
   /* ── Return from Expedice ── */
   async function handleReturnFromExpedice(pid: string) {
