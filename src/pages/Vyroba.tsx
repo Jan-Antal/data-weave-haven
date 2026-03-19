@@ -1482,7 +1482,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               </div>
               {/* Fixed bottom Log button */}
               {todayDayIndex >= 0 && (
-                <div className="shrink-0 px-4 py-3 border-t border-border bg-background safe-area-bottom">
+                <div className="shrink-0 px-4 py-3 border-t border-border bg-background" style={{ paddingBottom: "calc(12px + 56px + env(safe-area-inset-bottom, 0px))" }}>
                   <button
                     onClick={() => openLogModal()}
                     className="w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90 min-h-[44px]"
