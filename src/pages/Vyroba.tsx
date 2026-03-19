@@ -3685,14 +3685,19 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
       <div className="flex items-center justify-between mb-2">
         <span className="text-[11px] uppercase tracking-wider font-medium" style={{ color: "hsl(var(--muted-foreground))" }}>Foto</span>
         {isMobile ? (
-          <button
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors min-h-[44px]"
-            style={{ border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}
-            onClick={() => { setPickerOpen(true); setPickerSelected(new Set()); }}
-          >
+          <label className="flex items-center gap-1 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors min-h-[44px] cursor-pointer"
+            style={{ border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}>
             <Camera className="h-3.5 w-3.5" />
             Přidat foto
-          </button>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleUpload}
+              disabled={uploading}
+            />
+          </label>
         ) : (
           <label className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium cursor-pointer transition-colors"
             style={{ background: "hsl(var(--success) / 0.08)", color: "hsl(var(--success))", border: "1px solid hsl(var(--success) / 0.2)" }}>
