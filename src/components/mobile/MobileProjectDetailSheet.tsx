@@ -83,12 +83,6 @@ export function MobileProjectDetailSheet({ project, open, onOpenChange, onOpenTP
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {project.status && <StatusBadge status={project.status} />}
-              <button
-                onClick={() => onOpenChange(false)}
-                className="p-1.5 rounded-md hover:bg-accent min-w-[36px] min-h-[36px] flex items-center justify-center"
-              >
-                <X className="h-4 w-4 text-muted-foreground" />
-              </button>
             </div>
           </div>
         </div>
