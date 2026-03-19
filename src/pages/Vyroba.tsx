@@ -2658,7 +2658,7 @@ function UnifiedItemList({ projectId, currentItems, onToggleItem, isExpanded, on
                     />
 
                     {/* Item info */}
-                    <div className="flex-1 min-w-0 flex items-center gap-1.5 flex-wrap">
+                    <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-hidden">
                       {item.item_code && (
                         <span className="font-mono text-[12px] font-bold shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>
                       )}
