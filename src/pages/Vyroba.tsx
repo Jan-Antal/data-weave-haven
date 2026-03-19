@@ -3685,8 +3685,8 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
       <div className="flex items-center justify-between mb-2">
         <span className="text-[11px] uppercase tracking-wider font-medium" style={{ color: "hsl(var(--muted-foreground))" }}>Foto</span>
         {isMobile ? (
-          <label className="flex items-center gap-1 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors min-h-[44px] cursor-pointer"
-            style={{ border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}>
+          <label className="flex items-center gap-2 px-4 py-3 rounded-xl text-[13px] font-medium transition-colors cursor-pointer active:opacity-70"
+            style={{ border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))", minHeight: 48, minWidth: 120 }}>
             <Camera className="h-3.5 w-3.5" />
             Přidat foto
             <input
