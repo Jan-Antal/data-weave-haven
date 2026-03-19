@@ -1687,13 +1687,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             transform: "none",
           } : undefined}
         >
-          <div ref={dragNoProduction.ref} className={isMobile ? "flex flex-col" : "contents"}>
+          <div className={isMobile ? "flex flex-col" : "contents"}>
             {isMobile && (
               <div
                 className="flex items-center justify-center pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
-                onTouchStart={dragNoProduction.onTouchStart}
-                onTouchMove={dragNoProduction.onTouchMove}
-                onTouchEnd={dragNoProduction.onTouchEnd}
               >
                 <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
               </div>
