@@ -1449,7 +1449,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
       {/* ═══ LOG MODAL ═══ */}
       <Dialog open={logModalOpen} onOpenChange={setLogModalOpen}>
-        <DialogContent className="sm:max-w-md p-0 gap-0" style={isMobile ? {
+        <DialogContent className={isMobile ? "p-0 gap-0" : "sm:max-w-md p-0 gap-0"} style={isMobile ? {
           position: "fixed",
           top: "auto",
           bottom: "calc(56px + env(safe-area-inset-bottom, 0px))",
@@ -1460,7 +1460,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
           maxHeight: "calc(100dvh - 100px)",
           overflowY: "auto" as const,
           borderRadius: "16px 16px 0 0",
-          margin: 0
+          margin: 0,
+          transform: "none"
         } : undefined}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
