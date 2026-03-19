@@ -3794,75 +3794,86 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
       {/* Mobile Slack-style photo picker Sheet */}
       <Sheet open={pickerOpen} onOpenChange={setPickerOpen}>
         <SheetContent side="bottom" className="rounded-t-2xl p-0 max-h-[60vh] flex flex-col" style={{ zIndex: 99999 }}>
-          {/* Header */}
-          <div className="px-4 pt-4 pb-2">
-            <span className="text-sm font-semibold" style={{ color: "hsl(var(--foreground))" }}>Photos &amp; Video</span>
-          </div>
-
-          {/* Horizontal scrollable thumbnails */}
-          <div className="px-4 py-2 overflow-x-auto flex gap-2" style={{ scrollbarWidth: "none" }}>
-            {/* Camera button */}
-            <button
-              className="flex-shrink-0 w-[72px] h-[72px] rounded-lg flex items-center justify-center"
-              style={{ background: "hsl(var(--muted))" }}
-              onClick={() => { cameraInputRef.current?.click(); }}
+          <div ref={dragPicker.ref} className="flex flex-col max-h-[60vh]">
+            {/* Drag handle */}
+            <div
+              className="flex items-center justify-center pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
+              onTouchStart={dragPicker.onTouchStart}
+              onTouchMove={dragPicker.onTouchMove}
+              onTouchEnd={dragPicker.onTouchEnd}
             >
-              <Camera className="h-6 w-6" style={{ color: "hsl(var(--muted-foreground))" }} />
-            </button>
+              <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+            </div>
+            {/* Header */}
+            <div className="px-4 pb-2">
+              <span className="text-sm font-semibold" style={{ color: "hsl(var(--foreground))" }}>Photos &amp; Video</span>
+            </div>
 
-            {/* Last 8 photos */}
-            {photos.slice(0, 8).map((photo, idx) => {
-              const selected = pickerSelected.has(idx);
-              return (
-                <button
-                  key={photo.itemId || photo.name}
-                  className="flex-shrink-0 w-[72px] h-[72px] rounded-lg overflow-hidden relative"
-                  onClick={() => {
-                    setPickerSelected(prev => {
-                      const next = new Set(prev);
-                      if (next.has(idx)) next.delete(idx); else next.add(idx);
-                      return next;
-                    });
-                  }}
-                >
-                  <img
-                    src={photo.thumbnailUrl || photo.downloadUrl || ""}
-                    alt={photo.name}
-                    className="w-full h-full object-cover"
-                  />
-                  {selected && (
-                    <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.35)" }}>
-                      <Check className="h-5 w-5 text-white" />
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Upload selected button */}
-          {pickerSelected.size > 0 && (
-            <div className="px-4 py-2">
+            {/* Horizontal scrollable thumbnails */}
+            <div className="px-4 py-2 overflow-x-auto flex gap-2" style={{ scrollbarWidth: "none" }}>
+              {/* Camera button */}
               <button
-                onClick={handlePickerUpload}
-                className="w-full py-2.5 rounded-lg text-sm font-medium"
-                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                className="flex-shrink-0 w-[72px] h-[72px] rounded-lg flex items-center justify-center"
+                style={{ background: "hsl(var(--muted))" }}
+                onClick={() => { cameraInputRef.current?.click(); }}
               >
-                Nahrát vybrané ({pickerSelected.size})
+                <Camera className="h-6 w-6" style={{ color: "hsl(var(--muted-foreground))" }} />
+              </button>
+
+              {/* Last 8 photos */}
+              {photos.slice(0, 8).map((photo, idx) => {
+                const selected = pickerSelected.has(idx);
+                return (
+                  <button
+                    key={photo.itemId || photo.name}
+                    className="flex-shrink-0 w-[72px] h-[72px] rounded-lg overflow-hidden relative"
+                    onClick={() => {
+                      setPickerSelected(prev => {
+                        const next = new Set(prev);
+                        if (next.has(idx)) next.delete(idx); else next.add(idx);
+                        return next;
+                      });
+                    }}
+                  >
+                    <img
+                      src={photo.thumbnailUrl || photo.downloadUrl || ""}
+                      alt={photo.name}
+                      className="w-full h-full object-cover"
+                    />
+                    {selected && (
+                      <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.35)" }}>
+                        <Check className="h-5 w-5 text-white" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Upload selected button */}
+            {pickerSelected.size > 0 && (
+              <div className="px-4 py-2">
+                <button
+                  onClick={handlePickerUpload}
+                  className="w-full py-2.5 rounded-lg text-sm font-medium"
+                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                >
+                  Nahrát vybrané ({pickerSelected.size})
+                </button>
+              </div>
+            )}
+
+            {/* Bottom action */}
+            <div className="px-4 pb-4 pt-1">
+              <button
+                onClick={() => { fileInputRef.current?.click(); setPickerOpen(false); }}
+                className="flex items-center gap-2 w-full py-3 text-sm font-medium rounded-lg px-3"
+                style={{ color: "hsl(var(--foreground))", background: "hsl(var(--muted) / 0.5)" }}
+              >
+                <ImageIcon className="h-4 w-4" style={{ color: "hsl(var(--muted-foreground))" }} />
+                Vybrat z knihovny
               </button>
             </div>
-          )}
-
-          {/* Bottom action */}
-          <div className="px-4 pb-4 pt-1">
-            <button
-              onClick={() => { fileInputRef.current?.click(); setPickerOpen(false); }}
-              className="flex items-center gap-2 w-full py-3 text-sm font-medium rounded-lg px-3"
-              style={{ color: "hsl(var(--foreground))", background: "hsl(var(--muted) / 0.5)" }}
-            >
-              <ImageIcon className="h-4 w-4" style={{ color: "hsl(var(--muted-foreground))" }} />
-              Vybrat z knihovny
-            </button>
           </div>
         </SheetContent>
       </Sheet>
