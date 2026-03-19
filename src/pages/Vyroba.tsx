@@ -1449,7 +1449,19 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
       {/* ═══ LOG MODAL ═══ */}
       <Dialog open={logModalOpen} onOpenChange={setLogModalOpen}>
-        <DialogContent className="sm:max-w-md pb-[72px] sm:pb-6">
+        <DialogContent className="sm:max-w-md p-0 gap-0" style={isMobile ? {
+          position: "fixed",
+          top: "auto",
+          bottom: "calc(56px + env(safe-area-inset-bottom, 0px))",
+          left: 0,
+          right: 0,
+          width: "100%",
+          maxWidth: "100%",
+          maxHeight: "calc(100dvh - 100px)",
+          overflowY: "auto" as const,
+          borderRadius: "16px 16px 0 0",
+          margin: 0
+        } : undefined}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <span className="font-mono text-xs" style={{ color: "#6b7280" }}>{selectedProject?.projectId}</span>
