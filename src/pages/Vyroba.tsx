@@ -891,10 +891,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
-  // Drag-to-dismiss hooks
-  const dragMobileDetail = useDragToDismiss(useCallback(() => setMobileDetailOpen(false), []));
-  const dragLogModal = useDragToDismiss(useCallback(() => setLogModalOpen(false), []));
-  const dragNoProduction = useDragToDismiss(useCallback(() => setNoProductionOpen(false), []));
+  // Swipe-to-dismiss hooks for mobile bottom sheets
+  const swipeMobileDetail = useSwipeToDismiss(useCallback(() => setMobileDetailOpen(false), []));
+  const swipeLogModal = useSwipeToDismiss(useCallback(() => setLogModalOpen(false), []));
+  const swipeNoProduction = useSwipeToDismiss(useCallback(() => setNoProductionOpen(false), []));
 
 
   /* ── Return from Expedice ── */
