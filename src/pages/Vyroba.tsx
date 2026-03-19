@@ -1444,7 +1444,43 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       {/* ═══ MOBILE BOTTOM SHEET ═══ */}
       {isMobile && selectedProject && (
         <Sheet open={mobileDetailOpen} onOpenChange={setMobileDetailOpen}>
-          <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl p-0 overflow-hidden" style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))" }}>
+          <SheetContent
+            side="bottom"
+            className="h-[85vh] rounded-t-2xl p-0 overflow-hidden"
+            style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))", touchAction: "none" }}
+            onTouchStart={(e: React.TouchEvent) => {
+              const el = e.currentTarget as HTMLElement;
+              el.dataset.startY = String(e.touches[0].clientY);
+              el.style.transition = "none";
+              const overlay = el.previousElementSibling as HTMLElement;
+              if (overlay) overlay.style.transition = "none";
+            }}
+            onTouchMove={(e: React.TouchEvent) => {
+              const el = e.currentTarget as HTMLElement;
+              const startY = Number(el.dataset.startY);
+              const delta = Math.max(0, e.touches[0].clientY - startY);
+              el.style.transform = `translateY(${delta}px)`;
+              const progress = Math.min(delta / (el.offsetHeight * 0.5), 1);
+              const overlay = el.previousElementSibling as HTMLElement;
+              if (overlay) overlay.style.opacity = String(1 - progress);
+            }}
+            onTouchEnd={(e: React.TouchEvent) => {
+              const el = e.currentTarget as HTMLElement;
+              const startY = Number(el.dataset.startY);
+              const delta = e.changedTouches[0].clientY - startY;
+              el.style.transition = "transform 0.25s ease";
+              const overlay = el.previousElementSibling as HTMLElement;
+              if (overlay) overlay.style.transition = "opacity 0.25s ease";
+              if (delta > el.offsetHeight * 0.3) {
+                el.style.transform = `translateY(${el.offsetHeight}px)`;
+                if (overlay) overlay.style.opacity = "0";
+                setTimeout(() => setMobileDetailOpen(false), 250);
+              } else {
+                el.style.transform = "translateY(0)";
+                if (overlay) overlay.style.opacity = "1";
+              }
+            }}
+          >
             <div ref={dragMobileDetail.ref} className="flex flex-col h-full">
               <div
                 className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
