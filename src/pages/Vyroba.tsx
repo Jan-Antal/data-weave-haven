@@ -1498,31 +1498,17 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       )}
 
       {/* ═══ LOG MODAL ═══ */}
-      <Dialog open={logModalOpen} onOpenChange={setLogModalOpen}>
-        <DialogContent
-          className={isMobile
-            ? "p-0 gap-0 border-0 data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom data-[state=open]:!slide-in-from-top-0 data-[state=closed]:!slide-out-to-top-0"
-            : "sm:max-w-md p-0 gap-0"
-          }
-          style={isMobile ? {
-            position: "fixed",
-            top: "auto",
-            bottom: "calc(56px + env(safe-area-inset-bottom, 0px))",
-            left: 0,
-            right: 0,
-            width: "100%",
-            maxWidth: "100%",
-            height: "85vh",
-            maxHeight: "85vh",
-            borderRadius: "16px 16px 0 0",
-            margin: 0,
-            transform: "none",
-            display: "flex",
-            flexDirection: "column" as const,
-            overflow: "hidden",
-          } : undefined}
-        >
-          <div ref={dragLogModal.ref} className={isMobile ? "flex flex-col h-full" : "contents"}>
+      {isMobile ? (
+        <Sheet open={logModalOpen} onOpenChange={setLogModalOpen}>
+          <SheetContent side="bottom" className="rounded-t-2xl p-0 max-h-[90dvh] overflow-y-auto flex flex-col" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px))" }}>
+            <div className="flex justify-center pt-2 pb-1 shrink-0">
+              <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+            </div>
+      ) : (
+        <Dialog open={logModalOpen} onOpenChange={setLogModalOpen}>
+          <DialogContent className="sm:max-w-md p-0 gap-0">
+      )}
+          <div className={isMobile ? "flex flex-col h-full" : "contents"}>
             {/* Mobile header bar matching project detail sheet */}
             {isMobile && (
               <div
