@@ -3604,6 +3604,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const mobileBottomNavOffset = "calc(56px + env(safe-area-inset-bottom, 0px))";
   const [pickerSelected, setPickerSelected] = useState<Set<number>>(new Set());
   const dragPicker = useDragToDismiss(useCallback(() => setPickerOpen(false), []));
   const pendingRetryFiles = useRef<File[]>([]);
