@@ -176,6 +176,44 @@ function useProfileName(userId: string | null) {
   return data || null;
 }
 
+/* ═══ swipe-to-dismiss hook ═══ */
+function useDragToDismiss(onDismiss: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  const startY = useRef(0);
+  const currentY = useRef(0);
+  const isDragging = useRef(false);
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    startY.current = e.touches[0].clientY;
+    isDragging.current = true;
+    if (ref.current) ref.current.style.transition = "none";
+  }, []);
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging.current) return;
+    const delta = Math.max(0, e.touches[0].clientY - startY.current);
+    currentY.current = delta;
+    if (ref.current) ref.current.style.transform = `translateY(${delta}px)`;
+  }, []);
+
+  const onTouchEnd = useCallback(() => {
+    isDragging.current = false;
+    if (!ref.current) return;
+    const height = ref.current.offsetHeight;
+    if (currentY.current > height * 0.3) {
+      ref.current.style.transition = "transform 0.25s ease";
+      ref.current.style.transform = `translateY(${height}px)`;
+      setTimeout(onDismiss, 250);
+    } else {
+      ref.current.style.transition = "transform 0.25s ease";
+      ref.current.style.transform = "translateY(0)";
+    }
+    currentY.current = 0;
+  }, [onDismiss]);
+
+  return { ref, onTouchStart, onTouchMove, onTouchEnd };
+}
+
 /* ═══ MAIN PAGE ═══ */
 export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}) {
   const { isOwner, isAdmin, isTestUser, loading, profile, signOut, canAccessSettings, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, realRole, simulatedRole, setSimulatedRole, role } = useAuth();
@@ -851,6 +889,11 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
+  // Drag-to-dismiss hooks
+  const dragMobileDetail = useDragToDismiss(useCallback(() => setMobileDetailOpen(false), []));
+  const dragLogModal = useDragToDismiss(useCallback(() => setLogModalOpen(false), []));
+  const dragNoProduction = useDragToDismiss(useCallback(() => setNoProductionOpen(false), []));
+
 
   /* ── Return from Expedice ── */
   async function handleReturnFromExpedice(pid: string) {
@@ -1385,64 +1428,71 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       {/* ═══ MOBILE BOTTOM SHEET ═══ */}
       {isMobile && selectedProject && (
         <Sheet open={mobileDetailOpen} onOpenChange={setMobileDetailOpen}>
-          <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col" style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))" }}>
-            <div className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0">
-              <button
-                onClick={() => setMobileDetailOpen(false)}
-                className="text-xs font-medium flex items-center gap-1 min-h-[36px]"
-                style={{ color: "#6b7280" }}
+          <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl p-0 overflow-hidden" style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))" }}>
+            <div ref={dragMobileDetail.ref} className="flex flex-col h-full">
+              <div
+                className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
+                onTouchStart={dragMobileDetail.onTouchStart}
+                onTouchMove={dragMobileDetail.onTouchMove}
+                onTouchEnd={dragMobileDetail.onTouchEnd}
               >
-                <ChevronLeft className="h-3.5 w-3.5" /> Zpět
-              </button>
-              <div className="w-10 h-1 rounded-full" style={{ background: "#d0cdc8" }} />
-              <div className="w-[50px]" /> {/* spacer for centering drag handle */}
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <DetailPanel
-                project={selectedProject}
-                weekKey={weekKey}
-                currentMonday={currentMonday}
-                todayDayIndex={todayDayIndex}
-                onOpenLog={openLogModal}
-                nextWeekNum={nextWeekNum}
-                onSpillAll={openSpillDialog}
-                onOpenExpedice={openExpediceDialog}
-                onToggleItem={toggleItemComplete}
-                getCumulativeForDay={(di) => getCumulativeForDay(selectedProject.projectId, di)}
-                getExpectedPct={getExpectedPct}
-                status={getProjectStatus(selectedProject.projectId)}
-                latestPct={getLatestPercent(selectedProject.projectId)}
-                latestPhase={getLatestPhase(selectedProject.projectId)}
-                logs={getLogsForProject(selectedProject.projectId)}
-                expandedMap={expandedMap}
-                setExpandedMap={setExpandedMap}
-                bundleId={bundleId(selectedProject.projectId)}
-                allItems={getAllItemsForProject(selectedProject.projectId)}
-                scheduleData={scheduleData}
-                pushUndo={pushUndo}
-                onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
-                dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
-                onDismissDyha={() => setDyhaDismissed(prev => new Set(prev).add(selectedProject.projectId))}
-                weeklyGoal={getWeeklyGoal(selectedProject.projectId)}
-                bundleProgress={getBundleProgress(selectedProject.projectId)}
-                isWeeklyGoalMet={isWeeklyGoalMet(selectedProject.projectId)}
-                areAllPartsCompleted={(itemCode, itemName) => areAllPartsCompleted(selectedProject.projectId, itemCode, itemName)}
-                getIncompletePartsInfo={(itemCode, itemName) => getIncompletePartsInfo(selectedProject.projectId, itemCode, itemName)}
-                hideLogButton
-              />
-            </div>
-            {/* Fixed bottom Log button */}
-            {todayDayIndex >= 0 && (
-              <div className="shrink-0 px-4 py-3 border-t border-border bg-background safe-area-bottom">
                 <button
-                  onClick={() => openLogModal()}
-                  className="w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90 min-h-[44px]"
-                  style={{ background: "#3a8a36" }}
+                  onClick={() => setMobileDetailOpen(false)}
+                  className="text-xs font-medium flex items-center gap-1 min-h-[36px]"
+                  style={{ color: "#6b7280" }}
                 >
-                  + Log dnes ({DAY_SHORT[todayDayIndex]})
+                  <ChevronLeft className="h-3.5 w-3.5" /> Zpět
                 </button>
+                <div className="w-10 h-1 rounded-full" style={{ background: "#d0cdc8" }} />
+                <div className="w-[50px]" />
               </div>
-            )}
+              <div className="flex-1 overflow-y-auto">
+                <DetailPanel
+                  project={selectedProject}
+                  weekKey={weekKey}
+                  currentMonday={currentMonday}
+                  todayDayIndex={todayDayIndex}
+                  onOpenLog={openLogModal}
+                  nextWeekNum={nextWeekNum}
+                  onSpillAll={openSpillDialog}
+                  onOpenExpedice={openExpediceDialog}
+                  onToggleItem={toggleItemComplete}
+                  getCumulativeForDay={(di) => getCumulativeForDay(selectedProject.projectId, di)}
+                  getExpectedPct={getExpectedPct}
+                  status={getProjectStatus(selectedProject.projectId)}
+                  latestPct={getLatestPercent(selectedProject.projectId)}
+                  latestPhase={getLatestPhase(selectedProject.projectId)}
+                  logs={getLogsForProject(selectedProject.projectId)}
+                  expandedMap={expandedMap}
+                  setExpandedMap={setExpandedMap}
+                  bundleId={bundleId(selectedProject.projectId)}
+                  allItems={getAllItemsForProject(selectedProject.projectId)}
+                  scheduleData={scheduleData}
+                  pushUndo={pushUndo}
+                  onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
+                  dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
+                  onDismissDyha={() => setDyhaDismissed(prev => new Set(prev).add(selectedProject.projectId))}
+                  weeklyGoal={getWeeklyGoal(selectedProject.projectId)}
+                  bundleProgress={getBundleProgress(selectedProject.projectId)}
+                  isWeeklyGoalMet={isWeeklyGoalMet(selectedProject.projectId)}
+                  areAllPartsCompleted={(itemCode, itemName) => areAllPartsCompleted(selectedProject.projectId, itemCode, itemName)}
+                  getIncompletePartsInfo={(itemCode, itemName) => getIncompletePartsInfo(selectedProject.projectId, itemCode, itemName)}
+                  hideLogButton
+                />
+              </div>
+              {/* Fixed bottom Log button */}
+              {todayDayIndex >= 0 && (
+                <div className="shrink-0 px-4 py-3 border-t border-border bg-background safe-area-bottom">
+                  <button
+                    onClick={() => openLogModal()}
+                    className="w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90 min-h-[44px]"
+                    style={{ background: "#3a8a36" }}
+                  >
+                    + Log dnes ({DAY_SHORT[todayDayIndex]})
+                  </button>
+                </div>
+              )}
+            </div>
           </SheetContent>
         </Sheet>
       )}
@@ -1472,19 +1522,25 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             overflow: "hidden",
           } : undefined}
         >
-          {/* Mobile header bar matching project detail sheet */}
-          {isMobile && (
-            <div className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0">
-              <button
-                onClick={() => setLogModalOpen(false)}
-                className="text-xs font-medium flex items-center gap-1 min-h-[36px] text-muted-foreground"
+          <div ref={dragLogModal.ref} className={isMobile ? "flex flex-col h-full" : "contents"}>
+            {/* Mobile header bar matching project detail sheet */}
+            {isMobile && (
+              <div
+                className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
+                onTouchStart={dragLogModal.onTouchStart}
+                onTouchMove={dragLogModal.onTouchMove}
+                onTouchEnd={dragLogModal.onTouchEnd}
               >
-                <ChevronLeft className="h-3.5 w-3.5" /> Zpět
-              </button>
-              <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-              <div className="w-[50px]" />
-            </div>
-          )}
+                <button
+                  onClick={() => setLogModalOpen(false)}
+                  className="text-xs font-medium flex items-center gap-1 min-h-[36px] text-muted-foreground"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" /> Zpět
+                </button>
+                <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+                <div className="w-[50px]" />
+              </div>
+            )}
 
           {/* Scrollable content */}
           <div className={isMobile ? "flex-1 overflow-y-auto px-4 pb-4" : ""}>
@@ -1626,25 +1682,54 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               </Button>
             </DialogFooter>
           </div>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* ═══ NO PRODUCTION DIALOG ═══ */}
       <Dialog open={noProductionOpen} onOpenChange={setNoProductionOpen}>
-        <DialogContent className="sm:max-w-xs">
-          <DialogHeader><DialogTitle>Důvod bez výroby</DialogTitle></DialogHeader>
-          <div className="space-y-2 py-2">
-            {["dovolenka", "nemoc", "čeká na materiál", "jiný důvod"].map(r => (
-              <label key={r} className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" checked={noProductionReason === r} onChange={() => setNoProductionReason(r)} className="accent-amber-600" />
-                <span className="text-sm capitalize">{r}</span>
-              </label>
-            ))}
+        <DialogContent
+          className={isMobile ? "p-0 gap-0 border-0 data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom data-[state=open]:!slide-in-from-top-0 data-[state=closed]:!slide-out-to-top-0" : "sm:max-w-xs"}
+          style={isMobile ? {
+            position: "fixed",
+            top: "auto",
+            bottom: "calc(56px + env(safe-area-inset-bottom, 0px))",
+            left: 0,
+            right: 0,
+            width: "100%",
+            maxWidth: "100%",
+            borderRadius: "16px 16px 0 0",
+            margin: 0,
+            transform: "none",
+          } : undefined}
+        >
+          <div ref={dragNoProduction.ref} className={isMobile ? "flex flex-col" : "contents"}>
+            {isMobile && (
+              <div
+                className="flex items-center justify-center pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
+                onTouchStart={dragNoProduction.onTouchStart}
+                onTouchMove={dragNoProduction.onTouchMove}
+                onTouchEnd={dragNoProduction.onTouchEnd}
+              >
+                <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+              </div>
+            )}
+            <div className={isMobile ? "px-4 pb-4" : ""}>
+              <DialogHeader><DialogTitle>Důvod bez výroby</DialogTitle></DialogHeader>
+              <div className="space-y-2 py-2">
+                {["dovolenka", "nemoc", "čeká na materiál", "jiný důvod"].map(r => (
+                  <label key={r} className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" checked={noProductionReason === r} onChange={() => setNoProductionReason(r)} className="accent-amber-600" />
+                    <span className="text-sm capitalize">{r}</span>
+                  </label>
+                ))}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setNoProductionOpen(false)}>Zrušit</Button>
+                <Button onClick={handleNoProduction}>Potvrdit</Button>
+              </DialogFooter>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNoProductionOpen(false)}>Zrušit</Button>
-            <Button onClick={handleNoProduction}>Potvrdit</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -3524,6 +3609,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSelected, setPickerSelected] = useState<Set<number>>(new Set());
+  const dragPicker = useDragToDismiss(useCallback(() => setPickerOpen(false), []));
   const pendingRetryFiles = useRef<File[]>([]);
   const [retryBannerVisible, setRetryBannerVisible] = useState(false);
 
@@ -3708,75 +3794,86 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
       {/* Mobile Slack-style photo picker Sheet */}
       <Sheet open={pickerOpen} onOpenChange={setPickerOpen}>
         <SheetContent side="bottom" className="rounded-t-2xl p-0 max-h-[60vh] flex flex-col" style={{ zIndex: 99999 }}>
-          {/* Header */}
-          <div className="px-4 pt-4 pb-2">
-            <span className="text-sm font-semibold" style={{ color: "hsl(var(--foreground))" }}>Photos &amp; Video</span>
-          </div>
-
-          {/* Horizontal scrollable thumbnails */}
-          <div className="px-4 py-2 overflow-x-auto flex gap-2" style={{ scrollbarWidth: "none" }}>
-            {/* Camera button */}
-            <button
-              className="flex-shrink-0 w-[72px] h-[72px] rounded-lg flex items-center justify-center"
-              style={{ background: "hsl(var(--muted))" }}
-              onClick={() => { cameraInputRef.current?.click(); }}
+          <div ref={dragPicker.ref} className="flex flex-col max-h-[60vh]">
+            {/* Drag handle */}
+            <div
+              className="flex items-center justify-center pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
+              onTouchStart={dragPicker.onTouchStart}
+              onTouchMove={dragPicker.onTouchMove}
+              onTouchEnd={dragPicker.onTouchEnd}
             >
-              <Camera className="h-6 w-6" style={{ color: "hsl(var(--muted-foreground))" }} />
-            </button>
+              <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+            </div>
+            {/* Header */}
+            <div className="px-4 pb-2">
+              <span className="text-sm font-semibold" style={{ color: "hsl(var(--foreground))" }}>Photos &amp; Video</span>
+            </div>
 
-            {/* Last 8 photos */}
-            {photos.slice(0, 8).map((photo, idx) => {
-              const selected = pickerSelected.has(idx);
-              return (
-                <button
-                  key={photo.itemId || photo.name}
-                  className="flex-shrink-0 w-[72px] h-[72px] rounded-lg overflow-hidden relative"
-                  onClick={() => {
-                    setPickerSelected(prev => {
-                      const next = new Set(prev);
-                      if (next.has(idx)) next.delete(idx); else next.add(idx);
-                      return next;
-                    });
-                  }}
-                >
-                  <img
-                    src={photo.thumbnailUrl || photo.downloadUrl || ""}
-                    alt={photo.name}
-                    className="w-full h-full object-cover"
-                  />
-                  {selected && (
-                    <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.35)" }}>
-                      <Check className="h-5 w-5 text-white" />
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Upload selected button */}
-          {pickerSelected.size > 0 && (
-            <div className="px-4 py-2">
+            {/* Horizontal scrollable thumbnails */}
+            <div className="px-4 py-2 overflow-x-auto flex gap-2" style={{ scrollbarWidth: "none" }}>
+              {/* Camera button */}
               <button
-                onClick={handlePickerUpload}
-                className="w-full py-2.5 rounded-lg text-sm font-medium"
-                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                className="flex-shrink-0 w-[72px] h-[72px] rounded-lg flex items-center justify-center"
+                style={{ background: "hsl(var(--muted))" }}
+                onClick={() => { cameraInputRef.current?.click(); }}
               >
-                Nahrát vybrané ({pickerSelected.size})
+                <Camera className="h-6 w-6" style={{ color: "hsl(var(--muted-foreground))" }} />
+              </button>
+
+              {/* Last 8 photos */}
+              {photos.slice(0, 8).map((photo, idx) => {
+                const selected = pickerSelected.has(idx);
+                return (
+                  <button
+                    key={photo.itemId || photo.name}
+                    className="flex-shrink-0 w-[72px] h-[72px] rounded-lg overflow-hidden relative"
+                    onClick={() => {
+                      setPickerSelected(prev => {
+                        const next = new Set(prev);
+                        if (next.has(idx)) next.delete(idx); else next.add(idx);
+                        return next;
+                      });
+                    }}
+                  >
+                    <img
+                      src={photo.thumbnailUrl || photo.downloadUrl || ""}
+                      alt={photo.name}
+                      className="w-full h-full object-cover"
+                    />
+                    {selected && (
+                      <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.35)" }}>
+                        <Check className="h-5 w-5 text-white" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Upload selected button */}
+            {pickerSelected.size > 0 && (
+              <div className="px-4 py-2">
+                <button
+                  onClick={handlePickerUpload}
+                  className="w-full py-2.5 rounded-lg text-sm font-medium"
+                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                >
+                  Nahrát vybrané ({pickerSelected.size})
+                </button>
+              </div>
+            )}
+
+            {/* Bottom action */}
+            <div className="px-4 pb-4 pt-1">
+              <button
+                onClick={() => { fileInputRef.current?.click(); setPickerOpen(false); }}
+                className="flex items-center gap-2 w-full py-3 text-sm font-medium rounded-lg px-3"
+                style={{ color: "hsl(var(--foreground))", background: "hsl(var(--muted) / 0.5)" }}
+              >
+                <ImageIcon className="h-4 w-4" style={{ color: "hsl(var(--muted-foreground))" }} />
+                Vybrat z knihovny
               </button>
             </div>
-          )}
-
-          {/* Bottom action */}
-          <div className="px-4 pb-4 pt-1">
-            <button
-              onClick={() => { fileInputRef.current?.click(); setPickerOpen(false); }}
-              className="flex items-center gap-2 w-full py-3 text-sm font-medium rounded-lg px-3"
-              style={{ color: "hsl(var(--foreground))", background: "hsl(var(--muted) / 0.5)" }}
-            >
-              <ImageIcon className="h-4 w-4" style={{ color: "hsl(var(--muted-foreground))" }} />
-              Vybrat z knihovny
-            </button>
           </div>
         </SheetContent>
       </Sheet>
