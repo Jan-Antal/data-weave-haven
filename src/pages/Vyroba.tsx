@@ -193,7 +193,13 @@ function useDragToDismiss(onDismiss: () => void) {
     if (!isDragging.current) return;
     const delta = Math.max(0, e.touches[0].clientY - startY.current);
     currentY.current = delta;
-    if (ref.current) ref.current.style.transform = `translateY(${delta}px)`;
+    if (ref.current) {
+      ref.current.style.transform = `translateY(${delta}px)`;
+      const height = ref.current.offsetHeight;
+      const progress = Math.min(delta / (height * 0.5), 1);
+      const backdrop = ref.current.closest('[role="dialog"]')?.previousElementSibling as HTMLElement;
+      if (backdrop) backdrop.style.opacity = String(1 - progress);
+    }
   }, []);
 
   const onTouchEnd = useCallback(() => {
@@ -203,10 +209,20 @@ function useDragToDismiss(onDismiss: () => void) {
     if (currentY.current > height * 0.3) {
       ref.current.style.transition = "transform 0.25s ease";
       ref.current.style.transform = `translateY(${height}px)`;
+      const backdrop = ref.current.closest('[role="dialog"]')?.previousElementSibling as HTMLElement;
+      if (backdrop) {
+        backdrop.style.transition = "opacity 0.25s ease";
+        backdrop.style.opacity = "0";
+      }
       setTimeout(onDismiss, 250);
     } else {
       ref.current.style.transition = "transform 0.25s ease";
       ref.current.style.transform = "translateY(0)";
+      const backdrop = ref.current.closest('[role="dialog"]')?.previousElementSibling as HTMLElement;
+      if (backdrop) {
+        backdrop.style.transition = "opacity 0.25s ease";
+        backdrop.style.opacity = "1";
+      }
     }
     currentY.current = 0;
   }, [onDismiss]);
