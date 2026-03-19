@@ -1663,7 +1663,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         if (isMobile) {
           return (
             <Sheet open={logModalOpen} onOpenChange={setLogModalOpen}>
-              <SheetContent side="bottom" className="rounded-t-2xl p-0 max-h-[90dvh] flex flex-col" style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))" }}>
+              <SheetContent side="bottom" className="rounded-t-2xl p-0 flex flex-col" style={{ maxHeight: "92dvh", paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))" }}>
                 <div className="flex justify-center pt-2 pb-1 shrink-0">
                   <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
                 </div>
