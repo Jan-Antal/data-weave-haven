@@ -3670,14 +3670,6 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
     listFiles("fotky", true);
   }
 
-  async function handlePickerUpload() {
-    const selectedPhotos = Array.from(pickerSelected).map(i => photos[i]).filter(Boolean);
-    // "Upload selected" doesn't really apply to already-uploaded photos
-    // This is more for re-sharing, but close the picker
-    setPickerSelected(new Set());
-    setPickerOpen(false);
-    toast.success(`${selectedPhotos.length} fotek vybráno`);
-  }
 
   async function handleDelete(fileName: string) {
     try {
