@@ -1522,19 +1522,25 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             overflow: "hidden",
           } : undefined}
         >
-          {/* Mobile header bar matching project detail sheet */}
-          {isMobile && (
-            <div className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0">
-              <button
-                onClick={() => setLogModalOpen(false)}
-                className="text-xs font-medium flex items-center gap-1 min-h-[36px] text-muted-foreground"
+          <div ref={dragLogModal.ref} className={isMobile ? "flex flex-col h-full" : "contents"}>
+            {/* Mobile header bar matching project detail sheet */}
+            {isMobile && (
+              <div
+                className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
+                onTouchStart={dragLogModal.onTouchStart}
+                onTouchMove={dragLogModal.onTouchMove}
+                onTouchEnd={dragLogModal.onTouchEnd}
               >
-                <ChevronLeft className="h-3.5 w-3.5" /> Zpět
-              </button>
-              <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-              <div className="w-[50px]" />
-            </div>
-          )}
+                <button
+                  onClick={() => setLogModalOpen(false)}
+                  className="text-xs font-medium flex items-center gap-1 min-h-[36px] text-muted-foreground"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" /> Zpět
+                </button>
+                <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+                <div className="w-[50px]" />
+              </div>
+            )}
 
           {/* Scrollable content */}
           <div className={isMobile ? "flex-1 overflow-y-auto px-4 pb-4" : ""}>
