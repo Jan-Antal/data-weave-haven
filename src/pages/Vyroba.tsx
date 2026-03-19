@@ -217,6 +217,21 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     if (!loading && !isOwner && !isAdmin && !isTester) navigate("/", { replace: true });
   }, [loading, isOwner, isAdmin, isTester, navigate]);
 
+  // Close all overlays when mobile bottom nav changes module
+  useEffect(() => {
+    const handler = () => {
+      setMobileDetailOpen(false);
+      setLogModalOpen(false);
+      setNoProductionOpen(false);
+      setDetailDialogOpen(false);
+      setDataLogOpen(false);
+      setCtxMenu(null);
+      setWeekPickerOpen(false);
+    };
+    window.addEventListener("mobile-nav-change", handler);
+    return () => window.removeEventListener("mobile-nav-change", handler);
+  }, []);
+
   // Week navigation
   const [weekOffset, setWeekOffset] = useState(0);
   const currentMonday = useMemo(() => addWeeks(getMonday(new Date()), weekOffset), [weekOffset]);
