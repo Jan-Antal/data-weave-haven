@@ -886,10 +886,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
-  // Swipe-to-dismiss hooks for mobile bottom sheets
-  const swipeMobileDetail = useSwipeToDismiss(useCallback(() => setMobileDetailOpen(false), []));
-  const swipeLogModal = useSwipeToDismiss(useCallback(() => setLogModalOpen(false), []));
-  const swipeNoProduction = useSwipeToDismiss(useCallback(() => setNoProductionOpen(false), []));
+  // Swipe-to-dismiss hooks for mobile bottom sheets (ref-based)
+  const { sheetRef: sheetRefDetail, handleTouchStart: handleDetailTouchStart, handleTouchMove: handleDetailTouchMove, handleTouchEnd: handleDetailTouchEnd } = useSwipeToDismissRef(useCallback(() => setMobileDetailOpen(false), []));
+  const { sheetRef: sheetRefLog, handleTouchStart: handleLogTouchStart, handleTouchMove: handleLogTouchMove, handleTouchEnd: handleLogTouchEnd } = useSwipeToDismissRef(useCallback(() => setLogModalOpen(false), []));
+  const swipeNoProduction = useSwipeToDismissRef(useCallback(() => setNoProductionOpen(false), []));
 
 
   /* ── Return from Expedice ── */
