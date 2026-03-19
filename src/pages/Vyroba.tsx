@@ -15,7 +15,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList,
   User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange, Factory,
   CheckCircle2, X, Plus, Trash2, Loader2, Download, Printer, FileText,
-  AlertTriangle, Camera, ArrowRight, Shield, Undo2, Redo2, Clock
+  AlertTriangle, Camera, ArrowRight, Shield, Undo2, Redo2, Clock, Image as ImageIcon
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
@@ -3571,20 +3571,14 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
       <div className="flex items-center justify-between mb-2">
         <span className="text-[11px] uppercase tracking-wider font-medium" style={{ color: "hsl(var(--muted-foreground))" }}>Foto</span>
         {isMobile ? (
-          <label className="flex items-center gap-1 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors min-h-[44px] cursor-pointer"
-            style={{ border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}>
+          <button
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors min-h-[44px]"
+            style={{ border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}
+            onClick={() => { setPickerOpen(true); setPickerSelected(new Set()); }}
+          >
             <Camera className="h-3.5 w-3.5" />
             Přidat foto
-            <input
-              ref={cameraInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => { handleUpload(e); }}
-              disabled={uploading}
-            />
-          </label>
+          </button>
         ) : (
           <label className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium cursor-pointer transition-colors"
             style={{ background: "hsl(var(--success) / 0.08)", color: "hsl(var(--success))", border: "1px solid hsl(var(--success) / 0.2)" }}>
@@ -3648,6 +3642,101 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
         </div>
       )}
 
+      {/* Hidden inputs for camera & file picker */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleUpload}
+        disabled={uploading}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={handleUpload}
+        disabled={uploading}
+      />
+
+      {/* Mobile Slack-style photo picker Sheet */}
+      <Sheet open={pickerOpen} onOpenChange={setPickerOpen}>
+        <SheetContent side="bottom" className="rounded-t-2xl p-0 max-h-[60vh] flex flex-col" style={{ zIndex: 99999 }}>
+          {/* Header */}
+          <div className="px-4 pt-4 pb-2">
+            <span className="text-sm font-semibold" style={{ color: "hsl(var(--foreground))" }}>Photos &amp; Video</span>
+          </div>
+
+          {/* Horizontal scrollable thumbnails */}
+          <div className="px-4 py-2 overflow-x-auto flex gap-2" style={{ scrollbarWidth: "none" }}>
+            {/* Camera button */}
+            <button
+              className="flex-shrink-0 w-[72px] h-[72px] rounded-lg flex items-center justify-center"
+              style={{ background: "hsl(var(--muted))" }}
+              onClick={() => { cameraInputRef.current?.click(); }}
+            >
+              <Camera className="h-6 w-6" style={{ color: "hsl(var(--muted-foreground))" }} />
+            </button>
+
+            {/* Last 8 photos */}
+            {photos.slice(0, 8).map((photo, idx) => {
+              const selected = pickerSelected.has(idx);
+              return (
+                <button
+                  key={photo.itemId || photo.name}
+                  className="flex-shrink-0 w-[72px] h-[72px] rounded-lg overflow-hidden relative"
+                  onClick={() => {
+                    setPickerSelected(prev => {
+                      const next = new Set(prev);
+                      if (next.has(idx)) next.delete(idx); else next.add(idx);
+                      return next;
+                    });
+                  }}
+                >
+                  <img
+                    src={photo.thumbnailUrl || photo.downloadUrl || ""}
+                    alt={photo.name}
+                    className="w-full h-full object-cover"
+                  />
+                  {selected && (
+                    <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.35)" }}>
+                      <Check className="h-5 w-5 text-white" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Upload selected button */}
+          {pickerSelected.size > 0 && (
+            <div className="px-4 py-2">
+              <button
+                onClick={handlePickerUpload}
+                className="w-full py-2.5 rounded-lg text-sm font-medium"
+                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+              >
+                Nahrát vybrané ({pickerSelected.size})
+              </button>
+            </div>
+          )}
+
+          {/* Bottom action */}
+          <div className="px-4 pb-4 pt-1">
+            <button
+              onClick={() => { fileInputRef.current?.click(); setPickerOpen(false); }}
+              className="flex items-center gap-2 w-full py-3 text-sm font-medium rounded-lg px-3"
+              style={{ color: "hsl(var(--foreground))", background: "hsl(var(--muted) / 0.5)" }}
+            >
+              <ImageIcon className="h-4 w-4" style={{ color: "hsl(var(--muted-foreground))" }} />
+              Vybrat z knihovny
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <PhotoLightbox
         open={lightboxOpen}
