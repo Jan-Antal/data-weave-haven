@@ -177,57 +177,43 @@ function useProfileName(userId: string | null) {
 }
 
 /* ═══ swipe-to-dismiss hook ═══ */
-function useDragToDismiss(onDismiss: () => void) {
-  const ref = useRef<HTMLDivElement>(null);
-  const startY = useRef(0);
-  const currentY = useRef(0);
-  const isDragging = useRef(false);
-
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    startY.current = e.touches[0].clientY;
-    isDragging.current = true;
-    if (ref.current) ref.current.style.transition = "none";
-  }, []);
-
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isDragging.current) return;
-    const delta = Math.max(0, e.touches[0].clientY - startY.current);
-    currentY.current = delta;
-    if (ref.current) {
-      ref.current.style.transform = `translateY(${delta}px)`;
-      const height = ref.current.offsetHeight;
+function useSwipeToDismiss(onDismiss: () => void) {
+  const startYRef = useRef(0);
+  const handlers = {
+    onTouchStart: (e: React.TouchEvent<HTMLElement>) => {
+      startYRef.current = e.touches[0].clientY;
+      const el = e.currentTarget;
+      el.style.transition = "none";
+      const overlay = el.previousElementSibling as HTMLElement | null;
+      if (overlay) overlay.style.transition = "none";
+    },
+    onTouchMove: (e: React.TouchEvent<HTMLElement>) => {
+      const delta = Math.max(0, e.touches[0].clientY - startYRef.current);
+      const el = e.currentTarget;
+      el.style.transform = `translateY(${delta}px)`;
+      const height = el.offsetHeight || 600;
       const progress = Math.min(delta / (height * 0.5), 1);
-      const backdrop = ref.current.closest('[role="dialog"]')?.previousElementSibling as HTMLElement;
-      if (backdrop) backdrop.style.opacity = String(1 - progress);
-    }
-  }, []);
-
-  const onTouchEnd = useCallback(() => {
-    isDragging.current = false;
-    if (!ref.current) return;
-    const height = ref.current.offsetHeight;
-    if (currentY.current > height * 0.3) {
-      ref.current.style.transition = "transform 0.25s ease";
-      ref.current.style.transform = `translateY(${height}px)`;
-      const backdrop = ref.current.closest('[role="dialog"]')?.previousElementSibling as HTMLElement;
-      if (backdrop) {
-        backdrop.style.transition = "opacity 0.25s ease";
-        backdrop.style.opacity = "0";
+      const overlay = el.previousElementSibling as HTMLElement | null;
+      if (overlay) overlay.style.opacity = String(1 - progress);
+    },
+    onTouchEnd: (e: React.TouchEvent<HTMLElement>) => {
+      const delta = e.changedTouches[0].clientY - startYRef.current;
+      const el = e.currentTarget;
+      const height = el.offsetHeight || 600;
+      el.style.transition = "transform 0.25s ease";
+      const overlay = el.previousElementSibling as HTMLElement | null;
+      if (overlay) overlay.style.transition = "opacity 0.25s ease";
+      if (delta > height * 0.3) {
+        el.style.transform = `translateY(${height}px)`;
+        if (overlay) overlay.style.opacity = "0";
+        setTimeout(onDismiss, 250);
+      } else {
+        el.style.transform = "translateY(0)";
+        if (overlay) overlay.style.opacity = "1";
       }
-      setTimeout(onDismiss, 250);
-    } else {
-      ref.current.style.transition = "transform 0.25s ease";
-      ref.current.style.transform = "translateY(0)";
-      const backdrop = ref.current.closest('[role="dialog"]')?.previousElementSibling as HTMLElement;
-      if (backdrop) {
-        backdrop.style.transition = "opacity 0.25s ease";
-        backdrop.style.opacity = "1";
-      }
-    }
-    currentY.current = 0;
-  }, [onDismiss]);
-
-  return { ref, onTouchStart, onTouchMove, onTouchEnd };
+    },
+  };
+  return handlers;
 }
 
 /* ═══ MAIN PAGE ═══ */
@@ -905,10 +891,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
-  // Drag-to-dismiss hooks
-  const dragMobileDetail = useDragToDismiss(useCallback(() => setMobileDetailOpen(false), []));
-  const dragLogModal = useDragToDismiss(useCallback(() => setLogModalOpen(false), []));
-  const dragNoProduction = useDragToDismiss(useCallback(() => setNoProductionOpen(false), []));
+  // Swipe-to-dismiss hooks for mobile bottom sheets
+  const swipeMobileDetail = useSwipeToDismiss(useCallback(() => setMobileDetailOpen(false), []));
+  const swipeLogModal = useSwipeToDismiss(useCallback(() => setLogModalOpen(false), []));
+  const swipeNoProduction = useSwipeToDismiss(useCallback(() => setNoProductionOpen(false), []));
 
 
   /* ── Return from Expedice ── */
@@ -1448,45 +1434,11 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             side="bottom"
             className="h-[85vh] rounded-t-2xl p-0 overflow-hidden"
             style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))", touchAction: "none" }}
-            onTouchStart={(e: React.TouchEvent) => {
-              const el = e.currentTarget as HTMLElement;
-              el.dataset.startY = String(e.touches[0].clientY);
-              el.style.transition = "none";
-              const overlay = el.previousElementSibling as HTMLElement;
-              if (overlay) overlay.style.transition = "none";
-            }}
-            onTouchMove={(e: React.TouchEvent) => {
-              const el = e.currentTarget as HTMLElement;
-              const startY = Number(el.dataset.startY);
-              const delta = Math.max(0, e.touches[0].clientY - startY);
-              el.style.transform = `translateY(${delta}px)`;
-              const progress = Math.min(delta / (el.offsetHeight * 0.5), 1);
-              const overlay = el.previousElementSibling as HTMLElement;
-              if (overlay) overlay.style.opacity = String(1 - progress);
-            }}
-            onTouchEnd={(e: React.TouchEvent) => {
-              const el = e.currentTarget as HTMLElement;
-              const startY = Number(el.dataset.startY);
-              const delta = e.changedTouches[0].clientY - startY;
-              el.style.transition = "transform 0.25s ease";
-              const overlay = el.previousElementSibling as HTMLElement;
-              if (overlay) overlay.style.transition = "opacity 0.25s ease";
-              if (delta > el.offsetHeight * 0.3) {
-                el.style.transform = `translateY(${el.offsetHeight}px)`;
-                if (overlay) overlay.style.opacity = "0";
-                setTimeout(() => setMobileDetailOpen(false), 250);
-              } else {
-                el.style.transform = "translateY(0)";
-                if (overlay) overlay.style.opacity = "1";
-              }
-            }}
+            {...swipeMobileDetail}
           >
-            <div ref={dragMobileDetail.ref} className="flex flex-col h-full">
+            <div className="flex flex-col h-full">
               <div
                 className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
-                onTouchStart={dragMobileDetail.onTouchStart}
-                onTouchMove={dragMobileDetail.onTouchMove}
-                onTouchEnd={dragMobileDetail.onTouchEnd}
               >
                 <button
                   onClick={() => setMobileDetailOpen(false)}
@@ -1699,7 +1651,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         if (isMobile) {
           return (
             <Sheet open={logModalOpen} onOpenChange={setLogModalOpen}>
-              <SheetContent side="bottom" className="rounded-t-2xl p-0 flex flex-col" style={{ maxHeight: "92dvh", paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))" }}>
+              <SheetContent side="bottom" className="rounded-t-2xl p-0 flex flex-col" style={{ maxHeight: "92dvh", paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))", touchAction: "none" }} {...swipeLogModal}>
                 <div className="flex justify-center pt-2 pb-1 shrink-0">
                   <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
                 </div>
@@ -1735,13 +1687,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             transform: "none",
           } : undefined}
         >
-          <div ref={dragNoProduction.ref} className={isMobile ? "flex flex-col" : "contents"}>
+          <div className={isMobile ? "flex flex-col" : "contents"}>
             {isMobile && (
               <div
                 className="flex items-center justify-center pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
-                onTouchStart={dragNoProduction.onTouchStart}
-                onTouchMove={dragNoProduction.onTouchMove}
-                onTouchEnd={dragNoProduction.onTouchEnd}
               >
                 <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
               </div>
