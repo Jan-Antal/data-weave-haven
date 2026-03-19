@@ -3604,6 +3604,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const mobileBottomNavOffset = "calc(56px + env(safe-area-inset-bottom, 0px))";
   const [pickerSelected, setPickerSelected] = useState<Set<number>>(new Set());
   const dragPicker = useDragToDismiss(useCallback(() => setPickerOpen(false), []));
   const pendingRetryFiles = useRef<File[]>([]);
@@ -3789,7 +3790,11 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
 
       {/* Mobile Slack-style photo picker Sheet */}
       <Sheet open={pickerOpen} onOpenChange={setPickerOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl p-0 flex flex-col" style={{ zIndex: 99999, maxHeight: "55vh" }}>
+        <SheetContent
+          side="bottom"
+          className="rounded-t-2xl p-0 flex flex-col"
+          style={{ zIndex: 99999, bottom: mobileBottomNavOffset, maxHeight: "55vh" }}
+        >
           <div ref={dragPicker.ref} className="flex flex-col" style={{ maxHeight: "55vh" }}>
             {/* Drag handle */}
             <div
