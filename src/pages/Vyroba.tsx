@@ -1688,20 +1688,48 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
       {/* ═══ NO PRODUCTION DIALOG ═══ */}
       <Dialog open={noProductionOpen} onOpenChange={setNoProductionOpen}>
-        <DialogContent className="sm:max-w-xs">
-          <DialogHeader><DialogTitle>Důvod bez výroby</DialogTitle></DialogHeader>
-          <div className="space-y-2 py-2">
-            {["dovolenka", "nemoc", "čeká na materiál", "jiný důvod"].map(r => (
-              <label key={r} className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" checked={noProductionReason === r} onChange={() => setNoProductionReason(r)} className="accent-amber-600" />
-                <span className="text-sm capitalize">{r}</span>
-              </label>
-            ))}
+        <DialogContent
+          className={isMobile ? "p-0 gap-0 border-0 data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom data-[state=open]:!slide-in-from-top-0 data-[state=closed]:!slide-out-to-top-0" : "sm:max-w-xs"}
+          style={isMobile ? {
+            position: "fixed",
+            top: "auto",
+            bottom: "calc(56px + env(safe-area-inset-bottom, 0px))",
+            left: 0,
+            right: 0,
+            width: "100%",
+            maxWidth: "100%",
+            borderRadius: "16px 16px 0 0",
+            margin: 0,
+            transform: "none",
+          } : undefined}
+        >
+          <div ref={dragNoProduction.ref} className={isMobile ? "flex flex-col" : "contents"}>
+            {isMobile && (
+              <div
+                className="flex items-center justify-center pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
+                onTouchStart={dragNoProduction.onTouchStart}
+                onTouchMove={dragNoProduction.onTouchMove}
+                onTouchEnd={dragNoProduction.onTouchEnd}
+              >
+                <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+              </div>
+            )}
+            <div className={isMobile ? "px-4 pb-4" : ""}>
+              <DialogHeader><DialogTitle>Důvod bez výroby</DialogTitle></DialogHeader>
+              <div className="space-y-2 py-2">
+                {["dovolenka", "nemoc", "čeká na materiál", "jiný důvod"].map(r => (
+                  <label key={r} className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" checked={noProductionReason === r} onChange={() => setNoProductionReason(r)} className="accent-amber-600" />
+                    <span className="text-sm capitalize">{r}</span>
+                  </label>
+                ))}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setNoProductionOpen(false)}>Zrušit</Button>
+                <Button onClick={handleNoProduction}>Potvrdit</Button>
+              </DialogFooter>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNoProductionOpen(false)}>Zrušit</Button>
-            <Button onClick={handleNoProduction}>Potvrdit</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
