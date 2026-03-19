@@ -15,7 +15,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ClipboardList,
   User, UserCog, Settings, Check, LogOut, LayoutDashboard, CalendarRange, Factory,
   CheckCircle2, X, Plus, Trash2, Loader2, Download, Printer, FileText,
-  AlertTriangle, Camera, ArrowRight, Shield, Undo2, Redo2, Clock
+  AlertTriangle, Camera, ArrowRight, Shield, Undo2, Redo2, Clock, Image as ImageIcon
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
