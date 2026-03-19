@@ -1434,7 +1434,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
       {/* ═══ LOG MODAL ═══ */}
       <Dialog open={logModalOpen} onOpenChange={setLogModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md pb-[72px] sm:pb-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <span className="font-mono text-xs" style={{ color: "#6b7280" }}>{selectedProject?.projectId}</span>
