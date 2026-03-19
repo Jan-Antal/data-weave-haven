@@ -3790,7 +3790,11 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
 
       {/* Mobile Slack-style photo picker Sheet */}
       <Sheet open={pickerOpen} onOpenChange={setPickerOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl p-0 flex flex-col" style={{ zIndex: 99999, maxHeight: "55vh" }}>
+        <SheetContent
+          side="bottom"
+          className="rounded-t-2xl p-0 flex flex-col"
+          style={{ zIndex: 99999, bottom: mobileBottomNavOffset, maxHeight: "55vh" }}
+        >
           <div ref={dragPicker.ref} className="flex flex-col" style={{ maxHeight: "55vh" }}>
             {/* Drag handle */}
             <div
