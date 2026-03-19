@@ -851,44 +851,6 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
-/* ═══ swipe-to-dismiss hook ═══ */
-function useDragToDismiss(onDismiss: () => void) {
-  const ref = useRef<HTMLDivElement>(null);
-  const startY = useRef(0);
-  const currentY = useRef(0);
-  const isDragging = useRef(false);
-
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    startY.current = e.touches[0].clientY;
-    isDragging.current = true;
-    if (ref.current) ref.current.style.transition = "none";
-  }, []);
-
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isDragging.current) return;
-    const delta = Math.max(0, e.touches[0].clientY - startY.current);
-    currentY.current = delta;
-    if (ref.current) ref.current.style.transform = `translateY(${delta}px)`;
-  }, []);
-
-  const onTouchEnd = useCallback(() => {
-    isDragging.current = false;
-    if (!ref.current) return;
-    const height = ref.current.offsetHeight;
-    if (currentY.current > height * 0.3) {
-      ref.current.style.transition = "transform 0.25s ease";
-      ref.current.style.transform = `translateY(${height}px)`;
-      setTimeout(onDismiss, 250);
-    } else {
-      ref.current.style.transition = "transform 0.25s ease";
-      ref.current.style.transform = "translateY(0)";
-    }
-    currentY.current = 0;
-  }, [onDismiss]);
-
-  return { ref, onTouchStart, onTouchMove, onTouchEnd };
-}
-
 
   /* ── Return from Expedice ── */
   async function handleReturnFromExpedice(pid: string) {
