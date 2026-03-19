@@ -1428,8 +1428,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       {/* ═══ MOBILE BOTTOM SHEET ═══ */}
       {isMobile && selectedProject && (
         <Sheet open={mobileDetailOpen} onOpenChange={setMobileDetailOpen}>
-          <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col" style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))" }}>
-            <div ref={dragMobileDetail.ref} className="flex flex-col">
+          <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl p-0 overflow-hidden" style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))" }}>
+            <div ref={dragMobileDetail.ref} className="flex flex-col h-full">
               <div
                 className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
                 onTouchStart={dragMobileDetail.onTouchStart}
@@ -1444,55 +1444,55 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                   <ChevronLeft className="h-3.5 w-3.5" /> Zpět
                 </button>
                 <div className="w-10 h-1 rounded-full" style={{ background: "#d0cdc8" }} />
-                <div className="w-[50px]" /> {/* spacer for centering drag handle */}
+                <div className="w-[50px]" />
               </div>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <DetailPanel
-                project={selectedProject}
-                weekKey={weekKey}
-                currentMonday={currentMonday}
-                todayDayIndex={todayDayIndex}
-                onOpenLog={openLogModal}
-                nextWeekNum={nextWeekNum}
-                onSpillAll={openSpillDialog}
-                onOpenExpedice={openExpediceDialog}
-                onToggleItem={toggleItemComplete}
-                getCumulativeForDay={(di) => getCumulativeForDay(selectedProject.projectId, di)}
-                getExpectedPct={getExpectedPct}
-                status={getProjectStatus(selectedProject.projectId)}
-                latestPct={getLatestPercent(selectedProject.projectId)}
-                latestPhase={getLatestPhase(selectedProject.projectId)}
-                logs={getLogsForProject(selectedProject.projectId)}
-                expandedMap={expandedMap}
-                setExpandedMap={setExpandedMap}
-                bundleId={bundleId(selectedProject.projectId)}
-                allItems={getAllItemsForProject(selectedProject.projectId)}
-                scheduleData={scheduleData}
-                pushUndo={pushUndo}
-                onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
-                dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
-                onDismissDyha={() => setDyhaDismissed(prev => new Set(prev).add(selectedProject.projectId))}
-                weeklyGoal={getWeeklyGoal(selectedProject.projectId)}
-                bundleProgress={getBundleProgress(selectedProject.projectId)}
-                isWeeklyGoalMet={isWeeklyGoalMet(selectedProject.projectId)}
-                areAllPartsCompleted={(itemCode, itemName) => areAllPartsCompleted(selectedProject.projectId, itemCode, itemName)}
-                getIncompletePartsInfo={(itemCode, itemName) => getIncompletePartsInfo(selectedProject.projectId, itemCode, itemName)}
-                hideLogButton
-              />
-            </div>
-            {/* Fixed bottom Log button */}
-            {todayDayIndex >= 0 && (
-              <div className="shrink-0 px-4 py-3 border-t border-border bg-background safe-area-bottom">
-                <button
-                  onClick={() => openLogModal()}
-                  className="w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90 min-h-[44px]"
-                  style={{ background: "#3a8a36" }}
-                >
-                  + Log dnes ({DAY_SHORT[todayDayIndex]})
-                </button>
+              <div className="flex-1 overflow-y-auto">
+                <DetailPanel
+                  project={selectedProject}
+                  weekKey={weekKey}
+                  currentMonday={currentMonday}
+                  todayDayIndex={todayDayIndex}
+                  onOpenLog={openLogModal}
+                  nextWeekNum={nextWeekNum}
+                  onSpillAll={openSpillDialog}
+                  onOpenExpedice={openExpediceDialog}
+                  onToggleItem={toggleItemComplete}
+                  getCumulativeForDay={(di) => getCumulativeForDay(selectedProject.projectId, di)}
+                  getExpectedPct={getExpectedPct}
+                  status={getProjectStatus(selectedProject.projectId)}
+                  latestPct={getLatestPercent(selectedProject.projectId)}
+                  latestPhase={getLatestPhase(selectedProject.projectId)}
+                  logs={getLogsForProject(selectedProject.projectId)}
+                  expandedMap={expandedMap}
+                  setExpandedMap={setExpandedMap}
+                  bundleId={bundleId(selectedProject.projectId)}
+                  allItems={getAllItemsForProject(selectedProject.projectId)}
+                  scheduleData={scheduleData}
+                  pushUndo={pushUndo}
+                  onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
+                  dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
+                  onDismissDyha={() => setDyhaDismissed(prev => new Set(prev).add(selectedProject.projectId))}
+                  weeklyGoal={getWeeklyGoal(selectedProject.projectId)}
+                  bundleProgress={getBundleProgress(selectedProject.projectId)}
+                  isWeeklyGoalMet={isWeeklyGoalMet(selectedProject.projectId)}
+                  areAllPartsCompleted={(itemCode, itemName) => areAllPartsCompleted(selectedProject.projectId, itemCode, itemName)}
+                  getIncompletePartsInfo={(itemCode, itemName) => getIncompletePartsInfo(selectedProject.projectId, itemCode, itemName)}
+                  hideLogButton
+                />
               </div>
-            )}
+              {/* Fixed bottom Log button */}
+              {todayDayIndex >= 0 && (
+                <div className="shrink-0 px-4 py-3 border-t border-border bg-background safe-area-bottom">
+                  <button
+                    onClick={() => openLogModal()}
+                    className="w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90 min-h-[44px]"
+                    style={{ background: "#3a8a36" }}
+                  >
+                    + Log dnes ({DAY_SHORT[todayDayIndex]})
+                  </button>
+                </div>
+              )}
+            </div>
           </SheetContent>
         </Sheet>
       )}
