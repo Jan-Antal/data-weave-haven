@@ -176,44 +176,39 @@ function useProfileName(userId: string | null) {
   return data || null;
 }
 
-/* ═══ swipe-to-dismiss hook ═══ */
-function useSwipeToDismiss(onDismiss: () => void) {
-  const startYRef = useRef(0);
-  const handlers = {
-    onTouchStart: (e: React.TouchEvent<HTMLElement>) => {
-      startYRef.current = e.touches[0].clientY;
-      const el = e.currentTarget;
-      el.style.transition = "none";
-      const overlay = el.previousElementSibling as HTMLElement | null;
-      if (overlay) overlay.style.transition = "none";
-    },
-    onTouchMove: (e: React.TouchEvent<HTMLElement>) => {
-      const delta = Math.max(0, e.touches[0].clientY - startYRef.current);
-      const el = e.currentTarget;
-      el.style.transform = `translateY(${delta}px)`;
-      const height = el.offsetHeight || 600;
-      const progress = Math.min(delta / (height * 0.5), 1);
-      const overlay = el.previousElementSibling as HTMLElement | null;
-      if (overlay) overlay.style.opacity = String(1 - progress);
-    },
-    onTouchEnd: (e: React.TouchEvent<HTMLElement>) => {
-      const delta = e.changedTouches[0].clientY - startYRef.current;
-      const el = e.currentTarget;
-      const height = el.offsetHeight || 600;
-      el.style.transition = "transform 0.25s ease";
-      const overlay = el.previousElementSibling as HTMLElement | null;
-      if (overlay) overlay.style.transition = "opacity 0.25s ease";
-      if (delta > height * 0.3) {
-        el.style.transform = `translateY(${height}px)`;
-        if (overlay) overlay.style.opacity = "0";
-        setTimeout(onDismiss, 250);
-      } else {
-        el.style.transform = "translateY(0)";
-        if (overlay) overlay.style.opacity = "1";
-      }
-    },
-  };
-  return handlers;
+/* ═══ swipe-to-dismiss hook (ref-based, bound to drag handle) ═══ */
+function useSwipeToDismissRef(onDismiss: () => void) {
+  const dragRef = useRef({ startY: 0, currentY: 0, dragging: false });
+  const sheetRef = useRef<HTMLDivElement>(null);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    dragRef.current = { startY: e.touches[0].clientY, currentY: 0, dragging: true };
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!dragRef.current.dragging || !sheetRef.current) return;
+    const deltaY = e.touches[0].clientY - dragRef.current.startY;
+    if (deltaY > 0) {
+      sheetRef.current.style.transform = `translateY(${deltaY}px)`;
+      sheetRef.current.style.transition = "none";
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!dragRef.current.dragging || !sheetRef.current) return;
+    const finalY = parseFloat(sheetRef.current.style.transform.replace(/[^\d.-]/g, "") || "0");
+    if (finalY > 80) {
+      sheetRef.current.style.transition = "transform 200ms ease-out";
+      sheetRef.current.style.transform = "translateY(100%)";
+      setTimeout(onDismiss, 200);
+    } else {
+      sheetRef.current.style.transition = "transform 200ms ease-out";
+      sheetRef.current.style.transform = "translateY(0)";
+    }
+    dragRef.current.dragging = false;
+  }, [onDismiss]);
+
+  return { sheetRef, handleTouchStart, handleTouchMove, handleTouchEnd };
 }
 
 /* ═══ MAIN PAGE ═══ */
