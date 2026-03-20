@@ -82,7 +82,6 @@ import { useQualityDefects, type QualityDefect } from "@/hooks/useQualityDefects
 import { logActivity } from "@/lib/activityLog";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
-import { useSheetSwipeDismiss } from "@/hooks/useSheetSwipeDismiss";
 
 /* ═══ helpers ═══ */
 function getMonday(d: Date): Date {
