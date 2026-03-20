@@ -30,7 +30,7 @@ const PIPELINE_STAGES: { statuses: string[]; label: string }[] = [
   { statuses: ["Reklamace"], label: "Reklamace" },
 ];
 
-const EXCLUDED_STATUSES = ["Fakturace", "Dokončeno"];
+const EXCLUDED_STATUSES = ["Fakturace", "Dokončeno", "On Hold"];
 
 const PIPELINE_COLORS: Record<string, string> = {
   "Příprava": "#a7d9a2",
