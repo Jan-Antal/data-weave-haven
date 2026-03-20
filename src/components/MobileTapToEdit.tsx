@@ -80,10 +80,12 @@ export function MobileTapField({ displayValue, disabled, multiline, maxLines = 1
     <div
       onClick={() => setEditing(true)}
       className={cn(
-        "flex items-center h-10 px-3 rounded-md border border-input bg-background text-sm cursor-pointer truncate active:bg-accent/50 transition-colors",
+        "px-3 rounded-md border border-input bg-background text-sm cursor-pointer active:bg-accent/50 transition-colors",
+        multiline ? "py-2 whitespace-pre-wrap break-words" : "flex items-center h-10 truncate",
         !displayValue && "text-muted-foreground",
         className
       )}
+      style={multiline && displayValue ? { display: "-webkit-box", WebkitLineClamp: maxLines, WebkitBoxOrient: "vertical", overflow: "hidden" } : undefined}
     >
       {displayValue || "—"}
     </div>
