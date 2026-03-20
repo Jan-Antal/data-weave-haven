@@ -5,6 +5,7 @@ import { useTPVItems } from "@/hooks/useTPVItems";
 import { useSharePointDocs, type SPFile, CATEGORY_FOLDER_MAP } from "@/hooks/useSharePointDocs";
 import { ProjectDetailDialog, type ProjectDetailProject } from "@/components/ProjectDetailDialog";
 import { isImageFile, PhotoTimelineGrid, PhotoLightbox, generatePhotoFilename } from "@/components/PhotoLightbox";
+import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
 import { ChevronLeft, ChevronRight, ChevronDown, FileText, Package, Info, Plus, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
