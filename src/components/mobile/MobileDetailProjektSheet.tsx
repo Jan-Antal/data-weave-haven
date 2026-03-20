@@ -10,6 +10,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, FileText, Package, Info, Plus, 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { useSheetSwipeDismiss } from "@/hooks/useSheetSwipeDismiss";
 
 interface Project {
   id: string;
