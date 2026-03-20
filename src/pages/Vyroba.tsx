@@ -1840,7 +1840,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               ref={sheetRefVyrobaProjekt}
               side="bottom"
               className="h-[85vh] rounded-t-2xl p-0 overflow-hidden"
-              style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))", touchAction: "none" }}
+              style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))", touchAction: "pan-y" }}
+              onTouchStart={handleSheetHSwipeStart}
+              onTouchMove={handleSheetHSwipeMove}
+              onTouchEnd={handleSheetHSwipeEnd}
             >
               <div className="flex flex-col h-full">
                 <div
