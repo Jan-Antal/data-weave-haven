@@ -72,7 +72,7 @@ export function useProjectAttention(pmName?: string | null) {
       ? projects.filter(p => p.pm === pmName)
       : projects;
 
-    const DONE_STATUSES = new Set(["Fakturace", "Dokončeno"]);
+    const DONE_STATUSES = new Set(["Fakturace", "Dokončeno", "On Hold"]);
 
     for (const project of filteredProjects) {
       // Skip finished projects — they are not "po termínu"
