@@ -231,6 +231,18 @@ function TPVTabContent({ items, currency }: { items: any[]; currency: string }) 
   );
 }
 
+const CATEGORY_ICONS: Record<string, string> = {
+  cenova_nabidka: "📄",
+  smlouva: "📋",
+  zadani: "📝",
+  vykresy: "📐",
+  dokumentace: "📁",
+  dodaci_list: "📦",
+  fotky: "📷",
+};
+
+const CATEGORY_ORDER = ["cenova_nabidka", "smlouva", "zadani", "vykresy", "dokumentace", "dodaci_list", "fotky"];
+
 const CATEGORY_LABELS: Record<string, string> = {
   cenova_nabidka: "Cenová nabídka",
   smlouva: "Smlouva",
