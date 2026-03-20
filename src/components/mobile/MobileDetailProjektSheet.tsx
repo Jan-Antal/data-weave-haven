@@ -5,6 +5,7 @@ import { useTPVItems } from "@/hooks/useTPVItems";
 import { useSharePointDocs, type SPFile, CATEGORY_FOLDER_MAP } from "@/hooks/useSharePointDocs";
 import { ProjectDetailDialog, type ProjectDetailProject } from "@/components/ProjectDetailDialog";
 import { isImageFile, PhotoTimelineGrid, PhotoLightbox, generatePhotoFilename } from "@/components/PhotoLightbox";
+import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
 import { ChevronLeft, ChevronRight, ChevronDown, FileText, Package, Info, Plus, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -423,6 +424,7 @@ function DocsTabContent({ projectId }: { projectId: string }) {
   const sp = useSharePointDocs(projectId);
   const { filesByCategory, initialLoading } = sp;
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
+  const [previewFile, setPreviewFile] = useState<{ file: SPFile; loading: boolean; previewUrl: string | null; webUrl: string | null; downloadUrl: string | null } | null>(null);
   const { profile } = useAuth();
 
   useEffect(() => {
@@ -517,18 +519,24 @@ function DocsTabContent({ projectId }: { projectId: string }) {
             {isOpen && (
               <div style={{ borderTop: "0.5px solid hsl(var(--border))" }}>
                 {rawFiles.map((file: SPFile, idx: number) => (
-                  <a
+                  <div
                     key={file.itemId || file.name}
-                    href={file.downloadUrl || "#"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 px-4 py-3"
+                    className="flex items-center gap-3 px-4 py-3 cursor-pointer active:opacity-70"
                     style={{ borderBottom: idx < rawFiles.length - 1 ? "0.5px solid hsl(var(--border))" : undefined }}
+                    onClick={async () => {
+                      setPreviewFile({ file, loading: true, previewUrl: null, webUrl: file.webUrl, downloadUrl: file.downloadUrl });
+                      try {
+                        const preview = await sp.getPreview(file.itemId);
+                        setPreviewFile(prev => prev?.file.itemId === file.itemId ? { ...prev, loading: false, previewUrl: preview.previewUrl, webUrl: preview.webUrl ?? file.webUrl, downloadUrl: preview.downloadUrl ?? file.downloadUrl } : prev);
+                      } catch {
+                        setPreviewFile(prev => prev?.file.itemId === file.itemId ? { ...prev, loading: false } : prev);
+                      }
+                    }}
                   >
                     <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                     <span className="text-[12px] truncate flex-1">{file.name}</span>
                     <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
-                  </a>
+                  </div>
                 ))}
                 <label
                   className="flex items-center gap-3 px-4 py-3 cursor-pointer active:opacity-70"
@@ -549,6 +557,18 @@ function DocsTabContent({ projectId }: { projectId: string }) {
           </div>
         );
       })}
+      {previewFile && (
+        <DocumentPreviewModal
+          open={!!previewFile}
+          onClose={() => setPreviewFile(null)}
+          fileName={previewFile.file.name}
+          fileSize={previewFile.file.size}
+          previewUrl={previewFile.previewUrl}
+          webUrl={previewFile.webUrl}
+          downloadUrl={previewFile.downloadUrl}
+          loading={previewFile.loading}
+        />
+      )}
     </div>
   );
 }
