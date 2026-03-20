@@ -66,42 +66,9 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
     return () => window.removeEventListener("mobile-nav-change", handler);
   }, [onOpenChange]);
 
-  // Ref-based swipe-to-dismiss
-  const dragRef = useRef({ startY: 0, currentY: 0, dragging: false });
-  const sheetRef = useRef<HTMLDivElement>(null);
-
-  function handleDragTouchStart(e: React.TouchEvent) {
-    dragRef.current = { startY: e.touches[0].clientY, currentY: e.touches[0].clientY, dragging: true };
-  }
-  function handleDragTouchMove(e: React.TouchEvent) {
-    if (!dragRef.current.dragging || !sheetRef.current) return;
-    dragRef.current.currentY = e.touches[0].clientY;
-    const deltaY = Math.max(0, dragRef.current.currentY - dragRef.current.startY);
-    sheetRef.current.style.transition = "none";
-    sheetRef.current.style.transform = `translateY(${deltaY}px)`;
-    const overlay = sheetRef.current.previousElementSibling as HTMLElement | null;
-    if (overlay) {
-      overlay.style.transition = "none";
-      overlay.style.opacity = String(1 - Math.min(deltaY / 300, 1));
-    }
-  }
-  function handleDragTouchEnd() {
-    if (!dragRef.current.dragging || !sheetRef.current) return;
-    dragRef.current.dragging = false;
-    const finalY = dragRef.current.currentY - dragRef.current.startY;
-    const el = sheetRef.current;
-    const overlay = el.previousElementSibling as HTMLElement | null;
-    if (finalY > 80) {
-      el.style.transition = "transform 0.2s ease";
-      el.style.transform = `translateY(${el.offsetHeight}px)`;
-      if (overlay) { overlay.style.transition = "opacity 0.2s ease"; overlay.style.opacity = "0"; }
-      setTimeout(() => onOpenChange(false), 200);
-    } else {
-      el.style.transition = "transform 0.2s ease";
-      el.style.transform = "translateY(0)";
-      if (overlay) { overlay.style.transition = "opacity 0.2s ease"; overlay.style.opacity = "1"; }
-    }
-  }
+  // Swipe-to-dismiss (vertical + horizontal)
+  const { sheetRef, onTouchStart: swipeTouchStart, onTouchMove: swipeTouchMove, onTouchEnd: swipeTouchEnd } =
+    useSheetSwipeDismiss({ onDismiss: () => onOpenChange(false) });
 
   const { data: tpvItems = [] } = useTPVItems(projectId);
 
