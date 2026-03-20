@@ -39,12 +39,13 @@ interface MobileDetailProjektSheetProps {
   onOpenTPV?: (project: Project) => void;
 }
 
-type TabKey = "info" | "tpv" | "docs";
+type TabKey = "info" | "tpv" | "docs" | "foto";
 
 const TABS: { key: TabKey; label: string; icon: typeof Info }[] = [
   { key: "info", label: "Info", icon: Info },
   { key: "tpv", label: "Položky", icon: Package },
   { key: "docs", label: "Dokumenty", icon: FileText },
+  { key: "foto", label: "Foto", icon: Camera },
 ];
 
 export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTPV }: MobileDetailProjektSheetProps) {
