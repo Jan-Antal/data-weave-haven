@@ -221,8 +221,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   // Close all overlays when mobile bottom nav changes module
   useEffect(() => {
     const handler = () => {
-      setMobileDetailOpen(false);
-      setLogModalOpen(false);
+      setMobileVyrobaProjektOpen(false);
+      setMobileDaylogOpen(false);
       setNoProductionOpen(false);
       setDetailDialogOpen(false);
       setDataLogOpen(false);
@@ -339,7 +339,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   // Selection
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [mobileVyrobaProjektOpen, setMobileVyrobaProjektOpen] = useState(false);
   const selectedProject = enrichedProjects.find(p => p.projectId === selectedProjectId) || null;
 
   // Week picker
@@ -357,7 +357,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   useEffect(() => {
     const handler = () => {
       setDataLogOpen(false);
-      setMobileDetailOpen(false);
+      setMobileVyrobaProjektOpen(false);
       setDetailDialogOpen(false);
       setDetailProject(null);
     };
@@ -389,14 +389,14 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       openProjectIdHandled.current = true;
       setSelectedProjectId(openProjectIdFromState);
       if (isMobile) {
-        setMobileDetailOpen(true);
+        setMobileVyrobaProjektOpen(true);
       }
       window.history.replaceState({}, "");
     }
   }, [openProjectIdFromState, enrichedProjects, isMobile]);
 
   // Log modal
-  const [logModalOpen, setLogModalOpen] = useState(false);
+  const [mobileDaylogOpen, setMobileDaylogOpen] = useState(false);
   const [logDayIndex, setLogDayIndex] = useState(-1);
   const [logPhase, setLogPhase] = useState("Řezání");
   const [logPercent, setLogPercent] = useState(0);
@@ -607,7 +607,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       setLogNotes("");
     }
 
-    setLogModalOpen(true);
+    setMobileDaylogOpen(true);
   }
 
   async function handleSaveLog() {
@@ -667,7 +667,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         logActivity({ projectId: selectedProject.projectId, actionType: "phase_changed", oldValue: prevPhaseVal, newValue: logPhase, detail: `${logPercent}%` });
       }
 
-      setLogModalOpen(false);
+      setMobileDaylogOpen(false);
     } catch (err: any) {
       toast.error(`Chyba při ukládání logu: ${err?.message || "neznámá chyba"}`);
     }
@@ -853,37 +853,37 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   }
 
   // Ref-based swipe-to-dismiss for mobile bottom sheets
-  const dragRefDetail = useRef({ startY: 0, currentY: 0, dragging: false });
-  const sheetRefDetail = useRef<HTMLDivElement>(null);
-  const dragRefLog = useRef({ startY: 0, currentY: 0, dragging: false });
-  const sheetRefLog = useRef<HTMLDivElement>(null);
+  const dragRefVyrobaProjekt = useRef({ startY: 0, currentY: 0, dragging: false });
+  const sheetRefVyrobaProjekt = useRef<HTMLDivElement>(null);
+  const dragRefDaylog = useRef({ startY: 0, currentY: 0, dragging: false });
+  const sheetRefDaylog = useRef<HTMLDivElement>(null);
 
-  function handleDetailTouchStart(e: React.TouchEvent) {
-    dragRefDetail.current = { startY: e.touches[0].clientY, currentY: e.touches[0].clientY, dragging: true };
+  function handleVyrobaProjektTouchStart(e: React.TouchEvent) {
+    dragRefVyrobaProjekt.current = { startY: e.touches[0].clientY, currentY: e.touches[0].clientY, dragging: true };
   }
-  function handleDetailTouchMove(e: React.TouchEvent) {
-    if (!dragRefDetail.current.dragging || !sheetRefDetail.current) return;
-    dragRefDetail.current.currentY = e.touches[0].clientY;
-    const deltaY = Math.max(0, dragRefDetail.current.currentY - dragRefDetail.current.startY);
-    sheetRefDetail.current.style.transition = "none";
-    sheetRefDetail.current.style.transform = `translateY(${deltaY}px)`;
-    const overlay = sheetRefDetail.current.previousElementSibling as HTMLElement | null;
+  function handleVyrobaProjektTouchMove(e: React.TouchEvent) {
+    if (!dragRefVyrobaProjekt.current.dragging || !sheetRefVyrobaProjekt.current) return;
+    dragRefVyrobaProjekt.current.currentY = e.touches[0].clientY;
+    const deltaY = Math.max(0, dragRefVyrobaProjekt.current.currentY - dragRefVyrobaProjekt.current.startY);
+    sheetRefVyrobaProjekt.current.style.transition = "none";
+    sheetRefVyrobaProjekt.current.style.transform = `translateY(${deltaY}px)`;
+    const overlay = sheetRefVyrobaProjekt.current.previousElementSibling as HTMLElement | null;
     if (overlay) {
       overlay.style.transition = "none";
       overlay.style.opacity = String(1 - Math.min(deltaY / 300, 1));
     }
   }
-  function handleDetailTouchEnd() {
-    if (!dragRefDetail.current.dragging || !sheetRefDetail.current) return;
-    dragRefDetail.current.dragging = false;
-    const finalY = dragRefDetail.current.currentY - dragRefDetail.current.startY;
-    const el = sheetRefDetail.current;
+  function handleVyrobaProjektTouchEnd() {
+    if (!dragRefVyrobaProjekt.current.dragging || !sheetRefVyrobaProjekt.current) return;
+    dragRefVyrobaProjekt.current.dragging = false;
+    const finalY = dragRefVyrobaProjekt.current.currentY - dragRefVyrobaProjekt.current.startY;
+    const el = sheetRefVyrobaProjekt.current;
     const overlay = el.previousElementSibling as HTMLElement | null;
     if (finalY > 80) {
       el.style.transition = "transform 0.2s ease";
       el.style.transform = `translateY(${el.offsetHeight}px)`;
       if (overlay) { overlay.style.transition = "opacity 0.2s ease"; overlay.style.opacity = "0"; }
-      setTimeout(() => setMobileDetailOpen(false), 200);
+      setTimeout(() => setMobileVyrobaProjektOpen(false), 200);
     } else {
       el.style.transition = "transform 0.2s ease";
       el.style.transform = "translateY(0)";
@@ -891,32 +891,32 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
-  function handleLogTouchStart(e: React.TouchEvent) {
-    dragRefLog.current = { startY: e.touches[0].clientY, currentY: e.touches[0].clientY, dragging: true };
+  function handleDaylogTouchStart(e: React.TouchEvent) {
+    dragRefDaylog.current = { startY: e.touches[0].clientY, currentY: e.touches[0].clientY, dragging: true };
   }
-  function handleLogTouchMove(e: React.TouchEvent) {
-    if (!dragRefLog.current.dragging || !sheetRefLog.current) return;
-    dragRefLog.current.currentY = e.touches[0].clientY;
-    const deltaY = Math.max(0, dragRefLog.current.currentY - dragRefLog.current.startY);
-    sheetRefLog.current.style.transition = "none";
-    sheetRefLog.current.style.transform = `translateY(${deltaY}px)`;
-    const overlay = sheetRefLog.current.previousElementSibling as HTMLElement | null;
+  function handleDaylogTouchMove(e: React.TouchEvent) {
+    if (!dragRefDaylog.current.dragging || !sheetRefDaylog.current) return;
+    dragRefDaylog.current.currentY = e.touches[0].clientY;
+    const deltaY = Math.max(0, dragRefDaylog.current.currentY - dragRefDaylog.current.startY);
+    sheetRefDaylog.current.style.transition = "none";
+    sheetRefDaylog.current.style.transform = `translateY(${deltaY}px)`;
+    const overlay = sheetRefDaylog.current.previousElementSibling as HTMLElement | null;
     if (overlay) {
       overlay.style.transition = "none";
       overlay.style.opacity = String(1 - Math.min(deltaY / 300, 1));
     }
   }
-  function handleLogTouchEnd() {
-    if (!dragRefLog.current.dragging || !sheetRefLog.current) return;
-    dragRefLog.current.dragging = false;
-    const finalY = dragRefLog.current.currentY - dragRefLog.current.startY;
-    const el = sheetRefLog.current;
+  function handleDaylogTouchEnd() {
+    if (!dragRefDaylog.current.dragging || !sheetRefDaylog.current) return;
+    dragRefDaylog.current.dragging = false;
+    const finalY = dragRefDaylog.current.currentY - dragRefDaylog.current.startY;
+    const el = sheetRefDaylog.current;
     const overlay = el.previousElementSibling as HTMLElement | null;
     if (finalY > 80) {
       el.style.transition = "transform 0.2s ease";
       el.style.transform = `translateY(${el.offsetHeight}px)`;
       if (overlay) { overlay.style.transition = "opacity 0.2s ease"; overlay.style.opacity = "0"; }
-      setTimeout(() => setLogModalOpen(false), 200);
+      setTimeout(() => setMobileDaylogOpen(false), 200);
     } else {
       el.style.transition = "transform 0.2s ease";
       el.style.transform = "translateY(0)";
@@ -982,7 +982,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   function handleSelectProject(pid: string) {
     setSelectedProjectId(pid);
-    if (isMobile) setMobileDetailOpen(true);
+    if (isMobile) setMobileVyrobaProjektOpen(true);
   }
 
   /* ── No production today ── */
@@ -1010,7 +1010,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
       logActivity({ projectId: selectedProject.projectId, actionType: "vyroba_no_activity", detail: noProductionReason });
       setNoProductionOpen(false);
-      setLogModalOpen(false);
+      setMobileDaylogOpen(false);
     } catch {
       toast.error("Chyba");
     }
@@ -1457,9 +1457,9 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
       {/* ═══ MOBILE BOTTOM SHEET ═══ */}
       {isMobile && selectedProject && (
-        <Sheet open={mobileDetailOpen} onOpenChange={setMobileDetailOpen}>
+        <Sheet open={mobileVyrobaProjektOpen} onOpenChange={setMobileVyrobaProjektOpen}>
           <SheetContent
-            ref={sheetRefDetail}
+            ref={sheetRefVyrobaProjekt}
             side="bottom"
             className="h-[85vh] rounded-t-2xl p-0 overflow-hidden"
             style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))", touchAction: "none" }}
@@ -1467,12 +1467,12 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             <div className="flex flex-col h-full">
               <div
                 className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
-                onTouchStart={handleDetailTouchStart}
-                onTouchMove={handleDetailTouchMove}
-                onTouchEnd={handleDetailTouchEnd}
+                onTouchStart={handleVyrobaProjektTouchStart}
+                onTouchMove={handleVyrobaProjektTouchMove}
+                onTouchEnd={handleVyrobaProjektTouchEnd}
               >
                 <button
-                  onClick={() => setMobileDetailOpen(false)}
+                  onClick={() => setMobileVyrobaProjektOpen(false)}
                   className="text-xs font-medium flex items-center gap-1 min-h-[36px]"
                   style={{ color: "#6b7280" }}
                 >
@@ -1670,7 +1670,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                   </Button>
                 )}
                 {!isMobile && <div className="flex-1" />}
-                <Button variant="outline" onClick={() => setLogModalOpen(false)}>Zrušit</Button>
+                <Button variant="outline" onClick={() => setMobileDaylogOpen(false)}>Zrušit</Button>
                 <Button onClick={handleSaveLog} style={{ background: "#3a8a36" }} className="text-white">
                   💾 Uložit
                 </Button>
@@ -1681,16 +1681,16 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
         if (isMobile) {
           return (
-            <Sheet open={logModalOpen} onOpenChange={setLogModalOpen}>
-              <SheetContent ref={sheetRefLog} side="bottom" className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col" style={{ touchAction: "none" }}>
+            <Sheet open={mobileDaylogOpen} onOpenChange={setMobileDaylogOpen}>
+              <SheetContent ref={sheetRefDaylog} side="bottom" className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col" style={{ touchAction: "none" }}>
                 <div
                   className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
-                  onTouchStart={handleLogTouchStart}
-                  onTouchMove={handleLogTouchMove}
-                  onTouchEnd={handleLogTouchEnd}
+                  onTouchStart={handleDaylogTouchStart}
+                  onTouchMove={handleDaylogTouchMove}
+                  onTouchEnd={handleDaylogTouchEnd}
                 >
                   <button
-                    onClick={() => setLogModalOpen(false)}
+                    onClick={() => setMobileDaylogOpen(false)}
                     className="text-xs font-medium flex items-center gap-1 min-h-[36px]"
                     style={{ color: "#6b7280" }}
                   >
@@ -1708,7 +1708,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         }
 
         return (
-          <Dialog open={logModalOpen} onOpenChange={setLogModalOpen}>
+          <Dialog open={mobileDaylogOpen} onOpenChange={setMobileDaylogOpen}>
             <DialogContent className="sm:max-w-md p-0 gap-0">
               {logModalContent}
             </DialogContent>
