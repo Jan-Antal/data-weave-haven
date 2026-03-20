@@ -392,8 +392,25 @@ function DocsTabContent({ projectId }: { projectId: string }) {
   const sp = useSharePointDocs(projectId);
   const { filesByCategory, initialLoading } = sp;
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
-  const [previewFile, setPreviewFile] = useState<{ file: SPFile; loading: boolean; previewUrl: string | null; webUrl: string | null; downloadUrl: string | null } | null>(null);
+  const [docPreview, setDocPreview] = useState<{ file: SPFile; catKey: string; loading: boolean; previewUrl: string | null } | null>(null);
   const { profile } = useAuth();
+
+  async function openDocPreview(file: SPFile, catKey: string) {
+    setDocPreview({ file, catKey, loading: true, previewUrl: null });
+    try {
+      const preview = await sp.getPreview(file.itemId);
+      setDocPreview(prev => prev?.file.itemId === file.itemId ? { ...prev, loading: false, previewUrl: preview.previewUrl } : prev);
+    } catch {
+      setDocPreview(prev => prev?.file.itemId === file.itemId ? { ...prev, loading: false } : prev);
+    }
+  }
+
+  const previewFiles = docPreview ? (filesByCategory[docPreview.catKey] ?? []) : [];
+  const previewIdx = docPreview ? previewFiles.findIndex(f => f.itemId === docPreview.file.itemId) : 0;
+  function handlePreviewNavigate(dir: -1 | 1) {
+    const next = previewFiles[previewIdx + dir];
+    if (next && docPreview) openDocPreview(next, docPreview.catKey);
+  }
 
   useEffect(() => {
     for (const catKey of Object.keys(CATEGORY_FOLDER_MAP)) {
