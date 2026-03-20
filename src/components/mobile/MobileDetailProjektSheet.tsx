@@ -4,7 +4,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useTPVItems } from "@/hooks/useTPVItems";
 import { useSharePointDocs, type SPFile, CATEGORY_FOLDER_MAP } from "@/hooks/useSharePointDocs";
 import { ProjectDetailDialog, type ProjectDetailProject } from "@/components/ProjectDetailDialog";
-import { isImageFile, PhotoTimelineGrid } from "@/components/PhotoLightbox";
+import { isImageFile, PhotoTimelineGrid, generatePhotoFilename } from "@/components/PhotoLightbox";
 import { ChevronLeft, ChevronRight, ChevronDown, FileText, Package, Info, Plus, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
