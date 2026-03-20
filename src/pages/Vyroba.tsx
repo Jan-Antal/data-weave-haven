@@ -4783,7 +4783,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   const photos = useMemo(() => {
     const all = filesByCategory["fotky"] || [];
     return all
-      .filter((f) => isImageFile(f.name))
+      .filter((f) => isImageFile(f.name) && f.name.includes("-Log-"))
       .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
   }, [filesByCategory]);
 
