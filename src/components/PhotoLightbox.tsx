@@ -585,6 +585,7 @@ export const PhotoLightbox = memo(function PhotoLightbox({
 
   const modal = (
     <div
+      ref={modalRef}
       className="fixed inset-0 z-[100000] flex items-center justify-center select-none"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
@@ -594,6 +595,7 @@ export const PhotoLightbox = memo(function PhotoLightbox({
       }}
       onMouseMove={resetHideTimer}
       onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
       {/* Backdrop */}
