@@ -174,15 +174,12 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
         {/* Tab content */}
         <div className="flex-1 overflow-hidden flex flex-col">
           {activeTab === "info" && (
-            <>
-              <InfoNotesSection project={project} />
-              <ProjectDetailDialog
-                project={project as ProjectDetailProject}
-                open={true}
-                onOpenChange={onOpenChange}
-                mode="embedded"
-              />
-            </>
+            <ProjectDetailDialog
+              project={project as ProjectDetailProject}
+              open={true}
+              onOpenChange={onOpenChange}
+              mode="embedded"
+            />
           )}
           {activeTab === "tpv" && (
             <div className="flex-1 overflow-y-auto px-4 pt-3 pb-6">
