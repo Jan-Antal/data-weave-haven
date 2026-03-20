@@ -4,7 +4,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useTPVItems } from "@/hooks/useTPVItems";
 import { useSharePointDocs, type SPFile, CATEGORY_FOLDER_MAP } from "@/hooks/useSharePointDocs";
 import { ProjectDetailDialog, type ProjectDetailProject } from "@/components/ProjectDetailDialog";
-import { ChevronLeft, ChevronRight, FileText, Package, Info } from "lucide-react";
+import { ChevronLeft, ChevronRight, Package, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Project {
