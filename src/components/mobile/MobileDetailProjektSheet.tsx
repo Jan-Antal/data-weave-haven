@@ -352,6 +352,7 @@ function DocsTabContent({ projectId }: { projectId: string }) {
           ? rawFiles.filter((f: SPFile) => f.name.includes("-Log-"))
           : rawFiles;
         const icon = CATEGORY_ICONS[catKey] || "📄";
+        const isOpen = openCategories.has(catKey);
         return (
           <div key={catKey} className="bg-card rounded-[10px] overflow-hidden" style={{ border: "0.5px solid hsl(var(--border))" }}>
             <div
