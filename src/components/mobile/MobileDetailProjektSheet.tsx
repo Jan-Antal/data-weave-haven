@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useTPVItems } from "@/hooks/useTPVItems";
