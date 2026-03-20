@@ -560,17 +560,17 @@ export const PhotoLightbox = memo(function PhotoLightbox({
     <div
       className="fixed inset-0 z-[100000] flex items-center justify-center select-none"
       onClick={(e) => {
-        // Only close if clicking the outermost div directly (not children)
         if (e.target === e.currentTarget) {
           onClose();
         }
+        e.stopPropagation();
       }}
       onMouseMove={resetHideTimer}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/90" />
+      <div className="absolute inset-0 bg-black/90" onClick={(e) => { e.stopPropagation(); onClose(); }} />
 
       {/* Top bar */}
       <div
