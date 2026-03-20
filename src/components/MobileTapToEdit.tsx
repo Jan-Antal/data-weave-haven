@@ -7,6 +7,10 @@ interface MobileTapFieldProps {
   displayValue: string;
   /** Whether the field is disabled (role-based) — always show as read-only text */
   disabled?: boolean;
+  /** If true, shows multiline text (up to maxLines) instead of single-line truncated */
+  multiline?: boolean;
+  /** Max visible lines in multiline mode before requiring tap to expand (default 10) */
+  maxLines?: number;
   /** Render the actual input/select when editing */
   children: (props: { onDone: () => void; autoFocus: boolean }) => ReactNode;
   className?: string;
