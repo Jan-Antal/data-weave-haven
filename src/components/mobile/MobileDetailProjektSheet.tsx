@@ -314,42 +314,10 @@ function DocsTabContent({ projectId }: { projectId: string }) {
     );
   }
 
-  // Filter: "vyroba" shows only fotky with "-Log-" in filename
-  const categoriesToShow = docFilter === "vyroba"
-    ? ["fotky"]
-    : CATEGORY_ORDER;
-
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex gap-2">
-        <button
-          onClick={() => setDocFilter("all")}
-          className={cn(
-            "px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors",
-            docFilter === "all"
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted text-muted-foreground"
-          )}
-        >
-          Vše
-        </button>
-        <button
-          onClick={() => setDocFilter("vyroba")}
-          className={cn(
-            "px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors",
-            docFilter === "vyroba"
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted text-muted-foreground"
-          )}
-        >
-          Výroba
-        </button>
-      </div>
-      {categoriesToShow.map((catKey) => {
+      {CATEGORY_ORDER.map((catKey) => {
         const rawFiles = filesByCategory[catKey] || [];
-        const files = docFilter === "vyroba"
-          ? rawFiles.filter((f: SPFile) => f.name.includes("-Log-"))
-          : rawFiles;
         const icon = CATEGORY_ICONS[catKey] || "📄";
         const isOpen = openCategories.has(catKey);
         return (
