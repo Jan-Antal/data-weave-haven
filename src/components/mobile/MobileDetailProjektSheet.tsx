@@ -354,57 +354,59 @@ function FotkyCategorySection({ projectId, rawFiles, isOpen, onToggle, onUpload 
 
   return (
     <>
-      <div
-        className="flex items-center gap-2 px-4 cursor-pointer active:bg-accent/50 transition-colors bg-card rounded-[10px]"
-        style={{ minHeight: 48, border: "0.5px solid hsl(var(--border))" }}
-        onClick={onToggle}
-      >
-        <span className="text-sm shrink-0">📷</span>
-        <span className="text-[13px] font-medium text-foreground flex-1">Fotky</span>
-        {rawFiles.length > 0 && (
-          <span className="text-[11px] text-muted-foreground">{rawFiles.length}</span>
-        )}
-        <ChevronRight className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform duration-200", isOpen && "rotate-90")} />
-      </div>
-
-      {isOpen && (
-        <div className="bg-card rounded-[10px] overflow-hidden mt-1" style={{ border: "0.5px solid hsl(var(--border))" }}>
-          <div className="flex gap-1.5 px-4 py-2" style={{ borderBottom: "0.5px solid hsl(var(--border))" }}>
-            {(["all", "vyroba"] as const).map(f => (
-              <button
-                key={f}
-                onClick={() => setFotkyFilter(f)}
-                className={cn(
-                  "px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors",
-                  fotkyFilter === f
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                )}
-              >
-                {f === "all" ? "Vše" : "Výroba"}
-              </button>
-            ))}
-          </div>
-
-          {photos.length > 0 && (
-            <div className="px-3 py-3">
-              <PhotoTimelineGrid
-                files={photos}
-                onOpenLightbox={(idx) => { setLightboxIndex(idx); setLightboxOpen(true); }}
-              />
-            </div>
+      <div className="bg-card rounded-[12px] overflow-hidden" style={{ border: "0.5px solid hsl(var(--border))" }}>
+        {/* Header */}
+        <div
+          className="flex items-center gap-3 px-4 min-h-[48px] cursor-pointer select-none"
+          onClick={onToggle}
+        >
+          <span className="text-[16px]">📷</span>
+          <span className="text-[13px] font-medium flex-1">Fotky</span>
+          {rawFiles.length > 0 && (
+            <span className="text-[11px] text-muted-foreground mr-1">{rawFiles.length}</span>
           )}
-
-          <label
-            className="flex items-center gap-2 px-4 py-3 text-[12px] font-medium cursor-pointer active:bg-accent/50 transition-colors"
-            style={{ borderTop: photos.length > 0 ? "0.5px solid hsl(var(--border))" : undefined, color: "hsl(var(--primary))" }}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Nahrát foto
-            <input type="file" multiple className="hidden" accept="image/*" onChange={onUpload} />
-          </label>
+          <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform duration-200", isOpen && "rotate-90")} />
         </div>
-      )}
+
+        {isOpen && (
+          <div style={{ borderTop: "0.5px solid hsl(var(--border))" }}>
+            <div className="flex gap-1.5 px-4 py-2" style={{ borderBottom: "0.5px solid hsl(var(--border))" }}>
+              {(["all", "vyroba"] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setFotkyFilter(f)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors",
+                    fotkyFilter === f
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {f === "all" ? "Vše" : "Výroba"}
+                </button>
+              ))}
+            </div>
+
+            {photos.length > 0 && (
+              <div className="px-3 py-3">
+                <PhotoTimelineGrid
+                  files={photos}
+                  onOpenLightbox={(idx) => { setLightboxIndex(idx); setLightboxOpen(true); }}
+                />
+              </div>
+            )}
+
+            <label
+              className="flex items-center gap-3 px-4 py-3 cursor-pointer active:opacity-70"
+              style={{ borderTop: photos.length > 0 ? "0.5px solid hsl(var(--border))" : undefined }}
+            >
+              <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-[12px] text-muted-foreground">Nahrát foto</span>
+              <input type="file" multiple className="hidden" accept="image/*" onChange={onUpload} />
+            </label>
+          </div>
+        )}
+      </div>
 
       <PhotoLightbox
         open={lightboxOpen}
