@@ -353,15 +353,25 @@ function DocsTabContent({ projectId }: { projectId: string }) {
           : rawFiles;
         const icon = CATEGORY_ICONS[catKey] || "📄";
         return (
-          <div key={catKey}>
-            <div className="flex items-center justify-between mb-1">
-              <h4 className="uppercase text-[11px] font-semibold tracking-wide text-muted-foreground">
-                <span className="mr-1">{icon}</span>
+          <div key={catKey} className="bg-card rounded-[10px] overflow-hidden" style={{ border: "0.5px solid hsl(var(--border))" }}>
+            <div
+              className="flex items-center gap-2 px-4 cursor-pointer active:bg-accent/50 transition-colors"
+              style={{ minHeight: 48, borderBottom: isOpen ? "0.5px solid hsl(var(--border))" : undefined }}
+              onClick={() => setOpenCategories(prev => {
+                const next = new Set(prev);
+                next.has(catKey) ? next.delete(catKey) : next.add(catKey);
+                return next;
+              })}
+            >
+              <span className="text-sm shrink-0">{icon}</span>
+              <span className="uppercase text-[11px] font-semibold tracking-wide text-muted-foreground flex-1">
                 {CATEGORY_LABELS[catKey] || catKey} ({files.length})
-              </h4>
+              </span>
+              <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")} />
               <label
                 className="flex items-center justify-center w-7 h-7 rounded-full cursor-pointer active:opacity-70"
                 style={{ background: "hsl(var(--primary) / 0.1)", color: "hsl(var(--primary))" }}
+                onClick={(e) => e.stopPropagation()}
               >
                 <Plus className="h-3.5 w-3.5" />
                 <input
@@ -373,9 +383,9 @@ function DocsTabContent({ projectId }: { projectId: string }) {
                 />
               </label>
             </div>
-            <div className="bg-card rounded-[10px] overflow-hidden" style={{ border: "0.5px solid hsl(var(--border))" }}>
-              {files.length === 0 ? (
-                <div className="px-4 py-3 text-[12px] text-muted-foreground">Žádné dokumenty</div>
+            {isOpen && (
+              files.length === 0 ? (
+                <div className="px-4 py-3 text-[12px] text-muted-foreground">Žádné soubory</div>
               ) : (
                 files.map((file: SPFile, idx: number) => (
                   <a
@@ -391,8 +401,8 @@ function DocsTabContent({ projectId }: { projectId: string }) {
                     <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
                   </a>
                 ))
-              )}
-            </div>
+              )
+            )}
           </div>
         );
       })}
