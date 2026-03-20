@@ -4803,7 +4803,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
       const dateStr = `${captureDate.getFullYear()}-${String(captureDate.getMonth() + 1).padStart(2, "0")}-${String(captureDate.getDate()).padStart(2, "0")}`;
       const timeStr = `${String(captureDate.getHours()).padStart(2, "0")}-${String(captureDate.getMinutes()).padStart(2, "0")}`;
       const ext = file.name.split(".").pop() || "jpg";
-      const autoName = `${projectId}-Log-${dateStr}-${timeStr}.${ext}`;
+      const autoName = `${projectId}-Log-${dateStr}-${timeStr}-${userSuffix}.${ext}`;
       const renamedFile = new File([file], autoName, { type: file.type });
       try {
         await uploadFile("fotky", renamedFile);
