@@ -331,40 +331,44 @@ const CATEGORY_LABELS: Record<string, string> = {
   fotky: "Fotky",
 };
 
-function FotkyCategorySection({ rawFiles, isOpen, onToggle, onUpload }: {
+function FotkyCategorySection({ projectId, rawFiles, isOpen, onToggle, onUpload }: {
+  projectId: string;
   rawFiles: SPFile[];
   isOpen: boolean;
   onToggle: () => void;
   onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
   const [fotkyFilter, setFotkyFilter] = useState<"all" | "vyroba">("all");
-  const files = fotkyFilter === "vyroba"
+  const filtered = fotkyFilter === "vyroba"
     ? rawFiles.filter(f => f.name.includes("-Log-"))
     : rawFiles;
 
+  const photos = useMemo(() =>
+    filtered.filter(f => isImageFile(f.name))
+      .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()),
+    [filtered]
+  );
+
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
   return (
-    <div className="bg-card rounded-[10px] overflow-hidden" style={{ border: "0.5px solid hsl(var(--border))" }}>
+    <>
       <div
-        className="flex items-center gap-2 px-4 cursor-pointer active:bg-accent/50 transition-colors"
-        style={{ minHeight: 48, borderBottom: isOpen ? "0.5px solid hsl(var(--border))" : undefined }}
+        className="flex items-center gap-2 px-4 cursor-pointer active:bg-accent/50 transition-colors bg-card rounded-[10px]"
+        style={{ minHeight: 48, border: "0.5px solid hsl(var(--border))" }}
         onClick={onToggle}
       >
         <span className="text-sm shrink-0">📷</span>
-        <span className="uppercase text-[11px] font-semibold tracking-wide text-muted-foreground flex-1">
-          Fotky ({files.length})
-        </span>
-        <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")} />
-        <label
-          className="flex items-center justify-center w-7 h-7 rounded-full cursor-pointer active:opacity-70"
-          style={{ background: "hsl(var(--primary) / 0.1)", color: "hsl(var(--primary))" }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Plus className="h-3.5 w-3.5" />
-          <input type="file" multiple className="hidden" accept="image/*" onChange={onUpload} />
-        </label>
+        <span className="text-[13px] font-medium text-foreground flex-1">Fotky</span>
+        {rawFiles.length > 0 && (
+          <span className="text-[11px] text-muted-foreground">{rawFiles.length}</span>
+        )}
+        <ChevronRight className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform duration-200", isOpen && "rotate-90")} />
       </div>
+
       {isOpen && (
-        <>
+        <div className="bg-card rounded-[10px] overflow-hidden mt-1" style={{ border: "0.5px solid hsl(var(--border))" }}>
           <div className="flex gap-1.5 px-4 py-2" style={{ borderBottom: "0.5px solid hsl(var(--border))" }}>
             {(["all", "vyroba"] as const).map(f => (
               <button
@@ -381,43 +385,44 @@ function FotkyCategorySection({ rawFiles, isOpen, onToggle, onUpload }: {
               </button>
             ))}
           </div>
-          {files.length === 0 ? (
-            <div className="px-4 py-3 text-[12px] text-muted-foreground">Žádné soubory</div>
-          ) : (
-            files.map((file: SPFile, idx: number) => (
-              <a
-                key={file.itemId || file.name}
-                href={file.downloadUrl || "#"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors"
-                style={{ borderBottom: idx < files.length - 1 ? "0.5px solid hsl(var(--border))" : undefined }}
-              >
-                <span className="text-sm shrink-0">📷</span>
-                <span className="text-[12px] font-medium text-foreground truncate flex-1">{file.name}</span>
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
-              </a>
-            ))
+
+          {photos.length > 0 && (
+            <div className="px-3 py-3">
+              <PhotoTimelineGrid
+                files={photos}
+                onOpenLightbox={(idx) => { setLightboxIndex(idx); setLightboxOpen(true); }}
+              />
+            </div>
           )}
-        </>
+
+          <label
+            className="flex items-center gap-2 px-4 py-3 text-[12px] font-medium cursor-pointer active:bg-accent/50 transition-colors"
+            style={{ borderTop: photos.length > 0 ? "0.5px solid hsl(var(--border))" : undefined, color: "hsl(var(--primary))" }}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nahrát foto
+            <input type="file" multiple className="hidden" accept="image/*" onChange={onUpload} />
+          </label>
+        </div>
       )}
-    </div>
+
+      <PhotoLightbox
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        files={photos}
+        initialIndex={lightboxIndex}
+        projectName={projectId}
+      />
+    </>
   );
 }
 
 function DocsTabContent({ projectId }: { projectId: string }) {
   const sp = useSharePointDocs(projectId);
   const { filesByCategory, initialLoading } = sp;
-  const [openCategories, setOpenCategories] = useState<Set<string>>(() => {
-    const initial = new Set<string>();
-    for (const [key, files] of Object.entries(filesByCategory)) {
-      if (files.length > 0) initial.add(key);
-    }
-    return initial;
-  });
+  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
   const { profile } = useAuth();
 
-  // Load all categories on mount
   useEffect(() => {
     for (const catKey of Object.keys(CATEGORY_FOLDER_MAP)) {
       sp.listFiles(catKey);
@@ -455,6 +460,14 @@ function DocsTabContent({ projectId }: { projectId: string }) {
     sp.listFiles(catKey);
   }, [sp, projectId, userSuffix]);
 
+  const toggleCategory = useCallback((key: string) => {
+    setOpenCategories(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }, []);
+
   if (initialLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -464,64 +477,73 @@ function DocsTabContent({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       {CATEGORY_ORDER.map((catKey) => {
-        if (catKey === "fotky") {
-          return <FotkyCategorySection key={catKey} rawFiles={filesByCategory["fotky"] || []} isOpen={openCategories.has("fotky")} onToggle={() => setOpenCategories(prev => { const next = new Set(prev); next.has("fotky") ? next.delete("fotky") : next.add("fotky"); return next; })} onUpload={(e) => handleMobileUpload("fotky", e)} />;
-        }
         const rawFiles = filesByCategory[catKey] || [];
         const icon = CATEGORY_ICONS[catKey] || "📄";
         const isOpen = openCategories.has(catKey);
+
+        if (catKey === "fotky") {
+          return (
+            <FotkyCategorySection
+              key={catKey}
+              projectId={projectId}
+              rawFiles={rawFiles}
+              isOpen={isOpen}
+              onToggle={() => toggleCategory("fotky")}
+              onUpload={(e) => handleMobileUpload("fotky", e)}
+            />
+          );
+        }
+
         return (
-          <div key={catKey} className="bg-card rounded-[10px] overflow-hidden" style={{ border: "0.5px solid hsl(var(--border))" }}>
+          <div key={catKey}>
             <div
-              className="flex items-center gap-2 px-4 cursor-pointer active:bg-accent/50 transition-colors"
-              style={{ minHeight: 48, borderBottom: isOpen ? "0.5px solid hsl(var(--border))" : undefined }}
-              onClick={() => setOpenCategories(prev => {
-                const next = new Set(prev);
-                next.has(catKey) ? next.delete(catKey) : next.add(catKey);
-                return next;
-              })}
+              className="flex items-center gap-2 px-4 cursor-pointer active:bg-accent/50 transition-colors bg-card rounded-[10px]"
+              style={{ minHeight: 48, border: "0.5px solid hsl(var(--border))" }}
+              onClick={() => toggleCategory(catKey)}
             >
               <span className="text-sm shrink-0">{icon}</span>
-              <span className="uppercase text-[11px] font-semibold tracking-wide text-muted-foreground flex-1">
-                {CATEGORY_LABELS[catKey] || catKey} ({rawFiles.length})
+              <span className="text-[13px] font-medium text-foreground flex-1">
+                {CATEGORY_LABELS[catKey] || catKey}
               </span>
-              <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")} />
-              <label
-                className="flex items-center justify-center w-7 h-7 rounded-full cursor-pointer active:opacity-70"
-                style={{ background: "hsl(var(--primary) / 0.1)", color: "hsl(var(--primary))" }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <input
-                  type="file"
-                  multiple
-                  className="hidden"
-                  accept="*/*"
-                  onChange={(e) => handleMobileUpload(catKey, e)}
-                />
-              </label>
+              {rawFiles.length > 0 && (
+                <span className="text-[11px] text-muted-foreground">{rawFiles.length}</span>
+              )}
+              <ChevronRight className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform duration-200", isOpen && "rotate-90")} />
             </div>
+
             {isOpen && (
-              rawFiles.length === 0 ? (
-                <div className="px-4 py-3 text-[12px] text-muted-foreground">Žádné soubory</div>
-              ) : (
-                rawFiles.map((file: SPFile, idx: number) => (
+              <div className="bg-card rounded-[10px] overflow-hidden mt-1" style={{ border: "0.5px solid hsl(var(--border))" }}>
+                {rawFiles.map((file: SPFile, idx: number) => (
                   <a
                     key={file.itemId || file.name}
                     href={file.downloadUrl || "#"}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors"
-                    style={{ borderBottom: idx < rawFiles.length - 1 ? "0.5px solid hsl(var(--border))" : undefined }}
+                    style={{ borderBottom: "0.5px solid hsl(var(--border))" }}
                   >
                     <span className="text-sm shrink-0">{icon}</span>
                     <span className="text-[12px] font-medium text-foreground truncate flex-1">{file.name}</span>
                     <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
                   </a>
-                ))
-              )
+                ))}
+                <label
+                  className="flex items-center gap-2 px-4 py-3 text-[12px] font-medium cursor-pointer active:bg-accent/50 transition-colors"
+                  style={{ color: "hsl(var(--primary))" }}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Nahrát dokument
+                  <input
+                    type="file"
+                    multiple
+                    className="hidden"
+                    accept="*/*"
+                    onChange={(e) => handleMobileUpload(catKey, e)}
+                  />
+                </label>
+              </div>
             )}
           </div>
         );
