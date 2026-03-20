@@ -424,6 +424,7 @@ function DocsTabContent({ projectId }: { projectId: string }) {
   const sp = useSharePointDocs(projectId);
   const { filesByCategory, initialLoading } = sp;
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
+  const [previewFile, setPreviewFile] = useState<{ file: SPFile; loading: boolean; previewUrl: string | null; webUrl: string | null; downloadUrl: string | null } | null>(null);
   const { profile } = useAuth();
 
   useEffect(() => {
