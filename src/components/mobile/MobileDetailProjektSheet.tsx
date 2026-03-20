@@ -330,7 +330,7 @@ function FotkyCategorySection({ rawFiles, isOpen, onToggle, onUpload }: {
   );
 }
 
-
+function DocsTabContent({ projectId }: { projectId: string }) {
   const sp = useSharePointDocs(projectId);
   const { filesByCategory, initialLoading } = sp;
   const [openCategories, setOpenCategories] = useState<Set<string>>(() => {
