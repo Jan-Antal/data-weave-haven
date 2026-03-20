@@ -20,7 +20,7 @@ interface MobileTapFieldProps {
  * On mobile: shows a static text span. Tap → replaces with actual input (children).
  * On desktop: always renders the children (input).
  */
-export function MobileTapField({ displayValue, disabled, children, className }: MobileTapFieldProps) {
+export function MobileTapField({ displayValue, disabled, multiline, maxLines = 10, children, className }: MobileTapFieldProps) {
   const isMobile = useIsMobile();
   const [editing, setEditing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
