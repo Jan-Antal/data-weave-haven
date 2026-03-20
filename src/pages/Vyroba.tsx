@@ -176,45 +176,6 @@ function useProfileName(userId: string | null) {
   return data || null;
 }
 
-/* ═══ swipe-to-dismiss hook ═══ */
-function useSwipeToDismiss(onDismiss: () => void) {
-  const startYRef = useRef(0);
-  const handlers = {
-    onTouchStart: (e: React.TouchEvent<HTMLElement>) => {
-      startYRef.current = e.touches[0].clientY;
-      const el = e.currentTarget;
-      el.style.transition = "none";
-      const overlay = el.previousElementSibling as HTMLElement | null;
-      if (overlay) overlay.style.transition = "none";
-    },
-    onTouchMove: (e: React.TouchEvent<HTMLElement>) => {
-      const delta = Math.max(0, e.touches[0].clientY - startYRef.current);
-      const el = e.currentTarget;
-      el.style.transform = `translateY(${delta}px)`;
-      const height = el.offsetHeight || 600;
-      const progress = Math.min(delta / (height * 0.5), 1);
-      const overlay = el.previousElementSibling as HTMLElement | null;
-      if (overlay) overlay.style.opacity = String(1 - progress);
-    },
-    onTouchEnd: (e: React.TouchEvent<HTMLElement>) => {
-      const delta = e.changedTouches[0].clientY - startYRef.current;
-      const el = e.currentTarget;
-      const height = el.offsetHeight || 600;
-      el.style.transition = "transform 0.25s ease";
-      const overlay = el.previousElementSibling as HTMLElement | null;
-      if (overlay) overlay.style.transition = "opacity 0.25s ease";
-      if (delta > height * 0.3) {
-        el.style.transform = `translateY(${height}px)`;
-        if (overlay) overlay.style.opacity = "0";
-        setTimeout(onDismiss, 250);
-      } else {
-        el.style.transform = "translateY(0)";
-        if (overlay) overlay.style.opacity = "1";
-      }
-    },
-  };
-  return handlers;
-}
 
 /* ═══ MAIN PAGE ═══ */
 export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}) {
@@ -891,10 +852,77 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
-  // Swipe-to-dismiss hooks for mobile bottom sheets
-  const swipeMobileDetail = useSwipeToDismiss(useCallback(() => setMobileDetailOpen(false), []));
-  const swipeLogModal = useSwipeToDismiss(useCallback(() => setLogModalOpen(false), []));
-  const swipeNoProduction = useSwipeToDismiss(useCallback(() => setNoProductionOpen(false), []));
+  // Ref-based swipe-to-dismiss for mobile bottom sheets
+  const dragRefDetail = useRef({ startY: 0, currentY: 0, dragging: false });
+  const sheetRefDetail = useRef<HTMLDivElement>(null);
+  const dragRefLog = useRef({ startY: 0, currentY: 0, dragging: false });
+  const sheetRefLog = useRef<HTMLDivElement>(null);
+
+  function handleDetailTouchStart(e: React.TouchEvent) {
+    dragRefDetail.current = { startY: e.touches[0].clientY, currentY: e.touches[0].clientY, dragging: true };
+  }
+  function handleDetailTouchMove(e: React.TouchEvent) {
+    if (!dragRefDetail.current.dragging || !sheetRefDetail.current) return;
+    dragRefDetail.current.currentY = e.touches[0].clientY;
+    const deltaY = Math.max(0, dragRefDetail.current.currentY - dragRefDetail.current.startY);
+    sheetRefDetail.current.style.transition = "none";
+    sheetRefDetail.current.style.transform = `translateY(${deltaY}px)`;
+    const overlay = sheetRefDetail.current.previousElementSibling as HTMLElement | null;
+    if (overlay) {
+      overlay.style.transition = "none";
+      overlay.style.opacity = String(1 - Math.min(deltaY / 300, 1));
+    }
+  }
+  function handleDetailTouchEnd() {
+    if (!dragRefDetail.current.dragging || !sheetRefDetail.current) return;
+    dragRefDetail.current.dragging = false;
+    const finalY = dragRefDetail.current.currentY - dragRefDetail.current.startY;
+    const el = sheetRefDetail.current;
+    const overlay = el.previousElementSibling as HTMLElement | null;
+    if (finalY > 80) {
+      el.style.transition = "transform 0.2s ease";
+      el.style.transform = `translateY(${el.offsetHeight}px)`;
+      if (overlay) { overlay.style.transition = "opacity 0.2s ease"; overlay.style.opacity = "0"; }
+      setTimeout(() => setMobileDetailOpen(false), 200);
+    } else {
+      el.style.transition = "transform 0.2s ease";
+      el.style.transform = "translateY(0)";
+      if (overlay) { overlay.style.transition = "opacity 0.2s ease"; overlay.style.opacity = "1"; }
+    }
+  }
+
+  function handleLogTouchStart(e: React.TouchEvent) {
+    dragRefLog.current = { startY: e.touches[0].clientY, currentY: e.touches[0].clientY, dragging: true };
+  }
+  function handleLogTouchMove(e: React.TouchEvent) {
+    if (!dragRefLog.current.dragging || !sheetRefLog.current) return;
+    dragRefLog.current.currentY = e.touches[0].clientY;
+    const deltaY = Math.max(0, dragRefLog.current.currentY - dragRefLog.current.startY);
+    sheetRefLog.current.style.transition = "none";
+    sheetRefLog.current.style.transform = `translateY(${deltaY}px)`;
+    const overlay = sheetRefLog.current.previousElementSibling as HTMLElement | null;
+    if (overlay) {
+      overlay.style.transition = "none";
+      overlay.style.opacity = String(1 - Math.min(deltaY / 300, 1));
+    }
+  }
+  function handleLogTouchEnd() {
+    if (!dragRefLog.current.dragging || !sheetRefLog.current) return;
+    dragRefLog.current.dragging = false;
+    const finalY = dragRefLog.current.currentY - dragRefLog.current.startY;
+    const el = sheetRefLog.current;
+    const overlay = el.previousElementSibling as HTMLElement | null;
+    if (finalY > 80) {
+      el.style.transition = "transform 0.2s ease";
+      el.style.transform = `translateY(${el.offsetHeight}px)`;
+      if (overlay) { overlay.style.transition = "opacity 0.2s ease"; overlay.style.opacity = "0"; }
+      setTimeout(() => setLogModalOpen(false), 200);
+    } else {
+      el.style.transition = "transform 0.2s ease";
+      el.style.transform = "translateY(0)";
+      if (overlay) { overlay.style.transition = "opacity 0.2s ease"; overlay.style.opacity = "1"; }
+    }
+  }
 
 
   /* ── Return from Expedice ── */
@@ -1431,14 +1459,17 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       {isMobile && selectedProject && (
         <Sheet open={mobileDetailOpen} onOpenChange={setMobileDetailOpen}>
           <SheetContent
+            ref={sheetRefDetail}
             side="bottom"
             className="h-[85vh] rounded-t-2xl p-0 overflow-hidden"
             style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))", touchAction: "none" }}
-            {...swipeMobileDetail}
           >
             <div className="flex flex-col h-full">
               <div
                 className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
+                onTouchStart={handleDetailTouchStart}
+                onTouchMove={handleDetailTouchMove}
+                onTouchEnd={handleDetailTouchEnd}
               >
                 <button
                   onClick={() => setMobileDetailOpen(false)}
@@ -1651,8 +1682,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         if (isMobile) {
           return (
             <Sheet open={logModalOpen} onOpenChange={setLogModalOpen}>
-              <SheetContent side="bottom" className="rounded-t-2xl p-0 flex flex-col" style={{ maxHeight: "92dvh", paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))", touchAction: "none" }} {...swipeLogModal}>
-                <div className="flex justify-center pt-2 pb-1 shrink-0">
+              <SheetContent ref={sheetRefLog} side="bottom" className="rounded-t-2xl p-0 flex flex-col" style={{ maxHeight: "92dvh", paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))", touchAction: "none" }}>
+                <div className="flex justify-center pt-2 pb-1 shrink-0" onTouchStart={handleLogTouchStart} onTouchMove={handleLogTouchMove} onTouchEnd={handleLogTouchEnd}>
                   <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
                 </div>
                 {logModalContent}
