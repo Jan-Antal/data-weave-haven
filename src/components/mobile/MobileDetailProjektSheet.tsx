@@ -273,18 +273,10 @@ function DocsTabContent({ projectId }: { projectId: string }) {
     );
   }
 
-  const allFiles = Object.entries(filesByCategory).flatMap(([cat, files]) =>
-    files.map(f => ({ ...f, category: cat }))
-  );
-
-  if (allFiles.length === 0) {
-    return <p className="text-[12px] text-muted-foreground text-center py-8">Žádné dokumenty</p>;
-  }
-
   // Filter: "vyroba" shows only fotky with "-Log-" in filename
-  const filteredCategories = docFilter === "vyroba"
-    ? { fotky: (filesByCategory["fotky"] || []).filter((f: SPFile) => f.name.includes("-Log-")) }
-    : filesByCategory;
+  const categoriesToShow = docFilter === "vyroba"
+    ? ["fotky"]
+    : CATEGORY_ORDER;
 
   return (
     <div className="flex flex-col gap-3">
@@ -312,28 +304,37 @@ function DocsTabContent({ projectId }: { projectId: string }) {
           Výroba
         </button>
       </div>
-      {Object.entries(filteredCategories).map(([catKey, files]) => {
-        if (files.length === 0) return null;
+      {categoriesToShow.map((catKey) => {
+        const rawFiles = filesByCategory[catKey] || [];
+        const files = docFilter === "vyroba"
+          ? rawFiles.filter((f: SPFile) => f.name.includes("-Log-"))
+          : rawFiles;
+        const icon = CATEGORY_ICONS[catKey] || "📄";
         return (
           <div key={catKey}>
             <h4 className="uppercase text-[11px] font-semibold tracking-wide text-muted-foreground mb-1">
+              <span className="mr-1">{icon}</span>
               {CATEGORY_LABELS[catKey] || catKey} ({files.length})
             </h4>
             <div className="bg-card rounded-[10px] overflow-hidden" style={{ border: "0.5px solid hsl(var(--border))" }}>
-              {files.map((file: SPFile, idx: number) => (
-                <a
-                  key={file.itemId || file.name}
-                  href={file.downloadUrl || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors"
-                  style={{ borderBottom: idx < files.length - 1 ? "0.5px solid hsl(var(--border))" : undefined }}
-                >
-                  <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-[12px] font-medium text-foreground truncate flex-1">{file.name}</span>
-                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
-                </a>
-              ))}
+              {files.length === 0 ? (
+                <div className="px-4 py-3 text-[12px] text-muted-foreground">Žádné dokumenty</div>
+              ) : (
+                files.map((file: SPFile, idx: number) => (
+                  <a
+                    key={file.itemId || file.name}
+                    href={file.downloadUrl || "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors"
+                    style={{ borderBottom: idx < files.length - 1 ? "0.5px solid hsl(var(--border))" : undefined }}
+                  >
+                    <span className="text-sm shrink-0">{icon}</span>
+                    <span className="text-[12px] font-medium text-foreground truncate flex-1">{file.name}</span>
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+                  </a>
+                ))
+              )}
             </div>
           </div>
         );
