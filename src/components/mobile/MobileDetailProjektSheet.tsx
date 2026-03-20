@@ -557,6 +557,18 @@ function DocsTabContent({ projectId }: { projectId: string }) {
           </div>
         );
       })}
+      {previewFile && (
+        <DocumentPreviewModal
+          open={!!previewFile}
+          onClose={() => setPreviewFile(null)}
+          fileName={previewFile.file.name}
+          fileSize={previewFile.file.size}
+          previewUrl={previewFile.previewUrl}
+          webUrl={previewFile.webUrl}
+          downloadUrl={previewFile.downloadUrl}
+          loading={previewFile.loading}
+        />
+      )}
     </div>
   );
 }
