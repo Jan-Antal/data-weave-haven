@@ -176,45 +176,6 @@ function useProfileName(userId: string | null) {
   return data || null;
 }
 
-/* ═══ swipe-to-dismiss hook ═══ */
-function useSwipeToDismiss(onDismiss: () => void) {
-  const startYRef = useRef(0);
-  const handlers = {
-    onTouchStart: (e: React.TouchEvent<HTMLElement>) => {
-      startYRef.current = e.touches[0].clientY;
-      const el = e.currentTarget;
-      el.style.transition = "none";
-      const overlay = el.previousElementSibling as HTMLElement | null;
-      if (overlay) overlay.style.transition = "none";
-    },
-    onTouchMove: (e: React.TouchEvent<HTMLElement>) => {
-      const delta = Math.max(0, e.touches[0].clientY - startYRef.current);
-      const el = e.currentTarget;
-      el.style.transform = `translateY(${delta}px)`;
-      const height = el.offsetHeight || 600;
-      const progress = Math.min(delta / (height * 0.5), 1);
-      const overlay = el.previousElementSibling as HTMLElement | null;
-      if (overlay) overlay.style.opacity = String(1 - progress);
-    },
-    onTouchEnd: (e: React.TouchEvent<HTMLElement>) => {
-      const delta = e.changedTouches[0].clientY - startYRef.current;
-      const el = e.currentTarget;
-      const height = el.offsetHeight || 600;
-      el.style.transition = "transform 0.25s ease";
-      const overlay = el.previousElementSibling as HTMLElement | null;
-      if (overlay) overlay.style.transition = "opacity 0.25s ease";
-      if (delta > height * 0.3) {
-        el.style.transform = `translateY(${height}px)`;
-        if (overlay) overlay.style.opacity = "0";
-        setTimeout(onDismiss, 250);
-      } else {
-        el.style.transform = "translateY(0)";
-        if (overlay) overlay.style.opacity = "1";
-      }
-    },
-  };
-  return handlers;
-}
 
 /* ═══ MAIN PAGE ═══ */
 export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}) {
