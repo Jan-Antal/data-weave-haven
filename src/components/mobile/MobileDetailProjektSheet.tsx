@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useTPVItems } from "@/hooks/useTPVItems";
 import { useSharePointDocs, type SPFile, CATEGORY_FOLDER_MAP } from "@/hooks/useSharePointDocs";
 import { ProjectDetailDialog, type ProjectDetailProject } from "@/components/ProjectDetailDialog";
-import { generatePhotoFilename } from "@/components/PhotoLightbox";
-import { ChevronLeft, ChevronRight, ChevronDown, FileText, Package, Info, Plus } from "lucide-react";
+import { isImageFile, PhotoTimelineGrid, PhotoLightbox, generatePhotoFilename } from "@/components/PhotoLightbox";
+import { ChevronLeft, ChevronRight, ChevronDown, FileText, Package, Info, Plus, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -39,12 +39,13 @@ interface MobileDetailProjektSheetProps {
   onOpenTPV?: (project: Project) => void;
 }
 
-type TabKey = "info" | "tpv" | "docs";
+type TabKey = "info" | "tpv" | "docs" | "foto";
 
 const TABS: { key: TabKey; label: string; icon: typeof Info }[] = [
   { key: "info", label: "Info", icon: Info },
   { key: "tpv", label: "Položky", icon: Package },
   { key: "docs", label: "Dokumenty", icon: FileText },
+  { key: "foto", label: "Foto", icon: Camera },
 ];
 
 export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTPV }: MobileDetailProjektSheetProps) {
@@ -194,12 +195,86 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
               <DocsTabContent projectId={projectId} />
             </div>
           )}
+          {activeTab === "foto" && (
+            <div className="flex-1 overflow-y-auto px-4 pt-3 pb-6">
+              <FotoTabContent projectId={projectId} />
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>
   );
 }
 
+function FotoTabContent({ projectId }: { projectId: string }) {
+  const { uploadFile, filesByCategory, listFiles, uploading } = useSharePointDocs(projectId);
+  const { profile } = useAuth();
+
+  useEffect(() => {
+    if (projectId) listFiles("fotky");
+  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const photos = useMemo(() => {
+    const all = filesByCategory["fotky"] || [];
+    return all.filter(f => isImageFile(f.name) && !f.name.includes("-Log-"))
+      .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
+  }, [filesByCategory]);
+
+  const handleUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    for (const file of Array.from(files)) {
+      const captureDate = file.lastModified ? new Date(file.lastModified) : new Date();
+      const dateStr = `${captureDate.getFullYear()}-${String(captureDate.getMonth() + 1).padStart(2, "0")}-${String(captureDate.getDate()).padStart(2, "0")}`;
+      const timeStr = `${String(captureDate.getHours()).padStart(2, "0")}${String(captureDate.getMinutes()).padStart(2, "0")}${String(captureDate.getSeconds()).padStart(2, "0")}`;
+      const userSuffix = profile?.full_name
+        ? profile.full_name.trim().split(" ").pop()!.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+        : "user";
+      const ext = file.name.split(".").pop() || "jpg";
+      const autoName = `${projectId}-${dateStr}_${timeStr}-${userSuffix}.${ext}`;
+      const renamed = new File([file], autoName, { type: file.type });
+      try {
+        await uploadFile("fotky", renamed);
+        toast.success(`✓ ${autoName}`);
+      } catch {
+        toast.error("Upload selhal");
+      }
+    }
+    listFiles("fotky");
+    if (e.target) e.target.value = "";
+  }, [uploadFile, listFiles, projectId, profile]);
+
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <label
+        className="flex items-center justify-center gap-2 w-full py-3 rounded-xl cursor-pointer active:opacity-70 font-medium text-[13px]"
+        style={{ border: "2px dashed hsl(var(--border))", color: "hsl(var(--primary))" }}
+      >
+        <Camera className="h-4 w-4" />
+        Přidat foto
+        <input type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} disabled={uploading} />
+      </label>
+      {photos.length === 0 ? (
+        <p className="text-[12px] text-muted-foreground text-center py-4">Žádné fotky</p>
+      ) : (
+        <PhotoTimelineGrid
+          files={photos}
+          onOpenLightbox={(idx) => { setLightboxIndex(idx); setLightboxOpen(true); }}
+        />
+      )}
+      <PhotoLightbox
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        files={photos}
+        initialIndex={lightboxIndex}
+        projectName={projectId}
+      />
+    </div>
+  );
+}
 
 function TPVTabContent({ items, currency }: { items: any[]; currency: string }) {
   if (items.length === 0) {
