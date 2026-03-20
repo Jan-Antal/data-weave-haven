@@ -4783,7 +4783,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   const photos = useMemo(() => {
     const all = filesByCategory["fotky"] || [];
     return all
-      .filter((f) => isImageFile(f.name))
+      .filter((f) => isImageFile(f.name) && f.name.includes("-Log-"))
       .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
   }, [filesByCategory]);
 
@@ -4792,9 +4792,9 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
     if (!files || files.length === 0) return;
     const failed: File[] = [];
     for (const file of Array.from(files)) {
-      const now = new Date();
-      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-      const timeStr = `${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}`;
+      const captureDate = file.lastModified ? new Date(file.lastModified) : new Date();
+      const dateStr = `${captureDate.getFullYear()}-${String(captureDate.getMonth() + 1).padStart(2, "0")}-${String(captureDate.getDate()).padStart(2, "0")}`;
+      const timeStr = `${String(captureDate.getHours()).padStart(2, "0")}-${String(captureDate.getMinutes()).padStart(2, "0")}`;
       const ext = file.name.split(".").pop() || "jpg";
       const autoName = `${projectId}-Log-${dateStr}-${timeStr}.${ext}`;
       const renamedFile = new File([file], autoName, { type: file.type });
@@ -4821,9 +4821,9 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
     setRetryBannerVisible(false);
     const failed: File[] = [];
     for (const file of filesToRetry) {
-      const now = new Date();
-      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-      const timeStr = `${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}`;
+      const captureDate = file.lastModified ? new Date(file.lastModified) : new Date();
+      const dateStr = `${captureDate.getFullYear()}-${String(captureDate.getMonth() + 1).padStart(2, "0")}-${String(captureDate.getDate()).padStart(2, "0")}`;
+      const timeStr = `${String(captureDate.getHours()).padStart(2, "0")}-${String(captureDate.getMinutes()).padStart(2, "0")}`;
       const ext = file.name.split(".").pop() || "jpg";
       const autoName = `${projectId}-Log-${dateStr}-${timeStr}.${ext}`;
       const renamedFile = new File([file], autoName, { type: file.type });
