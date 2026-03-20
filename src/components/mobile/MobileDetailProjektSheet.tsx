@@ -174,12 +174,15 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
         {/* Tab content */}
         <div className="flex-1 overflow-hidden flex flex-col">
           {activeTab === "info" && (
-            <ProjectDetailDialog
-              project={project as ProjectDetailProject}
-              open={true}
-              onOpenChange={onOpenChange}
-              mode="embedded"
-            />
+            <>
+              <InfoNotesSection project={project} />
+              <ProjectDetailDialog
+                project={project as ProjectDetailProject}
+                open={true}
+                onOpenChange={onOpenChange}
+                mode="embedded"
+              />
+            </>
           )}
           {activeTab === "tpv" && (
             <div className="flex-1 overflow-y-auto px-4 pt-3 pb-6">
@@ -194,6 +197,44 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function InfoNotesSection({ project }: { project: Project }) {
+  const [pmExpanded, setPmExpanded] = useState(false);
+  const [tpvExpanded, setTpvExpanded] = useState(false);
+
+  if (!project.pm_poznamka && !project.tpv_poznamka) return null;
+
+  return (
+    <div className="px-4 pt-2 shrink-0">
+      {project.pm_poznamka && (
+        <div className="py-2" style={{ borderBottom: "0.5px solid hsl(var(--border))" }}>
+          <span className="text-[11px] text-muted-foreground block mb-0.5">PM poznámka</span>
+          <p className={cn("text-[12px] text-foreground whitespace-pre-wrap", !pmExpanded && "line-clamp-3")}>
+            {project.pm_poznamka}
+          </p>
+          {project.pm_poznamka.length > 120 && (
+            <button onClick={() => setPmExpanded(p => !p)} className="text-[11px] text-primary mt-1">
+              {pmExpanded ? "Skrýt" : "Zobrazit vše"}
+            </button>
+          )}
+        </div>
+      )}
+      {project.tpv_poznamka && (
+        <div className="py-2" style={{ borderBottom: "0.5px solid hsl(var(--border))" }}>
+          <span className="text-[11px] text-muted-foreground block mb-0.5">TPV poznámka</span>
+          <p className={cn("text-[12px] text-foreground whitespace-pre-wrap", !tpvExpanded && "line-clamp-3")}>
+            {project.tpv_poznamka}
+          </p>
+          {project.tpv_poznamka.length > 120 && (
+            <button onClick={() => setTpvExpanded(p => !p)} className="text-[11px] text-primary mt-1">
+              {tpvExpanded ? "Skrýt" : "Zobrazit vše"}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
