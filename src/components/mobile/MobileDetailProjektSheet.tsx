@@ -29,7 +29,7 @@ interface Project {
   [key: string]: any;
 }
 
-interface MobileProjectDetailSheetProps {
+interface MobileDetailProjektSheetProps {
   project: Project | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -44,7 +44,7 @@ const TABS: { key: TabKey; label: string; icon: typeof Info }[] = [
   { key: "docs", label: "Dokumenty", icon: FileText },
 ];
 
-export function MobileProjectDetailSheet({ project, open, onOpenChange, onOpenTPV }: MobileProjectDetailSheetProps) {
+export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTPV }: MobileDetailProjektSheetProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("info");
   const projectId = project?.project_id || "";
 

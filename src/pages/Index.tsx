@@ -44,7 +44,7 @@ import { MobileCardList } from "@/components/mobile/MobileCardList";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { MobilePrehled } from "@/components/mobile/MobilePrehled";
 import { MobileTPVCardList } from "@/components/mobile/MobileTPVCardList";
-import { MobileProjectDetailSheet } from "@/components/mobile/MobileProjectDetailSheet";
+import { MobileDetailProjektSheet } from "@/components/mobile/MobileDetailProjektSheet";
 import { useRecentlyOpened } from "@/hooks/useRecentlyOpened";
 import { useTPVItems, useAddTPVItem } from "@/hooks/useTPVItems";
 import { useProductionStatuses } from "@/hooks/useProductionStatuses";
@@ -512,7 +512,7 @@ const Index = () => {
                   onOpenTPV={handleMobileOpenTPV}
                 />
               )}
-              <MobileProjectDetailSheet
+              <MobileDetailProjektSheet
                 project={mobileDetailProject}
                 open={mobileDetailOpen}
                 onOpenChange={(open) => {
