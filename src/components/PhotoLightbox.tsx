@@ -680,6 +680,13 @@ export const PhotoLightbox = memo(function PhotoLightbox({
         )}
       </div>
 
+      {/* Filename */}
+      <div className="absolute bottom-16 left-0 right-0 z-20 flex justify-center px-4 pointer-events-none">
+        <span className="text-white/60 text-[11px] font-mono truncate max-w-[80vw] text-center">
+          {file.name}
+        </span>
+      </div>
+
       {/* Bottom bar */}
       <div
         className={cn(
