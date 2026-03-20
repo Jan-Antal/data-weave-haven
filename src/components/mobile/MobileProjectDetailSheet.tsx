@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useTPVItems } from "@/hooks/useTPVItems";
 import { useSharePointDocs, type SPFile, CATEGORY_FOLDER_MAP } from "@/hooks/useSharePointDocs";
 import { ProjectDetailDialog, type ProjectDetailProject } from "@/components/ProjectDetailDialog";
-import { ChevronRight, FileText, Package, Info, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, Package, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Project {
@@ -53,6 +53,50 @@ export function MobileProjectDetailSheet({ project, open, onOpenChange, onOpenTP
     if (open) setActiveTab("info");
   }, [project?.project_id, open]);
 
+  // Close on mobile nav change
+  useEffect(() => {
+    const handler = () => onOpenChange(false);
+    window.addEventListener("mobile-nav-change", handler);
+    return () => window.removeEventListener("mobile-nav-change", handler);
+  }, [onOpenChange]);
+
+  // Ref-based swipe-to-dismiss
+  const dragRef = useRef({ startY: 0, currentY: 0, dragging: false });
+  const sheetRef = useRef<HTMLDivElement>(null);
+
+  function handleDragTouchStart(e: React.TouchEvent) {
+    dragRef.current = { startY: e.touches[0].clientY, currentY: e.touches[0].clientY, dragging: true };
+  }
+  function handleDragTouchMove(e: React.TouchEvent) {
+    if (!dragRef.current.dragging || !sheetRef.current) return;
+    dragRef.current.currentY = e.touches[0].clientY;
+    const deltaY = Math.max(0, dragRef.current.currentY - dragRef.current.startY);
+    sheetRef.current.style.transition = "none";
+    sheetRef.current.style.transform = `translateY(${deltaY}px)`;
+    const overlay = sheetRef.current.previousElementSibling as HTMLElement | null;
+    if (overlay) {
+      overlay.style.transition = "none";
+      overlay.style.opacity = String(1 - Math.min(deltaY / 300, 1));
+    }
+  }
+  function handleDragTouchEnd() {
+    if (!dragRef.current.dragging || !sheetRef.current) return;
+    dragRef.current.dragging = false;
+    const finalY = dragRef.current.currentY - dragRef.current.startY;
+    const el = sheetRef.current;
+    const overlay = el.previousElementSibling as HTMLElement | null;
+    if (finalY > 80) {
+      el.style.transition = "transform 0.2s ease";
+      el.style.transform = `translateY(${el.offsetHeight}px)`;
+      if (overlay) { overlay.style.transition = "opacity 0.2s ease"; overlay.style.opacity = "0"; }
+      setTimeout(() => onOpenChange(false), 200);
+    } else {
+      el.style.transition = "transform 0.2s ease";
+      el.style.transform = "translateY(0)";
+      if (overlay) { overlay.style.transition = "opacity 0.2s ease"; overlay.style.opacity = "1"; }
+    }
+  }
+
   const { data: tpvItems = [] } = useTPVItems(projectId);
 
   if (!project) return null;
@@ -60,18 +104,30 @@ export function MobileProjectDetailSheet({ project, open, onOpenChange, onOpenTP
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
+        ref={sheetRef}
         side="bottom"
-        className="h-[90vh] rounded-t-2xl p-0 overflow-hidden flex flex-col"
+        className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col"
+        style={{ touchAction: "none" }}
         onPointerDownOutside={(e) => { e.preventDefault(); onOpenChange(false); }}
       >
         <SheetTitle className="sr-only">{project.project_name}</SheetTitle>
 
-        {/* Drag handle */}
+        {/* Top bar with back button + drag handle */}
         <div
-          data-vaul-drag-handle
-          className="flex justify-center pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
+          className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
+          onTouchStart={handleDragTouchStart}
+          onTouchMove={handleDragTouchMove}
+          onTouchEnd={handleDragTouchEnd}
         >
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+          <button
+            onClick={() => onOpenChange(false)}
+            className="text-xs font-medium flex items-center gap-1 min-h-[36px]"
+            style={{ color: "#6b7280" }}
+          >
+            <ChevronLeft className="h-3.5 w-3.5" /> Zpět
+          </button>
+          <div className="w-10 h-1 rounded-full" style={{ background: "#d0cdc8" }} />
+          <div className="w-[50px]" />
         </div>
 
         {/* Header */}
