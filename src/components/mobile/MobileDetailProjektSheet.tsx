@@ -317,6 +317,9 @@ function DocsTabContent({ projectId }: { projectId: string }) {
   return (
     <div className="flex flex-col gap-3">
       {CATEGORY_ORDER.map((catKey) => {
+        if (catKey === "fotky") {
+          return <FotkyCategorySection key={catKey} rawFiles={filesByCategory["fotky"] || []} isOpen={openCategories.has("fotky")} onToggle={() => setOpenCategories(prev => { const next = new Set(prev); next.has("fotky") ? next.delete("fotky") : next.add("fotky"); return next; })} onUpload={(e) => handleMobileUpload("fotky", e)} />;
+        }
         const rawFiles = filesByCategory[catKey] || [];
         const icon = CATEGORY_ICONS[catKey] || "📄";
         const isOpen = openCategories.has(catKey);
@@ -333,7 +336,7 @@ function DocsTabContent({ projectId }: { projectId: string }) {
             >
               <span className="text-sm shrink-0">{icon}</span>
               <span className="uppercase text-[11px] font-semibold tracking-wide text-muted-foreground flex-1">
-                {CATEGORY_LABELS[catKey] || catKey} ({files.length})
+                {CATEGORY_LABELS[catKey] || catKey} ({rawFiles.length})
               </span>
               <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")} />
               <label
@@ -346,23 +349,23 @@ function DocsTabContent({ projectId }: { projectId: string }) {
                   type="file"
                   multiple
                   className="hidden"
-                  accept={catKey === "fotky" ? "image/*" : "*/*"}
+                  accept="*/*"
                   onChange={(e) => handleMobileUpload(catKey, e)}
                 />
               </label>
             </div>
             {isOpen && (
-              files.length === 0 ? (
+              rawFiles.length === 0 ? (
                 <div className="px-4 py-3 text-[12px] text-muted-foreground">Žádné soubory</div>
               ) : (
-                files.map((file: SPFile, idx: number) => (
+                rawFiles.map((file: SPFile, idx: number) => (
                   <a
                     key={file.itemId || file.name}
                     href={file.downloadUrl || "#"}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors"
-                    style={{ borderBottom: idx < files.length - 1 ? "0.5px solid hsl(var(--border))" : undefined }}
+                    style={{ borderBottom: idx < rawFiles.length - 1 ? "0.5px solid hsl(var(--border))" : undefined }}
                   >
                     <span className="text-sm shrink-0">{icon}</span>
                     <span className="text-[12px] font-medium text-foreground truncate flex-1">{file.name}</span>
