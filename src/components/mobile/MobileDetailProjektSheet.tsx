@@ -244,6 +244,9 @@ function FotoTabContent({ projectId }: { projectId: string }) {
     if (e.target) e.target.value = "";
   }, [uploadFile, listFiles, projectId, profile]);
 
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
   return (
     <div className="flex flex-col gap-4">
       <label
@@ -257,8 +260,18 @@ function FotoTabContent({ projectId }: { projectId: string }) {
       {photos.length === 0 ? (
         <p className="text-[12px] text-muted-foreground text-center py-4">Žádné fotky</p>
       ) : (
-        <PhotoTimelineGrid files={photos} projectName={projectId} />
+        <PhotoTimelineGrid
+          files={photos}
+          onOpenLightbox={(idx) => { setLightboxIndex(idx); setLightboxOpen(true); }}
+        />
       )}
+      <PhotoLightbox
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        files={photos}
+        initialIndex={lightboxIndex}
+        projectName={projectId}
+      />
     </div>
   );
 }
