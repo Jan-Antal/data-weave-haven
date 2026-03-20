@@ -260,6 +260,7 @@ function DocsTabContent({ projectId }: { projectId: string }) {
   const sp = useSharePointDocs(projectId);
   const { filesByCategory, initialLoading } = sp;
   const [docFilter, setDocFilter] = useState<"all" | "vyroba">("all");
+  const { profile } = useAuth();
 
   // Load all categories on mount
   useEffect(() => {
@@ -267,6 +268,37 @@ function DocsTabContent({ projectId }: { projectId: string }) {
       sp.listFiles(catKey);
     }
   }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isImageFile = (name: string) => /\.(jpe?g|png|gif|webp|heic|bmp|tiff?)$/i.test(name);
+
+  const userSuffix = profile?.full_name
+    ? profile.full_name.trim().split(" ").pop()!
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+    : undefined;
+
+  const handleMobileUpload = useCallback(async (catKey: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+    e.target.value = "";
+
+    for (const file of Array.from(fileList)) {
+      try {
+        let uploadFile = file;
+        if (catKey === "fotky" && isImageFile(file.name)) {
+          const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+          const baseName = generatePhotoFilename(false, file, projectId, userSuffix);
+          const newName = baseName.replace(/\.jpg$/, `.${ext}`);
+          uploadFile = new File([file], newName, { type: file.type });
+        }
+        await sp.uploadFile(catKey, uploadFile);
+        toast.success(`Nahráno: ${uploadFile.name}`);
+      } catch {
+        toast.error(`Chyba při nahrávání: ${file.name}`);
+      }
+    }
+    sp.listFiles(catKey);
+  }, [sp, projectId, userSuffix]);
 
   if (initialLoading) {
     return (
@@ -315,10 +347,25 @@ function DocsTabContent({ projectId }: { projectId: string }) {
         const icon = CATEGORY_ICONS[catKey] || "📄";
         return (
           <div key={catKey}>
-            <h4 className="uppercase text-[11px] font-semibold tracking-wide text-muted-foreground mb-1">
-              <span className="mr-1">{icon}</span>
-              {CATEGORY_LABELS[catKey] || catKey} ({files.length})
-            </h4>
+            <div className="flex items-center justify-between mb-1">
+              <h4 className="uppercase text-[11px] font-semibold tracking-wide text-muted-foreground">
+                <span className="mr-1">{icon}</span>
+                {CATEGORY_LABELS[catKey] || catKey} ({files.length})
+              </h4>
+              <label
+                className="flex items-center justify-center w-7 h-7 rounded-full cursor-pointer active:opacity-70"
+                style={{ background: "hsl(var(--primary) / 0.1)", color: "hsl(var(--primary))" }}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  accept={catKey === "fotky" ? "image/*" : "*/*"}
+                  onChange={(e) => handleMobileUpload(catKey, e)}
+                />
+              </label>
+            </div>
             <div className="bg-card rounded-[10px] overflow-hidden" style={{ border: "0.5px solid hsl(var(--border))" }}>
               {files.length === 0 ? (
                 <div className="px-4 py-3 text-[12px] text-muted-foreground">Žádné dokumenty</div>
