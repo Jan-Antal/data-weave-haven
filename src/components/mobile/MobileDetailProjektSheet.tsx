@@ -263,7 +263,7 @@ function FotoTabContent({ projectId }: { projectId: string }) {
   );
 }
 
-
+function TPVTabContent({ items, currency }: { items: any[]; currency: string }) {
   if (items.length === 0) {
     return <p className="text-[12px] text-muted-foreground text-center py-8">Žádné TPV položky</p>;
   }
