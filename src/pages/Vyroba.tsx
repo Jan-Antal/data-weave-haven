@@ -1747,7 +1747,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         {isMobile && selectedProject && (
           <Sheet open={mobileVyrobaProjektOpen} onOpenChange={setMobileVyrobaProjektOpen}>
             <SheetContent
-              ref={sheetRefVyrobaProjekt}
+              ref={vyrobaProjektSwipe.sheetRef}
               side="bottom"
               className="h-[85vh] rounded-t-2xl p-0 overflow-hidden"
               style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))", touchAction: "none" }}
@@ -1755,9 +1755,9 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               <div className="flex flex-col h-full">
                 <div
                   className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
-                  onTouchStart={handleVyrobaProjektTouchStart}
-                  onTouchMove={handleVyrobaProjektTouchMove}
-                  onTouchEnd={handleVyrobaProjektTouchEnd}
+                  onTouchStart={vyrobaProjektSwipe.onTouchStart}
+                  onTouchMove={vyrobaProjektSwipe.onTouchMove}
+                  onTouchEnd={vyrobaProjektSwipe.onTouchEnd}
                 >
                   <button
                     onClick={() => setMobileVyrobaProjektOpen(false)}
