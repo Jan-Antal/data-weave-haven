@@ -20,10 +20,12 @@ export function isReklamace(name: string): boolean {
 }
 
 /** Generate a timestamped upload filename */
-export function generatePhotoFilename(isReklamace = false): string {
-  const now = new Date();
-  const ts = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
-  return isReklamace ? `REC_${ts}_foto.jpg` : `${ts}_foto.jpg`;
+export function generatePhotoFilename(isReklamace = false, file?: File, projectId?: string, userSuffix?: string): string {
+  const src = file?.lastModified ? new Date(file.lastModified) : new Date();
+  const ts = `${src.getFullYear()}-${String(src.getMonth() + 1).padStart(2, "0")}-${String(src.getDate()).padStart(2, "0")}_${String(src.getHours()).padStart(2, "0")}${String(src.getMinutes()).padStart(2, "0")}${String(src.getSeconds()).padStart(2, "0")}`;
+  const proj = projectId ? `${projectId}-` : "";
+  const user = userSuffix ? `-${userSuffix}` : "";
+  return isReklamace ? `REC_${proj}${ts}${user}_foto.jpg` : `${proj}${ts}${user}_foto.jpg`;
 }
 
 /** Extract date from filename like 2026-03-10_143022_foto.jpg or REC_2026-03-10_... */

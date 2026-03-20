@@ -272,7 +272,7 @@ function defaultForm() {
 export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList, tpvItemCount, mode = "dialog" }: ProjectDetailDialogProps) {
   const qc = useQueryClient();
   const { data: statusOptions = [] } = useProjectStatusOptions();
-  const { canEdit, canDeleteProject, isViewer, isKonstrukter, isPM, isFieldReadOnly, canUploadDocuments, isAdmin } = useAuth();
+  const { canEdit, canDeleteProject, isViewer, isKonstrukter, isPM, isFieldReadOnly, canUploadDocuments, isAdmin, profile } = useAuth();
   const statusLabels = statusOptions.map((s) => s.label);
   const [form, setForm] = useState(defaultForm());
   const [initialForm, setInitialForm] = useState(defaultForm());
@@ -446,7 +446,12 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     let uploadFile = file;
     if (categoryKey === "fotky" && isImageFile(file.name)) {
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
-      const baseName = generatePhotoFilename(reklamaceToggle);
+      const userSuffix = profile?.full_name
+        ? profile.full_name.trim().split(" ").pop()!
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+        : undefined;
+      const baseName = generatePhotoFilename(reklamaceToggle, file, project?.project_id, userSuffix);
       const newName = baseName.replace(/\.jpg$/, `.${ext}`);
       uploadFile = new File([file], newName, { type: file.type });
     }
