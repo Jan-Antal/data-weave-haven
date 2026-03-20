@@ -1207,7 +1207,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
 
         <div className="col-span-2">
           <Label className="text-xs">Poznámka PM</Label>
-          <MobileTapField displayValue={form.pm_poznamka || ""} disabled={isSectionReadOnly("pm")}>
+          <MobileTapField displayValue={form.pm_poznamka || ""} disabled={isSectionReadOnly("pm")} multiline>
             {({ autoFocus }) => (
               <Textarea
                 value={form.pm_poznamka}
