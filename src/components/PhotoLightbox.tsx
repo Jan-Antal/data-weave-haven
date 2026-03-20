@@ -570,7 +570,7 @@ export const PhotoLightbox = memo(function PhotoLightbox({
       onTouchEnd={handleTouchEnd}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/90" />
+      <div className="absolute inset-0 bg-black/90" onClick={(e) => { e.stopPropagation(); onClose(); }} />
 
       {/* Top bar */}
       <div
