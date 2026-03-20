@@ -392,8 +392,25 @@ function DocsTabContent({ projectId }: { projectId: string }) {
   const sp = useSharePointDocs(projectId);
   const { filesByCategory, initialLoading } = sp;
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
-  const [previewFile, setPreviewFile] = useState<{ file: SPFile; loading: boolean; previewUrl: string | null; webUrl: string | null; downloadUrl: string | null } | null>(null);
+  const [docPreview, setDocPreview] = useState<{ file: SPFile; catKey: string; loading: boolean; previewUrl: string | null } | null>(null);
   const { profile } = useAuth();
+
+  async function openDocPreview(file: SPFile, catKey: string) {
+    setDocPreview({ file, catKey, loading: true, previewUrl: null });
+    try {
+      const preview = await sp.getPreview(file.itemId);
+      setDocPreview(prev => prev?.file.itemId === file.itemId ? { ...prev, loading: false, previewUrl: preview.previewUrl } : prev);
+    } catch {
+      setDocPreview(prev => prev?.file.itemId === file.itemId ? { ...prev, loading: false } : prev);
+    }
+  }
+
+  const previewFiles = docPreview ? (filesByCategory[docPreview.catKey] ?? []) : [];
+  const previewIdx = docPreview ? previewFiles.findIndex(f => f.itemId === docPreview.file.itemId) : 0;
+  function handlePreviewNavigate(dir: -1 | 1) {
+    const next = previewFiles[previewIdx + dir];
+    if (next && docPreview) openDocPreview(next, docPreview.catKey);
+  }
 
   useEffect(() => {
     for (const catKey of Object.keys(CATEGORY_FOLDER_MAP)) {
@@ -491,15 +508,7 @@ function DocsTabContent({ projectId }: { projectId: string }) {
                     key={file.itemId || file.name}
                     className="flex items-center gap-3 px-4 py-3 cursor-pointer active:opacity-70"
                     style={{ borderBottom: idx < rawFiles.length - 1 ? "0.5px solid hsl(var(--border))" : undefined }}
-                    onClick={async () => {
-                      setPreviewFile({ file, loading: true, previewUrl: null, webUrl: file.webUrl, downloadUrl: file.downloadUrl });
-                      try {
-                        const preview = await sp.getPreview(file.itemId);
-                        setPreviewFile(prev => prev?.file.itemId === file.itemId ? { ...prev, loading: false, previewUrl: preview.previewUrl, webUrl: preview.webUrl ?? file.webUrl, downloadUrl: preview.downloadUrl ?? file.downloadUrl } : prev);
-                      } catch {
-                        setPreviewFile(prev => prev?.file.itemId === file.itemId ? { ...prev, loading: false } : prev);
-                      }
-                    }}
+                    onClick={() => openDocPreview(file, catKey)}
                   >
                     <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                     <span className="text-[12px] truncate flex-1">{file.name}</span>
@@ -525,16 +534,19 @@ function DocsTabContent({ projectId }: { projectId: string }) {
           </div>
         );
       })}
-      {previewFile && (
+      {docPreview && (
         <DocumentPreviewModal
-          open={!!previewFile}
-          onClose={() => setPreviewFile(null)}
-          fileName={previewFile.file.name}
-          fileSize={previewFile.file.size}
-          previewUrl={previewFile.previewUrl}
-          webUrl={previewFile.webUrl}
-          downloadUrl={previewFile.downloadUrl}
-          loading={previewFile.loading}
+          open={!!docPreview}
+          onClose={() => setDocPreview(null)}
+          fileName={docPreview.file.name}
+          fileSize={docPreview.file.size}
+          previewUrl={docPreview.previewUrl}
+          webUrl={docPreview.file.webUrl ?? null}
+          downloadUrl={docPreview.file.downloadUrl ?? null}
+          loading={docPreview.loading}
+          totalFiles={previewFiles.length}
+          currentIndex={previewIdx}
+          onNavigate={previewFiles.length > 1 ? handlePreviewNavigate : undefined}
         />
       )}
     </div>
