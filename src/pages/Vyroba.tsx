@@ -852,10 +852,77 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
-  // Swipe-to-dismiss hooks for mobile bottom sheets
-  const swipeMobileDetail = useSwipeToDismiss(useCallback(() => setMobileDetailOpen(false), []));
-  const swipeLogModal = useSwipeToDismiss(useCallback(() => setLogModalOpen(false), []));
-  const swipeNoProduction = useSwipeToDismiss(useCallback(() => setNoProductionOpen(false), []));
+  // Ref-based swipe-to-dismiss for mobile bottom sheets
+  const dragRefDetail = useRef({ startY: 0, currentY: 0, dragging: false });
+  const sheetRefDetail = useRef<HTMLDivElement>(null);
+  const dragRefLog = useRef({ startY: 0, currentY: 0, dragging: false });
+  const sheetRefLog = useRef<HTMLDivElement>(null);
+
+  function handleDetailTouchStart(e: React.TouchEvent) {
+    dragRefDetail.current = { startY: e.touches[0].clientY, currentY: e.touches[0].clientY, dragging: true };
+  }
+  function handleDetailTouchMove(e: React.TouchEvent) {
+    if (!dragRefDetail.current.dragging || !sheetRefDetail.current) return;
+    dragRefDetail.current.currentY = e.touches[0].clientY;
+    const deltaY = Math.max(0, dragRefDetail.current.currentY - dragRefDetail.current.startY);
+    sheetRefDetail.current.style.transition = "none";
+    sheetRefDetail.current.style.transform = `translateY(${deltaY}px)`;
+    const overlay = sheetRefDetail.current.previousElementSibling as HTMLElement | null;
+    if (overlay) {
+      overlay.style.transition = "none";
+      overlay.style.opacity = String(1 - Math.min(deltaY / 300, 1));
+    }
+  }
+  function handleDetailTouchEnd() {
+    if (!dragRefDetail.current.dragging || !sheetRefDetail.current) return;
+    dragRefDetail.current.dragging = false;
+    const finalY = dragRefDetail.current.currentY - dragRefDetail.current.startY;
+    const el = sheetRefDetail.current;
+    const overlay = el.previousElementSibling as HTMLElement | null;
+    if (finalY > 80) {
+      el.style.transition = "transform 0.2s ease";
+      el.style.transform = `translateY(${el.offsetHeight}px)`;
+      if (overlay) { overlay.style.transition = "opacity 0.2s ease"; overlay.style.opacity = "0"; }
+      setTimeout(() => setMobileDetailOpen(false), 200);
+    } else {
+      el.style.transition = "transform 0.2s ease";
+      el.style.transform = "translateY(0)";
+      if (overlay) { overlay.style.transition = "opacity 0.2s ease"; overlay.style.opacity = "1"; }
+    }
+  }
+
+  function handleLogTouchStart(e: React.TouchEvent) {
+    dragRefLog.current = { startY: e.touches[0].clientY, currentY: e.touches[0].clientY, dragging: true };
+  }
+  function handleLogTouchMove(e: React.TouchEvent) {
+    if (!dragRefLog.current.dragging || !sheetRefLog.current) return;
+    dragRefLog.current.currentY = e.touches[0].clientY;
+    const deltaY = Math.max(0, dragRefLog.current.currentY - dragRefLog.current.startY);
+    sheetRefLog.current.style.transition = "none";
+    sheetRefLog.current.style.transform = `translateY(${deltaY}px)`;
+    const overlay = sheetRefLog.current.previousElementSibling as HTMLElement | null;
+    if (overlay) {
+      overlay.style.transition = "none";
+      overlay.style.opacity = String(1 - Math.min(deltaY / 300, 1));
+    }
+  }
+  function handleLogTouchEnd() {
+    if (!dragRefLog.current.dragging || !sheetRefLog.current) return;
+    dragRefLog.current.dragging = false;
+    const finalY = dragRefLog.current.currentY - dragRefLog.current.startY;
+    const el = sheetRefLog.current;
+    const overlay = el.previousElementSibling as HTMLElement | null;
+    if (finalY > 80) {
+      el.style.transition = "transform 0.2s ease";
+      el.style.transform = `translateY(${el.offsetHeight}px)`;
+      if (overlay) { overlay.style.transition = "opacity 0.2s ease"; overlay.style.opacity = "0"; }
+      setTimeout(() => setLogModalOpen(false), 200);
+    } else {
+      el.style.transition = "transform 0.2s ease";
+      el.style.transform = "translateY(0)";
+      if (overlay) { overlay.style.transition = "opacity 0.2s ease"; overlay.style.opacity = "1"; }
+    }
+  }
 
 
   /* ── Return from Expedice ── */
