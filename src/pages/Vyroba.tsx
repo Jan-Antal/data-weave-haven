@@ -4768,6 +4768,7 @@ function DayCell({
 
 function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   const isMobile = useIsMobile();
+  const { profile } = useAuth();
   const { filesByCategory, listFiles, uploadFile, deleteFile, uploading } = useSharePointDocs(projectId);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -4775,6 +4776,12 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const pendingRetryFiles = useRef<File[]>([]);
   const [retryBannerVisible, setRetryBannerVisible] = useState(false);
+
+  const userSuffix = profile?.full_name
+    ? profile.full_name.trim().split(" ").pop()!
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+    : "user";
 
   useEffect(() => {
     if (projectId) listFiles("fotky");
