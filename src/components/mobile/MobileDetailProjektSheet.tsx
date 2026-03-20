@@ -243,6 +243,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 function DocsTabContent({ projectId }: { projectId: string }) {
   const sp = useSharePointDocs(projectId);
   const { filesByCategory, initialLoading } = sp;
+  const [docFilter, setDocFilter] = useState<"all" | "vyroba">("all");
 
   // Load all categories on mount
   useEffect(() => {
@@ -267,9 +268,38 @@ function DocsTabContent({ projectId }: { projectId: string }) {
     return <p className="text-[12px] text-muted-foreground text-center py-8">Žádné dokumenty</p>;
   }
 
+  // Filter: "vyroba" shows only fotky with "-Log-" in filename
+  const filteredCategories = docFilter === "vyroba"
+    ? { fotky: (filesByCategory["fotky"] || []).filter((f: SPFile) => f.name.includes("-Log-")) }
+    : filesByCategory;
+
   return (
     <div className="flex flex-col gap-3">
-      {Object.entries(filesByCategory).map(([catKey, files]) => {
+      <div className="flex gap-2">
+        <button
+          onClick={() => setDocFilter("all")}
+          className={cn(
+            "px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors",
+            docFilter === "all"
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted text-muted-foreground"
+          )}
+        >
+          Vše
+        </button>
+        <button
+          onClick={() => setDocFilter("vyroba")}
+          className={cn(
+            "px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors",
+            docFilter === "vyroba"
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted text-muted-foreground"
+          )}
+        >
+          Výroba
+        </button>
+      </div>
+      {Object.entries(filteredCategories).map(([catKey, files]) => {
         if (files.length === 0) return null;
         return (
           <div key={catKey}>
