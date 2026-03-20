@@ -54,9 +54,13 @@ export function MobileTapField({ displayValue, disabled, multiline, maxLines = 1
   if (disabled) {
     return (
       <div className={cn(
-        "flex items-center h-10 px-3 rounded-md border border-input bg-muted text-muted-foreground text-sm cursor-not-allowed opacity-70 truncate",
+        "px-3 rounded-md border border-input bg-muted text-muted-foreground text-sm cursor-not-allowed opacity-70",
+        multiline ? "py-2 whitespace-pre-wrap break-words" : "flex items-center h-10 truncate",
+        multiline && `line-clamp-[${maxLines}]`,
         className
-      )}>
+      )}
+      style={multiline ? { display: "-webkit-box", WebkitLineClamp: maxLines, WebkitBoxOrient: "vertical", overflow: "hidden" } : undefined}
+      >
         {displayValue || "—"}
       </div>
     );
