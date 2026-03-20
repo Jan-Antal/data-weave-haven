@@ -4768,6 +4768,7 @@ function DayCell({
 
 function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   const isMobile = useIsMobile();
+  const { profile } = useAuth();
   const { filesByCategory, listFiles, uploadFile, deleteFile, uploading } = useSharePointDocs(projectId);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -4775,6 +4776,12 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const pendingRetryFiles = useRef<File[]>([]);
   const [retryBannerVisible, setRetryBannerVisible] = useState(false);
+
+  const userSuffix = profile?.full_name
+    ? profile.full_name.trim().split(" ").pop()!
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+    : "user";
 
   useEffect(() => {
     if (projectId) listFiles("fotky");
@@ -4796,7 +4803,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
       const dateStr = `${captureDate.getFullYear()}-${String(captureDate.getMonth() + 1).padStart(2, "0")}-${String(captureDate.getDate()).padStart(2, "0")}`;
       const timeStr = `${String(captureDate.getHours()).padStart(2, "0")}-${String(captureDate.getMinutes()).padStart(2, "0")}`;
       const ext = file.name.split(".").pop() || "jpg";
-      const autoName = `${projectId}-Log-${dateStr}-${timeStr}.${ext}`;
+      const autoName = `${projectId}-Log-${dateStr}-${timeStr}-${userSuffix}.${ext}`;
       const renamedFile = new File([file], autoName, { type: file.type });
       try {
         await uploadFile("fotky", renamedFile);
@@ -4825,7 +4832,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
       const dateStr = `${captureDate.getFullYear()}-${String(captureDate.getMonth() + 1).padStart(2, "0")}-${String(captureDate.getDate()).padStart(2, "0")}`;
       const timeStr = `${String(captureDate.getHours()).padStart(2, "0")}-${String(captureDate.getMinutes()).padStart(2, "0")}`;
       const ext = file.name.split(".").pop() || "jpg";
-      const autoName = `${projectId}-Log-${dateStr}-${timeStr}.${ext}`;
+      const autoName = `${projectId}-Log-${dateStr}-${timeStr}-${userSuffix}.${ext}`;
       const renamedFile = new File([file], autoName, { type: file.type });
       try {
         await uploadFile("fotky", renamedFile);
