@@ -517,10 +517,26 @@ export const PhotoLightbox = memo(function PhotoLightbox({
     return () => clearTimeout(hideTimer.current);
   }, [open, currentIndex, resetHideTimer]);
 
-  // Touch handlers for swipe
+  // Touch handlers for swipe (horizontal nav + vertical drag-to-close)
+  const modalRef = useRef<HTMLDivElement>(null);
+
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     const t = e.touches[0];
     touchRef.current = { startX: t.clientX, startY: t.clientY, swiping: false };
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    const t = e.touches[0];
+    const dy = t.clientY - touchRef.current.startY;
+    const dx = Math.abs(t.clientX - touchRef.current.startX);
+    // Only track vertical drag if mainly vertical
+    if (dy > 0 && dy > dx) {
+      const el = modalRef.current;
+      if (el) {
+        el.style.transition = "none";
+        el.style.transform = `translateY(${dy}px)`;
+      }
+    }
   }, []);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
@@ -529,14 +545,23 @@ export const PhotoLightbox = memo(function PhotoLightbox({
     const dy = t.clientY - touchRef.current.startY;
     const absDx = Math.abs(dx);
     const absDy = Math.abs(dy);
+    const el = modalRef.current;
 
-    if (absDx > 60 && absDx > absDy * 1.5) {
+    if (dy > 120 && absDy > absDx) {
+      // Swipe down → animate out and close
+      if (el) {
+        el.style.transition = "transform 200ms ease";
+        el.style.transform = "translateY(100vh)";
+      }
+      setTimeout(onClose, 200);
+    } else if (absDx > 60 && absDx > absDy * 1.5) {
       // Horizontal swipe
       if (dx < 0 && canGoNext) navigate(1);
       else if (dx > 0 && canGoPrev) navigate(-1);
-    } else if (dy > 80 && absDy > absDx * 1.5) {
-      // Swipe down → close
-      onClose();
+      if (el) { el.style.transition = "transform 200ms ease"; el.style.transform = "translateY(0)"; }
+    } else {
+      // Snap back
+      if (el) { el.style.transition = "transform 200ms ease"; el.style.transform = "translateY(0)"; }
     }
   }, [canGoNext, canGoPrev, navigate, onClose]);
 
