@@ -272,7 +272,7 @@ function defaultForm() {
 export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList, tpvItemCount, mode = "dialog" }: ProjectDetailDialogProps) {
   const qc = useQueryClient();
   const { data: statusOptions = [] } = useProjectStatusOptions();
-  const { canEdit, canDeleteProject, isViewer, isKonstrukter, isPM, isFieldReadOnly, canUploadDocuments, isAdmin } = useAuth();
+  const { canEdit, canDeleteProject, isViewer, isKonstrukter, isPM, isFieldReadOnly, canUploadDocuments, isAdmin, profile } = useAuth();
   const statusLabels = statusOptions.map((s) => s.label);
   const [form, setForm] = useState(defaultForm());
   const [initialForm, setInitialForm] = useState(defaultForm());
