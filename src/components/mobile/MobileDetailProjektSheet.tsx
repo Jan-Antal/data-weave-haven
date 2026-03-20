@@ -534,16 +534,19 @@ function DocsTabContent({ projectId }: { projectId: string }) {
           </div>
         );
       })}
-      {previewFile && (
+      {docPreview && (
         <DocumentPreviewModal
-          open={!!previewFile}
-          onClose={() => setPreviewFile(null)}
-          fileName={previewFile.file.name}
-          fileSize={previewFile.file.size}
-          previewUrl={previewFile.previewUrl}
-          webUrl={previewFile.webUrl}
-          downloadUrl={previewFile.downloadUrl}
-          loading={previewFile.loading}
+          open={!!docPreview}
+          onClose={() => setDocPreview(null)}
+          fileName={docPreview.file.name}
+          fileSize={docPreview.file.size}
+          previewUrl={docPreview.previewUrl}
+          webUrl={docPreview.file.webUrl ?? null}
+          downloadUrl={docPreview.file.downloadUrl ?? null}
+          loading={docPreview.loading}
+          totalFiles={previewFiles.length}
+          currentIndex={previewIdx}
+          onNavigate={previewFiles.length > 1 ? handlePreviewNavigate : undefined}
         />
       )}
     </div>
