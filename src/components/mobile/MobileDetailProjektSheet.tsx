@@ -260,6 +260,13 @@ function DocsTabContent({ projectId }: { projectId: string }) {
   const sp = useSharePointDocs(projectId);
   const { filesByCategory, initialLoading } = sp;
   const [docFilter, setDocFilter] = useState<"all" | "vyroba">("all");
+  const [openCategories, setOpenCategories] = useState<Set<string>>(() => {
+    const initial = new Set<string>();
+    for (const [key, files] of Object.entries(filesByCategory)) {
+      if (files.length > 0) initial.add(key);
+    }
+    return initial;
+  });
   const { profile } = useAuth();
 
   // Load all categories on mount
