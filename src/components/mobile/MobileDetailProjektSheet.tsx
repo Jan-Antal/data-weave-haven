@@ -499,44 +499,43 @@ function DocsTabContent({ projectId }: { projectId: string }) {
         }
 
         return (
-          <div key={catKey}>
+          <div key={catKey} className="bg-card rounded-[12px] overflow-hidden" style={{ border: "0.5px solid hsl(var(--border))" }}>
             <div
-              className="flex items-center gap-2 px-4 cursor-pointer active:bg-accent/50 transition-colors bg-card rounded-[10px]"
-              style={{ minHeight: 48, border: "0.5px solid hsl(var(--border))" }}
+              className="flex items-center gap-3 px-4 min-h-[48px] cursor-pointer select-none"
               onClick={() => toggleCategory(catKey)}
             >
-              <span className="text-sm shrink-0">{icon}</span>
-              <span className="text-[13px] font-medium text-foreground flex-1">
+              <span className="text-[16px]">{icon}</span>
+              <span className="text-[13px] font-medium flex-1">
                 {CATEGORY_LABELS[catKey] || catKey}
               </span>
               {rawFiles.length > 0 && (
-                <span className="text-[11px] text-muted-foreground">{rawFiles.length}</span>
+                <span className="text-[11px] text-muted-foreground mr-1">{rawFiles.length}</span>
               )}
-              <ChevronRight className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform duration-200", isOpen && "rotate-90")} />
+              <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform duration-200", isOpen && "rotate-90")} />
             </div>
 
             {isOpen && (
-              <div className="bg-card rounded-[10px] overflow-hidden mt-1" style={{ border: "0.5px solid hsl(var(--border))" }}>
+              <div style={{ borderTop: "0.5px solid hsl(var(--border))" }}>
                 {rawFiles.map((file: SPFile, idx: number) => (
                   <a
                     key={file.itemId || file.name}
                     href={file.downloadUrl || "#"}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors"
-                    style={{ borderBottom: "0.5px solid hsl(var(--border))" }}
+                    className="flex items-center gap-3 px-4 py-3"
+                    style={{ borderBottom: idx < rawFiles.length - 1 ? "0.5px solid hsl(var(--border))" : undefined }}
                   >
-                    <span className="text-sm shrink-0">{icon}</span>
-                    <span className="text-[12px] font-medium text-foreground truncate flex-1">{file.name}</span>
+                    <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-[12px] truncate flex-1">{file.name}</span>
                     <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
                   </a>
                 ))}
                 <label
-                  className="flex items-center gap-2 px-4 py-3 text-[12px] font-medium cursor-pointer active:bg-accent/50 transition-colors"
-                  style={{ color: "hsl(var(--primary))" }}
+                  className="flex items-center gap-3 px-4 py-3 cursor-pointer active:opacity-70"
+                  style={{ borderTop: rawFiles.length > 0 ? "0.5px solid hsl(var(--border))" : undefined }}
                 >
-                  <Plus className="h-3.5 w-3.5" />
-                  Nahrát dokument
+                  <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-[12px] text-muted-foreground">Nahrát dokument</span>
                   <input
                     type="file"
                     multiple
