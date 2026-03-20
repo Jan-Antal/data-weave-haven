@@ -7,6 +7,10 @@ interface MobileTapFieldProps {
   displayValue: string;
   /** Whether the field is disabled (role-based) — always show as read-only text */
   disabled?: boolean;
+  /** If true, shows multiline text (up to maxLines) instead of single-line truncated */
+  multiline?: boolean;
+  /** Max visible lines in multiline mode before requiring tap to expand (default 10) */
+  maxLines?: number;
   /** Render the actual input/select when editing */
   children: (props: { onDone: () => void; autoFocus: boolean }) => ReactNode;
   className?: string;
@@ -16,7 +20,7 @@ interface MobileTapFieldProps {
  * On mobile: shows a static text span. Tap → replaces with actual input (children).
  * On desktop: always renders the children (input).
  */
-export function MobileTapField({ displayValue, disabled, children, className }: MobileTapFieldProps) {
+export function MobileTapField({ displayValue, disabled, multiline, maxLines = 10, children, className }: MobileTapFieldProps) {
   const isMobile = useIsMobile();
   const [editing, setEditing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -50,9 +54,13 @@ export function MobileTapField({ displayValue, disabled, children, className }: 
   if (disabled) {
     return (
       <div className={cn(
-        "flex items-center h-10 px-3 rounded-md border border-input bg-muted text-muted-foreground text-sm cursor-not-allowed opacity-70 truncate",
+        "px-3 rounded-md border border-input bg-muted text-muted-foreground text-sm cursor-not-allowed opacity-70",
+        multiline ? "py-2 whitespace-pre-wrap break-words" : "flex items-center h-10 truncate",
+        multiline && `line-clamp-[${maxLines}]`,
         className
-      )}>
+      )}
+      style={multiline ? { display: "-webkit-box", WebkitLineClamp: maxLines, WebkitBoxOrient: "vertical", overflow: "hidden" } : undefined}
+      >
         {displayValue || "—"}
       </div>
     );
@@ -72,10 +80,12 @@ export function MobileTapField({ displayValue, disabled, children, className }: 
     <div
       onClick={() => setEditing(true)}
       className={cn(
-        "flex items-center h-10 px-3 rounded-md border border-input bg-background text-sm cursor-pointer truncate active:bg-accent/50 transition-colors",
+        "px-3 rounded-md border border-input bg-background text-sm cursor-pointer active:bg-accent/50 transition-colors",
+        multiline ? "py-2 whitespace-pre-wrap break-words" : "flex items-center h-10 truncate",
         !displayValue && "text-muted-foreground",
         className
       )}
+      style={multiline && displayValue ? { display: "-webkit-box", WebkitLineClamp: maxLines, WebkitBoxOrient: "vertical", overflow: "hidden" } : undefined}
     >
       {displayValue || "—"}
     </div>
