@@ -259,7 +259,6 @@ const CATEGORY_LABELS: Record<string, string> = {
 function DocsTabContent({ projectId }: { projectId: string }) {
   const sp = useSharePointDocs(projectId);
   const { filesByCategory, initialLoading } = sp;
-  const [docFilter, setDocFilter] = useState<"all" | "vyroba">("all");
   const [openCategories, setOpenCategories] = useState<Set<string>>(() => {
     const initial = new Set<string>();
     for (const [key, files] of Object.entries(filesByCategory)) {
