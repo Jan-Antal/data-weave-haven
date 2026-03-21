@@ -1529,24 +1529,6 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     </>
                   )}
 
-        {/* ═══ RESET DATA CONFIRM ═══ */}
-        {resetDataConfirmOpen && (
-          <ConfirmDialog
-            open={resetDataConfirmOpen}
-            onConfirm={handleResetDataConfirm}
-            onCancel={() => { setResetDataConfirmOpen(false); setResetDataPreview(null); }}
-            title="Reset dát výroby"
-            description={
-              resetDataPreview && resetDataPreview.length > 0
-                ? `Bude smazáno ${resetDataPreview.reduce((s, r) => s + r.count, 0)} položek z ${resetDataPreview.length} skupin (T14+). Také budou odstraněny duplicity.\n\n${resetDataPreview.map(r => `${r.project_id} (${r.scheduled_week}): ${r.count}x`).join('\n')}`
-                : "Žádné položky k smazání v T14+. Budou pouze odstraněny duplicity."
-            }
-            confirmLabel="Smazat"
-            cancelLabel="Zrušit"
-            variant="destructive"
-          />
-        )}
-
 
                   {realRole === "owner" && (
                     <>
