@@ -641,13 +641,13 @@ export function useProductionDragDrop() {
           .in("id", allRemaining)
           .order("scheduled_week", { ascending: true });
         if (siblings && siblings.length > 1) {
-          for (let i = 0; i < siblings.length; i++) {
-            await supabase.from("production_schedule").update({
+          await Promise.all(siblings.map((s, i) =>
+            supabase.from("production_schedule").update({
               item_name: `${cleanName} (${i + 1}/${siblings.length})`,
               split_part: i + 1,
               split_total: siblings.length,
-            }).eq("id", siblings[i].id);
-          }
+            }).eq("id", s.id)
+          ));
         } else if (siblings && siblings.length === 1) {
           // Only one part left — remove split metadata
           await supabase.from("production_schedule").update({
