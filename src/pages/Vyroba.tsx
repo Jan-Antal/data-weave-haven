@@ -1144,6 +1144,40 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
+  async function recalculateScheduledHours(projectId: string) {
+    const { data: schedItems } = await supabase
+      .from("production_schedule")
+      .select("id, item_code, item_name, scheduled_hours, inbox_item_id")
+      .eq("project_id", projectId)
+      .in("status", ["scheduled", "in_progress"]);
+    if (!schedItems?.length) { toast.info("Žádné aktivní položky k přepočtu"); return; }
+
+    const { data: inboxItems } = await supabase
+      .from("production_inbox")
+      .select("id, estimated_hours, item_code, item_name")
+      .eq("project_id", projectId);
+
+    let updated = 0;
+    for (const item of schedItems) {
+      // Match by inbox_item_id first, then by item_code
+      const inbox = inboxItems?.find(i =>
+        (item.inbox_item_id && i.id === item.inbox_item_id) ||
+        (item.item_code && i.item_code === item.item_code)
+      );
+      if (!inbox) continue;
+      const correctHours = inbox.estimated_hours;
+      if (correctHours > 0 && correctHours !== Number(item.scheduled_hours)) {
+        await supabase
+          .from("production_schedule")
+          .update({ scheduled_hours: correctHours })
+          .eq("id", item.id);
+        updated++;
+      }
+    }
+    qc.invalidateQueries({ queryKey: ["production-schedule"] });
+    toast.success(`Přepočítáno ${updated} položek z Inboxu`);
+  }
+
 
   /* ── Return from Expedice ── */
   async function handleReturnFromExpedice(pid: string) {
