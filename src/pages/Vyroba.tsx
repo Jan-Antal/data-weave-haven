@@ -1575,7 +1575,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       )}
 
       <div
-        className="relative z-[99999] shrink-0 flex items-center gap-2 px-3 text-xs overflow-x-auto overflow-y-visible scrollbar-hide whitespace-nowrap"
+        className={cn("relative shrink-0 flex items-center gap-2 px-3 text-xs overflow-x-auto overflow-y-visible scrollbar-hide whitespace-nowrap", isMobile ? "z-10" : "z-[99999]")}
         style={{ height: 40, background: "#f5f3f0", borderBottom: "1px solid #e5e2dd" }}
       >
         {isMobile ? (
