@@ -1736,19 +1736,12 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 const threshold = window.innerWidth * 0.35;
                 if (Math.abs(dx) > threshold) {
                   const dir = dx > 0 ? -1 : 1;
-                  el.style.transition = 'transform 180ms ease-out, opacity 150ms';
-                  el.style.transform = `translateX(${dir > 0 ? '-110%' : '110%'})`;
-                  el.style.opacity = '0';
-                  setTimeout(() => {
-                    setWeekOffset(w => w + dir);
-                    el.style.transition = 'none';
-                    el.style.transform = `translateX(${dir > 0 ? '80px' : '-80px'})`;
-                    el.style.opacity = '0';
-                    void el.offsetWidth;
-                    el.style.transition = 'transform 200ms ease-out, opacity 150ms';
-                    el.style.transform = 'translateX(0)';
-                    el.style.opacity = '1';
-                  }, 180);
+                  // Reset transform before React re-render
+                  el.style.transition = 'none';
+                  el.style.transform = 'translateX(0)';
+                  el.style.opacity = '1';
+                  setSlideDir(dir > 0 ? 'left' : 'right');
+                  setWeekOffset(w => w + dir);
                 } else {
                   el.style.transition = 'transform 220ms ease-out';
                   el.style.transform = 'translateX(0)';
