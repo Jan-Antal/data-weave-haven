@@ -575,6 +575,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   // ── WEEKLY GOAL: this week's hours / total hours across all weeks ──
   function getWeeklyGoal(pid: string): number {
+    const projectForGoal = enrichedProjects.find(p => p.projectId === pid);
+    if (projectForGoal?.isSpilled) return 100;
     if (!scheduleData) return 100;
     let thisWeekHours = 0;
     let totalHours = 0;
