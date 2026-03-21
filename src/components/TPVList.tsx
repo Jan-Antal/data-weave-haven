@@ -310,8 +310,9 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
 
           // Hours = (selling price × (1 - margin) × production%) / hourly rate
           const itemCena = (item.cena || 0) * (Number(item.pocet) || 1);
+          const itemCenaConverted = isEur ? itemCena * eurRate : itemCena;
           const estimatedHours =
-            itemCena > 0 ? Math.max(1, Math.round((itemCena * (1 - marze) * prodPct) / hourlyRate)) : 8;
+            itemCenaConverted > 0 ? Math.max(1, Math.round((itemCenaConverted * (1 - marze) * prodPct) / hourlyRate)) : 8;
 
           // Insert into production_inbox
           const { error } = await supabase.from("production_inbox").insert({
