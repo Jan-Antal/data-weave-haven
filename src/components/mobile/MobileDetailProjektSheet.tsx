@@ -110,9 +110,9 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
         {/* Top bar with back button + drag handle */}
         <div
           className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
-          onTouchStart={swipeTouchStart}
-          onTouchMove={swipeTouchMove}
-          onTouchEnd={swipeTouchEnd}
+          onTouchStart={handleDragTouchStart}
+          onTouchMove={handleDragTouchMove}
+          onTouchEnd={handleDragTouchEnd}
         >
           <button
             onClick={() => onOpenChange(false)}
