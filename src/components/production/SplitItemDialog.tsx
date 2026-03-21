@@ -61,12 +61,12 @@ async function renumberSiblings(splitGroupId: string) {
     }).eq("id", s.id)
   );
   // Actually just update part/total, not names
-  for (let i = 0; i < siblings.length; i++) {
-    await supabase.from("production_schedule").update({
+  await Promise.all(siblings.map((s, i) =>
+    supabase.from("production_schedule").update({
       split_part: i + 1,
       split_total: total,
-    }).eq("id", siblings[i].id);
-  }
+    }).eq("id", s.id)
+  ));
 }
 
 export { renumberSiblings };
@@ -177,11 +177,11 @@ export function SplitItemDialog({
           .or(`split_group_id.eq.${groupId},id.eq.${groupId}`)
           .order("scheduled_week");
         if (allParts) {
-          for (const p of allParts) {
-            await supabase.from("production_schedule").update({
+          await Promise.all(allParts.map(p =>
+            supabase.from("production_schedule").update({
               item_name: `${cleanName} (${p.split_part}/${p.split_total})`,
-            }).eq("id", p.id);
-          }
+            }).eq("id", p.id)
+          ));
         }
 
         invalidateAll();
