@@ -1713,7 +1713,7 @@ function DroppableWeekCell({ droppableId, weekKey, isCurrent, children }: {
 }
 
 /* ─── Filled week cell with popover + draggable ─── */
-function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCellValue, getCellStyle, moveTargetWeeks, getWeekCapacity, weekCapacities, onMoveToWeek, onReturnToInbox, onComplete, onCancel, onContextMenu }: {
+function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCellValue, getCellStyle, projectColor, moveTargetWeeks, getWeekCapacity, weekCapacities, onMoveToWeek, onReturnToInbox, onComplete, onCancel, onContextMenu }: {
   weekKey: string;
   isCurrent: boolean;
   alloc: WeekAlloc;
@@ -1721,6 +1721,7 @@ function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCe
   displayMode: DisplayMode;
   formatCellValue: (hours: number, czk: number, status: string, totalItemHours: number, splitPart?: number, splitTotal?: number, projectId?: string) => string;
   getCellStyle: (status: string) => { bg: string; text: string; border: string };
+  projectColor?: string;
   moveTargetWeeks: { key: string; weekNum: number; label: string }[];
   getWeekCapacity: (weekKey: string) => number;
   weekCapacities: Map<string, number>;
