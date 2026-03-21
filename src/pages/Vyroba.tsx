@@ -252,21 +252,6 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return () => setCurrentPage(null);
   }, [setCurrentPage]);
 
-  // One-time data reset
-  useEffect(() => {
-    async function resetProductionSchedule() {
-      const { error } = await supabase
-        .from("production_schedule")
-        .delete()
-        .in("status", ["scheduled", "in_progress", "paused"]);
-      if (!error) {
-        console.log("Production schedule reset complete");
-        qc.invalidateQueries({ queryKey: ["production-schedule"] });
-      }
-    }
-    resetProductionSchedule();
-  }, []);
-
 
   const [resetDataPreview, setResetDataPreview] = useState<any[] | null>(null);
   const [resetDataConfirmOpen, setResetDataConfirmOpen] = useState(false);
