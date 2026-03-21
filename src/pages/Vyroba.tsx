@@ -253,6 +253,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   }, [setCurrentPage]);
 
 
+  const [resetDataPreview, setResetDataPreview] = useState<any[] | null>(null);
+  const [resetDataConfirmOpen, setResetDataConfirmOpen] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [userMgmtOpen, setUserMgmtOpen] = useState(false);
   const [exchangeRateOpen, setExchangeRateOpen] = useState(false);
