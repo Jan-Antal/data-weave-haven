@@ -320,7 +320,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             item_name: item.item_type || item.item_name,
             item_code: item.item_name,
             estimated_hours: estimatedHours,
-            estimated_czk: itemCena,
+            estimated_czk: itemCenaConverted,
             status: "pending",
             sent_by: user.id,
           } as any);
