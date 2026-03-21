@@ -1091,38 +1091,6 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
-  // Horizontal swipe-left-to-dismiss for project sheet
-  const hSwipeRef = useRef({ startX: 0, startY: 0, axis: null as "h" | "v" | null });
-  function handleSheetHSwipeStart(e: React.TouchEvent) {
-    hSwipeRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY, axis: null };
-  }
-  function handleSheetHSwipeMove(e: React.TouchEvent) {
-    const h = hSwipeRef.current;
-    const t = e.touches[0];
-    const dx = t.clientX - h.startX;
-    const dy = t.clientY - h.startY;
-    if (!h.axis && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
-      h.axis = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
-    }
-    if (h.axis === "h" && dx < 0 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      const el = sheetRefVyrobaProjekt.current;
-      if (el) { el.style.transition = "none"; el.style.transform = `translateX(${dx}px)`; }
-    }
-  }
-  function handleSheetHSwipeEnd(e: React.TouchEvent) {
-    const h = hSwipeRef.current;
-    const dx = e.changedTouches[0].clientX - h.startX;
-    const el = sheetRefVyrobaProjekt.current;
-    if (h.axis === "h" && dx < 0 && Math.abs(dx) > window.innerWidth * 0.35 && el) {
-      el.style.transition = "transform 220ms ease"; el.style.transform = "translateX(-100vw)";
-      const overlay = el.previousElementSibling as HTMLElement | null;
-      if (overlay) { overlay.style.transition = "opacity 220ms ease"; overlay.style.opacity = "0"; }
-      setTimeout(() => setMobileVyrobaProjektOpen(false), 220);
-    } else if (el) {
-      el.style.transition = "transform 200ms ease"; el.style.transform = "translateX(0)";
-    }
-    h.axis = null;
-  }
 
   /* ── Return from Expedice ── */
   async function handleReturnFromExpedice(pid: string) {
