@@ -1180,6 +1180,70 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     toast.success(`Přepočítáno ${updated} položek z Inboxu`);
   }
 
+  async function handleResetDataPreview() {
+    const { data, error } = await supabase
+      .from("production_schedule")
+      .select("project_id, scheduled_week, item_code, id, status")
+      .in("status", ["scheduled", "in_progress"])
+      .gt("scheduled_week", "2026-03-30")
+      .order("scheduled_week");
+    if (error) { toast.error("Chyba při načítání dat"); return; }
+    // Group by project_id + week
+    const grouped = new Map<string, { project_id: string; scheduled_week: string; count: number; items: string[] }>();
+    for (const row of data || []) {
+      const key = `${row.project_id}::${row.scheduled_week}`;
+      const g = grouped.get(key) || { project_id: row.project_id, scheduled_week: row.scheduled_week, count: 0, items: [] };
+      g.count++;
+      if (row.item_code) g.items.push(row.item_code);
+      grouped.set(key, g);
+    }
+    setResetDataPreview(Array.from(grouped.values()));
+    setResetDataConfirmOpen(true);
+  }
+
+  async function handleResetDataConfirm() {
+    // Step 1: Delete future weeks (T14+)
+    const { data: deleted1 } = await supabase
+      .from("production_schedule")
+      .delete()
+      .in("status", ["scheduled", "in_progress"])
+      .gt("scheduled_week", "2026-03-30")
+      .select("id");
+
+    // Step 2: Delete duplicates — same project_id + item_code, keep most recent week
+    const { data: allActive } = await supabase
+      .from("production_schedule")
+      .select("id, project_id, item_code, item_name, scheduled_week")
+      .in("status", ["scheduled", "in_progress"])
+      .order("scheduled_week", { ascending: false });
+
+    const seen = new Map<string, string>();
+    const dupeIds: string[] = [];
+    for (const row of allActive || []) {
+      const key = `${row.project_id}::${row.item_code || row.item_name}`;
+      if (!seen.has(key)) {
+        seen.set(key, row.id);
+      } else {
+        dupeIds.push(row.id);
+      }
+    }
+
+    let deleted2Count = 0;
+    if (dupeIds.length > 0) {
+      const { data: deleted2 } = await supabase
+        .from("production_schedule")
+        .delete()
+        .in("id", dupeIds)
+        .select("id");
+      deleted2Count = deleted2?.length || 0;
+    }
+
+    qc.invalidateQueries({ queryKey: ["production-schedule"] });
+    toast.success(`Smazáno ${deleted1?.length || 0} budoucích + ${deleted2Count} duplicit`);
+    setResetDataConfirmOpen(false);
+    setResetDataPreview(null);
+  }
+
 
   /* ── Return from Expedice ── */
   async function handleReturnFromExpedice(pid: string) {
