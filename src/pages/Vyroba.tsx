@@ -843,17 +843,9 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     let movedCount = 0;
 
     for (const item of itemsToMove) {
-      const useFull = spillFullHours.has(item.id);
-      const hours = useFull ? item.scheduled_hours : getRemainingHours(item, pct);
-      if (hours <= 0) continue;
-      const czk = useFull ? item.scheduled_czk : Math.round(item.scheduled_czk * (1 - pct / 100));
       const { error } = await supabase
         .from("production_schedule")
-        .update({
-          scheduled_week: nextWeekKey,
-          scheduled_hours: hours,
-          scheduled_czk: czk,
-        })
+        .update({ scheduled_week: nextWeekKey })
         .eq("id", item.id);
       if (error) {
         toast.error(error.message);
@@ -868,29 +860,18 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       description: `přesun ${movedCount} položek do T${nextWeekNum}`,
       undo: async () => {
         for (const pw of prevWeeks) {
-          const orig = itemsToMove.find((i) => i.id === pw.id);
-          if (!orig) continue;
           await supabase
             .from("production_schedule")
-            .update({
-              scheduled_week: pw.prevWeek,
-              scheduled_hours: orig.scheduled_hours,
-              scheduled_czk: orig.scheduled_czk,
-            })
+            .update({ scheduled_week: pw.prevWeek })
             .eq("id", pw.id);
         }
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
       },
       redo: async () => {
         for (const pw of prevWeeks) {
-          const orig = itemsToMove.find((i) => i.id === pw.id);
-          if (!orig) continue;
-          const useFull = spillFullHours.has(pw.id);
-          const h = useFull ? orig.scheduled_hours : getRemainingHours(orig, pct);
-          const c = useFull ? orig.scheduled_czk : Math.round(orig.scheduled_czk * (1 - pct / 100));
           await supabase
             .from("production_schedule")
-            .update({ scheduled_week: nextWeekKey, scheduled_hours: h, scheduled_czk: c })
+            .update({ scheduled_week: nextWeekKey })
             .eq("id", pw.id);
         }
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
