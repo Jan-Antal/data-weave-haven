@@ -518,7 +518,11 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     overdue:     { bg: "#FEE2E2", text: "#DC2626", border: "#DC2626" },
   } as const;
 
-  const getCellStyle = (status: string) => {
+  const getCellStyle = (status: string, projectColor?: string) => {
+    if (projectColor && status !== "paused") {
+      if (status === "completed") return { bg: projectColor + "25", text: projectColor, border: projectColor + "60" };
+      return { bg: projectColor + "18", text: projectColor, border: projectColor + "40" };
+    }
     switch (status) {
       case "completed": return STATUS_COLORS.completed;
       case "in_progress": return STATUS_COLORS.in_progress;
@@ -527,8 +531,11 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     }
   };
 
-  // Bold variant for bundle-level cells (uses border color as bg, white text)
-  const getBundleCellStyle = (status: string) => {
+  // Bold variant for bundle-level cells (uses project color as bg, white text)
+  const getBundleCellStyle = (status: string, projectColor?: string) => {
+    if (projectColor && status !== "paused") {
+      return { bg: projectColor, text: "#ffffff", border: projectColor };
+    }
     const base = getCellStyle(status);
     return { bg: base.border, text: "#ffffff", border: base.border };
   };
