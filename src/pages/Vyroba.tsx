@@ -534,15 +534,23 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   function getLatestPercent(pid: string): number {
     const logs = getLogsForProject(pid);
-    if (logs.length === 0) return 0;
-    return Math.max(...logs.map((l) => l.percent));
+    if (logs.length > 0) return Math.max(...logs.map((l) => l.percent));
+    // Fallback: check all-weeks latest log (for spilled projects)
+    const allLog = allLatestLogs?.get(pid);
+    if (allLog) return allLog.percent;
+    return 0;
   }
 
   function getLatestPhase(pid: string): string | null {
     const logs = getLogsForProject(pid);
-    if (logs.length === 0) return null;
-    const sorted = [...logs].sort((a, b) => b.day_index - a.day_index);
-    return sorted[0].phase;
+    if (logs.length > 0) {
+      const sorted = [...logs].sort((a, b) => b.day_index - a.day_index);
+      return sorted[0].phase;
+    }
+    // Fallback: check all-weeks latest log (for spilled projects)
+    const allLog = allLatestLogs?.get(pid);
+    if (allLog) return allLog.phase;
+    return null;
   }
 
   function getCumulativeForDay(pid: string, dayIndex: number): CumulativeInfo | null {
