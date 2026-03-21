@@ -960,8 +960,8 @@ function MissingItemProjectCard({ progress, projectInfo, urgency, daysLabel, isS
   const [expanded, setExpanded] = useState(defaultExpanded);
   const color = getProjectColor(progress.project_id);
   const uColors = URGENCY_COLORS[urgency];
-  const leftBorderColor = urgency !== "ok" ? uColors.border : color;
-  const leftBorderWidth = urgency !== "ok" ? 3 : 4;
+  const leftBorderColor = color;
+  const leftBorderWidth = 4;
 
   const deadline = useMemo(() => {
     if (!projectInfo) return null;
@@ -1105,9 +1105,8 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
   const color = getProjectColor(project.project_id);
   const uColors = URGENCY_COLORS[urgency];
 
-  // Use urgency border color if not "ok", otherwise project color
-  const leftBorderColor = urgency !== "ok" ? uColors.border : color;
-  const leftBorderWidth = urgency !== "ok" ? 3 : 4;
+  const leftBorderColor = color;
+  const leftBorderWidth = 4;
 
   // Resolve deadline for display
   const deadline = useMemo(() => {
