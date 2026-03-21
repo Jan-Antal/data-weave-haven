@@ -261,14 +261,15 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         if (!user) throw new Error("Nepřihlášený uživatel");
 
         // Fetch project cost parameters for correct hour estimation
-        const [{ data: projectData }, { data: settingsData }, { data: presetsData }] = await Promise.all([
+        const [{ data: projectData }, { data: settingsData }, { data: presetsData }, { data: ratesData }] = await Promise.all([
           supabase
             .from("projects")
-            .select("marze, cost_production_pct, cost_preset_id")
+            .select("marze, cost_production_pct, cost_preset_id, currency")
             .eq("project_id", projectId)
             .single(),
           supabase.from("production_settings").select("hourly_rate").limit(1).single(),
           supabase.from("cost_breakdown_presets").select("id, is_default, production_pct").order("sort_order"),
+          supabase.from("exchange_rates").select("year, eur_czk").order("year", { ascending: false }).limit(1),
         ]);
 
         const hourlyRate = Number(settingsData?.hourly_rate) || 550;
