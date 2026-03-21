@@ -303,6 +303,15 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   // Week navigation
   const [weekOffset, setWeekOffset] = useState(0);
+  const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null);
+
+  // Clear slide direction after animation
+  useEffect(() => {
+    if (slideDir) {
+      const t = setTimeout(() => setSlideDir(null), 200);
+      return () => clearTimeout(t);
+    }
+  }, [slideDir]);
   const currentMonday = useMemo(() => addWeeks(getMonday(new Date()), weekOffset), [weekOffset]);
   const weekKey = weekKeyStr(currentMonday);
   const weekNum = getISOWeekNumber(currentMonday);
@@ -1727,19 +1736,12 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 const threshold = window.innerWidth * 0.35;
                 if (Math.abs(dx) > threshold) {
                   const dir = dx > 0 ? -1 : 1;
-                  el.style.transition = 'transform 180ms ease-out, opacity 150ms';
-                  el.style.transform = `translateX(${dir > 0 ? '-110%' : '110%'})`;
-                  el.style.opacity = '0';
-                  setTimeout(() => {
-                    setWeekOffset(w => w + dir);
-                    el.style.transition = 'none';
-                    el.style.transform = `translateX(${dir > 0 ? '80px' : '-80px'})`;
-                    el.style.opacity = '0';
-                    void el.offsetWidth;
-                    el.style.transition = 'transform 200ms ease-out, opacity 150ms';
-                    el.style.transform = 'translateX(0)';
-                    el.style.opacity = '1';
-                  }, 180);
+                  // Reset transform before React re-render
+                  el.style.transition = 'none';
+                  el.style.transform = 'translateX(0)';
+                  el.style.opacity = '1';
+                  setSlideDir(dir > 0 ? 'left' : 'right');
+                  setWeekOffset(w => w + dir);
                 } else {
                   el.style.transition = 'transform 220ms ease-out';
                   el.style.transform = 'translateX(0)';
@@ -1751,7 +1753,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         <div className="flex-1 min-w-0 flex min-h-0">
           {/* ═══ LEFT PANEL ═══ */}
           <div
-            className={`shrink-0 flex flex-col overflow-y-auto week-content-area ${isMobile ? "w-full" : "w-[252px]"}`}
+            key={isMobile ? weekKey : undefined}
+            className={`shrink-0 flex flex-col overflow-y-auto week-content-area ${isMobile ? "w-full" : "w-[252px]"} ${isMobile && slideDir === 'left' ? 'week-slide-from-right' : ''} ${isMobile && slideDir === 'right' ? 'week-slide-from-left' : ''}`}
             style={{
               borderRight: isMobile ? "none" : "1px solid #e5e2dd",
               background: isMobile ? "hsl(var(--background))" : "#ffffff",
