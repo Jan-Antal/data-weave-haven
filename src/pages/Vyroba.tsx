@@ -385,7 +385,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     // Spilled: only show projects from the immediately preceding week (T-1)
     const prevMonday = new Date(currentMonday);
     prevMonday.setDate(prevMonday.getDate() - 7);
-    const prevWeekKey = prevMonday.toISOString().split("T")[0];
+    const prevWeekKey = weekKeyStr(prevMonday);
     const prevSilo = scheduleData.get(prevWeekKey);
     if (prevSilo) {
       for (const b of prevSilo.bundles) {
