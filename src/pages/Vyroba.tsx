@@ -2688,6 +2688,14 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               setDetailDialogOpen(open);
               if (!open) setDetailProject(null);
             }}
+            extraFooter={!isMobile && (isAdmin || isOwner) ? (
+              <button
+                onClick={() => recalculateScheduledHours(detailProject.project_id)}
+                className="text-xs px-3 py-1.5 rounded border border-border hover:bg-muted transition-colors"
+              >
+                🔄 Přepočítat hodiny
+              </button>
+            ) : undefined}
           />
         )}
 
