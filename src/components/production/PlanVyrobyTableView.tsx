@@ -1530,7 +1530,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                                     item={item}
                                     displayMode={displayMode}
                                     formatCellValue={formatCellValue}
-                                    getCellStyle={getCellStyle}
+                                    getCellStyle={(status: string) => getCellStyle(status, getProjectColor(item.projectId))}
+                                    projectColor={getProjectColor(item.projectId)}
                                     moveTargetWeeks={moveTargetWeeks}
                                     getWeekCapacity={getWeekCapacity}
                                     weekCapacities={weekCapacities}
