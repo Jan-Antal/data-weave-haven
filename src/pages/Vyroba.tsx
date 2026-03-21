@@ -2208,6 +2208,21 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     <div className="w-[50px]" />
                   </div>
                   <div className="flex-1 overflow-y-auto">{logModalContent}</div>
+                  <div className="shrink-0 px-4 py-3 border-t border-border bg-background space-y-2" style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))" }}>
+                    <div className="flex flex-col gap-2">
+                      {logDayIndex === todayDayIndex && (
+                        <Button variant="outline" onClick={() => setNoProductionOpen(true)} className="text-xs">
+                          Dnes nebyla výroba
+                        </Button>
+                      )}
+                      <Button variant="outline" onClick={() => setMobileDaylogOpen(false)}>
+                        Zrušit
+                      </Button>
+                      <Button onClick={handleSaveLog} style={{ background: "#3a8a36" }} className="text-white">
+                        💾 Uložit
+                      </Button>
+                    </div>
+                  </div>
                 </SheetContent>
               </Sheet>
             );
