@@ -273,6 +273,8 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         ]);
 
         const hourlyRate = Number(settingsData?.hourly_rate) || 550;
+        const eurRate = ratesData?.[0] ? Number(ratesData[0].eur_czk) : 25.0;
+        const isEur = projectData?.currency === "EUR";
         const presets = presetsData || [];
         const projectPreset = projectData?.cost_preset_id
           ? presets.find((p) => p.id === projectData.cost_preset_id)
