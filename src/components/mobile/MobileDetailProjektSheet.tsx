@@ -319,13 +319,11 @@ function TPVTabContent({ items, currency }: { items: any[]; currency: string }) 
           className="flex items-center gap-3 px-4 py-3"
           style={{ borderBottom: idx < items.length - 1 ? "0.5px solid hsl(var(--border))" : undefined }}
         >
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[11px] font-mono text-muted-foreground shrink-0">{item.item_name}</span>
-              {item.item_type && (
-                <span className="text-[12px] font-medium text-foreground truncate">{item.item_type}</span>
-              )}
-            </div>
+           <div className="min-w-0 flex-1">
+            <span className="text-[11px] font-mono text-muted-foreground block">{item.item_name}</span>
+            {item.nazev_prvku && (
+              <span className="text-[13px] font-medium text-foreground block truncate">{item.nazev_prvku}</span>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {(item.vyroba_status || item.status) && (
