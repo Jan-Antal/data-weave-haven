@@ -241,6 +241,7 @@ export default function PlanVyroby() {
     }
   }, [qc]);
 
+  const handleSelectProject = useCallback((projectId: string) => {
     setSelectedProjectId(projectId);
   }, []);
   const { data: allProjects = [] } = useProjects();
