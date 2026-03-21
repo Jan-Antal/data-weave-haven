@@ -641,6 +641,9 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   }
 
   function getProjectStatus(pid: string): "on-track" | "at-risk" | "behind" {
+    // Spilled projects are always "behind" regardless of current progress
+    const statusProject = enrichedProjects.find(p => p.projectId === pid);
+    if (statusProject?.isSpilled) return "behind";
     const { bundleProgress } = getBundleProgress(pid);
     const goal = getWeeklyGoal(pid);
     if (bundleProgress >= goal) return "on-track";
