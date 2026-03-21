@@ -206,7 +206,7 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
         </div>
 
         {/* Tab content */}
-        <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-hidden flex flex-col" style={{ paddingBottom: "calc(24px + env(safe-area-inset-bottom, 0px))" }}>
           {activeTab === "info" && (
             <ProjectDetailDialog
               project={project as ProjectDetailProject}
