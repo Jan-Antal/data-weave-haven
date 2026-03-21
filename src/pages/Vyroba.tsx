@@ -303,15 +303,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   // Week navigation
   const [weekOffset, setWeekOffset] = useState(0);
-  const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null);
-
-  // Clear slide direction after animation
-  useEffect(() => {
-    if (slideDir) {
-      const t = setTimeout(() => setSlideDir(null), 200);
-      return () => clearTimeout(t);
-    }
-  }, [slideDir]);
+  const [weekSlideClass, setWeekSlideClass] = useState("");
   const currentMonday = useMemo(() => addWeeks(getMonday(new Date()), weekOffset), [weekOffset]);
   const weekKey = weekKeyStr(currentMonday);
   const weekNum = getISOWeekNumber(currentMonday);
@@ -1733,18 +1725,15 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 const dx = e.changedTouches[0].clientX - sw.startX;
                 const el = e.currentTarget.querySelector('.week-content-area') as HTMLElement;
                 if (!el) return;
+                el.style.transition = 'none';
+                el.style.transform = 'translateX(0)';
+                el.style.opacity = '1';
                 const threshold = window.innerWidth * 0.35;
                 if (Math.abs(dx) > threshold) {
                   const dir = dx > 0 ? -1 : 1;
-                  // Reset transform before React re-render
-                  el.style.transition = 'none';
-                  el.style.transform = 'translateX(0)';
-                  el.style.opacity = '1';
-                  setSlideDir(dir > 0 ? 'left' : 'right');
+                  setWeekSlideClass(dir > 0 ? 'week-slide-in-left' : 'week-slide-in-right');
                   setWeekOffset(w => w + dir);
-                } else {
-                  el.style.transition = 'transform 220ms ease-out';
-                  el.style.transform = 'translateX(0)';
+                  setTimeout(() => setWeekSlideClass(''), 250);
                 }
               },
             }
@@ -1754,7 +1743,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
           {/* ═══ LEFT PANEL ═══ */}
           <div
             key={isMobile ? weekKey : undefined}
-            className={`shrink-0 flex flex-col overflow-y-auto week-content-area ${isMobile ? "w-full" : "w-[252px]"} ${isMobile && slideDir === 'left' ? 'week-slide-from-right' : ''} ${isMobile && slideDir === 'right' ? 'week-slide-from-left' : ''}`}
+            className={`shrink-0 flex flex-col overflow-y-auto week-content-area ${isMobile ? "w-full" : "w-[252px]"} ${isMobile ? weekSlideClass : ''}`}
             style={{
               borderRight: isMobile ? "none" : "1px solid #e5e2dd",
               background: isMobile ? "hsl(var(--background))" : "#ffffff",
