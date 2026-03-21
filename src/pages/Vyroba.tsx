@@ -1743,7 +1743,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
           {/* ═══ LEFT PANEL ═══ */}
           <div
             key={isMobile ? weekKey : undefined}
-            className={`shrink-0 flex flex-col overflow-y-auto week-content-area ${isMobile ? "w-full" : "w-[252px]"} ${isMobile && slideDir === 'left' ? 'week-slide-from-right' : ''} ${isMobile && slideDir === 'right' ? 'week-slide-from-left' : ''}`}
+            className={`shrink-0 flex flex-col overflow-y-auto week-content-area ${isMobile ? "w-full" : "w-[252px]"} ${isMobile ? weekSlideClass : ''}`}
             style={{
               borderRight: isMobile ? "none" : "1px solid #e5e2dd",
               background: isMobile ? "hsl(var(--background))" : "#ffffff",
