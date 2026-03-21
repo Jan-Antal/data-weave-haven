@@ -114,6 +114,7 @@ interface ProjectRow {
 }
 
 function getCollapsedCellStyle(proj: ProjectRow, weekKey: string): { bg: string; text: string; border: string } {
+  const color = proj.color;
   let hasInProgress = false, hasPaused = false, hasScheduled = false, hasCompleted = false, hasInbox = false;
   for (const item of proj.items) {
     const alloc = item.weekAllocations.get(weekKey);
@@ -126,13 +127,12 @@ function getCollapsedCellStyle(proj: ProjectRow, weekKey: string): { bg: string;
     }
     if (item.inboxHours > 0 && !hasInProgress && !hasPaused && !hasScheduled && !hasCompleted) hasInbox = true;
   }
-  // Priority: in_progress > paused > scheduled > completed > inbox
-  if (hasInProgress) return { bg: "rgba(34,197,94,0.12)", text: "#16a34a", border: "rgba(34,197,94,0.3)" };
+  // Paused/inbox keep their semantic colors; all others use project color
   if (hasPaused) return { bg: "rgba(107,114,128,0.12)", text: "#6b7280", border: "rgba(107,114,128,0.3)" };
-  if (hasScheduled) return { bg: "rgba(59,130,246,0.12)", text: "#2563eb", border: "rgba(59,130,246,0.3)" };
-  if (hasCompleted) return { bg: "rgba(22,163,74,0.15)", text: "#15803d", border: "rgba(22,163,74,0.4)" };
-  if (hasInbox) return { bg: "rgba(249,115,22,0.12)", text: "#ea580c", border: "rgba(249,115,22,0.3)" };
-  return { bg: "rgba(59,130,246,0.12)", text: "#2563eb", border: "rgba(59,130,246,0.3)" };
+  if (hasInbox && !hasScheduled && !hasInProgress && !hasCompleted) return { bg: "rgba(249,115,22,0.12)", text: "#ea580c", border: "rgba(249,115,22,0.3)" };
+  // Use project color with varying opacity for active states
+  if (hasCompleted && !hasInProgress && !hasScheduled) return { bg: color + "25", text: color, border: color + "60" };
+  return { bg: color + "18", text: color, border: color + "40" };
 }
 
 const CELL_W = 132;
