@@ -960,8 +960,8 @@ function MissingItemProjectCard({ progress, projectInfo, urgency, daysLabel, isS
   const [expanded, setExpanded] = useState(defaultExpanded);
   const color = getProjectColor(progress.project_id);
   const uColors = URGENCY_COLORS[urgency];
-  const leftBorderColor = urgency !== "ok" ? uColors.border : color;
-  const leftBorderWidth = urgency !== "ok" ? 3 : 4;
+  const leftBorderColor = color;
+  const leftBorderWidth = 4;
 
   const deadline = useMemo(() => {
     if (!projectInfo) return null;
