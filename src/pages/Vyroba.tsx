@@ -252,14 +252,6 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return () => setCurrentPage(null);
   }, [setCurrentPage]);
 
-  // Clear slide direction after animation
-  useEffect(() => {
-    if (slideDir) {
-      const t = setTimeout(() => setSlideDir(null), 200);
-      return () => clearTimeout(t);
-    }
-  }, [slideDir]);
-
 
 
   const [resetDataPreview, setResetDataPreview] = useState<any[] | null>(null);
