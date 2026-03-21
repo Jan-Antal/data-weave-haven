@@ -82,6 +82,7 @@ interface ProjectDetailDialogProps {
   onOpenTPVList?: (projectId: string, projectName: string, autoImport?: boolean) => void;
   tpvItemCount?: number;
   mode?: "dialog" | "embedded";
+  extraFooter?: React.ReactNode;
 }
 
 const DOC_CATEGORIES = [
