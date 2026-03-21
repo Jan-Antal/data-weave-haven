@@ -467,9 +467,23 @@ export function useForecastMode(): UseForecastModeReturn {
 
       const allRows = [...inboxRows, ...blockerRows];
 
+      // Keep only the earliest week per project for non-blocker rows
+      const earliestWeekByProject = new Map<string, string>();
+      for (const row of allRows) {
+        if (row.is_blocker) continue;
+        const existing = earliestWeekByProject.get(row.project_id);
+        if (!existing || row.scheduled_week < existing) {
+          earliestWeekByProject.set(row.project_id, row.scheduled_week);
+        }
+      }
+      const dedupedRows = allRows.filter(row => {
+        if (row.is_blocker) return true;
+        return row.scheduled_week === earliestWeekByProject.get(row.project_id);
+      });
+
       // Single batch insert for ALL blocks
-      if (allRows.length > 0) {
-        const { error } = await supabase.from("production_schedule").insert(allRows as any);
+      if (dedupedRows.length > 0) {
+        const { error } = await supabase.from("production_schedule").insert(dedupedRows as any);
         if (error) throw error;
       }
 
