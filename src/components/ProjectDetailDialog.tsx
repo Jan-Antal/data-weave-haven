@@ -714,6 +714,20 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     qc.invalidateQueries({ queryKey: ["tpv-items"] });
     onOpenChange(false);
     showUndoToast(project.id, previousValues, qc);
+
+    // Auto-recalculate production hours if marze, cost_production_pct, or cost_preset_id changed
+    const hoursRelevantChanged =
+      newValues.marze !== previousValues.marze ||
+      newValues.cost_production_pct !== (project as any).cost_production_pct ||
+      newValues.cost_preset_id !== (project as any).cost_preset_id;
+    if (hoursRelevantChanged) {
+      import("@/lib/recalculateProductionHours").then(({ recalculateProductionHours }) => {
+        recalculateProductionHours(supabase, [form.project_id]).then(() => {
+          qc.invalidateQueries({ queryKey: ["production-inbox"] });
+          qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        });
+      });
+    }
   };
 
   const handleDelete = async () => {
