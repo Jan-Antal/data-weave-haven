@@ -240,7 +240,7 @@ serve(async (req) => {
     const dow = currentMonday.getUTCDay();
     currentMonday.setUTCDate(currentMonday.getUTCDate() + (dow === 0 ? -6 : 1 - dow));
 
-    const [projRes, tpvRes, settingsRes, presetsRes, capacityRes, ratesRes, inboxRes] = await Promise.all([
+    const [projRes, tpvRes, settingsRes, presetsRes, capacityRes, ratesRes, inboxRes, schedRes] = await Promise.all([
       sb
         .from("projects")
         .select(
@@ -249,12 +249,13 @@ serve(async (req) => {
         .in("status", ["Příprava", "Engineering", "TPV", "Výroba IN", "Výroba"])
         .is("deleted_at", null)
         .eq("is_test", false),
-      sb.from("tpv_items").select("project_id,cena,pocet,status").is("deleted_at", null),
+      sb.from("tpv_items").select("project_id,item_name,cena,pocet,status").is("deleted_at", null),
       sb.from("production_settings").select("hourly_rate").limit(1).single(),
       sb.from("cost_breakdown_presets").select("id,name,is_default,production_pct").order("sort_order"),
       sb.from("production_capacity").select("week_number,week_year,capacity_hours"),
       sb.from("exchange_rates").select("year,eur_czk"),
-      sb.from("production_inbox").select("project_id,estimated_hours").eq("status", "pending"),
+      sb.from("production_inbox").select("project_id,item_code,estimated_hours").in("status", ["pending", "scheduled"]),
+      sb.from("production_schedule").select("project_id,item_code,scheduled_hours").in("status", ["scheduled", "in_progress"]),
     ]);
 
     const projects = projRes.data || [];
