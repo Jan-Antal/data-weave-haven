@@ -322,9 +322,9 @@ function TPVTabContent({ items, currency }: { items: any[]; currency: string }) 
         >
            <div className="min-w-0 flex-1">
             <span className="text-[11px] font-mono text-muted-foreground block">{item.item_name}</span>
-            {item.nazev_prvku && (
-              <span className="text-[13px] font-medium text-foreground block truncate">{item.nazev_prvku}</span>
-            )}
+             {item.item_type && (
+               <span className="text-[13px] font-medium text-foreground block truncate">{item.item_type}</span>
+             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {(item.vyroba_status || item.status) && (
