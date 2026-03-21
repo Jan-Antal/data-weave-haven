@@ -303,15 +303,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   // Week navigation
   const [weekOffset, setWeekOffset] = useState(0);
-  const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null);
-
-  // Clear slide direction after animation
-  useEffect(() => {
-    if (slideDir) {
-      const t = setTimeout(() => setSlideDir(null), 200);
-      return () => clearTimeout(t);
-    }
-  }, [slideDir]);
+  const [weekSlideClass, setWeekSlideClass] = useState("");
   const currentMonday = useMemo(() => addWeeks(getMonday(new Date()), weekOffset), [weekOffset]);
   const weekKey = weekKeyStr(currentMonday);
   const weekNum = getISOWeekNumber(currentMonday);
