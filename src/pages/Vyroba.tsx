@@ -839,32 +839,26 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     const pct = getLatestPercent(selectedProject.projectId);
 
     const itemsToMove = selectedProject.scheduleItems.filter((i) => ids.includes(i.id));
+    const prevWeeks = itemsToMove.map((i) => ({ id: i.id, prevWeek: i.scheduled_week }));
     let movedCount = 0;
-    const insertedPairs: { originalId: string; newId: string; original: typeof itemsToMove[0] }[] = [];
 
     for (const item of itemsToMove) {
       const useFull = spillFullHours.has(item.id);
       const hours = useFull ? item.scheduled_hours : getRemainingHours(item, pct);
       if (hours <= 0) continue;
       const czk = useFull ? item.scheduled_czk : Math.round(item.scheduled_czk * (1 - pct / 100));
-      const { data: inserted, error } = await supabase.from("production_schedule").insert({
-        project_id: item.project_id,
-        item_name: item.item_name,
-        item_code: item.item_code,
-        stage_id: item.stage_id,
-        scheduled_week: nextWeekKey,
-        scheduled_hours: hours,
-        scheduled_czk: czk,
-        status: "scheduled",
-        is_blocker: false,
-      }).select("id").single();
+      const { error } = await supabase
+        .from("production_schedule")
+        .update({
+          scheduled_week: nextWeekKey,
+          scheduled_hours: hours,
+          scheduled_czk: czk,
+        })
+        .eq("id", item.id);
       if (error) {
         toast.error(error.message);
         return;
       }
-      // Delete original from current week
-      await supabase.from("production_schedule").delete().eq("id", item.id);
-      insertedPairs.push({ originalId: item.id, newId: inserted.id, original: item });
       movedCount++;
     }
 
@@ -873,28 +867,31 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       actionType: "move_items",
       description: `přesun ${movedCount} položek do T${nextWeekNum}`,
       undo: async () => {
-        for (const pair of insertedPairs) {
-          await supabase.from("production_schedule").delete().eq("id", pair.newId);
-          const o = pair.original;
-          await supabase.from("production_schedule").insert({
-            id: o.id,
-            project_id: o.project_id,
-            item_name: o.item_name,
-            item_code: o.item_code,
-            stage_id: o.stage_id,
-            scheduled_week: o.scheduled_week,
-            scheduled_hours: o.scheduled_hours,
-            scheduled_czk: o.scheduled_czk,
-            status: o.status,
-            is_blocker: o.is_blocker,
-            position: o.position,
-          });
+        for (const pw of prevWeeks) {
+          const orig = itemsToMove.find((i) => i.id === pw.id);
+          if (!orig) continue;
+          await supabase
+            .from("production_schedule")
+            .update({
+              scheduled_week: pw.prevWeek,
+              scheduled_hours: orig.scheduled_hours,
+              scheduled_czk: orig.scheduled_czk,
+            })
+            .eq("id", pw.id);
         }
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
       },
       redo: async () => {
-        for (const pair of insertedPairs) {
-          await supabase.from("production_schedule").delete().eq("id", pair.originalId);
+        for (const pw of prevWeeks) {
+          const orig = itemsToMove.find((i) => i.id === pw.id);
+          if (!orig) continue;
+          const useFull = spillFullHours.has(pw.id);
+          const h = useFull ? orig.scheduled_hours : getRemainingHours(orig, pct);
+          const c = useFull ? orig.scheduled_czk : Math.round(orig.scheduled_czk * (1 - pct / 100));
+          await supabase
+            .from("production_schedule")
+            .update({ scheduled_week: nextWeekKey, scheduled_hours: h, scheduled_czk: c })
+            .eq("id", pw.id);
         }
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
       },
