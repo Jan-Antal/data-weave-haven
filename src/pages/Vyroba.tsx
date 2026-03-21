@@ -252,6 +252,41 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return () => setCurrentPage(null);
   }, [setCurrentPage]);
 
+  // One-time cleanup of duplicate spill records from old buggy logic
+  useEffect(() => {
+    async function cleanupDuplicateSpillRecords() {
+      const { data, error } = await supabase
+        .from("production_schedule")
+        .select("id, project_id, item_code, item_name, scheduled_week, status")
+        .in("status", ["scheduled", "in_progress"])
+        .order("scheduled_week", { ascending: false });
+
+      if (error || !data) return;
+
+      const seen = new Map<string, string>();
+      const toDelete: string[] = [];
+
+      for (const row of data) {
+        const key = `${row.project_id}::${row.item_code || row.item_name}`;
+        if (!seen.has(key)) {
+          seen.set(key, row.id);
+        } else {
+          toDelete.push(row.id);
+        }
+      }
+
+      if (toDelete.length > 0) {
+        await supabase
+          .from("production_schedule")
+          .delete()
+          .in("id", toDelete);
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        console.log(`Cleaned up ${toDelete.length} duplicate spill records`);
+      }
+    }
+    cleanupDuplicateSpillRecords();
+  }, []);
+
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [userMgmtOpen, setUserMgmtOpen] = useState(false);
   const [exchangeRateOpen, setExchangeRateOpen] = useState(false);
