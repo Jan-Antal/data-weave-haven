@@ -38,31 +38,52 @@ export async function recalculateProductionHours(
       : (preset?.production_pct ?? 30) / 100;
     const marze = proj.marze ? Number(proj.marze) / 100 : 0;
 
-    // Inbox items (pending)
-    const { data: inboxItems } = await supabaseClient
-      .from("production_inbox").select("id, estimated_czk, estimated_hours")
-      .eq("project_id", proj.project_id).eq("status", "pending");
+    // Get TPV items for this project — source of truth
+    const { data: tpvItems } = await supabaseClient
+      .from("tpv_items")
+      .select("item_name, item_type, cena, pocet, status")
+      .eq("project_id", proj.project_id)
+      .neq("status", "Zrušeno");
 
-    for (const item of inboxItems || []) {
-      const czk = Number(item.estimated_czk) || 0;
-      const hours = czk > 0 ? Math.round((czk * (1 - marze) * prodPct) / hourlyRate) : 0;
-      if (hours !== Number(item.estimated_hours)) {
-        await supabaseClient.from("production_inbox").update({ estimated_hours: hours }).eq("id", item.id);
-        updated++;
-      }
-    }
+    if (!tpvItems?.length) continue;
 
     // Schedule items (current + future weeks only)
     const { data: schedItems } = await supabaseClient
-      .from("production_schedule").select("id, scheduled_czk, scheduled_hours, scheduled_week")
+      .from("production_schedule").select("id, item_code, scheduled_czk, scheduled_hours, scheduled_week")
       .eq("project_id", proj.project_id).in("status", ["scheduled", "in_progress"])
       .gte("scheduled_week", weekKey);
 
     for (const item of schedItems || []) {
-      const czk = Number(item.scheduled_czk) || 0;
-      const hours = czk > 0 ? Math.round((czk * (1 - marze) * prodPct) / hourlyRate) : 0;
-      if (hours !== Number(item.scheduled_hours)) {
-        await supabaseClient.from("production_schedule").update({ scheduled_hours: hours }).eq("id", item.id);
+      const tpv = tpvItems.find((t: any) => t.item_name === item.item_code);
+      if (!tpv) continue;
+
+      const correctCzk = (Number(tpv.cena) || 0) * (Number(tpv.pocet) || 1);
+      const correctHours = correctCzk > 0
+        ? Math.floor((correctCzk * (1 - marze) * prodPct) / hourlyRate)
+        : 0;
+
+      if (correctCzk !== Number(item.scheduled_czk) || correctHours !== Number(item.scheduled_hours)) {
+        await supabaseClient.from("production_schedule").update({ scheduled_hours: correctHours, scheduled_czk: correctCzk }).eq("id", item.id);
+        updated++;
+      }
+    }
+
+    // Inbox items (pending)
+    const { data: inboxItems } = await supabaseClient
+      .from("production_inbox").select("id, item_code, estimated_czk, estimated_hours")
+      .eq("project_id", proj.project_id).eq("status", "pending");
+
+    for (const item of inboxItems || []) {
+      const tpv = tpvItems.find((t: any) => t.item_name === item.item_code);
+      if (!tpv) continue;
+
+      const correctCzk = (Number(tpv.cena) || 0) * (Number(tpv.pocet) || 1);
+      const correctHours = correctCzk > 0
+        ? Math.floor((correctCzk * (1 - marze) * prodPct) / hourlyRate)
+        : 0;
+
+      if (correctCzk !== Number(item.estimated_czk) || correctHours !== Number(item.estimated_hours)) {
+        await supabaseClient.from("production_inbox").update({ estimated_hours: correctHours, estimated_czk: correctCzk }).eq("id", item.id);
         updated++;
       }
     }
