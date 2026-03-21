@@ -252,6 +252,19 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return () => setCurrentPage(null);
   }, [setCurrentPage]);
 
+  // One-time full production data reset
+  useEffect(() => {
+    async function fullReset() {
+      await supabase.from("production_schedule").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await supabase.from("production_inbox").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await supabase.from("production_daily_logs").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      qc.invalidateQueries({ queryKey: ["production-inbox"] });
+      console.log("Full production reset complete");
+    }
+    fullReset();
+  }, []);
+
 
   const [resetDataPreview, setResetDataPreview] = useState<any[] | null>(null);
   const [resetDataConfirmOpen, setResetDataConfirmOpen] = useState(false);
