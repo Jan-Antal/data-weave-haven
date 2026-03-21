@@ -132,10 +132,14 @@ function montazWeeks(count: number): number {
   return Math.ceil(count / 20);
 }
 
-function estimateHours(proj: any, tpvItems: any[], hourlyRate: number, vyrobaPct: number, eurRate: number) {
+function estimateHours(proj: any, tpvItems: any[], hourlyRate: number, vyrobaPct: number, eurRate: number, plannedItemCodes: Set<string>) {
   const marze = normalizeMarze(proj.marze);
   const active = tpvItems.filter((t) => t.status !== "Zrušeno");
-  const withPrice = active.filter((t) => t.cena && Number(t.cena) > 0);
+  const withPrice = active.filter((t) => t.cena && Number(t.cena) > 0 && !plannedItemCodes.has(t.item_name));
+  if (active.length > 0 && withPrice.length === 0) {
+    // All priced items are already planned
+    return { hours: 0, badge: "Vše naplánováno", base: "none" };
+  }
   if (withPrice.length > 0) {
     let tpvSum = withPrice.reduce((s, t) => s + Number(t.cena) * (Number(t.pocet) || 1), 0);
     if (proj.currency === "EUR") tpvSum = tpvSum * eurRate;
