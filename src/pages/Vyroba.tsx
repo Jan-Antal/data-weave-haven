@@ -1835,14 +1835,21 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               }}
               onTouchMove={(e: React.TouchEvent) => {
                 const el = e.currentTarget as HTMLElement;
+                if (el.dataset.swiping === "cancelled") return;
                 const startY = Number(el.dataset.swipeStartY);
                 const startX = Number(el.dataset.swipeStartX);
                 const dy = e.touches[0].clientY - startY;
                 const dx = Math.abs(e.touches[0].clientX - startX);
-                if (dy > 10 && dy > dx * 1.5) {
-                  el.dataset.swiping = "true";
-                  el.style.transform = `translateY(${Math.max(0, dy)}px)`;
+                const height = el.offsetHeight || 600;
+                const activationThreshold = height * 0.3;
+                if (dx > dy * 0.5 && dy < activationThreshold) {
+                  el.dataset.swiping = "cancelled";
+                  return;
                 }
+                if (dy < activationThreshold) return;
+                e.preventDefault();
+                el.dataset.swiping = "true";
+                el.style.transform = `translateY(${Math.max(0, dy)}px)`;
               }}
               onTouchEnd={(e: React.TouchEvent) => {
                 const el = e.currentTarget as HTMLElement;
@@ -1850,7 +1857,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 const startY = Number(el.dataset.swipeStartY);
                 const dy = e.changedTouches[0].clientY - startY;
                 el.style.transition = "transform 220ms ease";
-                if (dy > el.offsetHeight * 0.3) {
+                if (dy > (el.offsetHeight || 600) * 0.3) {
                   el.style.transform = `translateY(${el.offsetHeight}px)`;
                   setTimeout(() => setMobileVyrobaProjektOpen(false), 220);
                 } else {
