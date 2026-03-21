@@ -320,10 +320,10 @@ function TPVTabContent({ items, currency }: { items: any[]; currency: string }) 
           className="flex items-center gap-3 px-4 py-3"
           style={{ borderBottom: idx < items.length - 1 ? "0.5px solid hsl(var(--border))" : undefined }}
         >
-           <div className="min-w-0 flex-1">
-            <span className="text-[11px] font-mono text-muted-foreground block">{item.item_name}</span>
+           <div className="min-w-0 flex-1 flex items-baseline gap-1.5">
+            <span className="text-[12px] font-bold font-mono text-foreground shrink-0">{item.item_name}</span>
              {item.item_type && (
-               <span className="text-[13px] font-medium text-foreground block truncate">{item.item_type}</span>
+               <span className="text-[12px] text-muted-foreground truncate">{item.item_type}</span>
              )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
