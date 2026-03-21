@@ -761,6 +761,9 @@ export default function PlanVyroby() {
           })() : undefined}
           overbookedWeekCount={forecast.forecastActive ? forecast.overbookedWeeks.length : 0}
           onOverbookBadgeClick={() => setOverbookDialogOpen(true)}
+          isAdmin={isAdmin}
+          recalculating={recalculating}
+          onRecalculateHours={handleRecalculateHours}
         />
         )}
 
