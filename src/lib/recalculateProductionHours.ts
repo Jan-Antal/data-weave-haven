@@ -45,7 +45,7 @@ export async function recalculateProductionHours(
 
     for (const item of inboxItems || []) {
       const czk = Number(item.estimated_czk) || 0;
-      const hours = czk > 0 ? Math.max(1, Math.round((czk * (1 - marze) * prodPct) / hourlyRate)) : 8;
+      const hours = czk > 0 ? Math.round((czk * (1 - marze) * prodPct) / hourlyRate) : 0;
       if (hours !== Number(item.estimated_hours)) {
         await supabaseClient.from("production_inbox").update({ estimated_hours: hours }).eq("id", item.id);
         updated++;
@@ -60,7 +60,7 @@ export async function recalculateProductionHours(
 
     for (const item of schedItems || []) {
       const czk = Number(item.scheduled_czk) || 0;
-      const hours = czk > 0 ? Math.max(1, Math.round((czk * (1 - marze) * prodPct) / hourlyRate)) : 8;
+      const hours = czk > 0 ? Math.round((czk * (1 - marze) * prodPct) / hourlyRate) : 0;
       if (hours !== Number(item.scheduled_hours)) {
         await supabaseClient.from("production_schedule").update({ scheduled_hours: hours }).eq("id", item.id);
         updated++;
