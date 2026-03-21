@@ -38,3 +38,14 @@
 .read-the-docs {
   color: #888;
 }
+
+@keyframes slideInFromRight {
+  from { transform: translateX(60px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slideInFromLeft {
+  from { transform: translateX(-60px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.week-slide-from-right { animation: slideInFromRight 180ms ease-out; }
+.week-slide-from-left { animation: slideInFromLeft 180ms ease-out; }

@@ -303,6 +303,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   // Week navigation
   const [weekOffset, setWeekOffset] = useState(0);
+  const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null);
   const currentMonday = useMemo(() => addWeeks(getMonday(new Date()), weekOffset), [weekOffset]);
   const weekKey = weekKeyStr(currentMonday);
   const weekNum = getISOWeekNumber(currentMonday);
