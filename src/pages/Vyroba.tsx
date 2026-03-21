@@ -372,13 +372,13 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       }
     }
 
-    // Spilled: find each project's most recent past week with active items
-    const pastWeeks = Array.from(scheduleData.keys())
-      .filter(wk => new Date(wk).getTime() < currentMondayTime)
-      .sort((a, b) => b.localeCompare(a)); // newest first
-    for (const wk of pastWeeks) {
-      const ws = scheduleData.get(wk)!;
-      for (const b of ws.bundles) {
+    // Spilled: only show projects from the immediately preceding week (T-1)
+    const prevMonday = new Date(currentMonday);
+    prevMonday.setDate(prevMonday.getDate() - 7);
+    const prevWeekKey = prevMonday.toISOString().split("T")[0];
+    const prevSilo = scheduleData.get(prevWeekKey);
+    if (prevSilo) {
+      for (const b of prevSilo.bundles) {
         if (result.some((r) => r.projectId === b.project_id)) continue;
         const activeItems = b.items.filter((i) => i.status === "scheduled" || i.status === "in_progress");
         if (activeItems.length === 0) continue;
