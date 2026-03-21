@@ -1034,7 +1034,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   const sheetRefVyrobaProjekt = useRef<HTMLDivElement>(null);
   const dragRefDaylog = useRef({ startY: 0, currentY: 0, dragging: false });
   const sheetRefDaylog = useRef<HTMLDivElement>(null);
-  const weekDragRef = useRef({ startX: 0, isDragging: false, currentX: 0 });
+  
 
   function handleVyrobaProjektTouchStart(e: React.TouchEvent) {
     dragRefVyrobaProjekt.current = { startY: e.touches[0].clientY, currentY: e.touches[0].clientY, dragging: true };
