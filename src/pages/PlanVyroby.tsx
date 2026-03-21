@@ -1158,6 +1158,19 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
         </button>
       </div>
 
+      {/* Recalculate hours — admin only */}
+      {isAdmin && !forecastActive && (
+        <button
+          onClick={onRecalculateHours}
+          disabled={recalculating}
+          className="inline-flex items-center gap-1 px-2.5 py-1 h-8 text-[12px] font-medium rounded-md border transition-colors hover:bg-muted disabled:opacity-50"
+          style={{ borderColor: "hsl(var(--border))", color: "hsl(var(--foreground))" }}
+        >
+          {recalculating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span>⟳</span>}
+          Přepočítat hodiny
+        </button>
+      )}
+
       {/* Forecast plan mode toggle + Reset */}
       {forecastActive && (
         <div className="flex items-center gap-1.5">
