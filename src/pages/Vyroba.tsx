@@ -1511,6 +1511,15 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             </span>
             <div className="flex-1" />
             <div className="relative flex items-center gap-1" ref={weekPickerRef}>
+              {weekOffset !== 0 && (
+                <button
+                  onClick={() => setWeekOffset(0)}
+                  className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors mr-1"
+                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", fontSize: 11 }}
+                >
+                  Dnes
+                </button>
+              )}
               <button
                 onClick={() => setWeekOffset((w) => w - 1)}
                 className="p-1 rounded hover:bg-muted transition-colors"
@@ -1533,15 +1542,6 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               >
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
-              {weekOffset !== 0 && (
-                <button
-                  onClick={() => setWeekOffset(0)}
-                  className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors"
-                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", fontSize: 11 }}
-                >
-                  Dnes
-                </button>
-              )}
               {weekPickerOpen && (
                 <WeekPickerPopup
                   currentWeekOffset={weekOffset}
