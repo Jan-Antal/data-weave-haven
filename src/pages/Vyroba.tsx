@@ -253,6 +253,841 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   }, [setCurrentPage]);
 
 
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [userMgmtOpen, setUserMgmtOpen] = useState(false);
+  const [exchangeRateOpen, setExchangeRateOpen] = useState(false);
+  const [statusMgmtOpen, setStatusMgmtOpen] = useState(false);
+  const [recycleBinOpen, setRecycleBinOpen] = useState(false);
+  const [costPresetsOpen, setCostPresetsOpen] = useState(false);
+  const [dataLogOpen, setDataLogOpen] = useState(() => {
+    try {
+      return localStorage.getItem("datalog-panel-vyroba") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const toggleDataLog = useCallback(() => {
+    setDataLogOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("datalog-panel-vyroba", String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+  const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
+
+  // Owner/Admin/Tester guard
+  const isTester = role === "tester";
+  useEffect(() => {
+    if (!loading && !isOwner && !isAdmin && !isTester) navigate("/", { replace: true });
+  }, [loading, isOwner, isAdmin, isTester, navigate]);
+
+  // Close all overlays when mobile bottom nav changes module
+  useEffect(() => {
+    const handler = () => {
+      setMobileVyrobaProjektOpen(false);
+      setMobileDaylogOpen(false);
+      setNoProductionOpen(false);
+      setDetailDialogOpen(false);
+      setDataLogOpen(false);
+      setCtxMenu(null);
+      setWeekPickerOpen(false);
+    };
+    window.addEventListener("mobile-nav-change", handler);
+    return () => window.removeEventListener("mobile-nav-change", handler);
+  }, []);
+
+  // Week navigation
+  const [weekOffset, setWeekOffset] = useState(0);
+  const currentMonday = useMemo(() => addWeeks(getMonday(new Date()), weekOffset), [weekOffset]);
+  const weekKey = weekKeyStr(currentMonday);
+  const weekNum = getISOWeekNumber(currentMonday);
+  const friday = useMemo(() => {
+    const f = new Date(currentMonday);
+    f.setDate(f.getDate() + 4);
+    return f;
+  }, [currentMonday]);
+
+  // Data
+  const { data: scheduleData } = useProductionSchedule();
+  const { data: dailyLogsMap } = useProductionDailyLogs(weekKey);
+
+  // Fetch latest daily log per project across ALL weeks (for spilled projects)
+  const { data: allLatestLogs } = useQuery({
+    queryKey: ["production-daily-logs-latest-all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("production_daily_logs" as any)
+        .select("*")
+        .order("logged_at", { ascending: false });
+      if (error) throw error;
+      // Group by bundle_id prefix (project_id) — bundle_id format is "projectId::weekKey"
+      const latestByProject = new Map<string, DailyLog>();
+      for (const row of (data || []) as any[]) {
+        const log = row as DailyLog;
+        const pid = log.bundle_id.split("::")[0];
+        if (!latestByProject.has(pid)) {
+          latestByProject.set(pid, log);
+        }
+      }
+      return latestByProject;
+    },
+  });
+
+  // Build projects from schedule for this week + spilled from previous weeks
+  const projects = useMemo<VyrobaProject[]>(() => {
+    if (!scheduleData) return [];
+    const result: VyrobaProject[] = [];
+    const currentMondayTime = currentMonday.getTime();
+
+    // Current week bundles
+    const silo = scheduleData.get(weekKey);
+    if (silo) {
+      for (const b of silo.bundles) {
+        const isPaused = b.items.every((i) => i.status === "paused");
+        if (
+          b.items.some(
+            (i) =>
+              i.status === "scheduled" ||
+              i.status === "in_progress" ||
+              i.status === "paused" ||
+              i.status === "completed",
+          )
+        ) {
+          result.push({
+            projectId: b.project_id,
+            projectName: b.project_name,
+            totalHours: b.total_hours,
+            scheduleItems: b.items,
+            color: getProjectColor(b.project_id),
+            isSpilled: false,
+            isPaused,
+            pauseReason: isPaused ? b.items[0]?.pause_reason : null,
+            pauseExpectedDate: isPaused ? b.items[0]?.pause_expected_date : null,
+          });
+        }
+      }
+    }
+
+    // Spilled: find each project's most recent past week with active items
+    const pastWeeks = Array.from(scheduleData.keys())
+      .filter(wk => new Date(wk).getTime() < currentMondayTime)
+      .sort((a, b) => b.localeCompare(a)); // newest first
+    for (const wk of pastWeeks) {
+      const ws = scheduleData.get(wk)!;
+      for (const b of ws.bundles) {
+        if (result.some((r) => r.projectId === b.project_id)) continue;
+        const activeItems = b.items.filter((i) => i.status === "scheduled" || i.status === "in_progress");
+        if (activeItems.length === 0) continue;
+        result.push({
+          projectId: b.project_id,
+          projectName: b.project_name,
+          totalHours: activeItems.reduce((s, i) => s + i.scheduled_hours, 0),
+          scheduleItems: activeItems,
+          color: getProjectColor(b.project_id),
+          isSpilled: true,
+        });
+      }
+    }
+
+    // Sort: spilled first, paused last
+    result.sort((a, b) => {
+      if (a.isPaused && !b.isPaused) return 1;
+      if (!a.isPaused && b.isPaused) return -1;
+      return (b.isSpilled ? 1 : 0) - (a.isSpilled ? 1 : 0);
+    });
+    return result;
+  }, [scheduleData, weekKey, currentMonday]);
+
+  // Fetch project details for deadlines/PM
+  const { data: projectDetails } = useProjectDetails(projects.map((p) => p.projectId));
+
+  // Merge project details
+  const enrichedProjects = useMemo<VyrobaProject[]>(() => {
+    if (!projectDetails) return projects;
+    return projects.map((p) => {
+      const detail = projectDetails.get(p.projectId);
+      if (!detail) return p;
+      const deadlineSrc = detail.expedice || detail.datum_smluvni || null;
+      const deadlineDate = deadlineSrc ? parseAppDate(deadlineSrc) : null;
+      return { ...p, pm: detail.pm, expedice: detail.expedice, deadline: deadlineDate, projectStatus: detail.status };
+    });
+  }, [projects, projectDetails]);
+
+  // Capacity for this week
+  const weekCapacity = useMemo(() => {
+    if (!scheduleData) return { used: 0, total: 760 };
+    const silo = scheduleData.get(weekKey);
+    const used = silo
+      ? silo.bundles.reduce((s, b) => {
+          // Don't count paused items
+          const activeHours = b.items
+            .filter((i) => i.status !== "paused" && i.status !== "cancelled")
+            .reduce((h, i) => h + i.scheduled_hours, 0);
+          return s + activeHours;
+        }, 0)
+      : 0;
+    return { used, total: 760 };
+  }, [scheduleData, weekKey]);
+
+  const capacityPct = weekCapacity.total > 0 ? Math.round((weekCapacity.used / weekCapacity.total) * 100) : 0;
+  const capacityColor = capacityPct > 100 ? "#dc2626" : capacityPct > 85 ? "#d97706" : "#3a8a36";
+
+  // Today info
+  const todayDayIndex = useMemo(() => {
+    const now = new Date();
+    const todayMonday = getMonday(now);
+    if (weekKeyStr(todayMonday) !== weekKey) return -1;
+    return (now.getDay() + 6) % 7;
+  }, [weekKey]);
+
+  // Selection
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [mobileVyrobaProjektOpen, setMobileVyrobaProjektOpen] = useState(false);
+  const selectedProject = enrichedProjects.find((p) => p.projectId === selectedProjectId) || null;
+
+  // Week picker
+  const [weekPickerOpen, setWeekPickerOpen] = useState(false);
+  const weekPickerRef = useRef<HTMLDivElement>(null);
+
+  // Context menu state
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; projectId: string } | null>(null);
+
+  // Project detail dialog
+  const [detailProject, setDetailProject] = useState<any | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+
+  // Close overlays on mobile nav change
+  useEffect(() => {
+    const handler = () => {
+      setDataLogOpen(false);
+      setMobileVyrobaProjektOpen(false);
+      setDetailDialogOpen(false);
+      setDetailProject(null);
+    };
+    window.addEventListener("mobile-nav-change", handler);
+    return () => window.removeEventListener("mobile-nav-change", handler);
+  }, []);
+
+  // Pause dialog
+  const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
+  const [pauseTarget, setPauseTarget] = useState<{ id: string; name: string; code?: string | null }>({
+    id: "",
+    name: "",
+  });
+
+  // Return from expedice confirm
+  const [returnExpediceConfirm, setReturnExpediceConfirm] = useState<string | null>(null);
+
+  // Dýha dismissal per project
+  const [dyhaDismissed, setDyhaDismissed] = useState<Set<string>>(new Set());
+
+  // Auto-select first
+  useEffect(() => {
+    if (enrichedProjects.length > 0 && !enrichedProjects.find((p) => p.projectId === selectedProjectId)) {
+      setSelectedProjectId(enrichedProjects[0].projectId);
+    }
+  }, [enrichedProjects, selectedProjectId]);
+
+  // Handle openProjectId from DataLog navigation
+  const openProjectIdHandled = useRef(false);
+  useEffect(() => {
+    if (openProjectIdFromState && !openProjectIdHandled.current && enrichedProjects.length > 0) {
+      openProjectIdHandled.current = true;
+      setSelectedProjectId(openProjectIdFromState);
+      if (isMobile) {
+        setMobileVyrobaProjektOpen(true);
+      }
+      window.history.replaceState({}, "");
+    }
+  }, [openProjectIdFromState, enrichedProjects, isMobile]);
+
+  // Log modal
+  const [mobileDaylogOpen, setMobileDaylogOpen] = useState(false);
+  const [logDayIndex, setLogDayIndex] = useState(-1);
+  const [logPhase, setLogPhase] = useState("Řezání");
+  const [logPercent, setLogPercent] = useState(0);
+  const [logNotes, setLogNotes] = useState("");
+  const logNotesUndoStack = useRef<string[]>([]);
+  const [hotovostTouched, setHotovostTouched] = useState(false);
+  const [logPhaseWarning, setLogPhaseWarning] = useState<string | null>(null);
+  const [noProductionOpen, setNoProductionOpen] = useState(false);
+  const [noProductionReason, setNoProductionReason] = useState("dovolenka");
+
+  // Expedice confirmation dialog
+  const [expediceDialogOpen, setExpediceDialogOpen] = useState(false);
+
+  // Spill dialog
+  const [spillDialogOpen, setSpillDialogOpen] = useState(false);
+  const [spillSelected, setSpillSelected] = useState<Set<string>>(new Set());
+  const [spillFullHours, setSpillFullHours] = useState<Set<string>>(new Set());
+
+  // Items expand
+  const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
+
+  /* ── helpers for a project ── */
+  const bundleId = (pid: string) => `${pid}::${weekKey}`;
+
+  function getLogsForProject(pid: string): DailyLog[] {
+    return dailyLogsMap?.get(bundleId(pid)) || [];
+  }
+
+  function getLatestPercent(pid: string): number {
+    const logs = getLogsForProject(pid);
+    if (logs.length > 0) return Math.max(...logs.map((l) => l.percent));
+    // Fallback: check all-weeks latest log (for spilled projects)
+    const allLog = allLatestLogs?.get(pid);
+    if (allLog) return allLog.percent;
+    return 0;
+  }
+
+  function getLatestPhase(pid: string): string | null {
+    const logs = getLogsForProject(pid);
+    if (logs.length > 0) {
+      const sorted = [...logs].sort((a, b) => b.day_index - a.day_index);
+      return sorted[0].phase;
+    }
+    // Fallback: check all-weeks latest log (for spilled projects)
+    const allLog = allLatestLogs?.get(pid);
+    if (allLog) return allLog.phase;
+    return null;
+  }
+
+  function getCumulativeForDay(pid: string, dayIndex: number): CumulativeInfo | null {
+    const logs = getLogsForProject(pid);
+    const exact = logs.find((l) => l.day_index === dayIndex);
+    if (exact) return { percent: exact.percent, phase: exact.phase, isCarryForward: false, hasLog: true };
+    const prev = logs.filter((l) => l.day_index < dayIndex).sort((a, b) => b.day_index - a.day_index);
+    if (prev.length > 0) return { percent: prev[0].percent, phase: prev[0].phase, isCarryForward: true, hasLog: false };
+    return null;
+  }
+
+  // Get ALL items for a project across ALL weeks (non-cancelled)
+  function getAllItemsForProject(pid: string): { item: ScheduleItem; weekKey: string; weekNum: number }[] {
+    if (!scheduleData) return [];
+    const items: { item: ScheduleItem; weekKey: string; weekNum: number }[] = [];
+    const seen = new Set<string>();
+    for (const [wk, silo] of scheduleData) {
+      for (const bundle of silo.bundles) {
+        if (bundle.project_id !== pid) continue;
+        for (const item of bundle.items) {
+          if (item.status === "cancelled") continue;
+          const dedupeKey = `${wk}::${item.id}`;
+          if (seen.has(dedupeKey)) continue;
+          seen.add(dedupeKey);
+          items.push({ item, weekKey: wk, weekNum: silo.week_number });
+        }
+      }
+    }
+    return items;
+  }
+
+  // ── BUNDLE PROGRESS: prefer latest daily log percent, fallback to completed hours ──
+  function getBundleProgress(pid: string): { totalHours: number; completedHours: number; bundleProgress: number } {
+    const allItems = getAllItemsForProject(pid);
+    const totalHours = allItems.reduce((s, e) => s + e.item.scheduled_hours, 0);
+    const completedHours = allItems
+      .filter((e) => e.item.status === "completed")
+      .reduce((s, e) => s + e.item.scheduled_hours, 0);
+
+    // Check daily logs for the latest percent — this reflects actual logged progress
+    const latestLogPct = getLatestPercent(pid);
+
+    // Spilled projects use carried-forward log % as their starting progress
+    const project = enrichedProjects.find(p => p.projectId === pid);
+    if (project?.isSpilled) {
+      return { totalHours, completedHours: 0, bundleProgress: latestLogPct };
+    }
+
+    const completionPct = totalHours > 0 ? Math.round((completedHours / totalHours) * 100) : 0;
+    // Use whichever is higher: logged progress or completion-based progress
+    const bundleProgress = Math.max(latestLogPct, completionPct);
+    return { totalHours, completedHours, bundleProgress };
+  }
+
+  // ── WEEKLY GOAL: this week's hours / total hours across all weeks ──
+  function getWeeklyGoal(pid: string): number {
+    const projectForGoal = enrichedProjects.find(p => p.projectId === pid);
+    if (projectForGoal?.isSpilled) return 100;
+    if (!scheduleData) return 100;
+    let thisWeekHours = 0;
+    let totalHours = 0;
+    for (const [wk, silo] of scheduleData) {
+      for (const bundle of silo.bundles) {
+        if (bundle.project_id !== pid) continue;
+        const activeHours = bundle.items
+          .filter((i: ScheduleItem) => i.status !== "cancelled")
+          .reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0);
+        totalHours += activeHours;
+        if (wk === weekKey) thisWeekHours += activeHours;
+      }
+    }
+    if (totalHours <= 0) return 100;
+    return Math.round((thisWeekHours / totalHours) * 100);
+  }
+
+  // ── Check if weekly goal is met (this week's completed hours >= this week's total hours) ──
+  function isWeeklyGoalMet(pid: string): boolean {
+    if (!scheduleData) return false;
+    const silo = scheduleData.get(weekKey);
+    if (!silo) return false;
+    const bundle = silo.bundles.find((b) => b.project_id === pid);
+    if (!bundle) return false;
+    const activeItems = bundle.items.filter((i) => i.status !== "cancelled");
+    const thisWeekHours = activeItems.reduce((s, i) => s + i.scheduled_hours, 0);
+    const thisWeekCompleted = activeItems
+      .filter((i) => i.status === "completed")
+      .reduce((s, i) => s + i.scheduled_hours, 0);
+    return thisWeekHours > 0 && thisWeekCompleted >= thisWeekHours;
+  }
+
+  // ── Check if ALL parts of an item_code are completed across ALL weeks ──
+  function areAllPartsCompleted(pid: string, itemCode: string | null, itemName: string): boolean {
+    if (!scheduleData) return false;
+    const allItems = getAllItemsForProject(pid);
+    const stripSuffix = (n: string) => n.replace(/\s*\(\d+\/\d+\)$/, "").trim();
+    const matching = allItems.filter((e) => {
+      if (itemCode && e.item.item_code === itemCode) return true;
+      if (!itemCode && stripSuffix(e.item.item_name) === stripSuffix(itemName)) return true;
+      return false;
+    });
+    if (matching.length === 0) return false;
+    return matching.every((e) => e.item.status === "completed");
+  }
+
+  // ── Get incomplete parts info for an item_code across ALL weeks ──
+  function getIncompletePartsInfo(
+    pid: string,
+    itemCode: string | null,
+    itemName: string,
+  ): { incomplete: number; total: number; weekNums: number[] } {
+    if (!scheduleData) return { incomplete: 0, total: 0, weekNums: [] };
+    const allItems = getAllItemsForProject(pid);
+    const stripSuffix = (n: string) => n.replace(/\s*\(\d+\/\d+\)$/, "").trim();
+    const matching = allItems.filter((e) => {
+      if (itemCode && e.item.item_code === itemCode) return true;
+      if (!itemCode && stripSuffix(e.item.item_name) === stripSuffix(itemName)) return true;
+      return false;
+    });
+    const incomplete = matching.filter((e) => e.item.status !== "completed");
+    const weekNums = [...new Set(incomplete.map((e) => e.weekNum))];
+    return { incomplete: incomplete.length, total: matching.length, weekNums };
+  }
+
+  function getExpectedPct(_dayIndex: number, weeklyGoal: number = 100): number {
+    const today = new Date();
+    const dow = today.getDay(); // 0=Sun..6=Sat
+    const workingDaysElapsed = dow === 0 || dow === 6 ? 5 : dow; // weekend → treat as Friday
+    return Math.round(weeklyGoal * (workingDaysElapsed / 5));
+  }
+
+  function getProjectStatus(pid: string): "on-track" | "at-risk" | "behind" {
+    // Spilled projects are always "behind" regardless of current progress
+    const statusProject = enrichedProjects.find(p => p.projectId === pid);
+    if (statusProject?.isSpilled) return "behind";
+    const { bundleProgress } = getBundleProgress(pid);
+    const goal = getWeeklyGoal(pid);
+    if (bundleProgress >= goal) return "on-track";
+    if (todayDayIndex < 0) {
+      const realWeekKey = weekKeyStr(getMonday(new Date()));
+      let hasDelayed = false;
+      if (scheduleData) {
+        for (const [wk, silo] of scheduleData) {
+          if (wk >= realWeekKey) continue;
+          if (silo.bundles.some(b => b.project_id === pid && b.items.some(i => i.status === "scheduled" || i.status === "in_progress"))) {
+            hasDelayed = true;
+            break;
+          }
+        }
+      }
+      return hasDelayed ? "behind" : "on-track";
+    }
+    const expected = getExpectedPct(todayDayIndex, goal);
+    if (bundleProgress >= expected - 10) return "on-track";
+    if (bundleProgress >= expected - 25) return "at-risk";
+    return "behind";
+  }
+
+  /* ── Stats ── */
+  const stats = useMemo(() => {
+    const activeProjects = enrichedProjects.filter((p) => !p.isPaused);
+    const total = activeProjects.length;
+    const avgPct =
+      total > 0
+        ? Math.round(activeProjects.reduce((s, p) => s + getBundleProgress(p.projectId).bundleProgress, 0) / total)
+        : 0;
+    const onTrack = activeProjects.filter((p) => getProjectStatus(p.projectId) === "on-track").length;
+    const behind = activeProjects.filter((p) => getProjectStatus(p.projectId) === "behind").length;
+    const todayLogged =
+      todayDayIndex >= 0
+        ? activeProjects.filter((p) => getLogsForProject(p.projectId).some((l) => l.day_index === todayDayIndex)).length
+        : 0;
+    return { total, avgPct, onTrack, behind, todayLogged };
+  }, [enrichedProjects, dailyLogsMap, todayDayIndex, scheduleData]);
+
+  /* ── Log modal ── */
+  function openLogModal(dayIdx?: number) {
+    if (!selectedProject) return;
+    const di = dayIdx ?? todayDayIndex;
+    setLogDayIndex(di);
+    setLogPhaseWarning(null);
+    setHotovostTouched(false);
+    logNotesUndoStack.current = [];
+
+    // Load log data specifically for the clicked day
+    const logs = getLogsForProject(selectedProject.projectId);
+    const existingLog = logs.find((l) => l.day_index === di);
+
+    if (existingLog) {
+      // Day has an existing log — populate from it
+      setLogPhase(existingLog.phase || "Řezání");
+      setLogPercent(existingLog.percent);
+      setLogNotes(existingLog.note_text || "");
+    } else {
+      // No log for this day — find most recent previous day's log
+      const previousLogs = logs.filter((l) => l.day_index < di).sort((a, b) => b.day_index - a.day_index);
+      const prevLog = previousLogs[0];
+      if (prevLog) {
+        // Pre-fill from previous day's values as starting point
+        setLogPhase(prevLog.phase || "Řezání");
+        setLogPercent(prevLog.percent);
+      } else {
+        // No previous logs at all — use current bundle progress
+        setLogPhase("Řezání");
+        setLogPercent(getLatestPercent(selectedProject.projectId));
+      }
+      setLogNotes("");
+    }
+
+    setMobileDaylogOpen(true);
+  }
+
+  async function handleSaveLog() {
+    if (!selectedProject || logDayIndex < 0) return;
+    try {
+      // Push undo for log note + phase change
+      const existingLogs = getLogsForProject(selectedProject.projectId);
+      const existingLog = existingLogs.find((l) => l.day_index === logDayIndex);
+      const prevPhase = getLatestPhase(selectedProject.projectId) || "Řezání";
+      const prevPercent = getLatestPercent(selectedProject.projectId);
+      const bId = bundleId(selectedProject.projectId);
+      const capturedDay = logDayIndex;
+      const capturedPhase = logPhase;
+      const capturedPct = logPercent;
+      const capturedNotes = logNotes || null;
+      pushUndo({
+        page: "vyroba",
+        actionType: "phase_change",
+        description: "změna fáze/logu",
+        undo: async () => {
+          if (existingLog) {
+            await saveDailyLog(
+              bId,
+              weekKey,
+              capturedDay,
+              existingLog.phase || prevPhase,
+              existingLog.percent,
+              existingLog.note_text || null,
+            );
+          } else {
+            await (supabase.from("production_daily_logs") as any)
+              .delete()
+              .eq("bundle_id", bId)
+              .eq("day_index", capturedDay)
+              .eq("week_key", weekKey);
+          }
+          qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
+        },
+        redo: async () => {
+          await saveDailyLog(bId, weekKey, capturedDay, capturedPhase, capturedPct, capturedNotes);
+          qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
+        },
+      });
+
+      await saveDailyLog(bId, weekKey, logDayIndex, logPhase, logPercent, logNotes || null);
+      qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
+
+      // Log "Nad plán" activity if over weekly goal
+      const wGoal = getWeeklyGoal(selectedProject.projectId);
+      if (logPercent > wGoal) {
+        const {
+          data: { user: logUser },
+        } = await supabase.auth.getUser();
+        if (logUser) {
+          await supabase.from("data_log").insert({
+            project_id: selectedProject.projectId,
+            user_id: logUser.id,
+            action_type: "log_nad_plan",
+            detail: `Nad plán: ${logPercent}% (cíl byl ${wGoal}%)`,
+          });
+        }
+      }
+
+      // Log vyroba_log_saved
+      logActivity({
+        projectId: selectedProject.projectId,
+        actionType: "vyroba_log_saved",
+        newValue: `${logPercent}%`,
+        detail: logPhase || "",
+      });
+
+      // Log phase_changed if phase changed
+      const prevPhaseVal = getLatestPhase(selectedProject.projectId) || "Řezání";
+      if (logPhase !== prevPhaseVal) {
+        logActivity({
+          projectId: selectedProject.projectId,
+          actionType: "phase_changed",
+          oldValue: prevPhaseVal,
+          newValue: logPhase,
+          detail: `${logPercent}%`,
+        });
+      }
+
+      setMobileDaylogOpen(false);
+    } catch (err: any) {
+      toast.error(`Chyba při ukládání logu: ${err?.message || "neznámá chyba"}`);
+    }
+  }
+
+  /* ── Spill dialog ── */
+  const nextWeekKey = weekKeyStr(addWeeks(currentMonday, 1));
+  const nextWeekNum = getISOWeekNumber(addWeeks(currentMonday, 1));
+
+  function openSpillDialog() {
+    if (!selectedProject) return;
+    const pct = getLatestPercent(selectedProject.projectId);
+    const doneIds = new Set(selectedProject.scheduleItems.filter((i) => i.status === "completed").map((i) => i.id));
+    const selected = new Set(
+      selectedProject.scheduleItems
+        .filter((i) => i.status !== "cancelled" && !doneIds.has(i.id) && getRemainingHours(i, pct) > 0)
+        .map((i) => i.id),
+    );
+    setSpillSelected(selected);
+    setSpillFullHours(new Set());
+    setSpillDialogOpen(true);
+  }
+
+  function getRemainingHours(item: ScheduleItem, progressPct: number): number {
+    return Math.round(item.scheduled_hours * (1 - progressPct / 100));
+  }
+
+  async function handleSpillConfirm() {
+    if (!selectedProject || spillSelected.size === 0) {
+      toast.error("Vyberte alespoň jednu položku");
+      return;
+    }
+    const ids = Array.from(spillSelected);
+    const pct = getLatestPercent(selectedProject.projectId);
+
+    const itemsToMove = selectedProject.scheduleItems.filter((i) => ids.includes(i.id));
+    const prevWeeks = itemsToMove.map((i) => ({ id: i.id, prevWeek: i.scheduled_week }));
+    let movedCount = 0;
+
+    for (const item of itemsToMove) {
+      const { error } = await supabase
+        .from("production_schedule")
+        .update({ scheduled_week: nextWeekKey })
+        .eq("id", item.id);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      movedCount++;
+    }
+
+    pushUndo({
+      page: "vyroba",
+      actionType: "move_items",
+      description: `přesun ${movedCount} položek do T${nextWeekNum}`,
+      undo: async () => {
+        for (const pw of prevWeeks) {
+          await supabase
+            .from("production_schedule")
+            .update({ scheduled_week: pw.prevWeek })
+            .eq("id", pw.id);
+        }
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      },
+      redo: async () => {
+        for (const pw of prevWeeks) {
+          await supabase
+            .from("production_schedule")
+            .update({ scheduled_week: nextWeekKey })
+            .eq("id", pw.id);
+        }
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      },
+    });
+
+    qc.invalidateQueries({ queryKey: ["production-schedule"] });
+    toast.success(`⇒ ${movedCount} položek přesunuto do T${nextWeekNum}`, { duration: 2000 });
+    if (selectedProject) {
+      logActivity({
+        projectId: selectedProject.projectId,
+        actionType: "item_moved_next_week",
+        newValue: `T${nextWeekNum}`,
+        detail: `${movedCount} položek`,
+      });
+    }
+    setSpillDialogOpen(false);
+  }
+
+  /* ── Expedice confirmation flow ── */
+  function openExpediceDialog() {
+    setExpediceDialogOpen(true);
+  }
+
+  async function handleConfirmExpedice() {
+    if (!selectedProject) return;
+    const allItems = selectedProject.scheduleItems;
+    const prevStatus = selectedProject.projectStatus || "Ve výrobě";
+    const snapshots = allItems.map((i) => ({ id: i.id, prevStatus: i.status }));
+    const pid = selectedProject.projectId;
+    const pName = selectedProject.projectName;
+    pushUndo({
+      page: "vyroba",
+      actionType: "expedice",
+      description: `${pName} → Expedice`,
+      undo: async () => {
+        await supabase.from("projects").update({ status: prevStatus }).eq("project_id", pid);
+        for (const snap of snapshots) {
+          await supabase
+            .from("production_schedule")
+            .update({ status: snap.prevStatus, completed_at: null, completed_by: null })
+            .eq("id", snap.id);
+        }
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        qc.invalidateQueries({ queryKey: ["projects"] });
+        qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
+      },
+      redo: async () => {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        const ids = snapshots
+          .filter((s) => s.prevStatus !== "completed" && s.prevStatus !== "cancelled")
+          .map((s) => s.id);
+        if (ids.length > 0) {
+          await supabase
+            .from("production_schedule")
+            .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null })
+            .in("id", ids);
+        }
+        await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", pid);
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        qc.invalidateQueries({ queryKey: ["projects"] });
+        qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
+      },
+    });
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const activeItems = selectedProject.scheduleItems.filter(
+      (i) => i.status !== "completed" && i.status !== "cancelled",
+    );
+    if (activeItems.length > 0) {
+      const ids = activeItems.map((i) => i.id);
+      await supabase
+        .from("production_schedule")
+        .update({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          completed_by: user?.id || null,
+        })
+        .in("id", ids);
+    }
+    await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", pid);
+    qc.invalidateQueries({ queryKey: ["production-schedule"] });
+    qc.invalidateQueries({ queryKey: ["projects"] });
+    qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
+    qc.invalidateQueries({ queryKey: ["production-statuses", pid] });
+    toast.success(`✓ ${pName} odoslaný do Expedice`, { duration: 4000 });
+    logActivity({ projectId: pid, actionType: "item_expedice", detail: "Odesláno do Expedice" });
+    setExpediceDialogOpen(false);
+  }
+
+  /* ── Toggle single item complete ── */
+  async function toggleItemComplete(itemId: string, currentStatus: string) {
+    const newStatus = currentStatus === "completed" ? "scheduled" : "completed";
+    pushUndo({
+      page: "vyroba",
+      actionType: "item_hotovo",
+      description: newStatus === "completed" ? "označení jako hotovo" : "vrácení položky",
+      undo: async () => {
+        if (currentStatus === "completed") {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          await supabase
+            .from("production_schedule")
+            .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null })
+            .eq("id", itemId);
+        } else {
+          await supabase
+            .from("production_schedule")
+            .update({ status: currentStatus, completed_at: null, completed_by: null })
+            .eq("id", itemId);
+        }
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      },
+      redo: async () => {
+        if (newStatus === "completed") {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          await supabase
+            .from("production_schedule")
+            .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null })
+            .eq("id", itemId);
+        } else {
+          await supabase
+            .from("production_schedule")
+            .update({ status: "scheduled", completed_at: null, completed_by: null })
+            .eq("id", itemId);
+        }
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      },
+    });
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (currentStatus === "completed") {
+      await supabase
+        .from("production_schedule")
+        .update({ status: "scheduled", completed_at: null, completed_by: null })
+        .eq("id", itemId);
+    } else {
+      await supabase
+        .from("production_schedule")
+        .update({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          completed_by: user?.id || null,
+        })
+        .eq("id", itemId);
+    }
+    qc.invalidateQueries({ queryKey: ["production-schedule"] });
+    // Log item hotovo
+    if (newStatus === "completed" && selectedProject) {
+      const item = selectedProject.scheduleItems.find((i) => i.id === itemId);
+      logActivity({
+        projectId: selectedProject.projectId,
+        actionType: "item_hotovo",
+        newValue: item?.item_code || item?.item_name || itemId,
+        detail: "Označeno jako hotovo",
+      });
+    }
+  }
+
+  // Ref-based swipe-to-dismiss for mobile bottom sheets (vertical only)
+  const dragRefVyrobaProjekt = useRef({ startY: 0, currentY: 0, dragging: false });
+  const sheetRefVyrobaProjekt = useRef<HTMLDivElement>(null);
+  const dragRefDaylog = useRef({ startY: 0, currentY: 0, dragging: false });
+  const sheetRefDaylog = useRef<HTMLDivElement>(null);
+  
+
   function handleVyrobaProjektTouchStart(e: React.TouchEvent) {
     dragRefVyrobaProjekt.current = { startY: e.touches[0].clientY, currentY: e.touches[0].clientY, dragging: true };
   }
