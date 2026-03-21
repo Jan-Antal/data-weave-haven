@@ -644,7 +644,20 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     const { bundleProgress } = getBundleProgress(pid);
     const goal = getWeeklyGoal(pid);
     if (bundleProgress >= goal) return "on-track";
-    if (todayDayIndex < 0) return "on-track";
+    if (todayDayIndex < 0) {
+      const realWeekKey = weekKeyStr(getMonday(new Date()));
+      let hasDelayed = false;
+      if (scheduleData) {
+        for (const [wk, silo] of scheduleData) {
+          if (wk >= realWeekKey) continue;
+          if (silo.bundles.some(b => b.project_id === pid && b.items.some(i => i.status === "scheduled" || i.status === "in_progress"))) {
+            hasDelayed = true;
+            break;
+          }
+        }
+      }
+      return hasDelayed ? "behind" : "on-track";
+    }
     const expected = getExpectedPct(todayDayIndex, goal);
     if (bundleProgress >= expected - 10) return "on-track";
     if (bundleProgress >= expected - 25) return "at-risk";
