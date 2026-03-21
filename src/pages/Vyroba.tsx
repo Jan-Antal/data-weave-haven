@@ -560,6 +560,13 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
     // Check daily logs for the latest percent — this reflects actual logged progress
     const latestLogPct = getLatestPercent(pid);
+
+    // Spilled projects use carried-forward log % as their starting progress
+    const project = enrichedProjects.find(p => p.projectId === pid);
+    if (project?.isSpilled) {
+      return { totalHours, completedHours: 0, bundleProgress: latestLogPct };
+    }
+
     const completionPct = totalHours > 0 ? Math.round((completedHours / totalHours) * 100) : 0;
     // Use whichever is higher: logged progress or completion-based progress
     const bundleProgress = Math.max(latestLogPct, completionPct);
@@ -568,6 +575,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   // ── WEEKLY GOAL: this week's hours / total hours across all weeks ──
   function getWeeklyGoal(pid: string): number {
+    const projectForGoal = enrichedProjects.find(p => p.projectId === pid);
+    if (projectForGoal?.isSpilled) return 100;
     if (!scheduleData) return 100;
     let thisWeekHours = 0;
     let totalHours = 0;
