@@ -104,6 +104,38 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
         side="bottom"
         className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col"
         onPointerDownOutside={(e) => { e.preventDefault(); onOpenChange(false); }}
+        onTouchStart={(e: React.TouchEvent) => {
+          const el = e.currentTarget as HTMLElement;
+          el.dataset.swipeStartY = String(e.touches[0].clientY);
+          el.dataset.swipeStartX = String(e.touches[0].clientX);
+          el.dataset.swiping = "false";
+          el.style.transition = "none";
+        }}
+        onTouchMove={(e: React.TouchEvent) => {
+          const el = e.currentTarget as HTMLElement;
+          const startY = Number(el.dataset.swipeStartY);
+          const startX = Number(el.dataset.swipeStartX);
+          const dy = e.touches[0].clientY - startY;
+          const dx = Math.abs(e.touches[0].clientX - startX);
+          if (dy > 10 && dy > dx * 1.5) {
+            el.dataset.swiping = "true";
+            el.style.transform = `translateY(${Math.max(0, dy)}px)`;
+          }
+        }}
+        onTouchEnd={(e: React.TouchEvent) => {
+          const el = e.currentTarget as HTMLElement;
+          if (el.dataset.swiping !== "true") return;
+          const startY = Number(el.dataset.swipeStartY);
+          const dy = e.changedTouches[0].clientY - startY;
+          el.style.transition = "transform 220ms ease";
+          if (dy > el.offsetHeight * 0.3) {
+            el.style.transform = `translateY(${el.offsetHeight}px)`;
+            setTimeout(() => onOpenChange(false), 220);
+          } else {
+            el.style.transform = "translateY(0)";
+          }
+          el.dataset.swiping = "false";
+        }}
       >
         <SheetTitle className="sr-only">{project.project_name}</SheetTitle>
 
