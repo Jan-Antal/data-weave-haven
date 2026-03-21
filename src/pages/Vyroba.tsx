@@ -1725,18 +1725,15 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 const dx = e.changedTouches[0].clientX - sw.startX;
                 const el = e.currentTarget.querySelector('.week-content-area') as HTMLElement;
                 if (!el) return;
+                el.style.transition = 'none';
+                el.style.transform = 'translateX(0)';
+                el.style.opacity = '1';
                 const threshold = window.innerWidth * 0.35;
                 if (Math.abs(dx) > threshold) {
                   const dir = dx > 0 ? -1 : 1;
-                  // Reset transform before React re-render
-                  el.style.transition = 'none';
-                  el.style.transform = 'translateX(0)';
-                  el.style.opacity = '1';
-                  setSlideDir(dir > 0 ? 'left' : 'right');
+                  setWeekSlideClass(dir > 0 ? 'week-slide-in-left' : 'week-slide-in-right');
                   setWeekOffset(w => w + dir);
-                } else {
-                  el.style.transition = 'transform 220ms ease-out';
-                  el.style.transform = 'translateX(0)';
+                  setTimeout(() => setWeekSlideClass(''), 250);
                 }
               },
             }
