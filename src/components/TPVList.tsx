@@ -261,17 +261,20 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         if (!user) throw new Error("Nepřihlášený uživatel");
 
         // Fetch project cost parameters for correct hour estimation
-        const [{ data: projectData }, { data: settingsData }, { data: presetsData }] = await Promise.all([
+        const [{ data: projectData }, { data: settingsData }, { data: presetsData }, { data: ratesData }] = await Promise.all([
           supabase
             .from("projects")
-            .select("marze, cost_production_pct, cost_preset_id")
+            .select("marze, cost_production_pct, cost_preset_id, currency")
             .eq("project_id", projectId)
             .single(),
           supabase.from("production_settings").select("hourly_rate").limit(1).single(),
           supabase.from("cost_breakdown_presets").select("id, is_default, production_pct").order("sort_order"),
+          supabase.from("exchange_rates").select("year, eur_czk").order("year", { ascending: false }).limit(1),
         ]);
 
         const hourlyRate = Number(settingsData?.hourly_rate) || 550;
+        const eurRate = ratesData?.[0] ? Number(ratesData[0].eur_czk) : 25.0;
+        const isEur = projectData?.currency === "EUR";
         const presets = presetsData || [];
         const projectPreset = projectData?.cost_preset_id
           ? presets.find((p) => p.id === projectData.cost_preset_id)
@@ -307,8 +310,9 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
 
           // Hours = (selling price × (1 - margin) × production%) / hourly rate
           const itemCena = (item.cena || 0) * (Number(item.pocet) || 1);
+          const itemCenaConverted = isEur ? itemCena * eurRate : itemCena;
           const estimatedHours =
-            itemCena > 0 ? Math.max(1, Math.round((itemCena * (1 - marze) * prodPct) / hourlyRate)) : 8;
+            itemCenaConverted > 0 ? Math.max(1, Math.round((itemCenaConverted * (1 - marze) * prodPct) / hourlyRate)) : 8;
 
           // Insert into production_inbox
           const { error } = await supabase.from("production_inbox").insert({
@@ -316,7 +320,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             item_name: item.item_type || item.item_name,
             item_code: item.item_name,
             estimated_hours: estimatedHours,
-            estimated_czk: itemCena,
+            estimated_czk: itemCenaConverted,
             status: "pending",
             sent_by: user.id,
           } as any);
