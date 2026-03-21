@@ -10,7 +10,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, FileText, Package, Info, Plus, 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { useSheetSwipeDismiss } from "@/hooks/useSheetSwipeDismiss";
+
 
 interface Project {
   id: string;
@@ -66,9 +66,32 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
     return () => window.removeEventListener("mobile-nav-change", handler);
   }, [onOpenChange]);
 
-  // Swipe-to-dismiss (vertical + horizontal)
-  const { sheetRef, onTouchStart: swipeTouchStart, onTouchMove: swipeTouchMove, onTouchEnd: swipeTouchEnd } =
-    useSheetSwipeDismiss({ onDismiss: () => onOpenChange(false) });
+  // Vertical swipe-down-to-dismiss on drag handle only
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef({ startY: 0, active: false });
+  function handleDragTouchStart(e: React.TouchEvent) {
+    dragRef.current = { startY: e.touches[0].clientY, active: true };
+  }
+  function handleDragTouchMove(e: React.TouchEvent) {
+    if (!dragRef.current.active) return;
+    const dy = Math.max(0, e.touches[0].clientY - dragRef.current.startY);
+    const el = sheetRef.current;
+    if (el) { el.style.transition = "none"; el.style.transform = `translateY(${dy}px)`; }
+  }
+  function handleDragTouchEnd(e: React.TouchEvent) {
+    dragRef.current.active = false;
+    const dy = e.changedTouches[0].clientY - dragRef.current.startY;
+    const el = sheetRef.current;
+    if (!el) return;
+    if (dy > 80) {
+      el.style.transition = "transform 0.2s ease"; el.style.transform = "translateY(100%)";
+      const overlay = el.previousElementSibling as HTMLElement | null;
+      if (overlay) { overlay.style.transition = "opacity 0.2s ease"; overlay.style.opacity = "0"; }
+      setTimeout(() => onOpenChange(false), 220);
+    } else {
+      el.style.transition = "transform 0.2s ease"; el.style.transform = "translateY(0)";
+    }
+  }
 
   const { data: tpvItems = [] } = useTPVItems(projectId);
 
@@ -80,7 +103,6 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
         ref={sheetRef}
         side="bottom"
         className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col"
-        style={{ touchAction: "none" }}
         onPointerDownOutside={(e) => { e.preventDefault(); onOpenChange(false); }}
       >
         <SheetTitle className="sr-only">{project.project_name}</SheetTitle>
@@ -88,9 +110,9 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
         {/* Top bar with back button + drag handle */}
         <div
           className="flex items-center justify-between px-4 pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
-          onTouchStart={swipeTouchStart}
-          onTouchMove={swipeTouchMove}
-          onTouchEnd={swipeTouchEnd}
+          onTouchStart={handleDragTouchStart}
+          onTouchMove={handleDragTouchMove}
+          onTouchEnd={handleDragTouchEnd}
         >
           <button
             onClick={() => onOpenChange(false)}
