@@ -5225,7 +5225,7 @@ function WeekPickerPopup({
   return (
     <div
       ref={popupRef}
-      className="absolute top-full right-0 mt-1 z-50 rounded-lg shadow-lg py-1 overflow-y-auto"
+      className="absolute top-full right-0 mt-1 z-[99999] rounded-lg shadow-lg py-1 overflow-y-auto"
       style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", maxHeight: 320, width: 240 }}
     >
       {weeks.map((w) => (
