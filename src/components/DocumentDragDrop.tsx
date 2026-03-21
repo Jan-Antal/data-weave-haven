@@ -12,6 +12,15 @@ interface DOC_CAT {
 
 // ─── Custom drag ghost creator ──────────────────────────────────
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function createDragGhost(fileName: string, count: number): HTMLElement {
   const ghost = document.createElement("div");
   ghost.style.cssText = `
@@ -35,7 +44,7 @@ export function createDragGhost(fileName: string, count: number): HTMLElement {
   } else {
     ghost.innerHTML = `
       <span style="font-size:14px">📄</span>
-      <span style="overflow:hidden;text-overflow:ellipsis;max-width:180px;color:hsl(var(--foreground))">${fileName}</span>
+      <span style="overflow:hidden;text-overflow:ellipsis;max-width:180px;color:hsl(var(--foreground))">${escapeHtml(fileName)}</span>
     `;
   }
 

@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 const TEST_EMAIL = "alfred@ami-test.cz";
-const TEST_PASSWORD = "Alfred2026!";
+const TEST_PASSWORD = Deno.env.get("TEST_ADMIN_PASSWORD") || "changeme";
 const TEST_FULL_NAME = "Alfred Test (AMI)";
 
 // Using Z-2201-XXX prefix to avoid any collision with production Z-26XX projects
