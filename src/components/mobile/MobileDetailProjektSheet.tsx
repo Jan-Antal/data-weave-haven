@@ -103,7 +103,6 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
         ref={sheetRef}
         side="bottom"
         className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col"
-        style={{ touchAction: "none" }}
         onPointerDownOutside={(e) => { e.preventDefault(); onOpenChange(false); }}
       >
         <SheetTitle className="sr-only">{project.project_name}</SheetTitle>
