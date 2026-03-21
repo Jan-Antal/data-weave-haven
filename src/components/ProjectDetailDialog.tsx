@@ -82,6 +82,7 @@ interface ProjectDetailDialogProps {
   onOpenTPVList?: (projectId: string, projectName: string, autoImport?: boolean) => void;
   tpvItemCount?: number;
   mode?: "dialog" | "embedded";
+  readOnly?: boolean;
   extraFooter?: React.ReactNode;
 }
 
@@ -270,7 +271,7 @@ function defaultForm() {
   };
 }
 
-export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList, tpvItemCount, mode = "dialog", extraFooter }: ProjectDetailDialogProps) {
+export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList, tpvItemCount, mode = "dialog", readOnly = false, extraFooter }: ProjectDetailDialogProps) {
   const qc = useQueryClient();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const { canEdit, canDeleteProject, isViewer, isKonstrukter, isPM, isFieldReadOnly, canUploadDocuments, isAdmin, profile } = useAuth();
@@ -1325,9 +1326,11 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
         <div className="flex-1 overflow-y-auto px-4 pb-20">
           {formFieldsContent}
         </div>
-        <div className="sticky bottom-0 bg-background border-t border-border px-4 py-3 flex items-center justify-end gap-2 z-10">
-          {canEdit && <Button onClick={handleSave} disabled={idExists || !form.project_id} size="sm">Uložit</Button>}
-        </div>
+        {!readOnly && (
+          <div className="sticky bottom-0 bg-background border-t border-border px-4 py-3 flex items-center justify-end gap-2 z-10">
+            {canEdit && <Button onClick={handleSave} disabled={idExists || !form.project_id} size="sm">Uložit</Button>}
+          </div>
+        )}
         <ConfirmDialog
           open={unsavedConfirmOpen}
           onConfirm={() => { setUnsavedConfirmOpen(false); }}
