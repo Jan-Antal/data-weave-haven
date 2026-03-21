@@ -61,12 +61,12 @@ async function renumberSiblings(splitGroupId: string) {
     }).eq("id", s.id)
   );
   // Actually just update part/total, not names
-  for (let i = 0; i < siblings.length; i++) {
-    await supabase.from("production_schedule").update({
+  await Promise.all(siblings.map((s, i) =>
+    supabase.from("production_schedule").update({
       split_part: i + 1,
       split_total: total,
-    }).eq("id", siblings[i].id);
-  }
+    }).eq("id", s.id)
+  ));
 }
 
 export { renumberSiblings };
