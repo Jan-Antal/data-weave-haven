@@ -560,6 +560,13 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
     // Check daily logs for the latest percent — this reflects actual logged progress
     const latestLogPct = getLatestPercent(pid);
+
+    // Spilled projects use carried-forward log % as their starting progress
+    const project = enrichedProjects.find(p => p.projectId === pid);
+    if (project?.isSpilled) {
+      return { totalHours, completedHours: 0, bundleProgress: latestLogPct };
+    }
+
     const completionPct = totalHours > 0 ? Math.round((completedHours / totalHours) * 100) : 0;
     // Use whichever is higher: logged progress or completion-based progress
     const bundleProgress = Math.max(latestLogPct, completionPct);
