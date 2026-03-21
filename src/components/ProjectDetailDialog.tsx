@@ -271,7 +271,7 @@ function defaultForm() {
   };
 }
 
-export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList, tpvItemCount, mode = "dialog", extraFooter }: ProjectDetailDialogProps) {
+export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList, tpvItemCount, mode = "dialog", readOnly = false, extraFooter }: ProjectDetailDialogProps) {
   const qc = useQueryClient();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const { canEdit, canDeleteProject, isViewer, isKonstrukter, isPM, isFieldReadOnly, canUploadDocuments, isAdmin, profile } = useAuth();
