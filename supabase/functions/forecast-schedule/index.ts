@@ -271,12 +271,20 @@ serve(async (req) => {
       if (!tpvByProject.has(item.project_id)) tpvByProject.set(item.project_id, []);
       tpvByProject.get(item.project_id)!.push(item);
     }
-    const inboxByProject = new Map<string, number>();
-    for (const item of inboxRes.data || [])
-      inboxByProject.set(
-        item.project_id,
-        (inboxByProject.get(item.project_id) || 0) + (Number(item.estimated_hours) || 0),
-      );
+
+    // Build sets of already-planned item_codes per project
+    const inboxItemsByProject = new Map<string, Set<string>>();
+    const schedItemsByProject = new Map<string, Set<string>>();
+    for (const row of inboxRes.data || []) {
+      if (!row.item_code) continue;
+      if (!inboxItemsByProject.has(row.project_id)) inboxItemsByProject.set(row.project_id, new Set());
+      inboxItemsByProject.get(row.project_id)!.add(row.item_code);
+    }
+    for (const row of schedRes.data || []) {
+      if (!row.item_code) continue;
+      if (!schedItemsByProject.has(row.project_id)) schedItemsByProject.set(row.project_id, new Set());
+      schedItemsByProject.get(row.project_id)!.add(row.item_code);
+    }
 
     const workItems: any[] = [];
     const safetyNetMap = new Map<string, any>();
@@ -287,9 +295,19 @@ serve(async (req) => {
       const preset = proj.cost_preset_id ? presets.find((p: any) => p.id === proj.cost_preset_id) : defaultPreset;
       const vyrobaPct =
         ((proj.cost_production_pct ? Number(proj.cost_production_pct) : null) ?? preset?.production_pct ?? 35) / 100;
-      const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct, eurRate);
-      const inboxH = inboxByProject.get(proj.project_id) || 0;
-      const remainingHours = Math.max(20, est.hours - inboxH);
+
+      // Union of already-planned item codes (inbox + schedule)
+      const plannedCodes = new Set([
+        ...(inboxItemsByProject.get(proj.project_id) || []),
+        ...(schedItemsByProject.get(proj.project_id) || []),
+      ]);
+
+      const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct, eurRate, plannedCodes);
+
+      // Skip fully planned projects
+      if (est.hours === 0) continue;
+
+      const remainingHours = est.hours;
 
       const hasAnyDate =
         proj.tpv_date || proj.datum_objednavky || proj.expedice || proj.montaz || proj.predani || proj.datum_smluvni;
