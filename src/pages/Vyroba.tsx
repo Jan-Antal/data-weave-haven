@@ -1544,27 +1544,43 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               onTouchStart: (e: React.TouchEvent) => {
                 const t = e.touches[0];
                 if (t.clientX < 30) return;
-                (e.currentTarget as any)._swipeX = t.clientX;
-                (e.currentTarget as any)._swipeT = Date.now();
+                weekDragRef.current = { startX: t.clientX, isDragging: true, currentX: 0 };
+                const el = e.currentTarget.querySelector('.week-content-area') as HTMLElement;
+                if (el) el.style.transition = "none";
+              },
+              onTouchMove: (e: React.TouchEvent) => {
+                if (!weekDragRef.current.isDragging) return;
+                const dx = e.touches[0].clientX - weekDragRef.current.startX;
+                weekDragRef.current.currentX = dx;
+                const el = e.currentTarget.querySelector('.week-content-area') as HTMLElement;
+                if (el) el.style.transform = `translateX(${dx}px)`;
               },
               onTouchEnd: (e: React.TouchEvent) => {
-                const startX = (e.currentTarget as any)._swipeX;
-                const startT = (e.currentTarget as any)._swipeT;
-                if (startX == null) return;
-                const diff = e.changedTouches[0].clientX - startX;
-                const elapsed = Date.now() - startT;
-                if (Math.abs(diff) > 80 && elapsed < 400) {
-                  const dir = diff > 0 ? -1 : 1;
-                  const el = e.currentTarget.querySelector(".week-content-area") as HTMLElement;
-                  if (el) {
-                    el.style.setProperty("--slide-dir", dir > 0 ? "30px" : "-30px");
-                    el.classList.remove("week-slide-enter");
+                if (!weekDragRef.current.isDragging) return;
+                weekDragRef.current.isDragging = false;
+                const dx = weekDragRef.current.currentX;
+                const threshold = window.innerWidth * 0.5;
+                const el = e.currentTarget.querySelector('.week-content-area') as HTMLElement;
+                if (!el) return;
+                if (Math.abs(dx) > threshold) {
+                  const dir = dx > 0 ? -1 : 1;
+                  el.style.transition = "transform 180ms ease-out, opacity 180ms";
+                  el.style.transform = `translateX(${dir > 0 ? '-100vw' : '100vw'})`;
+                  el.style.opacity = "0";
+                  setTimeout(() => {
+                    setWeekOffset(w => w + dir);
+                    el.style.transition = "none";
+                    el.style.transform = `translateX(${dir > 0 ? '100vw' : '-100vw'})`;
+                    el.style.opacity = "0";
                     void el.offsetWidth;
-                    el.classList.add("week-slide-enter");
-                  }
-                  setWeekOffset((w) => w + dir);
+                    el.style.transition = "transform 180ms ease-out, opacity 180ms";
+                    el.style.transform = "translateX(0)";
+                    el.style.opacity = "1";
+                  }, 180);
+                } else {
+                  el.style.transition = "transform 200ms ease-out";
+                  el.style.transform = "translateX(0)";
                 }
-                (e.currentTarget as any)._swipeX = null;
               },
             }
           : {})}
