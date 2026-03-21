@@ -177,11 +177,11 @@ export function SplitItemDialog({
           .or(`split_group_id.eq.${groupId},id.eq.${groupId}`)
           .order("scheduled_week");
         if (allParts) {
-          for (const p of allParts) {
-            await supabase.from("production_schedule").update({
+          await Promise.all(allParts.map(p =>
+            supabase.from("production_schedule").update({
               item_name: `${cleanName} (${p.split_part}/${p.split_total})`,
-            }).eq("id", p.id);
-          }
+            }).eq("id", p.id)
+          ));
         }
 
         invalidateAll();
