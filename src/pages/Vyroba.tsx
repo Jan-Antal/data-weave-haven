@@ -1034,7 +1034,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   const sheetRefVyrobaProjekt = useRef<HTMLDivElement>(null);
   const dragRefDaylog = useRef({ startY: 0, currentY: 0, dragging: false });
   const sheetRefDaylog = useRef<HTMLDivElement>(null);
-  const weekDragRef = useRef({ startX: 0, isDragging: false, currentX: 0 });
+  
 
   function handleVyrobaProjektTouchStart(e: React.TouchEvent) {
     dragRefVyrobaProjekt.current = { startY: e.touches[0].clientY, currentY: e.touches[0].clientY, dragging: true };
@@ -1545,42 +1545,43 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               onTouchStart: (e: React.TouchEvent) => {
                 const t = e.touches[0];
                 if (t.clientX < 30) return;
-                weekDragRef.current = { startX: t.clientX, isDragging: true, currentX: 0 };
+                (e.currentTarget as any)._weekSwipe = { startX: t.clientX, startTime: Date.now() };
                 const el = e.currentTarget.querySelector('.week-content-area') as HTMLElement;
-                if (el) el.style.transition = "none";
+                if (el) el.style.transition = 'none';
               },
               onTouchMove: (e: React.TouchEvent) => {
-                if (!weekDragRef.current.isDragging) return;
-                const dx = e.touches[0].clientX - weekDragRef.current.startX;
-                weekDragRef.current.currentX = dx;
+                const sw = (e.currentTarget as any)._weekSwipe;
+                if (!sw) return;
+                const dx = e.touches[0].clientX - sw.startX;
                 const el = e.currentTarget.querySelector('.week-content-area') as HTMLElement;
                 if (el) el.style.transform = `translateX(${dx}px)`;
               },
               onTouchEnd: (e: React.TouchEvent) => {
-                if (!weekDragRef.current.isDragging) return;
-                weekDragRef.current.isDragging = false;
-                const dx = weekDragRef.current.currentX;
-                const threshold = window.innerWidth * 0.5;
+                const sw = (e.currentTarget as any)._weekSwipe;
+                if (!sw) return;
+                (e.currentTarget as any)._weekSwipe = null;
+                const dx = e.changedTouches[0].clientX - sw.startX;
                 const el = e.currentTarget.querySelector('.week-content-area') as HTMLElement;
                 if (!el) return;
+                const threshold = window.innerWidth * 0.35;
                 if (Math.abs(dx) > threshold) {
                   const dir = dx > 0 ? -1 : 1;
-                  el.style.transition = "transform 180ms ease-out, opacity 180ms";
-                  el.style.transform = `translateX(${dir > 0 ? '-100vw' : '100vw'})`;
-                  el.style.opacity = "0";
+                  el.style.transition = 'transform 180ms ease-out, opacity 150ms';
+                  el.style.transform = `translateX(${dir > 0 ? '-110%' : '110%'})`;
+                  el.style.opacity = '0';
                   setTimeout(() => {
                     setWeekOffset(w => w + dir);
-                    el.style.transition = "none";
-                    el.style.transform = `translateX(${dir > 0 ? '100vw' : '-100vw'})`;
-                    el.style.opacity = "0";
+                    el.style.transition = 'none';
+                    el.style.transform = `translateX(${dir > 0 ? '80px' : '-80px'})`;
+                    el.style.opacity = '0';
                     void el.offsetWidth;
-                    el.style.transition = "transform 180ms ease-out, opacity 180ms";
-                    el.style.transform = "translateX(0)";
-                    el.style.opacity = "1";
+                    el.style.transition = 'transform 200ms ease-out, opacity 150ms';
+                    el.style.transform = 'translateX(0)';
+                    el.style.opacity = '1';
                   }, 180);
                 } else {
-                  el.style.transition = "transform 200ms ease-out";
-                  el.style.transform = "translateX(0)";
+                  el.style.transition = 'transform 220ms ease-out';
+                  el.style.transform = 'translateX(0)';
                 }
               },
             }
