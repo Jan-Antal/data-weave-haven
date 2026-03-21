@@ -132,10 +132,14 @@ function montazWeeks(count: number): number {
   return Math.ceil(count / 20);
 }
 
-function estimateHours(proj: any, tpvItems: any[], hourlyRate: number, vyrobaPct: number, eurRate: number) {
+function estimateHours(proj: any, tpvItems: any[], hourlyRate: number, vyrobaPct: number, eurRate: number, plannedItemCodes: Set<string>) {
   const marze = normalizeMarze(proj.marze);
   const active = tpvItems.filter((t) => t.status !== "Zrušeno");
-  const withPrice = active.filter((t) => t.cena && Number(t.cena) > 0);
+  const withPrice = active.filter((t) => t.cena && Number(t.cena) > 0 && !plannedItemCodes.has(t.item_name));
+  if (active.length > 0 && withPrice.length === 0) {
+    // All priced items are already planned
+    return { hours: 0, badge: "Vše naplánováno", base: "none" };
+  }
   if (withPrice.length > 0) {
     let tpvSum = withPrice.reduce((s, t) => s + Number(t.cena) * (Number(t.pocet) || 1), 0);
     if (proj.currency === "EUR") tpvSum = tpvSum * eurRate;
@@ -236,7 +240,7 @@ serve(async (req) => {
     const dow = currentMonday.getUTCDay();
     currentMonday.setUTCDate(currentMonday.getUTCDate() + (dow === 0 ? -6 : 1 - dow));
 
-    const [projRes, tpvRes, settingsRes, presetsRes, capacityRes, ratesRes, inboxRes] = await Promise.all([
+    const [projRes, tpvRes, settingsRes, presetsRes, capacityRes, ratesRes, inboxRes, schedRes] = await Promise.all([
       sb
         .from("projects")
         .select(
@@ -245,12 +249,13 @@ serve(async (req) => {
         .in("status", ["Příprava", "Engineering", "TPV", "Výroba IN", "Výroba"])
         .is("deleted_at", null)
         .eq("is_test", false),
-      sb.from("tpv_items").select("project_id,cena,pocet,status").is("deleted_at", null),
+      sb.from("tpv_items").select("project_id,item_name,cena,pocet,status").is("deleted_at", null),
       sb.from("production_settings").select("hourly_rate").limit(1).single(),
       sb.from("cost_breakdown_presets").select("id,name,is_default,production_pct").order("sort_order"),
       sb.from("production_capacity").select("week_number,week_year,capacity_hours"),
       sb.from("exchange_rates").select("year,eur_czk"),
-      sb.from("production_inbox").select("project_id,estimated_hours").eq("status", "pending"),
+      sb.from("production_inbox").select("project_id,item_code,estimated_hours").in("status", ["pending", "scheduled"]),
+      sb.from("production_schedule").select("project_id,item_code,scheduled_hours").in("status", ["scheduled", "in_progress"]),
     ]);
 
     const projects = projRes.data || [];
@@ -266,12 +271,20 @@ serve(async (req) => {
       if (!tpvByProject.has(item.project_id)) tpvByProject.set(item.project_id, []);
       tpvByProject.get(item.project_id)!.push(item);
     }
-    const inboxByProject = new Map<string, number>();
-    for (const item of inboxRes.data || [])
-      inboxByProject.set(
-        item.project_id,
-        (inboxByProject.get(item.project_id) || 0) + (Number(item.estimated_hours) || 0),
-      );
+
+    // Build sets of already-planned item_codes per project
+    const inboxItemsByProject = new Map<string, Set<string>>();
+    const schedItemsByProject = new Map<string, Set<string>>();
+    for (const row of inboxRes.data || []) {
+      if (!row.item_code) continue;
+      if (!inboxItemsByProject.has(row.project_id)) inboxItemsByProject.set(row.project_id, new Set());
+      inboxItemsByProject.get(row.project_id)!.add(row.item_code);
+    }
+    for (const row of schedRes.data || []) {
+      if (!row.item_code) continue;
+      if (!schedItemsByProject.has(row.project_id)) schedItemsByProject.set(row.project_id, new Set());
+      schedItemsByProject.get(row.project_id)!.add(row.item_code);
+    }
 
     const workItems: any[] = [];
     const safetyNetMap = new Map<string, any>();
@@ -282,9 +295,19 @@ serve(async (req) => {
       const preset = proj.cost_preset_id ? presets.find((p: any) => p.id === proj.cost_preset_id) : defaultPreset;
       const vyrobaPct =
         ((proj.cost_production_pct ? Number(proj.cost_production_pct) : null) ?? preset?.production_pct ?? 35) / 100;
-      const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct, eurRate);
-      const inboxH = inboxByProject.get(proj.project_id) || 0;
-      const remainingHours = Math.max(20, est.hours - inboxH);
+
+      // Union of already-planned item codes (inbox + schedule)
+      const plannedCodes = new Set([
+        ...(inboxItemsByProject.get(proj.project_id) || []),
+        ...(schedItemsByProject.get(proj.project_id) || []),
+      ]);
+
+      const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct, eurRate, plannedCodes);
+
+      // Skip fully planned projects
+      if (est.hours === 0) continue;
+
+      const remainingHours = est.hours;
 
       const hasAnyDate =
         proj.tpv_date || proj.datum_objednavky || proj.expedice || proj.montaz || proj.predani || proj.datum_smluvni;
