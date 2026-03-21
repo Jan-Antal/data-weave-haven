@@ -1243,7 +1243,14 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     setResetDataConfirmOpen(false);
     setResetDataPreview(null);
   }
-
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleResetDataPreview} className="text-destructive">
+                        🗑️ Reset dát výroby
+                      </DropdownMenuItem>
+                    </>
+                  )}
 
   /* ── Return from Expedice ── */
   async function handleReturnFromExpedice(pid: string) {
