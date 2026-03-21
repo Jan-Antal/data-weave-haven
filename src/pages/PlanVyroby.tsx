@@ -176,60 +176,8 @@ export default function PlanVyroby() {
   const handleRecalculateHours = useCallback(async () => {
     setRecalculating(true);
     try {
-      // Current week key
-      const now = new Date();
-      const day = now.getDay();
-      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(now.getFullYear(), now.getMonth(), diff);
-      const currentWeekKey = monday.toISOString().split("T")[0];
-
-      // Fetch all needed data
-      const [settingsRes, presetsRes, projectsRes, inboxRes, schedRes] = await Promise.all([
-        supabase.from("production_settings").select("hourly_rate").limit(1).single(),
-        supabase.from("cost_breakdown_presets").select("*"),
-        supabase.from("projects").select("project_id, marze, cost_production_pct, cost_preset_id").eq("is_active", true),
-        supabase.from("production_inbox").select("id, project_id, estimated_czk, estimated_hours").eq("status", "pending"),
-        supabase.from("production_schedule").select("id, project_id, scheduled_czk, scheduled_hours, scheduled_week, status").in("status", ["scheduled", "in_progress"]).gte("scheduled_week", currentWeekKey),
-      ]);
-
-      const hourlyRate = settingsRes.data?.hourly_rate || 550;
-      const presets = presetsRes.data || [];
-      const projects = projectsRes.data || [];
-      const inboxItems = inboxRes.data || [];
-      const schedItems = schedRes.data || [];
-
-      const projectMap = new Map(projects.map(p => [p.project_id, p]));
-      const defaultPreset = presets.find(p => p.is_default);
-
-      function calcHours(itemCzk: number, projectId: string): number {
-        const proj = projectMap.get(projectId);
-        if (!proj || itemCzk <= 0) return 8;
-        const preset = proj.cost_preset_id ? presets.find(p => p.id === proj.cost_preset_id) : defaultPreset;
-        const prodPct = proj.cost_production_pct != null ? Number(proj.cost_production_pct) / 100 : (preset ? Number(preset.production_pct) / 100 : 0.35);
-        const marze = proj.marze ? Number(proj.marze) / 100 : 0;
-        return Math.max(1, Math.round((itemCzk * (1 - marze) * prodPct) / hourlyRate));
-      }
-
-      let updated = 0;
-
-      // Update inbox items
-      for (const item of inboxItems) {
-        const newHours = calcHours(Number(item.estimated_czk), item.project_id);
-        if (newHours !== Number(item.estimated_hours)) {
-          await supabase.from("production_inbox").update({ estimated_hours: newHours }).eq("id", item.id);
-          updated++;
-        }
-      }
-
-      // Update schedule items (current + future weeks only)
-      for (const item of schedItems) {
-        const newHours = calcHours(Number(item.scheduled_czk), item.project_id);
-        if (newHours !== Number(item.scheduled_hours)) {
-          await supabase.from("production_schedule").update({ scheduled_hours: newHours }).eq("id", item.id);
-          updated++;
-        }
-      }
-
+      const { recalculateProductionHours } = await import("@/lib/recalculateProductionHours");
+      const updated = await recalculateProductionHours(supabase, "all");
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       toast({ title: `✓ Hodiny přepočítány (${updated} položek)` });

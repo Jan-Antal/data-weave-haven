@@ -85,6 +85,15 @@ export function useSetDefaultPreset() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["cost-breakdown-presets"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["cost-breakdown-presets"] });
+      // Recalculate all production hours when default preset changes
+      import("@/lib/recalculateProductionHours").then(({ recalculateProductionHours }) => {
+        recalculateProductionHours(supabase, "all").then(() => {
+          qc.invalidateQueries({ queryKey: ["production-inbox"] });
+          qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        });
+      });
+    },
   });
 }
