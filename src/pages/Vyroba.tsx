@@ -312,6 +312,28 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   const { data: scheduleData } = useProductionSchedule();
   const { data: dailyLogsMap } = useProductionDailyLogs(weekKey);
 
+  // Fetch latest daily log per project across ALL weeks (for spilled projects)
+  const { data: allLatestLogs } = useQuery({
+    queryKey: ["production-daily-logs-latest-all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("production_daily_logs" as any)
+        .select("*")
+        .order("logged_at", { ascending: false });
+      if (error) throw error;
+      // Group by bundle_id prefix (project_id) — bundle_id format is "projectId::weekKey"
+      const latestByProject = new Map<string, DailyLog>();
+      for (const row of (data || []) as any[]) {
+        const log = row as DailyLog;
+        const pid = log.bundle_id.split("::")[0];
+        if (!latestByProject.has(pid)) {
+          latestByProject.set(pid, log);
+        }
+      }
+      return latestByProject;
+    },
+  });
+
   // Build projects from schedule for this week + spilled from previous weeks
   const projects = useMemo<VyrobaProject[]>(() => {
     if (!scheduleData) return [];
@@ -512,15 +534,23 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   function getLatestPercent(pid: string): number {
     const logs = getLogsForProject(pid);
-    if (logs.length === 0) return 0;
-    return Math.max(...logs.map((l) => l.percent));
+    if (logs.length > 0) return Math.max(...logs.map((l) => l.percent));
+    // Fallback: check all-weeks latest log (for spilled projects)
+    const allLog = allLatestLogs?.get(pid);
+    if (allLog) return allLog.percent;
+    return 0;
   }
 
   function getLatestPhase(pid: string): string | null {
     const logs = getLogsForProject(pid);
-    if (logs.length === 0) return null;
-    const sorted = [...logs].sort((a, b) => b.day_index - a.day_index);
-    return sorted[0].phase;
+    if (logs.length > 0) {
+      const sorted = [...logs].sort((a, b) => b.day_index - a.day_index);
+      return sorted[0].phase;
+    }
+    // Fallback: check all-weeks latest log (for spilled projects)
+    const allLog = allLatestLogs?.get(pid);
+    if (allLog) return allLog.phase;
+    return null;
   }
 
   function getCumulativeForDay(pid: string, dayIndex: number): CumulativeInfo | null {
