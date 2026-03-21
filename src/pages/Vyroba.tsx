@@ -646,11 +646,16 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     if (bundleProgress >= goal) return "on-track";
     if (todayDayIndex < 0) {
       const realWeekKey = weekKeyStr(getMonday(new Date()));
-      const hasDelayed = (scheduleData || []).some(s =>
-        s.project_id === pid &&
-        (s.status === "scheduled" || s.status === "in_progress") &&
-        s.scheduled_week < realWeekKey
-      );
+      let hasDelayed = false;
+      if (scheduleData) {
+        for (const [wk, silo] of scheduleData) {
+          if (wk >= realWeekKey) continue;
+          if (silo.bundles.some(b => b.project_id === pid && b.items.some(i => i.status === "scheduled" || i.status === "in_progress"))) {
+            hasDelayed = true;
+            break;
+          }
+        }
+      }
       return hasDelayed ? "behind" : "on-track";
     }
     const expected = getExpectedPct(todayDayIndex, goal);
