@@ -114,6 +114,7 @@ interface ProjectRow {
 }
 
 function getCollapsedCellStyle(proj: ProjectRow, weekKey: string): { bg: string; text: string; border: string } {
+  const color = proj.color;
   let hasInProgress = false, hasPaused = false, hasScheduled = false, hasCompleted = false, hasInbox = false;
   for (const item of proj.items) {
     const alloc = item.weekAllocations.get(weekKey);
@@ -126,13 +127,12 @@ function getCollapsedCellStyle(proj: ProjectRow, weekKey: string): { bg: string;
     }
     if (item.inboxHours > 0 && !hasInProgress && !hasPaused && !hasScheduled && !hasCompleted) hasInbox = true;
   }
-  // Priority: in_progress > paused > scheduled > completed > inbox
-  if (hasInProgress) return { bg: "rgba(34,197,94,0.12)", text: "#16a34a", border: "rgba(34,197,94,0.3)" };
+  // Paused/inbox keep their semantic colors; all others use project color
   if (hasPaused) return { bg: "rgba(107,114,128,0.12)", text: "#6b7280", border: "rgba(107,114,128,0.3)" };
-  if (hasScheduled) return { bg: "rgba(59,130,246,0.12)", text: "#2563eb", border: "rgba(59,130,246,0.3)" };
-  if (hasCompleted) return { bg: "rgba(22,163,74,0.15)", text: "#15803d", border: "rgba(22,163,74,0.4)" };
-  if (hasInbox) return { bg: "rgba(249,115,22,0.12)", text: "#ea580c", border: "rgba(249,115,22,0.3)" };
-  return { bg: "rgba(59,130,246,0.12)", text: "#2563eb", border: "rgba(59,130,246,0.3)" };
+  if (hasInbox && !hasScheduled && !hasInProgress && !hasCompleted) return { bg: "rgba(249,115,22,0.12)", text: "#ea580c", border: "rgba(249,115,22,0.3)" };
+  // Use project color with varying opacity for active states
+  if (hasCompleted && !hasInProgress && !hasScheduled) return { bg: color + "25", text: color, border: color + "60" };
+  return { bg: color + "18", text: color, border: color + "40" };
 }
 
 const CELL_W = 132;
@@ -518,7 +518,11 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     overdue:     { bg: "#FEE2E2", text: "#DC2626", border: "#DC2626" },
   } as const;
 
-  const getCellStyle = (status: string) => {
+  const getCellStyle = (status: string, projectColor?: string) => {
+    if (projectColor && status !== "paused") {
+      if (status === "completed") return { bg: projectColor + "25", text: projectColor, border: projectColor + "60" };
+      return { bg: projectColor + "18", text: projectColor, border: projectColor + "40" };
+    }
     switch (status) {
       case "completed": return STATUS_COLORS.completed;
       case "in_progress": return STATUS_COLORS.in_progress;
@@ -527,8 +531,11 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     }
   };
 
-  // Bold variant for bundle-level cells (uses border color as bg, white text)
-  const getBundleCellStyle = (status: string) => {
+  // Bold variant for bundle-level cells (uses project color as bg, white text)
+  const getBundleCellStyle = (status: string, projectColor?: string) => {
+    if (projectColor && status !== "paused") {
+      return { bg: projectColor, text: "#ffffff", border: projectColor };
+    }
     const base = getCellStyle(status);
     return { bg: base.border, text: "#ffffff", border: base.border };
   };
@@ -1523,7 +1530,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                                     item={item}
                                     displayMode={displayMode}
                                     formatCellValue={formatCellValue}
-                                    getCellStyle={getCellStyle}
+                                    getCellStyle={(status: string) => getCellStyle(status, getProjectColor(item.projectId))}
+                                    projectColor={getProjectColor(item.projectId)}
                                     moveTargetWeeks={moveTargetWeeks}
                                     getWeekCapacity={getWeekCapacity}
                                     weekCapacities={weekCapacities}
@@ -1705,7 +1713,7 @@ function DroppableWeekCell({ droppableId, weekKey, isCurrent, children }: {
 }
 
 /* ─── Filled week cell with popover + draggable ─── */
-function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCellValue, getCellStyle, moveTargetWeeks, getWeekCapacity, weekCapacities, onMoveToWeek, onReturnToInbox, onComplete, onCancel, onContextMenu }: {
+function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCellValue, getCellStyle, projectColor, moveTargetWeeks, getWeekCapacity, weekCapacities, onMoveToWeek, onReturnToInbox, onComplete, onCancel, onContextMenu }: {
   weekKey: string;
   isCurrent: boolean;
   alloc: WeekAlloc;
@@ -1713,6 +1721,7 @@ function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCe
   displayMode: DisplayMode;
   formatCellValue: (hours: number, czk: number, status: string, totalItemHours: number, splitPart?: number, splitTotal?: number, projectId?: string) => string;
   getCellStyle: (status: string) => { bg: string; text: string; border: string };
+  projectColor?: string;
   moveTargetWeeks: { key: string; weekNum: number; label: string }[];
   getWeekCapacity: (weekKey: string) => number;
   weekCapacities: Map<string, number>;
