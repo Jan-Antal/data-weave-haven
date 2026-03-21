@@ -1520,6 +1520,15 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                   {canAccessRecycleBin && (
                     <DropdownMenuItem onClick={() => setRecycleBinOpen(true)}>Koš</DropdownMenuItem>
                   )}
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleResetDataPreview} className="text-destructive">
+                        🗑️ Reset dát výroby
+                      </DropdownMenuItem>
+                    </>
+                  )}
+
 
                   {realRole === "owner" && (
                     <>
