@@ -82,6 +82,7 @@ interface ProjectDetailDialogProps {
   onOpenTPVList?: (projectId: string, projectName: string, autoImport?: boolean) => void;
   tpvItemCount?: number;
   mode?: "dialog" | "embedded";
+  extraFooter?: React.ReactNode;
 }
 
 const DOC_CATEGORIES = [
@@ -269,7 +270,7 @@ function defaultForm() {
   };
 }
 
-export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList, tpvItemCount, mode = "dialog" }: ProjectDetailDialogProps) {
+export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList, tpvItemCount, mode = "dialog", extraFooter }: ProjectDetailDialogProps) {
   const qc = useQueryClient();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const { canEdit, canDeleteProject, isViewer, isKonstrukter, isPM, isFieldReadOnly, canUploadDocuments, isAdmin, profile } = useAuth();
@@ -1839,6 +1840,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                     </Button>
                   </div>
                 )}
+                {extraFooter}
                 <Button variant="outline" onClick={tryClose}>Zavřít</Button>
                 {canEdit && <Button onClick={handleSave} disabled={idExists || !form.project_id}>Uložit</Button>}
               </div>
