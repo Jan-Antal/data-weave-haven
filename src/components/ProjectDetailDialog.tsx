@@ -1840,6 +1840,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                     </Button>
                   </div>
                 )}
+                {extraFooter}
                 <Button variant="outline" onClick={tryClose}>Zavřít</Button>
                 {canEdit && <Button onClick={handleSave} disabled={idExists || !form.project_id}>Uložit</Button>}
               </div>
