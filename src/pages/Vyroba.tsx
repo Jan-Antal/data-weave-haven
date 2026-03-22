@@ -1574,7 +1574,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             /* ═══ MOBILE: scroll-snap pager ═══ */
             <div
               ref={pagerRef}
-              className="flex flex-1 min-h-0 overflow-x-auto overflow-y-hidden"
+              className="flex flex-1 min-h-0 overflow-x-auto overflow-y-hidden scrollbar-hide"
               style={{
                 scrollSnapType: 'x mandatory',
                 scrollBehavior: 'auto',
