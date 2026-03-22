@@ -368,6 +368,42 @@ export type Database = {
         }
         Relationships: []
       }
+      production_hours_log: {
+        Row: {
+          ami_project_id: string | null
+          created_at: string | null
+          datum_sync: string | null
+          hodiny_skutocne: number | null
+          id: string
+          pm: string | null
+          project_name: string | null
+          source: string | null
+          status: string | null
+        }
+        Insert: {
+          ami_project_id?: string | null
+          created_at?: string | null
+          datum_sync?: string | null
+          hodiny_skutocne?: number | null
+          id?: string
+          pm?: string | null
+          project_name?: string | null
+          source?: string | null
+          status?: string | null
+        }
+        Update: {
+          ami_project_id?: string | null
+          created_at?: string | null
+          datum_sync?: string | null
+          hodiny_skutocne?: number | null
+          id?: string
+          pm?: string | null
+          project_name?: string | null
+          source?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
       production_inbox: {
         Row: {
           adhoc_reason: string | null
@@ -692,48 +728,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      project_hours_log: {
-        Row: {
-          ami_project_id: string | null
-          created_at: string | null
-          datum_sync: string | null
-          hodiny_plan: number | null
-          hodiny_skutocne: number | null
-          id: string
-          pm: string | null
-          project_name: string | null
-          rozdiel: number | null
-          source: string | null
-          status: string | null
-        }
-        Insert: {
-          ami_project_id?: string | null
-          created_at?: string | null
-          datum_sync?: string | null
-          hodiny_plan?: number | null
-          hodiny_skutocne?: number | null
-          id?: string
-          pm?: string | null
-          project_name?: string | null
-          rozdiel?: number | null
-          source?: string | null
-          status?: string | null
-        }
-        Update: {
-          ami_project_id?: string | null
-          created_at?: string | null
-          datum_sync?: string | null
-          hodiny_plan?: number | null
-          hodiny_skutocne?: number | null
-          id?: string
-          pm?: string | null
-          project_name?: string | null
-          rozdiel?: number | null
-          source?: string | null
-          status?: string | null
-        }
-        Relationships: []
       }
       project_stages: {
         Row: {
