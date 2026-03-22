@@ -4371,17 +4371,25 @@ function QcDefectForm({
     const files = e.target.files;
     if (!files || files.length === 0) return;
     setPhotoUploading(true);
+    const qcUserSuffix = profile?.full_name
+      ? profile.full_name.trim().split(" ").pop()!
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+      : "user";
     try {
-      for (const file of Array.from(files)) {
+      const filesArray = Array.from(files);
+      for (let idx = 0; idx < filesArray.length; idx++) {
+        const file = filesArray[idx];
         const now = new Date();
         const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-        const timeStr = `${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}`;
+        const timeStr = `${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
+        const idxSuffix = filesArray.length > 1 ? `-${idx + 1}` : "";
         const itemLabel =
           defectItemId === "__bundle__"
             ? "bundle"
             : availableItems.find((i) => i.id === defectItemId)?.item_code || "item";
         const ext = file.name.split(".").pop() || "jpg";
-        const autoName = `${projectId}-Vada-${itemLabel}-${dateStr}-${timeStr}.${ext}`;
+        const autoName = `${projectId}-QC-${itemLabel}-${dateStr}-${timeStr}${idxSuffix}-${qcUserSuffix}.${ext}`;
         const renamedFile = new File([file], autoName, { type: file.type });
         const result = await uploadFile("fotky", renamedFile);
         if (result?.downloadUrl) {
