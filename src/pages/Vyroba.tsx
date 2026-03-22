@@ -307,7 +307,9 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   // Week navigation
   const [weekOffset, setWeekOffset] = useState(0);
-  const [weekSlideClass, setWeekSlideClass] = useState("");
+  const pagerRef = useRef<HTMLDivElement>(null);
+  const pagerCenteringRef = useRef(false);
+  const PAGER_OFFSETS = [-2, -1, 0, 1, 2] as const;
   const currentMonday = useMemo(() => addWeeks(getMonday(new Date()), weekOffset), [weekOffset]);
   const weekKey = weekKeyStr(currentMonday);
   const weekNum = getISOWeekNumber(currentMonday);
@@ -317,7 +319,30 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return f;
   }, [currentMonday]);
 
-  // Data
+  // Pager: center on mount and after week change
+  useEffect(() => {
+    if (!isMobile) return;
+    const el = pagerRef.current;
+    if (!el) return;
+    pagerCenteringRef.current = true;
+    el.scrollLeft = el.offsetWidth * 2; // center slide (index 2)
+    requestAnimationFrame(() => { pagerCenteringRef.current = false; });
+  }, [weekOffset, isMobile]);
+
+  // Pager: detect scroll-snap end and update weekOffset
+  const handlePagerScrollEnd = useCallback(() => {
+    if (pagerCenteringRef.current) return;
+    const el = pagerRef.current;
+    if (!el) return;
+    const slideWidth = el.offsetWidth;
+    if (slideWidth === 0) return;
+    const currentSlide = Math.round(el.scrollLeft / slideWidth);
+    const delta = currentSlide - 2; // 2 = center
+    if (delta !== 0) {
+      setWeekOffset(w => w + delta);
+    }
+  }, []);
+
   const { data: scheduleData } = useProductionSchedule();
   const { data: dailyLogsMap } = useProductionDailyLogs(weekKey);
 
@@ -1543,74 +1568,210 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       </div>
 
       {/* ═══ BODY ═══ */}
-      <div
-        className="flex flex-1 min-h-0 overflow-hidden"
-        {...(isMobile
-          ? {
-              onTouchStart: (e: React.TouchEvent) => {
-                const t = e.touches[0];
-                if (t.clientX < 30) return;
-                (e.currentTarget as any)._weekSwipe = { startX: t.clientX, startTime: Date.now() };
-                const el = e.currentTarget.querySelector('.week-content-area') as HTMLElement;
-                if (el) el.style.transition = 'none';
-              },
-              onTouchMove: (e: React.TouchEvent) => {
-                const sw = (e.currentTarget as any)._weekSwipe;
-                if (!sw) return;
-                const dx = e.touches[0].clientX - sw.startX;
-                const el = e.currentTarget.querySelector('.week-content-area') as HTMLElement;
-                if (el) el.style.transform = `translateX(${dx}px)`;
-              },
-              onTouchEnd: (e: React.TouchEvent) => {
-                const sw = (e.currentTarget as any)._weekSwipe;
-                if (!sw) return;
-                (e.currentTarget as any)._weekSwipe = null;
-                const dx = e.changedTouches[0].clientX - sw.startX;
-                const el = e.currentTarget.querySelector('.week-content-area') as HTMLElement;
-                if (!el) return;
-                const threshold = window.innerWidth * 0.35;
-                if (Math.abs(dx) > threshold) {
-                  const dir = dx > 0 ? -1 : 1;
-                  // 1. Animate current content OFF screen in drag direction
-                  el.style.transition = 'transform 160ms ease-in, opacity 160ms';
-                  el.style.transform = `translateX(${dir > 0 ? '-110%' : '110%'})`;
-                  el.style.opacity = '0';
-                  setTimeout(() => {
-                    // 2. Switch week (new content loads)
-                    setWeekOffset(w => w + dir);
-                    // 3. Position new content on opposite side (instant, no transition)
-                    el.style.transition = 'none';
-                    el.style.transform = `translateX(${dir > 0 ? '60px' : '-60px'})`;
-                    el.style.opacity = '0';
-                    void el.offsetWidth; // force reflow
-                    // 4. Animate new content IN from opposite side
-                    el.style.transition = 'transform 200ms ease-out, opacity 160ms';
-                    el.style.transform = 'translateX(0)';
-                    el.style.opacity = '1';
-                  }, 160);
-                } else {
-                  // Snap back to original position with spring
-                  el.style.transition = 'transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1)';
-                  el.style.transform = 'translateX(0)';
-                }
-              },
-            }
-          : {})}
-      >
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         <div className="flex-1 min-w-0 flex min-h-0">
-          {/* ═══ LEFT PANEL ═══ */}
-          <div
-            key={isMobile ? weekKey : undefined}
-            className={`shrink-0 flex flex-col overflow-y-auto week-content-area ${isMobile ? "w-full" : "w-[252px]"} ${isMobile ? weekSlideClass : ''}`}
-            style={{
-              borderRight: isMobile ? "none" : "1px solid #e5e2dd",
-              background: isMobile ? "hsl(var(--background))" : "#ffffff",
-              paddingTop: isMobile ? 8 : 0,
-              paddingBottom: isMobile ? 100 : 0,
-            }}
-          >
-            {/* Capacity bar — hidden on mobile */}
-            {!isMobile && (
+          {isMobile ? (
+            /* ═══ MOBILE: scroll-snap pager ═══ */
+            <div
+              ref={pagerRef}
+              className="flex flex-1 min-h-0 overflow-x-auto overflow-y-hidden scrollbar-hide"
+              style={{
+                scrollSnapType: 'x mandatory',
+                scrollBehavior: 'auto',
+                WebkitOverflowScrolling: 'touch',
+                scrollbarWidth: 'none',
+              }}
+              onScroll={(e) => {
+                clearTimeout((e.currentTarget as any)._scrollTimer);
+                (e.currentTarget as any)._scrollTimer = setTimeout(() => handlePagerScrollEnd(), 120);
+              }}
+            >
+              {PAGER_OFFSETS.map(offset => {
+                const slideMonday = addWeeks(getMonday(new Date()), weekOffset + offset);
+                const slideWeekKey = weekKeyStr(slideMonday);
+                const slideWeekNum = getISOWeekNumber(slideMonday);
+                const isCenter = offset === 0;
+                return (
+                  <div
+                    key={slideWeekKey}
+                    className="flex-none w-full min-h-0 overflow-y-auto week-content-area shrink-0 flex flex-col"
+                    style={{
+                      scrollSnapAlign: 'start',
+                      scrollSnapStop: 'always',
+                      background: "hsl(var(--background))",
+                      paddingTop: 8,
+                      paddingBottom: 100,
+                    }}
+                  >
+                    {isCenter ? (
+                      /* Center slide: full content */
+                      <>
+                        <div
+                          className="px-3 py-1.5 text-[10px] uppercase font-semibold"
+                          style={{ color: "#6b7280", borderBottom: "1px solid #f0eeea" }}
+                        >
+                          Projekty v T{weekNum} ({enrichedProjects.filter((p) => !p.isPaused).length})
+                        </div>
+                        {enrichedProjects.length === 0 ? (
+                          <div className="flex-1 flex items-center justify-center p-4 text-center">
+                            <span className="text-sm" style={{ color: "#99a5a3" }}>
+                              Žádné projekty v tomto týdnu
+                            </span>
+                          </div>
+                        ) : (
+                          <>
+                            {spilledProjects.length > 0 && (
+                              <div
+                                className="px-3 py-1 text-[9px] uppercase font-semibold"
+                                style={{ color: "#d97706", borderBottom: "1px solid #f0eeea" }}
+                              >
+                                Přelité z minulého týdne ({spilledProjects.length})
+                              </div>
+                            )}
+                            {spilledProjects.map((p) => (
+                              <ProjectRow
+                                key={p.projectId}
+                                project={p}
+                                isSelected={selectedProjectId === p.projectId}
+                                onSelect={handleSelectProject}
+                                onContextMenu={handleContextMenu}
+                                getProjectStatus={getProjectStatus}
+                                getBundleProgress={() => getBundleProgress(p.projectId)}
+                                getLatestPhase={getLatestPhase}
+                                statusColors={statusColors}
+                                weeklyGoal={getWeeklyGoal(p.projectId)}
+                                isMobile={isMobile}
+                              />
+                            ))}
+                            {normalProjects.length > 0 && spilledProjects.length > 0 && (
+                              <div
+                                className="px-3 py-1 text-[9px] uppercase font-semibold"
+                                style={{ color: "#6b7280", borderBottom: "1px solid #f0eeea" }}
+                              >
+                                Naplánované v T{weekNum} ({normalProjects.length})
+                              </div>
+                            )}
+                            {normalProjects.map((p) => (
+                              <ProjectRow
+                                key={p.projectId}
+                                project={p}
+                                isSelected={selectedProjectId === p.projectId}
+                                onSelect={handleSelectProject}
+                                onContextMenu={handleContextMenu}
+                                getProjectStatus={getProjectStatus}
+                                getBundleProgress={() => getBundleProgress(p.projectId)}
+                                getLatestPhase={getLatestPhase}
+                                statusColors={statusColors}
+                                weeklyGoal={getWeeklyGoal(p.projectId)}
+                                isMobile={isMobile}
+                              />
+                            ))}
+                            {pausedProjects.length > 0 && (
+                              <>
+                                <div
+                                  className="px-3 py-1 text-[9px] uppercase font-semibold"
+                                  style={{ color: "#99a5a3", borderBottom: "1px solid #f0eeea" }}
+                                >
+                                  ⏸ Pozastavené ({pausedProjects.length})
+                                </div>
+                                {pausedProjects.map((p) => {
+                                  const isSelected = selectedProjectId === p.projectId;
+                                  const expectedDate = p.pauseExpectedDate ? new Date(p.pauseExpectedDate) : null;
+                                  const now = new Date();
+                                  const daysUntil = expectedDate
+                                    ? Math.ceil((expectedDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                                    : null;
+                                  const dateColor =
+                                    daysUntil === null
+                                      ? "#99a5a3"
+                                      : daysUntil < 0
+                                        ? "#dc2626"
+                                        : daysUntil <= 7
+                                          ? "#d97706"
+                                          : "#3a8a36";
+                                  return (
+                                    <button
+                                      key={p.projectId}
+                                      onClick={() => handleSelectProject(p.projectId)}
+                                      onContextMenu={(e) => handleContextMenu(e, p.projectId)}
+                                      className="w-full text-left flex items-stretch transition-colors"
+                                      style={{
+                                        background: isSelected ? "#fafaf8" : "transparent",
+                                        borderBottom: "1px solid #f0eeea",
+                                        outline: isSelected ? "2px solid #99a5a3" : undefined,
+                                        outlineOffset: -2,
+                                        opacity: 0.7,
+                                      }}
+                                    >
+                                      <div className="w-[4px] shrink-0 rounded-r-sm" style={{ background: "#99a5a3" }} />
+                                      <div className="flex-1 px-2.5 py-[5px] min-w-0">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                          <span className="truncate" style={{ fontSize: 14, fontWeight: 500, color: "#6b7280" }}>
+                                            {p.projectName}
+                                          </span>
+                                          <span
+                                            className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0"
+                                            style={{ backgroundColor: "rgba(107,122,120,0.1)", color: "#6b7280" }}
+                                          >
+                                            ⏸
+                                          </span>
+                                          {daysUntil !== null && daysUntil < 0 && (
+                                            <span
+                                              className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0"
+                                              style={{ backgroundColor: "rgba(220,38,38,0.1)", color: "#dc2626" }}
+                                            >
+                                              !
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                          <span className="font-sans" style={{ fontSize: 11, color: "#99a5a3" }}>
+                                            {p.projectId}
+                                          </span>
+                                          {p.pauseReason && (
+                                            <>
+                                              <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
+                                              <span style={{ fontSize: 11, color: "#99a5a3" }}>{p.pauseReason}</span>
+                                            </>
+                                          )}
+                                          {expectedDate && (
+                                            <>
+                                              <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
+                                              <span style={{ fontSize: 11, color: dateColor }}>{fmtDateFull(expectedDate)}</span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </>
+                            )}
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      /* Adjacent slides: placeholder with week label */
+                      <div className="flex-1 flex items-center justify-center">
+                        <span className="text-sm font-semibold" style={{ color: "#99a5a3" }}>
+                          T{slideWeekNum}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* ═══ DESKTOP: single column ═══ */
+            <div
+              className="shrink-0 flex flex-col overflow-y-auto week-content-area w-[252px]"
+              style={{
+                borderRight: "1px solid #e5e2dd",
+                background: "#ffffff",
+              }}
+            >
+              {/* Capacity bar */}
               <div
                 className="px-3 py-2 flex items-center gap-2"
                 style={{ borderBottom: "1px solid #f0eeea", background: "#fafaf8" }}
@@ -1628,158 +1789,153 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                   {weekCapacity.used}h/{weekCapacity.total}h · {capacityPct}%
                 </span>
               </div>
-            )}
 
-            <div
-              className="px-3 py-1.5 text-[10px] uppercase font-semibold"
-              style={{ color: "#6b7280", borderBottom: "1px solid #f0eeea" }}
-            >
-              Projekty v T{weekNum} ({enrichedProjects.filter((p) => !p.isPaused).length})
-            </div>
-
-            {enrichedProjects.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center p-4 text-center">
-                <span className="text-sm" style={{ color: "#99a5a3" }}>
-                  Žádné projekty v tomto týdnu
-                </span>
+              <div
+                className="px-3 py-1.5 text-[10px] uppercase font-semibold"
+                style={{ color: "#6b7280", borderBottom: "1px solid #f0eeea" }}
+              >
+                Projekty v T{weekNum} ({enrichedProjects.filter((p) => !p.isPaused).length})
               </div>
-            ) : (
-              <>
-                {/* Spilled section */}
-                {spilledProjects.length > 0 && (
-                  <div
-                    className="px-3 py-1 text-[9px] uppercase font-semibold"
-                    style={{ color: "#d97706", borderBottom: "1px solid #f0eeea" }}
-                  >
-                    Přelité z minulého týdne ({spilledProjects.length})
-                  </div>
-                )}
-                {spilledProjects.map((p) => (
-                  <ProjectRow
-                    key={p.projectId}
-                    project={p}
-                    isSelected={selectedProjectId === p.projectId}
-                    onSelect={handleSelectProject}
-                    onContextMenu={handleContextMenu}
-                    getProjectStatus={getProjectStatus}
-                    getBundleProgress={() => getBundleProgress(p.projectId)}
-                    getLatestPhase={getLatestPhase}
-                    statusColors={statusColors}
-                    weeklyGoal={getWeeklyGoal(p.projectId)}
-                    isMobile={isMobile}
-                  />
-                ))}
 
-                {/* Normal section */}
-                {normalProjects.length > 0 && spilledProjects.length > 0 && (
-                  <div
-                    className="px-3 py-1 text-[9px] uppercase font-semibold"
-                    style={{ color: "#6b7280", borderBottom: "1px solid #f0eeea" }}
-                  >
-                    Naplánované v T{weekNum} ({normalProjects.length})
-                  </div>
-                )}
-                {normalProjects.map((p) => (
-                  <ProjectRow
-                    key={p.projectId}
-                    project={p}
-                    isSelected={selectedProjectId === p.projectId}
-                    onSelect={handleSelectProject}
-                    onContextMenu={handleContextMenu}
-                    getProjectStatus={getProjectStatus}
-                    getBundleProgress={() => getBundleProgress(p.projectId)}
-                    getLatestPhase={getLatestPhase}
-                    statusColors={statusColors}
-                    weeklyGoal={getWeeklyGoal(p.projectId)}
-                    isMobile={isMobile}
-                  />
-                ))}
-
-                {/* Paused section */}
-                {pausedProjects.length > 0 && (
-                  <>
+              {enrichedProjects.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center p-4 text-center">
+                  <span className="text-sm" style={{ color: "#99a5a3" }}>
+                    Žádné projekty v tomto týdnu
+                  </span>
+                </div>
+              ) : (
+                <>
+                  {spilledProjects.length > 0 && (
                     <div
                       className="px-3 py-1 text-[9px] uppercase font-semibold"
-                      style={{ color: "#99a5a3", borderBottom: "1px solid #f0eeea" }}
+                      style={{ color: "#d97706", borderBottom: "1px solid #f0eeea" }}
                     >
-                      ⏸ Pozastavené ({pausedProjects.length})
+                      Přelité z minulého týdne ({spilledProjects.length})
                     </div>
-                    {pausedProjects.map((p) => {
-                      const isSelected = selectedProjectId === p.projectId;
-                      const expectedDate = p.pauseExpectedDate ? new Date(p.pauseExpectedDate) : null;
-                      const now = new Date();
-                      const daysUntil = expectedDate
-                        ? Math.ceil((expectedDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-                        : null;
-                      const dateColor =
-                        daysUntil === null
-                          ? "#99a5a3"
-                          : daysUntil < 0
-                            ? "#dc2626"
-                            : daysUntil <= 7
-                              ? "#d97706"
-                              : "#3a8a36";
-                      return (
-                        <button
-                          key={p.projectId}
-                          onClick={() => handleSelectProject(p.projectId)}
-                          onContextMenu={(e) => handleContextMenu(e, p.projectId)}
-                          className="w-full text-left flex items-stretch transition-colors"
-                          style={{
-                            background: isSelected ? "#fafaf8" : "transparent",
-                            borderBottom: "1px solid #f0eeea",
-                            outline: isSelected ? "2px solid #99a5a3" : undefined,
-                            outlineOffset: -2,
-                            opacity: 0.7,
-                          }}
-                        >
-                          <div className="w-[4px] shrink-0 rounded-r-sm" style={{ background: "#99a5a3" }} />
-                          <div className="flex-1 px-2.5 py-[5px] min-w-0">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <span className="truncate" style={{ fontSize: 14, fontWeight: 500, color: "#6b7280" }}>
-                                {p.projectName}
-                              </span>
-                              <span
-                                className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0"
-                                style={{ backgroundColor: "rgba(107,122,120,0.1)", color: "#6b7280" }}
-                              >
-                                ⏸
-                              </span>
-                              {daysUntil !== null && daysUntil < 0 && (
+                  )}
+                  {spilledProjects.map((p) => (
+                    <ProjectRow
+                      key={p.projectId}
+                      project={p}
+                      isSelected={selectedProjectId === p.projectId}
+                      onSelect={handleSelectProject}
+                      onContextMenu={handleContextMenu}
+                      getProjectStatus={getProjectStatus}
+                      getBundleProgress={() => getBundleProgress(p.projectId)}
+                      getLatestPhase={getLatestPhase}
+                      statusColors={statusColors}
+                      weeklyGoal={getWeeklyGoal(p.projectId)}
+                      isMobile={isMobile}
+                    />
+                  ))}
+                  {normalProjects.length > 0 && spilledProjects.length > 0 && (
+                    <div
+                      className="px-3 py-1 text-[9px] uppercase font-semibold"
+                      style={{ color: "#6b7280", borderBottom: "1px solid #f0eeea" }}
+                    >
+                      Naplánované v T{weekNum} ({normalProjects.length})
+                    </div>
+                  )}
+                  {normalProjects.map((p) => (
+                    <ProjectRow
+                      key={p.projectId}
+                      project={p}
+                      isSelected={selectedProjectId === p.projectId}
+                      onSelect={handleSelectProject}
+                      onContextMenu={handleContextMenu}
+                      getProjectStatus={getProjectStatus}
+                      getBundleProgress={() => getBundleProgress(p.projectId)}
+                      getLatestPhase={getLatestPhase}
+                      statusColors={statusColors}
+                      weeklyGoal={getWeeklyGoal(p.projectId)}
+                      isMobile={isMobile}
+                    />
+                  ))}
+                  {pausedProjects.length > 0 && (
+                    <>
+                      <div
+                        className="px-3 py-1 text-[9px] uppercase font-semibold"
+                        style={{ color: "#99a5a3", borderBottom: "1px solid #f0eeea" }}
+                      >
+                        ⏸ Pozastavené ({pausedProjects.length})
+                      </div>
+                      {pausedProjects.map((p) => {
+                        const isSelected = selectedProjectId === p.projectId;
+                        const expectedDate = p.pauseExpectedDate ? new Date(p.pauseExpectedDate) : null;
+                        const now = new Date();
+                        const daysUntil = expectedDate
+                          ? Math.ceil((expectedDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                          : null;
+                        const dateColor =
+                          daysUntil === null
+                            ? "#99a5a3"
+                            : daysUntil < 0
+                              ? "#dc2626"
+                              : daysUntil <= 7
+                                ? "#d97706"
+                                : "#3a8a36";
+                        return (
+                          <button
+                            key={p.projectId}
+                            onClick={() => handleSelectProject(p.projectId)}
+                            onContextMenu={(e) => handleContextMenu(e, p.projectId)}
+                            className="w-full text-left flex items-stretch transition-colors"
+                            style={{
+                              background: isSelected ? "#fafaf8" : "transparent",
+                              borderBottom: "1px solid #f0eeea",
+                              outline: isSelected ? "2px solid #99a5a3" : undefined,
+                              outlineOffset: -2,
+                              opacity: 0.7,
+                            }}
+                          >
+                            <div className="w-[4px] shrink-0 rounded-r-sm" style={{ background: "#99a5a3" }} />
+                            <div className="flex-1 px-2.5 py-[5px] min-w-0">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="truncate" style={{ fontSize: 14, fontWeight: 500, color: "#6b7280" }}>
+                                  {p.projectName}
+                                </span>
                                 <span
                                   className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0"
-                                  style={{ backgroundColor: "rgba(220,38,38,0.1)", color: "#dc2626" }}
+                                  style={{ backgroundColor: "rgba(107,122,120,0.1)", color: "#6b7280" }}
                                 >
-                                  !
+                                  ⏸
                                 </span>
-                              )}
+                                {daysUntil !== null && daysUntil < 0 && (
+                                  <span
+                                    className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0"
+                                    style={{ backgroundColor: "rgba(220,38,38,0.1)", color: "#dc2626" }}
+                                  >
+                                    !
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="font-sans" style={{ fontSize: 11, color: "#99a5a3" }}>
+                                  {p.projectId}
+                                </span>
+                                {p.pauseReason && (
+                                  <>
+                                    <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
+                                    <span style={{ fontSize: 11, color: "#99a5a3" }}>{p.pauseReason}</span>
+                                  </>
+                                )}
+                                {expectedDate && (
+                                  <>
+                                    <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
+                                    <span style={{ fontSize: 11, color: dateColor }}>{fmtDateFull(expectedDate)}</span>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="font-sans" style={{ fontSize: 11, color: "#99a5a3" }}>
-                                {p.projectId}
-                              </span>
-                              {p.pauseReason && (
-                                <>
-                                  <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
-                                  <span style={{ fontSize: 11, color: "#99a5a3" }}>{p.pauseReason}</span>
-                                </>
-                              )}
-                              {expectedDate && (
-                                <>
-                                  <span style={{ fontSize: 11, color: "#d0cdc8" }}>·</span>
-                                  <span style={{ fontSize: 11, color: dateColor }}>{fmtDateFull(expectedDate)}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </>
-                )}
-              </>
-            )}
-          </div>
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {/* ═══ DETAIL PANEL (desktop) ═══ */}
           {!isMobile && (
