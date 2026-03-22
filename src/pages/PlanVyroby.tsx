@@ -10,7 +10,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { useAuth } from "@/hooks/useAuth";
-import { ProductionHeader } from "@/components/production/ProductionHeader";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { InboxPanel } from "@/components/production/InboxPanel";
 import { ForecastSafetyNet } from "@/components/production/ForecastSafetyNet";
