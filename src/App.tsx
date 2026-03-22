@@ -3,7 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import SplashScreen from "@/components/SplashScreen";
 import { PeopleManagementProvider } from "@/components/PeopleManagementContext";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { UndoRedoProvider } from "@/hooks/useUndoRedo";
@@ -175,8 +176,18 @@ function VersionCheckBootstrap() {
 }
 
 const App = () => {
+  const isMobilePWA = window.matchMedia('(display-mode: standalone)').matches;
+  const [appReady, setAppReady] = useState(!isMobilePWA);
+
+  useEffect(() => {
+    if (!isMobilePWA) return;
+    const timer = setTimeout(() => setAppReady(true), 800);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
+      {!appReady && isMobilePWA && <SplashScreen />}
       <VersionCheckBootstrap />
       <TooltipProvider>
         <AuthProvider>
