@@ -169,9 +169,9 @@ function renderCell(
       if (saveCurrency && !ro("prodejni_cena")) {
         return <TableCell key={key} className="text-right"><CurrencyEditCell value={p.prodejni_cena} currency={p.currency || "CZK"} onSave={(a, c) => saveCurrency(p.id, a, c, String(p.prodejni_cena ?? ""), p.currency || "CZK")} /></TableCell>;
       }
-      return <TableCell key={key} className="text-right"><span className="text-xs font-mono">{formatCurrency(p.prodejni_cena, p.currency || "CZK")}</span></TableCell>;
+      return <TableCell key={key} className="text-right"><span className="text-xs font-sans">{formatCurrency(p.prodejni_cena, p.currency || "CZK")}</span></TableCell>;
     case "marze":
-      return <TableCell key={key} className="text-right"><InlineEditableCell value={marzeStorageToInput(p.marze)} onSave={(x) => s("marze", marzeInputToStorage(x) || "", v("marze"))} readOnly={ro("marze")} displayValue={<span className="text-xs font-mono">{formatMarze(p.marze)}</span>} /></TableCell>;
+      return <TableCell key={key} className="text-right"><InlineEditableCell value={marzeStorageToInput(p.marze)} onSave={(x) => s("marze", marzeInputToStorage(x) || "", v("marze"))} readOnly={ro("marze")} displayValue={<span className="text-xs font-sans">{formatMarze(p.marze)}</span>} /></TableCell>;
     case "pm":
       return <TableCell key={key}><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(x) => s("pm", x, v("pm"))} readOnly={ro("pm")} /></TableCell>;
     case "status":

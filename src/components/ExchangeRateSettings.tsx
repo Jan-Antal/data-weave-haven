@@ -76,7 +76,7 @@ export function ExchangeRateSettings({ open, onOpenChange }: Props) {
                   </TableRow>
                 ) : rates.map((rate) => (
                   <TableRow key={rate.id}>
-                    <TableCell className="font-mono text-sm">{rate.year}</TableCell>
+                    <TableCell className="font-sans text-sm">{rate.year}</TableCell>
                     <TableCell>
                       {editingId === rate.id && !isTestUser ? (
                         <Input

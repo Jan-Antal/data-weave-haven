@@ -205,7 +205,7 @@ function ByWeeksTab({ items, weeks, onConfirm, onCancel }: { items: PlanningItem
                     type="number"
                     value={w.hours || ""}
                     onChange={e => setWeekHours(w.key, parseFloat(e.target.value) || 0)}
-                    className="w-[70px] h-7 text-xs font-mono text-right"
+                    className="w-[70px] h-7 text-xs font-sans text-right"
                     min={0}
                   />
                   <span className="text-[10px] text-muted-foreground">h</span>
@@ -221,7 +221,7 @@ function ByWeeksTab({ items, weeks, onConfirm, onCancel }: { items: PlanningItem
       <div className="space-y-1.5 px-1">
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground">
-            Přiřazeno: <span className="font-mono font-medium text-foreground">{Math.round(effectiveAssigned)}h</span> / {Math.round(totalHours)}h
+            Přiřazeno: <span className="font-sans font-medium text-foreground">{Math.round(effectiveAssigned)}h</span> / {Math.round(totalHours)}h
           </span>
           {isOver && (
             <span className="text-xs font-medium" style={{ color: "#D97706" }}>
@@ -415,10 +415,10 @@ function ByItemsTab({ items, weeks, onConfirm, onCancel }: { items: PlanningItem
               <div className="flex items-center gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    {a.item_code && <span className="font-mono text-[10px] font-medium text-foreground">{a.item_code}</span>}
+                    {a.item_code && <span className="font-sans text-[10px] font-medium text-foreground">{a.item_code}</span>}
                     <span className="text-xs truncate text-muted-foreground">{a.item_name}</span>
                   </div>
-                  <span className="text-[10px] font-mono text-muted-foreground">{Math.round(a.estimated_hours)}h</span>
+                  <span className="text-[10px] font-sans text-muted-foreground">{Math.round(a.estimated_hours)}h</span>
                 </div>
 
                 {!a.isSplit && (
@@ -460,7 +460,7 @@ function ByItemsTab({ items, weeks, onConfirm, onCancel }: { items: PlanningItem
                         type="number"
                         value={part.hours || ""}
                         onChange={e => setSplitPartHours(a.id, pi, parseFloat(e.target.value) || 0)}
-                        className="w-[60px] h-6 text-[10px] font-mono text-right"
+                        className="w-[60px] h-6 text-[10px] font-sans text-right"
                         min={0}
                         max={a.estimated_hours}
                       />
@@ -509,7 +509,7 @@ function ByItemsTab({ items, weeks, onConfirm, onCancel }: { items: PlanningItem
             const over = used > total;
             return (
               <div key={key} className="flex items-center gap-2">
-                <span className="text-[9px] font-mono w-[80px] shrink-0 text-muted-foreground">{w.label.split("·")[0]?.trim()}</span>
+                <span className="text-[9px] font-sans w-[80px] shrink-0 text-muted-foreground">{w.label.split("·")[0]?.trim()}</span>
                 <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ backgroundColor: "hsl(var(--muted))" }}>
                   <div
                     className="h-full rounded-full transition-all"
@@ -519,7 +519,7 @@ function ByItemsTab({ items, weeks, onConfirm, onCancel }: { items: PlanningItem
                     }}
                   />
                 </div>
-                <span className="text-[9px] font-mono shrink-0" style={{ color: over ? "#DC2626" : "hsl(var(--muted-foreground))" }}>
+                <span className="text-[9px] font-sans shrink-0" style={{ color: over ? "#DC2626" : "hsl(var(--muted-foreground))" }}>
                   {Math.round(used)}/{Math.round(total)}h
                 </span>
               </div>

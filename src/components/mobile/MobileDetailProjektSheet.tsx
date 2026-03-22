@@ -166,7 +166,7 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
 
         {/* Header */}
         <div className="px-4 pb-3 shrink-0" style={{ borderBottom: "0.5px solid hsl(var(--border))" }}>
-          <p className="text-[11px] font-mono text-muted-foreground">{project.project_id}</p>
+          <p className="text-[11px] font-sans text-muted-foreground">{project.project_id}</p>
           <div className="flex items-center gap-2 mt-0.5">
             <p className="text-[15px] font-semibold text-foreground truncate min-w-0 flex-1">{project.project_name}</p>
             {project.status && <StatusBadge status={project.status} />}
@@ -321,7 +321,7 @@ function TPVTabContent({ items, currency }: { items: any[]; currency: string }) 
           style={{ borderBottom: idx < items.length - 1 ? "0.5px solid hsl(var(--border))" : undefined }}
         >
            <div className="min-w-0 flex-1 flex items-baseline gap-1.5">
-            <span className="text-[12px] font-bold font-mono text-foreground shrink-0">{item.item_name}</span>
+            <span className="text-[12px] font-bold font-sans text-foreground shrink-0">{item.item_name}</span>
              {item.item_type && (
                <span className="text-[12px] text-muted-foreground truncate">{item.item_type}</span>
              )}

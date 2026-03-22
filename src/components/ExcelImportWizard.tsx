@@ -558,7 +558,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                     <tbody>
                       {EXAMPLE_ROWS.map((r, i) => (
                         <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-blue-50/50"}>
-                          <td className="px-3 py-1 font-mono text-blue-800">{r.kod}</td>
+                          <td className="px-3 py-1 font-sans text-blue-800">{r.kod}</td>
                           <td className="px-3 py-1 font-semibold">{r.nazev}</td>
                           <td className="px-3 py-1 text-muted-foreground">{r.popis}</td>
                           <td className="px-3 py-1 text-right">{r.pocet}</td>

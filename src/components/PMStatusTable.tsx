@@ -143,7 +143,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
         </div>
       </TableCell>
       {v("project_id") && (
-        <TableCell className="font-mono text-xs truncate pl-4 text-muted-foreground">
+        <TableCell className="font-sans text-xs truncate pl-4 text-muted-foreground">
           {(() => {
             const suffix = stage.stage_name.startsWith(project.project_id + "-")
               ? stage.stage_name.slice(project.project_id.length + 1)

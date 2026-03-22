@@ -343,7 +343,7 @@ export function SplitItemDialog({
           <div className="text-[13px] font-semibold" style={{ color: "#223937" }}>
             ✂ Rozdělit: {cleanName}
           </div>
-          <div className="text-[11px] font-mono mt-0.5" style={{ color: "#99a5a3" }}>
+          <div className="text-[11px] font-sans mt-0.5" style={{ color: "#99a5a3" }}>
             Celkem {totalHours}h
           </div>
         </div>
@@ -374,7 +374,7 @@ export function SplitItemDialog({
             {editingPart === 1 ? (
               <input
                 type="number"
-                className="font-mono text-[16px] font-bold w-full bg-transparent border-b outline-none text-center"
+                className="font-sans text-[16px] font-bold w-full bg-transparent border-b outline-none text-center"
                 style={{ color: "#223937", borderColor: "#3a8a36" }}
                 value={editValue}
                 onChange={e => setEditValue(e.target.value)}
@@ -384,7 +384,7 @@ export function SplitItemDialog({
               />
             ) : (
               <div
-                className="font-mono text-[16px] font-bold text-center cursor-pointer rounded px-1 transition-colors"
+                className="font-sans text-[16px] font-bold text-center cursor-pointer rounded px-1 transition-colors"
                 style={{ color: "#223937" }}
                 onClick={() => handleHoursClick(1)}
                 onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#f0eee9")}
@@ -413,7 +413,7 @@ export function SplitItemDialog({
             {editingPart === 2 ? (
               <input
                 type="number"
-                className="font-mono text-[16px] font-bold w-full bg-transparent border-b outline-none text-center"
+                className="font-sans text-[16px] font-bold w-full bg-transparent border-b outline-none text-center"
                 style={{ color: "#223937", borderColor: "#3a8a36" }}
                 value={editValue}
                 onChange={e => setEditValue(e.target.value)}
@@ -423,7 +423,7 @@ export function SplitItemDialog({
               />
             ) : (
               <div
-                className="font-mono text-[16px] font-bold text-center cursor-pointer rounded px-1 transition-colors"
+                className="font-sans text-[16px] font-bold text-center cursor-pointer rounded px-1 transition-colors"
                 style={{ color: "#223937" }}
                 onClick={() => handleHoursClick(2)}
                 onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#f0eee9")}

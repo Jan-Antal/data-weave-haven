@@ -290,7 +290,7 @@ function DraggableSafetyNetRow({
             {project.project_name}
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="font-mono text-[10px]" style={{ color: "#5c706f" }}>{project.project_id}</span>
+            <span className="font-sans text-[10px]" style={{ color: "#5c706f" }}>{project.project_id}</span>
             {deadlineInfo ? (
               <span className="text-[9px] font-medium" style={{ color: deadlineInfo.color }}>
                 · {deadlineInfo.label}: {deadlineInfo.dateStr}
@@ -307,7 +307,7 @@ function DraggableSafetyNetRow({
             <Check className="h-3 w-3 flex-shrink-0" style={{ color: "#d97706" }} />
           )}
           <div className="flex flex-col items-end gap-0.5">
-            <span className="font-mono text-[11px] font-semibold" style={{ color: "#7aa8a4" }}>
+            <span className="font-sans text-[11px] font-semibold" style={{ color: "#7aa8a4" }}>
               ~{project.estimated_hours}h
             </span>
             {onRestore && !isMultiSelected && (
@@ -342,7 +342,7 @@ function DraggableSafetyNetRow({
                   style={{ paddingLeft: 16, borderLeft: "1px solid #2a3d3a", marginLeft: 8, fontSize: 11 }}
                 >
                   {item.item_code && (
-                    <span className="font-mono shrink-0" style={{ color: "#5c706f", fontSize: 10 }}>
+                    <span className="font-sans shrink-0" style={{ color: "#5c706f", fontSize: 10 }}>
                       {item.item_code}
                     </span>
                   )}
@@ -350,7 +350,7 @@ function DraggableSafetyNetRow({
                     {item.item_name}
                   </span>
                   {item.hours != null && (
-                    <span className="font-mono shrink-0" style={{ color: "#5c706f", fontSize: 10 }}>
+                    <span className="font-sans shrink-0" style={{ color: "#5c706f", fontSize: 10 }}>
                       {Math.round(item.hours)}h
                     </span>
                   )}

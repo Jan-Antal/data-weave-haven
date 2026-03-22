@@ -161,7 +161,7 @@ function DraggableForecastSubItem({
       
       <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: s.codeColor }} />
       {item.item_code &&
-      <span className="font-mono text-[9px] font-bold shrink-0" style={{ color: s.codeColor }}>
+      <span className="font-sans text-[9px] font-bold shrink-0" style={{ color: s.codeColor }}>
           {item.item_code}
         </span>
       }
@@ -169,7 +169,7 @@ function DraggableForecastSubItem({
         {item.item_name}
       </span>
       {item.hours > 0 &&
-      <span className="font-mono text-[9px] shrink-0" style={{ color: s.hoursColor, opacity: 0.7 }}>
+      <span className="font-sans text-[9px] shrink-0" style={{ color: s.hoursColor, opacity: 0.7 }}>
           {item.hours}h
         </span>
       }
@@ -387,7 +387,7 @@ function ForecastCard({
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span
-                  className="text-[9px] font-mono"
+                  className="text-[9px] font-sans"
                   style={{ color: style.codeColor }}>
                   {block.project_id}
                 </span>
@@ -448,7 +448,7 @@ function ForecastCard({
                           {style.hoursPrefix}{displayMode === "czk" ? formatCompactCzk(block.estimated_hours * hourlyRate) : displayMode === "percent" ? `${weeklyCapacity > 0 ? Math.round(block.estimated_hours / weeklyCapacity * 100) : 0}%` : `${block.estimated_hours}h`}
                         </span>
                       </TooltipTrigger>
-                      <TooltipContent side="left" className="max-w-xs p-3 text-xs font-mono leading-relaxed" style={{ backgroundColor: "#1C1F26", borderColor: "#2a2d35", color: "#e5e5e5" }}>
+                      <TooltipContent side="left" className="max-w-xs p-3 text-xs font-sans leading-relaxed" style={{ backgroundColor: "#1C1F26", borderColor: "#2a2d35", color: "#e5e5e5" }}>
                         <CalculationTooltipContent detail={block.calculation_detail} />
                       </TooltipContent>
                     </Tooltip>

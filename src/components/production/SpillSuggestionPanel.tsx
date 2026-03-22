@@ -417,11 +417,11 @@ export function SpillSuggestionPanel({
                     {bd.projectName}
                   </span>
                   {mode === "split" && (
-                    <span className="font-mono text-[8px] font-semibold shrink-0" style={{ color: "#223937" }}>
+                    <span className="font-sans text-[8px] font-semibold shrink-0" style={{ color: "#223937" }}>
                       {bundlePct}%
                     </span>
                   )}
-                  <span className="font-mono text-[8px] shrink-0" style={{ color: "#99a5a3" }}>
+                  <span className="font-sans text-[8px] shrink-0" style={{ color: "#99a5a3" }}>
                     {mode === "split" && bundleSpillHours > 0 ? `${bundleSpillHours}h/` : ""}{Math.round(bd.totalHours)}h
                   </span>
                   <button
@@ -465,14 +465,14 @@ export function SpillSuggestionPanel({
                               onCheckedChange={() => toggleItem(item.id)}
                             />
                             {item.item_code && (
-                              <span className="font-mono shrink-0" style={{ color: "#223937", fontSize: 8 }}>
+                              <span className="font-sans shrink-0" style={{ color: "#223937", fontSize: 8 }}>
                                 {item.item_code}
                               </span>
                             )}
                             <span className="flex-1 truncate" style={{ color: "#6b7a78" }}>
                               {item.item_name}
                             </span>
-                            <span className="font-mono shrink-0" style={{ color: "#99a5a3" }}>
+                            <span className="font-sans shrink-0" style={{ color: "#99a5a3" }}>
                               {item.scheduled_hours}h
                             </span>
                           </label>
@@ -480,17 +480,17 @@ export function SpillSuggestionPanel({
                           <div className="px-1 py-[2px]">
                             <div className="flex items-center gap-1.5 text-[8px] mb-[2px]">
                               {item.item_code && (
-                                <span className="font-mono shrink-0" style={{ color: "#223937" }}>
+                                <span className="font-sans shrink-0" style={{ color: "#223937" }}>
                                   {item.item_code}
                                 </span>
                               )}
                               <span className="flex-1 truncate" style={{ color: "#6b7a78" }}>
                                 {item.item_name}
                               </span>
-                              <span className="font-mono shrink-0 font-semibold" style={{ color: "#223937" }}>
+                              <span className="font-sans shrink-0 font-semibold" style={{ color: "#223937" }}>
                                 {splitPcts[item.id] || 0}%
                               </span>
-                              <span className="font-mono shrink-0" style={{ color: "#99a5a3" }}>
+                              <span className="font-sans shrink-0" style={{ color: "#99a5a3" }}>
                                 {Math.round(item.scheduled_hours * (splitPcts[item.id] || 0) / 100)}h
                               </span>
                             </div>
@@ -512,7 +512,7 @@ export function SpillSuggestionPanel({
         </div>
 
         {/* Live summary */}
-        <div className="mt-1 text-[8px] font-mono text-center" style={{ color: splitModeSufficient ? "#3a8a36" : "#dc3545" }}>
+        <div className="mt-1 text-[8px] font-sans text-center" style={{ color: splitModeSufficient ? "#3a8a36" : "#dc3545" }}>
           Přelije se: {Math.round(totalSpillHours)}h / Potřeba: {Math.round(overloadHours)}h
           {splitModeSufficient ? " ✓" : ""}
         </div>

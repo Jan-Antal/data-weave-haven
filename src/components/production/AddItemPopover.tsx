@@ -107,7 +107,7 @@ export function AddItemPopover({ open, onOpenChange, projectId, projectName, all
               value={code}
               onChange={e => setCode(e.target.value)}
               placeholder="např. TK.99"
-              className="w-full text-[11px] px-2.5 py-1.5 rounded-md bg-transparent outline-none font-mono"
+              className="w-full text-[11px] px-2.5 py-1.5 rounded-md bg-transparent outline-none font-sans"
               style={{ border: "1px solid #e2ddd6", color: "#223937" }}
             />
           </div>
@@ -132,7 +132,7 @@ export function AddItemPopover({ open, onOpenChange, projectId, projectName, all
               onChange={e => setHours(e.target.value)}
               placeholder="0"
               min={1}
-              className="w-full text-[11px] px-2.5 py-1.5 rounded-md bg-transparent outline-none font-mono"
+              className="w-full text-[11px] px-2.5 py-1.5 rounded-md bg-transparent outline-none font-sans"
               style={{ border: "1px solid #e2ddd6", color: "#223937" }}
             />
           </div>

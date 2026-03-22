@@ -1172,7 +1172,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                 {(() => {
                   const totalInboxH = filteredRows.reduce((s, p) => s + p.inboxTotalHours, 0);
                   return totalInboxH > 0 ? (
-                    <div className="text-[10px] font-mono font-bold mt-0.5" style={{ color: "#EA580C" }}>
+                    <div className="text-[10px] font-sans font-bold mt-0.5" style={{ color: "#EA580C" }}>
                       {Math.round(totalInboxH).toLocaleString("cs-CZ")}h
                     </div>
                   ) : null;
@@ -1222,7 +1222,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                     />
                   </div>
                   {/* Hours row */}
-                  <div className="flex items-center justify-between mt-[3px] font-mono text-[9px]">
+                  <div className="flex items-center justify-between mt-[3px] font-sans text-[9px]">
                     <div>
                       <span className="font-bold" style={{ color: barColor }}>{Math.round(used)}h</span>
                       <span className="text-muted-foreground"> / {cap}h</span>
@@ -1321,7 +1321,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                           fontWeight: (proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0)) ? 400 : 500,
                         }}>{proj.projectName}</div>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-muted-foreground font-mono leading-tight">{proj.projectId}</span>
+                          <span className="text-[10px] text-muted-foreground font-sans leading-tight">{proj.projectId}</span>
                           {(() => {
                             const pd = projectDateLookup.get(proj.projectId);
                             if (!pd) return null;
@@ -1381,7 +1381,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                         );
                       })()}
                       <div
-                        className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-mono font-bold"
+                        className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-sans font-bold"
                         style={{ backgroundColor: proj.color + "18", color: proj.color }}
                       >
                         {formatProjectTotal(proj)}
@@ -1395,7 +1395,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                         style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff", borderTop: "1px solid #e5e2dd", borderBottom: "1px solid #e5e2dd" }}
                       >
                         {proj.inboxTotalHours > 0 && (
-                          <div className="rounded-md px-2 py-0.5 text-center text-[10px] font-mono font-bold" style={{ backgroundColor: "#ffedd5", color: "#c2410c" }}>
+                          <div className="rounded-md px-2 py-0.5 text-center text-[10px] font-sans font-bold" style={{ backgroundColor: "#ffedd5", color: "#c2410c" }}>
                             {formatInboxValue(proj.inboxTotalHours, proj.inboxTotalCzk, proj.totalHours, proj.projectId)}
                           </div>
                         )}
@@ -1420,7 +1420,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                             const cellStyle = getCollapsedCellStyle(proj, week.key);
                             return (
                               <div
-                                className="w-full rounded px-1 py-0.5 text-center text-[9px] font-mono font-bold"
+                                className="w-full rounded px-1 py-0.5 text-center text-[9px] font-sans font-bold"
                                 style={{ backgroundColor: cellStyle.bg, color: cellStyle.text, border: `1px solid ${cellStyle.border}` }}
                               >
                                 {formatWeekTotal(wt.hours, wt.czk, week.key, proj.projectId)}
@@ -1445,7 +1445,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                         }}
                       >
                         {proj.expediceTotalHours > 0 && (
-                          <div className="rounded-md px-2 py-0.5 text-center text-[10px] font-mono font-bold" style={{ backgroundColor: "#dcfce7", color: "#15803d" }}>
+                          <div className="rounded-md px-2 py-0.5 text-center text-[10px] font-sans font-bold" style={{ backgroundColor: "#dcfce7", color: "#15803d" }}>
                             ✓ {formatExpediceValue(proj.expediceTotalHours, proj.expediceTotalCzk, proj.totalHours, proj.projectId)}
                           </div>
                         )}
@@ -1498,10 +1498,10 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                             }}
                           >
                             {item.itemCode && (
-                              <span className="font-mono font-bold text-[11px] shrink-0" style={{ color: "#223937" }}>{item.itemCode}</span>
+                              <span className="font-sans font-bold text-[11px] shrink-0" style={{ color: "#223937" }}>{item.itemCode}</span>
                             )}
                             <span className="text-[12px] truncate text-foreground">{item.itemName}</span>
-                            <span className="text-[10px] font-mono shrink-0 ml-auto" style={{ color: "#99a5a3" }}>{formatItemTotal(item, item.projectId)}</span>
+                            <span className="text-[10px] font-sans shrink-0 ml-auto" style={{ color: "#99a5a3" }}>{formatItemTotal(item, item.projectId)}</span>
                           </div>
                           {/* Inbox cell */}
                           {hasAnyInbox && (
@@ -1511,7 +1511,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                               style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff" }}
                             >
                               {item.inboxHours > 0 && (
-                                <div className="rounded-md px-2 py-0.5 text-center text-[9px] font-mono font-semibold" style={{ backgroundColor: "#ffedd5", color: "#c2410c" }}>
+                                <div className="rounded-md px-2 py-0.5 text-center text-[9px] font-sans font-semibold" style={{ backgroundColor: "#ffedd5", color: "#c2410c" }}>
                                   {formatInboxValue(item.inboxHours, item.inboxCzk, item.totalHours, item.projectId)}
                                 </div>
                               )}
@@ -1574,7 +1574,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                             >
                               {item.expediceHours > 0 && (
                                 <div
-                                  className="rounded-md px-2 py-0.5 text-center text-[9px] font-mono font-semibold"
+                                  className="rounded-md px-2 py-0.5 text-center text-[9px] font-sans font-semibold"
                                   style={{ backgroundColor: "#dcfce7", color: "#15803d" }}
                                 >
                                   ✓ {formatExpediceValue(item.expediceHours, item.expediceCzk, item.totalHours, item.projectId)}
@@ -1752,7 +1752,7 @@ function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCe
       <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setShowMoveList(false); }}>
         <PopoverTrigger asChild>
           <button
-            className="w-full text-center text-[9px] font-mono font-semibold transition-all"
+            className="w-full text-center text-[9px] font-sans font-semibold transition-all"
             style={{
               backgroundColor: cellStyle.bg,
               color: cellStyle.text,
@@ -1830,7 +1830,7 @@ function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCe
                       onClick={() => handleAction(() => onMoveToWeek(ids, tw.key))}
                     >
                       <span className="font-medium">{tw.label}</span>
-                      <span className="font-mono text-[9px] text-muted-foreground">
+                      <span className="font-sans text-[9px] text-muted-foreground">
                         {Math.round(remaining)}h volno
                       </span>
                     </button>

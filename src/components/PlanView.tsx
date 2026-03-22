@@ -984,7 +984,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                   >
                     <ExpandButton expanded={isExp} onClick={() => {}} hasStages={(stagesByProject.get(p.project_id)?.length ?? 0) > 0} />
                   </div>
-                  <span className="text-xs font-mono text-primary whitespace-nowrap shrink-0 cursor-pointer hover:underline px-2" style={{ width: 110, minWidth: 110 }} onClick={() => setEditProject(p)}>{p.project_id}</span>
+                  <span className="text-xs font-sans text-primary whitespace-nowrap shrink-0 cursor-pointer hover:underline px-2" style={{ width: 110, minWidth: 110 }} onClick={() => setEditProject(p)}>{p.project_id}</span>
                   <span className="text-xs font-medium truncate cursor-pointer hover:underline px-2" style={{ width: 180, minWidth: 180, maxWidth: 180 }} onClick={() => setEditProject(p)}>{p.project_name}</span>
                 </div>
                 {isExp && <SubstageLeftRows projectId={p.project_id} project={p} statusColorMap={statusColorMap} onClickStage={(stage) => { setEditStage(stage); setEditStageProject(p); }} hoveredRow={hoveredRow} setHoveredRow={setHoveredRow} />}
@@ -1160,7 +1160,7 @@ function SubstageLeftRows({ projectId, project, statusColorMap, onClickStage, ho
                {barData.warnings.length > 0 && <WarningIcon warnings={barData.warnings} />}
              </div>
              <div style={{ width: 36, minWidth: 36, maxWidth: 36 }} />
-            <span className="text-xs font-mono text-muted-foreground truncate pl-4 px-2 cursor-pointer hover:underline" style={{ width: 110, minWidth: 110 }} onClick={() => onClickStage(stage)}>{stage.stage_name}</span>
+            <span className="text-xs font-sans text-muted-foreground truncate pl-4 px-2 cursor-pointer hover:underline" style={{ width: 110, minWidth: 110 }} onClick={() => onClickStage(stage)}>{stage.stage_name}</span>
             <span className="text-xs text-muted-foreground truncate px-2" style={{ width: 180, minWidth: 180, maxWidth: 180 }} title={(stage as any).display_name || project.project_name}>{(stage as any).display_name || project.project_name}</span>
           </div>
         );

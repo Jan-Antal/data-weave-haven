@@ -214,7 +214,7 @@ export function AutoSplitPopover({
               <div className="text-[11px] font-semibold" style={{ color: "#223937" }}>
                 Rozdělit
               </div>
-              <div className="text-[10px] font-mono" style={{ color: "#6b7a78" }}>
+              <div className="text-[10px] font-sans" style={{ color: "#6b7a78" }}>
                 {splitViable ? <>{part1Hours}h → T{targetWeekNum}<br />{part2Hours}h → T{spillWeekNum}</> : "Nelze rozdělit (0h)"}
               </div>
             </div>

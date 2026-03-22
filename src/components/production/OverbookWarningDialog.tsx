@@ -91,16 +91,16 @@ export function OverbookWarningDialog({ open, onOpenChange, overbookedWeeks }: O
                 const color = w.utilizationPct > 115 ? "#ef4444" : "#f59e0b";
                 return (
                   <tr key={w.week} style={{ borderBottom: "1px solid #2d2800" }}>
-                    <td className="py-2 px-2 font-mono text-xs">
+                    <td className="py-2 px-2 font-sans text-xs">
                       <span className="font-bold" style={{ color }}>
                         T{wn}
                       </span>
                       <span className="ml-1.5 opacity-70">{range}</span>
                     </td>
-                    <td className="py-2 px-2 text-right font-bold font-mono text-xs" style={{ color }}>
+                    <td className="py-2 px-2 text-right font-bold font-sans text-xs" style={{ color }}>
                       {w.utilizationPct}%
                     </td>
-                    <td className="py-2 px-2 text-right font-mono text-xs">
+                    <td className="py-2 px-2 text-right font-sans text-xs">
                       {w.hoursScheduled}h / {w.capacity}h
                     </td>
                     <td className="py-2 px-2 text-xs max-w-[200px] truncate" title={w.projectsInWeek.join(", ")}>

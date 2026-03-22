@@ -142,10 +142,10 @@ export function CancelItemDialog({
           <div className="px-3 py-2 rounded-md" style={{ backgroundColor: "#fafaf8", border: "1px solid #ece8e2" }}>
             <div className="flex items-center gap-2">
               {itemCode && (
-                <span className="font-mono text-[10px] font-bold" style={{ color: "#223937" }}>{itemCode}</span>
+                <span className="font-sans text-[10px] font-bold" style={{ color: "#223937" }}>{itemCode}</span>
               )}
               <span className="text-[11px] font-medium" style={{ color: "#223937" }}>{cleanName}</span>
-              <span className="font-mono text-[10px] ml-auto" style={{ color: "#6b7a78" }}>{hours}h</span>
+              <span className="font-sans text-[10px] ml-auto" style={{ color: "#6b7a78" }}>{hours}h</span>
             </div>
             <div className="text-[10px] mt-0.5" style={{ color: "#99a5a3" }}>
               Projekt: {projectName} ({projectId})

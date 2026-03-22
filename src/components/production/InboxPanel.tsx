@@ -700,7 +700,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
                 <div className="flex-1 min-w-0">
                   <div className="truncate" style={{ fontSize: 12, fontWeight: 500, color: "#6b7280" }}>{p.project_name}</div>
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono" style={{ fontSize: 10, color: "#9ca3af" }}>{p.project_id}</span>
+                    <span className="font-sans" style={{ fontSize: 10, color: "#9ca3af" }}>{p.project_id}</span>
                     {p.missing > 0 && (
                       <span style={{ fontSize: 10, color: "#d97706", fontWeight: 500 }}>· chybí {p.missing} pol.</span>
                     )}
@@ -834,7 +834,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
                 <div className="flex-1 min-w-0">
                   <div className="truncate" style={{ fontSize: 12, fontWeight: 500, color: isMultiSelected ? "#92400e" : "#6b7280" }}>{p.project_name}</div>
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono" style={{ fontSize: 10, color: "#9ca3af" }}>{p.project_id}</span>
+                    <span className="font-sans" style={{ fontSize: 10, color: "#9ca3af" }}>{p.project_id}</span>
                     {reserveDeadlineDisplay && (
                       <span style={{ fontSize: 10, color: reserveDeadlineDisplay.color }}>· {reserveDeadlineDisplay.label}: {reserveDeadlineDisplay.dateStr}</span>
                     )}
@@ -1014,7 +1014,7 @@ function MissingItemProjectCard({ progress, projectInfo, urgency, daysLabel, isS
             </span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="font-mono" style={{ fontSize: 11, color: "#6b7280" }}>{progress.project_id}</span>
+            <span className="font-sans" style={{ fontSize: 11, color: "#6b7280" }}>{progress.project_id}</span>
             {deadlineDisplay && (
               <span style={{ fontSize: 11, color: deadlineDisplay.color }}>· {deadlineDisplay.label}: {deadlineDisplay.dateStr}</span>
             )}
@@ -1027,9 +1027,9 @@ function MissingItemProjectCard({ progress, projectInfo, urgency, daysLabel, isS
           {progress.scheduled_items.map(si => (
             <div key={si.id} className="flex items-center gap-1.5 px-2 py-[3px] rounded-[5px]" style={{ opacity: si.status === "completed" ? 0.6 : 0.7 }}>
               <span style={{ fontSize: 11, color: si.status === "completed" ? "#3a8a36" : "#3b82f6" }}>{si.status === "completed" ? "✓" : "→"}</span>
-              {si.item_code && <span className="font-mono shrink-0" style={{ fontSize: 11, color: si.status === "completed" ? "#9ca3af" : "#223937", fontWeight: 500 }}>{si.item_code}</span>}
+              {si.item_code && <span className="font-sans shrink-0" style={{ fontSize: 11, color: si.status === "completed" ? "#9ca3af" : "#223937", fontWeight: 500 }}>{si.item_code}</span>}
               <span className="flex-1 truncate" style={{ fontSize: 12, color: si.status === "completed" ? "#9ca3af" : "#4b5563" }}>{si.item_name}</span>
-              <span className="font-mono shrink-0" style={{ fontSize: 11, color: "#6b7280" }}>{si.week_label}</span>
+              <span className="font-sans shrink-0" style={{ fontSize: 11, color: "#6b7280" }}>{si.week_label}</span>
             </div>
           ))}
           {progress.missing > 0 && (
@@ -1157,7 +1157,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
             )}
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="font-mono" style={{ fontSize: 11, color: "#6b7280" }}>{project.project_id}</span>
+            <span className="font-sans" style={{ fontSize: 11, color: "#6b7280" }}>{project.project_id}</span>
             {deadlineDisplay && (
               <span style={{ fontSize: 11, color: deadlineDisplay.color }}>· {deadlineDisplay.label}: {deadlineDisplay.dateStr}</span>
             )}
@@ -1165,7 +1165,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
           {progress && <div className="mt-1"><ProjectProgressBar progress={progress} compact /></div>}
         </div>
         <div className="text-right shrink-0">
-          <span className="font-mono" style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 700 }}>
+          <span className="font-sans" style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 700 }}>
             {displayMode === "czk" ? formatCompactCzk(project.total_hours * hourlyRate) : `${Math.round(project.total_hours)}h`}
           </span>
         </div>
@@ -1175,9 +1175,9 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
           {progress?.scheduled_items.map(si => (
             <div key={si.id} className="flex items-center gap-1.5 px-2 py-[3px] rounded-[5px]" style={{ opacity: si.status === "completed" ? 0.6 : 0.7 }}>
               <span style={{ fontSize: 11, color: si.status === "completed" ? "#3a8a36" : "#3b82f6" }}>{si.status === "completed" ? "✓" : "→"}</span>
-              {si.item_code && <span className="font-mono shrink-0" style={{ fontSize: 11, color: si.status === "completed" ? "#9ca3af" : "#223937", fontWeight: 500 }}>{si.item_code}</span>}
+              {si.item_code && <span className="font-sans shrink-0" style={{ fontSize: 11, color: si.status === "completed" ? "#9ca3af" : "#223937", fontWeight: 500 }}>{si.item_code}</span>}
               <span className="flex-1 truncate" style={{ fontSize: 12, color: si.status === "completed" ? "#9ca3af" : "#4b5563" }}>{si.item_name}</span>
-              <span className="font-mono shrink-0" style={{ fontSize: 11, color: "#6b7280" }}>{si.week_label}</span>
+              <span className="font-sans shrink-0" style={{ fontSize: 11, color: "#6b7280" }}>{si.week_label}</span>
             </div>
           ))}
           {project.items.map((item) => (
@@ -1315,9 +1315,9 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
       {adhocBadge && (
         <span className="text-[8px] shrink-0" title={adhocBadge.label}>{adhocBadge.emoji}</span>
       )}
-      {item.item_code && <span className="font-mono shrink-0" style={{ fontSize: 11, color: "#223937", fontWeight: 500 }}>{item.item_code}</span>}
+      {item.item_code && <span className="font-sans shrink-0" style={{ fontSize: 11, color: "#223937", fontWeight: 500 }}>{item.item_code}</span>}
       <span className="flex-1 truncate" style={{ fontSize: 12, color: "#4b5563" }}>{item.item_name}</span>
-      <span className="font-mono text-[10px] shrink-0" style={{ color: "#1a1a1a", fontWeight: 700 }}>{displayMode === "czk" ? formatCompactCzk(item.estimated_hours * hourlyRate) : `${item.estimated_hours}h`}</span>
+      <span className="font-sans text-[10px] shrink-0" style={{ color: "#1a1a1a", fontWeight: 700 }}>{displayMode === "czk" ? formatCompactCzk(item.estimated_hours * hourlyRate) : `${item.estimated_hours}h`}</span>
     </div>
   );
 }
