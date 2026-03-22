@@ -146,13 +146,7 @@ function PersistentDesktopHeader() {
 function AppRoutes() {
   const { user, loading, profile } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Načítání...</p>
-      </div>
-    );
-  }
+  if (loading) return null;
 
   if (!user) {
     return (
