@@ -24,11 +24,14 @@ export function useProductionDailyLogs(weekKey: string) {
         qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [qc, weekKey]);
 
   return useQuery({
     queryKey: ["production-daily-logs", weekKey],
+    staleTime: 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("production_daily_logs" as any)
@@ -54,9 +57,11 @@ export async function saveDailyLog(
   dayIndex: number,
   phase: string | null,
   percent: number,
-  noteText?: string | null
+  noteText?: string | null,
 ) {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const payload: any = {
     bundle_id: bundleId,
     week_key: weekKey,
@@ -69,7 +74,8 @@ export async function saveDailyLog(
   if (noteText !== undefined) {
     payload.note_text = noteText;
   }
-  const { error } = await (supabase.from("production_daily_logs" as any) as any)
-    .upsert(payload, { onConflict: "bundle_id,week_key,day_index" });
+  const { error } = await (supabase.from("production_daily_logs" as any) as any).upsert(payload, {
+    onConflict: "bundle_id,week_key,day_index",
+  });
   if (error) throw error;
 }
