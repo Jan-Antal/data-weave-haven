@@ -5,11 +5,11 @@ interface SplashScreenProps {
 }
 
 export default function SplashScreen({ onComplete }: SplashScreenProps) {
-  const [visible, setVisible] = useState(false);
+  const [contentVisible, setContentVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
 
   useEffect(() => {
-    const t1 = setTimeout(() => setVisible(true), 50);
+    const t1 = setTimeout(() => setContentVisible(true), 50);
     const t2 = setTimeout(() => setExiting(true), 1800);
     const t3 = setTimeout(() => onComplete?.(), 2200);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
@@ -20,24 +20,29 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 99999,
+        zIndex: 999999,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
         background: "#223937",
-        transition: "opacity 400ms ease",
-        opacity: exiting ? 0 : visible ? 1 : 0,
+        overflow: "hidden",
+        transition: exiting ? "opacity 400ms ease" : undefined,
+        opacity: exiting ? 0 : 1,
         pointerEvents: exiting ? "none" : "auto",
       }}
     >
       {/* Official AM Interior logo — white on dark green */}
-      <div style={{ width: 220, marginBottom: 32 }}>
+      <div style={{
+        width: 220, marginBottom: 32,
+        transition: "opacity 400ms ease",
+        opacity: contentVisible ? 1 : 0,
+      }}>
         <AmiLogo />
       </div>
 
       {/* Loader dots — centred below logo, orange per brand */}
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8, transition: "opacity 400ms ease", opacity: contentVisible ? 1 : 0 }}>
         {[0, 1, 2].map((i) => (
           <div
             key={i}
