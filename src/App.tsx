@@ -184,7 +184,7 @@ function AppRoutes() {
       <PeopleManagementProvider>
         <BrowserRouter>
           <RealtimeSyncProvider />
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden', background: '#f8f7f4' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100svh', overflow: 'hidden', background: '#f8f7f4' }}>
             <PersistentDesktopHeader />
             <main style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
               <Routes>
