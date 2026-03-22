@@ -43,7 +43,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+    <div className="bg-background flex items-center justify-center px-4" style={{ minHeight: '100dvh' }}>
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <img src="/images/AM-Interior-orange.svg" alt="AM Interior" style={{ height: '32px', width: 'auto', margin: '0 auto' }} />
