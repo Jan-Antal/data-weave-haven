@@ -121,7 +121,7 @@ export function ProductionHeader({
               fetchPriority="high"
             />
             <span className="text-primary-foreground/40 text-sm">|</span>
-            <span className="text-primary-foreground/70 text-sm font-sans">{moduleLabel}</span>
+            <span className="text-primary-foreground/70 text-sm font-sans"><AnimatedTitle title={moduleLabel} /></span>
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
