@@ -45,7 +45,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
               width: 10,
               height: 10,
               borderRadius: "50%",
-              background: "#e07a2f",
+              background: "#ffffff",
               animation: `amiDot 1.2s ease-in-out ${i * 0.2}s infinite`,
             }}
           />
