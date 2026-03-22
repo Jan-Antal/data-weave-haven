@@ -168,12 +168,13 @@ function AppRoutes() {
   if (profile?.password_set === false) {
     return (
       <BrowserRouter>
-        <Routes>
-          <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route path="/set-password" element={<SetPassword />} />
-          
-          <Route path="*" element={<SetPassword />} />
-        </Routes>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
+          <Routes>
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/set-password" element={<SetPassword />} />
+            <Route path="*" element={<SetPassword />} />
+          </Routes>
+        </div>
       </BrowserRouter>
     );
   }
