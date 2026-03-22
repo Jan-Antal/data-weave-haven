@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
@@ -32,6 +32,35 @@ const ROLE_LABELS: Record<string, string> = {
   konstrukter: "Konstruktér",
   viewer: "Viewer",
 };
+
+function AnimatedTitle({ title }: { title: string }) {
+  const [displayed, setDisplayed] = useState(title);
+  const [animating, setAnimating] = useState(false);
+
+  useEffect(() => {
+    if (title === displayed) return;
+    setAnimating(true);
+    const t = setTimeout(() => {
+      setDisplayed(title);
+      setAnimating(false);
+    }, 200);
+    return () => clearTimeout(t);
+  }, [title]);
+
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        overflow: "hidden",
+        opacity: animating ? 0 : 1,
+        transform: animating ? "translateY(6px)" : "translateY(0px)",
+        transition: "opacity 200ms ease, transform 200ms ease",
+      }}
+    >
+      {displayed}
+    </span>
+  );
+}
 
 export function ProductionHeader({
   module = "plan-vyroby",
@@ -92,7 +121,7 @@ export function ProductionHeader({
               fetchPriority="high"
             />
             <span className="text-primary-foreground/40 text-sm">|</span>
-            <span className="text-primary-foreground/70 text-sm font-sans">{moduleLabel}</span>
+            <span className="text-primary-foreground/70 text-sm font-sans"><AnimatedTitle title={moduleLabel} /></span>
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
