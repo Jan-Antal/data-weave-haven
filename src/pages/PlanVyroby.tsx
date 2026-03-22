@@ -644,7 +644,7 @@ export default function PlanVyroby() {
       onDragEnd={handleDragEnd}
     >
       <div
-        className={cn("h-screen flex flex-col overflow-hidden transition-colors duration-300", isMobile && "pb-14")}
+        className={cn("h-full flex flex-col overflow-hidden transition-colors duration-300", isMobile && "pb-14")}
         style={{ backgroundColor: forecast.forecastActive ? "#1a2422" : "#f4f2f0" }}
       >
         {isMobile && <MobileHeader />}
