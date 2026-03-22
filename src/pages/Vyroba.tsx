@@ -4354,6 +4354,7 @@ function QcDefectForm({
   singleItemMode?: boolean;
 }) {
   const isMobile = useIsMobile();
+  const { profile } = useAuth();
   const { uploadFile } = useSharePointDocs(projectId);
   const [photoUploading, setPhotoUploading] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -4371,17 +4372,25 @@ function QcDefectForm({
     const files = e.target.files;
     if (!files || files.length === 0) return;
     setPhotoUploading(true);
+    const qcUserSuffix = profile?.full_name
+      ? profile.full_name.trim().split(" ").pop()!
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+      : "user";
     try {
-      for (const file of Array.from(files)) {
+      const filesArray = Array.from(files);
+      for (let idx = 0; idx < filesArray.length; idx++) {
+        const file = filesArray[idx];
         const now = new Date();
         const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-        const timeStr = `${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}`;
+        const timeStr = `${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
+        const idxSuffix = filesArray.length > 1 ? `-${idx + 1}` : "";
         const itemLabel =
           defectItemId === "__bundle__"
             ? "bundle"
             : availableItems.find((i) => i.id === defectItemId)?.item_code || "item";
         const ext = file.name.split(".").pop() || "jpg";
-        const autoName = `${projectId}-Vada-${itemLabel}-${dateStr}-${timeStr}.${ext}`;
+        const autoName = `${projectId}-QC-${itemLabel}-${dateStr}-${timeStr}${idxSuffix}-${qcUserSuffix}.${ext}`;
         const renamedFile = new File([file], autoName, { type: file.type });
         const result = await uploadFile("fotky", renamedFile);
         if (result?.downloadUrl) {
@@ -4910,12 +4919,15 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const failed: File[] = [];
-    for (const file of Array.from(files)) {
-      const captureDate = file.lastModified ? new Date(file.lastModified) : new Date();
-      const dateStr = `${captureDate.getFullYear()}-${String(captureDate.getMonth() + 1).padStart(2, "0")}-${String(captureDate.getDate()).padStart(2, "0")}`;
-      const timeStr = `${String(captureDate.getHours()).padStart(2, "0")}-${String(captureDate.getMinutes()).padStart(2, "0")}`;
+    const filesArray = Array.from(files);
+    for (let idx = 0; idx < filesArray.length; idx++) {
+      const file = filesArray[idx];
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const timeStr = `${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
+      const idxSuffix = filesArray.length > 1 ? `-${idx + 1}` : "";
       const ext = file.name.split(".").pop() || "jpg";
-      const autoName = `${projectId}-Log-${dateStr}-${timeStr}-${userSuffix}.${ext}`;
+      const autoName = `${projectId}-Log-${dateStr}-${timeStr}${idxSuffix}-${userSuffix}.${ext}`;
       const renamedFile = new File([file], autoName, { type: file.type });
       try {
         await uploadFile("fotky", renamedFile);
@@ -4939,12 +4951,14 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
     pendingRetryFiles.current = [];
     setRetryBannerVisible(false);
     const failed: File[] = [];
-    for (const file of filesToRetry) {
-      const captureDate = file.lastModified ? new Date(file.lastModified) : new Date();
-      const dateStr = `${captureDate.getFullYear()}-${String(captureDate.getMonth() + 1).padStart(2, "0")}-${String(captureDate.getDate()).padStart(2, "0")}`;
-      const timeStr = `${String(captureDate.getHours()).padStart(2, "0")}-${String(captureDate.getMinutes()).padStart(2, "0")}`;
+    for (let idx = 0; idx < filesToRetry.length; idx++) {
+      const file = filesToRetry[idx];
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const timeStr = `${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
+      const idxSuffix = filesToRetry.length > 1 ? `-${idx + 1}` : "";
       const ext = file.name.split(".").pop() || "jpg";
-      const autoName = `${projectId}-Log-${dateStr}-${timeStr}-${userSuffix}.${ext}`;
+      const autoName = `${projectId}-Log-${dateStr}-${timeStr}${idxSuffix}-${userSuffix}.${ext}`;
       const renamedFile = new File([file], autoName, { type: file.type });
       try {
         await uploadFile("fotky", renamedFile);
