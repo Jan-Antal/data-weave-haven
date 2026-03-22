@@ -623,7 +623,7 @@ export default function PlanVyroby() {
 
   if (isMobile) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-background px-6 text-center gap-4">
+      <div className="flex flex-col items-center justify-center h-full bg-background px-6 text-center gap-4">
         <p className="text-lg font-medium text-foreground">Plán Výroby je dostupný pouze na počítači</p>
         <button
           onClick={() => navigate("/")}
