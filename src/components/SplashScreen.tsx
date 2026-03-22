@@ -42,7 +42,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
       </div>
 
       {/* Loader dots — centred below logo, orange per brand */}
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8, transition: "opacity 400ms ease", opacity: contentVisible ? 1 : 0 }}>
         {[0, 1, 2].map((i) => (
           <div
             key={i}
