@@ -1567,15 +1567,30 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 const dx = e.changedTouches[0].clientX - sw.startX;
                 const el = e.currentTarget.querySelector('.week-content-area') as HTMLElement;
                 if (!el) return;
-                el.style.transition = 'none';
-                el.style.transform = 'translateX(0)';
-                el.style.opacity = '1';
                 const threshold = window.innerWidth * 0.35;
                 if (Math.abs(dx) > threshold) {
                   const dir = dx > 0 ? -1 : 1;
-                  setWeekSlideClass(dir > 0 ? 'week-slide-in-left' : 'week-slide-in-right');
-                  setWeekOffset(w => w + dir);
-                  setTimeout(() => setWeekSlideClass(''), 250);
+                  // 1. Animate current content OFF screen in drag direction
+                  el.style.transition = 'transform 160ms ease-in, opacity 160ms';
+                  el.style.transform = `translateX(${dir > 0 ? '-110%' : '110%'})`;
+                  el.style.opacity = '0';
+                  setTimeout(() => {
+                    // 2. Switch week (new content loads)
+                    setWeekOffset(w => w + dir);
+                    // 3. Position new content on opposite side (instant, no transition)
+                    el.style.transition = 'none';
+                    el.style.transform = `translateX(${dir > 0 ? '60px' : '-60px'})`;
+                    el.style.opacity = '0';
+                    void el.offsetWidth; // force reflow
+                    // 4. Animate new content IN from opposite side
+                    el.style.transition = 'transform 200ms ease-out, opacity 160ms';
+                    el.style.transform = 'translateX(0)';
+                    el.style.opacity = '1';
+                  }, 160);
+                } else {
+                  // Snap back to original position with spring
+                  el.style.transition = 'transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1)';
+                  el.style.transform = 'translateX(0)';
                 }
               },
             }
