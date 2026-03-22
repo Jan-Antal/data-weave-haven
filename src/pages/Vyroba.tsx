@@ -1207,6 +1207,20 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     setResetDataConfirmOpen(true);
   }
 
+  useEffect(() => {
+    const toggleHandler = () => toggleDataLog();
+    const resetHandler = () => {
+      void handleResetDataPreview();
+    };
+
+    window.addEventListener("desktop-header-toggle-datalog", toggleHandler);
+    window.addEventListener("desktop-header-vyroba-reset", resetHandler);
+    return () => {
+      window.removeEventListener("desktop-header-toggle-datalog", toggleHandler);
+      window.removeEventListener("desktop-header-vyroba-reset", resetHandler);
+    };
+  }, [toggleDataLog]);
+
   async function handleResetDataConfirm() {
     // Step 1: Delete future weeks (T14+)
     const { data: deleted1 } = await supabase

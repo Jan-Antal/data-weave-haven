@@ -154,6 +154,18 @@ export default function PlanVyroby() {
       return next;
     });
   }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("desktop-header-sync", {
+      detail: { dataLogOpen, forecastActive: forecast.forecastActive },
+    }));
+  }, [dataLogOpen, forecast.forecastActive]);
+
+  useEffect(() => {
+    const handler = () => toggleDataLog();
+    window.addEventListener("desktop-header-toggle-datalog", handler);
+    return () => window.removeEventListener("desktop-header-toggle-datalog", handler);
+  }, [toggleDataLog]);
   const [activeDrag, setActiveDrag] = useState<ActiveDragData | null>(null);
   const isDraggingFromInbox = activeDrag?.type === "inbox-item" || activeDrag?.type === "inbox-items" || activeDrag?.type === "inbox-project";
   const [overDroppableId, setOverDroppableId] = useState<string | null>(null);
