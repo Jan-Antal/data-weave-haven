@@ -406,8 +406,19 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     const el = pagerRef.current;
     if (!el) return;
     pagerCenteringRef.current = true;
-    el.scrollLeft = el.offsetWidth * 2; // center slide (index 2)
-    requestAnimationFrame(() => { pagerCenteringRef.current = false; });
+    const setCenter = () => {
+      if (el.offsetWidth > 0) {
+        el.style.scrollBehavior = 'auto';
+        el.scrollLeft = el.offsetWidth * 2;
+        requestAnimationFrame(() => {
+          el.style.scrollBehavior = '';
+          pagerCenteringRef.current = false;
+        });
+      } else {
+        requestAnimationFrame(setCenter);
+      }
+    };
+    setCenter();
   }, [weekOffset, isMobile]);
 
   // Pager: detect scroll-snap end and update weekOffset
@@ -1678,7 +1689,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 const slidePaused = slideProjects.filter((p) => p.isPaused);
                 return (
                   <div
-                    key={slideWeekKey}
+                    key={`pager-slide-${offset}`}
                     className="flex-none w-full min-h-0 overflow-y-auto week-content-area shrink-0 flex flex-col"
                     style={{
                       scrollSnapAlign: 'start',
