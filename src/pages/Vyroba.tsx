@@ -1936,6 +1936,9 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               )}
             </div>
           )}
+
+          {/* ═══ DETAIL PANEL (desktop) ═══ */}
+          {!isMobile && (
             <div className="flex-1 flex flex-col min-h-0">
               {!selectedProject ? (
                 <div className="flex-1 flex flex-col items-center justify-center gap-2" style={{ color: "#99a5a3" }}>
