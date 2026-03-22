@@ -124,6 +124,87 @@ function slugify(name: string): string {
     .slice(0, 20);
 }
 
+/** Compute VyrobaProject[] for any given week from the global schedule map */
+function getProjectsForWeek(
+  scheduleData: Map<string, any> | undefined,
+  slideWeekKey: string,
+  slideMonday: Date,
+  projectDetailsMap?: Map<string, any>,
+): VyrobaProject[] {
+  if (!scheduleData) return [];
+  const result: VyrobaProject[] = [];
+
+  // Current week bundles
+  const silo = scheduleData.get(slideWeekKey);
+  if (silo) {
+    for (const b of silo.bundles) {
+      const isPaused = b.items.every((i: ScheduleItem) => i.status === "paused");
+      if (
+        b.items.some(
+          (i: ScheduleItem) =>
+            i.status === "scheduled" ||
+            i.status === "in_progress" ||
+            i.status === "paused" ||
+            i.status === "completed",
+        )
+      ) {
+        result.push({
+          projectId: b.project_id,
+          projectName: b.project_name,
+          totalHours: b.total_hours,
+          scheduleItems: b.items,
+          color: getProjectColor(b.project_id),
+          isSpilled: false,
+          isPaused,
+          pauseReason: isPaused ? b.items[0]?.pause_reason : null,
+          pauseExpectedDate: isPaused ? b.items[0]?.pause_expected_date : null,
+        });
+      }
+    }
+  }
+
+  // Spilled: preceding week
+  const prevMonday = new Date(slideMonday);
+  prevMonday.setDate(prevMonday.getDate() - 7);
+  const prevWeekKey = weekKeyStr(prevMonday);
+  const prevSilo = scheduleData.get(prevWeekKey);
+  if (prevSilo) {
+    for (const b of prevSilo.bundles) {
+      if (result.some((r) => r.projectId === b.project_id)) continue;
+      const activeItems = b.items.filter((i: ScheduleItem) => i.status === "scheduled" || i.status === "in_progress");
+      if (activeItems.length === 0) continue;
+      result.push({
+        projectId: b.project_id,
+        projectName: b.project_name,
+        totalHours: activeItems.reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0),
+        scheduleItems: activeItems,
+        color: getProjectColor(b.project_id),
+        isSpilled: true,
+      });
+    }
+  }
+
+  // Enrich with project details if available
+  if (projectDetailsMap) {
+    for (let i = 0; i < result.length; i++) {
+      const detail = projectDetailsMap.get(result[i].projectId);
+      if (detail) {
+        const deadlineSrc = detail.expedice || detail.datum_smluvni || null;
+        const deadlineDate = deadlineSrc ? parseAppDate(deadlineSrc) : null;
+        result[i] = { ...result[i], pm: detail.pm, expedice: detail.expedice, deadline: deadlineDate, projectStatus: detail.status };
+      }
+    }
+  }
+
+  // Sort: spilled first, paused last
+  result.sort((a, b) => {
+    if (a.isPaused && !b.isPaused) return 1;
+    if (!a.isPaused && b.isPaused) return -1;
+    return (b.isSpilled ? 1 : 0) - (a.isSpilled ? 1 : 0);
+  });
+  return result;
+}
+
 const DAY_NAMES = ["Pondělí", "Úterý", "Středa", "Čtvrtek", "Pátek"];
 const DAY_SHORT = ["Po", "Út", "St", "Čt", "Pá"];
 
