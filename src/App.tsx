@@ -151,7 +151,7 @@ function AppRoutes() {
   if (!user) {
     return (
       <BrowserRouter>
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100svh', overflow: 'hidden' }}>
           <Routes>
             <Route path="/" element={<RootAuthRoute />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
@@ -168,7 +168,7 @@ function AppRoutes() {
   if (profile?.password_set === false) {
     return (
       <BrowserRouter>
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100svh', overflow: 'hidden' }}>
           <Routes>
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/set-password" element={<SetPassword />} />
@@ -184,7 +184,7 @@ function AppRoutes() {
       <PeopleManagementProvider>
         <BrowserRouter>
           <RealtimeSyncProvider />
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden', background: '#f8f7f4' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100svh', overflow: 'hidden', background: '#f8f7f4' }}>
             <PersistentDesktopHeader />
             <main style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
               <Routes>
