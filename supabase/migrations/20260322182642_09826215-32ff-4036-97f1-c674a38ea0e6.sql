@@ -1,0 +1,1 @@
+ALTER TABLE public.project_hours_log ADD CONSTRAINT project_hours_log_ami_project_id_datum_sync_key UNIQUE (ami_project_id, datum_sync);
