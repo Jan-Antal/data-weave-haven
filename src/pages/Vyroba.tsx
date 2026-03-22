@@ -278,6 +278,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       return next;
     });
   }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("desktop-header-sync", { detail: { dataLogOpen } }));
+  }, [dataLogOpen]);
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
 
   // Owner/Admin/Tester guard
@@ -1203,6 +1207,20 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     setResetDataConfirmOpen(true);
   }
 
+  useEffect(() => {
+    const toggleHandler = () => toggleDataLog();
+    const resetHandler = () => {
+      void handleResetDataPreview();
+    };
+
+    window.addEventListener("desktop-header-toggle-datalog", toggleHandler);
+    window.addEventListener("desktop-header-vyroba-reset", resetHandler);
+    return () => {
+      window.removeEventListener("desktop-header-toggle-datalog", toggleHandler);
+      window.removeEventListener("desktop-header-vyroba-reset", resetHandler);
+    };
+  }, [toggleDataLog]);
+
   async function handleResetDataConfirm() {
     // Step 1: Delete future weeks (T14+)
     const { data: deleted1 } = await supabase
@@ -1387,181 +1405,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       {!embedded && isMobile && (
         <MobileHeader onDataLog={toggleDataLog} showDataLog={isAdmin || role === "pm" || isOwner} />
       )}
-      {/* ═══ HEADER (desktop) ═══ */}
-      <header className="border-b bg-primary px-4 md:px-6 py-4 shrink-0 z-50 hidden md:block">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 shrink-0">
-            <img src="/images/AM-Interior-orange.svg" alt="AM Interior" width="180" height="24" style={{ height: '24px', width: 'auto', display: 'block', flexShrink: 0 }} fetchPriority="high" />
-            <span className="text-primary-foreground/40 text-sm hidden md:inline">|</span>
-            <span className="text-primary-foreground/70 text-sm font-sans hidden md:inline">Výroba</span>
-          </div>
-
-          <div className="flex items-center gap-1 shrink-0">
-            {/* Undo/Redo arrows */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => undo("vyroba")}
-                  disabled={!canUndo("vyroba")}
-                  className="p-2 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
-                >
-                  <Undo2 className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {canUndo("vyroba") ? `Zpět: ${lastUndoDescription("vyroba")}` : "Nic k vrácení"}
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => redo("vyroba")}
-                  disabled={!canRedo("vyroba")}
-                  className="p-2 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
-                >
-                  <Redo2 className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {canRedo("vyroba") ? `Obnovit: ${lastRedoDescription("vyroba")}` : "Nic k obnovení"}
-              </TooltipContent>
-            </Tooltip>
-
-            <span className="w-px h-5 bg-primary-foreground/20 mx-1 hidden md:block" />
-
-            <button
-              className="p-2 rounded-md text-primary-foreground bg-primary-foreground/10 transition-colors cursor-default"
-              title="Výroba"
-            >
-              <Factory className="h-5 w-5" />
-            </button>
-            {(isAdmin || isOwner) && (
-              <button
-                onClick={() => navigate("/plan-vyroby")}
-                className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
-                title="Plán Výroby"
-              >
-                <CalendarRange className="h-5 w-5" />
-              </button>
-            )}
-            <button
-              onClick={() => navigate("/")}
-              className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
-              title="Přehled"
-            >
-              <LayoutDashboard className="h-5 w-5" />
-            </button>
-
-            {/* DataLog icon button */}
-            {(isAdmin || role === "pm" || isOwner) && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={toggleDataLog}
-                    className={cn(
-                      "p-2 rounded-md transition-colors",
-                      dataLogOpen
-                        ? "text-primary-foreground bg-primary-foreground/10"
-                        : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10",
-                    )}
-                    title="Data Log"
-                  >
-                    <Clock className="h-5 w-5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Data Log</TooltipContent>
-              </Tooltip>
-            )}
-
-            <AdminInboxButton />
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors text-sm">
-                  <User className="h-4 w-4" />
-                  <span className="font-sans hidden md:inline">
-                    {profile?.full_name || profile?.email || "Uživatel"}
-                  </span>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setAccountSettingsOpen(true)}>
-                  <UserCog className="h-4 w-4 mr-2" /> Nastavení účtu
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={signOut}>
-                  <LogOut className="h-4 w-4 mr-2" /> Odhlásit se
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {(canAccessSettings || realRole === "owner") && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
-                    <Settings className="h-5 w-5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {canManageUsers && (
-                    <DropdownMenuItem onClick={() => setUserMgmtOpen(true)}>Správa uživatelů</DropdownMenuItem>
-                  )}
-                  {canManagePeople && <DropdownMenuItem onClick={openPeopleManagement}>Správa osob</DropdownMenuItem>}
-                  {canManageExchangeRates && (
-                    <DropdownMenuItem onClick={() => setExchangeRateOpen(true)}>Kurzovní lístek</DropdownMenuItem>
-                  )}
-                  {isAdmin && <DropdownMenuItem onClick={() => setCostPresetsOpen(true)}>Rozpad ceny</DropdownMenuItem>}
-                  {isAdmin && (
-                    <DropdownMenuItem onClick={() => setCapacitySettingsOpen(true)}>Kapacita výroby</DropdownMenuItem>
-                  )}
-                  {canManageStatuses && (
-                    <DropdownMenuItem onClick={() => setStatusMgmtOpen(true)}>Správa statusů</DropdownMenuItem>
-                  )}
-                  {canAccessRecycleBin && (
-                    <DropdownMenuItem onClick={() => setRecycleBinOpen(true)}>Koš</DropdownMenuItem>
-                  )}
-                  {isAdmin && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleResetDataPreview} className="text-destructive">
-                        🗑️ Reset dát výroby
-                      </DropdownMenuItem>
-                    </>
-                  )}
-
-
-                  {realRole === "owner" && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Zobrazit jako</div>
-                      {(["admin", "pm", "konstrukter", "viewer"] as const).map((r) => (
-                        <DropdownMenuItem
-                          key={r}
-                          onClick={() => setSimulatedRole(r === "admin" ? null : r)}
-                          className="flex items-center justify-between"
-                        >
-                          <span>
-                            {r === "admin"
-                              ? "Admin"
-                              : r === "pm"
-                                ? "PM"
-                                : r === "konstrukter"
-                                  ? "Konstruktér"
-                                  : "Viewer"}
-                          </span>
-                          {((r === "admin" && !simulatedRole) || simulatedRole === r) && (
-                            <Check className="h-4 w-4 text-green-600" />
-                          )}
-                        </DropdownMenuItem>
-                      ))}
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-        </div>
-      </header>
+      {/* Desktop header is rendered globally in App.tsx */}
 
       {/* TEST MODE banner */}
       {isTestUser && (

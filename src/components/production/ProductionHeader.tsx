@@ -1,6 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
@@ -17,6 +16,16 @@ import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDia
 import { CapacitySettings } from "@/components/production/CapacitySettings";
 import { cn } from "@/lib/utils";
 
+type HeaderModule = "index" | "plan-vyroby" | "vyroba";
+
+interface ProductionHeaderProps {
+  module?: HeaderModule;
+  forecastActive?: boolean;
+  dataLogOpen?: boolean;
+  onToggleDataLog?: () => void;
+  onOpenVyrobaReset?: () => void;
+}
+
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
   pm: "PM",
@@ -24,10 +33,30 @@ const ROLE_LABELS: Record<string, string> = {
   viewer: "Viewer",
 };
 
-export function ProductionHeader({ forecastActive, dataLogOpen, onToggleDataLog }: { forecastActive?: boolean; dataLogOpen?: boolean; onToggleDataLog?: () => void }) {
+export function ProductionHeader({
+  module = "plan-vyroby",
+  forecastActive,
+  dataLogOpen,
+  onToggleDataLog,
+  onOpenVyrobaReset,
+}: ProductionHeaderProps) {
   const navigate = useNavigate();
-  const { data: settings } = useProductionSettings();
-  const { canAccessSettings, isAdmin, isOwner, realRole, simulatedRole, setSimulatedRole, role, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, profile, signOut } = useAuth();
+  const {
+    canAccessSettings,
+    isAdmin,
+    isOwner,
+    realRole,
+    simulatedRole,
+    setSimulatedRole,
+    role,
+    canManageUsers,
+    canManagePeople,
+    canManageExchangeRates,
+    canManageStatuses,
+    canAccessRecycleBin,
+    profile,
+    signOut,
+  } = useAuth();
   const { openPeopleManagement } = usePeopleManagement();
   const { undo, redo, canUndo, canRedo, lastUndoDescription, lastRedoDescription } = useUndoRedo();
 
@@ -39,29 +68,38 @@ export function ProductionHeader({ forecastActive, dataLogOpen, onToggleDataLog 
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
 
-  const hasUndo = canUndo("plan-vyroby");
-  const hasRedo = canRedo("plan-vyroby");
-  const undoDesc = lastUndoDescription("plan-vyroby");
-  const redoDesc = lastRedoDescription("plan-vyroby");
+  const undoPage = module === "index" ? undefined : module;
+  const hasUndo = undoPage ? canUndo(undoPage) : canUndo();
+  const hasRedo = undoPage ? canRedo(undoPage) : canRedo();
+  const undoDesc = undoPage ? lastUndoDescription(undoPage) : lastUndoDescription();
+  const redoDesc = undoPage ? lastRedoDescription(undoPage) : lastRedoDescription();
+  const moduleLabel = module === "index" ? "Project Info 2026" : module === "vyroba" ? "Výroba" : "Plán Výroby";
+  const showDataLog = module === "index"
+    ? canAccessSettings || realRole === "owner" || role === "pm"
+    : isAdmin || role === "pm" || isOwner;
 
   return (
     <>
-      <header className="border-b bg-primary px-6 py-4 shrink-0 z-50" style={forecastActive ? { borderColor: "#2a3d3a" } : undefined}>
+      <header className="hidden md:block border-b bg-primary px-6 py-4 shrink-0 z-50" style={forecastActive ? { borderColor: "#2a3d3a" } : undefined}>
         <div className="flex items-center justify-between">
-          {/* Left: Logo */}
           <div className="flex items-center gap-3 shrink-0">
-            <img src="/images/AM-Interior-orange.svg" alt="AM Interior" width="180" height="24" style={{ height: '24px', width: 'auto', display: 'block', flexShrink: 0 }} fetchPriority="high" />
+            <img
+              src="/images/AM-Interior-orange.svg"
+              alt="AM Interior"
+              width="160"
+              height="22"
+              style={{ height: '22px', width: 'auto', display: 'block', flexShrink: 0 }}
+              fetchPriority="high"
+            />
             <span className="text-primary-foreground/40 text-sm">|</span>
-            <span className="text-primary-foreground/70 text-sm font-sans">Plán Výroby</span>
+            <span className="text-primary-foreground/70 text-sm font-sans">{moduleLabel}</span>
           </div>
 
-          {/* Right: undo/redo + user/settings */}
           <div className="flex items-center gap-1 shrink-0">
-            {/* Undo button */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => undo("plan-vyroby")}
+                  onClick={() => (undoPage ? undo(undoPage) : undo())}
                   disabled={!hasUndo}
                   className="p-2 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
                 >
@@ -73,11 +111,10 @@ export function ProductionHeader({ forecastActive, dataLogOpen, onToggleDataLog 
               </TooltipContent>
             </Tooltip>
 
-            {/* Redo button */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => redo("plan-vyroby")}
+                  onClick={() => (undoPage ? redo(undoPage) : redo())}
                   disabled={!hasRedo}
                   className="p-2 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
                 >
@@ -91,31 +128,50 @@ export function ProductionHeader({ forecastActive, dataLogOpen, onToggleDataLog 
 
             <span className="w-px h-5 bg-primary-foreground/20 mx-1" />
 
-            <button
-              onClick={() => navigate("/vyroba")}
-              className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
-              title="Výroba"
-            >
-              <Factory className="h-5 w-5" />
-            </button>
+            {(isAdmin || isOwner) && (
+              <button
+                onClick={module === "vyroba" ? undefined : () => navigate("/vyroba")}
+                className={cn(
+                  "p-2 rounded-md transition-colors",
+                  module === "vyroba"
+                    ? "text-primary-foreground bg-primary-foreground/10 cursor-default"
+                    : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                )}
+                title="Výroba"
+              >
+                <Factory className="h-5 w-5" />
+              </button>
+            )}
+
+            {(isAdmin || isOwner) && (
+              <button
+                onClick={module === "plan-vyroby" ? undefined : () => navigate("/plan-vyroby")}
+                className={cn(
+                  "p-2 rounded-md transition-colors",
+                  module === "plan-vyroby"
+                    ? "text-primary-foreground bg-primary-foreground/10 cursor-default"
+                    : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                )}
+                title="Plán Výroby"
+              >
+                <CalendarRange className="h-5 w-5" />
+              </button>
+            )}
 
             <button
-              className="p-2 rounded-md text-primary-foreground bg-primary-foreground/10 transition-colors cursor-default"
-              title="Plán Výroby"
-            >
-              <CalendarRange className="h-5 w-5" />
-            </button>
-
-            <button
-              onClick={() => navigate("/")}
-              className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+              onClick={module === "index" ? undefined : () => navigate("/")}
+              className={cn(
+                "p-2 rounded-md transition-colors",
+                module === "index"
+                  ? "text-primary-foreground bg-primary-foreground/10 cursor-default"
+                  : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+              )}
               title="Přehled projektů"
             >
               <LayoutDashboard className="h-5 w-5" />
             </button>
 
-            {/* DataLog icon button */}
-            {onToggleDataLog && (isAdmin || role === "pm" || isOwner) && (
+            {onToggleDataLog && showDataLog && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -200,6 +256,14 @@ export function ProductionHeader({ forecastActive, dataLogOpen, onToggleDataLog 
                       Koš
                     </DropdownMenuItem>
                   )}
+                  {module === "vyroba" && isAdmin && onOpenVyrobaReset && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={onOpenVyrobaReset} className="text-destructive">
+                        🗑️ Reset dát výroby
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   {realRole === "owner" && (
                     <>
                       <DropdownMenuSeparator />
@@ -225,7 +289,6 @@ export function ProductionHeader({ forecastActive, dataLogOpen, onToggleDataLog 
         </div>
       </header>
 
-      {/* Settings dialogs */}
       <UserManagement open={userMgmtOpen} onOpenChange={setUserMgmtOpen} />
       <ExchangeRateSettings open={exchangeRateOpen} onOpenChange={setExchangeRateOpen} />
       <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />

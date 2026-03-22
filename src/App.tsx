@@ -2,10 +2,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import SplashScreen from "@/components/SplashScreen";
 import { PeopleManagementProvider } from "@/components/PeopleManagementContext";
+import { ProductionHeader } from "@/components/production/ProductionHeader";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { UndoRedoProvider } from "@/hooks/useUndoRedo";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
@@ -102,6 +103,46 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function PersistentDesktopHeader() {
+  const location = useLocation();
+  const [headerState, setHeaderState] = useState({ dataLogOpen: false, forecastActive: false });
+
+  const module =
+    location.pathname === "/plan-vyroby"
+      ? "plan-vyroby"
+      : location.pathname === "/vyroba"
+        ? "vyroba"
+        : location.pathname === "/"
+          ? "index"
+          : null;
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const customEvent = event as CustomEvent<Partial<typeof headerState>>;
+      setHeaderState((prev) => ({ ...prev, ...customEvent.detail }));
+    };
+
+    window.addEventListener("desktop-header-sync", handler as EventListener);
+    return () => window.removeEventListener("desktop-header-sync", handler as EventListener);
+  }, []);
+
+  useEffect(() => {
+    setHeaderState({ dataLogOpen: false, forecastActive: false });
+  }, [module]);
+
+  if (!module) return null;
+
+  return (
+    <ProductionHeader
+      module={module}
+      dataLogOpen={headerState.dataLogOpen}
+      forecastActive={module === "plan-vyroby" ? headerState.forecastActive : false}
+      onToggleDataLog={() => window.dispatchEvent(new CustomEvent("desktop-header-toggle-datalog"))}
+      onOpenVyrobaReset={module === "vyroba" ? () => window.dispatchEvent(new CustomEvent("desktop-header-vyroba-reset")) : undefined}
+    />
+  );
+}
+
 function AppRoutes() {
   const { user, loading, profile } = useAuth();
 
@@ -147,6 +188,7 @@ function AppRoutes() {
         <PeopleManagementProvider>
           <BrowserRouter>
             <RealtimeSyncProvider />
+            <PersistentDesktopHeader />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/plan-vyroby" element={<AdminRoute><PlanVyroby /></AdminRoute>} />

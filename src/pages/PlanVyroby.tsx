@@ -10,7 +10,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { useAuth } from "@/hooks/useAuth";
-import { ProductionHeader } from "@/components/production/ProductionHeader";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { InboxPanel } from "@/components/production/InboxPanel";
 import { ForecastSafetyNet } from "@/components/production/ForecastSafetyNet";
@@ -155,6 +154,18 @@ export default function PlanVyroby() {
       return next;
     });
   }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("desktop-header-sync", {
+      detail: { dataLogOpen, forecastActive: forecast.forecastActive },
+    }));
+  }, [dataLogOpen, forecast.forecastActive]);
+
+  useEffect(() => {
+    const handler = () => toggleDataLog();
+    window.addEventListener("desktop-header-toggle-datalog", handler);
+    return () => window.removeEventListener("desktop-header-toggle-datalog", handler);
+  }, [toggleDataLog]);
   const [activeDrag, setActiveDrag] = useState<ActiveDragData | null>(null);
   const isDraggingFromInbox = activeDrag?.type === "inbox-item" || activeDrag?.type === "inbox-items" || activeDrag?.type === "inbox-project";
   const [overDroppableId, setOverDroppableId] = useState<string | null>(null);
@@ -642,7 +653,7 @@ export default function PlanVyroby() {
             <span>⚠ TEST MODE — Testovací prostředí — data nejsou produkční</span>
           </div>
         )}
-        {!isMobile && <ProductionHeader forecastActive={forecast.forecastActive} dataLogOpen={dataLogOpen} onToggleDataLog={toggleDataLog} />}
+        
 
         {/* Row 2: Tabs + Search + Display mode + Stats + Period + Forecast toggle — desktop only */}
         {!isMobile && (
