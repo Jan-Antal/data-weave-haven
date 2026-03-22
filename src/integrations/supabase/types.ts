@@ -693,6 +693,48 @@ export type Database = {
           },
         ]
       }
+      project_hours_log: {
+        Row: {
+          ami_project_id: string | null
+          created_at: string | null
+          datum_sync: string | null
+          hodiny_plan: number | null
+          hodiny_skutocne: number | null
+          id: string
+          pm: string | null
+          project_name: string | null
+          rozdiel: number | null
+          source: string | null
+          status: string | null
+        }
+        Insert: {
+          ami_project_id?: string | null
+          created_at?: string | null
+          datum_sync?: string | null
+          hodiny_plan?: number | null
+          hodiny_skutocne?: number | null
+          id?: string
+          pm?: string | null
+          project_name?: string | null
+          rozdiel?: number | null
+          source?: string | null
+          status?: string | null
+        }
+        Update: {
+          ami_project_id?: string | null
+          created_at?: string | null
+          datum_sync?: string | null
+          hodiny_plan?: number | null
+          hodiny_skutocne?: number | null
+          id?: string
+          pm?: string | null
+          project_name?: string | null
+          rozdiel?: number | null
+          source?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
       project_stages: {
         Row: {
           architekt: string | null
