@@ -40,10 +40,7 @@ export function MobileBottomNav({ onModuleChange, activeModule }: MobileBottomNa
   };
 
   return createPortal(
-    <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-[100000] bg-primary pointer-events-auto"
-      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
-    >
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[100000] flex items-center justify-around bg-primary pointer-events-auto h-14">
       <div className="flex items-center justify-around h-14">
       <button
         onClick={(e) => handleNav(e, "projekty")}
