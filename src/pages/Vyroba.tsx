@@ -319,7 +319,30 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return f;
   }, [currentMonday]);
 
-  // Data
+  // Pager: center on mount and after week change
+  useEffect(() => {
+    if (!isMobile) return;
+    const el = pagerRef.current;
+    if (!el) return;
+    pagerCenteringRef.current = true;
+    el.scrollLeft = el.offsetWidth * 2; // center slide (index 2)
+    requestAnimationFrame(() => { pagerCenteringRef.current = false; });
+  }, [weekOffset, isMobile]);
+
+  // Pager: detect scroll-snap end and update weekOffset
+  const handlePagerScrollEnd = useCallback(() => {
+    if (pagerCenteringRef.current) return;
+    const el = pagerRef.current;
+    if (!el) return;
+    const slideWidth = el.offsetWidth;
+    if (slideWidth === 0) return;
+    const currentSlide = Math.round(el.scrollLeft / slideWidth);
+    const delta = currentSlide - 2; // 2 = center
+    if (delta !== 0) {
+      setWeekOffset(w => w + delta);
+    }
+  }, []);
+
   const { data: scheduleData } = useProductionSchedule();
   const { data: dailyLogsMap } = useProductionDailyLogs(weekKey);
 
