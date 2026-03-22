@@ -50,7 +50,7 @@ function buildTbodyRows(rows: (string | number)[][], isNumberCol: boolean[], isS
 const BASE_STYLES = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: 'Early Sans', system-ui, sans-serif;
     font-size: 8pt;
     color: #1f2937;
     padding: 6mm;

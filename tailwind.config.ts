@@ -15,7 +15,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ["Early Sans", "system-ui", "sans-serif"],
-        serif: ["Late Serif", "Georgia", "serif"],
+        serif: ["Late Serif", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",
