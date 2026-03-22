@@ -4918,12 +4918,15 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const failed: File[] = [];
-    for (const file of Array.from(files)) {
-      const captureDate = file.lastModified ? new Date(file.lastModified) : new Date();
-      const dateStr = `${captureDate.getFullYear()}-${String(captureDate.getMonth() + 1).padStart(2, "0")}-${String(captureDate.getDate()).padStart(2, "0")}`;
-      const timeStr = `${String(captureDate.getHours()).padStart(2, "0")}-${String(captureDate.getMinutes()).padStart(2, "0")}`;
+    const filesArray = Array.from(files);
+    for (let idx = 0; idx < filesArray.length; idx++) {
+      const file = filesArray[idx];
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const timeStr = `${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
+      const idxSuffix = filesArray.length > 1 ? `-${idx + 1}` : "";
       const ext = file.name.split(".").pop() || "jpg";
-      const autoName = `${projectId}-Log-${dateStr}-${timeStr}-${userSuffix}.${ext}`;
+      const autoName = `${projectId}-Log-${dateStr}-${timeStr}${idxSuffix}-${userSuffix}.${ext}`;
       const renamedFile = new File([file], autoName, { type: file.type });
       try {
         await uploadFile("fotky", renamedFile);
