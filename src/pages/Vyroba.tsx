@@ -307,7 +307,9 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   // Week navigation
   const [weekOffset, setWeekOffset] = useState(0);
-  const [weekSlideClass, setWeekSlideClass] = useState("");
+  const pagerRef = useRef<HTMLDivElement>(null);
+  const pagerCenteringRef = useRef(false);
+  const PAGER_OFFSETS = [-2, -1, 0, 1, 2] as const;
   const currentMonday = useMemo(() => addWeeks(getMonday(new Date()), weekOffset), [weekOffset]);
   const weekKey = weekKeyStr(currentMonday);
   const weekNum = getISOWeekNumber(currentMonday);
