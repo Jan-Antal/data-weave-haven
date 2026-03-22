@@ -33,7 +33,11 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
       }}
     >
       {/* Official AM Interior logo — white on dark green */}
-      <div style={{ width: 220, marginBottom: 32 }}>
+      <div style={{
+        width: 220, marginBottom: 32,
+        transition: "opacity 400ms ease",
+        opacity: contentVisible ? 1 : 0,
+      }}>
         <AmiLogo />
       </div>
 
