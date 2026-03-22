@@ -406,8 +406,19 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     const el = pagerRef.current;
     if (!el) return;
     pagerCenteringRef.current = true;
-    el.scrollLeft = el.offsetWidth * 2; // center slide (index 2)
-    requestAnimationFrame(() => { pagerCenteringRef.current = false; });
+    const setCenter = () => {
+      if (el.offsetWidth > 0) {
+        el.style.scrollBehavior = 'auto';
+        el.scrollLeft = el.offsetWidth * 2;
+        requestAnimationFrame(() => {
+          el.style.scrollBehavior = '';
+          pagerCenteringRef.current = false;
+        });
+      } else {
+        requestAnimationFrame(setCenter);
+      }
+    };
+    setCenter();
   }, [weekOffset, isMobile]);
 
   // Pager: detect scroll-snap end and update weekOffset
