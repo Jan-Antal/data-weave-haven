@@ -613,7 +613,7 @@ export default function PlanVyroby() {
 
   if (loading) {
     return (
-      <div className="h-screen bg-background flex items-center justify-center">
+      <div className="h-full bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Načítání...</p>
       </div>
     );
