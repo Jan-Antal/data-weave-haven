@@ -1689,7 +1689,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 const slidePaused = slideProjects.filter((p) => p.isPaused);
                 return (
                   <div
-                    key={slideWeekKey}
+                    key={`pager-slide-${offset}`}
                     className="flex-none w-full min-h-0 overflow-y-auto week-content-area shrink-0 flex flex-col"
                     style={{
                       scrollSnapAlign: 'start',
