@@ -278,6 +278,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       return next;
     });
   }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("desktop-header-sync", { detail: { dataLogOpen } }));
+  }, [dataLogOpen]);
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
 
   // Owner/Admin/Tester guard
