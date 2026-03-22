@@ -176,18 +176,16 @@ function VersionCheckBootstrap() {
 }
 
 const App = () => {
-  const isMobilePWA = window.matchMedia('(display-mode: standalone)').matches;
-  const [appReady, setAppReady] = useState(!isMobilePWA);
+  const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
-    if (!isMobilePWA) return;
     const timer = setTimeout(() => setAppReady(true), 800);
     return () => clearTimeout(timer);
   }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
-      {!appReady && isMobilePWA && <SplashScreen />}
+      {!appReady && <SplashScreen />}
       <VersionCheckBootstrap />
       <TooltipProvider>
         <AuthProvider>
