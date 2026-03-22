@@ -109,6 +109,16 @@ const Index = () => {
     });
   }, []);
 
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("desktop-header-sync", { detail: { dataLogOpen } }));
+  }, [dataLogOpen]);
+
+  useEffect(() => {
+    const handler = () => toggleDataLog();
+    window.addEventListener("desktop-header-toggle-datalog", handler);
+    return () => window.removeEventListener("desktop-header-toggle-datalog", handler);
+  }, [toggleDataLog]);
+
   const { profile, signOut, canAccessSettings, canCreateProject, isAdmin, isOwner, isTestUser, realRole, simulatedRole, setSimulatedRole, role, isKonstrukter, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, defaultTab } = useAuth();
 
   const { data: userPrefs } = useUserPreferences();
