@@ -25,7 +25,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background: "#2d4a3e",
+        background: "#223937",
         transition: "opacity 400ms ease",
         opacity: exiting ? 0 : visible ? 1 : 0,
         pointerEvents: exiting ? "none" : "auto",
