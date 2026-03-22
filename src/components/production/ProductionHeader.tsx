@@ -50,7 +50,7 @@ export function ProductionHeader({ forecastActive, dataLogOpen, onToggleDataLog 
         <div className="flex items-center justify-between">
           {/* Left: Logo */}
           <div className="flex items-center gap-3 shrink-0">
-            <img src="/images/AM-Interior-orange.svg" alt="AM Interior" loading="eager" style={{ height: '24px', width: 'auto', display: 'block' }} />
+            <img src="/images/AM-Interior-orange.svg" alt="AM Interior" width="180" height="24" style={{ height: '24px', width: 'auto', display: 'block', flexShrink: 0 }} fetchPriority="high" />
             <span className="text-primary-foreground/40 text-sm">|</span>
             <span className="text-primary-foreground/70 text-sm font-sans">Plán Výroby</span>
           </div>
