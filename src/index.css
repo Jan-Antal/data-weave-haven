@@ -120,6 +120,11 @@
     overflow: hidden;
   }
 
+  /* Fill safe-area below bottom nav with primary color on mobile */
+  html {
+    background-color: hsl(175 25% 18%);
+  }
+
   #root {
     height: 100dvh;
     overflow: hidden;
