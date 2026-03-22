@@ -103,6 +103,46 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function PersistentDesktopHeader() {
+  const location = useLocation();
+  const [headerState, setHeaderState] = useState({ dataLogOpen: false, forecastActive: false });
+
+  const module =
+    location.pathname === "/plan-vyroby"
+      ? "plan-vyroby"
+      : location.pathname === "/vyroba"
+        ? "vyroba"
+        : location.pathname === "/"
+          ? "index"
+          : null;
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const customEvent = event as CustomEvent<Partial<typeof headerState>>;
+      setHeaderState((prev) => ({ ...prev, ...customEvent.detail }));
+    };
+
+    window.addEventListener("desktop-header-sync", handler as EventListener);
+    return () => window.removeEventListener("desktop-header-sync", handler as EventListener);
+  }, []);
+
+  useEffect(() => {
+    setHeaderState({ dataLogOpen: false, forecastActive: false });
+  }, [module]);
+
+  if (!module) return null;
+
+  return (
+    <ProductionHeader
+      module={module}
+      dataLogOpen={headerState.dataLogOpen}
+      forecastActive={module === "plan-vyroby" ? headerState.forecastActive : false}
+      onToggleDataLog={() => window.dispatchEvent(new CustomEvent("desktop-header-toggle-datalog"))}
+      onOpenVyrobaReset={module === "vyroba" ? () => window.dispatchEvent(new CustomEvent("desktop-header-vyroba-reset")) : undefined}
+    />
+  );
+}
+
 function AppRoutes() {
   const { user, loading, profile } = useAuth();
 
@@ -148,6 +188,7 @@ function AppRoutes() {
         <PeopleManagementProvider>
           <BrowserRouter>
             <RealtimeSyncProvider />
+            <PersistentDesktopHeader />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/plan-vyroby" element={<AdminRoute><PlanVyroby /></AdminRoute>} />
