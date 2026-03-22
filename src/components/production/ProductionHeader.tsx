@@ -50,9 +50,7 @@ export function ProductionHeader({ forecastActive, dataLogOpen, onToggleDataLog 
         <div className="flex items-center justify-between">
           {/* Left: Logo */}
           <div className="flex items-center gap-3 shrink-0">
-            <h1 className="text-xl font-serif text-primary-foreground tracking-wide">
-              A→M <span className="font-sans font-normal text-base opacity-80">Interior</span>
-            </h1>
+            <img src="/images/AM-Interior-orange.svg" alt="AM Interior" style={{ height: '28px', width: 'auto' }} />
             <span className="text-primary-foreground/40 text-sm">|</span>
             <span className="text-primary-foreground/70 text-sm font-sans">Plán Výroby</span>
           </div>

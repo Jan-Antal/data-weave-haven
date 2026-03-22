@@ -39,12 +39,12 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
         style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 12px)" }}
       >
         <div className="flex items-center justify-between">
-          <h1
-            className="text-lg font-serif text-primary-foreground tracking-wide cursor-pointer"
+          <img
+            src="/images/AM-Interior-orange.svg"
+            alt="AM Interior"
+            style={{ height: '24px', width: 'auto', cursor: 'pointer' }}
             onClick={() => navigate("/", { state: { view: "dashboard" } })}
-          >
-            A→M <span className="font-sans font-normal text-sm opacity-80">Interior</span>
-          </h1>
+          />
           <button
             onClick={() => setMenuOpen(true)}
             className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground min-w-[44px] min-h-[44px] flex items-center justify-center"

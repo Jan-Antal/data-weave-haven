@@ -46,9 +46,7 @@ export default function Login() {
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-serif text-foreground tracking-wide">
-            A→M <span className="font-sans font-normal text-lg opacity-70">Interior</span>
-          </h1>
+          <img src="/images/AM-Interior-orange.svg" alt="AM Interior" style={{ height: '32px', width: 'auto', margin: '0 auto' }} />
           <p className="text-sm text-muted-foreground mt-1">Project Info 2026</p>
         </div>
 
