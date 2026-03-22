@@ -436,7 +436,20 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   }, []);
 
   const { data: scheduleData } = useProductionSchedule();
-  const { data: dailyLogsMap } = useProductionDailyLogs(weekKey);
+  // Prefetch daily logs for all 5 pager weeks to avoid blink on swipe
+  const pagerWk0 = useProductionDailyLogs(weekKeyStr(addWeeks(currentMonday, -2)));
+  const pagerWk1 = useProductionDailyLogs(weekKeyStr(addWeeks(currentMonday, -1)));
+  const pagerWk2 = useProductionDailyLogs(weekKeyStr(addWeeks(currentMonday, 0)));
+  const pagerWk3 = useProductionDailyLogs(weekKeyStr(addWeeks(currentMonday, 1)));
+  const pagerWk4 = useProductionDailyLogs(weekKeyStr(addWeeks(currentMonday, 2)));
+  const dailyLogsMap = pagerWk2.data;
+  const allDailyLogsByWeek = useMemo(() => ({
+    [weekKeyStr(addWeeks(currentMonday, -2))]: pagerWk0.data,
+    [weekKeyStr(addWeeks(currentMonday, -1))]: pagerWk1.data,
+    [weekKeyStr(addWeeks(currentMonday,  0))]: pagerWk2.data,
+    [weekKeyStr(addWeeks(currentMonday,  1))]: pagerWk3.data,
+    [weekKeyStr(addWeeks(currentMonday,  2))]: pagerWk4.data,
+  }), [pagerWk0.data, pagerWk1.data, pagerWk2.data, pagerWk3.data, pagerWk4.data, currentMonday]);
 
   // Fetch latest daily log per project across ALL weeks (for spilled projects)
   const { data: allLatestLogs } = useQuery({
