@@ -1378,7 +1378,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="h-full bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Načítání...</p>
       </div>
     );
@@ -1396,7 +1396,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   return (
     <div
       className={cn(
-        embedded ? "h-full flex flex-col overflow-hidden" : "h-screen flex flex-col overflow-hidden",
+        "h-full flex flex-col overflow-hidden",
         !embedded && isMobile && "pb-[72px]",
       )}
       style={{ background: "#f8f7f4" }}

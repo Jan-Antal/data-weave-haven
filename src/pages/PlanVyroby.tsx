@@ -613,7 +613,7 @@ export default function PlanVyroby() {
 
   if (loading) {
     return (
-      <div className="h-screen bg-background flex items-center justify-center">
+      <div className="h-full bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Načítání...</p>
       </div>
     );
@@ -623,7 +623,7 @@ export default function PlanVyroby() {
 
   if (isMobile) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-background px-6 text-center gap-4">
+      <div className="flex flex-col items-center justify-center h-full bg-background px-6 text-center gap-4">
         <p className="text-lg font-medium text-foreground">Plán Výroby je dostupný pouze na počítači</p>
         <button
           onClick={() => navigate("/")}
@@ -644,7 +644,7 @@ export default function PlanVyroby() {
       onDragEnd={handleDragEnd}
     >
       <div
-        className={cn("h-screen flex flex-col overflow-hidden transition-colors duration-300", isMobile && "pb-14")}
+        className={cn("h-full flex flex-col overflow-hidden transition-colors duration-300", isMobile && "pb-14")}
         style={{ backgroundColor: forecast.forecastActive ? "#1a2422" : "#f4f2f0" }}
       >
         {isMobile && <MobileHeader />}
