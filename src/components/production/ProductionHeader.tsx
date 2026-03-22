@@ -33,6 +33,35 @@ const ROLE_LABELS: Record<string, string> = {
   viewer: "Viewer",
 };
 
+function AnimatedTitle({ title }: { title: string }) {
+  const [displayed, setDisplayed] = useState(title);
+  const [animating, setAnimating] = useState(false);
+
+  useEffect(() => {
+    if (title === displayed) return;
+    setAnimating(true);
+    const t = setTimeout(() => {
+      setDisplayed(title);
+      setAnimating(false);
+    }, 200);
+    return () => clearTimeout(t);
+  }, [title]);
+
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        overflow: "hidden",
+        opacity: animating ? 0 : 1,
+        transform: animating ? "translateY(6px)" : "translateY(0px)",
+        transition: "opacity 200ms ease, transform 200ms ease",
+      }}
+    >
+      {displayed}
+    </span>
+  );
+}
+
 export function ProductionHeader({
   module = "plan-vyroby",
   forecastActive,
