@@ -42,7 +42,7 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
           <img
             src="/images/AM-Interior-orange.svg"
             alt="AM Interior"
-            style={{ height: '24px', width: 'auto', cursor: 'pointer' }}
+            style={{ height: '12px', width: 'auto', cursor: 'pointer' }}
             onClick={() => navigate("/", { state: { view: "dashboard" } })}
           />
           <button
