@@ -146,13 +146,7 @@ function PersistentDesktopHeader() {
 function AppRoutes() {
   const { user, loading, profile } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Načítání...</p>
-      </div>
-    );
-  }
+  if (loading) return null;
 
   if (!user) {
     return (
@@ -219,24 +213,42 @@ function VersionCheckBootstrap() {
   return null;
 }
 
-const App = () => {
-  const [appReady, setAppReady] = useState(false);
+function SplashGate({ children }: { children: React.ReactNode }) {
+  const { loading } = useAuth();
+  const [minTimePassed, setMinTimePassed] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setAppReady(true), 800);
+    const timer = setTimeout(() => setMinTimePassed(true), 800);
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    if (!loading) setAuthReady(true);
+  }, [loading]);
+
+  const appReady = authReady && minTimePassed;
+
+  return (
+    <>
+      {!appReady && <SplashScreen />}
+      {children}
+    </>
+  );
+}
+
+const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      {!appReady && <SplashScreen />}
       <VersionCheckBootstrap />
       <TooltipProvider>
         <AuthProvider>
-          <Toaster />
-          <Sonner />
-          <PortraitLockOverlay />
-          <AppRoutes />
+          <SplashGate>
+            <Toaster />
+            <Sonner />
+            <PortraitLockOverlay />
+            <AppRoutes />
+          </SplashGate>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
