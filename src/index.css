@@ -115,12 +115,14 @@
     @apply border-border;
   }
 
+  html {
+    background-color: #1a3330;
+  }
+
   html, body {
     height: 100%;
     overflow: hidden;
   }
-
-
   #root {
     height: 100svh;
     overflow: hidden;
