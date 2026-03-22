@@ -1083,7 +1083,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                   type="button"
                   variant="outline"
                   size="sm"
-                  className={cn("h-10 px-3 font-mono shrink-0", isSectionReadOnly("finance") && "opacity-70 cursor-not-allowed")}
+                  className={cn("h-10 px-3 font-sans shrink-0", isSectionReadOnly("finance") && "opacity-70 cursor-not-allowed")}
                   onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
                   disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
                 >

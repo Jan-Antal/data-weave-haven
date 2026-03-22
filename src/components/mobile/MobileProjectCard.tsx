@@ -81,7 +81,7 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
         >
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] text-muted-foreground font-mono truncate">{project.project_id}</p>
+              <p className="text-[11px] text-muted-foreground font-sans truncate">{project.project_id}</p>
               <p className="font-medium text-[13px] truncate">{project.project_name}</p>
               {project.klient && (
                 <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{project.klient}</p>
@@ -112,14 +112,14 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
                 </span>
               )}
               {project.prodejni_cena != null && (
-              <span className="text-[11px] font-mono text-muted-foreground">
+              <span className="text-[11px] font-sans text-muted-foreground">
                   {formatCurrency(project.prodejni_cena, project.currency || "CZK")}
                 </span>
               )}
             </div>
           </div>
           {project.datum_smluvni && (
-            <p className="text-[11px] text-muted-foreground mt-1">Datum S.: <span className="font-mono">{(() => { const d = parseAppDate(project.datum_smluvni); return d ? formatAppDate(d) : project.datum_smluvni; })()}</span></p>
+            <p className="text-[11px] text-muted-foreground mt-1">Datum S.: <span className="font-sans">{(() => { const d = parseAppDate(project.datum_smluvni); return d ? formatAppDate(d) : project.datum_smluvni; })()}</span></p>
           )}
         </button>
 
@@ -174,7 +174,7 @@ export const MobileProjectCard = memo(function MobileProjectCard({ project, onTa
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                  <p className="text-[11px] text-muted-foreground font-sans mt-0.5">
                     {stage.project_id}
                     {stage.datum_smluvni && (
                       <> · Datum S.: {(() => { const d = parseAppDate(stage.datum_smluvni); return d ? formatAppDate(d) : stage.datum_smluvni; })()}</>

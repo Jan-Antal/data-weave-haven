@@ -1599,7 +1599,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                   }
                 }}
                 className={cn(
-                  "font-mono select-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer font-bold",
+                  "font-sans select-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer font-bold",
                   weekOffset !== 0 && "underline decoration-dotted underline-offset-2",
                 )}
                 style={{ fontSize: 13, color: "#223937" }}
@@ -1630,7 +1630,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
             <span style={{ color: "#dc2626", fontSize: 12 }}>⚠ {stats.behind} pozadu</span>
             <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
-            <span className="font-mono" style={{ color: "#2563eb", fontSize: 12 }}>
+            <span className="font-sans" style={{ color: "#2563eb", fontSize: 12 }}>
               ø {stats.avgPct}%
             </span>
           </>
@@ -1639,7 +1639,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
           <>
             <span style={{ color: "#1a1a1a", fontWeight: 500 }}>{stats.total} projektů</span>
             <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
-            <span className="font-mono" style={{ color: "#2563eb" }}>
+            <span className="font-sans" style={{ color: "#2563eb" }}>
               ∅ {stats.avgPct}%
             </span>
             <span className="w-px h-4" style={{ background: "#d0cdc8" }} />
@@ -1670,7 +1670,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               </button>
               <button
                 onClick={() => setWeekPickerOpen((o) => !o)}
-                className="font-mono select-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer"
+                className="font-sans select-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors cursor-pointer"
                 style={{ fontSize: 13, color: "#223937" }}
               >
                 T{weekNum} · {fmtDate(currentMonday)}–{fmtDate(friday)}
@@ -1757,7 +1757,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 className="px-3 py-2 flex items-center gap-2"
                 style={{ borderBottom: "1px solid #f0eeea", background: "#fafaf8" }}
               >
-                <span className="text-[10px] font-mono font-semibold" style={{ color: "#6b7280" }}>
+                <span className="text-[10px] font-sans font-semibold" style={{ color: "#6b7280" }}>
                   T{weekNum}
                 </span>
                 <div className="flex-1 h-[6px] rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
@@ -1766,7 +1766,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     style={{ width: `${Math.min(capacityPct, 100)}%`, background: capacityColor }}
                   />
                 </div>
-                <span className="text-[10px] font-mono" style={{ color: capacityColor }}>
+                <span className="text-[10px] font-sans" style={{ color: capacityColor }}>
                   {weekCapacity.used}h/{weekCapacity.total}h · {capacityPct}%
                 </span>
               </div>
@@ -1897,7 +1897,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                               )}
                             </div>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="font-mono" style={{ fontSize: 11, color: "#99a5a3" }}>
+                              <span className="font-sans" style={{ fontSize: 11, color: "#99a5a3" }}>
                                 {p.projectId}
                               </span>
                               {p.pauseReason && (
@@ -2100,7 +2100,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               <div className={isMobile ? "flex-1 overflow-y-auto px-4 pb-4" : ""}>
                 <DialogHeader className={isMobile ? "pb-2" : ""}>
                   <DialogTitle className="flex items-center gap-2">
-                    <span className="font-mono text-xs text-muted-foreground">{selectedProject?.projectId}</span>
+                    <span className="font-sans text-xs text-muted-foreground">{selectedProject?.projectId}</span>
                     <span>{selectedProject?.projectName}</span>
                   </DialogTitle>
                 </DialogHeader>
@@ -2171,7 +2171,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                             </div>
                           </div>
                           <span
-                            className="text-2xl font-mono font-bold min-w-[60px] text-right"
+                            className="text-2xl font-sans font-bold min-w-[60px] text-right"
                             style={{ color: logPercent >= logWeeklyGoal ? "#3a8a36" : "hsl(var(--foreground))" }}
                           >
                             {logPercent}%
@@ -2589,7 +2589,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                               <div className="flex items-center gap-1.5">
                                 {item.item_code && (
                                   <span
-                                    className="font-mono text-[10px] font-bold"
+                                    className="font-sans text-[10px] font-bold"
                                     style={{ color: "hsl(var(--foreground))" }}
                                   >
                                     {item.item_code}
@@ -2633,7 +2633,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                             </div>
                             {/* Hours badge */}
                             <span
-                              className="font-mono text-[11px] font-semibold shrink-0 px-1.5 py-0.5 rounded"
+                              className="font-sans text-[11px] font-semibold shrink-0 px-1.5 py-0.5 rounded"
                               style={{
                                 color: isDone ? "hsl(var(--muted-foreground))" : isFull ? "#92400e" : "#d97706",
                                 background: isDone ? "transparent" : isFull ? "rgba(217,119,6,0.12)" : "transparent",
@@ -2695,7 +2695,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                           </span>{" "}
                           · {nextTotal}h / 760h celkem
                         </span>
-                        <span className="font-mono font-semibold" style={{ color: nextColor }}>
+                        <span className="font-sans font-semibold" style={{ color: nextColor }}>
                           {nextPct}% využito
                         </span>
                       </div>
@@ -2903,12 +2903,12 @@ function ProjectRow({
                 </span>
               )}
             </div>
-            <span className="font-mono text-xs font-bold shrink-0" style={{ color: statusColors[status] }}>
+            <span className="font-sans text-xs font-bold shrink-0" style={{ color: statusColors[status] }}>
               {pct}%
             </span>
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="font-mono" style={{ fontSize: 11, color: "#6b7280" }}>
+            <span className="font-sans" style={{ fontSize: 11, color: "#6b7280" }}>
               {project.projectId}
             </span>
             {project.deadline && (
@@ -3123,7 +3123,7 @@ function DetailPanel({
             <div className="flex items-center gap-2 mb-0.5">
               <button
                 onClick={onOpenProjectDetail}
-                className="font-mono text-xs hover:underline cursor-pointer"
+                className="font-sans text-xs hover:underline cursor-pointer"
                 style={{ color: "#6b7280" }}
               >
                 {project.projectId}
@@ -3161,7 +3161,7 @@ function DetailPanel({
             </div>
           </div>
           <div className="text-right shrink-0">
-            <div className="text-3xl font-mono font-bold" style={{ color: statusColor }}>
+            <div className="text-3xl font-sans font-bold" style={{ color: statusColor }}>
               {bundleProgress.bundleProgress}%
             </div>
             <div className="text-xs" style={{ color: isWeeklyGoalMet ? "#3a8a36" : "#99a5a3" }}>
@@ -3368,20 +3368,20 @@ function DetailPanel({
                     style={{ border: "1px solid #ece8e2", background: "#f5f3f0" }}
                   >
                     <span
-                      className="text-[9px] font-mono font-bold px-1 py-[1px] rounded shrink-0"
+                      className="text-[9px] font-sans font-bold px-1 py-[1px] rounded shrink-0"
                       style={{ background: "rgba(37,99,235,0.08)", color: "#2563eb" }}
                     >
                       T{wn}
                     </span>
                     {item.item_code && (
-                      <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>
+                      <span className="font-sans text-[10px] shrink-0" style={{ color: "#223937" }}>
                         {item.item_code}
                       </span>
                     )}
                     <span className="text-[13px] flex-1 truncate" style={{ color: "#666666" }}>
                       {item.item_name}
                     </span>
-                    <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>
+                    <span className="font-sans text-[11px] shrink-0" style={{ color: "#99a5a3" }}>
                       {item.scheduled_hours}h
                     </span>
                   </div>
@@ -3414,7 +3414,7 @@ function DetailPanel({
                       <div className="flex items-center gap-2.5">
                         <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#3a8a36" }} />
                         {item.item_code && (
-                          <span className="font-mono text-[10px] shrink-0" style={{ color: "#3a8a36" }}>
+                          <span className="font-sans text-[10px] shrink-0" style={{ color: "#3a8a36" }}>
                             {item.item_code}
                           </span>
                         )}
@@ -3422,7 +3422,7 @@ function DetailPanel({
                           {item.item_name}
                         </span>
                         {qcCheck && <QualityCheckFullDisplay check={qcCheck} />}
-                        <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>
+                        <span className="font-sans text-[11px] shrink-0" style={{ color: "#99a5a3" }}>
                           {item.scheduled_hours}h
                         </span>
                       </div>
@@ -3857,7 +3857,7 @@ function UnifiedItemList({
                     {/* Item info */}
                     <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-hidden">
                       {item.item_code && (
-                        <span className="font-mono text-[12px] font-bold shrink-0" style={{ color: "#223937" }}>
+                        <span className="font-sans text-[12px] font-bold shrink-0" style={{ color: "#223937" }}>
                           {item.item_code}
                         </span>
                       )}
@@ -3990,7 +3990,7 @@ function UnifiedItemList({
                     </div>
 
                     {/* Hours */}
-                    <span className="font-mono text-[11px] shrink-0" style={{ color: "#99a5a3" }}>
+                    <span className="font-sans text-[11px] shrink-0" style={{ color: "#99a5a3" }}>
                       {thisWeekHours}h
                     </span>
 
@@ -4261,7 +4261,7 @@ function UnifiedItemList({
                     style={{ border: "1px solid #ece8e2", background: "#fafaf8" }}
                   >
                     {item.item_code && (
-                      <span className="font-mono text-[11px] font-bold shrink-0" style={{ color: "#223937" }}>
+                      <span className="font-sans text-[11px] font-bold shrink-0" style={{ color: "#223937" }}>
                         {item.item_code}
                       </span>
                     )}
@@ -4984,7 +4984,7 @@ function DayCell({
         <>
           <div className="flex items-center justify-between">
             <div
-              className={`font-mono font-bold ${isMobile ? "text-lg" : "text-xl"}`}
+              className={`font-sans font-bold ${isMobile ? "text-lg" : "text-xl"}`}
               style={{ color: isNoProduction ? "#99a5a3" : pct >= 100 ? "#3a8a36" : "#1a1a1a" }}
             >
               {pct}%
@@ -5380,7 +5380,7 @@ function WeekPickerPopup({
           }}
         >
           <span
-            className="font-mono text-[11px] font-bold min-w-[28px]"
+            className="font-sans text-[11px] font-bold min-w-[28px]"
             style={{
               color: w.isCurrent
                 ? "hsl(var(--accent))"

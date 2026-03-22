@@ -25,7 +25,7 @@ export function ProjectProgressBar({ progress, compact }: Props) {
     <div className="w-full">
       {!compact && (
         <div className="flex items-center justify-between mb-[2px]">
-          <span className="text-[9px] font-mono" style={{ color: "#6b7a78" }}>{accountedFor}/{total}</span>
+          <span className="text-[9px] font-sans" style={{ color: "#6b7a78" }}>{accountedFor}/{total}</span>
         </div>
       )}
       <div className="h-[4px] w-full rounded-full overflow-hidden flex" style={{ backgroundColor: "#d1d5db" }}>

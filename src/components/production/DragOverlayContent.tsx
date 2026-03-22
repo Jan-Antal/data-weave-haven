@@ -30,7 +30,7 @@ export function DragOverlayContent({ data }: { data: DragData }) {
         <div className="text-[10px] font-semibold truncate" style={{ color: "#3a8a36" }}>
           {data.itemCount} položek
         </div>
-        <div className="font-mono text-[9px] mt-0.5" style={{ color: "#6b7a78" }}>
+        <div className="font-sans text-[9px] mt-0.5" style={{ color: "#6b7a78" }}>
           {Math.round(data.hours ?? 0)}h
         </div>
       </div>
@@ -52,7 +52,7 @@ export function DragOverlayContent({ data }: { data: DragData }) {
       >
         <div className="flex items-center gap-1.5">
           {data.itemCode && (
-            <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>
+            <span className="font-sans text-[10px] shrink-0" style={{ color: "#223937" }}>
               {data.itemCode}
             </span>
           )}
@@ -60,7 +60,7 @@ export function DragOverlayContent({ data }: { data: DragData }) {
             {data.itemName}
           </span>
         </div>
-        <div className="font-mono text-[9px] mt-0.5" style={{ color: "#6b7a78" }}>
+        <div className="font-sans text-[9px] mt-0.5" style={{ color: "#6b7a78" }}>
           {data.hours}h
         </div>
       </div>
@@ -83,7 +83,7 @@ export function DragOverlayContent({ data }: { data: DragData }) {
         <div className="text-[10px] font-semibold truncate" style={{ color: "#223937" }}>
           {data.projectName}
         </div>
-        <div className="font-mono text-[9px] mt-0.5" style={{ color: "#6b7a78" }}>
+        <div className="font-sans text-[9px] mt-0.5" style={{ color: "#6b7a78" }}>
           {data.type === "silo-bundle" && data.itemCount
             ? `${data.itemCount} položky · ${Math.round(data.hours ?? 0)}h`
             : `${Math.round(data.hours ?? 0)}h`}
@@ -107,7 +107,7 @@ export function DragOverlayContent({ data }: { data: DragData }) {
       >
         <div className="flex items-center gap-1.5">
           {data.itemCode && (
-            <span className="font-mono text-[10px] shrink-0" style={{ color: "#f59e0b" }}>
+            <span className="font-sans text-[10px] shrink-0" style={{ color: "#f59e0b" }}>
               {data.itemCode}
             </span>
           )}
@@ -115,7 +115,7 @@ export function DragOverlayContent({ data }: { data: DragData }) {
             {data.itemName || data.projectName}
           </span>
         </div>
-        <div className="font-mono text-[9px] mt-0.5" style={{ color: "#8899bb" }}>
+        <div className="font-sans text-[9px] mt-0.5" style={{ color: "#8899bb" }}>
           {Math.round(data.hours ?? 0)}h
         </div>
       </div>

@@ -1158,7 +1158,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
 
       {/* Center: Stats */}
       <div className="flex items-center gap-2 min-w-0 shrink">
-        <div className="flex items-center gap-1 text-xs font-mono whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: forecastActive ? "#a8c5c2" : undefined }}>
+        <div className="flex items-center gap-1 text-xs font-sans whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: forecastActive ? "#a8c5c2" : undefined }}>
           <span>{forecastActive ? "Kap." : "Kapacita"} <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{Math.round(capacityHours).toLocaleString("cs-CZ")}h</span></span>
           <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
           <span>{forecastActive ? "Prodej" : "Prodej"} <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{formatCzk(displayCzk, forecastActive)}</span></span>
@@ -1233,7 +1233,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
                   >
                     <ChevronLeft className="h-3.5 w-3.5" />
                   </button>
-                  <span className="text-[11px] font-mono whitespace-nowrap" style={{
+                  <span className="text-[11px] font-sans whitespace-nowrap" style={{
                     color: forecastActive ? "#a8c5c2" : "hsl(var(--muted-foreground))",
                   }}>
                     {searchNavCurrentIndex + 1}/{searchNavTotalCount}
@@ -1248,7 +1248,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
                 </>
               )}
               {searchNavActive && searchNavTotalCount === 0 && (
-                <span className="text-[11px] font-mono whitespace-nowrap" style={{ color: "hsl(0 70% 55%)" }}>
+                <span className="text-[11px] font-sans whitespace-nowrap" style={{ color: "hsl(0 70% 55%)" }}>
                   0 výsledků
                 </span>
               )}

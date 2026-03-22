@@ -646,7 +646,7 @@ function ProjectGroup({
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="font-mono" style={{ fontSize: 11, color: isArchive ? "#9ca3af" : "#6b7280" }}>{group.project_id}</span>
+            <span className="font-sans" style={{ fontSize: 11, color: isArchive ? "#9ca3af" : "#6b7280" }}>{group.project_id}</span>
             {isArchive && latestExpedicedStr ? (
               <span style={{ fontSize: 11, color: "#6b7280" }}>
                 Expedováno: {latestExpedicedStr}
@@ -721,7 +721,7 @@ function ProjectGroup({
                       <Check className="shrink-0" style={{ width: 12, height: 12, color: "#3a8a36", strokeWidth: 3 }} />
                     )}
                     {item.item_code && (
-                      <span className="font-mono shrink-0" style={{ fontSize: 11, fontWeight: 500, color: isArchive ? "#9ca3af" : "#223937" }}>
+                      <span className="font-sans shrink-0" style={{ fontSize: 11, fontWeight: 500, color: isArchive ? "#9ca3af" : "#223937" }}>
                         {item.item_code}
                       </span>
                     )}

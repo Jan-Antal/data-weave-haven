@@ -99,7 +99,7 @@ export function PauseItemDialog({ open, onOpenChange, itemId, itemName, itemCode
             ⏸ Pozastavit: {cleanName}
           </div>
           {itemCode && (
-            <div className="text-[11px] font-mono mt-0.5" style={{ color: "#99a5a3" }}>{itemCode}</div>
+            <div className="text-[11px] font-sans mt-0.5" style={{ color: "#99a5a3" }}>{itemCode}</div>
           )}
         </div>
 

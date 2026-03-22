@@ -731,7 +731,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                             <InlineEditableCell
                               value={item.item_name || ""}
                               onSave={(v) => saveField(item.id, "item_name", v, item.item_name || "")}
-                              className="font-mono text-xs font-bold"
+                              className="font-sans text-xs font-bold"
                               readOnly={!canManageTPV}
                             />
                           </TableCell>
@@ -893,7 +893,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                       if (key === "cena") {
                         const formatted = formatCurrency(item.cena != null ? Number(item.cena) : null, currency);
                         return (
-                          <TableCell key={key} style={cellStyle} className="text-right font-mono text-xs">
+                          <TableCell key={key} style={cellStyle} className="text-right font-sans text-xs">
                             <InlineEditableCell
                               value={String(item.cena ?? "")}
                               type="number"
@@ -1038,7 +1038,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           <div className="space-y-2 py-2 max-h-[300px] overflow-auto">
             {notReadyItems.map((item) => (
               <div key={item.id} className="flex items-center gap-2 text-sm py-1 px-2 rounded bg-destructive/5">
-                <span className="font-mono text-xs font-semibold">{item.item_name}</span>
+                <span className="font-sans text-xs font-semibold">{item.item_name}</span>
                 <span className="text-muted-foreground truncate flex-1">{item.item_type || ""}</span>
                 <span className="text-xs text-destructive font-medium shrink-0">{item.status || "Bez statusu"}</span>
               </div>

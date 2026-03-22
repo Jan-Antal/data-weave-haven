@@ -159,7 +159,7 @@ export function CompletionDialog({
           <DialogTitle className="text-[14px] font-semibold" style={{ color: "#223937" }}>
             {projectName} ({projectId})
           </DialogTitle>
-          <DialogDescription className="text-[11px] font-mono" style={{ color: "#99a5a3" }}>
+          <DialogDescription className="text-[11px] font-sans" style={{ color: "#99a5a3" }}>
             {weekLabel}
           </DialogDescription>
         </DialogHeader>
@@ -185,7 +185,7 @@ export function CompletionDialog({
                 <span className="text-[11px] font-semibold" style={{ color: "#6b7a78" }}>
                   {allChecked ? "Odznačit vše" : "Vybrat vše"}
                 </span>
-                <span className="font-mono text-[10px] ml-auto" style={{ color: "#99a5a3" }}>
+                <span className="font-sans text-[10px] ml-auto" style={{ color: "#99a5a3" }}>
                   {checkedIds.size}/{uncompleted.length}
                 </span>
               </label>
@@ -224,14 +224,14 @@ export function CompletionDialog({
                     onClick={(e) => e.stopPropagation()}
                   />
                   {item.item_code && (
-                    <span className="font-mono text-[10px] shrink-0" style={{ color: "#223937" }}>
+                    <span className="font-sans text-[10px] shrink-0" style={{ color: "#223937" }}>
                       {item.item_code}
                     </span>
                   )}
                   <span className="text-[11px] flex-1 truncate" style={{ color: "#6b7a78" }}>
                     {item.item_name}
                   </span>
-                  <span className="font-mono text-[10px] shrink-0" style={{ color: "#6b7a78" }}>
+                  <span className="font-sans text-[10px] shrink-0" style={{ color: "#6b7a78" }}>
                     {item.scheduled_hours}h
                   </span>
                   {isCompleted ? (
@@ -272,7 +272,7 @@ export function CompletionDialog({
                           setConfig(item.id, { splitPct: Math.round((v / item.scheduled_hours) * 100) });
                         }}
                         onClick={e => e.stopPropagation()}
-                        className="w-14 text-center text-[11px] font-mono border border-border rounded px-1 py-0.5 bg-background"
+                        className="w-14 text-center text-[11px] font-sans border border-border rounded px-1 py-0.5 bg-background"
                       />
                       <span className="text-[10px] text-muted-foreground">+</span>
                       <input
@@ -285,9 +285,9 @@ export function CompletionDialog({
                           setConfig(item.id, { splitPct: Math.round(((item.scheduled_hours - v) / item.scheduled_hours) * 100) });
                         }}
                         onClick={e => e.stopPropagation()}
-                        className="w-14 text-center text-[11px] font-mono border border-border rounded px-1 py-0.5 bg-background"
+                        className="w-14 text-center text-[11px] font-sans border border-border rounded px-1 py-0.5 bg-background"
                       />
-                      <span className="text-[10px] font-mono text-muted-foreground shrink-0">= {item.scheduled_hours}h</span>
+                      <span className="text-[10px] font-sans text-muted-foreground shrink-0">= {item.scheduled_hours}h</span>
                     </div>
                     <button
                       className="text-[10px] text-muted-foreground hover:text-foreground transition-colors shrink-0"

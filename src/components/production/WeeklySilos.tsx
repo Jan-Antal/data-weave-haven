@@ -1038,7 +1038,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       {/* Header */}
       <div className="px-2.5 py-1.5 text-center" style={{ borderBottom: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #ece8e2" }}>
         <div className="flex items-center justify-center gap-1.5">
-          <span className="font-mono text-[14px]" style={{ color: headerColor, fontWeight: headerWeight }}>T{weekNum}</span>
+          <span className="font-sans text-[14px]" style={{ color: headerColor, fontWeight: headerWeight }}>T{weekNum}</span>
           {isCurrent && <span className="w-[5px] h-[5px] rounded-full" style={{ backgroundColor: forecastDarkMode ? "#4a9e96" : "#3a8a36" }} />}
         </div>
         <div className="text-[9px] mt-0.5" style={{ color: dateRangeColor }}>{formatDateShort(startDate)} – {formatDateShort(endDate)}</div>
@@ -1049,17 +1049,17 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
            <div className="flex items-baseline justify-between mt-[3px]">
             {displayMode === "czk" ? (
               <>
-                <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{formatCompactCzk(forecastDarkMode ? (totalHours * hourlyRate) : (activeSellingCzk))}</span>
-                {!forecastDarkMode && blockerHours > 0 && <span className="font-mono text-[9px]" style={{ color: "#6b7280" }}>+~{formatCompactCzk(blockerSellingCzk)}</span>}
-                <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }}>/ {formatCompactCzk(weeklyCapacity * hourlyRate)}</span>
-                <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
+                <span className="font-sans text-[11px] font-bold" style={{ color: barColor }}>{formatCompactCzk(forecastDarkMode ? (totalHours * hourlyRate) : (activeSellingCzk))}</span>
+                {!forecastDarkMode && blockerHours > 0 && <span className="font-sans text-[9px]" style={{ color: "#6b7280" }}>+~{formatCompactCzk(blockerSellingCzk)}</span>}
+                <span className="font-sans text-[10px]" style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }}>/ {formatCompactCzk(weeklyCapacity * hourlyRate)}</span>
+                <span className="font-sans text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
               </>
             ) : (
               <>
-                <span className="font-mono text-[11px] font-bold" style={{ color: barColor }}>{Math.round(forecastDarkMode ? totalHours : activeHours)}h</span>
-                {!forecastDarkMode && blockerHours > 0 && <span className="font-mono text-[9px]" style={{ color: "#6b7280" }}>+~{Math.round(blockerHours)}h</span>}
-                <span className="font-mono text-[10px]" style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }}>/ {weeklyCapacity}h</span>
-                <span className="font-mono text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
+                <span className="font-sans text-[11px] font-bold" style={{ color: barColor }}>{Math.round(forecastDarkMode ? totalHours : activeHours)}h</span>
+                {!forecastDarkMode && blockerHours > 0 && <span className="font-sans text-[9px]" style={{ color: "#6b7280" }}>+~{Math.round(blockerHours)}h</span>}
+                <span className="font-sans text-[10px]" style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }}>/ {weeklyCapacity}h</span>
+                <span className="font-sans text-[10px] font-bold" style={{ color: barColor }}>{Math.round(pct)}%</span>
               </>
             )}
           </div>
@@ -1308,7 +1308,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
         </div>
         <div className="flex items-center justify-between mt-0.5">
           <span className="text-[9px] rounded-full px-1.5 py-0.5" style={{ backgroundColor: "#374151", color: "#9ca3af", fontWeight: 600 }}>⏳ Rezerva</span>
-          <span className="font-mono text-[11px] font-bold" style={{ color: "#6b7280" }}>
+          <span className="font-sans text-[11px] font-bold" style={{ color: "#6b7280" }}>
             ~{displayMode === "czk" ? formatCompactCzk(productionCzkToSellingPrice(bundle.total_hours * hourlyRate, projectLookup.get(bundle.project_id)?.cost_production_pct, projectLookup.get(bundle.project_id)?.marze)) : `${Math.round(bundle.total_hours)}h`}
           </span>
         </div>
@@ -1376,7 +1376,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
               )}
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="font-mono" style={{ fontSize: 11, color: forecastDarkMode ? "#5a6480" : (allCompleted ? "#b0b7c3" : "#6b7280") }}>{bundle.project_id}</span>
+              <span className="font-sans" style={{ fontSize: 11, color: forecastDarkMode ? "#5a6480" : (allCompleted ? "#b0b7c3" : "#6b7280") }}>{bundle.project_id}</span>
               {(() => {
                 const proj = projectLookup.get(bundle.project_id);
                 const risk = proj?.risk;
@@ -1416,11 +1416,11 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
             })()}
             {completedCount > 0 && <span className="text-[9px]" style={{ color: "#3a8a36", fontWeight: 600 }}>{completedCount}/{totalCount} ✓</span>}
             {displayMode === "czk" ? (
-              <span className="font-mono" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{formatCompactCzk(productionCzkToSellingPrice(bundle.total_hours * hourlyRate, projectLookup.get(bundle.project_id)?.cost_production_pct, projectLookup.get(bundle.project_id)?.marze))}</span>
+              <span className="font-sans" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{formatCompactCzk(productionCzkToSellingPrice(bundle.total_hours * hourlyRate, projectLookup.get(bundle.project_id)?.cost_production_pct, projectLookup.get(bundle.project_id)?.marze))}</span>
             ) : displayMode === "percent" ? (
-              <span className="font-mono" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{weeklyCapacity > 0 ? Math.round((bundle.total_hours / weeklyCapacity) * 100) : 0}%</span>
+              <span className="font-sans" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{weeklyCapacity > 0 ? Math.round((bundle.total_hours / weeklyCapacity) * 100) : 0}%</span>
             ) : (
-              <span className="font-mono" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{Math.round(bundle.total_hours)}h</span>
+              <span className="font-sans" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{Math.round(bundle.total_hours)}h</span>
             )}
           </div>
         </div>
@@ -1468,13 +1468,13 @@ function CompletedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onCont
       onContextMenu={onContextMenu}
     >
       <span style={{ width: 10, fontSize: 9, color: "#3a8a36", fontWeight: 700 }}>✓</span>
-      {item.item_code && <span className="font-mono text-[9px] font-bold shrink-0" style={{ color: "#99a5a3" }}>{item.item_code}</span>}
+      {item.item_code && <span className="font-sans text-[9px] font-bold shrink-0" style={{ color: "#99a5a3" }}>{item.item_code}</span>}
       <span className="text-[10px] flex-1 truncate" style={{ color: "#6b7280", textDecoration: "line-through" }}>{item.item_name}</span>
       {isSplit && (
-        <Tooltip><TooltipTrigger asChild><span className="text-[8px] font-mono shrink-0" style={{ color: "#c4ccc9" }}>{item.split_part}/{item.split_total}</span></TooltipTrigger>
+        <Tooltip><TooltipTrigger asChild><span className="text-[8px] font-sans shrink-0" style={{ color: "#c4ccc9" }}>{item.split_part}/{item.split_total}</span></TooltipTrigger>
           <TooltipContent side="top" className="z-[9999] text-[10px]">Část {item.split_part} ze {item.split_total}</TooltipContent></Tooltip>
       )}
-      <span className="font-mono text-[9px] shrink-0" style={{ color: "#c4ccc9" }}>{item.scheduled_hours}h</span>
+      <span className="font-sans text-[9px] shrink-0" style={{ color: "#c4ccc9" }}>{item.scheduled_hours}h</span>
     </div>
   );
 }
@@ -1496,7 +1496,7 @@ function PausedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onContext
       onContextMenu={onContextMenu}
     >
       <span style={{ width: 10, fontSize: 9, color: "#d97706", fontWeight: 700 }}>⏸</span>
-      {item.item_code && <span className="font-mono text-[9px] shrink-0" style={{ color: "#d97706" }}>{item.item_code}</span>}
+      {item.item_code && <span className="font-sans text-[9px] shrink-0" style={{ color: "#d97706" }}>{item.item_code}</span>}
       <span className="text-[10px] flex-1 truncate" style={{ color: "#d97706", textDecoration: "line-through" }}>{item.item_name}</span>
       <Tooltip>
         <TooltipTrigger asChild>
@@ -1513,7 +1513,7 @@ function PausedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onContext
           {pauseExpDate ? `Očekávané uvolnění: ${new Date(pauseExpDate).toLocaleDateString("cs-CZ")}` : "Bez termínu uvolnění"}
         </TooltipContent>
       </Tooltip>
-      <span className="font-mono text-[9px] shrink-0" style={{ color: "#d97706", textDecoration: "line-through" }}>{item.scheduled_hours}h</span>
+      <span className="font-sans text-[9px] shrink-0" style={{ color: "#d97706", textDecoration: "line-through" }}>{item.scheduled_hours}h</span>
     </div>
   );
 }
@@ -1555,13 +1555,13 @@ function DraggableSiloItem({ item, weekKey, showCzk, onContextMenu, disabled = f
           {adhocReason === "oprava" ? "🔧" : adhocReason === "dodatecna" ? "➕" : "📝"}
         </span>
       )}
-      {item.item_code && <span className="font-mono text-[9px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
+      {item.item_code && <span className="font-sans text-[9px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
       <span className="text-[10px] flex-1 truncate" style={{ color: "#6b7a78" }}>{item.item_name}</span>
       {isSplit && (
-        <Tooltip><TooltipTrigger asChild><span className="text-[8px] font-mono shrink-0" style={{ color: "#99a5a3" }}>{item.split_part}/{item.split_total}</span></TooltipTrigger>
+        <Tooltip><TooltipTrigger asChild><span className="text-[8px] font-sans shrink-0" style={{ color: "#99a5a3" }}>{item.split_part}/{item.split_total}</span></TooltipTrigger>
           <TooltipContent side="top" className="z-[9999] text-[10px]">Část {item.split_part} ze {item.split_total}</TooltipContent></Tooltip>
       )}
-      <span className="font-mono text-[9px] shrink-0" style={{ color: "#99a5a3" }}>
+      <span className="font-sans text-[9px] shrink-0" style={{ color: "#99a5a3" }}>
         {item.scheduled_hours}h{showCzk && ` ${Math.round(item.scheduled_czk / 1000)}K`}
       </span>
     </div>

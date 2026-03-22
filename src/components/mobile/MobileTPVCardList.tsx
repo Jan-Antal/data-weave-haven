@@ -132,7 +132,7 @@ export function MobileTPVCardList({
                 {/* Compact view: 3 fields */}
                 <div className="p-3 space-y-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold font-mono text-primary truncate max-w-[160px]" title={item.item_name || "—"}>{item.item_name || "—"}</span>
+                    <span className="text-[11px] font-bold font-sans text-primary truncate max-w-[160px]" title={item.item_name || "—"}>{item.item_name || "—"}</span>
                     {isExpanded
                       ? <ChevronUp className="h-3 w-3 text-muted-foreground shrink-0" />
                       : <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
@@ -155,7 +155,7 @@ export function MobileTPVCardList({
                       <span className="text-[10px] text-muted-foreground">{item.konstrukter}</span>
                     )}
                     {item.pocet != null && item.pocet > 0 && (
-                      <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded">{item.pocet} ks</span>
+                      <span className="text-[10px] font-sans bg-muted px-1.5 py-0.5 rounded">{item.pocet} ks</span>
                     )}
                     {vyrobaLabel && (
                       <Badge variant="secondary" className="text-[10px] h-5">{vyrobaLabel}</Badge>

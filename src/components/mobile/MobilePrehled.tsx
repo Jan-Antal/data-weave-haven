@@ -231,7 +231,7 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <span className="text-[11px] font-mono" style={{ color: "#A32D2D" }}>
+                  <span className="text-[11px] font-sans" style={{ color: "#A32D2D" }}>
                     {item.project.project_id}
                   </span>
                   {item.project.status && (

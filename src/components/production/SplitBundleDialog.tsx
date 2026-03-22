@@ -180,7 +180,7 @@ export function SplitBundleDialog({
         <div className="px-5 py-4 space-y-3">
           <div className="flex items-center justify-between text-xs">
             <span className="font-medium text-foreground">Podíl do dalšího týdne</span>
-            <span className="font-mono text-muted-foreground">{pct}% (~{previewHours}h)</span>
+            <span className="font-sans text-muted-foreground">{pct}% (~{previewHours}h)</span>
           </div>
           <Slider value={[pct]} min={5} max={100} step={5} onValueChange={([v]) => setPct(v)} className="w-full" />
 

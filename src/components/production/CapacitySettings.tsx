@@ -436,19 +436,19 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   if (e.key === "Enter") { e.preventDefault(); commitCapacityInput(); (e.target as HTMLInputElement).blur(); }
                   if (e.key === "Escape") { setStandardCapacityInput(String(standardCapacity)); setCapacityInputFocused(false); (e.target as HTMLInputElement).blur(); }
                 }}
-                className="h-8 text-sm font-mono"
+                className="h-8 text-sm font-sans"
               />
               {capacityInputFocused && isExpr && exprPreview !== null && (
-                <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">= {exprPreview}</div>
+                <div className="text-[10px] text-muted-foreground mt-0.5 font-sans">= {exprPreview}</div>
               )}
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Pracovní dny</label>
-              <Input type="number" value={workingDaysPerWeek} disabled className="h-8 text-sm font-mono bg-muted" />
+              <Input type="number" value={workingDaysPerWeek} disabled className="h-8 text-sm font-sans bg-muted" />
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Hodin za den</label>
-              <Input type="number" value={calculatedHoursPerDay} disabled className="h-8 text-sm font-mono bg-muted" />
+              <Input type="number" value={calculatedHoursPerDay} disabled className="h-8 text-sm font-sans bg-muted" />
             </div>
           </div>
           <p className="text-[10px] text-muted-foreground">Změna kapacity ovlivní pouze týdny od dneška vpřed. Minulé týdny zůstanou nezměněny.</p>
@@ -544,7 +544,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                           onClick={e => handleBarClick(wn, e)}
                         />
                       </TooltipTrigger>
-                      <TooltipContent side="top" className="text-xs space-y-0.5 font-mono">
+                      <TooltipContent side="top" className="text-xs space-y-0.5 font-sans">
                         <div className="font-bold">T{wn}</div>
                         <div>{fmtDate(weekStart)} – {fmtDate(weekEnd)}{selectedYear}</div>
                         <div>{Math.round(cap)} h</div>
@@ -558,7 +558,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               {/* Week number labels */}
               <div className="flex gap-1 mt-1">
                 {Array.from({ length: VISIBLE_WEEKS }, (_, i) => viewStart + i).filter(wn => wn >= 1 && wn <= 52).map(wn => (
-                  <div key={wn} className="flex-1 text-center text-[10px] font-mono text-muted-foreground">
+                  <div key={wn} className="flex-1 text-center text-[10px] font-sans text-muted-foreground">
                     T{wn}
                   </div>
                 ))}
@@ -626,10 +626,10 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                 <tbody>
                   {holidayImpacts.map((h, i) => (
                     <tr key={i} className="border-b border-border/50">
-                      <td className="py-1 pr-2 font-mono">{h.date}</td>
+                      <td className="py-1 pr-2 font-sans">{h.date}</td>
                       <td className="py-1 pr-2">{h.name}</td>
-                      <td className="py-1 pr-2 font-mono">T{h.weekNum}</td>
-                      <td className="py-1 font-mono text-amber-600">-{h.reducedHours}h ({h.workingDays} dny)</td>
+                      <td className="py-1 pr-2 font-sans">T{h.weekNum}</td>
+                      <td className="py-1 font-sans text-amber-600">-{h.reducedHours}h ({h.workingDays} dny)</td>
                     </tr>
                   ))}
                 </tbody>
@@ -649,11 +649,11 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               {companyHolidays.map(ch => (
                 <div key={ch.id} className="flex items-center justify-between border border-border/50 rounded-md px-3 py-2">
                   <div className="text-xs">
-                    <span className="font-mono">{ch.start_date} – {ch.end_date}</span>
+                    <span className="font-sans">{ch.start_date} – {ch.end_date}</span>
                     <span className="mx-2 text-muted-foreground">|</span>
                     <span className="font-medium">{ch.name}</span>
                     <span className="mx-2 text-muted-foreground">|</span>
-                    <span className="font-mono text-amber-600">{ch.capacity_override}h</span>
+                    <span className="font-sans text-amber-600">{ch.capacity_override}h</span>
                   </div>
                   <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={() => deleteCompanyHoliday.mutate(ch.id)}>
                     <X className="h-3 w-3" />
@@ -837,7 +837,7 @@ function WeekEditor({ week, weekNum, selectedCount, isPast, standardCapacity, ho
             onChange={e => setCap(e.target.value)}
             onKeyDown={handleKeyDown}
             step={step}
-            className="h-7 text-xs font-mono"
+            className="h-7 text-xs font-sans"
             autoFocus
           />
         </div>
@@ -848,7 +848,7 @@ function WeekEditor({ week, weekNum, selectedCount, isPast, standardCapacity, ho
             value={days}
             onChange={e => setDays(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="h-7 text-xs font-mono"
+            className="h-7 text-xs font-sans"
           />
         </div>
         <Button size="sm" className="h-7 text-xs" onClick={save}>

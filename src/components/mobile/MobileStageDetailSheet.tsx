@@ -174,7 +174,7 @@ export function MobileStageDetailSheet({ stage, open, onOpenChange }: MobileStag
         <div className="flex items-start justify-between px-4 pt-2 pb-1">
           <DrawerHeader className="p-0 text-left flex-1 min-w-0">
             <DrawerTitle className="text-base font-semibold truncate">{stageDisplayName}</DrawerTitle>
-            <p className="text-xs text-muted-foreground font-mono mt-0.5">{stage.project_id}</p>
+            <p className="text-xs text-muted-foreground font-sans mt-0.5">{stage.project_id}</p>
           </DrawerHeader>
           <DrawerClose asChild>
             <button className="p-1.5 rounded-md hover:bg-muted transition-colors shrink-0 mt-0.5">

@@ -64,7 +64,7 @@ export function CurrencyEditCell({ value, currency, onSave, className = "" }: Cu
         <Button
           variant="outline"
           size="sm"
-          className="h-7 px-2 text-xs font-mono shrink-0"
+          className="h-7 px-2 text-xs font-sans shrink-0"
           onMouseDown={(e) => e.preventDefault()}
           onClick={toggleCurrency}
         >
@@ -82,7 +82,7 @@ export function CurrencyEditCell({ value, currency, onSave, className = "" }: Cu
         <TooltipTrigger asChild>
           <div
             className={cn(
-              "cursor-pointer hover:bg-muted/80 rounded px-1 py-0.5 h-7 leading-7 truncate whitespace-nowrap overflow-hidden font-mono text-xs",
+              "cursor-pointer hover:bg-muted/80 rounded px-1 py-0.5 h-7 leading-7 truncate whitespace-nowrap overflow-hidden font-sans text-xs",
               className
             )}
             onClick={() => {
