@@ -115,12 +115,14 @@
     @apply border-border;
   }
 
+  html {
+    background-color: #1a3330;
+  }
+
   html, body {
     height: 100%;
     overflow: hidden;
   }
-
-
   #root {
     height: 100svh;
     overflow: hidden;
@@ -273,6 +275,22 @@
   /* Block browser back-swipe gesture */
   html, body {
     overscroll-behavior-x: none;
+  }
+}
+
+/* Safe area bottom fill for iPhone home gesture zone */
+@media (max-width: 767px) {
+  body::after {
+    content: '';
+    display: block;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-bottom, 0px);
+    background-color: #1a3330;
+    z-index: 99999;
+    pointer-events: none;
   }
 }
 
