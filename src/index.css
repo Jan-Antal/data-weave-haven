@@ -120,10 +120,6 @@
     overflow: hidden;
   }
 
-  /* Fill safe-area below bottom nav with primary color on mobile */
-  html {
-    background-color: #223937;
-  }
 
   #root {
     height: 100svh;
