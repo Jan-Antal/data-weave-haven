@@ -326,11 +326,10 @@ function TPVTabContent({ items, currency }: { items: any[]; currency: string }) 
                <span className="text-[12px] text-muted-foreground truncate">{item.item_type}</span>
              )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center shrink-0 ml-auto">
             {(item.vyroba_status || item.status) && (
               <StatusBadge status={item.vyroba_status || item.status} />
             )}
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />
           </div>
         </div>
       ))}
