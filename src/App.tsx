@@ -183,25 +183,27 @@ function AppRoutes() {
   }
 
   return (
-    <div style={{ background: "#f8f7f4", minHeight: "100dvh" }}>
-      <UndoRedoProvider>
-        <PeopleManagementProvider>
-          <BrowserRouter>
-            <RealtimeSyncProvider />
+    <UndoRedoProvider>
+      <PeopleManagementProvider>
+        <BrowserRouter>
+          <RealtimeSyncProvider />
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden', background: '#f8f7f4' }}>
             <PersistentDesktopHeader />
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/plan-vyroby" element={<AdminRoute><PlanVyroby /></AdminRoute>} />
-              <Route path="/vyroba" element={<AdminRoute><Vyroba /></AdminRoute>} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="/set-password" element={<SetPassword />} />
-              <Route path="/login" element={<Navigate to="/" replace />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </PeopleManagementProvider>
-      </UndoRedoProvider>
-    </div>
+            <main style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/plan-vyroby" element={<AdminRoute><PlanVyroby /></AdminRoute>} />
+                <Route path="/vyroba" element={<AdminRoute><Vyroba /></AdminRoute>} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="/set-password" element={<SetPassword />} />
+                <Route path="/login" element={<Navigate to="/" replace />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </main>
+          </div>
+        </BrowserRouter>
+      </PeopleManagementProvider>
+    </UndoRedoProvider>
   );
 }
 
