@@ -442,7 +442,7 @@ const ProjectRow = memo(function ProjectRow({
         <ExpandArrow isExpanded={isExpanded} stageCount={stageCount} />
       </TableCell>
       {v("project_id") && (
-        <TableCell className="font-mono text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => onEditProject(p)}>
+        <TableCell className="font-sans font-semibold text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => onEditProject(p)}>
           {p.project_id}
         </TableCell>
       )}
