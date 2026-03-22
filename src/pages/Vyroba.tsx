@@ -4354,6 +4354,7 @@ function QcDefectForm({
   singleItemMode?: boolean;
 }) {
   const isMobile = useIsMobile();
+  const { profile } = useAuth();
   const { uploadFile } = useSharePointDocs(projectId);
   const [photoUploading, setPhotoUploading] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
