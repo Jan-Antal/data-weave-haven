@@ -405,11 +405,24 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const BULK_FIELDS = new Set(["status", "konstrukter", "sent_date", "accepted_date"]);
 
   const saveField = async (itemId: string, field: string, value: string, oldValue: string) => {
+    // Handle cena empty → save null
+    if (field === "cena" && value.trim() === "") {
+      updateItem.mutate({ id: itemId, field: "cena", value: null as any, projectId, oldValue });
+      return;
+    }
+
     // Intercept pocet changes — check if item is in production
     if (field === "pocet" && value !== oldValue) {
       const newPocet = Number(value) || 0;
       const oldPocetNum = Number(oldValue) || 0;
-      if (newPocet !== oldPocetNum && newPocet > 0) {
+
+      // Empty or zero — save directly without production warning
+      if (value.trim() === "" || newPocet === 0) {
+        updateItem.mutate({ id: itemId, field: "pocet", value: null as any, projectId, oldValue });
+        return;
+      }
+
+      if (newPocet !== oldPocetNum) {
         // Check if this item exists in production_inbox or production_schedule
         const item = items.find((i) => i.id === itemId);
         const itemCode = item?.item_name || "";
