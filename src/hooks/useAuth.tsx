@@ -23,6 +23,7 @@ interface AuthContextType {
   isPM: boolean;
   isKonstrukter: boolean;
   isViewer: boolean;
+  isVyroba: boolean;
   canEdit: boolean;
   canCreateProject: boolean;
   canDeleteProject: boolean;
