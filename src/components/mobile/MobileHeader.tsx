@@ -118,6 +118,13 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
       </Sheet>
 
       <AccountSettings open={accountOpen} onOpenChange={setAccountOpen} />
+
+      <Sheet open={notifOpen} onOpenChange={setNotifOpen}>
+        <SheetContent side="bottom" className="p-0 rounded-t-xl max-h-[80vh]">
+          <SheetTitle className="sr-only">Notifikace</SheetTitle>
+          <NotificationPanel onClose={() => setNotifOpen(false)} />
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
