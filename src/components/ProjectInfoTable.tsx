@@ -565,7 +565,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     }
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projects, sortCol, sortDir, computeKey]);
+  }, [projects, sortCol, sortDir, computeKey, statusOrderMap]);
 
   // Infinite scroll
   const tableScrollRef = useRef<HTMLDivElement>(null);
