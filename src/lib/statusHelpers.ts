@@ -42,9 +42,10 @@ export function getDefaultStatus(statusOptions: ProjectStatusOption[]): string {
  * Returns the last status label (hidden by default in filters).
  */
 export function getHiddenByDefaultStatuses(statusOptions: ProjectStatusOption[]): string[] {
-  if (!statusOptions.length) return ["Dokončeno"];
+  if (!statusOptions.length) return ["Dokončeno", "Reklamace"];
   const sorted = [...statusOptions].sort((a, b) => a.sort_order - b.sort_order);
-  return [sorted[sorted.length - 1].label];
+  // Hide last 2 statuses by default (e.g. Dokončeno, Reklamace)
+  return sorted.slice(-2).map((s) => s.label);
 }
 
 /**
