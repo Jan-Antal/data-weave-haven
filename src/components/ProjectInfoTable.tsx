@@ -545,6 +545,11 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     let result = projects.filter((p) => frozenIds.has(p.project_id));
     if (sortCol && sortDir) {
       result = [...result].sort((a, b) => {
+        if (sortCol === "status") {
+          const ao = statusOrderMap.get((a as any).status ?? "") ?? 999;
+          const bo = statusOrderMap.get((b as any).status ?? "") ?? 999;
+          return sortDir === "asc" ? ao - bo : bo - ao;
+        }
         const av = (a as any)[sortCol] ?? "";
         const bv = (b as any)[sortCol] ?? "";
         const numA = Number(av);
