@@ -71,7 +71,14 @@ export function MobileHeader({ onDataLog, showDataLog = false, onCloseDataLog }:
               )}
             </button>
             <button
-              onClick={() => setMenuOpen(true)}
+              onClick={() => {
+                if (onCloseDataLog) {
+                  onCloseDataLog();
+                  setTimeout(() => setMenuOpen(true), 150);
+                } else {
+                  setMenuOpen(true);
+                }
+              }}
               className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
               <Menu className="h-5 w-5" />
