@@ -74,7 +74,7 @@ export function NotificationPanel({ onClose, mobile = false }: NotificationPanel
         )}
 
         {/* List */}
-        <div className="max-h-[420px] overflow-y-auto">
+        <div className={mobile ? "flex-1 overflow-y-auto" : "max-h-[420px] overflow-y-auto"}>
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <Bell className="h-8 w-8 mb-2 opacity-40" />
