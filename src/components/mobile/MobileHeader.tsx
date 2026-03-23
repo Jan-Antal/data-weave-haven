@@ -21,9 +21,10 @@ const ROLE_LABELS: Record<string, string> = {
 interface MobileHeaderProps {
   onDataLog?: () => void;
   showDataLog?: boolean;
+  onCloseDataLog?: () => void;
 }
 
-export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderProps) {
+export function MobileHeader({ onDataLog, showDataLog = false, onCloseDataLog }: MobileHeaderProps) {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -52,7 +53,14 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
           />
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setNotifOpen(true)}
+              onClick={() => {
+                if (onCloseDataLog) {
+                  onCloseDataLog();
+                  setTimeout(() => setNotifOpen(true), 150);
+                } else {
+                  setNotifOpen(true);
+                }
+              }}
               className="relative p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
               <Bell className="h-5 w-5" />
@@ -63,7 +71,14 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
               )}
             </button>
             <button
-              onClick={() => setMenuOpen(true)}
+              onClick={() => {
+                if (onCloseDataLog) {
+                  onCloseDataLog();
+                  setTimeout(() => setMenuOpen(true), 150);
+                } else {
+                  setMenuOpen(true);
+                }
+              }}
               className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
               <Menu className="h-5 w-5" />
