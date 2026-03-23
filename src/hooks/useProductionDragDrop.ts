@@ -610,29 +610,24 @@ export function useProductionDragDrop() {
 
       // If there are remaining parts in other weeks, keep split metadata
       const hasRemaining = remainingParts.length > 0;
-      const { error: updateErr } = await supabase
-        .from("production_schedule")
-        .update({
+      const otherIds = parts.filter(p => p.id !== primary.id).map(p => p.id);
+
+      // Batch: update primary + delete others in parallel
+      await Promise.all([
+        supabase.from("production_schedule").update({
           scheduled_hours: totalHours,
           scheduled_czk: totalCzk,
-          item_name: hasRemaining ? cleanName : cleanName,
+          item_name: cleanName,
           split_group_id: hasRemaining ? splitGroupId : null,
-          split_part: hasRemaining ? null : null,
-          split_total: hasRemaining ? null : null,
-        })
-        .eq("id", primary.id);
-      if (updateErr) throw updateErr;
+          split_part: null,
+          split_total: null,
+        }).eq("id", primary.id),
+        otherIds.length > 0
+          ? supabase.from("production_schedule").delete().in("id", otherIds)
+          : Promise.resolve(),
+      ]);
 
-      const otherIds = parts.filter(p => p.id !== primary.id).map(p => p.id);
-      if (otherIds.length > 0) {
-        const { error: delErr } = await supabase
-          .from("production_schedule")
-          .delete()
-          .in("id", otherIds);
-        if (delErr) throw delErr;
-      }
-
-      // Renumber remaining siblings if any
+      // Renumber remaining siblings if any (unavoidable sequential)
       if (hasRemaining) {
         const allRemaining = [primary.id, ...remainingParts.map(p => p.id)];
         const { data: siblings } = await supabase
@@ -649,7 +644,6 @@ export function useProductionDragDrop() {
             }).eq("id", s.id)
           ));
         } else if (siblings && siblings.length === 1) {
-          // Only one part left — remove split metadata
           await supabase.from("production_schedule").update({
             item_name: cleanName,
             split_group_id: null,
