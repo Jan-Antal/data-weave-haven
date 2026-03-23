@@ -7,9 +7,10 @@ interface PdfPreviewModalProps {
   html: string;
   tabLabel: string;
   onClose: () => void;
+  portrait?: boolean;
 }
 
-export function PdfPreviewModal({ html, tabLabel, onClose }: PdfPreviewModalProps) {
+export function PdfPreviewModal({ html, tabLabel, onClose, portrait = false }: PdfPreviewModalProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
@@ -52,10 +53,10 @@ export function PdfPreviewModal({ html, tabLabel, onClose }: PdfPreviewModalProp
           Tisk / Uložit PDF
         </Button>
       </div>
-      <div className="flex-1 overflow-auto p-4 bg-muted/30">
-        <div className="mx-auto bg-white shadow-lg rounded-sm" style={{ maxWidth: "1200px", minHeight: "600px" }}>
+      <div className="flex-1 overflow-auto p-4 bg-muted/30 flex justify-center">
+        <div className="bg-white shadow-lg rounded-sm" style={portrait ? { width: "794px", minHeight: "1123px" } : { maxWidth: "1200px", minHeight: "600px" }}>
           {blobUrl && (
-            <iframe ref={iframeRef} src={blobUrl} className="w-full border-0 rounded-sm" style={{ minHeight: "80vh" }} title="PDF Preview" />
+            <iframe ref={iframeRef} src={blobUrl} className="w-full border-0 rounded-sm" style={portrait ? { height: "1123px" } : { minHeight: "80vh" }} title="PDF Preview" />
           )}
         </div>
       </div>
