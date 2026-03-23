@@ -1146,7 +1146,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
             }
           />
         )}
-        {!isAdmin && (
+        {!isAdmin && !isPM && (
           <div>
             <Label className="text-xs">Kalkulant</Label>
             {isSectionReadOnly("finance") ? (
