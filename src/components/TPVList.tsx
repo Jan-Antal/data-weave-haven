@@ -19,7 +19,9 @@ import {
   useBulkInsertTPVItems,
 } from "@/hooks/useTPVItems";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
-import { ArrowLeft, Plus, Upload, Trash2, FileText, Cog } from "lucide-react";
+import { ArrowLeft, Plus, Upload, Trash2, FileText, Cog, Printer } from "lucide-react";
+import { buildPruvodkaHtml } from "@/lib/exportPdf";
+import { PdfPreviewModal } from "./PdfPreviewModal";
 import { ProjectDetailDialog } from "./ProjectDetailDialog";
 import { useProjects } from "@/hooks/useProjects";
 import * as XLSX from "xlsx";
