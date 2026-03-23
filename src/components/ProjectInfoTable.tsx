@@ -96,7 +96,7 @@ function singleStageMatches(
   if (personFilter && !(stage.pm && String(stage.pm).includes(personFilter))) return false;
   if (statusFilterSet && !matchesStatusFilter(stage.status, statusFilterSet)) return false;
   if (searchLower) {
-    const searchable = [stage.stage_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
+    const searchable = [stage.stage_name, stage.display_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
     const found = searchable.some(v => normalizedIncludes(v, searchLower));
     if (!found) return false;
   }
@@ -469,6 +469,11 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const statusLabels = useMemo(() => statusOptions.map((s) => s.label), [statusOptions]);
+  const statusOrderMap = useMemo(() => {
+    const map = new Map<string, number>();
+    statusOptions.forEach((s, i) => map.set(s.label, s.sort_order ?? i));
+    return map;
+  }, [statusOptions]);
   const updateProject = useUpdateProject();
   const { columns: customColumns } = useAllCustomColumns("projects");
   const updateCustomField = useUpdateCustomField();
@@ -540,6 +545,11 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     let result = projects.filter((p) => frozenIds.has(p.project_id));
     if (sortCol && sortDir) {
       result = [...result].sort((a, b) => {
+        if (sortCol === "status") {
+          const ao = statusOrderMap.get((a as any).status ?? "") ?? 999;
+          const bo = statusOrderMap.get((b as any).status ?? "") ?? 999;
+          return sortDir === "asc" ? ao - bo : bo - ao;
+        }
         const av = (a as any)[sortCol] ?? "";
         const bv = (b as any)[sortCol] ?? "";
         const numA = Number(av);
@@ -555,7 +565,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     }
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projects, sortCol, sortDir, computeKey]);
+  }, [projects, sortCol, sortDir, computeKey, statusOrderMap]);
 
   // Infinite scroll
   const tableScrollRef = useRef<HTMLDivElement>(null);
