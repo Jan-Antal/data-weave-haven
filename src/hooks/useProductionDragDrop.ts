@@ -610,29 +610,24 @@ export function useProductionDragDrop() {
 
       // If there are remaining parts in other weeks, keep split metadata
       const hasRemaining = remainingParts.length > 0;
-      const { error: updateErr } = await supabase
-        .from("production_schedule")
-        .update({
+      const otherIds = parts.filter(p => p.id !== primary.id).map(p => p.id);
+
+      // Batch: update primary + delete others in parallel
+      await Promise.all([
+        supabase.from("production_schedule").update({
           scheduled_hours: totalHours,
           scheduled_czk: totalCzk,
-          item_name: hasRemaining ? cleanName : cleanName,
+          item_name: cleanName,
           split_group_id: hasRemaining ? splitGroupId : null,
-          split_part: hasRemaining ? null : null,
-          split_total: hasRemaining ? null : null,
-        })
-        .eq("id", primary.id);
-      if (updateErr) throw updateErr;
+          split_part: null,
+          split_total: null,
+        }).eq("id", primary.id),
+        otherIds.length > 0
+          ? supabase.from("production_schedule").delete().in("id", otherIds)
+          : Promise.resolve(),
+      ]);
 
-      const otherIds = parts.filter(p => p.id !== primary.id).map(p => p.id);
-      if (otherIds.length > 0) {
-        const { error: delErr } = await supabase
-          .from("production_schedule")
-          .delete()
-          .in("id", otherIds);
-        if (delErr) throw delErr;
-      }
-
-      // Renumber remaining siblings if any
+      // Renumber remaining siblings if any (unavoidable sequential)
       if (hasRemaining) {
         const allRemaining = [primary.id, ...remainingParts.map(p => p.id)];
         const { data: siblings } = await supabase
@@ -649,7 +644,6 @@ export function useProductionDragDrop() {
             }).eq("id", s.id)
           ));
         } else if (siblings && siblings.length === 1) {
-          // Only one part left — remove split metadata
           await supabase.from("production_schedule").update({
             item_name: cleanName,
             split_group_id: null,
@@ -659,23 +653,19 @@ export function useProductionDragDrop() {
         }
       }
 
-      invalidateAll();
-
-      // Store parts snapshot for undo
+      // Store parts snapshot for undo — push undo FIRST, then invalidate
       const partsSnapshot = parts.map(p => ({ ...p }));
       pushUndo({
         page: "plan-vyroby",
         actionType: "merge_split",
         description: `${parts.length} částí spojeno → "${cleanName}"`,
         undo: async () => {
-          // Restore primary to its original state
           const orig = partsSnapshot[0];
           await supabase.from("production_schedule").update({
             scheduled_hours: orig.scheduled_hours, scheduled_czk: orig.scheduled_czk,
             item_name: orig.item_name, split_group_id: orig.split_group_id,
             split_part: orig.split_part, split_total: orig.split_total,
           }).eq("id", orig.id);
-          // Re-create other parts
           const { data: { user } } = await supabase.auth.getUser();
           const others = partsSnapshot.slice(1).map(p => ({
             project_id: p.project_id, stage_id: p.stage_id,
@@ -689,12 +679,10 @@ export function useProductionDragDrop() {
           invalidateAll();
         },
         redo: async () => {
-          // Re-merge
           await supabase.from("production_schedule").update({
             scheduled_hours: totalHours, scheduled_czk: totalCzk,
             item_name: cleanName, split_group_id: null, split_part: null, split_total: null,
           }).eq("id", primary.id);
-          // Find and delete other parts
           const { data: reParts } = await supabase.from("production_schedule")
             .select("id").or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`)
             .neq("id", primary.id);
@@ -705,7 +693,7 @@ export function useProductionDragDrop() {
         },
       });
 
-      // Toast is shown by pushUndo
+      invalidateAll();
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
