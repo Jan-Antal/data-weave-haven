@@ -1125,7 +1125,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
           className="inline-flex items-center gap-1 px-2.5 py-1 h-8 text-[12px] font-medium rounded-md border transition-colors hover:bg-muted disabled:opacity-50"
           style={{ borderColor: "hsl(var(--border))", color: "hsl(var(--foreground))" }}
         >
-          {recalculating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span>⟳</span>}
+          {recalculating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span className="text-[12px]">⟳</span>}
           Přepočítat
         </button>
       )}
