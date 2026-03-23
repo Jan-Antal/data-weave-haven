@@ -268,7 +268,7 @@ const Index = () => {
       {/* Mobile Header */}
       {isMobile && (
         <MobileHeader
-          onDataLog={toggleDataLog}
+          onDataLog={() => setDataLogOpen(true)}
           showDataLog={canAccessSettings || realRole === "owner" || role === "pm"}
         />
       )}
@@ -361,11 +361,15 @@ const Index = () => {
                   handleMobileOpenTPV(p);
                 } : undefined}
               />
-              {/* Mobile DataLog full screen */}
-              <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
-                setDataLogOpen(v);
-                try { localStorage.setItem("datalog-panel-index", String(v)); } catch {}
-              }} />
+              {/* Mobile DataLog — positioned between header and bottom nav */}
+              {dataLogOpen && (
+                <div className="fixed inset-x-0 z-[90] bg-background flex flex-col" style={{ top: 'var(--mobile-header-height, 56px)', bottom: 'calc(56px + 36px)' }}>
+                  <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
+                    setDataLogOpen(v);
+                    try { localStorage.setItem("datalog-panel-index", String(v)); } catch {}
+                  }} />
+                </div>
+              )}
             </main>
           </>
         ) : (
