@@ -12,6 +12,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Search, X, ChevronDown, Check } from "lucide-react";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
+import { isTerminalStatus } from "@/lib/statusHelpers";
 
 interface MobileCardListProps {
   personFilter: string | null;
