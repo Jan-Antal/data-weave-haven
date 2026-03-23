@@ -54,11 +54,11 @@ export function MobileHeader({ onDataLog, showDataLog = false, onCloseDataLog }:
           <div className="flex items-center gap-1">
             <button
               onClick={() => {
-                const needsDelay = menuOpen || (onCloseDataLog != null);
-                setMenuOpen(false);
+                const otherOpen = menuOpen;
+                if (otherOpen) setMenuOpen(false);
                 if (onCloseDataLog) onCloseDataLog();
-                if (needsDelay) {
-                  setTimeout(() => setNotifOpen(true), 150);
+                if (otherOpen) {
+                  setTimeout(() => setNotifOpen(true), 300);
                 } else {
                   setNotifOpen(true);
                 }
@@ -74,11 +74,11 @@ export function MobileHeader({ onDataLog, showDataLog = false, onCloseDataLog }:
             </button>
             <button
               onClick={() => {
-                const needsDelay = notifOpen || (onCloseDataLog != null);
-                setNotifOpen(false);
+                const otherOpen = notifOpen;
+                if (otherOpen) setNotifOpen(false);
                 if (onCloseDataLog) onCloseDataLog();
-                if (needsDelay) {
-                  setTimeout(() => setMenuOpen(true), 150);
+                if (otherOpen) {
+                  setTimeout(() => setMenuOpen(true), 300);
                 } else {
                   setMenuOpen(true);
                 }
