@@ -1364,7 +1364,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                         const pd = projectDateLookup.get(proj.projectId);
                         const exp = pd?.expedice ? parseAppDate(pd.expedice) : null;
                         if (!exp) return null;
-                        const isProjectDone = ["Fakturace", "Dokonceno", "Dokončeno", "Expedice"].includes(pd?.status ?? "");
+                        const isProjectDone = terminalStatuses.has(pd?.status ?? "");
                         const allItemsDone = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
                         if (isProjectDone || allItemsDone) return null;
                         const days = differenceInDays(exp, new Date());
