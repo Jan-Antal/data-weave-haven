@@ -7,6 +7,7 @@ interface PdfPreviewModalProps {
   html: string;
   tabLabel: string;
   onClose: () => void;
+  portrait?: boolean;
 }
 
 export function PdfPreviewModal({ html, tabLabel, onClose }: PdfPreviewModalProps) {
