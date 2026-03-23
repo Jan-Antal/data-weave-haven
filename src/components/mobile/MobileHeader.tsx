@@ -37,7 +37,7 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
           }
         }}
         className="md:hidden border-b bg-primary px-4 pb-3 shrink-0 z-50"
-        style={{ paddingTop: "12px" }}
+        style={{ paddingTop: "0px" }}
       >
         <div className="flex items-center justify-between">
           <img
