@@ -24,18 +24,6 @@ export interface InboxProject {
 }
 
 export function useProductionInbox() {
-  const qc = useQueryClient();
-
-  useEffect(() => {
-    const channel = supabase
-      .channel("production-inbox-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "production_inbox" }, () => {
-        qc.invalidateQueries({ queryKey: ["production-inbox"] });
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [qc]);
-
   return useQuery({
     queryKey: ["production-inbox"],
     queryFn: async () => {
