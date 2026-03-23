@@ -145,56 +145,42 @@ export function SplitItemDialog({
       }
 
       if (source === "schedule") {
-        await supabase.from("production_schedule").update({
-          scheduled_hours: part1Hours,
-          scheduled_czk: part1Hours * czkPerHour,
-          split_group_id: groupId,
-          split_part: 1,
-          split_total: 2,
-        }).eq("id", itemId);
+        // Batched: update original + insert new part in parallel
+        const [, insertResult] = await Promise.all([
+          supabase.from("production_schedule").update({
+            scheduled_hours: part1Hours,
+            scheduled_czk: part1Hours * czkPerHour,
+            split_group_id: groupId,
+            split_part: 1,
+            split_total: 2,
+            item_name: `${cleanName} (1/2)`,
+          }).eq("id", itemId),
+          supabase.from("production_schedule").insert({
+            project_id: projectId,
+            stage_id: stageId,
+            item_name: `${cleanName} (2/2)`,
+            item_code: itemCode ?? null,
+            scheduled_week: targetWeek,
+            scheduled_hours: part2Hours,
+            scheduled_czk: part2Hours * czkPerHour,
+            position: 999,
+            status: "scheduled",
+            created_by: user.id,
+            split_group_id: groupId,
+            split_part: 2,
+            split_total: 2,
+          }).select().single(),
+        ]);
 
-        const { data: inserted } = await supabase.from("production_schedule").insert({
-          project_id: projectId,
-          stage_id: stageId,
-          item_name: cleanName,
-          item_code: itemCode ?? null,
-          scheduled_week: targetWeek,
-          scheduled_hours: part2Hours,
-          scheduled_czk: part2Hours * czkPerHour,
-          position: 999,
-          status: "scheduled",
-          created_by: user.id,
-          split_group_id: groupId,
-          split_part: 2,
-          split_total: 2,
-        }).select().single();
+        const insertedId = insertResult.data?.id;
 
-        await renumberSiblings(groupId);
-
-        const { data: allParts } = await supabase
-          .from("production_schedule")
-          .select("id, split_part, split_total")
-          .or(`split_group_id.eq.${groupId},id.eq.${groupId}`)
-          .order("scheduled_week");
-        if (allParts) {
-          await Promise.all(allParts.map(p =>
-            supabase.from("production_schedule").update({
-              item_name: `${cleanName} (${p.split_part}/${p.split_total})`,
-            }).eq("id", p.id)
-          ));
-        }
-
-        invalidateAll();
-
-        const insertedId = inserted?.id;
+        // Push undo first, then invalidate
         pushUndo({
           page: "plan-vyroby",
           actionType: "split_item",
           description: `✂ Rozděleno: ${cleanName} (${part1Hours}h + ${part2Hours}h)`,
           undo: async () => {
-            // Delete the created part
             if (insertedId) await supabase.from("production_schedule").delete().eq("id", insertedId);
-            // Restore original
             if (originalItem) {
               await supabase.from("production_schedule").update({
                 scheduled_hours: originalItem.scheduled_hours,
@@ -210,21 +196,26 @@ export function SplitItemDialog({
           },
           redo: async () => {
             const { data: { user: u } } = await supabase.auth.getUser();
-            await supabase.from("production_schedule").update({
-              scheduled_hours: part1Hours, scheduled_czk: part1Hours * czkPerHour,
-              split_group_id: groupId, split_part: 1, split_total: 2,
-            }).eq("id", itemId);
-            await supabase.from("production_schedule").insert({
-              project_id: projectId, stage_id: stageId, item_name: cleanName,
-              item_code: itemCode ?? null, scheduled_week: targetWeek,
-              scheduled_hours: part2Hours, scheduled_czk: part2Hours * czkPerHour,
-              position: 999, status: "scheduled", created_by: u?.id,
-              split_group_id: groupId, split_part: 2, split_total: 2,
-            });
-            await renumberSiblings(groupId);
+            await Promise.all([
+              supabase.from("production_schedule").update({
+                scheduled_hours: part1Hours, scheduled_czk: part1Hours * czkPerHour,
+                split_group_id: groupId, split_part: 1, split_total: 2,
+                item_name: `${cleanName} (1/2)`,
+              }).eq("id", itemId),
+              supabase.from("production_schedule").insert({
+                project_id: projectId, stage_id: stageId,
+                item_name: `${cleanName} (2/2)`, item_code: itemCode ?? null,
+                scheduled_week: targetWeek, scheduled_hours: part2Hours,
+                scheduled_czk: part2Hours * czkPerHour, position: 999,
+                status: "scheduled", created_by: u?.id,
+                split_group_id: groupId, split_part: 2, split_total: 2,
+              }),
+            ]);
             invalidateAll();
           },
         });
+
+        invalidateAll();
       } else {
         // Inbox split
         await supabase.from("production_inbox").update({
