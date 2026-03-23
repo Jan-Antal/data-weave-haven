@@ -91,7 +91,7 @@ export function MobileHeader({ onDataLog, showDataLog = false, onCloseDataLog }:
         </div>
       </header>
 
-      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen} modal={false}>
         <SheetContent side="right" className="w-[280px] p-0" style={{ top: "var(--mobile-header-height, 56px)", height: "calc(100% - var(--mobile-header-height, 56px))", zIndex: 200 }}>
           <SheetTitle className="sr-only">Menu</SheetTitle>
           <div className="p-5 border-b border-border">
