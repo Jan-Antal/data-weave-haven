@@ -1,0 +1,1 @@
+ALTER TABLE public.project_stages ADD COLUMN IF NOT EXISTS status_vyroba text;
