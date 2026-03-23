@@ -41,8 +41,10 @@ export function MobileBottomNav({ onModuleChange, activeModule }: MobileBottomNa
 
   return createPortal(
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-[100000] flex items-center justify-around bg-primary pointer-events-auto h-14"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-[100000] bg-primary pointer-events-auto"
+      style={{ paddingBottom: "env(safe-area-inset-bottom, 20px)" }}
     >
+      <div className="flex items-center justify-around h-14">
       <button
         onClick={(e) => handleNav(e, "projekty")}
         className={cn(
@@ -81,6 +83,7 @@ export function MobileBottomNav({ onModuleChange, activeModule }: MobileBottomNa
           <span className="text-[10px] font-medium">Výroba</span>
         </button>
       )}
+      </div>
     </nav>,
     document.body
   );
