@@ -54,9 +54,15 @@ export function MobileHeader({ onDataLog, showDataLog = false, onCloseDataLog }:
           <div className="flex items-center gap-1">
             <button
               onClick={() => {
+                const wasDataLogOpen = !!onCloseDataLog && showDataLog;
                 setMenuOpen(false);
                 if (onCloseDataLog) onCloseDataLog();
-                setNotifOpen(o => !o);
+                // If DataLog was open, explicitly open notif (don't toggle)
+                if (wasDataLogOpen) {
+                  setNotifOpen(true);
+                } else {
+                  setNotifOpen(o => !o);
+                }
               }}
               className="relative p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
@@ -69,9 +75,15 @@ export function MobileHeader({ onDataLog, showDataLog = false, onCloseDataLog }:
             </button>
             <button
               onClick={() => {
+                const wasDataLogOpen = !!onCloseDataLog && showDataLog;
                 setNotifOpen(false);
                 if (onCloseDataLog) onCloseDataLog();
-                setMenuOpen(o => !o);
+                // If DataLog was open, explicitly open menu (don't toggle)
+                if (wasDataLogOpen) {
+                  setMenuOpen(true);
+                } else {
+                  setMenuOpen(o => !o);
+                }
               }}
               className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
