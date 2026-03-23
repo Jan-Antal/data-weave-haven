@@ -25,6 +25,7 @@ type DefectInsert = Omit<QualityDefect, "id" | "reported_at" | "resolved" | "res
 
 export function useQualityDefects(projectId: string) {
   const qc = useQueryClient();
+  const { user, profile } = useAuth();
 
   const { data: defects = [] } = useQuery({
     queryKey: ["quality-defects", projectId],
