@@ -2927,7 +2927,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
         {/* Mobile: DataLog bottom Sheet */}
         {isMobile && (
-          <Sheet open={dataLogOpen} onOpenChange={setDataLogOpen}>
+          <Sheet open={dataLogOpen} onOpenChange={setDataLogOpen} modal={false}>
             <SheetContent side="bottom" className="h-[85vh] p-0 rounded-t-xl" style={{ zIndex: 10000 }}>
               <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} defaultCategory="vyroba" />
             </SheetContent>
