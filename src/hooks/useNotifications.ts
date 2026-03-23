@@ -14,6 +14,8 @@ export interface Notification {
   actor_initials: string | null;
   read: boolean;
   created_at: string;
+  link_context: { tab?: string; project_id?: string; item_id?: string; field?: string } | null;
+  batch_key: string | null;
 }
 
 export function useNotifications() {
@@ -35,7 +37,7 @@ export function useNotifications() {
     },
   });
 
-  // Realtime subscription
+  // Realtime subscription — listen for INSERT and UPDATE (batch updates)
   useEffect(() => {
     if (!user) return;
     const channel = supabase
@@ -43,7 +45,7 @@ export function useNotifications() {
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "notifications",
           filter: `user_id=eq.${user.id}`,
