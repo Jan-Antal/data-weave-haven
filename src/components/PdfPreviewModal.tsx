@@ -10,7 +10,7 @@ interface PdfPreviewModalProps {
   portrait?: boolean;
 }
 
-export function PdfPreviewModal({ html, tabLabel, onClose }: PdfPreviewModalProps) {
+export function PdfPreviewModal({ html, tabLabel, onClose, portrait = false }: PdfPreviewModalProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
