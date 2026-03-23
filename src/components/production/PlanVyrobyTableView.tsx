@@ -1328,7 +1328,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                             const pd = projectDateLookup.get(proj.projectId);
                             if (!pd) return null;
                             const allShipped = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
-                            const isProjectDone = ["Fakturace", "Dokonceno", "Dokončeno", "Expedice"].includes(pd?.status ?? "");
+                            const isProjectDone = terminalStatuses.has(pd?.status ?? "");
                             const fields: { label: string; value: string | null | undefined }[] = [
                               { label: "Exp", value: pd.expedice },
                               { label: "Mnt", value: pd.montaz },
