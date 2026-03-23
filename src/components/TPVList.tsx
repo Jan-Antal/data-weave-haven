@@ -709,7 +709,14 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             <Cog className="h-3 w-3 mr-1" /> Odeslat do výroby
           </Button>
         )}
-
+        <button
+          onClick={handlePruvodka}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm border border-border hover:bg-muted transition-colors"
+          title="Tisk průvodky do výroby"
+        >
+          <Printer className="h-4 w-4" />
+          <span className="hidden sm:inline">Průvodka</span>
+        </button>
         {selected.size > 0 && canManageTPV && (
           <div className="flex items-center gap-2 ml-4 border-l pl-4">
             <span className="text-sm text-muted-foreground">{selected.size} vybráno</span>
