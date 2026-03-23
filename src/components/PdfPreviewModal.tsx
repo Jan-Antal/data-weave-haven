@@ -54,9 +54,9 @@ export function PdfPreviewModal({ html, tabLabel, onClose, portrait = false }: P
         </Button>
       </div>
       <div className="flex-1 overflow-auto p-4 bg-muted/30 flex justify-center">
-        <div className="bg-white shadow-lg rounded-sm" style={{ width: "794px", minHeight: "1123px" }}>
+        <div className="bg-white shadow-lg rounded-sm" style={portrait ? { width: "794px", minHeight: "1123px" } : { maxWidth: "1200px", minHeight: "600px" }}>
           {blobUrl && (
-            <iframe ref={iframeRef} src={blobUrl} className="w-full border-0 rounded-sm" style={{ height: "1123px" }} title="PDF Preview" />
+            <iframe ref={iframeRef} src={blobUrl} className="w-full border-0 rounded-sm" style={portrait ? { height: "1123px" } : { minHeight: "80vh" }} title="PDF Preview" />
           )}
         </div>
       </div>
