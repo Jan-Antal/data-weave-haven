@@ -212,6 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isFieldReadOnly = (field: string, currentValue?: string | null): boolean => {
     if (isViewer) return true;
+    if (isVyroba) return true;
     if (isKonstrukter && konstrukterReadOnlyFields.has(field)) return true;
     if (isPM && pmReadOnlyFields.has(field)) return true;
     // PM can set datum_smluvni only when empty; once set it's read-only
