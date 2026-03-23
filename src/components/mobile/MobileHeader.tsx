@@ -31,6 +31,8 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
   const [notifOpen, setNotifOpen] = useState(false);
   const { user, profile, role, signOut } = useAuth();
   const { unreadCount } = useNotifications();
+  const handleNotifDismiss = useCallback(() => setNotifOpen(false), []);
+  const notifSwipe = useSheetSwipeDismiss({ onDismiss: handleNotifDismiss });
 
   return (
     <>
