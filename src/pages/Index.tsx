@@ -361,11 +361,27 @@ const Index = () => {
                   handleMobileOpenTPV(p);
                 } : undefined}
               />
-              {/* Mobile DataLog full screen */}
-              <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
-                setDataLogOpen(v);
-                try { localStorage.setItem("datalog-panel-index", String(v)); } catch {}
-              }} />
+              {/* Mobile DataLog full screen overlay */}
+              {dataLogOpen && (
+                <div className="fixed inset-0 z-[100001] flex flex-col bg-background">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+                    <button
+                      onClick={() => { setDataLogOpen(false); try { localStorage.setItem("datalog-panel-index", "false"); } catch {} }}
+                      className="text-sm text-muted-foreground"
+                    >
+                      ← Zpět
+                    </button>
+                    <span className="font-semibold text-sm">Data Log</span>
+                    <div className="w-12" />
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    <DataLogPanel open={true} onOpenChange={(v) => {
+                      setDataLogOpen(v);
+                      try { localStorage.setItem("datalog-panel-index", String(v)); } catch {}
+                    }} />
+                  </div>
+                </div>
+              )}
             </main>
           </>
         ) : (
