@@ -6,6 +6,8 @@ import { matchesStatusFilter } from "@/lib/statusFilter";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ChevronUp, ChevronDown } from "lucide-react";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
+import { getExcludedStatuses } from "@/lib/statusHelpers";
 import {
   BarChart,
   Bar,
