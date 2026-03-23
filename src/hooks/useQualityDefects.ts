@@ -1,5 +1,7 @@
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "./useAuth";
+import { createNotification, getUserIdsByRole } from "@/lib/createNotification";
 
 export interface QualityDefect {
   id: string;
