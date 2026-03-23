@@ -1117,7 +1117,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
         </div>
 
         {/* Rozpad ceny — admin only */}
-        {isAdmin && (
+        {(isAdmin || isPM) && (
           <RozpadCeny
             projectId={project.project_id}
             prodejniCena={form.prodejni_cena ? Number(form.prodejni_cena) : null}
@@ -1146,7 +1146,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
             }
           />
         )}
-        {!isAdmin && (
+        {!isAdmin && !isPM && (
           <div>
             <Label className="text-xs">Kalkulant</Label>
             {isSectionReadOnly("finance") ? (
