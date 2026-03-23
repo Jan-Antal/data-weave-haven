@@ -2,7 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useCallback } from "react";
-import { useUndoRedo } from "@/hooks/useUndoRedo";
+import { useUndoRedo, type UndoEntry } from "@/hooks/useUndoRedo";
 import { logActivity } from "@/lib/activityLog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
 
