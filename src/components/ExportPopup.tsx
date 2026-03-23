@@ -29,22 +29,10 @@ export function ExportPopup({ tabKey, tabLabel, sheetName, meta, onClose, projec
       const saved = localStorage.getItem(storageKey);
       if (saved) {
         const arr = JSON.parse(saved) as string[];
-        // Only keep keys that still exist
         const valid = arr.filter(k => allKeys.includes(k));
-        // Reset to defaults if available keys changed (e.g. Owner updated visibility)
-        const defaultSet = new Set(meta.defaultVisibleKeys);
-        const allKeysSet = new Set(allKeys);
-        const storedMatchesCurrent = valid.length > 0 &&
-          valid.every(k => allKeysSet.has(k)) &&
-          allKeys.every(k => defaultSet.has(k) === new Set(valid).has(k)) === false;
-        if (valid.length > 0 && valid.length === allKeys.length && valid.every(k => allKeysSet.has(k))) {
+        // If available keys changed (Owner updated visibility), reset to defaults
+        if (valid.length > 0 && valid.length === allKeys.length) {
           return new Set(valid);
-        }
-        // If stored keys don't match current available keys, reset to defaults
-        if (valid.length > 0) {
-          const validSet = new Set(valid);
-          const keysMatch = allKeys.length === valid.length && allKeys.every(k => validSet.has(k));
-          if (keysMatch) return validSet;
         }
       }
     } catch {}
