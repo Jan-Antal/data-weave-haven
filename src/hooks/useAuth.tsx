@@ -182,9 +182,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isPM = effectiveRole === "pm";
   const isKonstrukter = effectiveRole === "konstrukter";
   const isViewer = effectiveRole === "viewer";
+  const isVyroba = effectiveRole === "vyroba";
 
   // Granular permissions — tester gets edit rights (scoped to test projects via RLS)
-  const canEdit = !isViewer;
+  const canEdit = !isViewer && !isVyroba;
   const canCreateProject = isAdmin || isPM || isTester;
   const canDeleteProject = isAdmin || isPM || isTester;
   const canManageTPV = isAdmin || isPM || isKonstrukter || isTester;
@@ -197,8 +198,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const canManageUsers = isAdmin;
   const canManagePeople = isAdmin || isPM || isKonstrukter;
   const canManageExchangeRates = isAdmin;
-  const canManageStatuses = isAdmin || isPM;
+  const canManageStatuses = isAdmin;
   const canAccessRecycleBin = isAdmin || isPM || isKonstrukter || isTester;
+  const canManageProduction = isAdmin || isPM || isKonstrukter || isVyroba;
 
   // Fields that are read-only for Konstruktér
   const konstrukterReadOnlyFields = new Set([
