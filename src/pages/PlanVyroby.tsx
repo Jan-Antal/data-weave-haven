@@ -111,7 +111,7 @@ export default function PlanVyroby() {
     qc.invalidateQueries({ queryKey: ["production-expedice"] });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const openProjectIdFromState = (location.state as any)?.openProjectId as string | undefined;
-  const { setCurrentPage } = useUndoRedo();
+  const { setCurrentPage, popLastUndo } = useUndoRedo();
   const [displayMode, setDisplayMode] = useState<DisplayMode>("hours");
   const [viewTab, setViewTab] = useState<ViewTab>("kanban");
   const forecast = useForecastMode();
