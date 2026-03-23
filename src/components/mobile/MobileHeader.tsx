@@ -41,7 +41,7 @@ export function MobileHeader({ onDataLog, showDataLog = false, onCloseDataLog }:
             document.documentElement.style.setProperty('--mobile-header-height', `${h}px`);
           }
         }}
-        className="md:hidden border-b bg-primary px-4 pb-3 shrink-0 z-[300]"
+        className="md:hidden border-b bg-primary px-4 pb-3 shrink-0 relative z-[300]"
         style={{ paddingTop: "0px" }}
       >
         <div className="flex items-center justify-between">
