@@ -52,18 +52,26 @@ export function NotificationPanel({ onClose, mobile = false }: NotificationPanel
           ? "w-full flex flex-col flex-1 overflow-hidden"
           : "w-full sm:w-[380px] bg-background border border-border rounded-xl shadow-lg overflow-hidden"
       )}>
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <span className="font-semibold text-sm">Notifikace</span>
-          {unreadCount > 0 && (
-            <button
-              onClick={() => markAllAsRead()}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
+        {!mobile && (
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <span className="font-semibold text-sm">Notifikace</span>
+            {unreadCount > 0 && (
+              <button
+                onClick={() => markAllAsRead()}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Označit vše
+              </button>
+            )}
+          </div>
+        )}
+        {mobile && unreadCount > 0 && (
+          <div className="flex justify-end px-4 py-2 border-b border-border">
+            <button onClick={() => markAllAsRead()} className="text-xs text-muted-foreground">
               Označit vše
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* List */}
         <div className="max-h-[420px] overflow-y-auto">
