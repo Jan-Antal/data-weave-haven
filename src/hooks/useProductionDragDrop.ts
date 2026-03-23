@@ -224,12 +224,20 @@ export function useProductionDragDrop() {
 
   const moveBundleToWeek = useCallback(async (projectId: string, sourceWeekDate: string, targetWeekDate: string) => {
     try {
-      const { error } = await supabase
+      // First, capture the specific IDs being moved
+      const { data: movedItems } = await supabase
         .from("production_schedule")
-        .update({ scheduled_week: targetWeekDate })
+        .select("id")
         .eq("project_id", projectId)
         .eq("scheduled_week", sourceWeekDate)
         .in("status", ["scheduled", "in_progress"]);
+      const movedIds = (movedItems || []).map(i => i.id);
+      if (movedIds.length === 0) return;
+
+      const { error } = await supabase
+        .from("production_schedule")
+        .update({ scheduled_week: targetWeekDate })
+        .in("id", movedIds);
       if (error) throw error;
       invalidateAll();
 
@@ -240,17 +248,13 @@ export function useProductionDragDrop() {
         undo: async () => {
           await supabase.from("production_schedule")
             .update({ scheduled_week: sourceWeekDate })
-            .eq("project_id", projectId)
-            .eq("scheduled_week", targetWeekDate)
-            .in("status", ["scheduled", "in_progress"]);
+            .in("id", movedIds);
           invalidateAll();
         },
         redo: async () => {
           await supabase.from("production_schedule")
             .update({ scheduled_week: targetWeekDate })
-            .eq("project_id", projectId)
-            .eq("scheduled_week", sourceWeekDate)
-            .in("status", ["scheduled", "in_progress"]);
+            .in("id", movedIds);
           invalidateAll();
         },
       });
