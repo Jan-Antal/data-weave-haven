@@ -5,6 +5,8 @@ import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
 import { useProjects } from "@/hooks/useProjects";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
+import { getTerminalStatuses } from "@/lib/statusHelpers";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 import { getProjectColor } from "@/lib/projectColors";
 import { exportToExcel } from "@/lib/exportExcel";
