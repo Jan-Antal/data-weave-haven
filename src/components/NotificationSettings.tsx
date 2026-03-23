@@ -24,6 +24,7 @@ const PREFS = [
   { key: "konstrukter_item_changed", label: "Zmena prvku (Konštruktér)", desc: "Status, počet alebo poznámka prvku bola zmenená" },
   { key: "pm_assigned", label: "Priradenie projektu (PM)", desc: "Bol si priradený alebo odobraný z projektu" },
   { key: "tpv_items_added", label: "Nové TPV položky (PM)", desc: "Boli pridané alebo odobrané položky z projektu" },
+  { key: "low_margin", label: "Nízká marže (pod 15%)", desc: "Marže projektu byla nastavena pod 15%", adminOnly: true },
 ];
 
 const DEFAULT_PREFS: Record<string, boolean> = {
@@ -35,6 +36,7 @@ const DEFAULT_PREFS: Record<string, boolean> = {
   konstrukter_item_changed: true,
   pm_assigned: true,
   tpv_items_added: true,
+  low_margin: true,
 };
 
 export function NotificationSettings({ open, onOpenChange }: NotificationSettingsProps) {

@@ -187,6 +187,25 @@ export function useUpdateProject() {
               linkContext: { tab: "project-info", project_id: pId, field },
             });
           }
+
+          // Low margin notification
+          if (field === "marze" && value !== oldValue) {
+            const margeNum = parseFloat(String(value).replace(",", "."));
+            const margeNormalized = margeNum > 1 ? margeNum / 100 : margeNum;
+            if (margeNormalized < 0.15 && margeNormalized > 0) {
+              const adminIds = await getUserIdsByRole(supabase, ["owner", "admin"]);
+              await createNotification(supabase, {
+                userIds: adminIds,
+                type: "low_margin",
+                title: `⚠ Nízká marže: ${projectName || pId}`,
+                body: `Marže nastavena na ${Math.round(margeNormalized * 100)}% — pod minimem 15%`,
+                projectId: pId,
+                actorName,
+                excludeUserId: undefined,
+                linkContext: { tab: "project-info", project_id: pId },
+              });
+            }
+          }
         } catch {
           // Silent fail
         }

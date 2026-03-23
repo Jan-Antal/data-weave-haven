@@ -19,6 +19,7 @@ const TYPE_COLORS: Record<string, string> = {
   pm_removed: "bg-gray-500",
   tpv_items_added: "bg-teal-500",
   tpv_items_removed: "bg-orange-500",
+  low_margin: "bg-amber-500",
 };
 
 interface NotificationPanelProps {
