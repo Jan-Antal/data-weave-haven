@@ -487,7 +487,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   }, [projects]);
   const { counts: docCounts, failed: docFailed } = useDocumentCounts(allProjectIds, projectStatuses);
   const [addOpen, setAddOpen] = useState(false);
-  const [newProj, setNewProj] = useState({ ...emptyProject });
+  const [newProj, setNewProj] = useState({ ...emptyProject, status: getDefaultStatus(statusOptions) });
   const [datumWarning, setDatumWarning] = useState(false);
   const qc = useQueryClient();
   const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
