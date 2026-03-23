@@ -797,7 +797,9 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                     docFailed={docFailed.has(p.project_id)}
                     isExpanded={expanded.has(p.project_id)}
                     stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
+                    tpvCount={tpvItemsByProject.get(p.project_id)?.length ?? 0}
                     onToggleExpand={toggleExpand}
+                    onOpenTPVList={handleOpenTPVList}
                     isVisible={v}
                     renderKeys={renderKeys}
                     save={save}
