@@ -354,6 +354,24 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
     [bump]
   );
 
+  const popLastUndo = useCallback(
+    (page?: UndoPage): UndoEntry | null => {
+      const targetPage = page ?? currentPageRef.current;
+      const stack = undoStackRef.current;
+      let idx = -1;
+      for (let i = stack.length - 1; i >= 0; i--) {
+        if (!targetPage || stack[i].page === targetPage) { idx = i; break; }
+      }
+      if (idx === -1) return null;
+      const entry = stack[idx];
+      undoStackRef.current = [...stack.slice(0, idx), ...stack.slice(idx + 1)];
+      if (entry.dbId) removeFromDb(entry.dbId);
+      bump();
+      return entry;
+    },
+    [bump]
+  );
+
   const canUndo = useCallback(
     (page?: UndoPage) => {
       const targetPage = page ?? currentPageRef.current;
