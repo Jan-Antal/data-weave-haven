@@ -40,7 +40,7 @@ const DEFAULT_PREFS: Record<string, boolean> = {
 };
 
 export function NotificationSettings({ open, onOpenChange }: NotificationSettingsProps) {
-  const { user } = useAuth();
+  const { user, isAdmin, isOwner } = useAuth();
   const qc = useQueryClient();
   const [prefs, setPrefs] = useState<Record<string, boolean>>(DEFAULT_PREFS);
 
