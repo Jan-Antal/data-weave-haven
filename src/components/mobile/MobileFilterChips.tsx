@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { useProjects } from "@/hooks/useProjects";
 import { useProjectAttention } from "@/hooks/useProjectAttention";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
+import { isTerminalStatus } from "@/lib/statusHelpers";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
