@@ -1192,6 +1192,8 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   searchMatchedProjectIds?: Set<string>;
   searchActive?: boolean;
 }) {
+  const { data: statusOpts2 = [] } = useProjectStatusOptions();
+  const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts2), [statusOpts2]);
   const [expanded, setExpanded] = useState(false);
   const color = getProjectColor(bundle.project_id);
   const completedCount = bundle.items.filter(i => i.status === "completed").length;
