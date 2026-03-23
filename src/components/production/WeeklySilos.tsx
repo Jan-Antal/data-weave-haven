@@ -177,7 +177,7 @@ interface CancelState {
 export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock, onSplitForecastBlock, forecastSafetyNet, onRestoreFromSafetyNet, onConvertReserveToForecast, focusedMatchKey, searchMatchWeekKey, searchMatchedProjectIds, searchActive }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
-  const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
+  const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems, mergeBundleSplitGroups } = useProductionDragDrop();
   const { data: allProjects = [] } = useProjects();
   const { data: statusOpts = [] } = useProjectStatusOptions();
   const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts), [statusOpts]);
