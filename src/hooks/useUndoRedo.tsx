@@ -29,6 +29,7 @@ export interface UndoEntry {
 
 interface UndoRedoState {
   pushUndo: (entry: Omit<UndoEntry, "id" | "timestamp">) => void;
+  popLastUndo: (page?: UndoPage) => UndoEntry | null;
   undo: (page?: UndoPage) => void;
   redo: (page?: UndoPage) => void;
   canUndo: (page?: UndoPage) => boolean;
