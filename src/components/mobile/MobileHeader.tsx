@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Clock, Menu, UserCog, LogOut, BarChart3, Home, Bell } from "lucide-react";
+import { useSheetSwipeDismiss } from "@/hooks/useSheetSwipeDismiss";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
