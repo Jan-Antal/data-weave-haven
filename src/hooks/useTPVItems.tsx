@@ -42,6 +42,18 @@ export function useUpdateTPVItem() {
           page: "tpv-list",
           actionType: "inline_edit",
           description: `Úprava ${field}: "${oldValue || "—"}" → "${value || "—"}"`,
+          undoPayload: {
+            table: "tpv_items",
+            operation: "update",
+            records: [{ id, [field]: oldValue }],
+            queryKeys: [["tpv_items", projectId]],
+          },
+          redoPayload: {
+            table: "tpv_items",
+            operation: "update",
+            records: [{ id, [field]: value }],
+            queryKeys: [["tpv_items", projectId]],
+          },
           undo: async () => {
             await supabase.from("tpv_items").update({ [field]: oldValue } as any).eq("id", id);
             qc.invalidateQueries({ queryKey: ["tpv_items", projectId] });
