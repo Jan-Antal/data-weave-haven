@@ -886,7 +886,10 @@ export default function PlanVyroby() {
           mergeItemCount={mergeState.mergeItemCount}
           onMerge={async () => {
             await mergeState.onKeepSeparate();
-            await mergeBundleSplitGroups(mergeState.splitGroupIds, mergeState.targetWeekKey);
+            // Pop the move undo that was just pushed by the drag handler
+            // so we can combine it with the merge into a single undo entry
+            const moveEntry = popLastUndo("plan-vyroby");
+            await mergeBundleSplitGroups(mergeState.splitGroupIds, mergeState.targetWeekKey, moveEntry);
           }}
           onKeepSeparate={mergeState.onKeepSeparate}
         />
