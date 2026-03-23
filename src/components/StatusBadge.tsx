@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import type { RiskLevel } from "@/data/projects";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
+import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
 
 const riskStyles: Record<string, string> = {
   "Low": "bg-success/15 text-success border-success/30",
@@ -27,6 +28,30 @@ export function StatusBadge({ status }: { status: string }) {
 
   return (
     <Badge variant="outline" className="text-xs font-medium bg-muted text-muted-foreground">
+      {status}
+    </Badge>
+  );
+}
+
+export function TPVStatusBadge({ status }: { status: string }) {
+  const { data: options = [] } = useTPVStatusOptions();
+  const opt = options.find((o) => o.label === status);
+  const color = opt?.color;
+
+  if (color) {
+    return (
+      <Badge
+        variant="outline"
+        className="text-[10px] font-medium px-1.5 py-0"
+        style={{ backgroundColor: `${color}20`, color, borderColor: `${color}50` }}
+      >
+        {status}
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge variant="outline" className="text-[10px] font-medium px-1.5 py-0 bg-muted text-muted-foreground">
       {status}
     </Badge>
   );
