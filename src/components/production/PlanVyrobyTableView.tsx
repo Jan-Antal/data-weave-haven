@@ -151,7 +151,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   const { data: statusOpts = [] } = useProjectStatusOptions();
   const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts), [statusOpts]);
   const getWeekCapacity = useWeekCapacityLookup();
-  const { moveScheduleItemToWeek, moveItemBackToInbox, completeItems, moveInboxItemToWeek, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
+  const { moveScheduleItemToWeek, moveItemBackToInbox, completeItems, moveInboxItemToWeek, returnBundleToInbox, returnToProduction, mergeSplitItems, mergeBundleSplitGroups } = useProductionDragDrop();
   const qc = useQueryClient();
   const [sortMode, setSortMode] = useState<SortMode>("project");
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
