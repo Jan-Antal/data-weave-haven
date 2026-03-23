@@ -42,20 +42,10 @@ export interface WeekSilo {
 }
 
 export function useProductionSchedule() {
-  const qc = useQueryClient();
-
-  useEffect(() => {
-    const channel = supabase
-      .channel("production-schedule-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "production_schedule" }, () => {
-        qc.invalidateQueries({ queryKey: ["production-schedule"] });
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [qc]);
-
   return useQuery({
     queryKey: ["production-schedule"],
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("production_schedule")
