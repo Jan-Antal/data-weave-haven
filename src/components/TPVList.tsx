@@ -231,6 +231,47 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     newPocet: number;
   } | null>(null);
 
+  // ── Průvodka state ─────────────────────────────────────────────
+  const [pruvodkaWarning, setPruvodkaWarning] = useState<{ items: typeof items; allItems: typeof items } | null>(null);
+  const [pdfHtml, setPdfHtml] = useState<string | null>(null);
+
+  const openPruvodka = useCallback((itemsToPrint: typeof items) => {
+    const hasUnapproved = itemsToPrint.some(item => item.status !== "Schváleno");
+    const rows = itemsToPrint.map((item, idx) => ({
+      rowNum: idx + 1,
+      kodPrvku: item.item_name || "",
+      nazevPrvku: item.item_type || item.item_name || "",
+      konstrukter: item.konstrukter || "",
+      pocet: item.pocet ?? "",
+      notes: item.notes || "",
+      isApproved: item.status === "Schváleno",
+    }));
+
+    const html = buildPruvodkaHtml({
+      projectId,
+      projectName: projectName || projectId,
+      issuedBy: profile?.full_name || profile?.email || "—",
+      rows,
+      hasUnapproved,
+    });
+
+    setPdfHtml(html);
+    setPruvodkaWarning(null);
+  }, [projectId, projectName, profile]);
+
+  const handlePruvodka = useCallback(() => {
+    const itemsToPrint = selected.size > 0
+      ? sortedItems.filter(item => selected.has(item.id))
+      : sortedItems.filter(item => item.status !== "Zrušeno");
+
+    const unapproved = itemsToPrint.filter(item => item.status !== "Schváleno" && item.status !== "Zrušeno");
+
+    if (unapproved.length > 0) {
+      setPruvodkaWarning({ items: unapproved, allItems: itemsToPrint });
+    } else {
+      openPruvodka(itemsToPrint);
+    }
+  }, [selected, sortedItems, openPruvodka]);
   const handleSendToProduction = useCallback(() => {
     if (selected.size === 0) {
       toast({ title: "Vyberte alespoň jednu položku", variant: "destructive", duration: 2000 });
