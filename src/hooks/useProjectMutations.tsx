@@ -18,6 +18,7 @@ function parseField(field: string, value: string): string | number | null {
 export function useUpdateProject() {
   const qc = useQueryClient();
   const { pushUndo } = useUndoRedo();
+  const { user, profile } = useAuth();
 
   return useMutation({
     mutationFn: async ({ id, field, value, oldValue, projectId }: { id: string; field: string; value: string; oldValue: string; projectId?: string }) => {
