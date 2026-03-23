@@ -102,7 +102,7 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
     const warnCell = hasUnapproved
       ? `<td style="text-align:center;color:#f59e0b;font-size:14pt;">${r.isApproved ? "" : "⚠"}</td>`
       : "";
-    return `<tr${!r.isApproved ? ' style="background:#fffbeb;"' : ""}>
+    return `<tr>
       ${warnCell}
       <td style="text-align:center;color:#6b7280;">${r.rowNum}</td>
       <td><strong>${esc(r.kodPrvku)}</strong></td>
