@@ -358,6 +358,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, tpvStatusL
               onDelete={handleDelete}
               isVisible={isVisible}
               statusLabels={statusLabels}
+              tpvStatusLabels={tpvStatusLabels}
               canEdit={canEdit}
               renderKeys={renderKeys}
 
