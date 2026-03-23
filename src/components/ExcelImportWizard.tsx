@@ -826,8 +826,8 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                         </TableCell>
                         {TARGET_FIELDS.map(f => (
                           <TableCell key={f.key} className={cn(
-                            f.key === "nazev_prvku" && "font-semibold",
-                            f.key === "item_name" && "max-w-[300px] truncate",
+                            (f.key === "nazev_prvku" || f.key === "item_name") && "font-semibold",
+                            f.key === "notes" && "max-w-[300px] truncate font-normal",
                           )}>
                             {row.values[f.key] ?? ""}
                           </TableCell>
