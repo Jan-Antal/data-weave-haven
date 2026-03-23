@@ -61,16 +61,29 @@ export function useUpdateProject() {
         });
       });
 
-      // Push to undo stack
+      // Push to undo stack with DB-persistable payload
+      const parsedOld = parseField(field, oldValue);
+      const parsedNew = parseField(field, value);
       pushUndo({
         page: "project-table",
         actionType: "inline_edit",
         description: `Úprava ${field}: "${oldValue || "—"}" → "${value || "—"}"`,
+        undoPayload: {
+          table: "projects",
+          operation: "update",
+          records: [{ id, [field]: parsedOld }],
+          queryKeys: [["projects"]],
+        },
+        redoPayload: {
+          table: "projects",
+          operation: "update",
+          records: [{ id, [field]: parsedNew }],
+          queryKeys: [["projects"]],
+        },
         undo: async () => {
-          const parsed = parseField(field, oldValue);
           const { data } = await supabase
             .from("projects")
-            .update({ [field]: parsed } as any)
+            .update({ [field]: parsedOld } as any)
             .eq("id", id)
             .select()
             .single();
@@ -86,10 +99,9 @@ export function useUpdateProject() {
           }
         },
         redo: async () => {
-          const parsed = parseField(field, value);
           const { data } = await supabase
             .from("projects")
-            .update({ [field]: parsed } as any)
+            .update({ [field]: parsedNew } as any)
             .eq("id", id)
             .select()
             .single();
