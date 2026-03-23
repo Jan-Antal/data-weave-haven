@@ -2913,14 +2913,26 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
         <CostBreakdownPresetsDialog open={costPresetsOpen} onOpenChange={setCostPresetsOpen} />
         <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
-        <div
-          className={cn(
-            "transition-all duration-200 ease-in-out overflow-hidden shrink-0",
-            dataLogOpen ? "w-[360px] border-l border-border" : "w-0",
-          )}
-        >
-          {dataLogOpen && <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} defaultCategory="vyroba" />}
-        </div>
+        {/* Desktop: DataLog sidebar */}
+        {!isMobile && (
+          <div
+            className={cn(
+              "transition-all duration-200 ease-in-out overflow-hidden shrink-0",
+              dataLogOpen ? "w-[360px] border-l border-border" : "w-0",
+            )}
+          >
+            {dataLogOpen && <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} defaultCategory="vyroba" />}
+          </div>
+        )}
+
+        {/* Mobile: DataLog bottom Sheet */}
+        {isMobile && (
+          <Sheet open={dataLogOpen} onOpenChange={setDataLogOpen}>
+            <SheetContent side="bottom" className="h-[85vh] p-0 z-[100]">
+              <DataLogPanel open={dataLogOpen} onOpenChange={setDataLogOpen} defaultCategory="vyroba" />
+            </SheetContent>
+          </Sheet>
+        )}
       </div>
       {/* end outer flex */}
       {!embedded && isMobile && <MobileBottomNav />}
