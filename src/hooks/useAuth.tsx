@@ -37,6 +37,7 @@ interface AuthContextType {
   canManageExchangeRates: boolean;
   canManageStatuses: boolean;
   canAccessRecycleBin: boolean;
+  canManageProduction: boolean;
   isFieldReadOnly: (field: string, currentValue?: string | null) => boolean;
   defaultTab: string;
   simulatedRole: AppRole | null;
