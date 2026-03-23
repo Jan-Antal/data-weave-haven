@@ -55,7 +55,7 @@ export function MobileHeader({ onDataLog, showDataLog = false, isDataLogOpen = f
           <div className="flex items-center gap-1">
             <button
               onClick={() => {
-                const wasDataLogOpen = !!onCloseDataLog && showDataLog;
+                const wasDataLogOpen = isDataLogOpen;
                 setMenuOpen(false);
                 if (onCloseDataLog) onCloseDataLog();
                 // If DataLog was open, explicitly open notif (don't toggle)
