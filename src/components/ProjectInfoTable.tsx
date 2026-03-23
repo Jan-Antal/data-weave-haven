@@ -469,6 +469,11 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const statusLabels = useMemo(() => statusOptions.map((s) => s.label), [statusOptions]);
+  const statusOrderMap = useMemo(() => {
+    const map = new Map<string, number>();
+    statusOptions.forEach((s, i) => map.set(s.label, s.sort_order ?? i));
+    return map;
+  }, [statusOptions]);
   const updateProject = useUpdateProject();
   const { columns: customColumns } = useAllCustomColumns("projects");
   const updateCustomField = useUpdateCustomField();
