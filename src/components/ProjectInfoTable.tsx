@@ -138,7 +138,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, t
   const { isFieldReadOnly } = useAuth();
   const style = { transform: CSS.Transform.toString(transform), transition };
   const saveStage = useCallback((field: string, value: string) => {
-    const tracked = ["konstrukter", "status", "datum_smluvni"];
+    const tracked = ["konstrukter", "status", "status_vyroba", "datum_smluvni"];
     // Convert numeric fields
     const finalValue = field === "prodejni_cena" ? (value === "" ? null : Number(value)) : value;
     // Mark field as manually edited

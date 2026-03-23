@@ -102,7 +102,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, t
   const { isFieldReadOnly } = useAuth();
   const style = { transform: CSS.Transform.toString(transform), transition };
   const saveStage = useCallback((field: string, value: string) => {
-    const tracked = ["konstrukter", "status", "datum_smluvni"];
+    const tracked = ["konstrukter", "status", "status_vyroba", "datum_smluvni"];
     const newEditedFields = addEditedField(stage, field);
     updateStage.mutate({
       id: stage.id, field, value, projectId: project.project_id,
