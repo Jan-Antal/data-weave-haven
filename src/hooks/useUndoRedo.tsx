@@ -1,8 +1,18 @@
 import React, { createContext, useContext, useCallback, useRef, useEffect, useState } from "react";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 // ── Types ─────────────────────────────────────────────────────────────
 export type UndoPage = "plan-vyroby" | "vyroba" | "project-table" | "tpv-list" | "settings";
+
+export interface UndoPayload {
+  table: string;
+  operation: "update" | "delete" | "insert" | "multi";
+  records: Record<string, any>[];
+  newRecords?: Record<string, any>[];
+  queryKeys?: string[][];
+}
 
 export interface UndoEntry {
   id: string;
@@ -12,6 +22,9 @@ export interface UndoEntry {
   description: string;
   undo: () => Promise<void>;
   redo: () => Promise<void>;
+  undoPayload?: UndoPayload;
+  redoPayload?: UndoPayload;
+  dbId?: string; // id in undo_sessions table
 }
 
 interface UndoRedoState {
@@ -33,9 +46,78 @@ const PAGE_MAX_STACK: Record<string, number> = {
   "tpv-list": 20,
 };
 const DEFAULT_MAX_STACK = 20;
-const SESSION_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
+const SESSION_EXPIRY_MS = 15 * 60 * 1000;
 
 const UndoRedoContext = createContext<UndoRedoState | null>(null);
+
+// ── Reconstructor ─────────────────────────────────────────────────────
+async function executePayload(payload: UndoPayload, queryClient: ReturnType<typeof useQueryClient>) {
+  if (payload.operation === "update") {
+    for (const record of payload.records) {
+      const { id, ...rest } = record;
+      await supabase.from(payload.table as any).update(rest as any).eq("id", id);
+    }
+  } else if (payload.operation === "delete") {
+    // Undo a delete = re-insert the records
+    await supabase.from(payload.table as any).insert(payload.records as any);
+  } else if (payload.operation === "insert") {
+    // Undo an insert = delete the records
+    const ids = payload.records.map(r => r.id);
+    await supabase.from(payload.table as any).delete().in("id", ids);
+  } else if (payload.operation === "multi") {
+    // Multi combines sub-operations in records array
+    for (const sub of payload.records) {
+      await executePayload(sub as unknown as UndoPayload, queryClient);
+    }
+  }
+  // Invalidate relevant query keys
+  if (payload.queryKeys) {
+    for (const key of payload.queryKeys) {
+      queryClient.invalidateQueries({ queryKey: key });
+    }
+  }
+}
+
+function reconstructFromPayload(
+  payload: UndoPayload,
+  queryClient: ReturnType<typeof useQueryClient>
+): () => Promise<void> {
+  return async () => {
+    await executePayload(payload, queryClient);
+  };
+}
+
+// ── DB Persistence helpers ────────────────────────────────────────────
+async function persistToDb(entry: UndoEntry, userId: string): Promise<string | null> {
+  if (!entry.undoPayload || !entry.redoPayload) return null;
+  const expiresAt = new Date(Date.now() + SESSION_EXPIRY_MS).toISOString();
+  const { data, error } = await supabase.from("undo_sessions" as any).insert({
+    user_id: userId,
+    page: entry.page,
+    action_type: entry.actionType,
+    description: entry.description,
+    undo_payload: entry.undoPayload,
+    redo_payload: entry.redoPayload,
+    expires_at: expiresAt,
+  } as any).select("id").single();
+  if (error) {
+    console.warn("Failed to persist undo entry:", error.message);
+    return null;
+  }
+  return (data as any)?.id ?? null;
+}
+
+async function removeFromDb(dbId: string) {
+  await supabase.from("undo_sessions" as any).delete().eq("id", dbId);
+}
+
+async function refreshExpiry(userId: string) {
+  const expiresAt = new Date(Date.now() + SESSION_EXPIRY_MS).toISOString();
+  await supabase.from("undo_sessions" as any)
+    .update({ expires_at: expiresAt } as any)
+    .eq("user_id", userId)
+    .gt("expires_at", new Date().toISOString());
+}
 
 // ── Provider ──────────────────────────────────────────────────────────
 export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
@@ -47,11 +129,63 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
   const [currentPage, setCurrentPageState] = useState<UndoPage | null>(null);
   const executingRef = useRef(false);
   const undoFnRef = useRef<(page?: UndoPage) => void>(() => {});
+  const userIdRef = useRef<string | null>(null);
+  const queryClient = useQueryClient();
+  const loadedRef = useRef(false);
 
   const setCurrentPage = useCallback((page: UndoPage | null) => {
     currentPageRef.current = page;
     setCurrentPageState(page);
   }, []);
+
+  // Track current user
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      userIdRef.current = data.user?.id ?? null;
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      userIdRef.current = session?.user?.id ?? null;
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Load persisted undo entries on mount
+  useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+
+    const loadPersistedEntries = async () => {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) return;
+
+      const { data: rows, error } = await supabase
+        .from("undo_sessions" as any)
+        .select("*")
+        .eq("user_id", user.user.id)
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: true });
+
+      if (error || !rows || rows.length === 0) return;
+
+      const entries: UndoEntry[] = (rows as any[]).map((row: any) => ({
+        id: crypto.randomUUID(),
+        timestamp: new Date(row.created_at),
+        page: row.page as UndoPage,
+        actionType: row.action_type,
+        description: row.description,
+        undoPayload: row.undo_payload as UndoPayload,
+        redoPayload: row.redo_payload as UndoPayload,
+        dbId: row.id,
+        undo: reconstructFromPayload(row.undo_payload as UndoPayload, queryClient),
+        redo: reconstructFromPayload(row.redo_payload as UndoPayload, queryClient),
+      }));
+
+      undoStackRef.current = entries;
+      bump();
+    };
+
+    loadPersistedEntries();
+  }, [queryClient, bump]);
 
   function isExpired(entry: UndoEntry): boolean {
     return Date.now() - entry.timestamp.getTime() > SESSION_EXPIRY_MS;
@@ -70,9 +204,9 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
 
       const entry = undoStackRef.current[idx];
 
-      // Check session expiry
       if (isExpired(entry)) {
         undoStackRef.current = [...undoStackRef.current.slice(0, idx), ...undoStackRef.current.slice(idx + 1)];
+        if (entry.dbId) removeFromDb(entry.dbId);
         bump();
         toast({ title: "Akce již nelze vrátit (vypršel čas)", duration: 3000 });
         return;
@@ -82,6 +216,9 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
       const maxForPage = PAGE_MAX_STACK[entry.page] ?? DEFAULT_MAX_STACK;
       redoStackRef.current = [...redoStackRef.current, entry].slice(-maxForPage);
       bump();
+
+      // Remove from DB on undo
+      if (entry.dbId) removeFromDb(entry.dbId);
 
       executingRef.current = true;
       try {
@@ -115,7 +252,6 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
 
       const entry = redoStackRef.current[idx];
 
-      // Check session expiry
       if (isExpired(entry)) {
         redoStackRef.current = [...redoStackRef.current.slice(0, idx), ...redoStackRef.current.slice(idx + 1)];
         bump();
@@ -158,12 +294,28 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
       while (pageCount > maxForPage) {
         const oldest = newStack.findIndex(e => e.page === entry.page);
         if (oldest === -1) break;
+        // Clean up DB entry for evicted items
+        if (newStack[oldest].dbId) removeFromDb(newStack[oldest].dbId);
         newStack.splice(oldest, 1);
         pageCount--;
       }
       undoStackRef.current = newStack;
+      // Clear redo for this page
+      const evictedRedo = redoStackRef.current.filter((e) => e.page === entry.page);
+      for (const r of evictedRedo) {
+        if (r.dbId) removeFromDb(r.dbId);
+      }
       redoStackRef.current = redoStackRef.current.filter((e) => e.page !== entry.page);
       bump();
+
+      // Persist to DB if payloads provided
+      if (entry.undoPayload && entry.redoPayload && userIdRef.current) {
+        persistToDb(full, userIdRef.current).then((dbId) => {
+          if (dbId) full.dbId = dbId;
+        });
+        // Refresh expiry on all entries
+        refreshExpiry(userIdRef.current);
+      }
 
       // Show undo toast for plan-vyroby and vyroba actions
       if (entry.page === "plan-vyroby" || entry.page === "vyroba") {
