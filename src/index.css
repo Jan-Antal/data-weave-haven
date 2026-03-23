@@ -129,7 +129,8 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply text-foreground font-sans;
+    background-color: hsl(175, 25%, 18%);
   }
 
   /* Always show scrollbar for Mac users */
