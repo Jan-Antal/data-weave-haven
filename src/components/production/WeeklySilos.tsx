@@ -17,6 +17,8 @@ import { PauseItemDialog } from "./PauseItemDialog";
 import { CancelItemDialog } from "./CancelItemDialog";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 import { useProjects } from "@/hooks/useProjects";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
+import { getTerminalStatuses } from "@/lib/statusHelpers";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
