@@ -37,7 +37,7 @@ export function MobileFilterChips({ activeChip, onChipChange }: MobileFilterChip
       if (pmName && p.pm === pmName) c.mine++;
       const s = p.status;
       if (s) c[s] = (c[s] || 0) + 1;
-      if (s !== "Dokončeno") c.active++;
+      if (!isTerminalStatus(s, statusOptions)) c.active++;
     }
     return c;
   }, [projects, urgencyMap, pmName]);

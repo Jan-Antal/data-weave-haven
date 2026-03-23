@@ -31,8 +31,9 @@ export function useTableFilters() {
   // Initialize status filter once options are loaded
   useEffect(() => {
     if (statusOptions.length > 0 && !initialized) {
+      const hiddenStatuses = getHiddenByDefaultStatuses(statusOptions);
       const allLabels = getStatusFilterOptionValues(statusOptions.map((s) => s.label));
-      setStatusFilter(allLabels.filter((s) => s === EMPTY_STATUS_FILTER_VALUE || !defaultHiddenStatuses.includes(s)));
+      setStatusFilter(allLabels.filter((s) => s === EMPTY_STATUS_FILTER_VALUE || !hiddenStatuses.includes(s)));
       setInitialized(true);
     }
   }, [statusOptions, initialized]);

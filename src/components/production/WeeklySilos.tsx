@@ -1219,7 +1219,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const expDate = deadlineInfo?.dateStr ?? null;
   const daysUntilExp = deadlineInfo?.days ?? null;
   const deadlineLabel = deadlineInfo?.label ?? "Exp";
-  const isProjectDone = ["Fakturace", "Dokonceno", "Dokončeno", "Expedice"].includes(project?.status ?? "");
+  const isProjectDone = terminalStatuses.has(project?.status ?? "");
   const expSeverity: "overdue" | "urgent" | null = (!isProjectDone && !allCompleted && daysUntilExp !== null)
     ? (daysUntilExp < 0 ? "overdue" : daysUntilExp <= 3 ? "urgent" : null)
     : null;

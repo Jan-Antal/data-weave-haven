@@ -182,8 +182,8 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
   }, [projects, personFilter, statusFilter]);
 
   const activeProjects = useMemo(
-    () => filtered.filter((p) => !EXCLUDED_STATUSES.includes(p.status || "")),
-    [filtered]
+    () => filtered.filter((p) => !EXCLUDED_STATUSES.has(p.status || "")),
+    [filtered, EXCLUDED_STATUSES]
   );
 
   const activeCount = activeProjects.length;

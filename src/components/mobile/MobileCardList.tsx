@@ -74,7 +74,7 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
         if (pmName) filtered = projects.filter(p => p.pm === pmName);
         break;
       case "active":
-        filtered = projects.filter(p => p.status !== "Dokončeno");
+        filtered = projects.filter(p => !isTerminalStatus(p.status, statusOptions));
         break;
       case "everything":
         break;
