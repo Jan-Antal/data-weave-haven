@@ -368,7 +368,7 @@ const Index = () => {
               <Sheet open={dataLogOpen} onOpenChange={(v) => {
                 setDataLogOpen(v);
                 try { localStorage.setItem("datalog-panel-index", String(v)); } catch {}
-              }}>
+              }} modal={false}>
                 <SheetContent
                   side="bottom"
                   className="p-0 flex flex-col rounded-t-2xl"
