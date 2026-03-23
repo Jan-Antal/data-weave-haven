@@ -21,10 +21,11 @@ const ROLE_LABELS: Record<string, string> = {
 interface MobileHeaderProps {
   onDataLog?: () => void;
   showDataLog?: boolean;
+  isDataLogOpen?: boolean;
   onCloseDataLog?: () => void;
 }
 
-export function MobileHeader({ onDataLog, showDataLog = false, onCloseDataLog }: MobileHeaderProps) {
+export function MobileHeader({ onDataLog, showDataLog = false, isDataLogOpen = false, onCloseDataLog }: MobileHeaderProps) {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
