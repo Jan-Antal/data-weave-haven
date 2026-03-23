@@ -362,11 +362,19 @@ const Index = () => {
                   handleMobileOpenTPV(p);
                 } : undefined}
               />
-              {/* Mobile DataLog full screen */}
-              <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
+              {/* Mobile DataLog as Sheet */}
+              <Sheet open={dataLogOpen} onOpenChange={(v) => {
                 setDataLogOpen(v);
                 try { localStorage.setItem("datalog-panel-index", String(v)); } catch {}
-              }} />
+              }}>
+                <SheetContent side="bottom" className="h-[85vh] p-0 rounded-t-xl" style={{ zIndex: 100 }}>
+                  <SheetTitle className="sr-only">Data Log</SheetTitle>
+                  <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
+                    setDataLogOpen(v);
+                    try { localStorage.setItem("datalog-panel-index", String(v)); } catch {}
+                  }} />
+                </SheetContent>
+              </Sheet>
             </main>
           </>
         ) : (
