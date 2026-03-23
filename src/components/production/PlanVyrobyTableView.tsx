@@ -913,7 +913,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
       actions.push({ label: `Zrušit vše (${activeItems.length})`, icon: "✕", danger: true, dividerBefore: true, onClick: () => setCancelDialog({ open: true, itemId: activeItems.map(i => i.id).join(","), itemName: `${bundle.project_name} — ${activeItems.length} položek`, itemCode: null, hours: activeItems.reduce((s, i) => s + i.scheduled_hours, 0), projectName: bundle.project_name, projectId, splitGroupId: null, cancelAll: true }) });
     }
     if (actions.length > 0) setContextMenu({ x: e.clientX, y: e.clientY, actions });
-  }, [scheduleData, weeks, getBundleForWeek, returnBundleToInbox, returnToProduction, mergeSplitItems, handleReleaseItem, onNavigateToTPV, onOpenProjectDetail]);
+  }, [scheduleData, weeks, getBundleForWeek, returnBundleToInbox, returnToProduction, mergeSplitItems, mergeBundleSplitGroups, handleReleaseItem, onNavigateToTPV, onOpenProjectDetail]);
 
   // Context menu: scheduled item in week cell (matching Kanban DraggableSiloItem)
   const handleScheduleItemContextMenu = useCallback((e: React.MouseEvent, scheduleItemId: string, weekKey: string, projectId: string) => {
