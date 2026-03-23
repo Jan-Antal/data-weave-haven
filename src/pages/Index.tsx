@@ -268,7 +268,7 @@ const Index = () => {
       {/* Mobile Header */}
       {isMobile && (
         <MobileHeader
-          onDataLog={toggleDataLog}
+          onDataLog={() => setDataLogOpen(true)}
           showDataLog={canAccessSettings || realRole === "owner" || role === "pm"}
         />
       )}
