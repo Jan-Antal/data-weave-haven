@@ -41,7 +41,7 @@ export function MobileHeader({ onDataLog, showDataLog = false, onCloseDataLog }:
             document.documentElement.style.setProperty('--mobile-header-height', `${h}px`);
           }
         }}
-        className="md:hidden border-b bg-primary px-4 pb-3 shrink-0 z-[300]"
+        className="md:hidden border-b bg-primary px-4 pb-3 shrink-0 relative z-[300]"
         style={{ paddingTop: "0px" }}
       >
         <div className="flex items-center justify-between">
@@ -54,12 +54,9 @@ export function MobileHeader({ onDataLog, showDataLog = false, onCloseDataLog }:
           <div className="flex items-center gap-1">
             <button
               onClick={() => {
-                if (onCloseDataLog) {
-                  onCloseDataLog();
-                  setTimeout(() => setNotifOpen(true), 150);
-                } else {
-                  setNotifOpen(true);
-                }
+                setMenuOpen(false);
+                if (onCloseDataLog) onCloseDataLog();
+                setNotifOpen(o => !o);
               }}
               className="relative p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
@@ -72,12 +69,9 @@ export function MobileHeader({ onDataLog, showDataLog = false, onCloseDataLog }:
             </button>
             <button
               onClick={() => {
-                if (onCloseDataLog) {
-                  onCloseDataLog();
-                  setTimeout(() => setMenuOpen(true), 150);
-                } else {
-                  setMenuOpen(true);
-                }
+                setNotifOpen(false);
+                if (onCloseDataLog) onCloseDataLog();
+                setMenuOpen(o => !o);
               }}
               className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
@@ -87,7 +81,7 @@ export function MobileHeader({ onDataLog, showDataLog = false, onCloseDataLog }:
         </div>
       </header>
 
-      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen} modal={false}>
         <SheetContent side="right" className="w-[280px] p-0" style={{ top: "var(--mobile-header-height, 56px)", height: "calc(100% - var(--mobile-header-height, 56px))", zIndex: 200 }}>
           <SheetTitle className="sr-only">Menu</SheetTitle>
           <div className="p-5 border-b border-border">
@@ -134,7 +128,7 @@ export function MobileHeader({ onDataLog, showDataLog = false, onCloseDataLog }:
 
       <AccountSettings open={accountOpen} onOpenChange={setAccountOpen} />
 
-      <Sheet open={notifOpen} onOpenChange={setNotifOpen}>
+      <Sheet open={notifOpen} onOpenChange={setNotifOpen} modal={false}>
         <SheetContent
           side="bottom"
           className="p-0 flex flex-col rounded-t-2xl"
