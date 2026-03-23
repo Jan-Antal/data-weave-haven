@@ -1176,6 +1176,42 @@ export type Database = {
         }
         Relationships: []
       }
+      undo_sessions: {
+        Row: {
+          action_type: string
+          created_at: string | null
+          description: string
+          expires_at: string
+          id: string
+          page: string
+          redo_payload: Json
+          undo_payload: Json
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string | null
+          description: string
+          expires_at: string
+          id?: string
+          page: string
+          redo_payload: Json
+          undo_payload: Json
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string | null
+          description?: string
+          expires_at?: string
+          id?: string
+          page?: string
+          redo_payload?: Json
+          undo_payload?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_achievements: {
         Row: {
           achieved_at: string
@@ -1282,6 +1318,7 @@ export type Database = {
     Functions: {
       clean_test_production_data: { Args: never; Returns: Json }
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
+      cleanup_undo_sessions: { Args: never; Returns: undefined }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]

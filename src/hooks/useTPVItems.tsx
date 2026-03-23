@@ -42,6 +42,18 @@ export function useUpdateTPVItem() {
           page: "tpv-list",
           actionType: "inline_edit",
           description: `Úprava ${field}: "${oldValue || "—"}" → "${value || "—"}"`,
+          undoPayload: {
+            table: "tpv_items",
+            operation: "update",
+            records: [{ id, [field]: oldValue }],
+            queryKeys: [["tpv_items", projectId]],
+          },
+          redoPayload: {
+            table: "tpv_items",
+            operation: "update",
+            records: [{ id, [field]: value }],
+            queryKeys: [["tpv_items", projectId]],
+          },
           undo: async () => {
             await supabase.from("tpv_items").update({ [field]: oldValue } as any).eq("id", id);
             qc.invalidateQueries({ queryKey: ["tpv_items", projectId] });
@@ -98,8 +110,19 @@ export function useDeleteTPVItems() {
         page: "tpv-list",
         actionType: "delete_rows",
         description: `Smazáno ${ids.length} položek`,
+        undoPayload: {
+          table: "tpv_items",
+          operation: "update",
+          records: ids.map(id => ({ id, deleted_at: null })),
+          queryKeys: [["tpv_items", projectId]],
+        },
+        redoPayload: {
+          table: "tpv_items",
+          operation: "update",
+          records: ids.map(id => ({ id, deleted_at: new Date().toISOString() })),
+          queryKeys: [["tpv_items", projectId]],
+        },
         undo: async () => {
-          // Restore by clearing deleted_at
           await supabase.from("tpv_items").update({ deleted_at: null } as any).in("id", ids);
           qc.invalidateQueries({ queryKey: ["tpv_items", projectId] });
         },
