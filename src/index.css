@@ -279,21 +279,6 @@
   }
 }
 
-/* Safe area bottom fill for iPhone home gesture zone */
-@media (max-width: 767px) {
-  body::after {
-    content: '';
-    display: block;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: env(safe-area-inset-bottom, 0px);
-    background-color: #1a3330;
-    z-index: 99999;
-    pointer-events: none;
-  }
-}
 
 /* Portrait lock overlay for mobile — use aspect-ratio to avoid
    false trigger when Android keyboard shrinks viewport height */

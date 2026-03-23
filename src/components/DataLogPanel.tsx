@@ -414,7 +414,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
   // Mobile: full screen overlay
   if (isMobile) {
     return (
-      <div className="fixed inset-x-0 z-[100] bg-background flex flex-col" style={{ top: "var(--mobile-header-height, 56px)", bottom: "calc(56px + env(safe-area-inset-bottom, 0px))" }}>
+      <div className="fixed inset-x-0 z-[100] bg-background flex flex-col" style={{ top: "var(--mobile-header-height, 56px)", bottom: "56px" }}>
 
         {/* Tab bar */}
         <div className="flex border-b shrink-0">

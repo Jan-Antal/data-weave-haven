@@ -1527,8 +1527,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     <div
       className={cn(
         "h-full flex flex-col overflow-hidden",
-        !embedded && isMobile && "pb-[72px]",
-        // Note: pb-[72px] is fine — the nav extends into safe area but buttons stay at 56px
+        !embedded && isMobile && "pb-14",
       )}
       style={{ background: "#f8f7f4" }}
     >
@@ -2090,7 +2089,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               ref={sheetRefVyrobaProjekt}
               side="bottom"
               className="h-[85vh] rounded-t-2xl p-0 overflow-hidden"
-              style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))" }}
+              style={{ paddingBottom: "56px" }}
               onTouchStart={(e: React.TouchEvent) => {
                 const el = e.currentTarget as HTMLElement;
                 el.dataset.swipeStartY = String(e.touches[0].clientY);
@@ -2443,7 +2442,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     <div className="w-[50px]" />
                   </div>
                   <div className="flex-1 overflow-y-auto">{logModalContent}</div>
-                  <div className="shrink-0 px-4 py-3 border-t border-border bg-background space-y-2" style={{ paddingBottom: "calc(64px + env(safe-area-inset-bottom, 0px))" }}>
+                  <div className="shrink-0 px-4 py-3 border-t border-border bg-background space-y-2" style={{ paddingBottom: "64px" }}>
                     <div className="flex flex-col gap-2">
                       {logDayIndex === todayDayIndex && (
                         <Button variant="outline" onClick={() => setNoProductionOpen(true)} className="text-xs">
@@ -2483,7 +2482,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 ? {
                     position: "fixed",
                     top: "auto",
-                    bottom: "calc(56px + env(safe-area-inset-bottom, 0px))",
+                    bottom: "56px",
                     left: 0,
                     right: 0,
                     width: "100%",
