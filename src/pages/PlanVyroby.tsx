@@ -111,7 +111,7 @@ export default function PlanVyroby() {
     qc.invalidateQueries({ queryKey: ["production-expedice"] });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const openProjectIdFromState = (location.state as any)?.openProjectId as string | undefined;
-  const { setCurrentPage } = useUndoRedo();
+  const { setCurrentPage, popLastUndo } = useUndoRedo();
   const [displayMode, setDisplayMode] = useState<DisplayMode>("hours");
   const [viewTab, setViewTab] = useState<ViewTab>("kanban");
   const forecast = useForecastMode();
@@ -886,7 +886,10 @@ export default function PlanVyroby() {
           mergeItemCount={mergeState.mergeItemCount}
           onMerge={async () => {
             await mergeState.onKeepSeparate();
-            await mergeBundleSplitGroups(mergeState.splitGroupIds, mergeState.targetWeekKey);
+            // Pop the move undo that was just pushed by the drag handler
+            // so we can combine it with the merge into a single undo entry
+            const moveEntry = popLastUndo("plan-vyroby");
+            await mergeBundleSplitGroups(mergeState.splitGroupIds, mergeState.targetWeekKey, moveEntry);
           }}
           onKeepSeparate={mergeState.onKeepSeparate}
         />

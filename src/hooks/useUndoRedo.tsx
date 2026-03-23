@@ -29,6 +29,7 @@ export interface UndoEntry {
 
 interface UndoRedoState {
   pushUndo: (entry: Omit<UndoEntry, "id" | "timestamp">) => void;
+  popLastUndo: (page?: UndoPage) => UndoEntry | null;
   undo: (page?: UndoPage) => void;
   redo: (page?: UndoPage) => void;
   canUndo: (page?: UndoPage) => boolean;
@@ -353,6 +354,24 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
     [bump]
   );
 
+  const popLastUndo = useCallback(
+    (page?: UndoPage): UndoEntry | null => {
+      const targetPage = page ?? currentPageRef.current;
+      const stack = undoStackRef.current;
+      let idx = -1;
+      for (let i = stack.length - 1; i >= 0; i--) {
+        if (!targetPage || stack[i].page === targetPage) { idx = i; break; }
+      }
+      if (idx === -1) return null;
+      const entry = stack[idx];
+      undoStackRef.current = [...stack.slice(0, idx), ...stack.slice(idx + 1)];
+      if (entry.dbId) removeFromDb(entry.dbId);
+      bump();
+      return entry;
+    },
+    [bump]
+  );
+
   const canUndo = useCallback(
     (page?: UndoPage) => {
       const targetPage = page ?? currentPageRef.current;
@@ -433,7 +452,7 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
   }, [undo, redo]);
 
   return (
-    <UndoRedoContext.Provider value={{ pushUndo, undo, redo, canUndo, canRedo, setCurrentPage, currentPage, lastUndoDescription, lastRedoDescription }}>
+    <UndoRedoContext.Provider value={{ pushUndo, popLastUndo, undo, redo, canUndo, canRedo, setCurrentPage, currentPage, lastUndoDescription, lastRedoDescription }}>
       {children}
     </UndoRedoContext.Provider>
   );
