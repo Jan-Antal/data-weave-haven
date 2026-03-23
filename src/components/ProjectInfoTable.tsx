@@ -709,7 +709,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
       logActivity({ projectId: newProj.project_id, actionType: "project_created", detail: newProj.project_name });
       qc.invalidateQueries({ queryKey: ["projects"] });
       setAddOpen(false);
-      setNewProj({ ...emptyProject });
+      setNewProj({ ...emptyProject, status: getDefaultStatus(statusOptions) });
       setDatumWarning(false);
     }
   };
