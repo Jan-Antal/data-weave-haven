@@ -1216,6 +1216,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           html={pdfHtml}
           tabLabel="Průvodka"
           onClose={() => setPdfHtml(null)}
+          portrait
         />
       )}
     </div>
