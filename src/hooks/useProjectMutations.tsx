@@ -6,7 +6,7 @@ import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
 import type { Project } from "@/hooks/useProjects";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useAuth } from "@/hooks/useAuth";
-import { createNotification, getUserIdsByRole } from "@/lib/createNotification";
+import { createNotification, getUserIdsByRole, resolvePersonToUserId } from "@/lib/createNotification";
 
 const NUMERIC_FIELDS = ["prodejni_cena", "material", "subdodavky", "vyroba", "tpv_cost", "percent_tpv"];
 
@@ -56,7 +56,7 @@ export function useUpdateProject() {
       return { id, field, value, oldValue, updatedProject: data as Project };
     },
     onSuccess: ({ id, field, value, oldValue, updatedProject }) => {
-      // Patch project in all cached query variants (key includes isTester flag)
+      // Patch project in all cached query variants
       qc.getQueriesData<Project[]>({ queryKey: ["projects"] }).forEach(([key]) => {
         qc.setQueryData<Project[]>(key, (old) => {
           if (!old) return old;
@@ -64,7 +64,7 @@ export function useUpdateProject() {
         });
       });
 
-      // Push to undo stack with DB-persistable payload
+      // Push to undo stack
       const parsedOld = parseField(field, oldValue);
       const parsedNew = parseField(field, value);
       pushUndo({
@@ -123,44 +123,74 @@ export function useUpdateProject() {
 
       toast({ title: "Uloženo", duration: 2000 });
 
-      // Send notifications for key field changes (fire-and-forget)
-      const NOTIFY_FIELDS = ["status", "prodejni_cena", "datum_smluvni"];
-      if (NOTIFY_FIELDS.includes(field) && value !== oldValue) {
-        (async () => {
-          try {
+      // --- Notifications (fire-and-forget) ---
+      if (!user || !profile) return;
+      const actorName = profile.full_name || "";
+      const projectName = updatedProject?.project_name || "";
+      const pId = updatedProject?.project_id || "";
+
+      (async () => {
+        try {
+          // PM assignment notifications
+          if (field === "pm" && value !== oldValue) {
+            // Notify NEW PM
+            if (value) {
+              const newPmUserId = await resolvePersonToUserId(supabase, value);
+              if (newPmUserId && newPmUserId !== user.id) {
+                await createNotification(supabase, {
+                  userIds: [newPmUserId],
+                  type: "pm_assigned",
+                  title: `Bol si priradený ako PM na projekt ${pId} — ${projectName}`,
+                  projectId: pId,
+                  actorName,
+                  excludeUserId: user.id,
+                  linkContext: { tab: "project-info", project_id: pId },
+                });
+              }
+            }
+            // Notify OLD PM (removed)
+            if (oldValue) {
+              const oldPmUserId = await resolvePersonToUserId(supabase, oldValue);
+              if (oldPmUserId && oldPmUserId !== user.id) {
+                await createNotification(supabase, {
+                  userIds: [oldPmUserId],
+                  type: "pm_removed",
+                  title: `Bol si odobraný z projektu ${pId} — ${projectName}`,
+                  projectId: pId,
+                  actorName,
+                  excludeUserId: user.id,
+                  linkContext: { tab: "project-info", project_id: pId },
+                });
+              }
+            }
+          }
+
+          // Key field change notifications (status, price, deadline)
+          const NOTIFY_FIELDS = ["status", "prodejni_cena", "datum_smluvni"];
+          if (NOTIFY_FIELDS.includes(field) && value !== oldValue) {
             const adminIds = await getUserIdsByRole(supabase, ["owner", "admin"]);
             const pmName = updatedProject?.pm;
             let pmUserIds: string[] = [];
             if (pmName) {
-              // Find PM's user_id via profiles + people link
-              const { data: pmProfiles } = await supabase
-                .from("profiles")
-                .select("id, person_id")
-                .not("person_id", "is", null);
-              if (pmProfiles) {
-                const { data: people } = await supabase
-                  .from("people")
-                  .select("id, name")
-                  .eq("name", pmName);
-                const personIds = (people || []).map((p: any) => p.id);
-                pmUserIds = (pmProfiles as any[])
-                  .filter((p: any) => personIds.includes(p.person_id))
-                  .map((p: any) => p.id);
-              }
+              const pmUserId = await resolvePersonToUserId(supabase, pmName);
+              if (pmUserId) pmUserIds = [pmUserId];
             }
             const allIds = [...adminIds, ...pmUserIds];
             await createNotification(supabase, {
               userIds: allIds,
               type: "project_changed",
-              title: `Projekt upraven: ${updatedProject?.project_name || ""}`,
+              title: `Projekt upraven: ${projectName}`,
               body: `Změna pole ${field}: "${oldValue || "—"}" → "${value || "—"}"`,
-              projectId: updatedProject?.project_id,
-              actorName: profile?.full_name || "",
-              excludeUserId: user?.id,
+              projectId: pId,
+              actorName,
+              excludeUserId: user.id,
+              linkContext: { tab: "project-info", project_id: pId, field },
             });
-          } catch {}
-        })();
-      }
+          }
+        } catch {
+          // Silent fail
+        }
+      })();
     },
     onError: () => {
       toast({ title: "Chyba", description: "Nepodařilo se uložit změnu", variant: "destructive" });
