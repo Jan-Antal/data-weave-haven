@@ -4,7 +4,7 @@ import type { User, Session } from "@supabase/supabase-js";
 import { logLoginEvent, resetLoginTracking, hasLoginLoggedInCurrentTab } from "@/hooks/useLoginTracking";
 import { startSession, endSession, resetSessionTracking } from "@/hooks/useSessionTracking";
 
-export type AppRole = "owner" | "admin" | "pm" | "konstrukter" | "viewer" | "tester";
+export type AppRole = "owner" | "admin" | "pm" | "konstrukter" | "viewer" | "tester" | "vyroba";
 
 interface AuthContextType {
   user: User | null;
