@@ -143,7 +143,7 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
             </div>
           </div>
           <div className="flex-1 overflow-y-auto pb-4">
-            <NotificationPanel onClose={() => setNotifOpen(false)} />
+            <NotificationPanel onClose={() => setNotifOpen(false)} mobile />
           </div>
         </SheetContent>
       </Sheet>

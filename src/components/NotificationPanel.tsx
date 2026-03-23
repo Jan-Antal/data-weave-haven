@@ -24,9 +24,10 @@ const TYPE_COLORS: Record<string, string> = {
 
 interface NotificationPanelProps {
   onClose: () => void;
+  mobile?: boolean;
 }
 
-export function NotificationPanel({ onClose }: NotificationPanelProps) {
+export function NotificationPanel({ onClose, mobile = false }: NotificationPanelProps) {
   const navigate = useNavigate();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -46,22 +47,34 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
 
   return (
     <>
-      <div className="w-full sm:w-[380px] bg-background border border-border rounded-xl shadow-lg overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <span className="font-semibold text-sm">Notifikace</span>
-          {unreadCount > 0 && (
-            <button
-              onClick={() => markAllAsRead()}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
+      <div className={cn(
+        mobile
+          ? "w-full flex flex-col flex-1 overflow-hidden"
+          : "w-full sm:w-[380px] bg-background border border-border rounded-xl shadow-lg overflow-hidden"
+      )}>
+        {!mobile && (
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <span className="font-semibold text-sm">Notifikace</span>
+            {unreadCount > 0 && (
+              <button
+                onClick={() => markAllAsRead()}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Označit vše
+              </button>
+            )}
+          </div>
+        )}
+        {mobile && unreadCount > 0 && (
+          <div className="flex justify-end px-4 py-2 border-b border-border">
+            <button onClick={() => markAllAsRead()} className="text-xs text-muted-foreground">
               Označit vše
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* List */}
-        <div className="max-h-[420px] overflow-y-auto">
+        <div className={mobile ? "flex-1 overflow-y-auto" : "max-h-[420px] overflow-y-auto"}>
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <Bell className="h-8 w-8 mb-2 opacity-40" />
