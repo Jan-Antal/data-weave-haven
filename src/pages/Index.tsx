@@ -367,8 +367,19 @@ const Index = () => {
                 setDataLogOpen(v);
                 try { localStorage.setItem("datalog-panel-index", String(v)); } catch {}
               }}>
-                <SheetContent side="bottom" className="h-[85vh] p-0 rounded-t-xl" style={{ zIndex: 100 }}>
+                <SheetContent
+                  side="bottom"
+                  className="p-0 flex flex-col rounded-t-2xl"
+                  style={{
+                    top: "var(--mobile-header-height, 56px)",
+                    bottom: "calc(56px + 8px)",
+                    height: "auto",
+                    maxHeight: "none",
+                    zIndex: 100,
+                  }}
+                >
                   <SheetTitle className="sr-only">Data Log</SheetTitle>
+                  <div className="w-10 h-1 bg-muted rounded-full mx-auto mt-3 mb-1 shrink-0" />
                   <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
                     setDataLogOpen(v);
                     try { localStorage.setItem("datalog-panel-index", String(v)); } catch {}
