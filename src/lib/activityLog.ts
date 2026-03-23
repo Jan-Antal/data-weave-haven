@@ -12,6 +12,7 @@ export type ActivityActionType =
   | "stage_created"
   | "stage_deleted"
   | "stage_status_change"
+  | "stage_status_vyroba_change"
   | "stage_konstrukter_change"
   | "stage_datum_smluvni_change"
   | "stage_document_uploaded"
