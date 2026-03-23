@@ -46,7 +46,7 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
 
   return (
     <>
-      <div className="w-[380px] bg-background border border-border rounded-xl shadow-lg overflow-hidden">
+      <div className="w-full sm:w-[380px] bg-background border border-border rounded-xl shadow-lg overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <span className="font-semibold text-sm">Notifikace</span>
