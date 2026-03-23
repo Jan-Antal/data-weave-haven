@@ -121,7 +121,14 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, t
     switch (key) {
       case "datum_smluvni": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "datum_smluvni")} type="date" onSave={(val) => saveStage("datum_smluvni", val)} readOnly={!canEdit || isFieldReadOnly("datum_smluvni", stage.datum_smluvni ?? null)} className={ihClass("datum_smluvni")} /></TableCell>;
       case "pm": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "pm")} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} className={ihClass("pm")} /></TableCell>;
-      case "status": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "status")} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={getStageDisplayValue(stage, project, "status") ? <StatusBadge status={getStageDisplayValue(stage, project, "status")} /> : "—"} readOnly={!canEdit} className={ihClass("status")} /></TableCell>;
+      case "status": return (
+        <TableCell key={key}>
+          <div className="flex items-center gap-1">
+            <InlineEditableCell value={getStageDisplayValue(stage, project, "status")} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={getStageDisplayValue(stage, project, "status") ? <StatusBadge status={getStageDisplayValue(stage, project, "status")} /> : "—"} readOnly={!canEdit} className={ihClass("status")} />
+            <InlineEditableCell value={(stage as any).status_vyroba ?? ""} type="select" options={tpvStatusLabels} onSave={(val) => saveStage("status_vyroba", val)} displayValue={(stage as any).status_vyroba ? <TPVStatusBadge status={(stage as any).status_vyroba} /> : null} readOnly={!canEdit} />
+          </div>
+        </TableCell>
+      );
       case "risk": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "risk")} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("risk", val)} displayValue={<RiskBadge level={getStageDisplayValue(stage, project, "risk") || ""} />} readOnly={!canEdit} className={ihClass("risk")} /></TableCell>;
       case "zamereni": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "zamereni")} type="date" onSave={(val) => saveStage("zamereni", val)} readOnly={!canEdit} className={ihClass("zamereni")} /></TableCell>;
       case "tpv_date": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "tpv_date")} type="date" onSave={(val) => saveStage("tpv_date", val)} readOnly={!canEdit} className={ihClass("tpv_date")} /></TableCell>;
