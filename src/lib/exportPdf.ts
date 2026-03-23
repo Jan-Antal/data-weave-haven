@@ -129,22 +129,19 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
   @page { size: A4 portrait; margin: 10mm 12mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Early Sans', system-ui, sans-serif; font-size: 9pt; color: #1f2937; padding: 6mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
   .page-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
     border-bottom: 2px solid #1a3330;
     padding-bottom: 8px;
     margin-bottom: 12px;
   }
-  .logo-area { display: flex; flex-direction: column; }
-  .logo { font-size: 22pt; font-weight: 800; color: #1a3330; letter-spacing: -0.5px; }
-  .logo span { color: #ea580c; }
-  .claim { font-size: 7pt; color: #6b7280; letter-spacing: 0.15em; text-transform: uppercase; margin-top: 2px; }
+  .logo-area { display: flex; align-items: center; }
 
-  .doc-title { text-align: center; }
-  .doc-title h1 { font-size: 13pt; font-weight: 700; color: #1a3330; }
-  .doc-title .sub { font-size: 8pt; color: #6b7280; margin-top: 3px; }
+  .doc-title { text-align: right; }
+  .doc-title h1 { font-family: 'Early Sans', system-ui, sans-serif; font-size: 12pt; font-weight: 600; color: #1a3330; }
 
   .meta-row {
     display: flex;
@@ -176,13 +173,9 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 </head>
 <body>
 <div class="page-header">
-  <div class="logo-area">
-    <div class="logo">A<span>→</span>M Interior</div>
-    <div class="claim">From "A" to Masterpiece</div>
-  </div>
+  <div class="logo-area">${logoSvg}</div>
   <div class="doc-title">
     <h1>Seznam výkresové dokumentace</h1>
-    <div class="sub">Průvodka do výroby</div>
   </div>
 </div>
 <div class="meta-row">
