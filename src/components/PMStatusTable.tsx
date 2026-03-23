@@ -205,7 +205,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, t
 
 const MemoSortableStageRow = memo(SortableStageRow);
 
-function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, renderKeys, personFilter, statusFilterSet, searchLower, showAddButton = true, parentMatchesSearch = false }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[]; personFilter: string | null; statusFilterSet: Set<string> | null; searchLower: string | null; showAddButton?: boolean; parentMatchesSearch?: boolean }) {
+function StagesSection({ projectId, project, isVisible, statusLabels, tpvStatusLabels, canEdit, renderKeys, personFilter, statusFilterSet, searchLower, showAddButton = true, parentMatchesSearch = false }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; tpvStatusLabels: string[]; canEdit: boolean; renderKeys: string[]; personFilter: string | null; statusFilterSet: Set<string> | null; searchLower: string | null; showAddButton?: boolean; parentMatchesSearch?: boolean }) {
   const { data: stages = [] } = useProjectStages(projectId);
   const deleteStage = useDeleteStage();
   const reorderStages = useReorderStages();
