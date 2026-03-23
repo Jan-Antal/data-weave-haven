@@ -449,7 +449,9 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   useDataLogRowHighlight();
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
+  const { data: tpvStatusOptions = [] } = useTPVStatusOptions();
   const statusLabels = useMemo(() => statusOptions.map((s) => s.label), [statusOptions]);
+  const tpvStatusLabels = useMemo(() => tpvStatusOptions.map((s) => s.label), [tpvStatusOptions]);
   const updateProject = useUpdateProject();
   const { columns: customColumns } = useAllCustomColumns("projects");
   const updateCustomField = useUpdateCustomField();
