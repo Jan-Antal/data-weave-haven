@@ -27,7 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatAppDate, parseAppDate } from "@/lib/dateFormat";
-import { CalendarIcon, Paperclip, ChevronRight, ChevronDown, Plus, Trash2, GripVertical, ChevronsDown, ChevronsUp } from "lucide-react";
+import { CalendarIcon, Paperclip, List, ChevronRight, ChevronDown, Plus, Trash2, GripVertical, ChevronsDown, ChevronsUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 import { ProjectDetailDialog } from "./ProjectDetailDialog";
@@ -383,7 +383,9 @@ interface ProjectRowProps {
   docFailed?: boolean;
   isExpanded: boolean;
   stageCount: number;
+  tpvCount: number;
   onToggleExpand: (pid: string) => void;
+  onOpenTPVList: (projectId: string, projectName: string) => void;
   isVisible: (key: string) => boolean;
   renderKeys: string[];
   save: (id: string, field: string, value: string, oldValue: string) => void;
@@ -403,7 +405,9 @@ const ProjectRow = memo(function ProjectRow({
   docFailed,
   isExpanded,
   stageCount,
+  tpvCount,
   onToggleExpand,
+  onOpenTPVList,
   isVisible: v,
   renderKeys,
   save,
@@ -425,17 +429,17 @@ const ProjectRow = memo(function ProjectRow({
     <TableRow className="hover:bg-muted/50 transition-colors h-9" style={bgStyle} data-project-id={p.project_id}>
       {/* Col 1 — Icon slot */}
       <TableCell style={COL_ICON_STYLE} className="text-center px-0">
-        <span
-          className={cn(
-            "inline-flex items-center gap-0.5 text-[10px] cursor-pointer",
-            docCount !== undefined && docCount > 0 ? "text-[#223937]" : "text-[#99a5a3]"
-          )}
-          onClick={() => onEditProject(p)}
-          title={docFailed ? "Nepodařilo se načíst – klikněte pro ruční obnovení" : undefined}
+        <button
+          className="inline-flex items-center gap-0.5 cursor-pointer hover:opacity-80"
+          style={{ color: tpvCount > 0 ? "#223937" : "#99a5a3" }}
+          title={`TPV seznam (${tpvCount})`}
+          onClick={(e) => { e.stopPropagation(); onOpenTPVList(p.project_id, p.project_name); }}
         >
-          <Paperclip className="h-3 w-3" />
-          {docFailed ? "?" : docCount !== undefined ? docCount : "—"}
-        </span>
+          <List className="h-4 w-4" />
+          {tpvCount > 0 && (
+            <span className="text-[10px] text-muted-foreground">{tpvCount}</span>
+          )}
+        </button>
       </TableCell>
       {/* Col 2 — Chevron slot */}
       <TableCell style={COL_CHEVRON_STYLE} className="px-0 cursor-pointer" onClick={() => onToggleExpand(p.project_id)}>
@@ -793,7 +797,9 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                     docFailed={docFailed.has(p.project_id)}
                     isExpanded={expanded.has(p.project_id)}
                     stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
+                    tpvCount={tpvItemsByProject.get(p.project_id)?.length ?? 0}
                     onToggleExpand={toggleExpand}
+                    onOpenTPVList={handleOpenTPVList}
                     isVisible={v}
                     renderKeys={renderKeys}
                     save={save}
