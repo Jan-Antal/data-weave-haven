@@ -655,7 +655,7 @@ export function useProductionDragDrop() {
 
       // Store parts snapshot for undo — push undo FIRST, then invalidate
       const partsSnapshot = parts.map(p => ({ ...p }));
-      pushUndo({
+      if (!silent) pushUndo({
         page: "plan-vyroby",
         actionType: "merge_split",
         description: `${parts.length} částí spojeno → "${cleanName}"`,
