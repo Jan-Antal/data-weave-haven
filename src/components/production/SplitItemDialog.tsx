@@ -217,59 +217,63 @@ export function SplitItemDialog({
 
         invalidateAll();
       } else {
-        // Inbox split
-        await supabase.from("production_inbox").update({
-          estimated_hours: part1Hours,
-          estimated_czk: part1Hours * czkPerHour,
-          item_name: `${cleanName} (1/2)`,
-          split_group_id: groupId,
-          split_part: 1,
-          split_total: 2,
-        }).eq("id", itemId);
+        // Inbox split: batch all operations
+        const scheduleWeek1 = currentWeekKey || futureWeeks[0]?.key || "";
 
-        await supabase.from("production_schedule").insert({
-          project_id: projectId,
-          stage_id: stageId,
-          item_name: `${cleanName} (1/2)`,
-          item_code: itemCode ?? null,
-          scheduled_week: currentWeekKey || futureWeeks[0]?.key || "",
-          scheduled_hours: part1Hours,
-          scheduled_czk: part1Hours * czkPerHour,
-          position: 999,
-          status: "scheduled",
-          created_by: user.id,
-          inbox_item_id: itemId,
-          split_group_id: groupId,
-          split_part: 1,
-          split_total: 2,
-        });
+        const [, , , insertResult2] = await Promise.all([
+          // Update inbox item
+          supabase.from("production_inbox").update({
+            estimated_hours: part1Hours,
+            estimated_czk: part1Hours * czkPerHour,
+            item_name: `${cleanName} (1/2)`,
+            split_group_id: groupId,
+            split_part: 1,
+            split_total: 2,
+            status: "scheduled",
+          }).eq("id", itemId),
+          // Insert schedule part 1
+          supabase.from("production_schedule").insert({
+            project_id: projectId,
+            stage_id: stageId,
+            item_name: `${cleanName} (1/2)`,
+            item_code: itemCode ?? null,
+            scheduled_week: scheduleWeek1,
+            scheduled_hours: part1Hours,
+            scheduled_czk: part1Hours * czkPerHour,
+            position: 999,
+            status: "scheduled",
+            created_by: user.id,
+            inbox_item_id: itemId,
+            split_group_id: groupId,
+            split_part: 1,
+            split_total: 2,
+          }),
+          // Insert schedule part 2 (need id for undo)
+          Promise.resolve(), // placeholder
+          supabase.from("production_schedule").insert({
+            project_id: projectId,
+            stage_id: stageId,
+            item_name: `${cleanName} (2/2)`,
+            item_code: itemCode ?? null,
+            scheduled_week: targetWeek,
+            scheduled_hours: part2Hours,
+            scheduled_czk: part2Hours * czkPerHour,
+            position: 999,
+            status: "scheduled",
+            created_by: user.id,
+            split_group_id: groupId,
+            split_part: 2,
+            split_total: 2,
+          }).select().single(),
+        ]);
 
-        await supabase.from("production_inbox").update({ status: "scheduled" }).eq("id", itemId);
-
-        const { data: inserted2 } = await supabase.from("production_schedule").insert({
-          project_id: projectId,
-          stage_id: stageId,
-          item_name: `${cleanName} (2/2)`,
-          item_code: itemCode ?? null,
-          scheduled_week: targetWeek,
-          scheduled_hours: part2Hours,
-          scheduled_czk: part2Hours * czkPerHour,
-          position: 999,
-          status: "scheduled",
-          created_by: user.id,
-          split_group_id: groupId,
-          split_part: 2,
-          split_total: 2,
-        }).select().single();
-
-        invalidateAll();
+        const inserted2Id = insertResult2.data?.id;
 
         pushUndo({
           page: "plan-vyroby",
           actionType: "split_inbox_item",
           description: `✂ Rozděleno z inboxu: ${cleanName}`,
           undo: async () => {
-            // Restore inbox item
             if (originalItem) {
               await supabase.from("production_inbox").update({
                 estimated_hours: originalItem.estimated_hours,
@@ -281,16 +285,16 @@ export function SplitItemDialog({
                 status: "pending",
               }).eq("id", itemId);
             }
-            // Delete created schedule rows
             await supabase.from("production_schedule").delete().eq("inbox_item_id", itemId);
-            if (inserted2?.id) await supabase.from("production_schedule").delete().eq("id", inserted2.id);
+            if (inserted2Id) await supabase.from("production_schedule").delete().eq("id", inserted2Id);
             invalidateAll();
           },
           redo: async () => {
-            // Simplified: re-run the split logic would be complex, just invalidate
             invalidateAll();
           },
         });
+
+        invalidateAll();
       }
 
       // Log activity
