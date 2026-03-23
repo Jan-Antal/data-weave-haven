@@ -452,7 +452,7 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
   }, [undo, redo]);
 
   return (
-    <UndoRedoContext.Provider value={{ pushUndo, undo, redo, canUndo, canRedo, setCurrentPage, currentPage, lastUndoDescription, lastRedoDescription }}>
+    <UndoRedoContext.Provider value={{ pushUndo, popLastUndo, undo, redo, canUndo, canRedo, setCurrentPage, currentPage, lastUndoDescription, lastRedoDescription }}>
       {children}
     </UndoRedoContext.Provider>
   );
