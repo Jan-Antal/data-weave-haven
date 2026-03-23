@@ -78,7 +78,7 @@ export function NotificationSettings({ open, onOpenChange }: NotificationSetting
           <DialogTitle>Nastavení notifikací</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-2">
-          {PREFS.map((p) => (
+          {PREFS.filter((p) => !(p as any).adminOnly || isAdmin || isOwner).map((p) => (
             <div key={p.key} className="flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-sm font-medium">{p.label}</p>
