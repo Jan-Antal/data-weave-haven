@@ -12,6 +12,13 @@ const TYPE_COLORS: Record<string, string> = {
   qc_defect: "bg-red-500",
   project_created: "bg-green-500",
   daylog_missing: "bg-orange-500",
+  konstrukter_assigned: "bg-purple-500",
+  konstrukter_removed: "bg-gray-500",
+  konstrukter_item_changed: "bg-blue-500",
+  pm_assigned: "bg-green-500",
+  pm_removed: "bg-gray-500",
+  tpv_items_added: "bg-teal-500",
+  tpv_items_removed: "bg-orange-500",
 };
 
 interface NotificationPanelProps {
@@ -25,10 +32,15 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
 
   const handleClick = (n: Notification) => {
     if (!n.read) markAsRead(n.id);
-    if (n.project_id) {
-      navigate("/", { state: { openProjectId: n.project_id } });
-    }
     onClose();
+
+    const ctx = n.link_context as any;
+    const projectId = ctx?.project_id || n.project_id;
+    const tab = ctx?.tab || "project-info";
+
+    if (projectId) {
+      navigate(`/?tab=${tab}&project=${projectId}`);
+    }
   };
 
   return (
