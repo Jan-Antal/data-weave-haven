@@ -2482,7 +2482,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 ? {
                     position: "fixed",
                     top: "auto",
-                    bottom: "calc(56px + env(safe-area-inset-bottom, 0px))",
+                    bottom: "56px",
                     left: 0,
                     right: 0,
                     width: "100%",
