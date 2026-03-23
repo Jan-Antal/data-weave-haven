@@ -4,13 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Global realtime subscription that syncs data across all connected users.
- * Call once at app root level. Uses targeted cache updates for UPDATE events
- * so popups (whose open state lives in parent useState) are NOT disrupted.
- * Only INSERT/DELETE trigger full invalidation.
- *
- * Realtime is enabled on: projects, project_stages, production_schedule,
- * production_daily_logs, production_quality_checks, production_quality_defects,
- * tpv_items, data_log
+ * Uses setQueryData for ALL events (INSERT/UPDATE/DELETE) — zero HTTP re-fetches.
  */
 export function useRealtimeSync() {
   const queryClient = useQueryClient();
@@ -19,7 +13,7 @@ export function useRealtimeSync() {
     const channel = supabase
       .channel("global-sync")
 
-      // Projects — targeted cache patch for UPDATE, invalidate for INSERT/DELETE
+      // ━━━ PROJECTS ━━━
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "projects" },
@@ -38,19 +32,30 @@ export function useRealtimeSync() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "projects" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["projects"] });
+        (payload) => {
+          const newRow = payload.new as any;
+          queryClient.getQueriesData({ queryKey: ["projects"] }).forEach(([key]) => {
+            queryClient.setQueryData(key, (old: any[] | undefined) =>
+              old ? [...old, newRow] : [newRow]
+            );
+          });
         }
       )
       .on(
         "postgres_changes",
         { event: "DELETE", schema: "public", table: "projects" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["projects"] });
+        (payload) => {
+          const deletedId = (payload.old as any)?.project_id;
+          if (!deletedId) return;
+          queryClient.getQueriesData({ queryKey: ["projects"] }).forEach(([key]) => {
+            queryClient.setQueryData(key, (old: any[] | undefined) =>
+              old?.filter((p) => p.project_id !== deletedId) ?? old
+            );
+          });
         }
       )
 
-      // Project stages — targeted patch for UPDATE
+      // ━━━ PROJECT STAGES ━━━
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "project_stages" },
@@ -67,75 +72,122 @@ export function useRealtimeSync() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "project_stages" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["project_stages"] });
-          queryClient.invalidateQueries({ queryKey: ["all_project_stages"] });
+        (payload) => {
+          const newRow = payload.new as any;
+          const append = (old: any[] | undefined) => old ? [...old, newRow] : [newRow];
+          queryClient.setQueryData(["project_stages"], append);
+          queryClient.setQueryData(["all_project_stages"], append);
         }
       )
       .on(
         "postgres_changes",
         { event: "DELETE", schema: "public", table: "project_stages" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["project_stages"] });
-          queryClient.invalidateQueries({ queryKey: ["all_project_stages"] });
+        (payload) => {
+          const deletedId = (payload.old as any)?.id;
+          if (!deletedId) return;
+          const filter = (old: any[] | undefined) => old?.filter((s) => s.id !== deletedId) ?? old;
+          queryClient.setQueryData(["project_stages"], filter);
+          queryClient.setQueryData(["all_project_stages"], filter);
         }
       )
 
-      // Production schedule — targeted patch for UPDATE
+      // ━━━ PRODUCTION SCHEDULE ━━━
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "production_schedule" },
         (payload) => {
           const newData = payload.new as any;
-          queryClient.setQueryData(["production-schedule"], (old: any[] | undefined) =>
-            old?.map((item) => item.id === newData?.id ? { ...item, ...newData } : item) ?? old
-          );
+          queryClient.getQueriesData({ queryKey: ["production-schedule"] }).forEach(([key]) => {
+            queryClient.setQueryData(key, (old: any[] | undefined) =>
+              old?.map((item) => item.id === newData?.id ? { ...item, ...newData } : item) ?? old
+            );
+          });
         }
       )
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "production_schedule" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
-          queryClient.invalidateQueries({ queryKey: ["production-progress"] });
+        (payload) => {
+          const newRow = payload.new as any;
+          queryClient.getQueriesData({ queryKey: ["production-schedule"] }).forEach(([key]) => {
+            queryClient.setQueryData(key, (old: any[] | undefined) =>
+              old ? [...old, newRow] : [newRow]
+            );
+          });
         }
       )
       .on(
         "postgres_changes",
         { event: "DELETE", schema: "public", table: "production_schedule" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
-          queryClient.invalidateQueries({ queryKey: ["production-progress"] });
+        (payload) => {
+          const deletedId = (payload.old as any)?.id;
+          if (!deletedId) return;
+          queryClient.getQueriesData({ queryKey: ["production-schedule"] }).forEach(([key]) => {
+            queryClient.setQueryData(key, (old: any[] | undefined) =>
+              old?.filter((item) => item.id !== deletedId) ?? old
+            );
+          });
         }
       )
 
-      // Daily logs — targeted patch for UPDATE
+      // ━━━ DAILY LOGS ━━━
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "production_daily_logs" },
         (payload) => {
           const newData = payload.new as any;
-          queryClient.setQueryData(["production-daily-logs"], (old: any[] | undefined) =>
-            old?.map((item) => item.id === newData?.id ? { ...item, ...newData } : item) ?? old
-          );
+          queryClient.getQueriesData({ queryKey: ["production-daily-logs"] }).forEach(([key]) => {
+            queryClient.setQueryData(key, (old: any) => {
+              if (old instanceof Map) {
+                const newMap = new Map(old);
+                for (const [bundleId, logs] of newMap) {
+                  newMap.set(bundleId, (logs as any[]).map((l: any) =>
+                    l.id === newData?.id ? { ...l, ...newData } : l
+                  ));
+                }
+                return newMap;
+              }
+              return old;
+            });
+          });
         }
       )
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "production_daily_logs" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["production-daily-logs"] });
+        (payload) => {
+          const newRow = payload.new as any;
+          queryClient.getQueriesData({ queryKey: ["production-daily-logs"] }).forEach(([key]) => {
+            queryClient.setQueryData(key, (old: any) => {
+              if (!(old instanceof Map)) return old;
+              const newMap = new Map(old);
+              const existing = newMap.get(newRow.bundle_id) || [];
+              newMap.set(newRow.bundle_id, [...existing, newRow]);
+              return newMap;
+            });
+          });
         }
       )
       .on(
         "postgres_changes",
         { event: "DELETE", schema: "public", table: "production_daily_logs" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["production-daily-logs"] });
+        (payload) => {
+          const deletedId = (payload.old as any)?.id;
+          if (!deletedId) return;
+          queryClient.getQueriesData({ queryKey: ["production-daily-logs"] }).forEach(([key]) => {
+            queryClient.setQueryData(key, (old: any) => {
+              if (!(old instanceof Map)) return old;
+              const newMap = new Map(old);
+              for (const [bundleId, logs] of newMap) {
+                newMap.set(bundleId, (logs as any[]).filter((l: any) => l.id !== deletedId));
+              }
+              return newMap;
+            });
+          });
         }
       )
 
-      // QC checks
+      // ━━━ QC CHECKS ━━━
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "production_quality_checks" },
@@ -149,19 +201,26 @@ export function useRealtimeSync() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "production_quality_checks" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["quality-checks"] });
+        (payload) => {
+          const newRow = payload.new as any;
+          queryClient.setQueryData(["quality-checks"], (old: any[] | undefined) =>
+            old ? [...old, newRow] : [newRow]
+          );
         }
       )
       .on(
         "postgres_changes",
         { event: "DELETE", schema: "public", table: "production_quality_checks" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["quality-checks"] });
+        (payload) => {
+          const deletedId = (payload.old as any)?.id;
+          if (!deletedId) return;
+          queryClient.setQueryData(["quality-checks"], (old: any[] | undefined) =>
+            old?.filter((item) => item.id !== deletedId) ?? old
+          );
         }
       )
 
-      // QC defects
+      // ━━━ QC DEFECTS ━━━
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "production_quality_defects" },
@@ -175,19 +234,26 @@ export function useRealtimeSync() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "production_quality_defects" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["quality-defects"] });
+        (payload) => {
+          const newRow = payload.new as any;
+          queryClient.setQueryData(["quality-defects"], (old: any[] | undefined) =>
+            old ? [...old, newRow] : [newRow]
+          );
         }
       )
       .on(
         "postgres_changes",
         { event: "DELETE", schema: "public", table: "production_quality_defects" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["quality-defects"] });
+        (payload) => {
+          const deletedId = (payload.old as any)?.id;
+          if (!deletedId) return;
+          queryClient.setQueryData(["quality-defects"], (old: any[] | undefined) =>
+            old?.filter((item) => item.id !== deletedId) ?? old
+          );
         }
       )
 
-      // TPV items — targeted patch for UPDATE
+      // ━━━ TPV ITEMS ━━━
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "tpv_items" },
@@ -197,32 +263,85 @@ export function useRealtimeSync() {
             old?.map((item) => item.id === newData?.id ? { ...item, ...newData } : item) ?? old;
           queryClient.setQueryData(["tpv-items"], patchCache);
           queryClient.setQueryData(["tpv_items"], patchCache);
+          queryClient.setQueryData(["all_tpv_items"], patchCache);
         }
       )
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "tpv_items" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["tpv-items"] });
-          queryClient.invalidateQueries({ queryKey: ["tpv_items"] });
+        (payload) => {
+          const newRow = payload.new as any;
+          const append = (old: any[] | undefined) => old ? [...old, newRow] : [newRow];
+          queryClient.getQueriesData({ queryKey: ["tpv_items"] }).forEach(([key]) => {
+            queryClient.setQueryData(key, append);
+          });
+          queryClient.setQueryData(["tpv-items"], append);
+          queryClient.setQueryData(["all_tpv_items"], append);
         }
       )
       .on(
         "postgres_changes",
         { event: "DELETE", schema: "public", table: "tpv_items" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["tpv-items"] });
-          queryClient.invalidateQueries({ queryKey: ["tpv_items"] });
+        (payload) => {
+          const deletedId = (payload.old as any)?.id;
+          if (!deletedId) return;
+          const filter = (old: any[] | undefined) => old?.filter((item) => item.id !== deletedId) ?? old;
+          queryClient.getQueriesData({ queryKey: ["tpv_items"] }).forEach(([key]) => {
+            queryClient.setQueryData(key, filter);
+          });
+          queryClient.setQueryData(["tpv-items"], filter);
+          queryClient.setQueryData(["all_tpv_items"], filter);
         }
       )
 
-      // Activity log — live feed for DataLog panel (INSERT only)
+      // ━━━ PRODUCTION INBOX ━━━
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "production_inbox" },
+        (payload) => {
+          const newRow = payload.new as any;
+          queryClient.getQueriesData({ queryKey: ["production-inbox"] }).forEach(([key]) => {
+            queryClient.setQueryData(key, (old: any[] | undefined) =>
+              old ? [...old, newRow] : [newRow]
+            );
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "production_inbox" },
+        (payload) => {
+          const deletedId = (payload.old as any)?.id;
+          if (!deletedId) return;
+          queryClient.getQueriesData({ queryKey: ["production-inbox"] }).forEach(([key]) => {
+            queryClient.setQueryData(key, (old: any[] | undefined) =>
+              old?.filter((item) => item.id !== deletedId) ?? old
+            );
+          });
+        }
+      )
+
+      // ━━━ ACTIVITY LOG ━━━
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "data_log" },
         () => {
           queryClient.invalidateQueries({ queryKey: ["activity-log"] });
           queryClient.invalidateQueries({ queryKey: ["mobile-recent-activity"] });
+        }
+      )
+
+      // ━━━ NOTIFICATIONS ━━━
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications" },
+        (payload) => {
+          const newRow = payload.new as any;
+          queryClient.getQueriesData({ queryKey: ["notifications"] }).forEach(([key]) => {
+            queryClient.setQueryData(key, (old: any[] | undefined) =>
+              old ? [newRow, ...old] : [newRow]
+            );
+          });
         }
       )
 

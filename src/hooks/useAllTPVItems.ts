@@ -7,6 +7,8 @@ import { useMemo } from "react";
 export function useAllTPVItems() {
   const query = useQuery({
     queryKey: ["all_tpv_items"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tpv_items")
