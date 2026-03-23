@@ -383,7 +383,9 @@ interface ProjectRowProps {
   docFailed?: boolean;
   isExpanded: boolean;
   stageCount: number;
+  tpvCount: number;
   onToggleExpand: (pid: string) => void;
+  onOpenTPVList: (projectId: string, projectName: string) => void;
   isVisible: (key: string) => boolean;
   renderKeys: string[];
   save: (id: string, field: string, value: string, oldValue: string) => void;
