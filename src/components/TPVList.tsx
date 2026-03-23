@@ -19,7 +19,9 @@ import {
   useBulkInsertTPVItems,
 } from "@/hooks/useTPVItems";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
-import { ArrowLeft, Plus, Upload, Trash2, FileText, Cog } from "lucide-react";
+import { ArrowLeft, Plus, Upload, Trash2, FileText, Cog, Printer } from "lucide-react";
+import { buildPruvodkaHtml } from "@/lib/exportPdf";
+import { PdfPreviewModal } from "./PdfPreviewModal";
 import { ProjectDetailDialog } from "./ProjectDetailDialog";
 import { useProjects } from "@/hooks/useProjects";
 import * as XLSX from "xlsx";
@@ -100,7 +102,7 @@ interface Props {
 }
 
 export function TPVList({ projectId, projectName, currency = "CZK", onBack, autoOpenImport }: Props) {
-  const { canManageTPV, canEdit, canEditColumns } = useAuth();
+  const { canManageTPV, canEdit, canEditColumns, profile } = useAuth();
   const { data: items = [], isLoading } = useTPVItems(projectId);
   const { data: statusOptions = [] } = useTPVStatusOptions();
   const TPV_STATUSES = statusOptions.map((o) => o.label);
@@ -229,6 +231,47 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     newPocet: number;
   } | null>(null);
 
+  // ── Průvodka state ─────────────────────────────────────────────
+  const [pruvodkaWarning, setPruvodkaWarning] = useState<{ items: typeof items; allItems: typeof items } | null>(null);
+  const [pdfHtml, setPdfHtml] = useState<string | null>(null);
+
+  const openPruvodka = useCallback((itemsToPrint: typeof items) => {
+    const hasUnapproved = itemsToPrint.some(item => item.status !== "Schváleno");
+    const rows = itemsToPrint.map((item, idx) => ({
+      rowNum: idx + 1,
+      kodPrvku: item.item_name || "",
+      nazevPrvku: item.item_type || item.item_name || "",
+      konstrukter: item.konstrukter || "",
+      pocet: item.pocet ?? "",
+      notes: item.notes || "",
+      isApproved: item.status === "Schváleno",
+    }));
+
+    const html = buildPruvodkaHtml({
+      projectId,
+      projectName: projectName || projectId,
+      issuedBy: profile?.full_name || profile?.email || "—",
+      rows,
+      hasUnapproved,
+    });
+
+    setPdfHtml(html);
+    setPruvodkaWarning(null);
+  }, [projectId, projectName, profile]);
+
+  const handlePruvodka = useCallback(() => {
+    const itemsToPrint = selected.size > 0
+      ? sortedItems.filter(item => selected.has(item.id))
+      : sortedItems.filter(item => item.status !== "Zrušeno");
+
+    const unapproved = itemsToPrint.filter(item => item.status !== "Schváleno" && item.status !== "Zrušeno");
+
+    if (unapproved.length > 0) {
+      setPruvodkaWarning({ items: unapproved, allItems: itemsToPrint });
+    } else {
+      openPruvodka(itemsToPrint);
+    }
+  }, [selected, sortedItems, openPruvodka]);
   const handleSendToProduction = useCallback(() => {
     if (selected.size === 0) {
       toast({ title: "Vyberte alespoň jednu položku", variant: "destructive", duration: 2000 });
@@ -666,7 +709,14 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             <Cog className="h-3 w-3 mr-1" /> Odeslat do výroby
           </Button>
         )}
-
+        <button
+          onClick={handlePruvodka}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm border border-border hover:bg-muted transition-colors"
+          title="Tisk průvodky do výroby"
+        >
+          <Printer className="h-4 w-4" />
+          <span className="hidden sm:inline">Průvodka</span>
+        </button>
         {selected.size > 0 && canManageTPV && (
           <div className="flex items-center gap-2 ml-4 border-l pl-4">
             <span className="text-sm text-muted-foreground">{selected.size} vybráno</span>
@@ -1112,6 +1162,60 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           onOpenChange={setDetailOpen}
           onOpenTPVList={() => {}}
           tpvItemCount={items.length}
+        />
+      )}
+
+      {/* Průvodka Warning Dialog */}
+      <Dialog open={!!pruvodkaWarning} onOpenChange={(open) => { if (!open) setPruvodkaWarning(null); }}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>⚠ Prvky nejsou schváleny</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm text-muted-foreground">
+              Následující prvky nejsou ve stavu Schváleno. Hrozí riziko změny ze strany klienta:
+            </p>
+            <div className="max-h-[240px] overflow-auto border rounded">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Kód prvku</TableHead>
+                    <TableHead>Název prvku</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pruvodkaWarning?.items.map((item) => (
+                    <TableRow key={item.id} className="bg-amber-50/50">
+                      <TableCell className="font-semibold text-xs">{item.item_name}</TableCell>
+                      <TableCell className="text-xs">{item.item_type || ""}</TableCell>
+                      <TableCell className="text-xs text-amber-600 font-medium">{item.status || "Bez statusu"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Průvodka bude vytisknuta i pro tyto prvky. Doporučujeme před tiskem získat schválení.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setPruvodkaWarning(null)}>
+              Zrušit
+            </Button>
+            <Button size="sm" onClick={() => pruvodkaWarning && openPruvodka(pruvodkaWarning.allItems)}>
+              Přesto tisknout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Průvodka PDF Preview */}
+      {pdfHtml && (
+        <PdfPreviewModal
+          html={pdfHtml}
+          tabLabel="Průvodka"
+          onClose={() => setPdfHtml(null)}
         />
       )}
     </div>
