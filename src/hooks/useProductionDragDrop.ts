@@ -693,9 +693,11 @@ export function useProductionDragDrop() {
         },
       });
 
-      qc.invalidateQueries({ queryKey: ["production-schedule"] });
-      qc.invalidateQueries({ queryKey: ["production-inbox"] });
-      qc.invalidateQueries({ queryKey: ["production-expedice"] });
+      if (!silent) {
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        qc.invalidateQueries({ queryKey: ["production-inbox"] });
+        qc.invalidateQueries({ queryKey: ["production-expedice"] });
+      }
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
