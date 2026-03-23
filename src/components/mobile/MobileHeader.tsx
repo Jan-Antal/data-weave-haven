@@ -76,7 +76,7 @@ export function MobileHeader({ onDataLog, showDataLog = false, isDataLogOpen = f
             </button>
             <button
               onClick={() => {
-                const wasDataLogOpen = !!onCloseDataLog && showDataLog;
+                const wasDataLogOpen = isDataLogOpen;
                 setNotifOpen(false);
                 if (onCloseDataLog) onCloseDataLog();
                 // If DataLog was open, explicitly open menu (don't toggle)
