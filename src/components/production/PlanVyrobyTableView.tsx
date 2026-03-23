@@ -151,7 +151,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   const { data: statusOpts = [] } = useProjectStatusOptions();
   const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts), [statusOpts]);
   const getWeekCapacity = useWeekCapacityLookup();
-  const { moveScheduleItemToWeek, moveItemBackToInbox, completeItems, moveInboxItemToWeek, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
+  const { moveScheduleItemToWeek, moveItemBackToInbox, completeItems, moveInboxItemToWeek, returnBundleToInbox, returnToProduction, mergeSplitItems, mergeBundleSplitGroups } = useProductionDragDrop();
   const qc = useQueryClient();
   const [sortMode, setSortMode] = useState<SortMode>("project");
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
@@ -900,7 +900,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     }
     const mergeableSplitGroups = Array.from(splitGroupIds).filter(sgId => bundle.items.filter(i => i.split_group_id === sgId && i.status !== "completed" && i.status !== "cancelled").length >= 2);
     if (mergeableSplitGroups.length > 0) {
-      actions.push({ label: `Spojit části (${mergeableSplitGroups.length} skupin)`, icon: "🔗", onClick: async () => { for (let i = 0; i < mergeableSplitGroups.length; i++) { const isLast = i === mergeableSplitGroups.length - 1; await mergeSplitItems(mergeableSplitGroups[i], undefined, !isLast); } } });
+      actions.push({ label: `Spojit části (${mergeableSplitGroups.length} skupin)`, icon: "🔗", onClick: async () => { await mergeBundleSplitGroups(mergeableSplitGroups); } });
     }
     if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(projectId) });
     if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(projectId) });
@@ -913,7 +913,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
       actions.push({ label: `Zrušit vše (${activeItems.length})`, icon: "✕", danger: true, dividerBefore: true, onClick: () => setCancelDialog({ open: true, itemId: activeItems.map(i => i.id).join(","), itemName: `${bundle.project_name} — ${activeItems.length} položek`, itemCode: null, hours: activeItems.reduce((s, i) => s + i.scheduled_hours, 0), projectName: bundle.project_name, projectId, splitGroupId: null, cancelAll: true }) });
     }
     if (actions.length > 0) setContextMenu({ x: e.clientX, y: e.clientY, actions });
-  }, [scheduleData, weeks, getBundleForWeek, returnBundleToInbox, returnToProduction, mergeSplitItems, handleReleaseItem, onNavigateToTPV, onOpenProjectDetail]);
+  }, [scheduleData, weeks, getBundleForWeek, returnBundleToInbox, returnToProduction, mergeSplitItems, mergeBundleSplitGroups, handleReleaseItem, onNavigateToTPV, onOpenProjectDetail]);
 
   // Context menu: scheduled item in week cell (matching Kanban DraggableSiloItem)
   const handleScheduleItemContextMenu = useCallback((e: React.MouseEvent, scheduleItemId: string, weekKey: string, projectId: string) => {

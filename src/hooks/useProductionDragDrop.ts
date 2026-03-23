@@ -583,7 +583,11 @@ export function useProductionDragDrop() {
     }
   }, [invalidateAll, pushUndo]);
 
-  const mergeSplitItems = useCallback(async (splitGroupId: string, onlyInWeek?: string, silent?: boolean) => {
+  const mergeSplitItems = useCallback(async (
+    splitGroupId: string,
+    onlyInWeek?: string,
+    silent?: boolean,
+  ): Promise<{ undo: () => Promise<void>; redo: () => Promise<void>; partsCount: number; description: string } | null> => {
     try {
       const { data: allParts, error: fetchErr } = await supabase
         .from("production_schedule")
@@ -592,14 +596,13 @@ export function useProductionDragDrop() {
         .order("split_part", { ascending: true });
       if (fetchErr) throw fetchErr;
 
-      // If scoped to a week, only merge parts in that week
       const parts = onlyInWeek
         ? (allParts || []).filter(p => p.scheduled_week === onlyInWeek)
         : (allParts || []);
 
       if (!parts || parts.length <= 1) {
-        toast({ title: "Není co spojit", description: "Nebyla nalezena žádná další část." });
-        return;
+        if (!silent) toast({ title: "Není co spojit", description: "Nebyla nalezena žádná další část." });
+        return null;
       }
 
       const totalHours = parts.reduce((s, p) => s + p.scheduled_hours, 0);
@@ -607,12 +610,9 @@ export function useProductionDragDrop() {
       const primary = parts[0];
       const remainingParts = (allParts || []).filter(p => !parts.some(mp => mp.id === p.id));
       const cleanName = primary.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
-
-      // If there are remaining parts in other weeks, keep split metadata
       const hasRemaining = remainingParts.length > 0;
       const otherIds = parts.filter(p => p.id !== primary.id).map(p => p.id);
 
-      // Batch: update primary + delete others in parallel
       await Promise.all([
         supabase.from("production_schedule").update({
           scheduled_hours: totalHours,
@@ -627,7 +627,6 @@ export function useProductionDragDrop() {
           : Promise.resolve(),
       ]);
 
-      // Renumber remaining siblings if any (unavoidable sequential)
       if (hasRemaining) {
         const allRemaining = [primary.id, ...remainingParts.map(p => p.id)];
         const { data: siblings } = await supabase
@@ -653,55 +652,87 @@ export function useProductionDragDrop() {
         }
       }
 
-      // Store parts snapshot for undo — push undo FIRST, then invalidate
       const partsSnapshot = parts.map(p => ({ ...p }));
-      if (!silent) pushUndo({
-        page: "plan-vyroby",
-        actionType: "merge_split",
-        description: `${parts.length} částí spojeno → "${cleanName}"`,
-        undo: async () => {
-          const orig = partsSnapshot[0];
-          await supabase.from("production_schedule").update({
-            scheduled_hours: orig.scheduled_hours, scheduled_czk: orig.scheduled_czk,
-            item_name: orig.item_name, split_group_id: orig.split_group_id,
-            split_part: orig.split_part, split_total: orig.split_total,
-          }).eq("id", orig.id);
-          const { data: { user } } = await supabase.auth.getUser();
-          const others = partsSnapshot.slice(1).map(p => ({
-            project_id: p.project_id, stage_id: p.stage_id,
-            item_name: p.item_name, item_code: p.item_code,
-            scheduled_week: p.scheduled_week, scheduled_hours: p.scheduled_hours,
-            scheduled_czk: p.scheduled_czk, position: p.position,
-            status: p.status, created_by: user?.id,
-            split_group_id: p.split_group_id, split_part: p.split_part, split_total: p.split_total,
-          }));
-          if (others.length) await supabase.from("production_schedule").insert(others);
-          invalidateAll();
-        },
-        redo: async () => {
-          await supabase.from("production_schedule").update({
-            scheduled_hours: totalHours, scheduled_czk: totalCzk,
-            item_name: cleanName, split_group_id: null, split_part: null, split_total: null,
-          }).eq("id", primary.id);
-          const { data: reParts } = await supabase.from("production_schedule")
-            .select("id").or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`)
-            .neq("id", primary.id);
-          if (reParts && reParts.length) {
-            await supabase.from("production_schedule").delete().in("id", reParts.map(p => p.id));
-          }
-          invalidateAll();
-        },
-      });
+      const undoFn = async () => {
+        const orig = partsSnapshot[0];
+        await supabase.from("production_schedule").update({
+          scheduled_hours: orig.scheduled_hours, scheduled_czk: orig.scheduled_czk,
+          item_name: orig.item_name, split_group_id: orig.split_group_id,
+          split_part: orig.split_part, split_total: orig.split_total,
+        }).eq("id", orig.id);
+        const { data: { user } } = await supabase.auth.getUser();
+        const others = partsSnapshot.slice(1).map(p => ({
+          project_id: p.project_id, stage_id: p.stage_id,
+          item_name: p.item_name, item_code: p.item_code,
+          scheduled_week: p.scheduled_week, scheduled_hours: p.scheduled_hours,
+          scheduled_czk: p.scheduled_czk, position: p.position,
+          status: p.status, created_by: user?.id,
+          split_group_id: p.split_group_id, split_part: p.split_part, split_total: p.split_total,
+        }));
+        if (others.length) await supabase.from("production_schedule").insert(others);
+      };
+      const redoFn = async () => {
+        await supabase.from("production_schedule").update({
+          scheduled_hours: totalHours, scheduled_czk: totalCzk,
+          item_name: cleanName, split_group_id: null, split_part: null, split_total: null,
+        }).eq("id", primary.id);
+        const { data: reParts } = await supabase.from("production_schedule")
+          .select("id").or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`)
+          .neq("id", primary.id);
+        if (reParts && reParts.length) {
+          await supabase.from("production_schedule").delete().in("id", reParts.map(p => p.id));
+        }
+      };
+
+      const result = { undo: undoFn, redo: redoFn, partsCount: parts.length, description: `${parts.length} částí spojeno → "${cleanName}"` };
 
       if (!silent) {
+        pushUndo({
+          page: "plan-vyroby",
+          actionType: "merge_split",
+          description: result.description,
+          undo: async () => { await undoFn(); invalidateAll(); },
+          redo: async () => { await redoFn(); invalidateAll(); },
+        });
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
         qc.invalidateQueries({ queryKey: ["production-inbox"] });
         qc.invalidateQueries({ queryKey: ["production-expedice"] });
       }
+
+      return result;
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
+      return null;
     }
-  }, [invalidateAll, pushUndo]);
+  }, [invalidateAll, pushUndo, qc]);
+
+  const mergeBundleSplitGroups = useCallback(async (splitGroupIds: string[], onlyInWeek?: string) => {
+    const results: { undo: () => Promise<void>; redo: () => Promise<void>; partsCount: number; description: string }[] = [];
+    for (const sgId of splitGroupIds) {
+      const r = await mergeSplitItems(sgId, onlyInWeek, true);
+      if (r) results.push(r);
+    }
+    if (results.length === 0) return;
+
+    const totalParts = results.reduce((s, r) => s + r.partsCount, 0);
+    pushUndo({
+      page: "plan-vyroby",
+      actionType: "merge_split",
+      description: `${totalParts} částí spojeno (${results.length} skupin)`,
+      undo: async () => {
+        for (const r of results) await r.undo();
+        invalidateAll();
+      },
+      redo: async () => {
+        for (const r of results) await r.redo();
+        invalidateAll();
+      },
+    });
+
+    qc.invalidateQueries({ queryKey: ["production-schedule"] });
+    qc.invalidateQueries({ queryKey: ["production-inbox"] });
+    qc.invalidateQueries({ queryKey: ["production-expedice"] });
+  }, [mergeSplitItems, pushUndo, qc, invalidateAll]);
 
   return {
     moveInboxItemToWeek,
@@ -714,5 +745,8 @@ export function useProductionDragDrop() {
     returnToProduction,
     returnBundleToInbox,
     mergeSplitItems,
+    mergeBundleSplitGroups,
   };
 }
+
+

@@ -247,6 +247,7 @@ export default function PlanVyroby() {
     moveItemBackToInbox,
     returnBundleToInbox,
     mergeSplitItems,
+    mergeBundleSplitGroups,
   } = useProductionDragDrop();
 
   const weeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
@@ -885,10 +886,7 @@ export default function PlanVyroby() {
           mergeItemCount={mergeState.mergeItemCount}
           onMerge={async () => {
             await mergeState.onKeepSeparate();
-            for (let i = 0; i < mergeState.splitGroupIds.length; i++) {
-              const isLast = i === mergeState.splitGroupIds.length - 1;
-              await mergeSplitItems(mergeState.splitGroupIds[i], mergeState.targetWeekKey, !isLast);
-            }
+            await mergeBundleSplitGroups(mergeState.splitGroupIds, mergeState.targetWeekKey);
           }}
           onKeepSeparate={mergeState.onKeepSeparate}
         />

@@ -177,7 +177,7 @@ interface CancelState {
 export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock, onSplitForecastBlock, forecastSafetyNet, onRestoreFromSafetyNet, onConvertReserveToForecast, focusedMatchKey, searchMatchWeekKey, searchMatchedProjectIds, searchActive }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
-  const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
+  const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems, mergeBundleSplitGroups } = useProductionDragDrop();
   const { data: allProjects = [] } = useProjects();
   const { data: statusOpts = [] } = useProjectStatusOptions();
   const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts), [statusOpts]);
@@ -545,10 +545,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
         actions.push({
           label: `Spojit části (${mergeableSplitGroups.length} skupin)`, icon: "🔗",
           onClick: async () => {
-            for (let i = 0; i < mergeableSplitGroups.length; i++) {
-              const isLast = i === mergeableSplitGroups.length - 1;
-              await mergeSplitItems(mergeableSplitGroups[i], undefined, !isLast);
-            }
+            await mergeBundleSplitGroups(mergeableSplitGroups);
           },
         });
       }
@@ -598,7 +595,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       }
       setContextMenu({ x: e.clientX, y: e.clientY, actions });
     },
-    [returnBundleToInbox, returnToProduction, onNavigateToTPV, onOpenProjectDetail, handleReleaseItem, mergeSplitItems, forecastDarkMode, onConvertReserveToForecast]
+    [returnBundleToInbox, returnToProduction, onNavigateToTPV, onOpenProjectDetail, handleReleaseItem, mergeSplitItems, mergeBundleSplitGroups, forecastDarkMode, onConvertReserveToForecast]
   );
 
   const handleItemContextMenu = useCallback(
