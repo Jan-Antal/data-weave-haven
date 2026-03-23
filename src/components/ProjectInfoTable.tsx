@@ -96,7 +96,7 @@ function singleStageMatches(
   if (personFilter && !(stage.pm && String(stage.pm).includes(personFilter))) return false;
   if (statusFilterSet && !matchesStatusFilter(stage.status, statusFilterSet)) return false;
   if (searchLower) {
-    const searchable = [stage.stage_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
+    const searchable = [stage.stage_name, stage.display_name, stage.pm, stage.status, stage.notes, stage.pm_poznamka];
     const found = searchable.some(v => normalizedIncludes(v, searchLower));
     if (!found) return false;
   }
