@@ -20,13 +20,21 @@ const PREFS = [
   { key: "qc_defect", label: "QC vada", desc: "Byla zaznamenaná vada kvality na projektu" },
   { key: "project_created", label: "Nový projekt", desc: "Byl vytvořen nebo přiřazen nový projekt" },
   { key: "daylog_missing", label: "Chybějící Day Log", desc: "Do 15:00 nebyl zaznamenán denní log výroby" },
+  { key: "konstrukter_assigned", label: "Priradenie prvku (Konštruktér)", desc: "Bol si priradený na prvky projektu" },
+  { key: "konstrukter_item_changed", label: "Zmena prvku (Konštruktér)", desc: "Status, počet alebo poznámka prvku bola zmenená" },
+  { key: "pm_assigned", label: "Priradenie projektu (PM)", desc: "Bol si priradený alebo odobraný z projektu" },
+  { key: "tpv_items_added", label: "Nové TPV položky (PM)", desc: "Boli pridané alebo odobrané položky z projektu" },
 ];
 
-const DEFAULT_PREFS = {
+const DEFAULT_PREFS: Record<string, boolean> = {
   project_changed: true,
   qc_defect: true,
   project_created: true,
   daylog_missing: true,
+  konstrukter_assigned: true,
+  konstrukter_item_changed: true,
+  pm_assigned: true,
+  tpv_items_added: true,
 };
 
 export function NotificationSettings({ open, onOpenChange }: NotificationSettingsProps) {

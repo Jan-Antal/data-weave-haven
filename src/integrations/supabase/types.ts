@@ -270,9 +270,11 @@ export type Database = {
         Row: {
           actor_initials: string | null
           actor_name: string | null
+          batch_key: string | null
           body: string | null
           created_at: string | null
           id: string
+          link_context: Json | null
           project_id: string | null
           read: boolean | null
           title: string
@@ -282,9 +284,11 @@ export type Database = {
         Insert: {
           actor_initials?: string | null
           actor_name?: string | null
+          batch_key?: string | null
           body?: string | null
           created_at?: string | null
           id?: string
+          link_context?: Json | null
           project_id?: string | null
           read?: boolean | null
           title: string
@@ -294,9 +298,11 @@ export type Database = {
         Update: {
           actor_initials?: string | null
           actor_name?: string | null
+          batch_key?: string | null
           body?: string | null
           created_at?: string | null
           id?: string
+          link_context?: Json | null
           project_id?: string | null
           read?: boolean | null
           title?: string
