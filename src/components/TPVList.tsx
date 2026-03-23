@@ -149,10 +149,11 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     [isColVisible, updateVisibility],
   );
 
-  // Always use TPV_LIST_COLUMNS definition order as source of truth
+  // Use saved display_order from DB, falling back to definition order
   const allVisibleKeys = useMemo(() => {
-    return TPV_LIST_ALL_KEYS.filter((k) => isColVisible(k));
-  }, [isColVisible]);
+    const visible = TPV_LIST_ALL_KEYS.filter((k) => isColVisible(k));
+    return getDisplayOrderedKeys(visible);
+  }, [isColVisible, getDisplayOrderedKeys]);
 
   const [editMode, setEditMode] = useState(false);
   const [localOrder, setLocalOrder] = useState<string[]>(allVisibleKeys);
