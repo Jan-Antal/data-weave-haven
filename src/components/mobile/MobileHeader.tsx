@@ -53,7 +53,14 @@ export function MobileHeader({ onDataLog, showDataLog = false, onCloseDataLog }:
           />
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setNotifOpen(true)}
+              onClick={() => {
+                if (onCloseDataLog) {
+                  onCloseDataLog();
+                  setTimeout(() => setNotifOpen(true), 150);
+                } else {
+                  setNotifOpen(true);
+                }
+              }}
               className="relative p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
               <Bell className="h-5 w-5" />
