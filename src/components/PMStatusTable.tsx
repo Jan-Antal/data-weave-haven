@@ -4,7 +4,8 @@ import { logActivity } from "@/lib/activityLog";
 import { useDataLogRowHighlight } from "@/hooks/useDataLogRowHighlight";
 import { useAllCustomColumns, useUpdateCustomField } from "@/hooks/useCustomColumns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { StatusBadge, RiskBadge } from "./StatusBadge";
+import { StatusBadge, RiskBadge, TPVStatusBadge } from "./StatusBadge";
+import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
 import { InlineEditableCell } from "./InlineEditableCell";
 import { SortableHeader } from "./SortableHeader";
 import { useProjects } from "@/hooks/useProjects";
@@ -85,6 +86,7 @@ interface StageRowProps {
   onDelete: (id: string) => void;
   isVisible: (key: string) => boolean;
   statusLabels: string[];
+  tpvStatusLabels: string[];
   canEdit: boolean;
   renderKeys: string[];
   cancelConfirm?: boolean;
@@ -94,13 +96,13 @@ interface StageRowProps {
   freshInheritedFields?: Set<string>;
 }
 
-function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys, cancelConfirm, onCancelConfirm, onCancelDismiss, dimmed, freshInheritedFields }: StageRowProps) {
+function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, tpvStatusLabels, canEdit, renderKeys, cancelConfirm, onCancelConfirm, onCancelDismiss, dimmed, freshInheritedFields }: StageRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
   const updateStage = useUpdateStage();
   const { isFieldReadOnly } = useAuth();
   const style = { transform: CSS.Transform.toString(transform), transition };
   const saveStage = useCallback((field: string, value: string) => {
-    const tracked = ["konstrukter", "status", "datum_smluvni"];
+    const tracked = ["konstrukter", "status", "status_vyroba", "datum_smluvni"];
     const newEditedFields = addEditedField(stage, field);
     updateStage.mutate({
       id: stage.id, field, value, projectId: project.project_id,
@@ -119,7 +121,14 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
     switch (key) {
       case "datum_smluvni": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "datum_smluvni")} type="date" onSave={(val) => saveStage("datum_smluvni", val)} readOnly={!canEdit || isFieldReadOnly("datum_smluvni", stage.datum_smluvni ?? null)} className={ihClass("datum_smluvni")} /></TableCell>;
       case "pm": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "pm")} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} className={ihClass("pm")} /></TableCell>;
-      case "status": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "status")} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={getStageDisplayValue(stage, project, "status") ? <StatusBadge status={getStageDisplayValue(stage, project, "status")} /> : "—"} readOnly={!canEdit} className={ihClass("status")} /></TableCell>;
+      case "status": return (
+        <TableCell key={key}>
+          <div className="flex items-center gap-1">
+            <InlineEditableCell value={getStageDisplayValue(stage, project, "status")} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={getStageDisplayValue(stage, project, "status") ? <StatusBadge status={getStageDisplayValue(stage, project, "status")} /> : "—"} readOnly={!canEdit} className={ihClass("status")} />
+            <InlineEditableCell value={(stage as any).status_vyroba ?? ""} type="select" options={tpvStatusLabels} onSave={(val) => saveStage("status_vyroba", val)} displayValue={(stage as any).status_vyroba ? <TPVStatusBadge status={(stage as any).status_vyroba} /> : null} readOnly={!canEdit} />
+          </div>
+        </TableCell>
+      );
       case "risk": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "risk")} type="select" options={["Low", "Medium", "High"]} onSave={(val) => saveStage("risk", val)} displayValue={<RiskBadge level={getStageDisplayValue(stage, project, "risk") || ""} />} readOnly={!canEdit} className={ihClass("risk")} /></TableCell>;
       case "zamereni": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "zamereni")} type="date" onSave={(val) => saveStage("zamereni", val)} readOnly={!canEdit} className={ihClass("zamereni")} /></TableCell>;
       case "tpv_date": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "tpv_date")} type="date" onSave={(val) => saveStage("tpv_date", val)} readOnly={!canEdit} className={ihClass("tpv_date")} /></TableCell>;
@@ -196,7 +205,7 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
 
 const MemoSortableStageRow = memo(SortableStageRow);
 
-function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, renderKeys, personFilter, statusFilterSet, searchLower, showAddButton = true, parentMatchesSearch = false }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[]; personFilter: string | null; statusFilterSet: Set<string> | null; searchLower: string | null; showAddButton?: boolean; parentMatchesSearch?: boolean }) {
+function StagesSection({ projectId, project, isVisible, statusLabels, tpvStatusLabels, canEdit, renderKeys, personFilter, statusFilterSet, searchLower, showAddButton = true, parentMatchesSearch = false }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; tpvStatusLabels: string[]; canEdit: boolean; renderKeys: string[]; personFilter: string | null; statusFilterSet: Set<string> | null; searchLower: string | null; showAddButton?: boolean; parentMatchesSearch?: boolean }) {
   const { data: stages = [] } = useProjectStages(projectId);
   const deleteStage = useDeleteStage();
   const reorderStages = useReorderStages();
@@ -322,6 +331,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
               onDelete={handleDelete}
               isVisible={isVisible}
               statusLabels={statusLabels}
+              tpvStatusLabels={tpvStatusLabels}
               canEdit={canEdit}
               renderKeys={renderKeys}
 
@@ -439,7 +449,9 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   useDataLogRowHighlight();
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
+  const { data: tpvStatusOptions = [] } = useTPVStatusOptions();
   const statusLabels = useMemo(() => statusOptions.map((s) => s.label), [statusOptions]);
+  const tpvStatusLabels = useMemo(() => tpvStatusOptions.map((s) => s.label), [tpvStatusOptions]);
   const updateProject = useUpdateProject();
   const { columns: customColumns } = useAllCustomColumns("projects");
   const updateCustomField = useUpdateCustomField();
@@ -732,6 +744,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                       project={p}
                       isVisible={v}
                       statusLabels={statusLabels}
+                      tpvStatusLabels={tpvStatusLabels}
                       canEdit={canEdit}
                       renderKeys={renderKeys}
                       personFilter={personFilter}
