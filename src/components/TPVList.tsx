@@ -1164,6 +1164,60 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           tpvItemCount={items.length}
         />
       )}
+
+      {/* Průvodka Warning Dialog */}
+      <Dialog open={!!pruvodkaWarning} onOpenChange={(open) => { if (!open) setPruvodkaWarning(null); }}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>⚠ Prvky nejsou schváleny</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm text-muted-foreground">
+              Následující prvky nejsou ve stavu Schváleno. Hrozí riziko změny ze strany klienta:
+            </p>
+            <div className="max-h-[240px] overflow-auto border rounded">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Kód prvku</TableHead>
+                    <TableHead>Název prvku</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pruvodkaWarning?.items.map((item) => (
+                    <TableRow key={item.id} className="bg-amber-50/50">
+                      <TableCell className="font-semibold text-xs">{item.item_name}</TableCell>
+                      <TableCell className="text-xs">{item.item_type || ""}</TableCell>
+                      <TableCell className="text-xs text-amber-600 font-medium">{item.status || "Bez statusu"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Průvodka bude vytisknuta i pro tyto prvky. Doporučujeme před tiskem získat schválení.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setPruvodkaWarning(null)}>
+              Zrušit
+            </Button>
+            <Button size="sm" onClick={() => pruvodkaWarning && openPruvodka(pruvodkaWarning.allItems)}>
+              Přesto tisknout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Průvodka PDF Preview */}
+      {pdfHtml && (
+        <PdfPreviewModal
+          html={pdfHtml}
+          tabLabel="Průvodka"
+          onClose={() => setPdfHtml(null)}
+        />
+      )}
     </div>
   );
 }
