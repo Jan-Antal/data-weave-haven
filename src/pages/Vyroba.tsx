@@ -1533,7 +1533,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     >
       {/* ═══ MOBILE HEADER ═══ */}
       {!embedded && isMobile && (
-        <MobileHeader onDataLog={() => setDataLogOpen(true)} showDataLog={isAdmin || role === "pm" || isOwner} onCloseDataLog={() => setDataLogOpen(false)} />
+        <MobileHeader onDataLog={() => setDataLogOpen(true)} showDataLog={isAdmin || role === "pm" || isOwner} isDataLogOpen={dataLogOpen} onCloseDataLog={() => setDataLogOpen(false)} />
       )}
       {/* Desktop header is rendered globally in App.tsx */}
 
