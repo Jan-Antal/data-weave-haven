@@ -24,6 +24,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 interface NotificationPanelProps {
   onClose: () => void;
+  mobile?: boolean;
 }
 
 export function NotificationPanel({ onClose }: NotificationPanelProps) {
