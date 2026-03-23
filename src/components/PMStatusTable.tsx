@@ -744,6 +744,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                       project={p}
                       isVisible={v}
                       statusLabels={statusLabels}
+                      tpvStatusLabels={tpvStatusLabels}
                       canEdit={canEdit}
                       renderKeys={renderKeys}
                       personFilter={personFilter}
