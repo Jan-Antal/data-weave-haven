@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { toast } from "@/hooks/use-toast";
 
 export interface InboxItem {
