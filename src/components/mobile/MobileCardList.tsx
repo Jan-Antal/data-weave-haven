@@ -40,6 +40,7 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
   const { data: projects = [], isLoading } = useProjects();
   const { stagesByProject } = useStagesByProject();
   const { profile, linkedPersonName } = useAuth();
+  const { data: statusOptions = [] } = useProjectStatusOptions();
   const pmName = linkedPersonName || null;
   const { urgencyMap } = useProjectAttention(pmName);
   const queryClient = useQueryClient();
