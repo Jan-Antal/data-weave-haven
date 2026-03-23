@@ -27,7 +27,9 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const { user, profile, role, signOut } = useAuth();
+  const { unreadCount } = useNotifications();
 
   return (
     <>
