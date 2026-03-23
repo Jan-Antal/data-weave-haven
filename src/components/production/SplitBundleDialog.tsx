@@ -88,26 +88,48 @@ export function SplitBundleDialog({
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      let changedItems = 0;
+      const toMove: BundleSplitItem[] = [];
+    const toSplit: BundleSplitItem[] = [];
 
-      for (const item of items) {
+    for (const item of items) {
+      const spillHours = Math.round(item.scheduled_hours * pct / 100);
+      if (spillHours <= 0) continue;
+      if (spillHours >= item.scheduled_hours) toMove.push(item);
+      else toSplit.push(item);
+    }
+
+    if (toMove.length > 0) {
+      await Promise.all(toMove.map(item =>
+        supabase.from("production_schedule").update({ scheduled_week: targetWeek }).eq("id", item.id)
+      ));
+    }
+
+    if (toSplit.length > 0) {
+      await Promise.all(toSplit.flatMap(item => {
         const spillHours = Math.round(item.scheduled_hours * pct / 100);
-        if (spillHours <= 0) continue;
-
-        if (spillHours >= item.scheduled_hours) {
-          const { error: moveErr } = await supabase
-            .from("production_schedule")
-            .update({ scheduled_week: targetWeek })
-            .eq("id", item.id);
-          if (moveErr) throw moveErr;
-          changedItems++;
-          continue;
-        }
-
         const keepHours = item.scheduled_hours - spillHours;
         const czkPerHour = item.scheduled_hours > 0 ? item.scheduled_czk / item.scheduled_hours : 550;
         const groupId = item.split_group_id || item.id;
         const cleanName = item.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
+        return [
+          supabase.from("production_schedule").update({
+            scheduled_hours: keepHours, scheduled_czk: keepHours * czkPerHour,
+            split_group_id: groupId, split_part: 1, split_total: 2,
+            item_name: `${cleanName} (1/2)`,
+          }).eq("id", item.id),
+          supabase.from("production_schedule").insert({
+            project_id: item.project_id, stage_id: item.stage_id,
+            item_name: `${cleanName} (2/2)`, item_code: item.item_code,
+            scheduled_week: targetWeek, scheduled_hours: spillHours,
+            scheduled_czk: spillHours * czkPerHour, position: 999,
+            status: "scheduled", created_by: user.id,
+            split_group_id: groupId, split_part: 2, split_total: 2,
+          }),
+        ];
+      }));
+    }
+
+    const changedItems = toMove.length + toSplit.length;
 
         const { error: updateErr } = await supabase
           .from("production_schedule")
