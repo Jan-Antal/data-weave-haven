@@ -1527,8 +1527,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     <div
       className={cn(
         "h-full flex flex-col overflow-hidden",
-        !embedded && isMobile && "pb-[72px]",
-        // Note: pb-[72px] is fine — the nav extends into safe area but buttons stay at 56px
+        !embedded && isMobile && "pb-14",
       )}
       style={{ background: "#f8f7f4" }}
     >
