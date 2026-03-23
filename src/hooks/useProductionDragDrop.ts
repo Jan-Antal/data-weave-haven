@@ -583,7 +583,7 @@ export function useProductionDragDrop() {
     }
   }, [invalidateAll, pushUndo]);
 
-  const mergeSplitItems = useCallback(async (splitGroupId: string, onlyInWeek?: string) => {
+  const mergeSplitItems = useCallback(async (splitGroupId: string, onlyInWeek?: string, silent?: boolean) => {
     try {
       const { data: allParts, error: fetchErr } = await supabase
         .from("production_schedule")
@@ -655,7 +655,7 @@ export function useProductionDragDrop() {
 
       // Store parts snapshot for undo — push undo FIRST, then invalidate
       const partsSnapshot = parts.map(p => ({ ...p }));
-      pushUndo({
+      if (!silent) pushUndo({
         page: "plan-vyroby",
         actionType: "merge_split",
         description: `${parts.length} částí spojeno → "${cleanName}"`,
@@ -693,9 +693,11 @@ export function useProductionDragDrop() {
         },
       });
 
-      qc.invalidateQueries({ queryKey: ["production-schedule"] });
-      qc.invalidateQueries({ queryKey: ["production-inbox"] });
-      qc.invalidateQueries({ queryKey: ["production-expedice"] });
+      if (!silent) {
+        qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        qc.invalidateQueries({ queryKey: ["production-inbox"] });
+        qc.invalidateQueries({ queryKey: ["production-expedice"] });
+      }
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
