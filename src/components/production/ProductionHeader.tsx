@@ -224,6 +224,8 @@ export function ProductionHeader({
               </Tooltip>
             )}
 
+            <NotificationBell />
+
             <AdminInboxButton />
 
             <DropdownMenu>
