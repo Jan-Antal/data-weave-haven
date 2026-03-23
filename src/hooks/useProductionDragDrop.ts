@@ -748,8 +748,6 @@ export function useProductionDragDrop() {
     mergeBundleSplitGroups,
   };
 }
-        .from("production_schedule")
-        .select("*")
         .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`)
         .order("split_part", { ascending: true });
       if (fetchErr) throw fetchErr;
