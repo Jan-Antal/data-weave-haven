@@ -11,6 +11,7 @@ const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
   pm: "Projektový manažer",
   konstrukter: "Konstruktér",
+  vyroba: "Výroba",
   viewer: "Čtenář",
   tester: "Tester",
 };
