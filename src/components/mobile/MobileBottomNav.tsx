@@ -81,7 +81,6 @@ export function MobileBottomNav({ onModuleChange, activeModule }: MobileBottomNa
           <span className="text-[10px] font-medium">Výroba</span>
         </button>
       )}
-      </div>
     </nav>,
     document.body
   );
