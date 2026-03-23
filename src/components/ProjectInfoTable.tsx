@@ -161,7 +161,14 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, t
       case "klient": return <TableCell key={key}><span className="text-xs">{project.klient || "—"}</span></TableCell>;
       case "kalkulant": return <TableCell key={key}><InlineEditableCell value={(stage as any).kalkulant} type="people" peopleRole="Kalkulant" onSave={(val) => saveStage("kalkulant", val)} readOnly={!canEdit} className={ihClass("kalkulant")} /></TableCell>;
       case "pm": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "pm")} type="people" peopleRole="PM" onSave={(val) => saveStage("pm", val)} readOnly={!canEdit} className={ihClass("pm")} /></TableCell>;
-      case "status": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "status")} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={getStageDisplayValue(stage, project, "status") ? <StatusBadge status={getStageDisplayValue(stage, project, "status")} /> : "—"} readOnly={!canEdit} className={ihClass("status")} /></TableCell>;
+      case "status": return (
+        <TableCell key={key}>
+          <div className="flex items-center gap-1">
+            <InlineEditableCell value={getStageDisplayValue(stage, project, "status")} type="select" options={statusLabels} onSave={(val) => saveStage("status", val)} displayValue={getStageDisplayValue(stage, project, "status") ? <StatusBadge status={getStageDisplayValue(stage, project, "status")} /> : "—"} readOnly={!canEdit} className={ihClass("status")} />
+            <InlineEditableCell value={(stage as any).status_vyroba ?? ""} type="select" options={tpvStatusLabels} onSave={(val) => saveStage("status_vyroba", val)} displayValue={(stage as any).status_vyroba ? <TPVStatusBadge status={(stage as any).status_vyroba} /> : null} readOnly={!canEdit} />
+          </div>
+        </TableCell>
+      );
       case "datum_smluvni": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "datum_smluvni")} type="date" onSave={(val) => saveStage("datum_smluvni", val)} readOnly={!canEdit || isFieldReadOnly("datum_smluvni", stage.datum_smluvni ?? null)} className={ihClass("datum_smluvni")} /></TableCell>;
       case "datum_objednavky": return <TableCell key={key}><InlineEditableCell value={getStageDisplayValue(stage, project, "start_date")} type="date" onSave={(val) => saveStage("start_date", val)} readOnly={!canEdit} className={ihClass("start_date")} /></TableCell>;
       case "prodejni_cena": {
