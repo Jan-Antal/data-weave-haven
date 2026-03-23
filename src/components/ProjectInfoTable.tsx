@@ -429,17 +429,17 @@ const ProjectRow = memo(function ProjectRow({
     <TableRow className="hover:bg-muted/50 transition-colors h-9" style={bgStyle} data-project-id={p.project_id}>
       {/* Col 1 — Icon slot */}
       <TableCell style={COL_ICON_STYLE} className="text-center px-0">
-        <span
-          className={cn(
-            "inline-flex items-center gap-0.5 text-[10px] cursor-pointer",
-            docCount !== undefined && docCount > 0 ? "text-[#223937]" : "text-[#99a5a3]"
-          )}
-          onClick={() => onEditProject(p)}
-          title={docFailed ? "Nepodařilo se načíst – klikněte pro ruční obnovení" : undefined}
+        <button
+          className="inline-flex items-center gap-0.5 cursor-pointer hover:opacity-80"
+          style={{ color: tpvCount > 0 ? "#223937" : "#99a5a3" }}
+          title={`TPV seznam (${tpvCount})`}
+          onClick={(e) => { e.stopPropagation(); onOpenTPVList(p.project_id, p.project_name); }}
         >
-          <Paperclip className="h-3 w-3" />
-          {docFailed ? "?" : docCount !== undefined ? docCount : "—"}
-        </span>
+          <List className="h-4 w-4" />
+          {tpvCount > 0 && (
+            <span className="text-[10px] text-muted-foreground">{tpvCount}</span>
+          )}
+        </button>
       </TableCell>
       {/* Col 2 — Chevron slot */}
       <TableCell style={COL_CHEVRON_STYLE} className="px-0 cursor-pointer" onClick={() => onToggleExpand(p.project_id)}>
