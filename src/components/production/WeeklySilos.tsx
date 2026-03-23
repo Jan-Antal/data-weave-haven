@@ -545,7 +545,10 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
         actions.push({
           label: `Spojit části (${mergeableSplitGroups.length} skupin)`, icon: "🔗",
           onClick: async () => {
-            for (const sgId of mergeableSplitGroups) await mergeSplitItems(sgId);
+            for (let i = 0; i < mergeableSplitGroups.length; i++) {
+              const isLast = i === mergeableSplitGroups.length - 1;
+              await mergeSplitItems(mergeableSplitGroups[i], undefined, !isLast);
+            }
           },
         });
       }

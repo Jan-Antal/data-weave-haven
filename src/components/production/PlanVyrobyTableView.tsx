@@ -900,7 +900,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     }
     const mergeableSplitGroups = Array.from(splitGroupIds).filter(sgId => bundle.items.filter(i => i.split_group_id === sgId && i.status !== "completed" && i.status !== "cancelled").length >= 2);
     if (mergeableSplitGroups.length > 0) {
-      actions.push({ label: `Spojit části (${mergeableSplitGroups.length} skupin)`, icon: "🔗", onClick: async () => { for (const sgId of mergeableSplitGroups) await mergeSplitItems(sgId); } });
+      actions.push({ label: `Spojit části (${mergeableSplitGroups.length} skupin)`, icon: "🔗", onClick: async () => { for (let i = 0; i < mergeableSplitGroups.length; i++) { const isLast = i === mergeableSplitGroups.length - 1; await mergeSplitItems(mergeableSplitGroups[i], undefined, !isLast); } } });
     }
     if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(projectId) });
     if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(projectId) });

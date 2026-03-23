@@ -583,7 +583,7 @@ export function useProductionDragDrop() {
     }
   }, [invalidateAll, pushUndo]);
 
-  const mergeSplitItems = useCallback(async (splitGroupId: string, onlyInWeek?: string) => {
+  const mergeSplitItems = useCallback(async (splitGroupId: string, onlyInWeek?: string, silent?: boolean) => {
     try {
       const { data: allParts, error: fetchErr } = await supabase
         .from("production_schedule")
