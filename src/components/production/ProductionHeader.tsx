@@ -248,7 +248,7 @@ export function ProductionHeader({
 
             <NotificationBell />
 
-            <AdminInboxButton />
+            
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
