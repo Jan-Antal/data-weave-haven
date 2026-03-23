@@ -86,6 +86,7 @@ interface StageRowProps {
   onDelete: (id: string) => void;
   isVisible: (key: string) => boolean;
   statusLabels: string[];
+  tpvStatusLabels: string[];
   canEdit: boolean;
   renderKeys: string[];
   cancelConfirm?: boolean;
