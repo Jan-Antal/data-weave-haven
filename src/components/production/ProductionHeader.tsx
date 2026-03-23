@@ -298,7 +298,7 @@ export function ProductionHeader({
                     <>
                       <DropdownMenuSeparator />
                       <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Zobrazit jako</div>
-                      {(["admin", "pm", "konstrukter", "viewer"] as const).map((r) => (
+                      {(["admin", "pm", "konstrukter", "vyroba", "viewer"] as const).map((r) => (
                         <DropdownMenuItem
                           key={r}
                           onClick={() => setSimulatedRole(r === "admin" ? null : r)}
