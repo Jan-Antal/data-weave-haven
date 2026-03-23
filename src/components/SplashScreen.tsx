@@ -61,7 +61,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
       <div
         style={{
           position: "absolute",
-          bottom: "calc(32px + env(safe-area-inset-bottom, 0px))",
+          bottom: 32,
           color: "#e07a2f",
           fontSize: 13,
           letterSpacing: 2,
