@@ -42,7 +42,7 @@ export function MobileBottomNav({ onModuleChange, activeModule }: MobileBottomNa
   return createPortal(
     <nav
       className="md:hidden fixed bottom-0 left-0 right-0 z-[100000] bg-primary pointer-events-auto flex items-center justify-around"
-      style={{ height: "calc(56px + 8px)", paddingBottom: "8px" }}
+      style={{ height: "calc(56px + 36px)", paddingBottom: "36px" }}
     >
       <button
         onClick={(e) => handleNav(e, "projekty")}
