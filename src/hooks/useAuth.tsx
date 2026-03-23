@@ -253,6 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     canManageExchangeRates,
     canManageStatuses,
     canAccessRecycleBin,
+    canManageProduction,
     isFieldReadOnly,
     defaultTab,
     simulatedRole,
