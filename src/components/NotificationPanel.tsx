@@ -47,7 +47,11 @@ export function NotificationPanel({ onClose, mobile = false }: NotificationPanel
 
   return (
     <>
-      <div className="w-full sm:w-[380px] bg-background border border-border rounded-xl shadow-lg overflow-hidden">
+      <div className={cn(
+        mobile
+          ? "w-full flex flex-col flex-1 overflow-hidden"
+          : "w-full sm:w-[380px] bg-background border border-border rounded-xl shadow-lg overflow-hidden"
+      )}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <span className="font-semibold text-sm">Notifikace</span>
