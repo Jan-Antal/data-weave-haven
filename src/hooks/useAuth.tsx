@@ -221,7 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Default tab for role
-  const defaultTab = isPM ? "pm-status" : isKonstrukter ? "tpv-status" : "project-info";
+  const defaultTab = isVyroba ? "vyroba" : isPM ? "pm-status" : isKonstrukter ? "tpv-status" : "project-info";
 
   const value: AuthContextType = {
     user,
