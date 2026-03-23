@@ -711,7 +711,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         )}
         <button
           onClick={handlePruvodka}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm border border-border hover:bg-muted transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm border border-border hover:bg-accent hover:text-accent-foreground hover:border-accent transition-colors"
           title="Tisk průvodky do výroby"
         >
           <Printer className="h-4 w-4" />
