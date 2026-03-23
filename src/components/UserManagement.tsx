@@ -37,10 +37,11 @@ const ROLE_LABELS: Record<AppRole, string> = {
   konstrukter: "Konstruktér",
   viewer: "Viewer",
   tester: "Tester",
+  vyroba: "Výroba",
 };
 
 // Roles assignable via dropdown (owner excluded — can only be set via transfer)
-const ASSIGNABLE_ROLES: AppRole[] = ["admin", "pm", "konstrukter", "viewer", "tester"];
+const ASSIGNABLE_ROLES: AppRole[] = ["admin", "pm", "konstrukter", "vyroba", "viewer", "tester"];
 
 interface Props {
   open: boolean;

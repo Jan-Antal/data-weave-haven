@@ -11,13 +11,13 @@ interface MobileBottomNavProps {
 }
 
 export function MobileBottomNav({ onModuleChange, activeModule }: MobileBottomNavProps) {
-  const { isAdmin, isOwner } = useAuth();
+  const { isAdmin, isOwner, isVyroba } = useAuth();
 
   const isProjectsActive = activeModule === "projekty";
   const isDashboardActive = activeModule === "prehled";
   const isVyrobaActive = activeModule === "vyroba";
 
-  const canAccessProduction = isAdmin || isOwner;
+  const canAccessProduction = isAdmin || isOwner || isVyroba;
 
   // Close DataLog panels on all modules when navigating via bottom nav
   const closeDataLog = () => {

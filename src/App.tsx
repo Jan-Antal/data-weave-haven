@@ -96,10 +96,10 @@ function PortraitLockOverlay() {
   );
 }
 
-/** Route guard for admin/owner-only pages */
+/** Route guard for admin/owner-only pages and vyroba role */
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAdmin, isOwner } = useAuth();
-  if (!isAdmin && !isOwner) return <Navigate to="/" replace />;
+  const { isAdmin, isOwner, isVyroba } = useAuth();
+  if (!isAdmin && !isOwner && !isVyroba) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 

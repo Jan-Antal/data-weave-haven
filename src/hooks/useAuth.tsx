@@ -4,7 +4,7 @@ import type { User, Session } from "@supabase/supabase-js";
 import { logLoginEvent, resetLoginTracking, hasLoginLoggedInCurrentTab } from "@/hooks/useLoginTracking";
 import { startSession, endSession, resetSessionTracking } from "@/hooks/useSessionTracking";
 
-export type AppRole = "owner" | "admin" | "pm" | "konstrukter" | "viewer" | "tester";
+export type AppRole = "owner" | "admin" | "pm" | "konstrukter" | "viewer" | "tester" | "vyroba";
 
 interface AuthContextType {
   user: User | null;
@@ -23,6 +23,7 @@ interface AuthContextType {
   isPM: boolean;
   isKonstrukter: boolean;
   isViewer: boolean;
+  isVyroba: boolean;
   canEdit: boolean;
   canCreateProject: boolean;
   canDeleteProject: boolean;
@@ -36,6 +37,7 @@ interface AuthContextType {
   canManageExchangeRates: boolean;
   canManageStatuses: boolean;
   canAccessRecycleBin: boolean;
+  canManageProduction: boolean;
   isFieldReadOnly: (field: string, currentValue?: string | null) => boolean;
   defaultTab: string;
   simulatedRole: AppRole | null;
@@ -180,9 +182,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isPM = effectiveRole === "pm";
   const isKonstrukter = effectiveRole === "konstrukter";
   const isViewer = effectiveRole === "viewer";
+  const isVyroba = effectiveRole === "vyroba";
 
   // Granular permissions — tester gets edit rights (scoped to test projects via RLS)
-  const canEdit = !isViewer;
+  const canEdit = !isViewer && !isVyroba;
   const canCreateProject = isAdmin || isPM || isTester;
   const canDeleteProject = isAdmin || isPM || isTester;
   const canManageTPV = isAdmin || isPM || isKonstrukter || isTester;
@@ -195,8 +198,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const canManageUsers = isAdmin;
   const canManagePeople = isAdmin || isPM || isKonstrukter;
   const canManageExchangeRates = isAdmin;
-  const canManageStatuses = isAdmin || isPM;
+  const canManageStatuses = isAdmin;
   const canAccessRecycleBin = isAdmin || isPM || isKonstrukter || isTester;
+  const canManageProduction = isAdmin || isPM || isKonstrukter || isVyroba;
 
   // Fields that are read-only for Konstruktér
   const konstrukterReadOnlyFields = new Set([
@@ -208,6 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isFieldReadOnly = (field: string, currentValue?: string | null): boolean => {
     if (isViewer) return true;
+    if (isVyroba) return true;
     if (isKonstrukter && konstrukterReadOnlyFields.has(field)) return true;
     if (isPM && pmReadOnlyFields.has(field)) return true;
     // PM can set datum_smluvni only when empty; once set it's read-only
@@ -216,7 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Default tab for role
-  const defaultTab = isPM ? "pm-status" : isKonstrukter ? "tpv-status" : "project-info";
+  const defaultTab = isVyroba ? "vyroba" : isPM ? "pm-status" : isKonstrukter ? "tpv-status" : "project-info";
 
   const value: AuthContextType = {
     user,
@@ -234,6 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isPM,
     isKonstrukter,
     isViewer,
+    isVyroba,
     canEdit,
     canCreateProject,
     canDeleteProject,
@@ -247,6 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     canManageExchangeRates,
     canManageStatuses,
     canAccessRecycleBin,
+    canManageProduction,
     isFieldReadOnly,
     defaultTab,
     simulatedRole,

@@ -25,6 +25,7 @@ const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
   pm: "PM",
   konstrukter: "Konstruktér",
+  vyroba: "Výroba",
   viewer: "Viewer",
 };
 
@@ -33,6 +34,7 @@ const ROLE_COLORS: Record<string, string> = {
   admin: "bg-blue-100 text-blue-800 border-blue-200",
   pm: "bg-green-100 text-green-800 border-green-200",
   konstrukter: "bg-amber-100 text-amber-800 border-amber-200",
+  vyroba: "bg-orange-100 text-orange-800 border-orange-200",
   viewer: "bg-gray-100 text-gray-700 border-gray-200",
 };
 

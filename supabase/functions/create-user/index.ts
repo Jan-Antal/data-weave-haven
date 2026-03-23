@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const VALID_ROLES = ["admin", "pm", "konstrukter", "viewer"];
+const VALID_ROLES = ["admin", "pm", "konstrukter", "vyroba", "viewer"];
 const PRODUCTION_ORIGIN = "https://projekty.am-interior.cz";
 
 Deno.serve(async (req) => {
