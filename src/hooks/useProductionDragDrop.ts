@@ -706,7 +706,7 @@ export function useProductionDragDrop() {
     }
   }, [invalidateAll, pushUndo, qc]);
 
-  const mergeBundleSplitGroups = useCallback(async (splitGroupIds: string[], onlyInWeek?: string) => {
+  const mergeBundleSplitGroups = useCallback(async (splitGroupIds: string[], onlyInWeek?: string, precedingUndo?: UndoEntry | null) => {
     const results: { undo: () => Promise<void>; redo: () => Promise<void>; partsCount: number; description: string }[] = [];
     for (const sgId of splitGroupIds) {
       const r = await mergeSplitItems(sgId, onlyInWeek, true);
@@ -715,15 +715,18 @@ export function useProductionDragDrop() {
     if (results.length === 0) return;
 
     const totalParts = results.reduce((s, r) => s + r.partsCount, 0);
+    const mergeDesc = `${totalParts} částí spojeno (${results.length} skupin)`;
     pushUndo({
       page: "plan-vyroby",
       actionType: "merge_split",
-      description: `${totalParts} částí spojeno (${results.length} skupin)`,
+      description: precedingUndo ? `${mergeDesc} + přesun` : mergeDesc,
       undo: async () => {
         for (const r of results) await r.undo();
+        if (precedingUndo) await precedingUndo.undo();
         invalidateAll();
       },
       redo: async () => {
+        if (precedingUndo) await precedingUndo.redo();
         for (const r of results) await r.redo();
         invalidateAll();
       },
