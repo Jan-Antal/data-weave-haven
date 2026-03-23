@@ -3,7 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
-import { LayoutDashboard, Factory, CalendarRange, Settings, Check, User, UserCog, LogOut, Undo2, Redo2, Clock } from "lucide-react";
+import { LayoutDashboard, Factory, CalendarRange, Settings, Check, User, UserCog, LogOut, Undo2, Redo2, Clock, Bell } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { NotificationPanel } from "@/components/NotificationPanel";
+import { useNotifications } from "@/hooks/useNotifications";
 import { AdminInboxButton } from "@/components/AdminInbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -60,6 +63,28 @@ function AnimatedTitle({ title }: { title: string }) {
     >
       {displayed}
     </span>
+  );
+}
+
+function NotificationBell() {
+  const { unreadCount } = useNotifications();
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="relative p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+          <Bell className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <span className="absolute top-0.5 right-0.5 flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-semibold px-1">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={8} className="p-0 w-auto border-0 shadow-none bg-transparent">
+        <NotificationPanel onClose={() => setOpen(false)} />
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -220,6 +245,8 @@ export function ProductionHeader({
                 <TooltipContent side="bottom">Data Log</TooltipContent>
               </Tooltip>
             )}
+
+            <NotificationBell />
 
             <AdminInboxButton />
 
