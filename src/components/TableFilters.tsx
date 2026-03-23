@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { TableSearchBar } from "./TableSearchBar";
 import { useAuth } from "@/hooks/useAuth";
 import { EMPTY_STATUS_FILTER_VALUE, getStatusFilterLabel, getStatusFilterOptionValues } from "@/lib/statusFilter";
+import { getHiddenByDefaultStatuses } from "@/lib/statusHelpers";
 
 interface TableFiltersProps {
   personFilter: string | null;
@@ -17,8 +18,6 @@ interface TableFiltersProps {
   statusFilter: string[];
   onStatusFilterChange: (values: string[]) => void;
 }
-
-const defaultHiddenStatuses = ["Dokončeno"];
 
 export function useTableFilters() {
   const { data: statusOptions = [] } = useProjectStatusOptions();
