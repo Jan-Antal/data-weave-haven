@@ -841,6 +841,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                       project={p}
                       isVisible={v}
                       statusLabels={statusLabels}
+                      tpvStatusLabels={tpvStatusLabels}
                       canEdit={canEdit}
                       renderKeys={renderKeys}
                       personFilter={personFilter}
