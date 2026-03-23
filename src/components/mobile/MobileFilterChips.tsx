@@ -11,20 +11,19 @@ interface MobileFilterChipsProps {
   onChipChange: (chip: string) => void;
 }
 
-const STATUS_CHIPS = [
-  { value: "Příprava", label: "Příprava" },
-  { value: "Engineering", label: "Engineering" },
-  { value: "Výroba IN", label: "Výroba IN" },
-  { value: "Expedice", label: "Expedice" },
-  { value: "Montáž", label: "Montáž" },
-  { value: "Fakturace", label: "Fakturace" },
-];
-
 export function MobileFilterChips({ activeChip, onChipChange }: MobileFilterChipsProps) {
   const { data: projects = [] } = useProjects();
   const { linkedPersonName } = useAuth();
+  const { data: statusOptions = [] } = useProjectStatusOptions();
   const pmName = linkedPersonName || null;
   const { urgencyMap } = useProjectAttention(pmName);
+
+  const STATUS_CHIPS = useMemo(() =>
+    statusOptions
+      .filter(s => !isTerminalStatus(s.label, statusOptions))
+      .map(s => ({ value: s.label, label: s.label })),
+    [statusOptions]
+  );
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {
