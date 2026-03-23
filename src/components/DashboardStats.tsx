@@ -32,7 +32,7 @@ const PIPELINE_STAGES: { statuses: string[]; label: string }[] = [
   { statuses: ["Reklamace"], label: "Reklamace" },
 ];
 
-const EXCLUDED_STATUSES = ["Fakturace", "Dokončeno", "On Hold"];
+// EXCLUDED_STATUSES now derived dynamically from statusOptions
 
 const PIPELINE_COLORS: Record<string, string> = {
   "Příprava": "#a7d9a2",
