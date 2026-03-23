@@ -74,7 +74,10 @@ export interface DashboardStatsProps {
 export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRiskHighlightChange, activeTab, onCollapsedChange }: DashboardStatsProps) {
   const { data: projects = [] } = useProjects();
   const { data: rates = [] } = useExchangeRates();
+  const { data: statusOptions = [] } = useProjectStatusOptions();
   const isMobile = useIsMobile();
+
+  const EXCLUDED_STATUSES = useMemo(() => getExcludedStatuses(statusOptions), [statusOptions]);
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
