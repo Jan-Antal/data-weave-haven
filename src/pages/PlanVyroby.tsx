@@ -1126,7 +1126,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
           style={{ borderColor: "hsl(var(--border))", color: "hsl(var(--foreground))" }}
         >
           {recalculating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span>⟳</span>}
-          Přepočítat hodiny
+          Přepočítat
         </button>
       )}
 
