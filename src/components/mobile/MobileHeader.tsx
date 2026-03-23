@@ -43,7 +43,7 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
             document.documentElement.style.setProperty('--mobile-header-height', `${h}px`);
           }
         }}
-        className="md:hidden border-b bg-primary px-4 pb-3 shrink-0 z-50"
+        className="md:hidden border-b bg-primary px-4 pb-3 shrink-0 z-[300]"
         style={{ paddingTop: "0px" }}
       >
         <div className="flex items-center justify-between">
@@ -76,7 +76,7 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
       </header>
 
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-        <SheetContent side="right" className="w-[280px] p-0" style={{ top: "var(--mobile-header-height, 56px)", height: "calc(100% - var(--mobile-header-height, 56px))" }}>
+        <SheetContent side="right" className="w-[280px] p-0" style={{ top: "var(--mobile-header-height, 56px)", height: "calc(100% - var(--mobile-header-height, 56px))", zIndex: 200 }}>
           <SheetTitle className="sr-only">Menu</SheetTitle>
           <div className="p-5 border-b border-border">
             <p className="font-medium text-sm text-foreground">{profile?.full_name || user?.email}</p>

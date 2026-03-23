@@ -45,6 +45,7 @@ import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { MobilePrehled } from "@/components/mobile/MobilePrehled";
 import { MobileTPVCardList } from "@/components/mobile/MobileTPVCardList";
 import { MobileDetailProjektSheet } from "@/components/mobile/MobileDetailProjektSheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useRecentlyOpened } from "@/hooks/useRecentlyOpened";
 import { useTPVItems, useAddTPVItem } from "@/hooks/useTPVItems";
 import { useProductionStatuses } from "@/hooks/useProductionStatuses";
@@ -268,7 +269,7 @@ const Index = () => {
       {/* Mobile Header */}
       {isMobile && (
         <MobileHeader
-          onDataLog={toggleDataLog}
+          onDataLog={() => setDataLogOpen(true)}
           showDataLog={canAccessSettings || realRole === "owner" || role === "pm"}
         />
       )}
@@ -361,11 +362,19 @@ const Index = () => {
                   handleMobileOpenTPV(p);
                 } : undefined}
               />
-              {/* Mobile DataLog full screen */}
-              <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
+              {/* Mobile DataLog as Sheet */}
+              <Sheet open={dataLogOpen} onOpenChange={(v) => {
                 setDataLogOpen(v);
                 try { localStorage.setItem("datalog-panel-index", String(v)); } catch {}
-              }} />
+              }}>
+                <SheetContent side="bottom" className="h-[85vh] p-0 rounded-t-xl" style={{ zIndex: 100 }}>
+                  <SheetTitle className="sr-only">Data Log</SheetTitle>
+                  <DataLogPanel open={dataLogOpen} onOpenChange={(v) => {
+                    setDataLogOpen(v);
+                    try { localStorage.setItem("datalog-panel-index", String(v)); } catch {}
+                  }} />
+                </SheetContent>
+              </Sheet>
             </main>
           </>
         ) : (
