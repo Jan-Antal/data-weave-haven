@@ -179,6 +179,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
   const { data: allProjects = [] } = useProjects();
+  const { data: statusOpts = [] } = useProjectStatusOptions();
+  const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts), [statusOpts]);
   const qc = useQueryClient();
   const getWeekCapacity = useWeekCapacityLookup();
 
