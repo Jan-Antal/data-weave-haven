@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { TableSearchBar } from "./TableSearchBar";
 import { useAuth } from "@/hooks/useAuth";
 import { EMPTY_STATUS_FILTER_VALUE, getStatusFilterLabel, getStatusFilterOptionValues } from "@/lib/statusFilter";
+import { getHiddenByDefaultStatuses } from "@/lib/statusHelpers";
 
 interface TableFiltersProps {
   personFilter: string | null;
@@ -17,8 +18,6 @@ interface TableFiltersProps {
   statusFilter: string[];
   onStatusFilterChange: (values: string[]) => void;
 }
-
-const defaultHiddenStatuses = ["Dokončeno"];
 
 export function useTableFilters() {
   const { data: statusOptions = [] } = useProjectStatusOptions();
@@ -32,8 +31,9 @@ export function useTableFilters() {
   // Initialize status filter once options are loaded
   useEffect(() => {
     if (statusOptions.length > 0 && !initialized) {
+      const hiddenStatuses = getHiddenByDefaultStatuses(statusOptions);
       const allLabels = getStatusFilterOptionValues(statusOptions.map((s) => s.label));
-      setStatusFilter(allLabels.filter((s) => s === EMPTY_STATUS_FILTER_VALUE || !defaultHiddenStatuses.includes(s)));
+      setStatusFilter(allLabels.filter((s) => s === EMPTY_STATUS_FILTER_VALUE || !hiddenStatuses.includes(s)));
       setInitialized(true);
     }
   }, [statusOptions, initialized]);

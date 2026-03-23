@@ -17,6 +17,8 @@ import { PauseItemDialog } from "./PauseItemDialog";
 import { CancelItemDialog } from "./CancelItemDialog";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 import { useProjects } from "@/hooks/useProjects";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
+import { getTerminalStatuses } from "@/lib/statusHelpers";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -177,6 +179,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
   const { data: allProjects = [] } = useProjects();
+  const { data: statusOpts = [] } = useProjectStatusOptions();
+  const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts), [statusOpts]);
   const qc = useQueryClient();
   const getWeekCapacity = useWeekCapacityLookup();
 
@@ -275,8 +279,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     let maxDate = new Date();
     for (const p of allProjects) {
       if (!p.is_active || p.deleted_at) continue;
-      const status = p.status?.toLowerCase();
-      if (status === "fakturace" || status === "dokončeno" || status === "expedice") continue;
+      if (terminalStatuses.has(p.status ?? "")) continue;
       const deadline = resolveDeadline(p);
       if (deadline && deadline.date.getTime() > maxDate.getTime()) {
         maxDate = deadline.date;
@@ -1189,6 +1192,8 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   searchMatchedProjectIds?: Set<string>;
   searchActive?: boolean;
 }) {
+  const { data: statusOpts2 = [] } = useProjectStatusOptions();
+  const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts2), [statusOpts2]);
   const [expanded, setExpanded] = useState(false);
   const color = getProjectColor(bundle.project_id);
   const completedCount = bundle.items.filter(i => i.status === "completed").length;
@@ -1220,7 +1225,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const expDate = deadlineInfo?.dateStr ?? null;
   const daysUntilExp = deadlineInfo?.days ?? null;
   const deadlineLabel = deadlineInfo?.label ?? "Exp";
-  const isProjectDone = ["Fakturace", "Dokonceno", "Dokončeno", "Expedice"].includes(project?.status ?? "");
+  const isProjectDone = terminalStatuses.has(project?.status ?? "");
   const expSeverity: "overdue" | "urgent" | null = (!isProjectDone && !allCompleted && daysUntilExp !== null)
     ? (daysUntilExp < 0 ? "overdue" : daysUntilExp <= 3 ? "urgent" : null)
     : null;

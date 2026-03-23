@@ -12,6 +12,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Search, X, ChevronDown, Check } from "lucide-react";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
+import { isTerminalStatus } from "@/lib/statusHelpers";
 
 interface MobileCardListProps {
   personFilter: string | null;
@@ -38,6 +40,7 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
   const { data: projects = [], isLoading } = useProjects();
   const { stagesByProject } = useStagesByProject();
   const { profile, linkedPersonName } = useAuth();
+  const { data: statusOptions = [] } = useProjectStatusOptions();
   const pmName = linkedPersonName || null;
   const { urgencyMap } = useProjectAttention(pmName);
   const queryClient = useQueryClient();
@@ -71,7 +74,7 @@ export function MobileCardList({ personFilter, statusFilter, search, riskHighlig
         if (pmName) filtered = projects.filter(p => p.pm === pmName);
         break;
       case "active":
-        filtered = projects.filter(p => p.status !== "Dokončeno");
+        filtered = projects.filter(p => !isTerminalStatus(p.status, statusOptions));
         break;
       case "everything":
         break;

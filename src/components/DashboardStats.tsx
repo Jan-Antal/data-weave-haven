@@ -6,6 +6,8 @@ import { matchesStatusFilter } from "@/lib/statusFilter";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ChevronUp, ChevronDown } from "lucide-react";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
+import { getExcludedStatuses } from "@/lib/statusHelpers";
 import {
   BarChart,
   Bar,
@@ -30,7 +32,7 @@ const PIPELINE_STAGES: { statuses: string[]; label: string }[] = [
   { statuses: ["Reklamace"], label: "Reklamace" },
 ];
 
-const EXCLUDED_STATUSES = ["Fakturace", "Dokončeno", "On Hold"];
+// EXCLUDED_STATUSES now derived dynamically from statusOptions
 
 const PIPELINE_COLORS: Record<string, string> = {
   "Příprava": "#a7d9a2",
@@ -72,7 +74,10 @@ export interface DashboardStatsProps {
 export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRiskHighlightChange, activeTab, onCollapsedChange }: DashboardStatsProps) {
   const { data: projects = [] } = useProjects();
   const { data: rates = [] } = useExchangeRates();
+  const { data: statusOptions = [] } = useProjectStatusOptions();
   const isMobile = useIsMobile();
+
+  const EXCLUDED_STATUSES = useMemo(() => getExcludedStatuses(statusOptions), [statusOptions]);
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -177,8 +182,8 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
   }, [projects, personFilter, statusFilter]);
 
   const activeProjects = useMemo(
-    () => filtered.filter((p) => !EXCLUDED_STATUSES.includes(p.status || "")),
-    [filtered]
+    () => filtered.filter((p) => !EXCLUDED_STATUSES.has(p.status || "")),
+    [filtered, EXCLUDED_STATUSES]
   );
 
   const activeCount = activeProjects.length;

@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { useProjects } from "@/hooks/useProjects";
 import { useProjectAttention } from "@/hooks/useProjectAttention";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
+import { isTerminalStatus } from "@/lib/statusHelpers";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
@@ -9,20 +11,19 @@ interface MobileFilterChipsProps {
   onChipChange: (chip: string) => void;
 }
 
-const STATUS_CHIPS = [
-  { value: "Příprava", label: "Příprava" },
-  { value: "Engineering", label: "Engineering" },
-  { value: "Výroba IN", label: "Výroba IN" },
-  { value: "Expedice", label: "Expedice" },
-  { value: "Montáž", label: "Montáž" },
-  { value: "Fakturace", label: "Fakturace" },
-];
-
 export function MobileFilterChips({ activeChip, onChipChange }: MobileFilterChipsProps) {
   const { data: projects = [] } = useProjects();
   const { linkedPersonName } = useAuth();
+  const { data: statusOptions = [] } = useProjectStatusOptions();
   const pmName = linkedPersonName || null;
   const { urgencyMap } = useProjectAttention(pmName);
+
+  const STATUS_CHIPS = useMemo(() =>
+    statusOptions
+      .filter(s => !isTerminalStatus(s.label, statusOptions))
+      .map(s => ({ value: s.label, label: s.label })),
+    [statusOptions]
+  );
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {
@@ -36,7 +37,7 @@ export function MobileFilterChips({ activeChip, onChipChange }: MobileFilterChip
       if (pmName && p.pm === pmName) c.mine++;
       const s = p.status;
       if (s) c[s] = (c[s] || 0) + 1;
-      if (s !== "Dokončeno") c.active++;
+      if (!isTerminalStatus(s, statusOptions)) c.active++;
     }
     return c;
   }, [projects, urgencyMap, pmName]);

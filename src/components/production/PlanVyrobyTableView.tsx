@@ -5,6 +5,8 @@ import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
 import { useProjects } from "@/hooks/useProjects";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
+import { getTerminalStatuses } from "@/lib/statusHelpers";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 import { getProjectColor } from "@/lib/projectColors";
 import { exportToExcel } from "@/lib/exportExcel";
@@ -146,6 +148,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   const { data: inboxProjects = [] } = useProductionInbox();
   const { data: settings } = useProductionSettings();
   const { data: allProjects = [] } = useProjects();
+  const { data: statusOpts = [] } = useProjectStatusOptions();
+  const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts), [statusOpts]);
   const getWeekCapacity = useWeekCapacityLookup();
   const { moveScheduleItemToWeek, moveItemBackToInbox, completeItems, moveInboxItemToWeek, returnBundleToInbox, returnToProduction, mergeSplitItems } = useProductionDragDrop();
   const qc = useQueryClient();
@@ -1326,7 +1330,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                             const pd = projectDateLookup.get(proj.projectId);
                             if (!pd) return null;
                             const allShipped = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
-                            const isProjectDone = ["Fakturace", "Dokonceno", "Dokončeno", "Expedice"].includes(pd?.status ?? "");
+                            const isProjectDone = terminalStatuses.has(pd?.status ?? "");
                             const fields: { label: string; value: string | null | undefined }[] = [
                               { label: "Exp", value: pd.expedice },
                               { label: "Mnt", value: pd.montaz },
@@ -1362,7 +1366,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                         const pd = projectDateLookup.get(proj.projectId);
                         const exp = pd?.expedice ? parseAppDate(pd.expedice) : null;
                         if (!exp) return null;
-                        const isProjectDone = ["Fakturace", "Dokonceno", "Dokončeno", "Expedice"].includes(pd?.status ?? "");
+                        const isProjectDone = terminalStatuses.has(pd?.status ?? "");
                         const allItemsDone = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
                         if (isProjectDone || allItemsDone) return null;
                         const days = differenceInDays(exp, new Date());

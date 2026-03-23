@@ -8,6 +8,7 @@ import { InlineEditableCell } from "./InlineEditableCell";
 import { CurrencyEditCell } from "./CurrencyEditCell";
 import { formatCurrency, formatMarze, marzeInputToStorage, marzeStorageToInput } from "@/lib/currency";
 import { getStageDisplayValue, stageFieldClass, buildInheritedStageData, getInheritedFieldKeys, addEditedField, EDITABLE_INHERITED, READ_ONLY_INHERITED } from "@/lib/stageInheritance";
+import { getDefaultStatus } from "@/lib/statusHelpers";
 import { StatusBadge, RiskBadge } from "./StatusBadge";
 import { SortableHeader } from "./SortableHeader";
 import { useProjects } from "@/hooks/useProjects";
@@ -486,7 +487,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   }, [projects]);
   const { counts: docCounts, failed: docFailed } = useDocumentCounts(allProjectIds, projectStatuses);
   const [addOpen, setAddOpen] = useState(false);
-  const [newProj, setNewProj] = useState({ ...emptyProject });
+  const [newProj, setNewProj] = useState({ ...emptyProject, status: getDefaultStatus(statusOptions) });
   const [datumWarning, setDatumWarning] = useState(false);
   const qc = useQueryClient();
   const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
@@ -708,7 +709,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
       logActivity({ projectId: newProj.project_id, actionType: "project_created", detail: newProj.project_name });
       qc.invalidateQueries({ queryKey: ["projects"] });
       setAddOpen(false);
-      setNewProj({ ...emptyProject });
+      setNewProj({ ...emptyProject, status: getDefaultStatus(statusOptions) });
       setDatumWarning(false);
     }
   };
