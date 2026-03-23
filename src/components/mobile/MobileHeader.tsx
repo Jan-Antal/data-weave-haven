@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Clock, Menu, UserCog, LogOut, BarChart3, Home, Bell } from "lucide-react";
+import { useSheetSwipeDismiss } from "@/hooks/useSheetSwipeDismiss";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
@@ -30,6 +31,8 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
   const [notifOpen, setNotifOpen] = useState(false);
   const { user, profile, role, signOut } = useAuth();
   const { unreadCount } = useNotifications();
+  const handleNotifDismiss = useCallback(() => setNotifOpen(false), []);
+  const notifSwipe = useSheetSwipeDismiss({ onDismiss: handleNotifDismiss });
 
   return (
     <>
@@ -119,12 +122,32 @@ export function MobileHeader({ onDataLog, showDataLog = false }: MobileHeaderPro
 
       <AccountSettings open={accountOpen} onOpenChange={setAccountOpen} />
 
-      <Sheet open={notifOpen} onOpenChange={setNotifOpen}>
-        <SheetContent side="bottom" className="p-0 rounded-t-xl max-h-[80vh]">
-          <SheetTitle className="sr-only">Notifikace</SheetTitle>
-          <NotificationPanel onClose={() => setNotifOpen(false)} />
-        </SheetContent>
-      </Sheet>
+      {notifOpen && (
+        <div className="fixed inset-0 z-[100001] flex flex-col bg-background">
+          {/* Swipe handle + header */}
+          <div
+            className="flex flex-col items-center pt-3 pb-2 border-b border-border shrink-0"
+            onTouchStart={notifSwipe.onTouchStart}
+            onTouchMove={notifSwipe.onTouchMove}
+            onTouchEnd={notifSwipe.onTouchEnd}
+          >
+            <div className="w-10 h-1 rounded-full bg-[#d0cdc8] mb-2" />
+            <div className="flex items-center justify-between w-full px-4">
+              <button
+                onClick={() => setNotifOpen(false)}
+                className="text-sm text-muted-foreground"
+              >
+                ← Zpět
+              </button>
+              <span className="font-semibold text-sm">Notifikace</span>
+              <div className="w-12" />
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto pb-14">
+            <NotificationPanel onClose={() => setNotifOpen(false)} />
+          </div>
+        </div>
+      )}
     </>
   );
 }
