@@ -44,7 +44,30 @@ export function useQualityDefects(projectId: string) {
       const { error } = await (supabase.from("production_quality_defects" as any) as any).insert(defect);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["quality-defects", projectId] }),
+    onSuccess: (_data, defect) => {
+      qc.invalidateQueries({ queryKey: ["quality-defects", projectId] });
+      // Fire-and-forget notification for QC defect
+      (async () => {
+        try {
+          const adminIds = await getUserIdsByRole(supabase, ["owner", "admin"]);
+          // Get project name
+          const { data: proj } = await supabase
+            .from("projects")
+            .select("project_name")
+            .eq("project_id", projectId)
+            .maybeSingle();
+          await createNotification(supabase, {
+            userIds: adminIds,
+            type: "qc_defect",
+            title: `⚠ QC vada: ${proj?.project_name || projectId}`,
+            body: defect.description,
+            projectId,
+            actorName: profile?.full_name || "",
+            excludeUserId: user?.id,
+          });
+        } catch {}
+      })();
+    },
   });
 
   const resolveDefect = useMutation({
