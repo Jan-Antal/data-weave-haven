@@ -131,53 +131,6 @@ export function SplitBundleDialog({
 
     const changedItems = toMove.length + toSplit.length;
 
-        const { error: updateErr } = await supabase
-          .from("production_schedule")
-          .update({
-            scheduled_hours: keepHours,
-            scheduled_czk: keepHours * czkPerHour,
-            split_group_id: groupId,
-          })
-          .eq("id", item.id);
-        if (updateErr) throw updateErr;
-
-        const { error: insertErr } = await supabase.from("production_schedule").insert({
-          project_id: item.project_id,
-          stage_id: item.stage_id,
-          item_name: cleanName,
-          item_code: item.item_code,
-          scheduled_week: targetWeek,
-          scheduled_hours: spillHours,
-          scheduled_czk: spillHours * czkPerHour,
-          position: 999,
-          status: "scheduled",
-          created_by: user.id,
-          split_group_id: groupId,
-        });
-        if (insertErr) throw insertErr;
-
-        await renumberSiblings(groupId);
-
-        const { data: allParts, error: partsErr } = await supabase
-          .from("production_schedule")
-          .select("id, split_part, split_total")
-          .or(`split_group_id.eq.${groupId},id.eq.${groupId}`)
-          .order("scheduled_week", { ascending: true });
-        if (partsErr) throw partsErr;
-
-        if (allParts) {
-          for (const p of allParts) {
-            const { error: nameErr } = await supabase
-              .from("production_schedule")
-              .update({ item_name: `${cleanName} (${p.split_part}/${p.split_total})` })
-              .eq("id", p.id);
-            if (nameErr) throw nameErr;
-          }
-        }
-
-        changedItems++;
-      }
-
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
       qc.invalidateQueries({ queryKey: ["production-expedice"] });
