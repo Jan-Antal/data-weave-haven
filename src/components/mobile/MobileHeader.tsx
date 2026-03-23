@@ -138,7 +138,7 @@ export function MobileHeader({ onDataLog, showDataLog = false, onCloseDataLog }:
 
       <AccountSettings open={accountOpen} onOpenChange={setAccountOpen} />
 
-      <Sheet open={notifOpen} onOpenChange={setNotifOpen}>
+      <Sheet open={notifOpen} onOpenChange={setNotifOpen} modal={false}>
         <SheetContent
           side="bottom"
           className="p-0 flex flex-col rounded-t-2xl"
