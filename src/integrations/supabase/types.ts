@@ -759,7 +759,6 @@ export type Database = {
           stage_order: number | null
           start_date: string | null
           status: string | null
-          status_vyroba: string | null
           tpv_date: string | null
           updated_at: string
           van_date: string | null
@@ -794,7 +793,6 @@ export type Database = {
           stage_order?: number | null
           start_date?: string | null
           status?: string | null
-          status_vyroba?: string | null
           tpv_date?: string | null
           updated_at?: string
           van_date?: string | null
@@ -829,7 +827,6 @@ export type Database = {
           stage_order?: number | null
           start_date?: string | null
           status?: string | null
-          status_vyroba?: string | null
           tpv_date?: string | null
           updated_at?: string
           van_date?: string | null

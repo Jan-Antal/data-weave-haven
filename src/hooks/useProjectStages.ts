@@ -37,8 +37,8 @@ export function useUpdateStage() {
       if (field === "konstrukter" && String(value) !== String(oldValue ?? "")) {
         logActivity({ projectId, actionType: "stage_konstrukter_change", oldValue: oldValue || "—", newValue: String(value) || "—", detail: stageName || null });
       }
-      if ((field === "status" || field === "status_vyroba") && String(value) !== String(oldValue ?? "")) {
-        logActivity({ projectId, actionType: field === "status_vyroba" ? "stage_status_vyroba_change" : "stage_status_change", oldValue: oldValue || "—", newValue: String(value) || "—", detail: stageName || null });
+      if (field === "status" && String(value) !== String(oldValue ?? "")) {
+        logActivity({ projectId, actionType: "stage_status_change", oldValue: oldValue || "—", newValue: String(value) || "—", detail: stageName || null });
       }
       if (field === "datum_smluvni" && String(value) !== String(oldValue ?? "")) {
         const fmtOld = oldValue ? (parseAppDate(oldValue) ? formatAppDate(parseAppDate(oldValue)!) : oldValue) : "—";
