@@ -239,6 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isPM,
     isKonstrukter,
     isViewer,
+    isVyroba,
     canEdit,
     canCreateProject,
     canDeleteProject,
