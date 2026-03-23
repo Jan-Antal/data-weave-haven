@@ -27,7 +27,7 @@ interface NotificationPanelProps {
   mobile?: boolean;
 }
 
-export function NotificationPanel({ onClose }: NotificationPanelProps) {
+export function NotificationPanel({ onClose, mobile = false }: NotificationPanelProps) {
   const navigate = useNavigate();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [settingsOpen, setSettingsOpen] = useState(false);
