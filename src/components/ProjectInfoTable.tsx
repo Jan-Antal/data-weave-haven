@@ -480,6 +480,8 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
   const statusLabels = useMemo(() => statusOptions.map((s) => s.label), [statusOptions]);
+  const { data: tpvStatusOptions = [] } = useTPVStatusOptions();
+  const tpvStatusLabels = useMemo(() => tpvStatusOptions.map((s) => s.label), [tpvStatusOptions]);
   const statusOrderMap = useMemo(() => {
     const map = new Map<string, number>();
     statusOptions.forEach((s, i) => map.set(s.label, s.sort_order ?? i));
