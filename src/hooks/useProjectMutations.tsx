@@ -122,6 +122,45 @@ export function useUpdateProject() {
       });
 
       toast({ title: "Uloženo", duration: 2000 });
+
+      // Send notifications for key field changes (fire-and-forget)
+      const NOTIFY_FIELDS = ["status", "prodejni_cena", "datum_smluvni"];
+      if (NOTIFY_FIELDS.includes(field) && value !== oldValue) {
+        (async () => {
+          try {
+            const adminIds = await getUserIdsByRole(supabase, ["owner", "admin"]);
+            const pmName = updatedProject?.pm;
+            let pmUserIds: string[] = [];
+            if (pmName) {
+              // Find PM's user_id via profiles + people link
+              const { data: pmProfiles } = await supabase
+                .from("profiles")
+                .select("id, person_id")
+                .not("person_id", "is", null);
+              if (pmProfiles) {
+                const { data: people } = await supabase
+                  .from("people")
+                  .select("id, name")
+                  .eq("name", pmName);
+                const personIds = (people || []).map((p: any) => p.id);
+                pmUserIds = (pmProfiles as any[])
+                  .filter((p: any) => personIds.includes(p.person_id))
+                  .map((p: any) => p.id);
+              }
+            }
+            const allIds = [...adminIds, ...pmUserIds];
+            await createNotification(supabase, {
+              userIds: allIds,
+              type: "project_changed",
+              title: `Projekt upraven: ${updatedProject?.project_name || ""}`,
+              body: `Změna pole ${field}: "${oldValue || "—"}" → "${value || "—"}"`,
+              projectId: updatedProject?.project_id,
+              actorName: profile?.full_name || "",
+              excludeUserId: user?.id,
+            });
+          } catch {}
+        })();
+      }
     },
     onError: () => {
       toast({ title: "Chyba", description: "Nepodařilo se uložit změnu", variant: "destructive" });
