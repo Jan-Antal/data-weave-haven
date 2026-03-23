@@ -14,20 +14,6 @@ export interface DailyLog {
 }
 
 export function useProductionDailyLogs(weekKey: string) {
-  const qc = useQueryClient();
-
-  useEffect(() => {
-    const channel = supabase
-      .channel(`daily-logs-${weekKey}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "production_daily_logs" }, () => {
-        qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [qc, weekKey]);
-
   return useQuery({
     queryKey: ["production-daily-logs", weekKey],
     staleTime: 60_000,

@@ -11,6 +11,8 @@ export function useProjects() {
 
   return useQuery({
     queryKey: ["projects", isTester],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       let query = supabase
         .from("projects")

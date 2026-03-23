@@ -26,6 +26,8 @@ export interface InboxProject {
 export function useProductionInbox() {
   return useQuery({
     queryKey: ["production-inbox"],
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("production_inbox")

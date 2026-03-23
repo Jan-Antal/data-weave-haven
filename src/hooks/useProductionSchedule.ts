@@ -114,19 +114,9 @@ export function useProductionSchedule() {
 }
 
 export function useProductionExpedice() {
-  const qc = useQueryClient();
-
-  useEffect(() => {
-    const channel = supabase
-      .channel("production-expedice-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "production_schedule" }, () => {
-        qc.invalidateQueries({ queryKey: ["production-expedice"] });
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [qc]);
-
   return useQuery({
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
     queryKey: ["production-expedice"],
     queryFn: async () => {
       const { data, error } = await supabase

@@ -37,29 +37,7 @@ export function useNotifications() {
     },
   });
 
-  // Realtime subscription — listen for INSERT and UPDATE (batch updates)
-  useEffect(() => {
-    if (!user) return;
-    const channel = supabase
-      .channel("notifications-realtime")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-          qc.invalidateQueries({ queryKey: ["notifications", user.id] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id, qc]);
+  // Realtime handled by global useRealtimeSync — no duplicate channel needed
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
