@@ -275,8 +275,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     let maxDate = new Date();
     for (const p of allProjects) {
       if (!p.is_active || p.deleted_at) continue;
-      const status = p.status?.toLowerCase();
-      if (status === "fakturace" || status === "dokončeno" || status === "expedice") continue;
+      if (terminalStatuses.has(p.status ?? "")) continue;
       const deadline = resolveDeadline(p);
       if (deadline && deadline.date.getTime() > maxDate.getTime()) {
         maxDate = deadline.date;
