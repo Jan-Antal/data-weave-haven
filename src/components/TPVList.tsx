@@ -102,7 +102,7 @@ interface Props {
 }
 
 export function TPVList({ projectId, projectName, currency = "CZK", onBack, autoOpenImport }: Props) {
-  const { canManageTPV, canEdit, canEditColumns } = useAuth();
+  const { canManageTPV, canEdit, canEditColumns, profile } = useAuth();
   const { data: items = [], isLoading } = useTPVItems(projectId);
   const { data: statusOptions = [] } = useTPVStatusOptions();
   const TPV_STATUSES = statusOptions.map((o) => o.label);
