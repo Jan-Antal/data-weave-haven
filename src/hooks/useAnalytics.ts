@@ -160,7 +160,9 @@ export function useAnalytics() {
       // Also compute project-level plan for projects that have prodejni_cena but no TPV items
       for (const [pid, proj] of projectsDetailMap) {
         if (!projectPlanMap.has(pid)) {
-          const projCena = proj.prodejni_cena ? Number(proj.prodejni_cena) : 0;
+          const projCenaRaw = proj.prodejni_cena ? Number(proj.prodejni_cena) : 0;
+          const projIsEur = proj.currency === "EUR";
+          const projCena = projIsEur ? projCenaRaw * eurToCzk : projCenaRaw;
           if (projCena > 0) {
             const preset = proj.cost_preset_id
               ? presets.find((p) => p.id === proj.cost_preset_id)
