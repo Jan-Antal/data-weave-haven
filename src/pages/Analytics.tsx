@@ -140,6 +140,9 @@ export default function Analytics() {
           case "status":
             cmp = (a.status || "").localeCompare(b.status || "", "cs");
             break;
+          case "preset_label":
+            cmp = a.preset_label.localeCompare(b.preset_label, "cs");
+            break;
           case "hodiny_plan":
             cmp = (a.hodiny_plan ?? -1) - (b.hodiny_plan ?? -1);
             break;
