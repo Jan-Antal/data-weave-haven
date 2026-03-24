@@ -1,8 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
-import { AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -13,6 +13,9 @@ import { useProjects } from "@/hooks/useProjects";
 import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
 import { ColumnVisibilityToggle } from "@/components/ColumnVisibilityToggle";
 import { useColumnVisibility, type ColumnDef } from "@/hooks/useColumnVisibility";
+import { useColumnLabels } from "@/hooks/useColumnLabels";
+import { useAuth } from "@/hooks/useAuth";
+import { SortableHeader } from "@/components/SortableHeader";
 import { TableSearchBar } from "@/components/TableSearchBar";
 import { cn } from "@/lib/utils";
 import { normalizeSearch, normalizedIncludes } from "@/lib/statusFilter";
@@ -49,28 +52,7 @@ const ANALYTICS_COLUMNS: ColumnDef[] = [
 ];
 
 const ANALYTICS_DEFAULT_HIDDEN: string[] = [];
-
-function SortIcon({ column, sortCol, sortDir }: { column: string; sortCol: string | null; sortDir: SortDir }) {
-  if (sortCol !== column) return <ArrowUpDown className="h-3 w-3 text-muted-foreground/50" />;
-  return sortDir === "asc"
-    ? <ArrowUp className="h-3 w-3 text-primary" />
-    : <ArrowDown className="h-3 w-3 text-primary" />;
-}
-
-const SORTABLE_KEYS = new Set<string>(["project_id", "project_name", "pm", "status", "hodiny_plan", "hodiny_skutocne", "pct", "zostatok"]);
-
-const COL_CLASS: Record<string, string> = {
-  project_id: "w-28",
-  project_name: "",
-  pm: "w-24",
-  status: "w-28",
-  balik: "w-20",
-  hodiny_plan: "w-20 text-right",
-  hodiny_skutocne: "w-24 text-right",
-  pct: "w-40",
-  zostatok: "w-24 text-right",
-  tracking: "w-28",
-};
+const ANALYTICS_LABEL_MAP: Record<string, string> = Object.fromEntries(ANALYTICS_COLUMNS.map((c) => [c.key, c.label]));
 
 export default function Analytics() {
   const { data, isLoading } = useAnalytics();
@@ -82,12 +64,23 @@ export default function Analytics() {
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
   const [recalculating, setRecalculating] = useState(false);
   const queryClient = useQueryClient();
+  const [editMode, setEditMode] = useState(false);
+  const { canEditColumns } = useAuth();
+  const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("analytics");
 
   const { isVisible, toggleColumn } = useColumnVisibility(
     "analytics-columns",
     ANALYTICS_COLUMNS,
     ANALYTICS_DEFAULT_HIDDEN
   );
+
+  const handleToggleEditMode = useCallback(() => {
+    setEditMode((prev) => !prev);
+  }, []);
+
+  const handleCancelEditMode = useCallback(() => {
+    setEditMode(false);
+  }, []);
 
   const handleRecalculate = useCallback(async () => {
     setRecalculating(true);
@@ -181,6 +174,10 @@ export default function Analytics() {
     [isVisible]
   );
 
+  const allCurrentLabels = useMemo(() => {
+    return visibleCols.map((c) => getLabel(c.key, ANALYTICS_LABEL_MAP[c.key] || c.label));
+  }, [visibleCols, getLabel]);
+
   return (
     <div className="h-full flex flex-col overflow-hidden bg-background">
       {/* Filter row */}
@@ -254,25 +251,31 @@ export default function Analytics() {
 
       {/* Table — same wrapper as PMStatusTable */}
       <div className="flex-1 min-h-0 px-4 pb-4">
-        <div className="rounded-lg border bg-card flex flex-col h-full">
+        {editMode && (
+          <div className="bg-accent/10 border border-accent/30 text-accent text-xs font-medium px-3 py-1.5 rounded-t-lg shrink-0">
+            Režim úpravy sloupců
+          </div>
+        )}
+        <div className={cn("rounded-lg border bg-card flex flex-col h-full", editMode && "rounded-t-none border-t-0")}>
           <div className="flex-1 overflow-auto always-scrollbar rounded-t-lg">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow className="bg-primary/5">
                   {visibleCols.map((col) => (
-                    <TableHead key={col.key} className={cn("text-xs", COL_CLASS[col.key])}>
-                      {SORTABLE_KEYS.has(col.key) ? (
-                        <button
-                          onClick={() => toggleSort(col.key)}
-                          className="inline-flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer"
-                        >
-                          {col.label}
-                          <SortIcon column={col.key} sortCol={sortCol} sortDir={sortDir} />
-                        </button>
-                      ) : (
-                        col.label
-                      )}
-                    </TableHead>
+                    <SortableHeader
+                      key={col.key}
+                      label={getLabel(col.key, ANALYTICS_LABEL_MAP[col.key] || col.label)}
+                      column={col.key}
+                      sortCol={sortCol}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      editMode={editMode}
+                      customLabel={getLabel(col.key, ANALYTICS_LABEL_MAP[col.key] || col.label)}
+                      onLabelChange={(newLabel) => updateLabel(col.key, newLabel)}
+                      onWidthChange={(newWidth) => updateWidth(col.key, newWidth)}
+                      existingLabels={allCurrentLabels}
+                      style={getWidth(col.key) ? { width: getWidth(col.key)! } : undefined}
+                    />
                   ))}
                   <ColumnVisibilityToggle
                     standalone
@@ -281,6 +284,9 @@ export default function Analytics() {
                     labelTab="analytics"
                     isVisible={isVisible}
                     toggleColumn={toggleColumn}
+                    editMode={editMode}
+                    onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined}
+                    onCancelEditMode={canEditColumns ? handleCancelEditMode : undefined}
                   />
                 </TableRow>
               </TableHeader>
