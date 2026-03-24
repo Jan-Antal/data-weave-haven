@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
-import { AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,8 +13,13 @@ import { useProjects } from "@/hooks/useProjects";
 import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
 import { ColumnVisibilityToggle } from "@/components/ColumnVisibilityToggle";
 import { useColumnVisibility, type ColumnDef } from "@/hooks/useColumnVisibility";
+import { TableSearchBar } from "@/components/TableSearchBar";
 import { cn } from "@/lib/utils";
 import { normalizeSearch, normalizedIncludes } from "@/lib/statusFilter";
+import { supabase } from "@/integrations/supabase/client";
+import { recalculateProductionHours } from "@/lib/recalculateProductionHours";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 function formatHours(n: number | null): string {
   if (n == null) return "—";
