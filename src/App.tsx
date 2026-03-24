@@ -113,9 +113,11 @@ function PersistentDesktopHeader() {
       ? "plan-vyroby"
       : location.pathname === "/vyroba"
         ? "vyroba"
-        : location.pathname === "/"
-          ? "index"
-          : null;
+        : location.pathname === "/analytics"
+          ? "analytics"
+          : location.pathname === "/"
+            ? "index"
+            : null;
 
   useEffect(() => {
     const handler = (event: Event) => {
