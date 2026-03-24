@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAnalytics, type Balik } from "@/hooks/useAnalytics";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useProjects } from "@/hooks/useProjects";
 import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
 import { cn } from "@/lib/utils";
@@ -212,7 +213,26 @@ export default function Analytics() {
                       <BalikBadge balik={r.balik} />
                     </TableCell>
                     <TableCell className="text-right text-xs tabular-nums">
-                      {r.hodiny_plan != null ? Math.round(r.hodiny_plan) : "—"}
+                      <div className="flex items-center justify-end gap-1">
+                        {r.hodiny_plan != null ? Math.round(r.hodiny_plan) : "—"}
+                        {r.plan_source && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className={cn(
+                                  "text-[9px] font-medium px-1 rounded",
+                                  r.plan_source === "TPV" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                )}>
+                                  {r.plan_source === "TPV" ? "T" : "P"}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {r.plan_source === "TPV" ? "Počítáno z TPV položek" : "Počítáno z prodejní ceny projektu"}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right text-xs tabular-nums font-medium">
                       {Math.round(r.hodiny_skutocne)}

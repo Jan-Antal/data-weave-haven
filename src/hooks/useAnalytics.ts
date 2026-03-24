@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 export type Balik = "DONE" | "IN_PROGRESS" | "OVER";
 export type Trend = "ok" | "warning" | "over";
 
+export type PlanSource = "TPV" | "Projekt" | null;
+
 export interface AnalyticsRow {
   project_id: string;
   project_name: string;
@@ -17,6 +19,7 @@ export interface AnalyticsRow {
   trend: Trend | null;
   tracking_od: string | null;
   tracking_do: string | null;
+  plan_source: PlanSource;
 }
 
 export interface AnalyticsSummary {
@@ -47,7 +50,7 @@ export function useAnalytics() {
           .select("ami_project_id, project_name, status, pm, hodiny_skutocne, datum_sync"),
         supabase
           .from("projects")
-          .select("project_id, project_name, status, pm, marze, cost_production_pct, cost_preset_id")
+          .select("project_id, project_name, status, pm, marze, cost_production_pct, cost_preset_id, prodejni_cena")
           .is("deleted_at", null),
         supabase
           .from("tpv_items")
@@ -80,7 +83,7 @@ export function useAnalytics() {
       }
 
       // Build projects lookup (need marze, cost_production_pct, cost_preset_id)
-      const projectsDetailMap = new Map<string, { project_name: string; status: string | null; pm: string | null; marze: string | null; cost_production_pct: number | null; cost_preset_id: string | null }>();
+      const projectsDetailMap = new Map<string, { project_name: string; status: string | null; pm: string | null; marze: string | null; cost_production_pct: number | null; cost_preset_id: string | null; prodejni_cena: number | null }>();
       if (projectsRes.data) {
         for (const p of projectsRes.data) {
           projectsDetailMap.set(p.project_id, {
@@ -90,14 +93,19 @@ export function useAnalytics() {
             marze: p.marze,
             cost_production_pct: p.cost_production_pct,
             cost_preset_id: p.cost_preset_id,
+            prodejni_cena: p.prodejni_cena,
           });
         }
       }
 
-      // Compute tpv-based plan hours per project
+      // Compute plan hours per project with dual calculation + 35% threshold
+      // tpvPlanMap = from individual items, projectPlanMap = from prodejni_cena
       const tpvPlanMap = new Map<string, number>();
+      const projectPlanMap = new Map<string, number>();
+      // planSourceMap tracks which source was used: "TPV" | "Projekt"
+      const planSourceMap = new Map<string, PlanSource>();
+
       if (tpvRes.data) {
-        // Group tpv items by project_id, skip cancelled
         const tpvByProject = new Map<string, typeof tpvRes.data>();
         for (const item of tpvRes.data) {
           if (item.status === "Zrušeno") continue;
@@ -116,22 +124,75 @@ export function useAnalytics() {
             : (preset?.production_pct ?? 30) / 100;
           const marze = proj?.marze ? Number(proj.marze) / 100 : 0;
 
-          let total = 0;
+          // Sum from individual items that have cena
+          let totalFromItems = 0;
+          let hasAnyPrice = false;
           for (const item of items) {
-            const czk = (Number(item.cena) || 0) * (Number(item.pocet) || 1);
-            total += czk > 0 ? Math.floor((czk * (1 - marze) * prodPct) / hourlyRate) : 0;
+            const cena = Number(item.cena) || 0;
+            if (cena > 0) hasAnyPrice = true;
+            const czk = cena * (Number(item.pocet) || 1);
+            totalFromItems += czk > 0 ? Math.floor((czk * (1 - marze) * prodPct) / hourlyRate) : 0;
           }
-          if (total > 0) tpvPlanMap.set(pid, total);
+
+          if (hasAnyPrice && totalFromItems > 0) {
+            tpvPlanMap.set(pid, totalFromItems);
+          }
+
+          // Compute from project's prodejni_cena
+          const projCena = proj?.prodejni_cena ? Number(proj.prodejni_cena) : 0;
+          if (projCena > 0) {
+            const fromProject = Math.floor((projCena * (1 - marze) * prodPct) / hourlyRate);
+            if (fromProject > 0) projectPlanMap.set(pid, fromProject);
+          }
         }
       }
 
-      // Resolve hodiny_plan: tpv primary, fallback to schedule+inbox
-      function getPlanHours(pid: string): number | null {
-        const tpv = tpvPlanMap.get(pid);
-        if (tpv != null && tpv > 0) return tpv;
+      // Also compute project-level plan for projects that have prodejni_cena but no TPV items
+      for (const [pid, proj] of projectsDetailMap) {
+        if (!projectPlanMap.has(pid)) {
+          const projCena = proj.prodejni_cena ? Number(proj.prodejni_cena) : 0;
+          if (projCena > 0) {
+            const preset = proj.cost_preset_id
+              ? presets.find((p) => p.id === proj.cost_preset_id)
+              : presets.find((p) => p.is_default) || presets[0];
+            const prodPct = proj.cost_production_pct != null
+              ? Number(proj.cost_production_pct) / 100
+              : (preset?.production_pct ?? 30) / 100;
+            const marze = proj.marze ? Number(proj.marze) / 100 : 0;
+            const fromProject = Math.floor((projCena * (1 - marze) * prodPct) / hourlyRate);
+            if (fromProject > 0) projectPlanMap.set(pid, fromProject);
+          }
+        }
+      }
+
+      // Resolve hodiny_plan with dual calculation + 35% threshold
+      const THRESHOLD = 0.35;
+      function getPlanHours(pid: string): { hours: number | null; source: PlanSource } {
+        const fromItems = tpvPlanMap.get(pid);
+        const fromProject = projectPlanMap.get(pid);
+
+        // If we have both, compare with threshold
+        if (fromItems && fromItems > 0 && fromProject && fromProject > 0) {
+          const diff = Math.abs(fromItems - fromProject) / fromProject;
+          if (diff > THRESHOLD) {
+            // Items are skewed (some missing prices), use project price
+            return { hours: fromProject, source: "Projekt" };
+          }
+          // Items are consistent, use TPV items
+          return { hours: fromItems, source: "TPV" };
+        }
+
+        // Only items available
+        if (fromItems && fromItems > 0) return { hours: fromItems, source: "TPV" };
+
+        // Only project price available
+        if (fromProject && fromProject > 0) return { hours: fromProject, source: "Projekt" };
+
+        // Fallback to schedule+inbox
         const fb = fallbackPlanMap.get(pid);
-        if (fb != null && fb > 0) return fb;
-        return null;
+        if (fb != null && fb > 0) return { hours: fb, source: null };
+
+        return { hours: null, source: null };
       }
 
       // Build actual hours map from production_hours_log grouped by ami_project_id
@@ -185,7 +246,7 @@ export function useAnalytics() {
         const status = proj?.status || h.status;
         const pm = proj?.pm || h.pm;
 
-        const hodiny_plan = getPlanHours(pid);
+        const { hours: hodiny_plan, source: plan_source } = getPlanHours(pid);
         const hodiny_skutocne = h.skutocne;
 
         const pct = hodiny_plan ? Math.round((hodiny_skutocne / hodiny_plan) * 1000) / 10 : null;
@@ -218,6 +279,7 @@ export function useAnalytics() {
           trend,
           tracking_od: h.tracking_od,
           tracking_do: h.tracking_do,
+          plan_source,
         });
       }
 
