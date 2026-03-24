@@ -35,7 +35,7 @@ function formatDate(d: string | null): string {
   return `${day}.${m}`;
 }
 
-type SortKey = "project_id" | "project_name" | "pm" | "status" | "balik" | "hodiny_plan" | "hodiny_skutocne" | "pct" | "zostatok" | "tracking";
+type SortKey = "project_id" | "project_name" | "pm" | "status" | "balik" | "hodiny_plan" | "hodiny_skutocne" | "pct" | "zostatok" | "tracking" | "preset_label";
 type SortDir = "asc" | "desc";
 
 const ANALYTICS_COLUMNS: ColumnDef[] = [
@@ -44,6 +44,7 @@ const ANALYTICS_COLUMNS: ColumnDef[] = [
   { key: "pm", label: "PM" },
   { key: "status", label: "Status" },
   { key: "balik", label: "Balík" },
+  { key: "preset_label", label: "Preset" },
   { key: "hodiny_plan", label: "Plán h" },
   { key: "hodiny_skutocne", label: "Odprac. h" },
   { key: "pct", label: "% čerpání" },
