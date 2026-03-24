@@ -251,25 +251,31 @@ export default function Analytics() {
 
       {/* Table — same wrapper as PMStatusTable */}
       <div className="flex-1 min-h-0 px-4 pb-4">
-        <div className="rounded-lg border bg-card flex flex-col h-full">
+        {editMode && (
+          <div className="bg-accent/10 border border-accent/30 text-accent text-xs font-medium px-3 py-1.5 rounded-t-lg shrink-0">
+            Režim úpravy sloupců
+          </div>
+        )}
+        <div className={cn("rounded-lg border bg-card flex flex-col h-full", editMode && "rounded-t-none border-t-0")}>
           <div className="flex-1 overflow-auto always-scrollbar rounded-t-lg">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow className="bg-primary/5">
                   {visibleCols.map((col) => (
-                    <TableHead key={col.key} className={cn("text-xs", COL_CLASS[col.key])}>
-                      {SORTABLE_KEYS.has(col.key) ? (
-                        <button
-                          onClick={() => toggleSort(col.key)}
-                          className="inline-flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer"
-                        >
-                          {col.label}
-                          <SortIcon column={col.key} sortCol={sortCol} sortDir={sortDir} />
-                        </button>
-                      ) : (
-                        col.label
-                      )}
-                    </TableHead>
+                    <SortableHeader
+                      key={col.key}
+                      label={getLabel(col.key, ANALYTICS_LABEL_MAP[col.key] || col.label)}
+                      column={col.key}
+                      sortCol={sortCol}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      editMode={editMode}
+                      customLabel={getLabel(col.key, ANALYTICS_LABEL_MAP[col.key] || col.label)}
+                      onLabelChange={(newLabel) => updateLabel(col.key, newLabel)}
+                      onWidthChange={(newWidth) => updateWidth(col.key, newWidth)}
+                      existingLabels={allCurrentLabels}
+                      style={getWidth(col.key) ? { width: getWidth(col.key)! } : undefined}
+                    />
                   ))}
                   <ColumnVisibilityToggle
                     standalone
@@ -278,6 +284,9 @@ export default function Analytics() {
                     labelTab="analytics"
                     isVisible={isVisible}
                     toggleColumn={toggleColumn}
+                    editMode={editMode}
+                    onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined}
+                    onCancelEditMode={canEditColumns ? handleCancelEditMode : undefined}
                   />
                 </TableRow>
               </TableHeader>
