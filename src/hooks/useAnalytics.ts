@@ -132,7 +132,7 @@ export function useAnalytics() {
           const prodPct = proj?.cost_production_pct != null
             ? Number(proj.cost_production_pct) / 100
             : (preset?.production_pct ?? 30) / 100;
-          const marze = proj?.marze ? Number(proj.marze) / 100 : 0;
+          const marze = proj?.marze != null && proj?.marze !== "" ? Number(proj.marze) / 100 : 0.15;
 
           // Sum from individual items that have cena
           let totalFromItems = 0;
@@ -172,7 +172,7 @@ export function useAnalytics() {
             const prodPct = proj.cost_production_pct != null
               ? Number(proj.cost_production_pct) / 100
               : (preset?.production_pct ?? 30) / 100;
-            const marze = proj.marze ? Number(proj.marze) / 100 : 0;
+            const marze = proj.marze != null && proj.marze !== "" ? Number(proj.marze) / 100 : 0.15;
             const fromProject = Math.floor((projCena * (1 - marze) * prodPct) / hourlyRate);
             if (fromProject > 0) projectPlanMap.set(pid, fromProject);
           }

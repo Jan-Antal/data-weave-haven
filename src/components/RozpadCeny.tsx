@@ -76,7 +76,7 @@ export function RozpadCeny({ projectId, prodejniCena, marze, costValues, onChang
   const total = Object.values(pctValues).reduce((s, v) => s + v, 0);
 
   // Cost and margin calculations
-  const marzeNum = marze ?? 0;
+  const marzeNum = marze != null ? marze : 15;
   const naklady = prodejniCena && prodejniCena > 0 && marzeNum >= 0
     ? prodejniCena / (1 + marzeNum / 100)
     : null;

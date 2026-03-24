@@ -942,7 +942,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
             <div>
               <Label>Marže (%)</Label>
               <div className="flex items-center gap-1">
-                <Input type="number" className="no-spinners" value={newProj.marze} onChange={(e) => setNewProj((p) => ({ ...p, marze: e.target.value }))} placeholder="0" />
+                <Input type="number" className="no-spinners" value={newProj.marze} onChange={(e) => setNewProj((p) => ({ ...p, marze: e.target.value }))} placeholder="15" />
                 <span className="text-sm text-muted-foreground shrink-0">%</span>
               </div>
             </div>
