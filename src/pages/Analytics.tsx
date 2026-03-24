@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,8 @@ import { useAnalytics, type Balik, type AnalyticsRow } from "@/hooks/useAnalytic
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useProjects } from "@/hooks/useProjects";
 import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
+import { ColumnVisibilityToggle } from "@/components/ColumnVisibilityToggle";
+import { useColumnVisibility, type ColumnDef } from "@/hooks/useColumnVisibility";
 import { cn } from "@/lib/utils";
 import { normalizeSearch, normalizedIncludes } from "@/lib/statusFilter";
 
@@ -25,15 +27,45 @@ function formatDate(d: string | null): string {
   return `${day}.${m}`;
 }
 
-type SortKey = "project_id" | "project_name" | "pm" | "status" | "hodiny_plan" | "hodiny_skutocne" | "pct" | "zostatok";
+type SortKey = "project_id" | "project_name" | "pm" | "status" | "balik" | "hodiny_plan" | "hodiny_skutocne" | "pct" | "zostatok" | "tracking";
 type SortDir = "asc" | "desc";
 
-function SortIcon({ column, sortCol, sortDir }: { column: SortKey; sortCol: SortKey | null; sortDir: SortDir }) {
+const ANALYTICS_COLUMNS: ColumnDef[] = [
+  { key: "project_id", label: "ID", locked: true },
+  { key: "project_name", label: "Název projektu", locked: true },
+  { key: "pm", label: "PM" },
+  { key: "status", label: "Status" },
+  { key: "balik", label: "Balík" },
+  { key: "hodiny_plan", label: "Plán h" },
+  { key: "hodiny_skutocne", label: "Odprac. h" },
+  { key: "pct", label: "% čerpání" },
+  { key: "zostatok", label: "Zostatok h" },
+  { key: "tracking", label: "Tracking" },
+];
+
+const ANALYTICS_DEFAULT_HIDDEN: string[] = [];
+
+function SortIcon({ column, sortCol, sortDir }: { column: string; sortCol: string | null; sortDir: SortDir }) {
   if (sortCol !== column) return <ArrowUpDown className="h-3 w-3 text-muted-foreground/50" />;
   return sortDir === "asc"
     ? <ArrowUp className="h-3 w-3 text-primary" />
     : <ArrowDown className="h-3 w-3 text-primary" />;
 }
+
+const SORTABLE_KEYS = new Set<string>(["project_id", "project_name", "pm", "status", "hodiny_plan", "hodiny_skutocne", "pct", "zostatok"]);
+
+const COL_CLASS: Record<string, string> = {
+  project_id: "w-28",
+  project_name: "",
+  pm: "w-24",
+  status: "w-28",
+  balik: "w-20",
+  hodiny_plan: "w-20 text-right",
+  hodiny_skutocne: "w-24 text-right",
+  pct: "w-40",
+  zostatok: "w-24 text-right",
+  tracking: "w-28",
+};
 
 export default function Analytics() {
   const { data, isLoading } = useAnalytics();
@@ -44,14 +76,20 @@ export default function Analytics() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
 
-  const toggleSort = (col: SortKey) => {
+  const { isVisible, toggleColumn } = useColumnVisibility(
+    "analytics-columns",
+    ANALYTICS_COLUMNS,
+    ANALYTICS_DEFAULT_HIDDEN
+  );
+
+  const toggleSort = useCallback((col: string) => {
     if (sortCol === col) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
-      setSortCol(col);
+      setSortCol(col as SortKey);
       setSortDir("desc");
     }
-  };
+  }, [sortCol]);
 
   const detailProject = useMemo(() => {
     if (!detailProjectId) return null;
@@ -107,7 +145,6 @@ export default function Analytics() {
     return sorted;
   }, [data, filter, search, sortCol, sortDir]);
 
-  // Summary computed from filtered rows
   const summary = useMemo(() => {
     const src = rows;
     const totalPlan = src.reduce((s, r) => s + (r.hodiny_plan || 0), 0);
@@ -119,18 +156,10 @@ export default function Analytics() {
     return { totalPlan, totalSkutocne, avgPct, count: src.length };
   }, [rows]);
 
-  const headerCols: { key: SortKey | null; label: string; className?: string }[] = [
-    { key: "project_id", label: "ID", className: "w-28" },
-    { key: "project_name", label: "Název projektu" },
-    { key: "pm", label: "PM", className: "w-24" },
-    { key: "status", label: "Status", className: "w-28" },
-    { key: null, label: "Balík", className: "w-20" },
-    { key: "hodiny_plan", label: "Plán h", className: "w-20 text-right" },
-    { key: "hodiny_skutocne", label: "Odprac. h", className: "w-24 text-right" },
-    { key: "pct", label: "% čerpání", className: "w-40" },
-    { key: "zostatok", label: "Zostatok h", className: "w-24 text-right" },
-    { key: null, label: "Tracking", className: "w-28" },
-  ];
+  const visibleCols = useMemo(
+    () => ANALYTICS_COLUMNS.filter((c) => isVisible(c.key)),
+    [isVisible]
+  );
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-background">
@@ -187,55 +216,67 @@ export default function Analytics() {
         </Card>
       </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-auto px-4 pb-4">
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {headerCols.map((col, i) => (
-                  <TableHead key={i} className={cn("text-xs", col.className)}>
-                    {col.key ? (
-                      <button
-                        onClick={() => toggleSort(col.key!)}
-                        className="inline-flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer"
-                      >
-                        {col.label}
-                        <SortIcon column={col.key} sortCol={sortCol} sortDir={sortDir} />
-                      </button>
-                    ) : (
-                      col.label
-                    )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 10 }).map((_, j) => (
-                      <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : rows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
-                    Žádné projekty
-                  </TableCell>
-                </TableRow>
-              ) : (
-                rows.map((r) => (
-                  <AnalyticsTableRow
-                    key={r.project_id}
-                    row={r}
-                    onOpenDetail={setDetailProjectId}
+      {/* Table — same wrapper as PMStatusTable */}
+      <div className="flex-1 min-h-0 px-4 pb-4">
+        <div className="rounded-lg border bg-card flex flex-col h-full">
+          <div className="flex-1 overflow-auto always-scrollbar rounded-t-lg">
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-card">
+                <TableRow className="bg-primary/5">
+                  {visibleCols.map((col) => (
+                    <TableHead key={col.key} className={cn("text-xs", COL_CLASS[col.key])}>
+                      {SORTABLE_KEYS.has(col.key) ? (
+                        <button
+                          onClick={() => toggleSort(col.key)}
+                          className="inline-flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer"
+                        >
+                          {col.label}
+                          <SortIcon column={col.key} sortCol={sortCol} sortDir={sortDir} />
+                        </button>
+                      ) : (
+                        col.label
+                      )}
+                    </TableHead>
+                  ))}
+                  <ColumnVisibilityToggle
+                    standalone
+                    columns={ANALYTICS_COLUMNS.filter((c) => !c.locked)}
+                    groupLabel="Analytics"
+                    labelTab="analytics"
+                    isVisible={isVisible}
+                    toggleColumn={toggleColumn}
                   />
-                ))
-              )}
-            </TableBody>
-          </Table>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {visibleCols.map((_, j) => (
+                        <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                      ))}
+                      <TableCell />
+                    </TableRow>
+                  ))
+                ) : rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={visibleCols.length + 1} className="text-center py-8 text-muted-foreground text-sm">
+                      Žádné projekty
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  rows.map((r) => (
+                    <AnalyticsTableRow
+                      key={r.project_id}
+                      row={r}
+                      onOpenDetail={setDetailProjectId}
+                      isVisible={isVisible}
+                    />
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </div>
 
@@ -250,7 +291,7 @@ export default function Analytics() {
 
 // ── Row component ────────────────────────────────────────────────────
 
-function AnalyticsTableRow({ row: r, onOpenDetail }: { row: AnalyticsRow; onOpenDetail: (id: string) => void }) {
+function AnalyticsTableRow({ row: r, onOpenDetail, isVisible }: { row: AnalyticsRow; onOpenDetail: (id: string) => void; isVisible: (key: string) => boolean }) {
   return (
     <TableRow
       className={cn(
@@ -259,63 +300,77 @@ function AnalyticsTableRow({ row: r, onOpenDetail }: { row: AnalyticsRow; onOpen
         r.balik === "DONE" && "opacity-60"
       )}
     >
-      <TableCell>
-        <button
-          onClick={() => onOpenDetail(r.project_id)}
-          className="whitespace-nowrap font-mono text-xs text-primary hover:underline cursor-pointer font-semibold"
-        >
-          {r.project_id}
-        </button>
-      </TableCell>
-      <TableCell style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.project_name}>
-        <span
-          className="font-semibold text-xs cursor-pointer hover:underline hover:text-primary transition-colors truncate"
-          onClick={() => onOpenDetail(r.project_id)}
-        >
-          {r.project_name}
-        </span>
-      </TableCell>
-      <TableCell className="text-xs">{r.pm || "—"}</TableCell>
-      <TableCell>{r.status ? <StatusBadge status={r.status} /> : "—"}</TableCell>
-      <TableCell><BalikBadge balik={r.balik} /></TableCell>
-      <TableCell className="text-right text-xs tabular-nums">
-        <div className="flex items-center justify-end gap-1">
-          {r.hodiny_plan != null ? Math.round(r.hodiny_plan) : "—"}
-          {r.plan_source && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className={cn(
-                    "text-[9px] font-medium px-1 rounded",
-                    r.plan_source === "TPV" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                  )}>
-                    {r.plan_source === "TPV" ? "T" : "P"}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {r.plan_source === "TPV" ? "Počítáno z TPV položek" : "Počítáno z prodejní ceny projektu"}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-        </div>
-      </TableCell>
-      <TableCell className="text-right text-xs tabular-nums font-medium">
-        {Math.round(r.hodiny_skutocne)}
-      </TableCell>
-      <TableCell><PctBar pct={r.pct} /></TableCell>
-      <TableCell className={cn(
-        "text-right text-xs tabular-nums",
-        r.zostatok != null && r.zostatok > 0 && "text-green-600",
-        r.zostatok != null && r.zostatok === 0 && "text-muted-foreground",
-      )}>
-        {r.zostatok != null ? Math.round(r.zostatok) : "—"}
-      </TableCell>
-      <TableCell className="text-xs text-muted-foreground">
-        {r.tracking_od && r.tracking_do
-          ? `${formatDate(r.tracking_od)}–${formatDate(r.tracking_do)}`
-          : "—"}
-      </TableCell>
+      {isVisible("project_id") && (
+        <TableCell>
+          <button
+            onClick={() => onOpenDetail(r.project_id)}
+            className="whitespace-nowrap font-mono text-xs text-primary hover:underline cursor-pointer font-semibold"
+          >
+            {r.project_id}
+          </button>
+        </TableCell>
+      )}
+      {isVisible("project_name") && (
+        <TableCell style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.project_name}>
+          <span
+            className="font-semibold text-xs cursor-pointer hover:underline hover:text-primary transition-colors truncate"
+            onClick={() => onOpenDetail(r.project_id)}
+          >
+            {r.project_name}
+          </span>
+        </TableCell>
+      )}
+      {isVisible("pm") && <TableCell className="text-xs">{r.pm || "—"}</TableCell>}
+      {isVisible("status") && <TableCell>{r.status ? <StatusBadge status={r.status} /> : "—"}</TableCell>}
+      {isVisible("balik") && <TableCell><BalikBadge balik={r.balik} /></TableCell>}
+      {isVisible("hodiny_plan") && (
+        <TableCell className="text-right text-xs tabular-nums">
+          <div className="flex items-center justify-end gap-1">
+            {r.hodiny_plan != null ? Math.round(r.hodiny_plan) : "—"}
+            {r.plan_source && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className={cn(
+                      "text-[9px] font-medium px-1 rounded",
+                      r.plan_source === "TPV" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                    )}>
+                      {r.plan_source === "TPV" ? "T" : "P"}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {r.plan_source === "TPV" ? "Počítáno z TPV položek" : "Počítáno z prodejní ceny projektu"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+        </TableCell>
+      )}
+      {isVisible("hodiny_skutocne") && (
+        <TableCell className="text-right text-xs tabular-nums font-medium">
+          {Math.round(r.hodiny_skutocne)}
+        </TableCell>
+      )}
+      {isVisible("pct") && <TableCell><PctBar pct={r.pct} /></TableCell>}
+      {isVisible("zostatok") && (
+        <TableCell className={cn(
+          "text-right text-xs tabular-nums",
+          r.zostatok != null && r.zostatok > 0 && "text-green-600",
+          r.zostatok != null && r.zostatok === 0 && "text-muted-foreground",
+        )}>
+          {r.zostatok != null ? Math.round(r.zostatok) : "—"}
+        </TableCell>
+      )}
+      {isVisible("tracking") && (
+        <TableCell className="text-xs text-muted-foreground">
+          {r.tracking_od && r.tracking_do
+            ? `${formatDate(r.tracking_od)}–${formatDate(r.tracking_do)}`
+            : "—"}
+        </TableCell>
+      )}
+      {/* Empty cell for column toggle header */}
+      <TableCell className="w-0 p-0" />
     </TableRow>
   );
 }
