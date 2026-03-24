@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
-import { LayoutDashboard, Factory, CalendarRange, Settings, Check, User, UserCog, LogOut, Undo2, Redo2, Clock, Bell } from "lucide-react";
+import { LayoutDashboard, Factory, CalendarRange, Settings, Check, User, UserCog, LogOut, Undo2, Redo2, Clock, Bell, BarChart3 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { NotificationPanel } from "@/components/NotificationPanel";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -19,7 +19,7 @@ import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDia
 import { CapacitySettings } from "@/components/production/CapacitySettings";
 import { cn } from "@/lib/utils";
 
-type HeaderModule = "index" | "plan-vyroby" | "vyroba";
+type HeaderModule = "index" | "plan-vyroby" | "vyroba" | "analytics";
 
 interface ProductionHeaderProps {
   module?: HeaderModule;
@@ -123,12 +123,12 @@ export function ProductionHeader({
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
 
-  const undoPage = module === "index" ? undefined : module;
+  const undoPage = (module === "index" || module === "analytics") ? undefined : module;
   const hasUndo = undoPage ? canUndo(undoPage) : canUndo();
   const hasRedo = undoPage ? canRedo(undoPage) : canRedo();
   const undoDesc = undoPage ? lastUndoDescription(undoPage) : lastUndoDescription();
   const redoDesc = undoPage ? lastRedoDescription(undoPage) : lastRedoDescription();
-  const moduleLabel = module === "index" ? "Project Info 2026" : module === "vyroba" ? "Výroba" : "Plán Výroby";
+  const moduleLabel = module === "index" ? "Project Info 2026" : module === "vyroba" ? "Výroba" : module === "analytics" ? "Analytics" : "Plán Výroby";
   const showDataLog = module === "index"
     ? canAccessSettings || realRole === "owner" || role === "pm"
     : isAdmin || role === "pm" || isOwner;
@@ -210,6 +210,16 @@ export function ProductionHeader({
                 title="Plán Výroby"
               >
                 <CalendarRange className="h-5 w-5" />
+              </button>
+            )}
+
+            {(isAdmin || isOwner) && (
+              <button
+                onClick={() => navigate("/analytics")}
+                className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+                title="Analytics — Výroba"
+              >
+                <BarChart3 className="h-5 w-5" />
               </button>
             )}
 
