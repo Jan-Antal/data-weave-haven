@@ -185,8 +185,7 @@ export function useAnalytics() {
         const status = proj?.status || h.status;
         const pm = proj?.pm || h.pm;
 
-        const plan = planMap.get(pid);
-        const hodiny_plan = plan != null && plan > 0 ? plan : null;
+        const hodiny_plan = getPlanHours(pid);
         const hodiny_skutocne = h.skutocne;
 
         const pct = hodiny_plan ? Math.round((hodiny_skutocne / hodiny_plan) * 1000) / 10 : null;
