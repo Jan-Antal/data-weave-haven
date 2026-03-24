@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { BarChart3, AlertTriangle, ArrowLeft } from "lucide-react";
+import { BarChart3, AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAnalytics, type Balik } from "@/hooks/useAnalytics";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
@@ -15,6 +16,10 @@ import { useProjects } from "@/hooks/useProjects";
 import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
 import { cn } from "@/lib/utils";
 import { normalizeSearch, normalizedIncludes } from "@/lib/statusFilter";
+import { recalculateProductionHours } from "@/lib/recalculateProductionHours";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 function formatHours(n: number | null): string {
   if (n == null) return "—";
@@ -37,6 +42,21 @@ export default function Analytics() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortKey>("pct_desc");
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
+  const [recalculating, setRecalculating] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleRecalculate = useCallback(async () => {
+    setRecalculating(true);
+    try {
+      const updated = await recalculateProductionHours(supabase as any, "all");
+      await queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      toast.success(`Přepočet dokončen — ${updated} položek aktualizováno`);
+    } catch (e: any) {
+      toast.error("Chyba při přepočtu: " + (e.message || "neznámá chyba"));
+    } finally {
+      setRecalculating(false);
+    }
+  }, [queryClient]);
 
   const detailProject = useMemo(() => {
     if (!detailProjectId) return null;
@@ -87,11 +107,28 @@ export default function Analytics() {
           <BarChart3 className="h-5 w-5 text-primary" />
           <h1 className="text-lg font-semibold">Analytics — Výroba</h1>
         </div>
-        {summary?.lastSync && (
-          <span className="text-xs text-muted-foreground">
-            Poslední data: {formatDate(summary.lastSync)}
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRecalculate}
+                disabled={recalculating}
+                className="gap-1.5"
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5", recalculating && "animate-spin")} />
+                Přepočítat hodiny
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Přepočítá hodiny ve výrobě a inboxu podle aktuálních TPV dat</TooltipContent>
+          </Tooltip>
+          {summary?.lastSync && (
+            <span className="text-xs text-muted-foreground">
+              Poslední data: {formatDate(summary.lastSync)}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Summary cards */}
