@@ -33,7 +33,7 @@ const DONE_STATUSES = ["Expedice", "Montáž", "Předání", "Fakturace", "Dokon
 
 export function useAnalytics() {
   return useQuery({
-    queryKey: ["analytics-plan-vs-reality"],
+    queryKey: ["analytics"],
     queryFn: async () => {
       const [scheduleRes, inboxRes, hoursRes, projectsRes] = await Promise.all([
         supabase
