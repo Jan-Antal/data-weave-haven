@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
-import { AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,8 +13,13 @@ import { useProjects } from "@/hooks/useProjects";
 import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
 import { ColumnVisibilityToggle } from "@/components/ColumnVisibilityToggle";
 import { useColumnVisibility, type ColumnDef } from "@/hooks/useColumnVisibility";
+import { TableSearchBar } from "@/components/TableSearchBar";
 import { cn } from "@/lib/utils";
 import { normalizeSearch, normalizedIncludes } from "@/lib/statusFilter";
+import { supabase } from "@/integrations/supabase/client";
+import { recalculateProductionHours } from "@/lib/recalculateProductionHours";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 function formatHours(n: number | null): string {
   if (n == null) return "—";
@@ -75,12 +80,27 @@ export default function Analytics() {
   const [sortCol, setSortCol] = useState<SortKey | null>("pct");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
+  const [recalculating, setRecalculating] = useState(false);
+  const queryClient = useQueryClient();
 
   const { isVisible, toggleColumn } = useColumnVisibility(
     "analytics-columns",
     ANALYTICS_COLUMNS,
     ANALYTICS_DEFAULT_HIDDEN
   );
+
+  const handleRecalculate = useCallback(async () => {
+    setRecalculating(true);
+    try {
+      const updated = await recalculateProductionHours(supabase, "all");
+      await queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      toast.success(`Přepočet dokončen — ${updated} položek aktualizováno`);
+    } catch (e: any) {
+      toast.error("Chyba při přepočtu: " + (e.message || "neznámá chyba"));
+    } finally {
+      setRecalculating(false);
+    }
+  }, [queryClient]);
 
   const toggleSort = useCallback((col: string) => {
     if (sortCol === col) {
@@ -171,12 +191,28 @@ export default function Analytics() {
           <ToggleGroupItem value="DONE" className="text-xs h-7 px-2.5">✅ Hotovo</ToggleGroupItem>
           <ToggleGroupItem value="OVER" className="text-xs h-7 px-2.5">⚠ Přesčas</ToggleGroupItem>
         </ToggleGroup>
-        <div className="ml-auto">
-          <Input
-            placeholder="Hledat projekt..."
+        <div className="ml-auto flex items-center gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs gap-1"
+                  disabled={recalculating}
+                  onClick={handleRecalculate}
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5", recalculating && "animate-spin")} />
+                  Přepočítat
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Přepočítá hodiny výroby a inboxu podle aktuálních TPV dat</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TableSearchBar
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-7 w-48 text-xs"
+            onChange={setSearch}
+            placeholder="Hledat projekt..."
           />
         </div>
       </div>
