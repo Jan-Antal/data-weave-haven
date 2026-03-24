@@ -61,7 +61,7 @@ export default function Analytics() {
   const [filter, setFilter] = useState<Balik | "ALL">("ALL");
   const [search, setSearch] = useState("");
   const [sortCol, setSortCol] = useState<SortKey | null>("project_id");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
   const [recalculating, setRecalculating] = useState(false);
   const queryClient = useQueryClient();
