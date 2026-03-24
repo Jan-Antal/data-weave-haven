@@ -64,12 +64,23 @@ export default function Analytics() {
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
   const [recalculating, setRecalculating] = useState(false);
   const queryClient = useQueryClient();
+  const [editMode, setEditMode] = useState(false);
+  const { canEditColumns } = useAuth();
+  const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("analytics");
 
   const { isVisible, toggleColumn } = useColumnVisibility(
     "analytics-columns",
     ANALYTICS_COLUMNS,
     ANALYTICS_DEFAULT_HIDDEN
   );
+
+  const handleToggleEditMode = useCallback(() => {
+    setEditMode((prev) => !prev);
+  }, []);
+
+  const handleCancelEditMode = useCallback(() => {
+    setEditMode(false);
+  }, []);
 
   const handleRecalculate = useCallback(async () => {
     setRecalculating(true);
