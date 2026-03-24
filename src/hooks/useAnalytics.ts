@@ -20,6 +20,7 @@ export interface AnalyticsRow {
   tracking_od: string | null;
   tracking_do: string | null;
   plan_source: PlanSource;
+  preset_label: string;
 }
 
 export interface AnalyticsSummary {
@@ -62,8 +63,8 @@ export function useAnalytics() {
           .limit(1)
           .single(),
         supabase
-          .from("cost_breakdown_presets")
-          .select("id, is_default, production_pct"),
+65:           .from("cost_breakdown_presets")
+66:           .select("id, name, is_default, production_pct"),
         supabase
           .from("exchange_rates")
           .select("year, eur_czk")
@@ -90,7 +91,7 @@ export function useAnalytics() {
       }
 
       // Build projects lookup (need marze, cost_production_pct, cost_preset_id)
-      const projectsDetailMap = new Map<string, { project_name: string; status: string | null; pm: string | null; marze: string | null; cost_production_pct: number | null; cost_preset_id: string | null; prodejni_cena: number | null; currency: string | null }>();
+      const projectsDetailMap = new Map<string, { project_name: string; status: string | null; pm: string | null; marze: string | null; cost_production_pct: number | null; cost_preset_id: string | null; cost_is_custom: boolean; prodejni_cena: number | null; currency: string | null }>();
       if (projectsRes.data) {
         for (const p of projectsRes.data) {
           projectsDetailMap.set(p.project_id, {
