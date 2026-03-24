@@ -1106,7 +1106,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                   className={cn("no-spinners pr-8", (isSectionReadOnly("finance") || isFieldReadOnly("marze")) && roClass)}
                   value={isSectionReadOnly("finance") ? (form.marze ? `${form.marze}` : "—") : form.marze}
                   onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
-                  placeholder="0"
+                   placeholder="15"
                   disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
                   autoFocus={autoFocus}
                 />
@@ -1114,6 +1114,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
               </div>
             )}
           </MobileTapField>
+          {!form.marze && (
+            <p className="text-[10px] text-muted-foreground mt-0.5">Výchozí marže: 15 %</p>
+          )}
         </div>
 
         {/* Rozpad ceny — admin only */}

@@ -36,7 +36,7 @@ export async function recalculateProductionHours(
     const prodPct = proj.cost_production_pct != null
       ? Number(proj.cost_production_pct) / 100
       : (preset?.production_pct ?? 30) / 100;
-    const marze = proj.marze ? Number(proj.marze) / 100 : 0;
+    const marze = proj.marze != null && proj.marze !== "" ? Number(proj.marze) / 100 : 0.15;
 
     // Get TPV items for this project — source of truth
     const { data: tpvItems } = await supabaseClient
