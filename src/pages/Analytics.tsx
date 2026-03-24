@@ -369,6 +369,16 @@ function AnalyticsTableRow({ row: r, onOpenDetail, isVisible }: { row: Analytics
       {isVisible("pm") && <TableCell className="text-xs">{r.pm || "—"}</TableCell>}
       {isVisible("status") && <TableCell>{r.status ? <StatusBadge status={r.status} /> : "—"}</TableCell>}
       {isVisible("balik") && <TableCell><BalikBadge balik={r.balik} /></TableCell>}
+      {isVisible("preset_label") && (
+        <TableCell className="text-xs">
+          <span className={cn(
+            "px-1.5 py-0.5 rounded text-[10px] font-medium",
+            r.preset_label === "Custom" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-muted text-muted-foreground"
+          )}>
+            {r.preset_label}
+          </span>
+        </TableCell>
+      )}
       {isVisible("hodiny_plan") && (
         <TableCell className="text-right text-xs tabular-nums">
           <div className="flex items-center justify-end gap-1">
