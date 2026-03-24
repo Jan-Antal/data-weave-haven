@@ -172,13 +172,8 @@ export function useAnalytics() {
         }
       }
 
-      // Build projects lookup
-      const projectsMap = new Map<string, { project_name: string; status: string | null; pm: string | null }>();
-      if (projectsRes.data) {
-        for (const p of projectsRes.data) {
-          projectsMap.set(p.project_id, { project_name: p.project_name, status: p.status, pm: p.pm });
-        }
-      }
+      // projectsMap alias for merge loop
+      const projectsMap = projectsDetailMap;
 
       // Merge: iterate over hoursMap (projects with actual hours)
       const rows: AnalyticsRow[] = [];
