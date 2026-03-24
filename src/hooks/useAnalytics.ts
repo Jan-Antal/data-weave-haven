@@ -38,7 +38,7 @@ export function useAnalytics() {
   return useQuery({
     queryKey: ["analytics"],
     queryFn: async () => {
-      const [scheduleRes, inboxRes, hoursRes, projectsRes, tpvRes, settingsRes, presetsRes] = await Promise.all([
+      const [scheduleRes, inboxRes, hoursRes, projectsRes, tpvRes, settingsRes, presetsRes, ratesRes] = await Promise.all([
         supabase
           .from("production_schedule")
           .select("project_id, scheduled_hours"),
@@ -50,7 +50,7 @@ export function useAnalytics() {
           .select("ami_project_id, project_name, status, pm, hodiny_skutocne, datum_sync"),
         supabase
           .from("projects")
-          .select("project_id, project_name, status, pm, marze, cost_production_pct, cost_preset_id, prodejni_cena")
+          .select("project_id, project_name, status, pm, marze, cost_production_pct, cost_preset_id, prodejni_cena, currency")
           .is("deleted_at", null),
         supabase
           .from("tpv_items")
@@ -64,9 +64,16 @@ export function useAnalytics() {
         supabase
           .from("cost_breakdown_presets")
           .select("id, is_default, production_pct"),
+        supabase
+          .from("exchange_rates")
+          .select("year, eur_czk")
+          .order("year", { ascending: false })
+          .limit(1)
+          .single(),
       ]);
 
       const hourlyRate = Number(settingsRes.data?.hourly_rate) || 550;
+      const eurToCzk = Number(ratesRes.data?.eur_czk) || 25;
       const presets = presetsRes.data || [];
 
       // Build fallback plan map from schedule+inbox
@@ -83,7 +90,7 @@ export function useAnalytics() {
       }
 
       // Build projects lookup (need marze, cost_production_pct, cost_preset_id)
-      const projectsDetailMap = new Map<string, { project_name: string; status: string | null; pm: string | null; marze: string | null; cost_production_pct: number | null; cost_preset_id: string | null; prodejni_cena: number | null }>();
+      const projectsDetailMap = new Map<string, { project_name: string; status: string | null; pm: string | null; marze: string | null; cost_production_pct: number | null; cost_preset_id: string | null; prodejni_cena: number | null; currency: string | null }>();
       if (projectsRes.data) {
         for (const p of projectsRes.data) {
           projectsDetailMap.set(p.project_id, {
@@ -94,6 +101,7 @@ export function useAnalytics() {
             cost_production_pct: p.cost_production_pct,
             cost_preset_id: p.cost_preset_id,
             prodejni_cena: p.prodejni_cena,
+            currency: p.currency,
           });
         }
       }
@@ -128,9 +136,9 @@ export function useAnalytics() {
           let totalFromItems = 0;
           let hasAnyPrice = false;
           for (const item of items) {
-            const cena = Number(item.cena) || 0;
-            if (cena > 0) hasAnyPrice = true;
-            const czk = cena * (Number(item.pocet) || 1);
+            const cenaRaw = Number(item.cena) || 0;
+            if (cenaRaw > 0) hasAnyPrice = true;
+            const czk = cenaRaw * (Number(item.pocet) || 1);
             totalFromItems += czk > 0 ? Math.floor((czk * (1 - marze) * prodPct) / hourlyRate) : 0;
           }
 
@@ -138,8 +146,10 @@ export function useAnalytics() {
             tpvPlanMap.set(pid, totalFromItems);
           }
 
-          // Compute from project's prodejni_cena
-          const projCena = proj?.prodejni_cena ? Number(proj.prodejni_cena) : 0;
+          // Compute from project's prodejni_cena (with EUR conversion)
+          const projCenaRaw = proj?.prodejni_cena ? Number(proj.prodejni_cena) : 0;
+          const projIsEur = proj?.currency === "EUR";
+          const projCena = projIsEur ? projCenaRaw * eurToCzk : projCenaRaw;
           if (projCena > 0) {
             const fromProject = Math.floor((projCena * (1 - marze) * prodPct) / hourlyRate);
             if (fromProject > 0) projectPlanMap.set(pid, fromProject);
@@ -150,7 +160,9 @@ export function useAnalytics() {
       // Also compute project-level plan for projects that have prodejni_cena but no TPV items
       for (const [pid, proj] of projectsDetailMap) {
         if (!projectPlanMap.has(pid)) {
-          const projCena = proj.prodejni_cena ? Number(proj.prodejni_cena) : 0;
+          const projCenaRaw = proj.prodejni_cena ? Number(proj.prodejni_cena) : 0;
+          const projIsEur = proj.currency === "EUR";
+          const projCena = projIsEur ? projCenaRaw * eurToCzk : projCenaRaw;
           if (projCena > 0) {
             const preset = proj.cost_preset_id
               ? presets.find((p) => p.id === proj.cost_preset_id)
