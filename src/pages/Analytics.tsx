@@ -80,12 +80,27 @@ export default function Analytics() {
   const [sortCol, setSortCol] = useState<SortKey | null>("pct");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
+  const [recalculating, setRecalculating] = useState(false);
+  const queryClient = useQueryClient();
 
   const { isVisible, toggleColumn } = useColumnVisibility(
     "analytics-columns",
     ANALYTICS_COLUMNS,
     ANALYTICS_DEFAULT_HIDDEN
   );
+
+  const handleRecalculate = useCallback(async () => {
+    setRecalculating(true);
+    try {
+      const updated = await recalculateProductionHours(supabase, "all");
+      await queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      toast.success(`Přepočet dokončen — ${updated} položek aktualizováno`);
+    } catch (e: any) {
+      toast.error("Chyba při přepočtu: " + (e.message || "neznámá chyba"));
+    } finally {
+      setRecalculating(false);
+    }
+  }, [queryClient]);
 
   const toggleSort = useCallback((col: string) => {
     if (sortCol === col) {
