@@ -174,6 +174,10 @@ export default function Analytics() {
     [isVisible]
   );
 
+  const allCurrentLabels = useMemo(() => {
+    return visibleCols.map((c) => getLabel(c.key, ANALYTICS_LABEL_MAP[c.key] || c.label));
+  }, [visibleCols, getLabel]);
+
   return (
     <div className="h-full flex flex-col overflow-hidden bg-background">
       {/* Filter row */}
