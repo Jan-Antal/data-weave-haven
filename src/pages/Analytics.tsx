@@ -191,12 +191,28 @@ export default function Analytics() {
           <ToggleGroupItem value="DONE" className="text-xs h-7 px-2.5">✅ Hotovo</ToggleGroupItem>
           <ToggleGroupItem value="OVER" className="text-xs h-7 px-2.5">⚠ Přesčas</ToggleGroupItem>
         </ToggleGroup>
-        <div className="ml-auto">
-          <Input
-            placeholder="Hledat projekt..."
+        <div className="ml-auto flex items-center gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs gap-1"
+                  disabled={recalculating}
+                  onClick={handleRecalculate}
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5", recalculating && "animate-spin")} />
+                  Přepočítat
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Přepočítá hodiny výroby a inboxu podle aktuálních TPV dat</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TableSearchBar
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-7 w-48 text-xs"
+            onChange={setSearch}
+            placeholder="Hledat projekt..."
           />
         </div>
       </div>
