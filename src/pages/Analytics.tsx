@@ -52,28 +52,7 @@ const ANALYTICS_COLUMNS: ColumnDef[] = [
 ];
 
 const ANALYTICS_DEFAULT_HIDDEN: string[] = [];
-
-function SortIcon({ column, sortCol, sortDir }: { column: string; sortCol: string | null; sortDir: SortDir }) {
-  if (sortCol !== column) return <ArrowUpDown className="h-3 w-3 text-muted-foreground/50" />;
-  return sortDir === "asc"
-    ? <ArrowUp className="h-3 w-3 text-primary" />
-    : <ArrowDown className="h-3 w-3 text-primary" />;
-}
-
-const SORTABLE_KEYS = new Set<string>(["project_id", "project_name", "pm", "status", "hodiny_plan", "hodiny_skutocne", "pct", "zostatok"]);
-
-const COL_CLASS: Record<string, string> = {
-  project_id: "w-28",
-  project_name: "",
-  pm: "w-24",
-  status: "w-28",
-  balik: "w-20",
-  hodiny_plan: "w-20 text-right",
-  hodiny_skutocne: "w-24 text-right",
-  pct: "w-40",
-  zostatok: "w-24 text-right",
-  tracking: "w-28",
-};
+const ANALYTICS_LABEL_MAP: Record<string, string> = Object.fromEntries(ANALYTICS_COLUMNS.map((c) => [c.key, c.label]));
 
 export default function Analytics() {
   const { data, isLoading } = useAnalytics();
