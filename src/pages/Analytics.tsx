@@ -31,10 +31,16 @@ type SortKey = "pct_desc" | "pct_asc" | "name" | "pm";
 export default function Analytics() {
   const navigate = useNavigate();
   const { data, isLoading } = useAnalytics();
+  const { data: projects = [] } = useProjects();
   const [filter, setFilter] = useState<Balik | "ALL">("ALL");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortKey>("pct_desc");
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
+
+  const detailProject = useMemo(() => {
+    if (!detailProjectId) return null;
+    return projects.find((p: any) => p.project_id === detailProjectId) || null;
+  }, [detailProjectId, projects]);
 
   const rows = useMemo(() => {
     if (!data) return [];
