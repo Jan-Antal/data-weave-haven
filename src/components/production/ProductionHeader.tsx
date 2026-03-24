@@ -123,12 +123,12 @@ export function ProductionHeader({
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
 
-  const undoPage = module === "index" ? undefined : module;
+  const undoPage = (module === "index" || module === "analytics") ? undefined : module;
   const hasUndo = undoPage ? canUndo(undoPage) : canUndo();
   const hasRedo = undoPage ? canRedo(undoPage) : canRedo();
   const undoDesc = undoPage ? lastUndoDescription(undoPage) : lastUndoDescription();
   const redoDesc = undoPage ? lastRedoDescription(undoPage) : lastRedoDescription();
-  const moduleLabel = module === "index" ? "Project Info 2026" : module === "vyroba" ? "Výroba" : "Plán Výroby";
+  const moduleLabel = module === "index" ? "Project Info 2026" : module === "vyroba" ? "Výroba" : module === "analytics" ? "Analytics" : "Plán Výroby";
   const showDataLog = module === "index"
     ? canAccessSettings || realRole === "owner" || role === "pm"
     : isAdmin || role === "pm" || isOwner;
