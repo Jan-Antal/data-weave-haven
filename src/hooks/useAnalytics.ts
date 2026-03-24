@@ -20,6 +20,7 @@ export interface AnalyticsRow {
   tracking_od: string | null;
   tracking_do: string | null;
   plan_source: PlanSource;
+  preset_label: string;
 }
 
 export interface AnalyticsSummary {
@@ -50,7 +51,7 @@ export function useAnalytics() {
           .select("ami_project_id, project_name, status, pm, hodiny_skutocne, datum_sync"),
         supabase
           .from("projects")
-          .select("project_id, project_name, status, pm, marze, cost_production_pct, cost_preset_id, prodejni_cena, currency")
+          .select("project_id, project_name, status, pm, marze, cost_production_pct, cost_preset_id, cost_is_custom, prodejni_cena, currency")
           .is("deleted_at", null),
         supabase
           .from("tpv_items")
@@ -63,7 +64,7 @@ export function useAnalytics() {
           .single(),
         supabase
           .from("cost_breakdown_presets")
-          .select("id, is_default, production_pct"),
+          .select("id, name, is_default, production_pct"),
         supabase
           .from("exchange_rates")
           .select("year, eur_czk")
@@ -90,7 +91,7 @@ export function useAnalytics() {
       }
 
       // Build projects lookup (need marze, cost_production_pct, cost_preset_id)
-      const projectsDetailMap = new Map<string, { project_name: string; status: string | null; pm: string | null; marze: string | null; cost_production_pct: number | null; cost_preset_id: string | null; prodejni_cena: number | null; currency: string | null }>();
+      const projectsDetailMap = new Map<string, { project_name: string; status: string | null; pm: string | null; marze: string | null; cost_production_pct: number | null; cost_preset_id: string | null; cost_is_custom: boolean; prodejni_cena: number | null; currency: string | null }>();
       if (projectsRes.data) {
         for (const p of projectsRes.data) {
           projectsDetailMap.set(p.project_id, {
@@ -100,6 +101,7 @@ export function useAnalytics() {
             marze: p.marze,
             cost_production_pct: p.cost_production_pct,
             cost_preset_id: p.cost_preset_id,
+            cost_is_custom: p.cost_is_custom ?? false,
             prodejni_cena: p.prodejni_cena,
             currency: p.currency,
           });
@@ -278,6 +280,20 @@ export function useAnalytics() {
 
         if (h.tracking_do && (!lastSync || h.tracking_do > lastSync)) lastSync = h.tracking_do;
 
+        // Resolve preset label
+        let preset_label = "Default";
+        if (proj) {
+          if (proj.cost_is_custom) {
+            preset_label = "Custom";
+          } else if (proj.cost_preset_id) {
+            const matchedPreset = presets.find((p) => p.id === proj.cost_preset_id);
+            preset_label = matchedPreset?.name || "Default";
+          } else {
+            const defaultPreset = presets.find((p) => p.is_default);
+            preset_label = defaultPreset ? defaultPreset.name : "Default";
+          }
+        }
+
         rows.push({
           project_id: pid,
           project_name: name,
@@ -292,6 +308,7 @@ export function useAnalytics() {
           tracking_od: h.tracking_od,
           tracking_do: h.tracking_do,
           plan_source,
+          preset_label,
         });
       }
 
