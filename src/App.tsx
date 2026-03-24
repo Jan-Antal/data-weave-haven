@@ -21,6 +21,7 @@ import NotFound from "./pages/NotFound";
 import InviteLanding from "./pages/InviteLanding";
 import PlanVyroby from "./pages/PlanVyroby";
 import Vyroba from "./pages/Vyroba";
+import Analytics from "./pages/Analytics";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -191,6 +192,7 @@ function AppRoutes() {
                 <Route path="/" element={<Index />} />
                 <Route path="/plan-vyroby" element={<AdminRoute><PlanVyroby /></AdminRoute>} />
                 <Route path="/vyroba" element={<AdminRoute><Vyroba /></AdminRoute>} />
+                <Route path="/analytics" element={<AdminRoute><Analytics /></AdminRoute>} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="/set-password" element={<SetPassword />} />
                 <Route path="/login" element={<Navigate to="/" replace />} />

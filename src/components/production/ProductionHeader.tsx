@@ -213,6 +213,16 @@ export function ProductionHeader({
               </button>
             )}
 
+            {(isAdmin || isOwner) && (
+              <button
+                onClick={() => navigate("/analytics")}
+                className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+                title="Analytics — Výroba"
+              >
+                <BarChart3 className="h-5 w-5" />
+              </button>
+            )}
+
             <button
               onClick={module === "index" ? undefined : () => navigate("/")}
               className={cn(
