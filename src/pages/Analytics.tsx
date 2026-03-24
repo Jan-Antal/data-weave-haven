@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { StatusBadge } from "@/components/StatusBadge";
-import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
 import { useAnalytics, type Balik } from "@/hooks/useAnalytics";
+import { useProjects } from "@/hooks/useProjects";
+import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
 import { cn } from "@/lib/utils";
 import { normalizeSearch, normalizedIncludes } from "@/lib/statusFilter";
 
