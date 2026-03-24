@@ -19,7 +19,7 @@ import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDia
 import { CapacitySettings } from "@/components/production/CapacitySettings";
 import { cn } from "@/lib/utils";
 
-type HeaderModule = "index" | "plan-vyroby" | "vyroba";
+type HeaderModule = "index" | "plan-vyroby" | "vyroba" | "analytics";
 
 interface ProductionHeaderProps {
   module?: HeaderModule;
