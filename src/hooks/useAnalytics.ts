@@ -35,7 +35,7 @@ export function useAnalytics() {
   return useQuery({
     queryKey: ["analytics"],
     queryFn: async () => {
-      const [scheduleRes, inboxRes, hoursRes, projectsRes] = await Promise.all([
+      const [scheduleRes, inboxRes, hoursRes, projectsRes, tpvRes, settingsRes, presetsRes] = await Promise.all([
         supabase
           .from("production_schedule")
           .select("project_id, scheduled_hours"),
@@ -47,21 +47,91 @@ export function useAnalytics() {
           .select("ami_project_id, project_name, status, pm, hodiny_skutocne, datum_sync"),
         supabase
           .from("projects")
-          .select("project_id, project_name, status, pm")
+          .select("project_id, project_name, status, pm, marze, cost_production_pct, cost_preset_id")
           .is("deleted_at", null),
+        supabase
+          .from("tpv_items")
+          .select("project_id, cena, pocet, status")
+          .is("deleted_at", null),
+        supabase
+          .from("production_settings")
+          .select("hourly_rate")
+          .limit(1)
+          .single(),
+        supabase
+          .from("cost_breakdown_presets")
+          .select("id, is_default, production_pct"),
       ]);
 
-      // Build plan map: project_id -> total plan hours
-      const planMap = new Map<string, number>();
+      const hourlyRate = Number(settingsRes.data?.hourly_rate) || 550;
+      const presets = presetsRes.data || [];
+
+      // Build fallback plan map from schedule+inbox
+      const fallbackPlanMap = new Map<string, number>();
       if (scheduleRes.data) {
         for (const r of scheduleRes.data) {
-          planMap.set(r.project_id, (planMap.get(r.project_id) || 0) + Number(r.scheduled_hours || 0));
+          fallbackPlanMap.set(r.project_id, (fallbackPlanMap.get(r.project_id) || 0) + Number(r.scheduled_hours || 0));
         }
       }
       if (inboxRes.data) {
         for (const r of inboxRes.data) {
-          planMap.set(r.project_id, (planMap.get(r.project_id) || 0) + Number(r.estimated_hours || 0));
+          fallbackPlanMap.set(r.project_id, (fallbackPlanMap.get(r.project_id) || 0) + Number(r.estimated_hours || 0));
         }
+      }
+
+      // Build projects lookup (need marze, cost_production_pct, cost_preset_id)
+      const projectsDetailMap = new Map<string, { project_name: string; status: string | null; pm: string | null; marze: string | null; cost_production_pct: number | null; cost_preset_id: string | null }>();
+      if (projectsRes.data) {
+        for (const p of projectsRes.data) {
+          projectsDetailMap.set(p.project_id, {
+            project_name: p.project_name,
+            status: p.status,
+            pm: p.pm,
+            marze: p.marze,
+            cost_production_pct: p.cost_production_pct,
+            cost_preset_id: p.cost_preset_id,
+          });
+        }
+      }
+
+      // Compute tpv-based plan hours per project
+      const tpvPlanMap = new Map<string, number>();
+      if (tpvRes.data) {
+        // Group tpv items by project_id, skip cancelled
+        const tpvByProject = new Map<string, typeof tpvRes.data>();
+        for (const item of tpvRes.data) {
+          if (item.status === "Zrušeno") continue;
+          const arr = tpvByProject.get(item.project_id);
+          if (arr) arr.push(item);
+          else tpvByProject.set(item.project_id, [item]);
+        }
+
+        for (const [pid, items] of tpvByProject) {
+          const proj = projectsDetailMap.get(pid);
+          const preset = proj?.cost_preset_id
+            ? presets.find((p) => p.id === proj.cost_preset_id)
+            : presets.find((p) => p.is_default) || presets[0];
+          const prodPct = proj?.cost_production_pct != null
+            ? Number(proj.cost_production_pct) / 100
+            : (preset?.production_pct ?? 30) / 100;
+          const marze = proj?.marze ? Number(proj.marze) / 100 : 0;
+
+          let total = 0;
+          for (const item of items) {
+            const czk = (Number(item.cena) || 0) * (Number(item.pocet) || 1);
+            total += czk > 0 ? Math.floor((czk * (1 - marze) * prodPct) / hourlyRate) : 0;
+          }
+          if (total > 0) tpvPlanMap.set(pid, total);
+        }
+      }
+
+      // Resolve hodiny_plan: tpv primary, fallback to schedule+inbox
+      function getPlanHours(pid: string): number | null {
+        const tpv = tpvPlanMap.get(pid);
+        if (tpv != null && tpv > 0) return tpv;
+        const fb = fallbackPlanMap.get(pid);
+        if (fb != null && fb > 0) return fb;
+        return null;
       }
 
       // Build actual hours map from production_hours_log grouped by ami_project_id
@@ -102,13 +172,8 @@ export function useAnalytics() {
         }
       }
 
-      // Build projects lookup
-      const projectsMap = new Map<string, { project_name: string; status: string | null; pm: string | null }>();
-      if (projectsRes.data) {
-        for (const p of projectsRes.data) {
-          projectsMap.set(p.project_id, { project_name: p.project_name, status: p.status, pm: p.pm });
-        }
-      }
+      // projectsMap alias for merge loop
+      const projectsMap = projectsDetailMap;
 
       // Merge: iterate over hoursMap (projects with actual hours)
       const rows: AnalyticsRow[] = [];
@@ -120,8 +185,7 @@ export function useAnalytics() {
         const status = proj?.status || h.status;
         const pm = proj?.pm || h.pm;
 
-        const plan = planMap.get(pid);
-        const hodiny_plan = plan != null && plan > 0 ? plan : null;
+        const hodiny_plan = getPlanHours(pid);
         const hodiny_skutocne = h.skutocne;
 
         const pct = hodiny_plan ? Math.round((hodiny_skutocne / hodiny_plan) * 1000) / 10 : null;
