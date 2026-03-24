@@ -10,8 +10,8 @@ interface ExternalFilters {
 }
 
 export function useSortFilter<T extends Record<string, any>>(data: T[], externalFilters?: ExternalFilters, externalSearch?: string) {
-  const [sortCol, setSortCol] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>(null);
+  const [sortCol, setSortCol] = useState<string | null>("project_id");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [internalSearch, setInternalSearch] = useState("");
   const search = externalSearch !== undefined ? externalSearch : internalSearch;
   const setSearch = setInternalSearch;
