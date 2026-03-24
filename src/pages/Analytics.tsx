@@ -241,13 +241,11 @@ export default function Analytics() {
       </div>
 
       {/* Project Detail Dialog */}
-      {detailProjectId && (
-        <ProjectDetailDialog
-          projectId={detailProjectId}
-          open={!!detailProjectId}
-          onOpenChange={(open) => { if (!open) setDetailProjectId(null); }}
-        />
-      )}
+      <ProjectDetailDialog
+        project={detailProject}
+        open={!!detailProjectId}
+        onOpenChange={(open) => { if (!open) setDetailProjectId(null); }}
+      />
     </div>
   );
 }
