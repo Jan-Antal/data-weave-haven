@@ -63,8 +63,8 @@ export function useAnalytics() {
           .limit(1)
           .single(),
         supabase
-65:           .from("cost_breakdown_presets")
-66:           .select("id, name, is_default, production_pct"),
+          .from("cost_breakdown_presets")
+          .select("id, name, is_default, production_pct"),
         supabase
           .from("exchange_rates")
           .select("year, eur_czk")
