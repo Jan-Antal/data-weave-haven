@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
@@ -94,6 +94,15 @@ export default function Analytics() {
     } finally {
       setRecalculating(false);
     }
+  }, [queryClient]);
+
+  const handleToggleForceProject = useCallback(async (projectId: string, current: boolean) => {
+    const newValue = !current;
+    await supabase.from("projects").update({ plan_use_project_price: newValue }).eq("project_id", projectId);
+    // Recalculate just this project
+    await recalculateProductionHours(supabase, [projectId]);
+    await queryClient.invalidateQueries({ queryKey: ["analytics"] });
+    toast.success(newValue ? "Přepnuto na cenu projektu" : "Přepnuto na automatický výpočet");
   }, [queryClient]);
 
   const toggleSort = useCallback((col: string) => {
@@ -317,6 +326,7 @@ export default function Analytics() {
                       row={r}
                       onOpenDetail={setDetailProjectId}
                       isVisible={isVisible}
+                      onToggleForceProject={handleToggleForceProject}
                     />
                   ))
                 )}
@@ -337,7 +347,17 @@ export default function Analytics() {
 
 // ── Row component ────────────────────────────────────────────────────
 
-function AnalyticsTableRow({ row: r, onOpenDetail, isVisible }: { row: AnalyticsRow; onOpenDetail: (id: string) => void; isVisible: (key: string) => boolean }) {
+function AnalyticsTableRow({
+  row: r,
+  onOpenDetail,
+  isVisible,
+  onToggleForceProject,
+}: {
+  row: AnalyticsRow;
+  onOpenDetail: (id: string) => void;
+  isVisible: (key: string) => boolean;
+  onToggleForceProject?: (projectId: string, current: boolean) => void;
+}) {
   return (
     <TableRow
       className={cn(
@@ -383,19 +403,56 @@ function AnalyticsTableRow({ row: r, onOpenDetail, isVisible }: { row: Analytics
         <TableCell className="text-right text-xs tabular-nums">
           <div className="flex items-center justify-end gap-1">
             {r.hodiny_plan != null ? Math.round(r.hodiny_plan) : "—"}
-            {r.plan_source && (
+            {r.plan_source && r.plan_source !== "None" && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span className={cn(
-                      "text-[9px] font-medium px-1 rounded",
-                      r.plan_source === "TPV" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                      "text-[9px] font-medium px-1 rounded cursor-default",
+                      r.plan_source === "TPV"
+                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                     )}>
-                      {r.plan_source === "TPV" ? "T" : "P"}
+                      {r.force_project_price ? "P*" : r.plan_source === "TPV" ? "T" : "P"}
                     </span>
                   </TooltipTrigger>
                   <TooltipContent>
-                    {r.plan_source === "TPV" ? "Počítáno z TPV položek" : "Počítáno z prodejní ceny projektu"}
+                    {r.force_project_price
+                      ? "Manuálně přepnuto na cenu projektu"
+                      : r.plan_source === "TPV"
+                        ? "Počítáno z TPV položek"
+                        : "Počítáno z prodejní ceny projektu"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {r.warning_low_tpv && !r.force_project_price && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                  </TooltipTrigger>
+                  <TooltipContent>TPV pokrývá méně než 60 % ceny projektu</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {onToggleForceProject && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => onToggleForceProject(r.project_id, r.force_project_price)}
+                      className="ml-0.5 text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      {r.force_project_price
+                        ? <ToggleRight className="h-3 w-3 text-blue-500" />
+                        : <ToggleLeft className="h-3 w-3" />}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {r.force_project_price
+                      ? "Přepnout zpět na automatický výpočet"
+                      : "Vynutit výpočet z ceny projektu"}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

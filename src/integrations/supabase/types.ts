@@ -774,6 +774,54 @@ export type Database = {
           },
         ]
       }
+      project_plan_hours: {
+        Row: {
+          created_at: string | null
+          eur_rate_used: number | null
+          force_project_price: boolean
+          hodiny_plan: number
+          id: string
+          marze_used: number | null
+          prodpct_used: number | null
+          project_hours: number
+          project_id: string
+          recalculated_at: string | null
+          source: string
+          tpv_hours: number
+          warning_low_tpv: boolean
+        }
+        Insert: {
+          created_at?: string | null
+          eur_rate_used?: number | null
+          force_project_price?: boolean
+          hodiny_plan?: number
+          id?: string
+          marze_used?: number | null
+          prodpct_used?: number | null
+          project_hours?: number
+          project_id: string
+          recalculated_at?: string | null
+          source?: string
+          tpv_hours?: number
+          warning_low_tpv?: boolean
+        }
+        Update: {
+          created_at?: string | null
+          eur_rate_used?: number | null
+          force_project_price?: boolean
+          hodiny_plan?: number
+          id?: string
+          marze_used?: number | null
+          prodpct_used?: number | null
+          project_hours?: number
+          project_id?: string
+          recalculated_at?: string | null
+          source?: string
+          tpv_hours?: number
+          warning_low_tpv?: boolean
+        }
+        Relationships: []
+      }
       project_stages: {
         Row: {
           architekt: string | null
@@ -954,6 +1002,7 @@ export type Database = {
           montaz: string | null
           narocnost: string | null
           percent_tpv: number | null
+          plan_use_project_price: boolean | null
           pm: string | null
           pm_poznamka: string | null
           predani: string | null
@@ -1013,6 +1062,7 @@ export type Database = {
           montaz?: string | null
           narocnost?: string | null
           percent_tpv?: number | null
+          plan_use_project_price?: boolean | null
           pm?: string | null
           pm_poznamka?: string | null
           predani?: string | null
@@ -1072,6 +1122,7 @@ export type Database = {
           montaz?: string | null
           narocnost?: string | null
           percent_tpv?: number | null
+          plan_use_project_price?: boolean | null
           pm?: string | null
           pm_poznamka?: string | null
           predani?: string | null
@@ -1133,6 +1184,8 @@ export type Database = {
           created_at: string
           custom_fields: Json | null
           deleted_at: string | null
+          hodiny_plan: number | null
+          hodiny_source: string | null
           id: string
           import_source: string | null
           imported_at: string | null
@@ -1153,6 +1206,8 @@ export type Database = {
           created_at?: string
           custom_fields?: Json | null
           deleted_at?: string | null
+          hodiny_plan?: number | null
+          hodiny_source?: string | null
           id?: string
           import_source?: string | null
           imported_at?: string | null
@@ -1173,6 +1228,8 @@ export type Database = {
           created_at?: string
           custom_fields?: Json | null
           deleted_at?: string | null
+          hodiny_plan?: number | null
+          hodiny_source?: string | null
           id?: string
           import_source?: string | null
           imported_at?: string | null
