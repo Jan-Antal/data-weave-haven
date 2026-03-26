@@ -1133,6 +1133,8 @@ export type Database = {
           created_at: string
           custom_fields: Json | null
           deleted_at: string | null
+          hodiny_plan: number | null
+          hodiny_source: string | null
           id: string
           import_source: string | null
           imported_at: string | null
@@ -1153,6 +1155,8 @@ export type Database = {
           created_at?: string
           custom_fields?: Json | null
           deleted_at?: string | null
+          hodiny_plan?: number | null
+          hodiny_source?: string | null
           id?: string
           import_source?: string | null
           imported_at?: string | null
@@ -1173,6 +1177,8 @@ export type Database = {
           created_at?: string
           custom_fields?: Json | null
           deleted_at?: string | null
+          hodiny_plan?: number | null
+          hodiny_source?: string | null
           id?: string
           import_source?: string | null
           imported_at?: string | null
