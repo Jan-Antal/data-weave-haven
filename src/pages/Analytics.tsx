@@ -326,6 +326,7 @@ export default function Analytics() {
                       row={r}
                       onOpenDetail={setDetailProjectId}
                       isVisible={isVisible}
+                      onToggleForceProject={handleToggleForceProject}
                     />
                   ))
                 )}
