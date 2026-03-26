@@ -189,8 +189,10 @@ export default function PlanVyroby() {
     try {
       const { recalculateProductionHours } = await import("@/lib/recalculateProductionHours");
       const updated = await recalculateProductionHours(supabase, "all");
+      qc.invalidateQueries({ queryKey: ["analytics"] });
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      qc.invalidateQueries({ queryKey: ["project-plan-hours"] });
       toast({ title: `✓ Hodiny přepočítány (${updated} položek)` });
     } catch (err) {
       console.error("Recalculate error:", err);

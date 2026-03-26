@@ -87,8 +87,13 @@ export default function Analytics() {
     setRecalculating(true);
     try {
       const updated = await recalculateProductionHours(supabase, "all");
-      await queryClient.invalidateQueries({ queryKey: ["analytics"] });
-      toast.success(`Přepočet dokončen — ${updated} položek aktualizováno`);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["analytics"] }),
+        queryClient.invalidateQueries({ queryKey: ["production-schedule"] }),
+        queryClient.invalidateQueries({ queryKey: ["production-inbox"] }),
+        queryClient.invalidateQueries({ queryKey: ["project-plan-hours"] }),
+      ]);
+      toast.success(`Hodiny přepočítány (${updated} položek)`);
     } catch (e: any) {
       toast.error("Chyba při přepočtu: " + (e.message || "neznámá chyba"));
     } finally {
@@ -98,10 +103,12 @@ export default function Analytics() {
 
   const handleToggleForceProject = useCallback(async (projectId: string, current: boolean) => {
     const newValue = !current;
-    await supabase.from("projects").update({ plan_use_project_price: newValue }).eq("project_id", projectId);
-    // Recalculate just this project
+    await supabase.from("projects").update({ plan_use_project_price: newValue } as any).eq("project_id", projectId);
     await recalculateProductionHours(supabase, [projectId]);
-    await queryClient.invalidateQueries({ queryKey: ["analytics"] });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["analytics"] }),
+      queryClient.invalidateQueries({ queryKey: ["project-plan-hours"] }),
+    ]);
     toast.success(newValue ? "Přepnuto na cenu projektu" : "Přepnuto na automatický výpočet");
   }, [queryClient]);
 
