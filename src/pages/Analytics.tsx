@@ -96,6 +96,15 @@ export default function Analytics() {
     }
   }, [queryClient]);
 
+  const handleToggleForceProject = useCallback(async (projectId: string, current: boolean) => {
+    const newValue = !current;
+    await supabase.from("projects").update({ plan_use_project_price: newValue }).eq("project_id", projectId);
+    // Recalculate just this project
+    await recalculateProductionHours(supabase, [projectId]);
+    await queryClient.invalidateQueries({ queryKey: ["analytics"] });
+    toast.success(newValue ? "Přepnuto na cenu projektu" : "Přepnuto na automatický výpočet");
+  }, [queryClient]);
+
   const toggleSort = useCallback((col: string) => {
     if (sortCol === col) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
