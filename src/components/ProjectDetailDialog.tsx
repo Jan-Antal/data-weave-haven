@@ -724,8 +724,10 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     if (hoursRelevantChanged) {
       import("@/lib/recalculateProductionHours").then(({ recalculateProductionHours }) => {
         recalculateProductionHours(supabase, [form.project_id]).then(() => {
+          qc.invalidateQueries({ queryKey: ["analytics"] });
           qc.invalidateQueries({ queryKey: ["production-inbox"] });
           qc.invalidateQueries({ queryKey: ["production-schedule"] });
+          qc.invalidateQueries({ queryKey: ["project-plan-hours"] });
         });
       });
     }
