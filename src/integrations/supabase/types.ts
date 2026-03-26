@@ -774,6 +774,54 @@ export type Database = {
           },
         ]
       }
+      project_plan_hours: {
+        Row: {
+          created_at: string | null
+          eur_rate_used: number | null
+          force_project_price: boolean
+          hodiny_plan: number
+          id: string
+          marze_used: number | null
+          prodpct_used: number | null
+          project_hours: number
+          project_id: string
+          recalculated_at: string | null
+          source: string
+          tpv_hours: number
+          warning_low_tpv: boolean
+        }
+        Insert: {
+          created_at?: string | null
+          eur_rate_used?: number | null
+          force_project_price?: boolean
+          hodiny_plan?: number
+          id?: string
+          marze_used?: number | null
+          prodpct_used?: number | null
+          project_hours?: number
+          project_id: string
+          recalculated_at?: string | null
+          source?: string
+          tpv_hours?: number
+          warning_low_tpv?: boolean
+        }
+        Update: {
+          created_at?: string | null
+          eur_rate_used?: number | null
+          force_project_price?: boolean
+          hodiny_plan?: number
+          id?: string
+          marze_used?: number | null
+          prodpct_used?: number | null
+          project_hours?: number
+          project_id?: string
+          recalculated_at?: string | null
+          source?: string
+          tpv_hours?: number
+          warning_low_tpv?: boolean
+        }
+        Relationships: []
+      }
       project_stages: {
         Row: {
           architekt: string | null
