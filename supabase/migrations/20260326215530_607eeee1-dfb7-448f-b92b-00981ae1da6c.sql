@@ -1,0 +1,1 @@
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS plan_use_project_price BOOLEAN DEFAULT false;

@@ -1002,6 +1002,7 @@ export type Database = {
           montaz: string | null
           narocnost: string | null
           percent_tpv: number | null
+          plan_use_project_price: boolean | null
           pm: string | null
           pm_poznamka: string | null
           predani: string | null
@@ -1061,6 +1062,7 @@ export type Database = {
           montaz?: string | null
           narocnost?: string | null
           percent_tpv?: number | null
+          plan_use_project_price?: boolean | null
           pm?: string | null
           pm_poznamka?: string | null
           predani?: string | null
@@ -1120,6 +1122,7 @@ export type Database = {
           montaz?: string | null
           narocnost?: string | null
           percent_tpv?: number | null
+          plan_use_project_price?: boolean | null
           pm?: string | null
           pm_poznamka?: string | null
           predani?: string | null
