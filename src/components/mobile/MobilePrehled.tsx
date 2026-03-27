@@ -2,6 +2,7 @@ import { memo, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { PLAN_VYROBY_ACTIONS } from "@/hooks/useActivityLog";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjectAttention, type AttentionItem } from "@/hooks/useProjectAttention";
 import { type RecentProject } from "@/hooks/useRecentlyOpened";
