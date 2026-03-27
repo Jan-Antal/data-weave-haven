@@ -42,9 +42,7 @@ export function useAnalytics() {
     queryKey: ["analytics"],
     queryFn: async () => {
       const [hoursRes, projectsRes, planHoursRes, presetsRes] = await Promise.all([
-        supabase
-          .from("production_hours_log")
-          .select("ami_project_id, hodiny, datum_sync"),
+        supabase.rpc("get_hours_by_project"),
         supabase
           .from("projects")
           .select("project_id, project_name, status, pm, cost_preset_id, cost_is_custom, plan_use_project_price")
