@@ -113,6 +113,7 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
   if (!project) return null;
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         ref={sheetRef}
