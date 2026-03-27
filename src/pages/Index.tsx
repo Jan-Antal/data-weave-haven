@@ -371,13 +371,11 @@ const Index = () => {
               }} modal={false}>
                 <SheetContent
                   side="bottom"
-                  className="p-0 flex flex-col rounded-t-2xl"
-                  style={{
-                    top: "var(--mobile-header-height, 56px)",
-                    bottom: "calc(56px + 8px)",
-                    height: "auto",
-                    maxHeight: "none",
-                    zIndex: 100,
+                  noOverlay
+                  className="p-0 flex flex-col rounded-t-2xl bottom-[56px] max-h-[calc(100svh-112px)] z-[100]"
+                  onPointerDownOutside={() => {
+                    setDataLogOpen(false);
+                    try { localStorage.setItem("datalog-panel-index", "false"); } catch {}
                   }}
                 >
                   <SheetTitle className="sr-only">Data Log</SheetTitle>

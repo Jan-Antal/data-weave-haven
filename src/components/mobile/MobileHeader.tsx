@@ -144,14 +144,9 @@ export function MobileHeader({ onDataLog, showDataLog = false, isDataLogOpen = f
       <Sheet open={notifOpen} onOpenChange={setNotifOpen} modal={false}>
         <SheetContent
           side="bottom"
-          className="p-0 flex flex-col rounded-t-2xl"
-          style={{
-            top: "var(--mobile-header-height, 56px)",
-            bottom: "calc(56px + 8px)",
-            height: "auto",
-            maxHeight: "none",
-            zIndex: 200,
-          }}
+          noOverlay
+          className="p-0 flex flex-col rounded-t-2xl bottom-[56px] max-h-[calc(100svh-112px)] z-[200]"
+          onPointerDownOutside={() => setNotifOpen(false)}
         >
           <SheetTitle className="sr-only">Notifikace</SheetTitle>
           <div className="flex flex-col items-center pt-3 pb-2 border-b border-border shrink-0">
