@@ -69,14 +69,16 @@ export async function midflightImportPlanVyroby(
   onProgress?.("Načítám production_hours_log...");
 
   // Fetch all hours — paginate to avoid 1000 row limit
+  const EXCLUDED_CODES = ["TPV", "ENG", "PRO"];
   const allHours: HoursRow[] = [];
   let from = 0;
-  const pageSize = 5000;
+  const pageSize = 1000;
   while (true) {
     const { data, error } = await (supabaseClient as any)
       .from("production_hours_log")
       .select("ami_project_id, hodiny, datum_sync")
-      .not("cinnost_kod", "in", '("TPV","ENG")')
+      .filter("cinnost_kod", "not.in", `(${EXCLUDED_CODES.map(c => `"${c}"`).join(",")})`)
+      .order("datum_sync", { ascending: true })
       .range(from, from + pageSize - 1);
     if (error) {
       errors.push(`Chyba při načítání hodin: ${error.message}`);
@@ -84,6 +86,7 @@ export async function midflightImportPlanVyroby(
     }
     if (!data || data.length === 0) break;
     allHours.push(...(data as HoursRow[]));
+    onProgress?.(`Načítavam históriu... ${allHours.length} záznamov`);
     if (data.length < pageSize) break;
     from += pageSize;
   }
