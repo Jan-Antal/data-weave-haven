@@ -582,17 +582,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
                   </SelectContent>
                 </Select>
               </div>
-              <Select value={projectFilter ?? "__all__"} onValueChange={v => setProjectFilter(v === "__all__" ? null : v)}>
-                <SelectTrigger className="h-7 text-xs">
-                  <SelectValue placeholder="Všechny projekty" />
-                </SelectTrigger>
-                <SelectContent className="z-[99999]">
-                  <SelectItem value="__all__">Všechny projekty</SelectItem>
-                  {activeProjects.map(p => (
-                    <SelectItem key={p.project_id} value={p.project_id}>{p.project_id}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ProjectFilterCombobox value={projectFilter} onChange={setProjectFilter} projects={activeProjects} />
             </div>
 
             {/* Feed */}
@@ -607,7 +597,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
                     </p>
                   </div>
                   {group.items.map(entry => (
-                    <ActivityItem key={entry.id} entry={entry} isSelected={selectedEntryId === entry.id} onSelect={handleEntrySelect} onNavigate={handleEntryNavigate} />
+                    <ActivityItem key={entry.id} entry={entry} isSelected={selectedEntryId === entry.id} onSelect={handleEntrySelect} onNavigate={handleEntryNavigate} stageName={entry.stage_id ? stagesMap.get(entry.stage_id) : null} />
                   ))}
                 </div>
               ))}
@@ -714,17 +704,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
               </Select>
             </div>
 
-            <Select value={projectFilter ?? "__all__"} onValueChange={v => setProjectFilter(v === "__all__" ? null : v)}>
-              <SelectTrigger className="h-7 text-xs">
-                <SelectValue placeholder="Všechny projekty" />
-              </SelectTrigger>
-              <SelectContent className="z-[99999]">
-                <SelectItem value="__all__">Všechny projekty</SelectItem>
-                {activeProjects.map(p => (
-                  <SelectItem key={p.project_id} value={p.project_id}>{p.project_id}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ProjectFilterCombobox value={projectFilter} onChange={setProjectFilter} projects={activeProjects} />
           </div>
 
           {/* Feed */}
@@ -751,6 +731,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
                     isSelected={selectedEntryId === entry.id}
                     onSelect={handleEntrySelect}
                     onNavigate={handleEntryNavigate}
+                    stageName={entry.stage_id ? stagesMap.get(entry.stage_id) : null}
                   />
                 ))}
               </div>
