@@ -755,7 +755,6 @@ export default function PlanVyroby() {
           midflightRunning={midflightRunning}
           onMidflightImport={() => setMidflightConfirmOpen(true)}
         />
-        />
         )}
 
         {/* Main content + DataLog sidebar wrapper */}
