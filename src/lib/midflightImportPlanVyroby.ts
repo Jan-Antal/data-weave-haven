@@ -146,17 +146,23 @@ export async function midflightImportPlanVyroby(
     projectsWithFutureWork.add(s.project_id);
   }
 
-  // Track which projects we've seen (for Expedice special entry)
+  // Track which projects we've seen and their most recent monday
   const projectsInHours = new Set<string>();
+  const projectTotalHours = new Map<string, number>();
+  const projectLatestMonday = new Map<string, string>();
 
-  // Separate lists for schedule vs inbox inserts
+  // Schedule inserts only (no inbox inserts for expedice)
   const scheduleInserts: any[] = [];
-  const inboxInserts: any[] = [];
 
   for (const [key, totalHours] of byProjectMonday) {
     const [projectId, monday] = key.split("||");
     const projectName = validProjectMap.get(projectId)?.name || projectId;
     projectsInHours.add(projectId);
+
+    // Track total hours and latest monday per project
+    projectTotalHours.set(projectId, (projectTotalHours.get(projectId) || 0) + totalHours);
+    const prev = projectLatestMonday.get(projectId);
+    if (!prev || monday > prev) projectLatestMonday.set(projectId, monday);
 
     if (monday < currentMonday) {
       // Historical → production_schedule as completed midflight items
@@ -170,6 +176,7 @@ export async function midflightImportPlanVyroby(
         scheduled_hours: Math.round(totalHours * 100) / 100,
         scheduled_czk: 0,
         status: "completed",
+        completed_at: new Date().toISOString(),
         is_midflight: true,
       });
     } else if (monday === currentMonday) {
@@ -191,7 +198,7 @@ export async function midflightImportPlanVyroby(
     // future weeks: skip
   }
 
-  // Expedice projects: create special inbox entry with status="pending"
+  // Expedice/Montáž projects: create ONE summary entry in production_schedule
   for (const projectId of projectsInHours) {
     const status = validProjectMap.get(projectId)?.status || "";
     if (status !== "expedice" && status !== "montáž") continue;
@@ -200,21 +207,25 @@ export async function midflightImportPlanVyroby(
     if (projectsWithFutureWork.has(projectId)) continue;
 
     const projectName = validProjectMap.get(projectId)?.name || projectId;
-    inboxInserts.push({
+    const latestMonday = projectLatestMonday.get(projectId) || currentMonday;
+    const totalHrs = projectTotalHours.get(projectId) || 0;
+
+    scheduleInserts.push({
       project_id: projectId,
-      item_code: `EXPEDICE_${projectId}`,
-      item_name: `${projectName} — Expedice`,
-      estimated_hours: 0,
-      estimated_czk: 0,
-      status: "pending",
-      adhoc_reason: "midflight_expedice",
-      sent_by: userId,
+      item_code: "EXPEDICE_MIDFLIGHT",
+      item_name: projectName,
+      scheduled_week: latestMonday,
+      scheduled_hours: Math.round(totalHrs * 100) / 100,
+      scheduled_czk: 0,
+      status: "completed",
+      completed_at: new Date().toISOString(),
+      is_midflight: true,
     });
   }
 
-  // Batch insert historical items to production_schedule
+  // Batch insert all items to production_schedule
   if (scheduleInserts.length > 0) {
-    onProgress?.(`Vkládám ${scheduleInserts.length} historických položek do plánu...`);
+    onProgress?.(`Vkládám ${scheduleInserts.length} položek do plánu...`);
     for (let i = 0; i < scheduleInserts.length; i += 200) {
       const chunk = scheduleInserts.slice(i, i + 200);
       const { error: insErr } = await (supabaseClient as any)
@@ -222,22 +233,6 @@ export async function midflightImportPlanVyroby(
         .upsert(chunk, { onConflict: "project_id,item_code,scheduled_week", ignoreDuplicates: true });
       if (insErr) {
         errors.push(`Schedule insert error (batch ${i}): ${insErr.message}`);
-      } else {
-        created += chunk.length;
-      }
-    }
-  }
-
-  // Batch insert expedice items to production_inbox
-  if (inboxInserts.length > 0) {
-    onProgress?.(`Vkládám ${inboxInserts.length} expedice položek do inboxu...`);
-    for (let i = 0; i < inboxInserts.length; i += 200) {
-      const chunk = inboxInserts.slice(i, i + 200);
-      const { error: insErr } = await (supabaseClient as any)
-        .from("production_inbox")
-        .insert(chunk);
-      if (insErr) {
-        errors.push(`Inbox insert error (batch ${i}): ${insErr.message}`);
       } else {
         created += chunk.length;
       }
