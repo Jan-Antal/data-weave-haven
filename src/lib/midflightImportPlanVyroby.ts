@@ -45,6 +45,17 @@ export async function midflightImportPlanVyroby(
     return { created, skipped, errors };
   }
 
+  // FIX 4 — Clean up wrong midflight data from previous runs
+  onProgress?.("Mazání chybných midflight záznamů z inboxu...");
+  const { error: cleanupErr } = await (supabaseClient as any)
+    .from("production_inbox")
+    .delete()
+    .eq("adhoc_reason", "midflight_historical")
+    .eq("status", "scheduled");
+  if (cleanupErr) {
+    errors.push(`Cleanup error: ${cleanupErr.message}`);
+  }
+
   onProgress?.("Načítám production_hours_log...");
 
   // Fetch all hours — paginate to avoid 1000 row limit
@@ -103,14 +114,24 @@ export async function midflightImportPlanVyroby(
     onProgress?.(`Preskočený neznámy projekt: ${uid}`);
   }
 
-  // Fetch existing inbox item_codes for dedup (midflight items)
+  // Fetch existing schedule midflight items for dedup
+  const { data: existingSchedule } = await (supabaseClient as any)
+    .from("production_schedule")
+    .select("project_id, item_code, scheduled_week")
+    .eq("is_midflight", true);
+  const existingScheduleKeys = new Set<string>();
+  for (const item of existingSchedule || []) {
+    existingScheduleKeys.add(`${item.project_id}||${item.item_code}||${item.scheduled_week}`);
+  }
+
+  // Fetch existing inbox expedice items for dedup
   const { data: existingInbox } = await (supabaseClient as any)
     .from("production_inbox")
     .select("project_id, item_code, adhoc_reason")
-    .or("adhoc_reason.eq.midflight_historical,adhoc_reason.eq.midflight_expedice");
-  const existingKeys = new Set<string>();
+    .eq("adhoc_reason", "midflight_expedice");
+  const existingInboxKeys = new Set<string>();
   for (const item of existingInbox || []) {
-    existingKeys.add(`${item.project_id}||${item.item_code}`);
+    existingInboxKeys.add(`${item.project_id}||${item.item_code}`);
   }
 
   // Fetch inbox items for current week logic
@@ -138,8 +159,9 @@ export async function midflightImportPlanVyroby(
   // Track which projects we've seen (for Expedice special entry)
   const projectsInHours = new Set<string>();
 
-  // Process each project+monday
-  const toInsert: any[] = [];
+  // Separate lists for schedule vs inbox inserts
+  const scheduleInserts: any[] = [];
+  const inboxInserts: any[] = [];
 
   for (const [key, totalHours] of byProjectMonday) {
     const [projectId, monday] = key.split("||");
@@ -147,23 +169,23 @@ export async function midflightImportPlanVyroby(
     projectsInHours.add(projectId);
 
     if (monday < currentMonday) {
-      // CASE A — Historical → production_inbox as completed items
+      // FIX 1 — Historical → production_schedule as completed midflight items
       const itemCode = `HIST_${monday.replace(/-/g, "")}`;
-      const dedupKey = `${projectId}||${itemCode}`;
-      if (existingKeys.has(dedupKey)) {
+      const dedupKey = `${projectId}||${itemCode}||${monday}`;
+      if (existingScheduleKeys.has(dedupKey)) {
         skipped++;
         continue;
       }
 
-      toInsert.push({
+      scheduleInserts.push({
         project_id: projectId,
         item_code: itemCode,
-        item_name: `${projectName} — týždeň ${monday}`,
-        estimated_hours: Math.round(totalHours * 100) / 100,
-        estimated_czk: 0,
-        status: "scheduled",
-        adhoc_reason: "midflight_historical",
-        sent_by: userId,
+        item_name: `${projectName} — história ${monday}`,
+        scheduled_week: monday,
+        scheduled_hours: Math.round(totalHours * 100) / 100,
+        scheduled_czk: 0,
+        status: "completed",
+        is_midflight: true,
       });
     } else if (monday === currentMonday) {
       // CASE B — Current week: reduce inbox hours
@@ -184,7 +206,7 @@ export async function midflightImportPlanVyroby(
     // CASE C — future weeks: skip
   }
 
-  // CASE D — Expedice projects: create special inbox entry for scheduling
+  // FIX 2 — Expedice projects: create special inbox entry with status="pending"
   for (const projectId of projectsInHours) {
     const status = validProjectMap.get(projectId)?.status || "";
     if (status !== "expedice" && status !== "montáž") continue;
@@ -194,10 +216,10 @@ export async function midflightImportPlanVyroby(
 
     const itemCode = `EXPEDICE_${projectId}`;
     const dedupKey = `${projectId}||${itemCode}`;
-    if (existingKeys.has(dedupKey)) continue;
+    if (existingInboxKeys.has(dedupKey)) continue;
 
     const projectName = validProjectMap.get(projectId)?.name || projectId;
-    toInsert.push({
+    inboxInserts.push({
       project_id: projectId,
       item_code: itemCode,
       item_name: `${projectName} — Expedice`,
@@ -209,23 +231,37 @@ export async function midflightImportPlanVyroby(
     });
   }
 
-  // Batch insert to production_inbox
-  if (toInsert.length > 0) {
-    onProgress?.(`Vkládám ${toInsert.length} položek do inboxu...`);
-    for (let i = 0; i < toInsert.length; i += 200) {
-      const chunk = toInsert.slice(i, i + 200);
+  // Batch insert historical items to production_schedule
+  if (scheduleInserts.length > 0) {
+    onProgress?.(`Vkládám ${scheduleInserts.length} historických položek do plánu...`);
+    for (let i = 0; i < scheduleInserts.length; i += 200) {
+      const chunk = scheduleInserts.slice(i, i + 200);
       const { error: insErr } = await (supabaseClient as any)
-        .from("production_inbox")
-        .insert(chunk);
+        .from("production_schedule")
+        .upsert(chunk, { onConflict: "project_id,item_code,scheduled_week", ignoreDuplicates: true });
       if (insErr) {
-        errors.push(`Insert error (batch ${i}): ${insErr.message}`);
+        errors.push(`Schedule insert error (batch ${i}): ${insErr.message}`);
       } else {
         created += chunk.length;
       }
     }
   }
 
-  skipped = Math.max(0, (toInsert.length + skipped) - created);
+  // Batch insert expedice items to production_inbox
+  if (inboxInserts.length > 0) {
+    onProgress?.(`Vkládám ${inboxInserts.length} expedice položek do inboxu...`);
+    for (let i = 0; i < inboxInserts.length; i += 200) {
+      const chunk = inboxInserts.slice(i, i + 200);
+      const { error: insErr } = await (supabaseClient as any)
+        .from("production_inbox")
+        .insert(chunk);
+      if (insErr) {
+        errors.push(`Inbox insert error (batch ${i}): ${insErr.message}`);
+      } else {
+        created += chunk.length;
+      }
+    }
+  }
 
   onProgress?.(`Hotovo. Vytvořeno: ${created}, Přeskočeno: ${skipped}`);
   return { created, skipped, errors };
