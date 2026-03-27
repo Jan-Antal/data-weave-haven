@@ -6,10 +6,13 @@ import { useSharePointDocs, type SPFile, CATEGORY_FOLDER_MAP } from "@/hooks/use
 import { ProjectDetailDialog, type ProjectDetailProject } from "@/components/ProjectDetailDialog";
 import { isImageFile, PhotoTimelineGrid, PhotoLightbox, generatePhotoFilename } from "@/components/PhotoLightbox";
 import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
-import { ChevronLeft, ChevronRight, ChevronDown, FileText, Package, Info, Plus, Camera } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, FileText, Package, Info, Plus, Camera, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 
 interface Project {
@@ -52,7 +55,19 @@ const TABS: { key: TabKey; label: string; icon: typeof Info }[] = [
 
 export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTPV }: MobileDetailProjektSheetProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("info");
+  const [statusPickerOpen, setStatusPickerOpen] = useState(false);
   const projectId = project?.project_id || "";
+  const { data: statuses = [] } = useProjectStatusOptions();
+  const queryClient = useQueryClient();
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!project) return;
+    await supabase.from("projects")
+      .update({ status: newStatus })
+      .eq("project_id", project.project_id);
+    setStatusPickerOpen(false);
+    queryClient.invalidateQueries({ queryKey: ["projects"] });
+  };
 
   // Reset tab when project changes
   useEffect(() => {
@@ -169,7 +184,11 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
           <p className="text-[11px] font-sans text-muted-foreground">{project.project_id}</p>
           <div className="flex items-center gap-2 mt-0.5">
             <p className="text-[15px] font-semibold text-foreground truncate min-w-0 flex-1">{project.project_name}</p>
-            {project.status && <StatusBadge status={project.status} />}
+            {project.status && (
+              <button onClick={() => setStatusPickerOpen(true)} className="appearance-none">
+                <StatusBadge status={project.status} />
+              </button>
+            )}
           </div>
         </div>
 
