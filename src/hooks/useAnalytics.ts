@@ -44,7 +44,7 @@ export function useAnalytics() {
       const [hoursRes, projectsRes, planHoursRes, presetsRes] = await Promise.all([
         supabase
           .from("production_hours_log")
-          .select("ami_project_id, project_name, status, pm, hodiny_skutocne, datum_sync"),
+          .select("ami_project_id, hodiny, datum_sync"),
         supabase
           .from("projects")
           .select("project_id, project_name, status, pm, cost_preset_id, cost_is_custom, plan_use_project_price")
@@ -101,9 +101,6 @@ export function useAnalytics() {
 
       // Build actual hours from production_hours_log
       interface HoursAgg {
-        project_name: string;
-        status: string | null;
-        pm: string | null;
         skutocne: number;
         tracking_od: string | null;
         tracking_do: string | null;
@@ -114,26 +111,20 @@ export function useAnalytics() {
           const pid = r.ami_project_id;
           if (!pid) continue;
           const existing = hoursMap.get(pid);
-          const val = Number(r.hodiny_skutocne || 0);
+          const val = Number(r.hodiny || 0);
           const sync = r.datum_sync;
           if (!existing) {
             hoursMap.set(pid, {
-              project_name: r.project_name || pid,
-              status: r.status,
-              pm: r.pm,
               skutocne: val,
               tracking_od: sync,
               tracking_do: sync,
             });
           } else {
-            if (val > existing.skutocne) existing.skutocne = val;
+            existing.skutocne += val;
             if (sync && (!existing.tracking_od || sync < existing.tracking_od))
               existing.tracking_od = sync;
             if (sync && (!existing.tracking_do || sync > existing.tracking_do))
               existing.tracking_do = sync;
-            if (r.status) existing.status = r.status;
-            if (r.pm) existing.pm = r.pm;
-            if (r.project_name) existing.project_name = r.project_name;
           }
         }
       }
@@ -144,9 +135,9 @@ export function useAnalytics() {
 
       for (const [pid, h] of hoursMap) {
         const proj = projectsMap.get(pid);
-        const name = proj?.project_name || h.project_name;
-        const status = proj?.status || h.status;
-        const pm = proj?.pm || h.pm;
+        const name = proj?.project_name || pid;
+        const status = proj?.status || null;
+        const pm = proj?.pm || null;
 
         const plan = planMap.get(pid);
         const hodiny_plan = plan?.hodiny_plan ?? null;
