@@ -42,9 +42,7 @@ export function useAnalytics() {
     queryKey: ["analytics"],
     queryFn: async () => {
       const [hoursRes, projectsRes, planHoursRes, presetsRes] = await Promise.all([
-        supabase
-          .from("production_hours_log")
-          .select("ami_project_id, hodiny, datum_sync"),
+        (supabase.rpc as any)("get_hours_by_project"),
         supabase
           .from("projects")
           .select("project_id, project_name, status, pm, cost_preset_id, cost_is_custom, plan_use_project_price")
@@ -99,7 +97,7 @@ export function useAnalytics() {
         }
       }
 
-      // Build actual hours from production_hours_log
+      // Build actual hours from pre-aggregated RPC
       interface HoursAgg {
         skutocne: number;
         tracking_od: string | null;
@@ -107,25 +105,12 @@ export function useAnalytics() {
       }
       const hoursMap = new Map<string, HoursAgg>();
       if (hoursRes.data) {
-        for (const r of hoursRes.data) {
-          const pid = r.ami_project_id;
-          if (!pid) continue;
-          const existing = hoursMap.get(pid);
-          const val = Number(r.hodiny || 0);
-          const sync = r.datum_sync;
-          if (!existing) {
-            hoursMap.set(pid, {
-              skutocne: val,
-              tracking_od: sync,
-              tracking_do: sync,
-            });
-          } else {
-            existing.skutocne += val;
-            if (sync && (!existing.tracking_od || sync < existing.tracking_od))
-              existing.tracking_od = sync;
-            if (sync && (!existing.tracking_do || sync > existing.tracking_do))
-              existing.tracking_do = sync;
-          }
+        for (const r of hoursRes.data as Array<{ ami_project_id: string; total_hodiny: number; min_datum: string; max_datum: string }>) {
+          hoursMap.set(r.ami_project_id, {
+            skutocne: Number(r.total_hodiny || 0),
+            tracking_od: r.min_datum || null,
+            tracking_do: r.max_datum || null,
+          });
         }
       }
 
