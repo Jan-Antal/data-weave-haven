@@ -99,6 +99,11 @@ function RecordRow({
   };
 
   const handlePermanentDelete = async () => {
+    // Clean up related tables before hard-deleting a project
+    if (table === "projects" && record.project_id) {
+      await supabase.from("project_plan_hours").delete().eq("project_id", record.project_id);
+      await supabase.from("production_hours_log" as any).delete().eq("ami_project_id", record.project_id);
+    }
     const { error } = await supabase.from(table as any).delete().eq("id", record.id);
     if (error) {
       toast({ title: "Chyba", description: error.message, variant: "destructive" });
