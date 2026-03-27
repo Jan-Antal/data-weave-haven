@@ -2363,8 +2363,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 <SheetContent
                   ref={sheetRefDaylog}
                   side="bottom"
-                  className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col shadow-[0_-8px_30px_rgba(0,0,0,0.12)]"
-                  style={{ touchAction: "none", paddingBottom: "72px" }}
+                  className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col shadow-[0_-8px_30px_rgba(0,0,0,0.12)] bottom-[56px]"
+                  style={{ touchAction: "none" }}
                   onTouchStart={(e: React.TouchEvent) => {
                     const el = e.currentTarget as HTMLElement;
                     el.dataset.swipeStartY = String(e.touches[0].clientY);
