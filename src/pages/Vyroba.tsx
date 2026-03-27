@@ -2422,7 +2422,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     <div className="w-[50px]" />
                   </div>
                   <div className="flex-1 overflow-y-auto">{logModalContent}</div>
-                  <div className="shrink-0 px-4 pt-3 pb-[104px] border-t border-border bg-background space-y-2">
+                  <div className="shrink-0 px-4 pt-3 pb-[92px] border-t-0 bg-primary space-y-2">
                     <div className="flex flex-col gap-2">
                       <Button variant="outline" onClick={() => setMobileDaylogOpen(false)}>
                         Zrušit
