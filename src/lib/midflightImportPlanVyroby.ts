@@ -69,22 +69,24 @@ export async function midflightImportPlanVyroby(
     byProjectMonday.set(key, (byProjectMonday.get(key) || 0) + row.hodiny);
   }
 
-  // Fetch project names
+  // Fetch project names and statuses
   const projectIds = [...new Set(allHours.map((r) => r.ami_project_id))];
   const { data: projects } = await (supabaseClient as any)
     .from("projects")
-    .select("project_id, project_name")
+    .select("project_id, project_name, status")
     .in("project_id", projectIds);
   const projectNameMap = new Map<string, string>();
+  const projectStatusMap = new Map<string, string>();
   for (const p of projects || []) {
     projectNameMap.set(p.project_id, p.project_name);
+    projectStatusMap.set(p.project_id, (p.status || "").toLowerCase());
   }
 
-  // Fetch existing inbox item_codes for dedup
+  // Fetch existing inbox item_codes for dedup (midflight items)
   const { data: existingInbox } = await (supabaseClient as any)
     .from("production_inbox")
-    .select("project_id, item_code")
-    .eq("adhoc_reason", "midflight_historical");
+    .select("project_id, item_code, adhoc_reason")
+    .or("adhoc_reason.eq.midflight_historical,adhoc_reason.eq.midflight_expedice");
   const existingKeys = new Set<string>();
   for (const item of existingInbox || []) {
     existingKeys.add(`${item.project_id}||${item.item_code}`);
@@ -101,12 +103,27 @@ export async function midflightImportPlanVyroby(
     inboxByProject.get(item.project_id)!.push(item);
   }
 
+  // Fetch existing schedule items to check if Expedice projects have future work
+  const { data: schedItems } = await (supabaseClient as any)
+    .from("production_schedule")
+    .select("project_id, scheduled_week, status")
+    .gte("scheduled_week", currentMonday)
+    .in("status", ["scheduled", "in_progress"]);
+  const projectsWithFutureWork = new Set<string>();
+  for (const s of schedItems || []) {
+    projectsWithFutureWork.add(s.project_id);
+  }
+
+  // Track which projects we've seen (for Expedice special entry)
+  const projectsInHours = new Set<string>();
+
   // Process each project+monday
   const toInsert: any[] = [];
 
   for (const [key, totalHours] of byProjectMonday) {
     const [projectId, monday] = key.split("||");
     const projectName = projectNameMap.get(projectId) || projectId;
+    projectsInHours.add(projectId);
 
     if (monday < currentMonday) {
       // CASE A — Historical → production_inbox as completed items
@@ -146,6 +163,31 @@ export async function midflightImportPlanVyroby(
     // CASE C — future weeks: skip
   }
 
+  // CASE D — Expedice projects: create special inbox entry for scheduling
+  for (const projectId of projectsInHours) {
+    const status = projectStatusMap.get(projectId) || "";
+    if (status !== "expedice" && status !== "montáž") continue;
+
+    // Only create if no future scheduled work exists
+    if (projectsWithFutureWork.has(projectId)) continue;
+
+    const itemCode = `EXPEDICE_${projectId}`;
+    const dedupKey = `${projectId}||${itemCode}`;
+    if (existingKeys.has(dedupKey)) continue;
+
+    const projectName = projectNameMap.get(projectId) || projectId;
+    toInsert.push({
+      project_id: projectId,
+      item_code: itemCode,
+      item_name: `${projectName} — Expedice`,
+      estimated_hours: 0,
+      estimated_czk: 0,
+      status: "pending",
+      adhoc_reason: "midflight_expedice",
+      sent_by: userId,
+    });
+  }
+
   // Batch insert to production_inbox
   if (toInsert.length > 0) {
     onProgress?.(`Vkládám ${toInsert.length} položek do inboxu...`);
@@ -161,6 +203,8 @@ export async function midflightImportPlanVyroby(
       }
     }
   }
+
+  skipped = Math.max(0, (toInsert.length + skipped) - created);
 
   onProgress?.(`Hotovo. Vytvořeno: ${created}, Přeskočeno: ${skipped}`);
   return { created, skipped, errors };
