@@ -146,10 +146,19 @@ export async function midflightImportPlanVyroby(
     projectsWithFutureWork.add(s.project_id);
   }
 
-  // Track which projects we've seen and their most recent monday
+  // Track which projects we've seen, total hours, latest monday, and latest datum_sync
   const projectsInHours = new Set<string>();
   const projectTotalHours = new Map<string, number>();
   const projectLatestMonday = new Map<string, string>();
+  const projectLatestDatum = new Map<string, string>();
+
+  // Track latest datum_sync per normalized project from raw hours
+  for (const row of allHours) {
+    const normalizedId = normalizeProjectId(row.ami_project_id);
+    if (!validProjectMap.has(normalizedId)) continue;
+    const prev = projectLatestDatum.get(normalizedId);
+    if (!prev || row.datum_sync > prev) projectLatestDatum.set(normalizedId, row.datum_sync);
+  }
 
   // Schedule inserts only (no inbox inserts for expedice)
   const scheduleInserts: any[] = [];
@@ -198,10 +207,16 @@ export async function midflightImportPlanVyroby(
     // future weeks: skip
   }
 
-  // Expedice/Montáž projects: create ONE summary entry in production_schedule
+  // Expedice/Montáž → summary entry with completed_at = now()
+  // Dokončeno/Fakturace/Reklamace → summary entry with completed_at = last datum_sync
+  const doneStatuses = new Set(["dokončeno", "fakturace", "reklamace"]);
+  const expediceStatuses = new Set(["expedice", "montáž"]);
+
   for (const projectId of projectsInHours) {
     const status = validProjectMap.get(projectId)?.status || "";
-    if (status !== "expedice" && status !== "montáž") continue;
+    const isExpedice = expediceStatuses.has(status);
+    const isDone = doneStatuses.has(status);
+    if (!isExpedice && !isDone) continue;
 
     // Only create if no future scheduled work exists
     if (projectsWithFutureWork.has(projectId)) continue;
@@ -210,15 +225,20 @@ export async function midflightImportPlanVyroby(
     const latestMonday = projectLatestMonday.get(projectId) || currentMonday;
     const totalHrs = projectTotalHours.get(projectId) || 0;
 
+    // Expedice: completed_at = now, Done: completed_at = last recorded work date
+    const completedAt = isExpedice
+      ? new Date().toISOString()
+      : new Date(projectLatestDatum.get(projectId) || new Date().toISOString()).toISOString();
+
     scheduleInserts.push({
       project_id: projectId,
-      item_code: "EXPEDICE_MIDFLIGHT",
+      item_code: isExpedice ? "EXPEDICE_MIDFLIGHT" : "DONE_MIDFLIGHT",
       item_name: projectName,
       scheduled_week: latestMonday,
       scheduled_hours: Math.round(totalHrs * 100) / 100,
       scheduled_czk: 0,
       status: "completed",
-      completed_at: new Date().toISOString(),
+      completed_at: completedAt,
       is_midflight: true,
     });
   }
