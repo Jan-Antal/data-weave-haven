@@ -205,6 +205,7 @@ export default function PlanVyroby() {
 
   const [midflightRunning, setMidflightRunning] = useState(false);
   const [midflightConfirmOpen, setMidflightConfirmOpen] = useState(false);
+  const [showLegacyArchive, setShowLegacyArchive] = useState(false);
 
   const handleMidflightImport = useCallback(async () => {
     setMidflightRunning(true);
