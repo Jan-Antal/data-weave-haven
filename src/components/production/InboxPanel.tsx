@@ -719,6 +719,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
           </div>
         )}
 
+        {completedProjects.length > 0 && (
           <div className="mt-3 space-y-[2px]">
             {/* Section divider */}
             <div className="flex items-center gap-0 mb-1.5">
