@@ -76,6 +76,7 @@ export async function midflightImportPlanVyroby(
     const { data, error } = await (supabaseClient as any)
       .from("production_hours_log")
       .select("ami_project_id, hodiny, datum_sync")
+      .not("cinnost_kod", "in", '("TPV","ENG")')
       .range(from, from + pageSize - 1);
     if (error) {
       errors.push(`Chyba při načítání hodin: ${error.message}`);
