@@ -439,6 +439,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
   const { highlightProject } = useDataLogHighlight();
 
   const { data: projects = [] } = useProjects();
+  const { data: allStages = [] } = useAllProjectStages();
   const activeProjects = useMemo(() => projects.filter(p => !p.deleted_at), [projects]);
   const { data: allUsers = [] } = useActivityLogUsers();
 
