@@ -1475,6 +1475,9 @@ function CompletedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onCont
       <span style={{ width: 10, fontSize: 9, color: "#3a8a36", fontWeight: 700 }}>✓</span>
       {item.item_code && <span className="font-sans text-[9px] font-bold shrink-0" style={{ color: "#99a5a3" }}>{item.item_code}</span>}
       <span className="text-[10px] flex-1 truncate" style={{ color: "#6b7280", textDecoration: "line-through" }}>{item.item_name}</span>
+      {item.is_midflight && (
+        <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-300 rounded px-1 ml-1 font-medium tracking-wide shrink-0">Legacy</span>
+      )}
       {isSplit && (
         <Tooltip><TooltipTrigger asChild><span className="text-[8px] font-sans shrink-0" style={{ color: "#c4ccc9" }}>{item.split_part}/{item.split_total}</span></TooltipTrigger>
           <TooltipContent side="top" className="z-[9999] text-[10px]">Část {item.split_part} ze {item.split_total}</TooltipContent></Tooltip>
@@ -1562,6 +1565,9 @@ function DraggableSiloItem({ item, weekKey, showCzk, onContextMenu, disabled = f
       )}
       {item.item_code && <span className="font-sans text-[9px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
       <span className="text-[10px] flex-1 truncate" style={{ color: "#6b7a78" }}>{item.item_name}</span>
+      {item.is_midflight && (
+        <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-300 rounded px-1 ml-1 font-medium tracking-wide shrink-0">Legacy</span>
+      )}
       {isSplit && (
         <Tooltip><TooltipTrigger asChild><span className="text-[8px] font-sans shrink-0" style={{ color: "#99a5a3" }}>{item.split_part}/{item.split_total}</span></TooltipTrigger>
           <TooltipContent side="top" className="z-[9999] text-[10px]">Část {item.split_part} ze {item.split_total}</TooltipContent></Tooltip>
