@@ -371,7 +371,7 @@ const Index = () => {
               }}>
                 <SheetContent
                   side="bottom"
-                  className="p-0 flex flex-col rounded-t-2xl bottom-[56px] max-h-[calc(100svh-112px)] z-[100]"
+                  className="p-0 flex flex-col rounded-t-2xl bottom-[56px] max-h-[calc(100svh-112px)] z-[100] shadow-[0_-8px_30px_rgba(0,0,0,0.12)]"
                 >
                   <SheetTitle className="sr-only">Data Log</SheetTitle>
                   <div className="w-10 h-1 bg-muted rounded-full mx-auto mt-3 mb-1 shrink-0" />
