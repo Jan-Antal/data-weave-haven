@@ -23,7 +23,7 @@ export function useProductionProgress() {
       const [tpvRes, inboxRes, scheduleRes] = await Promise.all([
         supabase.from("tpv_items").select("project_id, id, item_name, item_type").is("deleted_at", null),
         supabase.from("production_inbox").select("project_id, id, item_name, item_code, status"),
-        supabase.from("production_schedule").select("project_id, id, item_name, item_code, status, scheduled_week, is_blocker, projects!production_schedule_project_id_fkey(project_name)"),
+        supabase.from("production_schedule").select("project_id, id, item_name, item_code, status, scheduled_week, is_blocker, projects!production_schedule_project_id_fkey(project_name)").in("status", ["scheduled", "in_progress", "paused"]).or("is_midflight.is.null,is_midflight.eq.false"),
       ]);
 
       if (tpvRes.error) throw tpvRes.error;
