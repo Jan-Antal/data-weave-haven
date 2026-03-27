@@ -708,6 +708,26 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
       toast({ title: "Projekt vytvořen" });
       logActivity({ projectId: newProj.project_id, actionType: "project_created", detail: newProj.project_name });
       qc.invalidateQueries({ queryKey: ["projects"] });
+
+      // Notify admin/owner about new project (fire-and-forget)
+      (async () => {
+        try {
+          const adminIds = await getUserIdsByRole(supabase, ["owner", "admin"]);
+          const currentUser = (await supabase.auth.getUser()).data.user;
+          const { data: prof } = await (supabase as any).from("profiles").select("full_name").eq("id", currentUser?.id).limit(1);
+          const actor = prof?.[0]?.full_name || "";
+          await createNotification(supabase, {
+            userIds: adminIds,
+            type: "info",
+            title: "Nový projekt",
+            body: `${newProj.project_id} — ${newProj.project_name}`,
+            projectId: newProj.project_id,
+            actorName: actor,
+            excludeUserId: currentUser?.id,
+            linkContext: { tab: "project-info", project_id: newProj.project_id },
+          });
+        } catch { /* silent */ }
+      })();
       setAddOpen(false);
       setNewProj({ ...emptyProject, status: getDefaultStatus(statusOptions) });
       setDatumWarning(false);

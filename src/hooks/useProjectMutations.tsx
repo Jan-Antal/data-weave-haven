@@ -188,6 +188,44 @@ export function useUpdateProject() {
             });
           }
 
+          // Status change by PM/konstrukter → notify admin/owner
+          if (field === "status" && value !== oldValue) {
+            const { data: roleData } = await (supabase as any)
+              .from("user_roles")
+              .select("role")
+              .eq("user_id", user.id)
+              .limit(1);
+            const userRole = roleData?.[0]?.role;
+            if (userRole === "pm" || userRole === "konstrukter") {
+              const adminOwnerIds = await getUserIdsByRole(supabase, ["owner", "admin"]);
+              await createNotification(supabase, {
+                userIds: adminOwnerIds,
+                type: "info",
+                title: "Změna statusu projektu",
+                body: `${pId} — ${projectName}: ${oldValue || "—"} → ${value || "—"}`,
+                projectId: pId,
+                actorName,
+                excludeUserId: user.id,
+                linkContext: { tab: "project-info", project_id: pId },
+              });
+            }
+
+            // Status → "Dokončeno" → notify admin/owner (by anyone)
+            if (value === "Dokončeno") {
+              const adminOwnerIds = await getUserIdsByRole(supabase, ["owner", "admin"]);
+              await createNotification(supabase, {
+                userIds: adminOwnerIds,
+                type: "success",
+                title: "Projekt dokončen",
+                body: `${pId} — ${projectName}`,
+                projectId: pId,
+                actorName,
+                excludeUserId: user.id,
+                linkContext: { tab: "project-info", project_id: pId },
+              });
+            }
+          }
+
           // Low margin notification
           if (field === "marze" && value !== oldValue) {
             const margeNum = parseFloat(String(value).replace(",", "."));

@@ -19,6 +19,12 @@ const PAGE_SIZE = 30;
 // Action types to always exclude from activity feed
 const EXCLUDED_ACTION_TYPES = ["user_login", "session_end", "user_session", "page_view"];
 
+// Plan Výroby actions — hidden from "Vše", shown only in "Výroba" pill
+const PLAN_VYROBY_ACTIONS = [
+  "item_scheduled", "item_moved", "item_completed", "item_paused", "item_split",
+  "item_returned_to_inbox", "forecast_committed", "item_moved_next_week", "item_cancelled",
+];
+
 export type DateRange = "today" | "yesterday" | "7d" | "30d" | "all";
 
 interface Filters {
@@ -35,7 +41,7 @@ function getActionTypes(category: Filters["category"]): string[] | null {
     case "terminy": return ["datum_smluvni_change", "stage_datum_smluvni_change"];
     case "documents": return ["document_uploaded", "document_deleted", "stage_document_uploaded", "stage_document_deleted"];
     case "projects": return ["project_created", "project_deleted", "project_restored", "stage_created", "stage_deleted", "prodejni_cena_change", "forecast_committed"];
-    case "vyroba": return ["item_scheduled", "item_moved", "item_completed", "item_paused", "item_cancelled", "item_returned_to_inbox", "item_split", "item_hotovo", "item_qc_confirmed", "item_expedice", "item_moved_next_week", "item_paused_vyroba", "vyroba_log_saved", "vyroba_no_activity", "defect_reported", "defect_resolved", "phase_changed"];
+    case "vyroba": return [...PLAN_VYROBY_ACTIONS, "item_hotovo", "item_qc_confirmed", "item_expedice", "item_paused_vyroba", "vyroba_log_saved", "vyroba_no_activity", "defect_reported", "defect_resolved", "phase_changed"];
     default: return null;
   }
 }
@@ -77,8 +83,8 @@ export function useActivityLog(filters: Filters) {
       if (types) {
         q = q.in("action_type", types);
       } else {
-        // "all" category: exclude noise
-        for (const excl of EXCLUDED_ACTION_TYPES) {
+        // "all" category: exclude noise + plan výroby actions
+        for (const excl of [...EXCLUDED_ACTION_TYPES, ...PLAN_VYROBY_ACTIONS]) {
           q = q.neq("action_type", excl);
         }
       }
