@@ -101,9 +101,6 @@ export function useAnalytics() {
 
       // Build actual hours from production_hours_log
       interface HoursAgg {
-        project_name: string;
-        status: string | null;
-        pm: string | null;
         skutocne: number;
         tracking_od: string | null;
         tracking_do: string | null;
@@ -118,9 +115,6 @@ export function useAnalytics() {
           const sync = r.datum_sync;
           if (!existing) {
             hoursMap.set(pid, {
-              project_name: r.project_name || pid,
-              status: r.status,
-              pm: r.pm,
               skutocne: val,
               tracking_od: sync,
               tracking_do: sync,
@@ -131,9 +125,6 @@ export function useAnalytics() {
               existing.tracking_od = sync;
             if (sync && (!existing.tracking_do || sync > existing.tracking_do))
               existing.tracking_do = sync;
-            if (r.status) existing.status = r.status;
-            if (r.pm) existing.pm = r.pm;
-            if (r.project_name) existing.project_name = r.project_name;
           }
         }
       }
