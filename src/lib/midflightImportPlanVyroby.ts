@@ -30,6 +30,14 @@ export async function midflightImportPlanVyroby(
   let created = 0;
   let skipped = 0;
 
+  // Get current user for sent_by
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  const userId = user?.id;
+  if (!userId) {
+    errors.push("Není přihlášený uživatel.");
+    return { created, skipped, errors };
+  }
+
   onProgress?.("Načítám production_hours_log...");
 
   // Fetch all hours — paginate to avoid 1000 row limit
@@ -72,6 +80,16 @@ export async function midflightImportPlanVyroby(
     projectNameMap.set(p.project_id, p.project_name);
   }
 
+  // Fetch existing inbox item_codes for dedup
+  const { data: existingInbox } = await (supabaseClient as any)
+    .from("production_inbox")
+    .select("project_id, item_code")
+    .eq("adhoc_reason", "midflight_historical");
+  const existingKeys = new Set<string>();
+  for (const item of existingInbox || []) {
+    existingKeys.add(`${item.project_id}||${item.item_code}`);
+  }
+
   // Fetch inbox items for current week logic
   const { data: inboxItems } = await (supabaseClient as any)
     .from("production_inbox")
@@ -91,33 +109,26 @@ export async function midflightImportPlanVyroby(
     const projectName = projectNameMap.get(projectId) || projectId;
 
     if (monday < currentMonday) {
-      // CASE A — Historical
+      // CASE A — Historical → production_inbox as completed items
+      const itemCode = `HIST_${monday.replace(/-/g, "")}`;
+      const dedupKey = `${projectId}||${itemCode}`;
+      if (existingKeys.has(dedupKey)) {
+        skipped++;
+        continue;
+      }
+
       toInsert.push({
         project_id: projectId,
-        item_code: "HIST",
-        item_name: `${projectName} — história`,
-        scheduled_week: monday,
-        scheduled_hours: Math.round(totalHours * 100) / 100,
-        scheduled_czk: 0,
-        status: "completed",
-        is_midflight: true,
-        position: 0,
+        item_code: itemCode,
+        item_name: `${projectName} — týždeň ${monday}`,
+        estimated_hours: Math.round(totalHours * 100) / 100,
+        estimated_czk: 0,
+        status: "scheduled",
+        adhoc_reason: "midflight_historical",
+        sent_by: userId,
       });
     } else if (monday === currentMonday) {
-      // CASE B — Current week
-      toInsert.push({
-        project_id: projectId,
-        item_code: "MIDFLIGHT_CURRENT",
-        item_name: `${projectName}`,
-        scheduled_week: monday,
-        scheduled_hours: Math.round(totalHours * 100) / 100,
-        scheduled_czk: 0,
-        status: "in_progress",
-        is_midflight: true,
-        position: 0,
-      });
-
-      // Reduce inbox hours if project is in inbox
+      // CASE B — Current week: reduce inbox hours
       const inboxEntries = inboxByProject.get(projectId);
       if (inboxEntries && inboxEntries.length > 0) {
         for (const entry of inboxEntries) {
@@ -135,30 +146,21 @@ export async function midflightImportPlanVyroby(
     // CASE C — future weeks: skip
   }
 
-  // Batch upsert (ON CONFLICT DO NOTHING via individual inserts with onConflict)
+  // Batch insert to production_inbox
   if (toInsert.length > 0) {
-    onProgress?.(`Vkládám ${toInsert.length} bundlů...`);
+    onProgress?.(`Vkládám ${toInsert.length} položek do inboxu...`);
     for (let i = 0; i < toInsert.length; i += 200) {
       const chunk = toInsert.slice(i, i + 200);
-      const { data: inserted, error: insErr } = await (supabaseClient as any)
-        .from("production_schedule")
-        .upsert(chunk, {
-          onConflict: "project_id,item_code,scheduled_week",
-          ignoreDuplicates: true,
-        })
-        .select("id");
+      const { error: insErr } = await (supabaseClient as any)
+        .from("production_inbox")
+        .insert(chunk);
       if (insErr) {
         errors.push(`Insert error (batch ${i}): ${insErr.message}`);
       } else {
-        const insertedCount = inserted?.length ?? chunk.length;
-        created += insertedCount;
+        created += chunk.length;
       }
     }
   }
-
-  // Count actual skipped as difference
-  skipped = toInsert.length - created;
-  if (skipped < 0) skipped = 0;
 
   onProgress?.(`Hotovo. Vytvořeno: ${created}, Přeskočeno: ${skipped}`);
   return { created, skipped, errors };
