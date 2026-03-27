@@ -1,0 +1,1 @@
+ALTER TABLE public.data_log ADD COLUMN IF NOT EXISTS stage_id UUID;
