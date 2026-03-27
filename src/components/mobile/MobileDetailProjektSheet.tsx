@@ -6,10 +6,13 @@ import { useSharePointDocs, type SPFile, CATEGORY_FOLDER_MAP } from "@/hooks/use
 import { ProjectDetailDialog, type ProjectDetailProject } from "@/components/ProjectDetailDialog";
 import { isImageFile, PhotoTimelineGrid, PhotoLightbox, generatePhotoFilename } from "@/components/PhotoLightbox";
 import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
-import { ChevronLeft, ChevronRight, ChevronDown, FileText, Package, Info, Plus, Camera } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, FileText, Package, Info, Plus, Camera, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 
 interface Project {
@@ -52,7 +55,19 @@ const TABS: { key: TabKey; label: string; icon: typeof Info }[] = [
 
 export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTPV }: MobileDetailProjektSheetProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("info");
+  const [statusPickerOpen, setStatusPickerOpen] = useState(false);
   const projectId = project?.project_id || "";
+  const { data: statuses = [] } = useProjectStatusOptions();
+  const queryClient = useQueryClient();
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!project) return;
+    await supabase.from("projects")
+      .update({ status: newStatus })
+      .eq("project_id", project.project_id);
+    setStatusPickerOpen(false);
+    queryClient.invalidateQueries({ queryKey: ["projects"] });
+  };
 
   // Reset tab when project changes
   useEffect(() => {
@@ -98,6 +113,7 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
   if (!project) return null;
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         ref={sheetRef}
@@ -169,7 +185,11 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
           <p className="text-[11px] font-sans text-muted-foreground">{project.project_id}</p>
           <div className="flex items-center gap-2 mt-0.5">
             <p className="text-[15px] font-semibold text-foreground truncate min-w-0 flex-1">{project.project_name}</p>
-            {project.status && <StatusBadge status={project.status} />}
+            {project.status && (
+              <button onClick={() => setStatusPickerOpen(true)} className="appearance-none">
+                <StatusBadge status={project.status} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -234,6 +254,31 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
         </div>
       </SheetContent>
     </Sheet>
+
+    {/* Status picker sheet */}
+    <Sheet open={statusPickerOpen} onOpenChange={setStatusPickerOpen}>
+      <SheetContent side="bottom" className="rounded-t-2xl px-0 pb-8">
+        <div className="px-4 pb-3" style={{ borderBottom: "0.5px solid hsl(var(--border))" }}>
+          <SheetTitle className="text-base font-semibold">Změnit status</SheetTitle>
+        </div>
+        <div className="flex flex-col py-1">
+          {statuses.map(s => (
+            <button
+              key={s.id}
+              onClick={() => handleStatusChange(s.label)}
+              className="flex items-center justify-between w-full px-4 py-3 hover:bg-muted/50 text-sm"
+            >
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                <span>{s.label}</span>
+              </div>
+              {project.status === s.label && <Check className="h-4 w-4 text-primary" />}
+            </button>
+          ))}
+        </div>
+      </SheetContent>
+    </Sheet>
+    </>
   );
 }
 
