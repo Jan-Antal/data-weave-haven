@@ -2069,7 +2069,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             <SheetContent
               ref={sheetRefVyrobaProjekt}
               side="bottom"
-              className="h-[85vh] rounded-t-2xl p-0 overflow-hidden shadow-[0_-8px_30px_rgba(0,0,0,0.12)] bottom-[56px]"
+              className="h-[85vh] rounded-t-2xl p-0 overflow-hidden shadow-[0_-8px_30px_rgba(0,0,0,0.12)]"
               onTouchStart={(e: React.TouchEvent) => {
                 const el = e.currentTarget as HTMLElement;
                 el.dataset.swipeStartY = String(e.touches[0].clientY);
@@ -2167,7 +2167,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 </div>
                 {/* Fixed bottom Log button */}
                 {todayDayIndex >= 0 && (
-                  <div className="shrink-0 px-4 py-3 border-t border-border bg-background">
+                  <div className="shrink-0 px-4 pt-3 border-t border-border bg-background">
                     <button
                       onClick={() => openLogModal()}
                       className="w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90 min-h-[44px]"
@@ -2177,6 +2177,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     </button>
                   </div>
                 )}
+                <div className="shrink-0 h-[56px] bg-background" />
               </div>
             </SheetContent>
           </Sheet>
@@ -2363,7 +2364,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 <SheetContent
                   ref={sheetRefDaylog}
                   side="bottom"
-                  className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col shadow-[0_-8px_30px_rgba(0,0,0,0.12)] bottom-[56px]"
+                  className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col shadow-[0_-8px_30px_rgba(0,0,0,0.12)]"
                   style={{ touchAction: "none" }}
                   onTouchStart={(e: React.TouchEvent) => {
                     const el = e.currentTarget as HTMLElement;
@@ -2422,7 +2423,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     <div className="w-[50px]" />
                   </div>
                   <div className="flex-1 overflow-y-auto">{logModalContent}</div>
-                  <div className="shrink-0 px-4 py-3 border-t border-border bg-background space-y-2">
+                  <div className="shrink-0 px-4 pt-3 border-t border-border bg-background space-y-2">
                     <div className="flex flex-col gap-2">
                       {logDayIndex === todayDayIndex && (
                         <Button variant="outline" onClick={() => setNoProductionOpen(true)} className="text-xs">
@@ -2437,6 +2438,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                       </Button>
                     </div>
                   </div>
+                  <div className="shrink-0 h-[56px] bg-background" />
                 </SheetContent>
               </Sheet>
             );
