@@ -253,6 +253,31 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
         </div>
       </SheetContent>
     </Sheet>
+
+    {/* Status picker sheet */}
+    <Sheet open={statusPickerOpen} onOpenChange={setStatusPickerOpen}>
+      <SheetContent side="bottom" className="rounded-t-2xl px-0 pb-8">
+        <div className="px-4 pb-3" style={{ borderBottom: "0.5px solid hsl(var(--border))" }}>
+          <SheetTitle className="text-base font-semibold">Změnit status</SheetTitle>
+        </div>
+        <div className="flex flex-col py-1">
+          {statuses.map(s => (
+            <button
+              key={s.id}
+              onClick={() => handleStatusChange(s.label)}
+              className="flex items-center justify-between w-full px-4 py-3 hover:bg-muted/50 text-sm"
+            >
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                <span>{s.label}</span>
+              </div>
+              {project.status === s.label && <Check className="h-4 w-4 text-primary" />}
+            </button>
+          ))}
+        </div>
+      </SheetContent>
+    </Sheet>
+    </>
   );
 }
 
