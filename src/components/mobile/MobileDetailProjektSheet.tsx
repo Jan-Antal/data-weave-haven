@@ -56,16 +56,29 @@ const TABS: { key: TabKey; label: string; icon: typeof Info }[] = [
 export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTPV }: MobileDetailProjektSheetProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("info");
   const [statusPickerOpen, setStatusPickerOpen] = useState(false);
+  const [localStatus, setLocalStatus] = useState<string | null | undefined>(project?.status);
   const projectId = project?.project_id || "";
   const { data: statuses = [] } = useProjectStatusOptions();
   const queryClient = useQueryClient();
 
+  // Sync local status when project prop changes
+  useEffect(() => {
+    setLocalStatus(project?.status);
+  }, [project?.status]);
+
   const handleStatusChange = async (newStatus: string) => {
     if (!project) return;
-    await supabase.from("projects")
+    const oldStatus = localStatus;
+    setLocalStatus(newStatus);
+    setStatusPickerOpen(false);
+    const { error } = await supabase.from("projects")
       .update({ status: newStatus })
       .eq("project_id", project.project_id);
-    setStatusPickerOpen(false);
+    if (error) {
+      setLocalStatus(oldStatus);
+      toast.error("Nepodařilo se změnit status");
+      return;
+    }
     queryClient.invalidateQueries({ queryKey: ["projects"] });
   };
 
