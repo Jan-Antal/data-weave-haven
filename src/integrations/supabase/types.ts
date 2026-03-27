@@ -1427,6 +1427,15 @@ export type Database = {
       clean_test_production_data: { Args: never; Returns: Json }
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
       cleanup_undo_sessions: { Args: never; Returns: undefined }
+      get_hours_by_project: {
+        Args: never
+        Returns: {
+          ami_project_id: string
+          max_datum: string
+          min_datum: string
+          total_hodiny: number
+        }[]
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
