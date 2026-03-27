@@ -2422,7 +2422,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     <div className="w-[50px]" />
                   </div>
                   <div className="flex-1 overflow-y-auto">{logModalContent}</div>
-                  <div className="shrink-0 px-4 pt-3 pb-5 mb-1 border-t border-border bg-background space-y-2">
+                  <div className="shrink-0 px-4 py-3 border-t border-border bg-background space-y-2">
                     <div className="flex flex-col gap-2">
                       {logDayIndex === todayDayIndex && (
                         <Button variant="outline" onClick={() => setNoProductionOpen(true)} className="text-xs">
