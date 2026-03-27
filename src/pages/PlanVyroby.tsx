@@ -970,6 +970,16 @@ export default function PlanVyroby() {
         open={!!detailProjectId}
         onOpenChange={(open) => { if (!open) setDetailProjectId(null); }}
       />
+      <ConfirmDialog
+        open={midflightConfirmOpen}
+        onConfirm={() => { setMidflightConfirmOpen(false); handleMidflightImport(); }}
+        onCancel={() => setMidflightConfirmOpen(false)}
+        title="Midflight import"
+        description="Toto vytvorí historické bundles z production_hours_log. Existujúce midflight záznamy sa preskočia. Pokračovať?"
+        confirmLabel="Importovať"
+        cancelLabel="Zrušit"
+        variant="default"
+      />
       {isMobile && <MobileBottomNav />}
     </DndContext>
   );
