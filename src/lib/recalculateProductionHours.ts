@@ -79,7 +79,7 @@ export async function recalculateProductionHours(
     // Update schedule items (current + future weeks only)
     const { data: schedItems } = await supabaseClient
       .from("production_schedule")
-      .select("id, item_code, scheduled_czk, scheduled_hours, scheduled_week")
+      .select("id, item_code, scheduled_czk, scheduled_hours, scheduled_week, split_part, split_total")
       .eq("project_id", proj.project_id)
       .in("status", ["scheduled", "in_progress"])
       .gte("scheduled_week", weekKey);
@@ -89,10 +89,12 @@ export async function recalculateProductionHours(
       if (!tpv) continue;
 
       const correctCzk = (Number(tpv.cena) || 0) * (Number(tpv.pocet) || 1);
-      const correctHours =
+      const totalHours =
         correctCzk > 0
           ? Math.floor((correctCzk * (1 - result.marze_used) * result.prodpct_used) / hourlyRate)
           : 0;
+      const splitTotal = Number(item.split_total) || 1;
+      const correctHours = Math.floor(totalHours / splitTotal);
 
       if (
         correctCzk !== Number(item.scheduled_czk) ||
@@ -109,7 +111,7 @@ export async function recalculateProductionHours(
     // Update inbox items (pending)
     const { data: inboxItems } = await supabaseClient
       .from("production_inbox")
-      .select("id, item_code, estimated_czk, estimated_hours")
+      .select("id, item_code, estimated_czk, estimated_hours, split_part, split_total")
       .eq("project_id", proj.project_id)
       .eq("status", "pending");
 
@@ -118,10 +120,12 @@ export async function recalculateProductionHours(
       if (!tpv) continue;
 
       const correctCzk = (Number(tpv.cena) || 0) * (Number(tpv.pocet) || 1);
-      const correctHours =
+      const totalHours =
         correctCzk > 0
           ? Math.floor((correctCzk * (1 - result.marze_used) * result.prodpct_used) / hourlyRate)
           : 0;
+      const splitTotal = Number(item.split_total) || 1;
+      const correctHours = Math.floor(totalHours / splitTotal);
 
       if (
         correctCzk !== Number(item.estimated_czk) ||
