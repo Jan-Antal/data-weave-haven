@@ -24,6 +24,7 @@ export interface ScheduleItem {
   adhoc_reason: string | null;
   cancel_reason: string | null;
   is_blocker: boolean;
+  is_midflight: boolean;
   tpv_expected_date: string | null;
 }
 
@@ -93,6 +94,7 @@ export function useProductionSchedule() {
           adhoc_reason: (row as any).adhoc_reason ?? null,
           cancel_reason: (row as any).cancel_reason ?? null,
           is_blocker: (row as any).is_blocker ?? false,
+          is_midflight: (row as any).is_midflight ?? false,
           tpv_expected_date: (row as any).tpv_expected_date ?? null,
         });
         bundle.total_hours += row.scheduled_hours;
