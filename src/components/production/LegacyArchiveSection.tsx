@@ -13,17 +13,37 @@ export function LegacyArchiveSection({ showLegacy, onToggle }: LegacyArchiveSect
   const legacyProjects = useMemo(() => {
     if (!expediceData) return [];
     return expediceData
-      .map(p => ({
-        ...p,
-        items: p.items.filter(i => i.is_midflight),
-      }))
-      .filter(p => p.items.length > 0);
+      .map(p => {
+        const midflightItems = p.items.filter(i => i.is_midflight);
+        if (midflightItems.length === 0) return null;
+        const totalHours = midflightItems.reduce((s, i) => s + i.scheduled_hours, 0);
+        const weeks = midflightItems.map(i => i.scheduled_week).filter(Boolean).sort();
+        const weekRange = weeks.length > 0
+          ? weeks.length === 1
+            ? weeks[0]
+            : `${weeks[0]} – ${weeks[weeks.length - 1]}`
+          : null;
+        return {
+          project_id: p.project_id,
+          project_name: p.project_name,
+          items: midflightItems,
+          totalHours,
+          weekRange,
+        };
+      })
+      .filter(Boolean) as Array<{
+        project_id: string;
+        project_name: string;
+        items: Array<{ id: string; item_name: string; item_code: string | null; scheduled_hours: number; scheduled_week: string }>;
+        totalHours: number;
+        weekRange: string | null;
+      }>;
   }, [expediceData]);
 
   if (legacyProjects.length === 0) return null;
 
   const totalItems = legacyProjects.reduce((s, p) => s + p.items.length, 0);
-  const totalHours = legacyProjects.reduce((s, p) => s + p.items.reduce((h, i) => h + i.scheduled_hours, 0), 0);
+  const totalHours = legacyProjects.reduce((s, p) => s + p.totalHours, 0);
 
   return (
     <div className="mt-2" style={{ opacity: 0.75 }}>
@@ -46,7 +66,7 @@ export function LegacyArchiveSection({ showLegacy, onToggle }: LegacyArchiveSect
           Zobrazit históriu
         </span>
         <span className="text-[10px] font-normal" style={{ color: "#9ca3af" }}>
-          ({totalItems} položek · {Math.round(totalHours)}h)
+          ({legacyProjects.length} projektů · {totalItems} položek · {Math.round(totalHours)}h)
         </span>
       </button>
 
@@ -61,9 +81,8 @@ export function LegacyArchiveSection({ showLegacy, onToggle }: LegacyArchiveSect
   );
 }
 
-function LegacyProjectCard({ project }: { project: { project_id: string; project_name: string; items: Array<{ id: string; item_name: string; item_code: string | null; scheduled_hours: number; scheduled_week: string }> } }) {
+function LegacyProjectCard({ project }: { project: { project_id: string; project_name: string; totalHours: number; weekRange: string | null; items: Array<{ id: string; item_name: string; item_code: string | null; scheduled_hours: number; scheduled_week: string }> } }) {
   const [expanded, setExpanded] = useState(false);
-  const totalHours = project.items.reduce((s, i) => s + i.scheduled_hours, 0);
 
   return (
     <div className="rounded-md" style={{ backgroundColor: "#fafaf8", border: "1px solid #ece8e2" }}>
@@ -86,7 +105,8 @@ function LegacyProjectCard({ project }: { project: { project_id: string; project
           Legacy
         </span>
         <span className="ml-auto text-[10px] font-sans shrink-0" style={{ color: "#9ca3af" }}>
-          {project.items.length} pol. · {Math.round(totalHours)}h
+          {Math.round(project.totalHours)}h
+          {project.weekRange && <span className="ml-1 text-[9px]">({project.weekRange})</span>}
         </span>
       </button>
 
