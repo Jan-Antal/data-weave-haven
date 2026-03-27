@@ -48,6 +48,7 @@ import { Switch } from "@/components/ui/switch";
 import { useSearchNavigation } from "@/hooks/useSearchNavigation";
 import { DataLogPanel } from "@/components/DataLogPanel";
 import { OverbookWarningDialog, OverbookBadge } from "@/components/production/OverbookWarningDialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 
 export type DisplayMode = "hours" | "czk" | "percent";
