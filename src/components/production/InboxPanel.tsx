@@ -1317,6 +1317,9 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
       )}
       {item.item_code && <span className="font-sans shrink-0" style={{ fontSize: 11, color: "#223937", fontWeight: 500 }}>{item.item_code}</span>}
       <span className="flex-1 truncate" style={{ fontSize: 12, color: "#4b5563" }}>{item.item_name}</span>
+      {(item as any).adhoc_reason && String((item as any).adhoc_reason).startsWith("midflight") && (
+        <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-300 rounded px-1 ml-1 font-medium tracking-wide shrink-0">Legacy</span>
+      )}
       <span className="font-sans text-[10px] shrink-0" style={{ color: "#1a1a1a", fontWeight: 700 }}>{displayMode === "czk" ? formatCompactCzk(item.estimated_hours * hourlyRate) : `${item.estimated_hours}h`}</span>
     </div>
   );

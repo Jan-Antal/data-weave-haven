@@ -15,6 +15,7 @@ import { InboxPanel } from "@/components/production/InboxPanel";
 import { ForecastSafetyNet } from "@/components/production/ForecastSafetyNet";
 import { WeeklySilos } from "@/components/production/WeeklySilos";
 import { ExpedicePanel } from "@/components/production/ExpedicePanel";
+import { LegacyArchiveSection } from "@/components/production/LegacyArchiveSection";
 import { DragOverlayContent } from "@/components/production/DragOverlayContent";
 import { AutoSplitPopover } from "@/components/production/AutoSplitPopover";
 import { MergePopover } from "@/components/production/MergePopover";
@@ -205,6 +206,7 @@ export default function PlanVyroby() {
 
   const [midflightRunning, setMidflightRunning] = useState(false);
   const [midflightConfirmOpen, setMidflightConfirmOpen] = useState(false);
+  const [showLegacyArchive, setShowLegacyArchive] = useState(false);
 
   const handleMidflightImport = useCallback(async () => {
     setMidflightRunning(true);
@@ -826,6 +828,9 @@ export default function PlanVyroby() {
                 />
                 {!forecast.forecastActive && (
                   <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />
+                )}
+                {!forecast.forecastActive && (
+                  <LegacyArchiveSection showLegacy={showLegacyArchive} onToggle={() => setShowLegacyArchive(v => !v)} />
                 )}
               </div>
             ) : (
