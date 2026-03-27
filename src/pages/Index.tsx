@@ -368,15 +368,10 @@ const Index = () => {
               <Sheet open={dataLogOpen} onOpenChange={(v) => {
                 setDataLogOpen(v);
                 try { localStorage.setItem("datalog-panel-index", String(v)); } catch {}
-              }} modal={false}>
+              }}>
                 <SheetContent
                   side="bottom"
-                  noOverlay
                   className="p-0 flex flex-col rounded-t-2xl bottom-[56px] max-h-[calc(100svh-112px)] z-[100]"
-                  onPointerDownOutside={() => {
-                    setDataLogOpen(false);
-                    try { localStorage.setItem("datalog-panel-index", "false"); } catch {}
-                  }}
                 >
                   <SheetTitle className="sr-only">Data Log</SheetTitle>
                   <div className="w-10 h-1 bg-muted rounded-full mx-auto mt-3 mb-1 shrink-0" />

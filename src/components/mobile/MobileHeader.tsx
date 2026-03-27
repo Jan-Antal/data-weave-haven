@@ -94,7 +94,7 @@ export function MobileHeader({ onDataLog, showDataLog = false, isDataLogOpen = f
         </div>
       </header>
 
-      <Sheet open={menuOpen} onOpenChange={setMenuOpen} modal={false}>
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
         <SheetContent side="right" className="w-[280px] p-0" style={{ top: "var(--mobile-header-height, 56px)", height: "calc(100% - var(--mobile-header-height, 56px))", zIndex: 200 }}>
           <SheetTitle className="sr-only">Menu</SheetTitle>
           <div className="p-5 border-b border-border">
@@ -141,12 +141,10 @@ export function MobileHeader({ onDataLog, showDataLog = false, isDataLogOpen = f
 
       <AccountSettings open={accountOpen} onOpenChange={setAccountOpen} />
 
-      <Sheet open={notifOpen} onOpenChange={setNotifOpen} modal={false}>
+      <Sheet open={notifOpen} onOpenChange={setNotifOpen}>
         <SheetContent
           side="bottom"
-          noOverlay
           className="p-0 flex flex-col rounded-t-2xl bottom-[56px] max-h-[calc(100svh-112px)] z-[200]"
-          onPointerDownOutside={() => setNotifOpen(false)}
         >
           <SheetTitle className="sr-only">Notifikace</SheetTitle>
           <div className="flex flex-col items-center pt-3 pb-2 border-b border-border shrink-0">

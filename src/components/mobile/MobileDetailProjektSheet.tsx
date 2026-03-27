@@ -127,13 +127,11 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
 
   return (
     <>
-    <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         ref={sheetRef}
         side="bottom"
-        noOverlay
-        className="rounded-t-2xl p-0 overflow-hidden flex flex-col bottom-[56px] max-h-[calc(100svh-112px)]"
-        onPointerDownOutside={() => onOpenChange(false)}
+        className="rounded-t-2xl p-0 overflow-hidden flex flex-col bottom-[56px] top-[30%] max-h-[70svh]"
         onTouchStart={(e: React.TouchEvent) => {
           const el = e.currentTarget as HTMLElement;
           el.dataset.swipeStartY = String(e.touches[0].clientY);
@@ -270,8 +268,8 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
     </Sheet>
 
     {/* Status picker sheet */}
-    <Sheet open={statusPickerOpen} onOpenChange={setStatusPickerOpen} modal={false}>
-      <SheetContent side="bottom" noOverlay className="rounded-t-2xl px-0 pb-8 bottom-[56px] max-h-[calc(100svh-112px)]" onPointerDownOutside={() => setStatusPickerOpen(false)}>
+    <Sheet open={statusPickerOpen} onOpenChange={setStatusPickerOpen}>
+      <SheetContent side="bottom" className="rounded-t-2xl px-0 pb-8 bottom-[56px] max-h-[calc(100svh-112px)]">
         <div className="px-4 pb-3" style={{ borderBottom: "0.5px solid hsl(var(--border))" }}>
           <SheetTitle className="text-base font-semibold">Změnit status</SheetTitle>
         </div>
