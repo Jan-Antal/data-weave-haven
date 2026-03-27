@@ -103,6 +103,11 @@ function RecordRow({
     if (table === "projects" && record.project_id) {
       await supabase.from("project_plan_hours").delete().eq("project_id", record.project_id);
       await supabase.from("production_hours_log" as any).delete().eq("ami_project_id", record.project_id);
+      await supabase.from("data_log" as any).delete().eq("project_id", record.project_id);
+      await supabase.from("tpv_items").delete().eq("project_id", record.project_id);
+      await supabase.from("project_stages").delete().eq("project_id", record.project_id);
+      await supabase.from("production_schedule").delete().eq("project_id", record.project_id);
+      await supabase.from("production_inbox").delete().eq("project_id", record.project_id);
     }
     const { error } = await supabase.from(table as any).delete().eq("id", record.id);
     if (error) {
