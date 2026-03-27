@@ -981,7 +981,7 @@ export default function PlanVyroby() {
         onConfirm={() => { setMidflightConfirmOpen(false); handleMidflightImport(); }}
         onCancel={() => setMidflightConfirmOpen(false)}
         title="Midflight import"
-        description="Toto vytvorí historické bundles z production_hours_log. Existujúce midflight záznamy sa preskočia. Pokračovať?"
+        description="Toto VYMAŽE všetky predchádzajúce midflight záznamy a znovu ich vytvorí z production_hours_log. Pokračovať?"
         confirmLabel="Importovať"
         cancelLabel="Zrušit"
         variant="default"

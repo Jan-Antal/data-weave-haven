@@ -45,15 +45,25 @@ export async function midflightImportPlanVyroby(
     return { created, skipped, errors };
   }
 
-  // FIX 4 — Clean up wrong midflight data from previous runs
-  onProgress?.("Mazání chybných midflight záznamů z inboxu...");
-  const { error: cleanupErr } = await (supabaseClient as any)
+  // ═══ FULL RESET — delete all previous midflight data ═══
+  onProgress?.("Čistím predchádzajúce midflight dáta...");
+
+  // 1. Delete all midflight historical entries from production_schedule
+  const { error: resetScheduleErr } = await (supabaseClient as any)
+    .from("production_schedule")
+    .delete()
+    .eq("is_midflight", true);
+  if (resetScheduleErr) {
+    errors.push(`Reset schedule error: ${resetScheduleErr.message}`);
+  }
+
+  // 2. Delete all midflight entries from production_inbox
+  const { error: resetInboxErr } = await (supabaseClient as any)
     .from("production_inbox")
     .delete()
-    .eq("adhoc_reason", "midflight_historical")
-    .eq("status", "scheduled");
-  if (cleanupErr) {
-    errors.push(`Cleanup error: ${cleanupErr.message}`);
+    .like("adhoc_reason", "midflight%");
+  if (resetInboxErr) {
+    errors.push(`Reset inbox error: ${resetInboxErr.message}`);
   }
 
   onProgress?.("Načítám production_hours_log...");
@@ -114,26 +124,6 @@ export async function midflightImportPlanVyroby(
     onProgress?.(`Preskočený neznámy projekt: ${uid}`);
   }
 
-  // Fetch existing schedule midflight items for dedup
-  const { data: existingSchedule } = await (supabaseClient as any)
-    .from("production_schedule")
-    .select("project_id, item_code, scheduled_week")
-    .eq("is_midflight", true);
-  const existingScheduleKeys = new Set<string>();
-  for (const item of existingSchedule || []) {
-    existingScheduleKeys.add(`${item.project_id}||${item.item_code}||${item.scheduled_week}`);
-  }
-
-  // Fetch existing inbox expedice items for dedup
-  const { data: existingInbox } = await (supabaseClient as any)
-    .from("production_inbox")
-    .select("project_id, item_code, adhoc_reason")
-    .eq("adhoc_reason", "midflight_expedice");
-  const existingInboxKeys = new Set<string>();
-  for (const item of existingInbox || []) {
-    existingInboxKeys.add(`${item.project_id}||${item.item_code}`);
-  }
-
   // Fetch inbox items for current week logic
   const { data: inboxItems } = await (supabaseClient as any)
     .from("production_inbox")
@@ -169,13 +159,8 @@ export async function midflightImportPlanVyroby(
     projectsInHours.add(projectId);
 
     if (monday < currentMonday) {
-      // FIX 1 — Historical → production_schedule as completed midflight items
+      // Historical → production_schedule as completed midflight items
       const itemCode = `HIST_${monday.replace(/-/g, "")}`;
-      const dedupKey = `${projectId}||${itemCode}||${monday}`;
-      if (existingScheduleKeys.has(dedupKey)) {
-        skipped++;
-        continue;
-      }
 
       scheduleInserts.push({
         project_id: projectId,
@@ -188,7 +173,7 @@ export async function midflightImportPlanVyroby(
         is_midflight: true,
       });
     } else if (monday === currentMonday) {
-      // CASE B — Current week: reduce inbox hours
+      // Current week: reduce inbox hours
       const inboxEntries = inboxByProject.get(projectId);
       if (inboxEntries && inboxEntries.length > 0) {
         for (const entry of inboxEntries) {
@@ -203,10 +188,10 @@ export async function midflightImportPlanVyroby(
         }
       }
     }
-    // CASE C — future weeks: skip
+    // future weeks: skip
   }
 
-  // FIX 2 — Expedice projects: create special inbox entry with status="pending"
+  // Expedice projects: create special inbox entry with status="pending"
   for (const projectId of projectsInHours) {
     const status = validProjectMap.get(projectId)?.status || "";
     if (status !== "expedice" && status !== "montáž") continue;
@@ -214,14 +199,10 @@ export async function midflightImportPlanVyroby(
     // Only create if no future scheduled work exists
     if (projectsWithFutureWork.has(projectId)) continue;
 
-    const itemCode = `EXPEDICE_${projectId}`;
-    const dedupKey = `${projectId}||${itemCode}`;
-    if (existingInboxKeys.has(dedupKey)) continue;
-
     const projectName = validProjectMap.get(projectId)?.name || projectId;
     inboxInserts.push({
       project_id: projectId,
-      item_code: itemCode,
+      item_code: `EXPEDICE_${projectId}`,
       item_name: `${projectName} — Expedice`,
       estimated_hours: 0,
       estimated_czk: 0,
