@@ -828,6 +828,9 @@ export default function PlanVyroby() {
                 {!forecast.forecastActive && (
                   <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />
                 )}
+                {!forecast.forecastActive && (
+                  <LegacyArchiveSection showLegacy={showLegacyArchive} onToggle={() => setShowLegacyArchive(v => !v)} />
+                )}
               </div>
             ) : (
               <PlanVyrobyTableView displayMode={displayMode} searchQuery={searchQuery} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} />
