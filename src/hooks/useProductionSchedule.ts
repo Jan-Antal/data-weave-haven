@@ -151,6 +151,7 @@ export function useProductionExpedice() {
           adhoc_reason: (row as any).adhoc_reason ?? null,
           cancel_reason: null,
           is_blocker: (row as any).is_blocker ?? false,
+          is_midflight: (row as any).is_midflight ?? false,
           tpv_expected_date: (row as any).tpv_expected_date ?? null,
         });
         g.count++;
