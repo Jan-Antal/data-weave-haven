@@ -441,6 +441,13 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
   const { data: projects = [] } = useProjects();
   const { data: allStages = [] } = useAllProjectStages();
   const activeProjects = useMemo(() => projects.filter(p => !p.deleted_at), [projects]);
+  const stagesMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of allStages) {
+      map.set(s.id, s.display_name || s.stage_name);
+    }
+    return map;
+  }, [allStages]);
   const { data: allUsers = [] } = useActivityLogUsers();
 
   const {
