@@ -202,6 +202,32 @@ export default function PlanVyroby() {
     }
   }, [qc]);
 
+  const [midflightRunning, setMidflightRunning] = useState(false);
+  const [midflightConfirmOpen, setMidflightConfirmOpen] = useState(false);
+
+  const handleMidflightImport = useCallback(async () => {
+    setMidflightRunning(true);
+    try {
+      const { midflightImportPlanVyroby } = await import("@/lib/midflightImportPlanVyroby");
+      const result = await midflightImportPlanVyroby(supabase, (msg) => {
+        console.log("[midflight]", msg);
+      });
+      qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      qc.invalidateQueries({ queryKey: ["production-inbox"] });
+      qc.invalidateQueries({ queryKey: ["production-expedice"] });
+      if (result.errors.length > 0) {
+        toast({ title: `Midflight import: ${result.errors.length} chýb`, description: result.errors[0], variant: "destructive" });
+      } else {
+        toast({ title: `✓ Midflight import: Vytvorené: ${result.created}, Preskočené: ${result.skipped}` });
+      }
+    } catch (err) {
+      console.error("Midflight error:", err);
+      toast({ title: "Chyba midflight importu", variant: "destructive" });
+    } finally {
+      setMidflightRunning(false);
+    }
+  }, [qc]);
+
   const handleSelectProject = useCallback((projectId: string) => {
     setSelectedProjectId(projectId);
   }, []);
