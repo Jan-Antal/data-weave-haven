@@ -198,9 +198,9 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
           <p className="text-[11px] font-sans text-muted-foreground">{project.project_id}</p>
           <div className="flex items-center gap-2 mt-0.5">
             <p className="text-[15px] font-semibold text-foreground truncate min-w-0 flex-1">{project.project_name}</p>
-            {project.status && (
+            {localStatus && (
               <button onClick={() => setStatusPickerOpen(true)} className="appearance-none">
-                <StatusBadge status={project.status} />
+                <StatusBadge status={localStatus} />
               </button>
             )}
           </div>
