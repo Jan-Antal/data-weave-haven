@@ -129,49 +129,50 @@ export function useAnalytics() {
         }
       }
 
-      // Merge
+      // Merge — iterate over ALL projects as primary source
       const rows: AnalyticsRow[] = [];
       let lastSync: string | null = null;
 
-      for (const [pid, h] of hoursMap) {
-        const proj = projectsMap.get(pid);
-        const name = proj?.project_name || pid;
-        const status = proj?.status || null;
-        const pm = proj?.pm || null;
+      if (projectsRes.data) {
+        for (const proj of projectsRes.data as any[]) {
+          const pid = proj.project_id;
+          const name = proj.project_name || pid;
+          const status = proj.status || null;
+          const pm = proj.pm || null;
 
-        const plan = planMap.get(pid);
-        const hodiny_plan = plan?.hodiny_plan ?? null;
-        const plan_source = plan?.source as PlanSource ?? null;
-        const warning_low_tpv = plan?.warning_low_tpv ?? false;
-        const force_project_price = plan?.force_project_price ?? proj?.plan_use_project_price ?? false;
+          const plan = planMap.get(pid);
+          const hodiny_plan = plan?.hodiny_plan ?? null;
+          const plan_source = plan?.source as PlanSource ?? null;
+          const warning_low_tpv = plan?.warning_low_tpv ?? false;
+          const force_project_price = plan?.force_project_price ?? proj.plan_use_project_price ?? false;
 
-        const hodiny_skutocne = h.skutocne;
+          const h = hoursMap.get(pid);
+          const hodiny_skutocne = h?.skutocne ?? 0;
 
-        const pct = hodiny_plan
-          ? Math.round((hodiny_skutocne / hodiny_plan) * 1000) / 10
-          : null;
-        const zostatok = hodiny_plan
-          ? Math.max(0, hodiny_plan - hodiny_skutocne)
-          : null;
+          const pct = hodiny_plan
+            ? Math.round((hodiny_skutocne / hodiny_plan) * 1000) / 10
+            : null;
+          const zostatok = hodiny_plan
+            ? Math.max(0, hodiny_plan - hodiny_skutocne)
+            : null;
 
-        const isDone = DONE_STATUSES.includes(status || "");
-        let balik: Balik = "IN_PROGRESS";
-        if (isDone) balik = "DONE";
-        else if (pct != null && pct > 100) balik = "OVER";
+          const isDone = DONE_STATUSES.includes(status || "");
+          let balik: Balik = "IN_PROGRESS";
+          if (isDone) balik = "DONE";
+          else if (pct != null && pct > 100) balik = "OVER";
 
-        let trend: Trend | null = null;
-        if (pct != null) {
-          if (pct <= 80) trend = "ok";
-          else if (pct <= 100) trend = "warning";
-          else trend = "over";
-        }
+          let trend: Trend | null = null;
+          if (pct != null) {
+            if (pct <= 80) trend = "ok";
+            else if (pct <= 100) trend = "warning";
+            else trend = "over";
+          }
 
-        if (h.tracking_do && (!lastSync || h.tracking_do > lastSync))
-          lastSync = h.tracking_do;
+          if (h?.tracking_do && (!lastSync || h.tracking_do > lastSync))
+            lastSync = h.tracking_do;
 
-        // Resolve preset label
-        let preset_label = "Default";
-        if (proj) {
+          // Resolve preset label
+          let preset_label = "Default";
           if (proj.cost_is_custom) {
             preset_label = "Custom";
           } else if (proj.cost_preset_id) {
@@ -181,26 +182,26 @@ export function useAnalytics() {
             const defaultPreset = presets.find((p: any) => p.is_default);
             preset_label = defaultPreset ? defaultPreset.name : "Default";
           }
-        }
 
-        rows.push({
-          project_id: pid,
-          project_name: name,
-          pm,
-          status,
-          hodiny_plan,
-          hodiny_skutocne,
-          pct,
-          zostatok,
-          balik,
-          trend,
-          tracking_od: h.tracking_od,
-          tracking_do: h.tracking_do,
-          plan_source,
-          preset_label,
-          warning_low_tpv,
-          force_project_price,
-        });
+          rows.push({
+            project_id: pid,
+            project_name: name,
+            pm,
+            status,
+            hodiny_plan,
+            hodiny_skutocne,
+            pct,
+            zostatok,
+            balik,
+            trend,
+            tracking_od: h?.tracking_od ?? null,
+            tracking_do: h?.tracking_do ?? null,
+            plan_source,
+            preset_label,
+            warning_low_tpv,
+            force_project_price,
+          });
+        }
       }
 
       const totalPlan = rows.reduce((s, r) => s + (r.hodiny_plan || 0), 0);
