@@ -415,37 +415,37 @@ export type Database = {
       }
       production_hours_log: {
         Row: {
-          ami_project_id: string | null
+          ami_project_id: string
+          cinnost_kod: string | null
+          cinnost_nazov: string | null
           created_at: string | null
-          datum_sync: string | null
-          hodiny_skutocne: number | null
+          datum_sync: string
+          hodiny: number
           id: string
-          pm: string | null
-          project_name: string | null
           source: string | null
-          status: string | null
+          zamestnanec: string
         }
         Insert: {
-          ami_project_id?: string | null
+          ami_project_id: string
+          cinnost_kod?: string | null
+          cinnost_nazov?: string | null
           created_at?: string | null
-          datum_sync?: string | null
-          hodiny_skutocne?: number | null
+          datum_sync: string
+          hodiny: number
           id?: string
-          pm?: string | null
-          project_name?: string | null
           source?: string | null
-          status?: string | null
+          zamestnanec: string
         }
         Update: {
-          ami_project_id?: string | null
+          ami_project_id?: string
+          cinnost_kod?: string | null
+          cinnost_nazov?: string | null
           created_at?: string | null
-          datum_sync?: string | null
-          hodiny_skutocne?: number | null
+          datum_sync?: string
+          hodiny?: number
           id?: string
-          pm?: string | null
-          project_name?: string | null
           source?: string | null
-          status?: string | null
+          zamestnanec?: string
         }
         Relationships: []
       }
