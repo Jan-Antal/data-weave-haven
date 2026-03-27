@@ -86,10 +86,10 @@ export async function midflightImportPlanVyroby(
   }
 
   // Fetch existing midflight entries to skip
-  const { data: existingMidflight } = await supabaseClient
+  const { data: existingMidflight } = await (supabaseClient as any)
     .from("production_schedule")
     .select("project_id, scheduled_week")
-    .eq("is_midflight" as any, true);
+    .eq("is_midflight", true);
   const existingSet = new Set(
     (existingMidflight || []).map(
       (r: any) => `${r.project_id}||${getWeekKey(r.scheduled_week)}`
@@ -97,7 +97,7 @@ export async function midflightImportPlanVyroby(
   );
 
   // Fetch inbox items for current week logic
-  const { data: inboxItems } = await supabaseClient
+  const { data: inboxItems } = await (supabaseClient as any)
     .from("production_inbox")
     .select("id, project_id, estimated_hours")
     .eq("status", "pending");
