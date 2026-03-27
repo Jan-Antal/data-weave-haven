@@ -50,7 +50,7 @@ export async function midflightImportPlanVyroby(
   let from = 0;
   const pageSize = 5000;
   while (true) {
-    const { data, error } = await supabaseClient
+    const { data, error } = await (supabaseClient as any)
       .from("production_hours_log")
       .select("ami_project_id, hodiny, datum_sync")
       .range(from, from + pageSize - 1);
