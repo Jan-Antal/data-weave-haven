@@ -223,9 +223,28 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     return m;
   }, [allDbProjects]);
 
+  // Separate expedice midflight items from regular inbox
+  const { regularProjects, expediceProjects } = useMemo(() => {
+    const regular: typeof projects = [];
+    const expedice: typeof projects = [];
+    for (const p of projects) {
+      const isExpedice = p.items.every(i => i.adhoc_reason === "midflight_expedice");
+      if (isExpedice) {
+        expedice.push(p);
+      } else {
+        // Filter out any expedice items from mixed projects
+        const filteredItems = p.items.filter(i => i.adhoc_reason !== "midflight_expedice");
+        if (filteredItems.length > 0) {
+          regular.push({ ...p, items: filteredItems, total_hours: filteredItems.reduce((s, i) => s + i.estimated_hours, 0) });
+        }
+      }
+    }
+    return { regularProjects: regular, expediceProjects: expedice };
+  }, [projects]);
+
   // Sort projects by urgency
   const sortedProjects = useMemo(() => {
-    return [...projects].sort((a, b) => {
+    return [...regularProjects].sort((a, b) => {
       const infoA = projectInfoMap.get(a.project_id);
       const infoB = projectInfoMap.get(b.project_id);
       const uA = getUrgency(infoA);
@@ -237,7 +256,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
       const dB = dlB ? dlB.getTime() : Infinity;
       return dA - dB;
     });
-  }, [projects, projectInfoMap]);
+  }, [regularProjects, projectInfoMap]);
 
   // Count overdue + urgent items
   const urgentItemCount = useMemo(() => {
