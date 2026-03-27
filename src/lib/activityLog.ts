@@ -46,6 +46,7 @@ interface LogParams {
   oldValue?: string | null;
   newValue?: string | null;
   detail?: string | null;
+  stageId?: string | null;
 }
 
 const TEST_EMAILS = ["alfred@ami-test.cz"];
@@ -66,6 +67,7 @@ export async function logActivity(params: LogParams) {
       old_value: params.oldValue ?? null,
       new_value: params.newValue ?? null,
       detail: `${detailPrefix}${params.detail ?? ""}` || null,
+      stage_id: params.stageId ?? null,
     });
   } catch (e) {
     console.error("Activity log error:", e);

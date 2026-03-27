@@ -11,6 +11,7 @@ export interface ActivityLogEntry {
   new_value: string | null;
   detail: string | null;
   created_at: string;
+  stage_id: string | null;
 }
 
 const PAGE_SIZE = 30;
