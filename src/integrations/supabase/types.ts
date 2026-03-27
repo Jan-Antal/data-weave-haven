@@ -185,6 +185,7 @@ export type Database = {
           new_value: string | null
           old_value: string | null
           project_id: string
+          stage_id: string | null
           user_email: string
           user_id: string
         }
@@ -196,6 +197,7 @@ export type Database = {
           new_value?: string | null
           old_value?: string | null
           project_id: string
+          stage_id?: string | null
           user_email?: string
           user_id: string
         }
@@ -207,6 +209,7 @@ export type Database = {
           new_value?: string | null
           old_value?: string | null
           project_id?: string
+          stage_id?: string | null
           user_email?: string
           user_id?: string
         }

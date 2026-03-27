@@ -1,10 +1,12 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useActivityLog, useActivityLogUsers, type ActivityLogEntry, type DateRange } from "@/hooks/useActivityLog";
 import { useUserSessions, formatSessionDuration, formatRelativeTime, type UserSessionSummary } from "@/hooks/useUserAnalytics";
 import { useProjects } from "@/hooks/useProjects";
+import { useAllProjectStages } from "@/hooks/useAllProjectStages";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Clock, Users, ChevronDown, ChevronRight, ArrowLeft } from "lucide-react";
+import { X, Clock, Users, ChevronDown, ChevronRight, ArrowLeft, Search } from "lucide-react";
 import { format, isToday, isYesterday, differenceInDays } from "date-fns";
 import { cs } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -116,16 +118,101 @@ function formatDayHeader(dateStr: string): string {
   return format(d, "d. MMMM yyyy", { locale: cs });
 }
 
+// Project filter combobox
+function ProjectFilterCombobox({
+  value,
+  onChange,
+  projects,
+}: {
+  value: string | null;
+  onChange: (v: string | null) => void;
+  projects: { project_id: string; project_name: string }[];
+}) {
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const filtered = useMemo(() => {
+    if (!search) return projects.slice(0, 30);
+    const q = search.toLowerCase();
+    return projects.filter(
+      p => p.project_id.toLowerCase().includes(q) || p.project_name.toLowerCase().includes(q)
+    ).slice(0, 30);
+  }, [projects, search]);
+
+  const selectedProject = value ? projects.find(p => p.project_id === value) : null;
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <div className="relative">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+        <Input
+          value={value ? (selectedProject ? `${selectedProject.project_id} — ${selectedProject.project_name}` : value) : search}
+          onChange={e => {
+            if (value) {
+              onChange(null);
+              setSearch(e.target.value);
+            } else {
+              setSearch(e.target.value);
+            }
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder="Hledat projekt..."
+          className="h-7 text-xs pl-7 pr-7"
+        />
+        {(value || search) && (
+          <button
+            onClick={() => { onChange(null); setSearch(""); setOpen(false); }}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted"
+          >
+            <X className="h-3 w-3 text-muted-foreground" />
+          </button>
+        )}
+      </div>
+      {open && !value && (
+        <div className="absolute z-[99999] mt-1 w-full bg-popover border border-border rounded-md shadow-md max-h-[200px] overflow-y-auto">
+          {filtered.length === 0 && (
+            <p className="text-xs text-muted-foreground p-2 text-center">Žádné výsledky</p>
+          )}
+          {filtered.map(p => (
+            <button
+              key={p.project_id}
+              onClick={() => { onChange(p.project_id); setSearch(""); setOpen(false); }}
+              className="w-full text-left px-2.5 py-1.5 text-xs hover:bg-muted/50 truncate"
+            >
+              <span className="font-medium">{p.project_id}</span>
+              <span className="text-muted-foreground ml-1">— {p.project_name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ActivityItem({
   entry,
   isSelected,
   onSelect,
   onNavigate,
+  stageName,
 }: {
   entry: ActivityLogEntry;
   isSelected: boolean;
   onSelect: (entry: ActivityLogEntry) => void;
   onNavigate?: (entry: ActivityLogEntry) => void;
+  stageName?: string | null;
 }) {
   const { data: projects = [] } = useProjects();
   const project = projects.find(p => p.project_id === entry.project_id);
@@ -164,6 +251,9 @@ function ActivityItem({
             )}
           </div>
         </div>
+        {stageName && (
+          <span className="text-[10px] text-muted-foreground">Etapa: {stageName}</span>
+        )}
         <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">
           {actionLabel}
         </p>
@@ -349,7 +439,15 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
   const { highlightProject } = useDataLogHighlight();
 
   const { data: projects = [] } = useProjects();
+  const { data: allStages = [] } = useAllProjectStages();
   const activeProjects = useMemo(() => projects.filter(p => !p.deleted_at), [projects]);
+  const stagesMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of allStages) {
+      map.set(s.id, s.display_name || s.stage_name);
+    }
+    return map;
+  }, [allStages]);
   const { data: allUsers = [] } = useActivityLogUsers();
 
   const {
@@ -484,17 +582,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
                   </SelectContent>
                 </Select>
               </div>
-              <Select value={projectFilter ?? "__all__"} onValueChange={v => setProjectFilter(v === "__all__" ? null : v)}>
-                <SelectTrigger className="h-7 text-xs">
-                  <SelectValue placeholder="Všechny projekty" />
-                </SelectTrigger>
-                <SelectContent className="z-[99999]">
-                  <SelectItem value="__all__">Všechny projekty</SelectItem>
-                  {activeProjects.map(p => (
-                    <SelectItem key={p.project_id} value={p.project_id}>{p.project_id}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ProjectFilterCombobox value={projectFilter} onChange={setProjectFilter} projects={activeProjects} />
             </div>
 
             {/* Feed */}
@@ -509,7 +597,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
                     </p>
                   </div>
                   {group.items.map(entry => (
-                    <ActivityItem key={entry.id} entry={entry} isSelected={selectedEntryId === entry.id} onSelect={handleEntrySelect} onNavigate={handleEntryNavigate} />
+                    <ActivityItem key={entry.id} entry={entry} isSelected={selectedEntryId === entry.id} onSelect={handleEntrySelect} onNavigate={handleEntryNavigate} stageName={entry.stage_id ? stagesMap.get(entry.stage_id) : null} />
                   ))}
                 </div>
               ))}
@@ -616,17 +704,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
               </Select>
             </div>
 
-            <Select value={projectFilter ?? "__all__"} onValueChange={v => setProjectFilter(v === "__all__" ? null : v)}>
-              <SelectTrigger className="h-7 text-xs">
-                <SelectValue placeholder="Všechny projekty" />
-              </SelectTrigger>
-              <SelectContent className="z-[99999]">
-                <SelectItem value="__all__">Všechny projekty</SelectItem>
-                {activeProjects.map(p => (
-                  <SelectItem key={p.project_id} value={p.project_id}>{p.project_id}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ProjectFilterCombobox value={projectFilter} onChange={setProjectFilter} projects={activeProjects} />
           </div>
 
           {/* Feed */}
@@ -653,6 +731,7 @@ export function DataLogPanel({ open, onOpenChange, defaultCategory }: DataLogPan
                     isSelected={selectedEntryId === entry.id}
                     onSelect={handleEntrySelect}
                     onNavigate={handleEntryNavigate}
+                    stageName={entry.stage_id ? stagesMap.get(entry.stage_id) : null}
                   />
                 ))}
               </div>
