@@ -76,7 +76,7 @@ export async function midflightImportPlanVyroby(
 
   // Fetch project names
   const projectIds = [...new Set(allHours.map((r) => r.ami_project_id))];
-  const { data: projects } = await supabaseClient
+  const { data: projects } = await (supabaseClient as any)
     .from("projects")
     .select("project_id, project_name")
     .in("project_id", projectIds);
