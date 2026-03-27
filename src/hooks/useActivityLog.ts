@@ -20,7 +20,7 @@ const PAGE_SIZE = 30;
 const EXCLUDED_ACTION_TYPES = ["user_login", "session_end", "user_session", "page_view"];
 
 // Plan Výroby actions — hidden from "Vše", shown only in "Výroba" pill
-const PLAN_VYROBY_ACTIONS = [
+export const PLAN_VYROBY_ACTIONS = [
   "item_scheduled", "item_moved", "item_completed", "item_paused", "item_split",
   "item_returned_to_inbox", "forecast_committed", "item_moved_next_week", "item_cancelled",
 ];

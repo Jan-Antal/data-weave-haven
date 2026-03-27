@@ -2,6 +2,7 @@ import { memo, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { PLAN_VYROBY_ACTIONS } from "@/hooks/useActivityLog";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjectAttention, type AttentionItem } from "@/hooks/useProjectAttention";
 import { type RecentProject } from "@/hooks/useRecentlyOpened";
@@ -170,12 +171,18 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
   const { data: recentActivity = [] } = useQuery({
     queryKey: ["mobile-recent-activity"],
     queryFn: async () => {
-      const { data, error } = await (supabase.from("data_log") as any)
+      let q = (supabase.from("data_log") as any)
         .select("*")
         .neq("action_type", "user_session")
         .neq("action_type", "user_login")
         .neq("action_type", "session_end")
-        .neq("action_type", "page_view")
+        .neq("action_type", "page_view");
+      for (const action of PLAN_VYROBY_ACTIONS) {
+        q = q.neq("action_type", action);
+      }
+      // Also exclude item_paused_vyroba
+      q = q.neq("action_type", "item_paused_vyroba");
+      const { data, error } = await q
         .order("created_at", { ascending: false })
         .limit(10);
       if (error) throw error;
