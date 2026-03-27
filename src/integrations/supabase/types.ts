@@ -611,6 +611,7 @@ export type Database = {
           id: string
           inbox_item_id: string | null
           is_blocker: boolean
+          is_midflight: boolean | null
           item_code: string | null
           item_name: string
           pause_expected_date: string | null
@@ -638,6 +639,7 @@ export type Database = {
           id?: string
           inbox_item_id?: string | null
           is_blocker?: boolean
+          is_midflight?: boolean | null
           item_code?: string | null
           item_name: string
           pause_expected_date?: string | null
@@ -665,6 +667,7 @@ export type Database = {
           id?: string
           inbox_item_id?: string | null
           is_blocker?: boolean
+          is_midflight?: boolean | null
           item_code?: string | null
           item_name?: string
           pause_expected_date?: string | null

@@ -1,0 +1,1 @@
+ALTER TABLE public.production_schedule ADD COLUMN IF NOT EXISTS is_midflight BOOLEAN DEFAULT false;
