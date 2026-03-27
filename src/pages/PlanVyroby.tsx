@@ -752,6 +752,9 @@ export default function PlanVyroby() {
           isAdmin={isAdmin}
           recalculating={recalculating}
           onRecalculateHours={handleRecalculateHours}
+          midflightRunning={midflightRunning}
+          onMidflightImport={() => setMidflightConfirmOpen(true)}
+        />
         />
         )}
 
