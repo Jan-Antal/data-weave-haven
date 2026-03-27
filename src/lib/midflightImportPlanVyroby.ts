@@ -211,18 +211,19 @@ export async function midflightImportPlanVyroby(
     // future weeks: skip
   }
 
-  // Expedice/Montáž → marker entry with 0 hours (HIST_ entries carry the real hours)
-  const expediceStatuses = new Set(["expedice", "montáž"]);
+  // Expedice/Montáž/Dokončeno/Fakturace → EXPEDICE_MIDFLIGHT marker entry
+  const expediceMarkerStatuses = new Set(["expedice", "montáž", "dokončeno", "fakturace"]);
 
   for (const projectId of projectsInHours) {
     const status = validProjectMap.get(projectId)?.status || "";
-    if (!expediceStatuses.has(status)) continue;
+    if (!expediceMarkerStatuses.has(status)) continue;
 
     // Only create if no future scheduled work exists
     if (projectsWithFutureWork.has(projectId)) continue;
 
     const projectName = validProjectMap.get(projectId)?.name || projectId;
     const latestMonday = projectLatestMonday.get(projectId) || currentMonday;
+    const latestDatum = projectLatestDatum.get(projectId);
 
     scheduleInserts.push({
       project_id: projectId,
@@ -232,7 +233,7 @@ export async function midflightImportPlanVyroby(
       scheduled_hours: 0,
       scheduled_czk: 0,
       status: "completed",
-      completed_at: new Date().toISOString(),
+      completed_at: latestDatum ? new Date(latestDatum).toISOString() : new Date().toISOString(),
       is_midflight: true,
     });
   }
