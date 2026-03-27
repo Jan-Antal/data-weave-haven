@@ -48,6 +48,7 @@ import { Switch } from "@/components/ui/switch";
 import { useSearchNavigation } from "@/hooks/useSearchNavigation";
 import { DataLogPanel } from "@/components/DataLogPanel";
 import { OverbookWarningDialog, OverbookBadge } from "@/components/production/OverbookWarningDialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 
 export type DisplayMode = "hours" | "czk" | "percent";
@@ -199,6 +200,32 @@ export default function PlanVyroby() {
       toast({ title: "Chyba při přepočtu", variant: "destructive" });
     } finally {
       setRecalculating(false);
+    }
+  }, [qc]);
+
+  const [midflightRunning, setMidflightRunning] = useState(false);
+  const [midflightConfirmOpen, setMidflightConfirmOpen] = useState(false);
+
+  const handleMidflightImport = useCallback(async () => {
+    setMidflightRunning(true);
+    try {
+      const { midflightImportPlanVyroby } = await import("@/lib/midflightImportPlanVyroby");
+      const result = await midflightImportPlanVyroby(supabase, (msg) => {
+        console.log("[midflight]", msg);
+      });
+      qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      qc.invalidateQueries({ queryKey: ["production-inbox"] });
+      qc.invalidateQueries({ queryKey: ["production-expedice"] });
+      if (result.errors.length > 0) {
+        toast({ title: `Midflight import: ${result.errors.length} chýb`, description: result.errors[0], variant: "destructive" });
+      } else {
+        toast({ title: `✓ Midflight import: Vytvorené: ${result.created}, Preskočené: ${result.skipped}` });
+      }
+    } catch (err) {
+      console.error("Midflight error:", err);
+      toast({ title: "Chyba midflight importu", variant: "destructive" });
+    } finally {
+      setMidflightRunning(false);
     }
   }, [qc]);
 
@@ -726,6 +753,8 @@ export default function PlanVyroby() {
           isAdmin={isAdmin}
           recalculating={recalculating}
           onRecalculateHours={handleRecalculateHours}
+          midflightRunning={midflightRunning}
+          onMidflightImport={() => setMidflightConfirmOpen(true)}
         />
         )}
 
@@ -942,13 +971,23 @@ export default function PlanVyroby() {
         open={!!detailProjectId}
         onOpenChange={(open) => { if (!open) setDetailProjectId(null); }}
       />
+      <ConfirmDialog
+        open={midflightConfirmOpen}
+        onConfirm={() => { setMidflightConfirmOpen(false); handleMidflightImport(); }}
+        onCancel={() => setMidflightConfirmOpen(false)}
+        title="Midflight import"
+        description="Toto vytvorí historické bundles z production_hours_log. Existujúce midflight záznamy sa preskočia. Pokračovať?"
+        confirmLabel="Importovať"
+        cancelLabel="Zrušit"
+        variant="default"
+      />
       {isMobile && <MobileBottomNav />}
     </DndContext>
   );
 }
 
 
-function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchNavActive = false, searchNavTotalCount = 0, searchNavCurrentIndex = 0, searchNavGoNext, searchNavGoPrev, overbookedWeekCount = 0, onOverbookBadgeClick, isAdmin, recalculating, onRecalculateHours }: {
+function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchNavActive = false, searchNavTotalCount = 0, searchNavCurrentIndex = 0, searchNavGoNext, searchNavGoPrev, overbookedWeekCount = 0, onOverbookBadgeClick, isAdmin, recalculating, onRecalculateHours, midflightRunning, onMidflightImport }: {
   viewTab: "kanban" | "table";
   setViewTab: (v: "kanban" | "table") => void;
   displayMode: DisplayMode;
@@ -973,6 +1012,8 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   searchNavCurrentIndex?: number;
   searchNavGoNext?: () => void;
   searchNavGoPrev?: () => void;
+  midflightRunning?: boolean;
+  onMidflightImport?: () => void;
 }) {
   const { data: settings } = useProductionSettings();
   const { data: scheduleData } = useProductionSchedule();
@@ -1131,6 +1172,19 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
         >
           {recalculating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span className="text-[12px]">⟳</span>}
           Přepočítat
+        </button>
+      )}
+
+      {/* Midflight import — admin only */}
+      {isAdmin && !forecastActive && (
+        <button
+          onClick={onMidflightImport}
+          disabled={midflightRunning}
+          className="inline-flex items-center gap-1 px-2.5 py-1 h-8 text-[12px] font-medium rounded-md border transition-colors hover:bg-muted disabled:opacity-50"
+          style={{ borderColor: "hsl(var(--border))", color: "hsl(var(--foreground))" }}
+        >
+          {midflightRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span className="text-[12px]">📥</span>}
+          Midflight
         </button>
       )}
 
