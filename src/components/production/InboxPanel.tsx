@@ -675,7 +675,50 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
           );
         })}
 
-        {completedProjects.length > 0 && (
+        {/* Expedice — midflight items awaiting scheduling */}
+        {expediceProjects.length > 0 && (
+          <div className="mt-3 space-y-[2px]">
+            <div className="flex items-center gap-0 mb-1.5">
+              <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+              <span className="px-2" style={{ fontSize: 11, color: "#d97706", backgroundColor: "#fffbeb" }}>
+                📦 Expedice — čeká na naplánování ({expediceProjects.length})
+              </span>
+              <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+            </div>
+            {expediceProjects.map(p => {
+              const expColor = getProjectColor(p.project_id);
+              const isExpSelected = selectedProjectId === p.project_id;
+              return (
+                <div key={p.project_id} className="flex items-center gap-1.5 px-2 py-[6px] rounded-[5px] cursor-pointer"
+                  onClick={(e) => { e.stopPropagation(); onSelectProject?.(p.project_id); }}
+                  onContextMenu={(e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    const actions: ContextMenuAction[] = [];
+                    if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(p.project_id) });
+                    if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(p.project_id) });
+                    if (actions.length > 0) setContextMenu({ x: e.clientX, y: Math.min(e.clientY, window.innerHeight - 200), actions });
+                  }}
+                  style={{
+                    backgroundColor: isExpSelected ? "rgba(217,119,6,0.08)" : "#fffbeb",
+                    border: isExpSelected ? "2px solid #d97706" : "1px solid #fde68a",
+                    borderLeft: `4px solid ${expColor}`,
+                    boxShadow: isExpSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
+                  }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[11px] font-semibold truncate" style={{ color: "#92400e" }}>{p.project_name}</span>
+                      <span className="text-[9px] font-sans shrink-0" style={{ color: "#b45309" }}>{p.project_id}</span>
+                    </div>
+                  </div>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0" style={{ backgroundColor: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }}>
+                    Expedice
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
           <div className="mt-3 space-y-[2px]">
             {/* Section divider */}
             <div className="flex items-center gap-0 mb-1.5">
