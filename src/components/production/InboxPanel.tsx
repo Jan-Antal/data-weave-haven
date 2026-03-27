@@ -223,9 +223,28 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     return m;
   }, [allDbProjects]);
 
+  // Separate expedice midflight items from regular inbox
+  const { regularProjects, expediceProjects } = useMemo(() => {
+    const regular: typeof projects = [];
+    const expedice: typeof projects = [];
+    for (const p of projects) {
+      const isExpedice = p.items.every(i => i.adhoc_reason === "midflight_expedice");
+      if (isExpedice) {
+        expedice.push(p);
+      } else {
+        // Filter out any expedice items from mixed projects
+        const filteredItems = p.items.filter(i => i.adhoc_reason !== "midflight_expedice");
+        if (filteredItems.length > 0) {
+          regular.push({ ...p, items: filteredItems, total_hours: filteredItems.reduce((s, i) => s + i.estimated_hours, 0) });
+        }
+      }
+    }
+    return { regularProjects: regular, expediceProjects: expedice };
+  }, [projects]);
+
   // Sort projects by urgency
   const sortedProjects = useMemo(() => {
-    return [...projects].sort((a, b) => {
+    return [...regularProjects].sort((a, b) => {
       const infoA = projectInfoMap.get(a.project_id);
       const infoB = projectInfoMap.get(b.project_id);
       const uA = getUrgency(infoA);
@@ -237,7 +256,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
       const dB = dlB ? dlB.getTime() : Infinity;
       return dA - dB;
     });
-  }, [projects, projectInfoMap]);
+  }, [regularProjects, projectInfoMap]);
 
   // Count overdue + urgent items
   const urgentItemCount = useMemo(() => {
@@ -655,6 +674,50 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
             />
           );
         })}
+
+        {/* Expedice — midflight items awaiting scheduling */}
+        {expediceProjects.length > 0 && (
+          <div className="mt-3 space-y-[2px]">
+            <div className="flex items-center gap-0 mb-1.5">
+              <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+              <span className="px-2" style={{ fontSize: 11, color: "#d97706", backgroundColor: "#fffbeb" }}>
+                📦 Expedice — čeká na naplánování ({expediceProjects.length})
+              </span>
+              <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+            </div>
+            {expediceProjects.map(p => {
+              const expColor = getProjectColor(p.project_id);
+              const isExpSelected = selectedProjectId === p.project_id;
+              return (
+                <div key={p.project_id} className="flex items-center gap-1.5 px-2 py-[6px] rounded-[5px] cursor-pointer"
+                  onClick={(e) => { e.stopPropagation(); onSelectProject?.(p.project_id); }}
+                  onContextMenu={(e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    const actions: ContextMenuAction[] = [];
+                    if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(p.project_id) });
+                    if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(p.project_id) });
+                    if (actions.length > 0) setContextMenu({ x: e.clientX, y: Math.min(e.clientY, window.innerHeight - 200), actions });
+                  }}
+                  style={{
+                    backgroundColor: isExpSelected ? "rgba(217,119,6,0.08)" : "#fffbeb",
+                    border: isExpSelected ? "2px solid #d97706" : "1px solid #fde68a",
+                    borderLeft: `4px solid ${expColor}`,
+                    boxShadow: isExpSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
+                  }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[11px] font-semibold truncate" style={{ color: "#92400e" }}>{p.project_name}</span>
+                      <span className="text-[9px] font-sans shrink-0" style={{ color: "#b45309" }}>{p.project_id}</span>
+                    </div>
+                  </div>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0" style={{ backgroundColor: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }}>
+                    Expedice
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {completedProjects.length > 0 && (
           <div className="mt-3 space-y-[2px]">

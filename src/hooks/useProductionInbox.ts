@@ -14,6 +14,7 @@ export interface InboxItem {
   sent_by: string;
   sent_at: string;
   status: string;
+  adhoc_reason: string | null;
 }
 
 export interface InboxProject {
@@ -59,6 +60,7 @@ export function useProductionInbox() {
           sent_by: row.sent_by,
           sent_at: row.sent_at,
           status: row.status,
+          adhoc_reason: row.adhoc_reason ?? null,
         });
         g.total_hours += row.estimated_hours;
       }
