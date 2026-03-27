@@ -1,31 +1,18 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-function getWeekKey(dateStr: string): string {
+/**
+ * Get the Monday of the ISO week for a given date string.
+ * Returns "YYYY-MM-DD" format.
+ */
+function getMondayOfWeek(dateStr: string): string {
   const d = new Date(dateStr);
   const day = d.getDay() || 7;
-  d.setDate(d.getDate() + 4 - day);
-  const yearStart = new Date(d.getFullYear(), 0, 1);
-  const week = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return `${d.getFullYear()}-W${String(week).padStart(2, "0")}`;
+  d.setDate(d.getDate() - day + 1);
+  return d.toISOString().split("T")[0];
 }
 
-function weekKeyToMonday(wk: string): string {
-  // "2026-W13" → Monday date as "YYYY-MM-DD"
-  const [yearStr, weekStr] = wk.split("-W");
-  const year = parseInt(yearStr, 10);
-  const week = parseInt(weekStr, 10);
-  // Jan 4 is always in week 1
-  const jan4 = new Date(year, 0, 4);
-  const dayOfWeek = jan4.getDay() || 7;
-  const monday = new Date(jan4);
-  monday.setDate(jan4.getDate() - dayOfWeek + 1 + (week - 1) * 7);
-  const mm = String(monday.getMonth() + 1).padStart(2, "0");
-  const dd = String(monday.getDate()).padStart(2, "0");
-  return `${monday.getFullYear()}-${mm}-${dd}`;
-}
-
-function getCurrentWeekKey(): string {
-  return getWeekKey(new Date().toISOString().split("T")[0]);
+function getCurrentMonday(): string {
+  return getMondayOfWeek(new Date().toISOString().split("T")[0]);
 }
 
 interface HoursRow {
@@ -38,7 +25,7 @@ export async function midflightImportPlanVyroby(
   supabaseClient: SupabaseClient,
   onProgress?: (msg: string) => void
 ): Promise<{ created: number; skipped: number; errors: string[] }> {
-  const currentWeek = getCurrentWeekKey();
+  const currentMonday = getCurrentMonday();
   const errors: string[] = [];
   let created = 0;
   let skipped = 0;
@@ -66,12 +53,12 @@ export async function midflightImportPlanVyroby(
 
   onProgress?.(`Načteno ${allHours.length} záznamů hodin.`);
 
-  // Group by project + week
-  const byProjectWeek = new Map<string, number>();
+  // Group by project + monday
+  const byProjectMonday = new Map<string, number>();
   for (const row of allHours) {
-    const wk = getWeekKey(row.datum_sync);
-    const key = `${row.ami_project_id}||${wk}`;
-    byProjectWeek.set(key, (byProjectWeek.get(key) || 0) + row.hodiny);
+    const monday = getMondayOfWeek(row.datum_sync);
+    const key = `${row.ami_project_id}||${monday}`;
+    byProjectMonday.set(key, (byProjectMonday.get(key) || 0) + row.hodiny);
   }
 
   // Fetch project names
@@ -85,17 +72,6 @@ export async function midflightImportPlanVyroby(
     projectNameMap.set(p.project_id, p.project_name);
   }
 
-  // Fetch existing midflight entries to skip
-  const { data: existingMidflight } = await (supabaseClient as any)
-    .from("production_schedule")
-    .select("project_id, scheduled_week")
-    .eq("is_midflight", true);
-  const existingSet = new Set(
-    (existingMidflight || []).map(
-      (r: any) => `${r.project_id}||${getWeekKey(r.scheduled_week)}`
-    )
-  );
-
   // Fetch inbox items for current week logic
   const { data: inboxItems } = await (supabaseClient as any)
     .from("production_inbox")
@@ -107,38 +83,33 @@ export async function midflightImportPlanVyroby(
     inboxByProject.get(item.project_id)!.push(item);
   }
 
-  // Process each project+week
+  // Process each project+monday
   const toInsert: any[] = [];
 
-  for (const [key, totalHours] of byProjectWeek) {
-    const [projectId, weekKey] = key.split("||");
+  for (const [key, totalHours] of byProjectMonday) {
+    const [projectId, monday] = key.split("||");
     const projectName = projectNameMap.get(projectId) || projectId;
 
-    if (existingSet.has(key)) {
-      skipped++;
-      continue;
-    }
-
-    if (weekKey < currentWeek) {
+    if (monday < currentMonday) {
       // CASE A — Historical
       toInsert.push({
         project_id: projectId,
-        item_code: "HISTORICAL",
-        item_name: projectName,
-        scheduled_week: weekKeyToMonday(weekKey),
+        item_code: "HIST",
+        item_name: `${projectName} — história`,
+        scheduled_week: monday,
         scheduled_hours: Math.round(totalHours * 100) / 100,
         scheduled_czk: 0,
         status: "completed",
         is_midflight: true,
         position: 0,
       });
-    } else if (weekKey === currentWeek) {
+    } else if (monday === currentMonday) {
       // CASE B — Current week
       toInsert.push({
         project_id: projectId,
         item_code: "MIDFLIGHT_CURRENT",
-        item_name: projectName,
-        scheduled_week: weekKeyToMonday(weekKey),
+        item_name: `${projectName}`,
+        scheduled_week: monday,
         scheduled_hours: Math.round(totalHours * 100) / 100,
         scheduled_czk: 0,
         status: "in_progress",
@@ -161,25 +132,33 @@ export async function midflightImportPlanVyroby(
         }
       }
     }
-    // CASE C — future weeks: skip (leave inbox untouched)
+    // CASE C — future weeks: skip
   }
 
-  // Batch insert
+  // Batch upsert (ON CONFLICT DO NOTHING via individual inserts with onConflict)
   if (toInsert.length > 0) {
     onProgress?.(`Vkládám ${toInsert.length} bundlů...`);
-    // Insert in chunks of 200
     for (let i = 0; i < toInsert.length; i += 200) {
       const chunk = toInsert.slice(i, i + 200);
-      const { error: insErr } = await (supabaseClient as any)
+      const { data: inserted, error: insErr } = await (supabaseClient as any)
         .from("production_schedule")
-        .insert(chunk);
+        .upsert(chunk, {
+          onConflict: "project_id,item_code,scheduled_week",
+          ignoreDuplicates: true,
+        })
+        .select("id");
       if (insErr) {
         errors.push(`Insert error (batch ${i}): ${insErr.message}`);
       } else {
-        created += chunk.length;
+        const insertedCount = inserted?.length ?? chunk.length;
+        created += insertedCount;
       }
     }
   }
+
+  // Count actual skipped as difference
+  skipped = toInsert.length - created;
+  if (skipped < 0) skipped = 0;
 
   onProgress?.(`Hotovo. Vytvořeno: ${created}, Přeskočeno: ${skipped}`);
   return { created, skipped, errors };

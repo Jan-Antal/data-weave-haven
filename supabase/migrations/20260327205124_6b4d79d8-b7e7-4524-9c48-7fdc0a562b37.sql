@@ -1,0 +1,2 @@
+ALTER TABLE production_schedule DROP CONSTRAINT IF EXISTS production_schedule_project_id_key;
+ALTER TABLE production_schedule ADD CONSTRAINT production_schedule_item_week_unique UNIQUE (project_id, item_code, scheduled_week);
