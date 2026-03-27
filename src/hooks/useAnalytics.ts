@@ -135,9 +135,9 @@ export function useAnalytics() {
 
       for (const [pid, h] of hoursMap) {
         const proj = projectsMap.get(pid);
-        const name = proj?.project_name || h.project_name;
-        const status = proj?.status || h.status;
-        const pm = proj?.pm || h.pm;
+        const name = proj?.project_name || pid;
+        const status = proj?.status || null;
+        const pm = proj?.pm || null;
 
         const plan = planMap.get(pid);
         const hodiny_plan = plan?.hodiny_plan ?? null;
