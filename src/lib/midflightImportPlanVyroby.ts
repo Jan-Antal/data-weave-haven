@@ -151,7 +151,7 @@ export async function midflightImportPlanVyroby(
       if (inboxEntries && inboxEntries.length > 0) {
         for (const entry of inboxEntries) {
           const remaining = Math.max(0, entry.estimated_hours - totalHours);
-          const { error: updErr } = await supabaseClient
+          const { error: updErr } = await (supabaseClient as any)
             .from("production_inbox")
             .update({ estimated_hours: remaining })
             .eq("id", entry.id);
@@ -170,7 +170,7 @@ export async function midflightImportPlanVyroby(
     // Insert in chunks of 200
     for (let i = 0; i < toInsert.length; i += 200) {
       const chunk = toInsert.slice(i, i + 200);
-      const { error: insErr } = await supabaseClient
+      const { error: insErr } = await (supabaseClient as any)
         .from("production_schedule")
         .insert(chunk);
       if (insErr) {
