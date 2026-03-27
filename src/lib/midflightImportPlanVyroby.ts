@@ -1,6 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
+ * Normalize project IDs: "Z-2501-002R" → "Z-2501-002-R"
+ */
+function normalizeProjectId(id: string): string {
+  return id.replace(/([0-9])([A-Z])$/, "$1-$2");
+}
+
+/**
  * Get the Monday of the ISO week for a given date string.
  * Returns "YYYY-MM-DD" format.
  */
@@ -61,25 +68,39 @@ export async function midflightImportPlanVyroby(
 
   onProgress?.(`Načteno ${allHours.length} záznamů hodin.`);
 
-  // Group by project + monday
+  // Fetch valid projects for matching
+  const { data: validProjects } = await (supabaseClient as any)
+    .from("projects")
+    .select("project_id, project_name, status")
+    .is("deleted_at", null);
+
+  const validProjectMap = new Map<string, { name: string; status: string }>();
+  for (const p of validProjects || []) {
+    validProjectMap.set(p.project_id, {
+      name: p.project_name,
+      status: (p.status || "").toLowerCase(),
+    });
+  }
+
+  // Group by normalized project + monday
   const byProjectMonday = new Map<string, number>();
   for (const row of allHours) {
+    const normalizedId = normalizeProjectId(row.ami_project_id);
+    if (!validProjectMap.has(normalizedId)) continue;
     const monday = getMondayOfWeek(row.datum_sync);
-    const key = `${row.ami_project_id}||${monday}`;
+    const key = `${normalizedId}||${monday}`;
     byProjectMonday.set(key, (byProjectMonday.get(key) || 0) + row.hodiny);
   }
 
-  // Fetch project names and statuses
-  const projectIds = [...new Set(allHours.map((r) => r.ami_project_id))];
-  const { data: projects } = await (supabaseClient as any)
-    .from("projects")
-    .select("project_id, project_name, status")
-    .in("project_id", projectIds);
-  const projectNameMap = new Map<string, string>();
-  const projectStatusMap = new Map<string, string>();
-  for (const p of projects || []) {
-    projectNameMap.set(p.project_id, p.project_name);
-    projectStatusMap.set(p.project_id, (p.status || "").toLowerCase());
+  // Track skipped unknown projects
+  const unknownProjects = new Set<string>();
+  for (const row of allHours) {
+    const normalizedId = normalizeProjectId(row.ami_project_id);
+    if (!validProjectMap.has(normalizedId)) unknownProjects.add(row.ami_project_id);
+  }
+  for (const uid of unknownProjects) {
+    skipped++;
+    onProgress?.(`Preskočený neznámy projekt: ${uid}`);
   }
 
   // Fetch existing inbox item_codes for dedup (midflight items)
@@ -122,7 +143,7 @@ export async function midflightImportPlanVyroby(
 
   for (const [key, totalHours] of byProjectMonday) {
     const [projectId, monday] = key.split("||");
-    const projectName = projectNameMap.get(projectId) || projectId;
+    const projectName = validProjectMap.get(projectId)?.name || projectId;
     projectsInHours.add(projectId);
 
     if (monday < currentMonday) {
@@ -165,7 +186,7 @@ export async function midflightImportPlanVyroby(
 
   // CASE D — Expedice projects: create special inbox entry for scheduling
   for (const projectId of projectsInHours) {
-    const status = projectStatusMap.get(projectId) || "";
+    const status = validProjectMap.get(projectId)?.status || "";
     if (status !== "expedice" && status !== "montáž") continue;
 
     // Only create if no future scheduled work exists
@@ -175,7 +196,7 @@ export async function midflightImportPlanVyroby(
     const dedupKey = `${projectId}||${itemCode}`;
     if (existingKeys.has(dedupKey)) continue;
 
-    const projectName = projectNameMap.get(projectId) || projectId;
+    const projectName = validProjectMap.get(projectId)?.name || projectId;
     toInsert.push({
       project_id: projectId,
       item_code: itemCode,
