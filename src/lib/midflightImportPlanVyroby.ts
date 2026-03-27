@@ -143,7 +143,7 @@ export async function midflightImportPlanVyroby(
 
   for (const [key, totalHours] of byProjectMonday) {
     const [projectId, monday] = key.split("||");
-    const projectName = projectNameMap.get(projectId) || projectId;
+    const projectName = validProjectMap.get(projectId)?.name || projectId;
     projectsInHours.add(projectId);
 
     if (monday < currentMonday) {
@@ -186,7 +186,7 @@ export async function midflightImportPlanVyroby(
 
   // CASE D — Expedice projects: create special inbox entry for scheduling
   for (const projectId of projectsInHours) {
-    const status = projectStatusMap.get(projectId) || "";
+    const status = validProjectMap.get(projectId)?.status || "";
     if (status !== "expedice" && status !== "montáž") continue;
 
     // Only create if no future scheduled work exists
@@ -196,7 +196,7 @@ export async function midflightImportPlanVyroby(
     const dedupKey = `${projectId}||${itemCode}`;
     if (existingKeys.has(dedupKey)) continue;
 
-    const projectName = projectNameMap.get(projectId) || projectId;
+    const projectName = validProjectMap.get(projectId)?.name || projectId;
     toInsert.push({
       project_id: projectId,
       item_code: itemCode,
