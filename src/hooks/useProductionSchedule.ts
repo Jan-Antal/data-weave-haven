@@ -52,6 +52,7 @@ export function useProductionSchedule() {
         .from("production_schedule")
         .select("*, projects!production_schedule_project_id_fkey(project_name)")
         .in("status", ["scheduled", "in_progress", "completed", "paused"])
+        .or("is_midflight.is.null,is_midflight.eq.false")
         .order("position", { ascending: true });
       if (error) throw error;
 
@@ -125,6 +126,7 @@ export function useProductionExpedice() {
         .from("production_schedule")
         .select("*, projects!production_schedule_project_id_fkey(project_name)")
         .eq("status", "completed")
+        .or("is_midflight.is.null,is_midflight.eq.false,item_code.eq.EXPEDICE_MIDFLIGHT")
         .order("completed_at", { ascending: false });
       if (error) throw error;
 
