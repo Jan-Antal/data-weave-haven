@@ -131,7 +131,7 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
       <SheetContent
         ref={sheetRef}
         side="bottom"
-        className="rounded-t-2xl p-0 overflow-hidden flex flex-col bottom-[56px] top-[30%] max-h-[70svh]"
+        className="rounded-t-2xl p-0 overflow-hidden flex flex-col bottom-[56px] top-[56px]"
         onTouchStart={(e: React.TouchEvent) => {
           const el = e.currentTarget as HTMLElement;
           el.dataset.swipeStartY = String(e.touches[0].clientY);
