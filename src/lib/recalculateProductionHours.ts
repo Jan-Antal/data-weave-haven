@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { computePlanHours, type PlanHoursResult } from "./computePlanHours";
+import { createNotification, getUserIdsByRole } from "./createNotification";
 
 function getCurrentWeekKey(): string {
   const now = new Date();
@@ -160,6 +161,45 @@ export async function recalculateProductionHours(
         { onConflict: "project_id" }
       );
     }
+
+    // Check for over-plan projects (>100%) and notify admin/owner
+    try {
+      // Get total scheduled hours per project from production_schedule
+      const overPlanProjectIds = projectResults
+        .filter((r) => r.result.hodiny_plan > 0)
+        .map((r) => r.project_id);
+
+      if (overPlanProjectIds.length > 0) {
+        const { data: schedData } = await supabaseClient
+          .from("production_schedule")
+          .select("project_id, scheduled_hours")
+          .in("project_id", overPlanProjectIds)
+          .in("status", ["scheduled", "in_progress", "completed"]);
+
+        const hoursByProject: Record<string, number> = {};
+        for (const s of schedData || []) {
+          hoursByProject[s.project_id] = (hoursByProject[s.project_id] || 0) + Number(s.scheduled_hours);
+        }
+
+        const adminIds = await getUserIdsByRole(supabaseClient, ["owner", "admin"]);
+        for (const r of projectResults) {
+          if (r.result.hodiny_plan <= 0) continue;
+          const usedHours = hoursByProject[r.project_id] || 0;
+          const pct = Math.round((usedHours / r.result.hodiny_plan) * 100);
+          if (pct > 100) {
+            await createNotification(supabaseClient, {
+              userIds: adminIds,
+              type: "warning",
+              title: "Překročení plánu hodin",
+              body: `${r.project_id} — ${pct}% čerpání`,
+              projectId: r.project_id,
+              linkContext: { tab: "plan-vyroby", project_id: r.project_id },
+              batchKey: `over-plan-${r.project_id}`,
+            });
+          }
+        }
+      }
+    } catch { /* silent */ }
   }
 
   // Batch update tpv_items.hodiny_plan
