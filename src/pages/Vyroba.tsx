@@ -2069,8 +2069,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             <SheetContent
               ref={sheetRefVyrobaProjekt}
               side="bottom"
-              className="h-[85vh] rounded-t-2xl p-0 overflow-hidden shadow-[0_-8px_30px_rgba(0,0,0,0.12)]"
-              style={{ paddingBottom: "72px" }}
+              className="h-[85vh] rounded-t-2xl p-0 overflow-hidden shadow-[0_-8px_30px_rgba(0,0,0,0.12)] bottom-[56px]"
               onTouchStart={(e: React.TouchEvent) => {
                 const el = e.currentTarget as HTMLElement;
                 el.dataset.swipeStartY = String(e.touches[0].clientY);
@@ -2168,7 +2167,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 </div>
                 {/* Fixed bottom Log button */}
                 {todayDayIndex >= 0 && (
-                  <div className="shrink-0 px-4 pt-3 pb-4 border-t border-border bg-background">
+                  <div className="shrink-0 px-4 py-3 border-t border-border bg-background">
                     <button
                       onClick={() => openLogModal()}
                       className="w-full py-2.5 rounded-md text-white text-sm font-medium transition-colors hover:opacity-90 min-h-[44px]"
@@ -2364,8 +2363,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 <SheetContent
                   ref={sheetRefDaylog}
                   side="bottom"
-                  className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col shadow-[0_-8px_30px_rgba(0,0,0,0.12)]"
-                  style={{ touchAction: "none", paddingBottom: "72px" }}
+                  className="h-[85vh] rounded-t-2xl p-0 overflow-hidden flex flex-col shadow-[0_-8px_30px_rgba(0,0,0,0.12)] bottom-[56px]"
+                  style={{ touchAction: "none" }}
                   onTouchStart={(e: React.TouchEvent) => {
                     const el = e.currentTarget as HTMLElement;
                     el.dataset.swipeStartY = String(e.touches[0].clientY);
