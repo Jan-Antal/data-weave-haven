@@ -44,7 +44,7 @@ export function useAnalytics() {
       const [hoursRes, projectsRes, planHoursRes, presetsRes] = await Promise.all([
         supabase
           .from("production_hours_log")
-          .select("ami_project_id, project_name, status, pm, hodiny_skutocne, datum_sync"),
+          .select("ami_project_id, project_name, status, pm, hodiny, datum_sync"),
         supabase
           .from("projects")
           .select("project_id, project_name, status, pm, cost_preset_id, cost_is_custom, plan_use_project_price")
@@ -114,7 +114,7 @@ export function useAnalytics() {
           const pid = r.ami_project_id;
           if (!pid) continue;
           const existing = hoursMap.get(pid);
-          const val = Number(r.hodiny_skutocne || 0);
+          const val = Number(r.hodiny || 0);
           const sync = r.datum_sync;
           if (!existing) {
             hoursMap.set(pid, {
@@ -126,7 +126,7 @@ export function useAnalytics() {
               tracking_do: sync,
             });
           } else {
-            if (val > existing.skutocne) existing.skutocne = val;
+            existing.skutocne += val;
             if (sync && (!existing.tracking_od || sync < existing.tracking_od))
               existing.tracking_od = sync;
             if (sync && (!existing.tracking_do || sync > existing.tracking_do))
