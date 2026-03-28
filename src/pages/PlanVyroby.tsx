@@ -1076,37 +1076,79 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
     return keys;
   }, [visibleMonth, scheduleData]);
 
+  // FIX: Fetch plan hours and real hours for prodej calculation (same as Kanban silos)
+  const { data: planHoursData } = useQuery({
+    queryKey: ["project-plan-hours-lookup"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("project_plan_hours").select("project_id, hodiny_plan");
+      if (error) throw error;
+      const map = new Map<string, number>();
+      for (const row of data || []) map.set(row.project_id, row.hodiny_plan);
+      return map;
+    },
+  });
+
+  const { data: realHoursData } = useQuery({
+    queryKey: ["real-hours-by-project"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_hours_by_project");
+      if (error) throw error;
+      const map = new Map<string, number>();
+      for (const row of data || []) map.set(row.ami_project_id, Number(row.total_hodiny));
+      return map;
+    },
+  });
+
+  const projectLookup = useMemo(() => {
+    const map = new Map<string, { prodejni_cena?: number | null }>();
+    for (const p of allProjects) map.set(p.project_id, p);
+    return map;
+  }, [allProjects]);
+
   const { capacityHours, scheduledHours, scheduledCzk } = useMemo(() => {
     if (!scheduleData) return { capacityHours: 0, scheduledHours: 0, scheduledCzk: 0 };
-
-    const projMap = new Map<string, { cost_production_pct?: number | null; marze?: string | null }>();
-    for (const p of (allProjects ?? [])) projMap.set(p.project_id, p);
 
     let cap = 0;
     let hours = 0;
     let czk = 0;
+    // Aggregate hours per project across the visible month for prodej calc
+    const projectHoursInMonth = new Map<string, number>();
     for (const wk of visibleMonthWeekKeys) {
       cap += getWeekCapacity(wk);
       const silo = scheduleData.get(wk);
       if (silo) {
-        // Plán: only count current week + future weeks
         const isPastWeek = wk < currentWeekKey;
         if (!isPastWeek) {
           hours += silo.total_hours;
         }
         for (const b of silo.bundles) {
-          const proj = projMap.get(b.project_id);
           for (const i of b.items) {
             if (i.is_midflight) continue;
-            if (!["scheduled", "in_progress", "paused"].includes(i.status)) continue;
-            const prodCzk = i.scheduled_hours * hourlyRate;
-            czk += productionCzkToSellingPrice(prodCzk, proj?.cost_production_pct, proj?.marze);
+            if (i.status === "paused") continue;
+            const prev = projectHoursInMonth.get(b.project_id) ?? 0;
+            projectHoursInMonth.set(b.project_id, prev + i.scheduled_hours);
           }
         }
       }
     }
+    // Use same calcProdejValue logic as Kanban silos
+    for (const [pid, scheduledH] of projectHoursInMonth) {
+      const proj = projectLookup.get(pid);
+      const prodejniCena = proj?.prodejni_cena ?? 0;
+      if (!prodejniCena || prodejniCena <= 0 || scheduledH <= 0) continue;
+      const planHours = planHoursData?.get(pid) ?? 0;
+      const realHours = realHoursData?.get(pid) ?? 0;
+      const effectiveHours = Math.max(planHours, realHours);
+      if (effectiveHours <= 0) continue;
+      const share = scheduledH / effectiveHours;
+      czk += share * prodejniCena;
+    }
     return { capacityHours: cap, scheduledHours: hours, scheduledCzk: czk };
-  }, [scheduleData, visibleMonthWeekKeys, getWeekCapacity, allProjects, hourlyRate, currentWeekKey]);
+  }, [scheduleData, visibleMonthWeekKeys, getWeekCapacity, projectLookup, planHoursData, realHoursData, currentWeekKey]);
 
   const isOverCapacity = scheduledHours > capacityHours;
   const displayCzk = scheduledCzk;
