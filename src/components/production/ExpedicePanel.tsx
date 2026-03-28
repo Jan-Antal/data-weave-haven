@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useProductionExpediceData, type ExpediceItem, type ExpediceProject } from "@/hooks/useProductionExpedice";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useProductionSchedule } from "@/hooks/useProductionSchedule";
@@ -66,6 +66,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const initializedArchiveCollapseRef = useRef(false);
   const [archiveSearch, setArchiveSearch] = useState("");
 
   const invalidateAll = useCallback(() => {
@@ -170,6 +171,17 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
       g.project_name.toLowerCase().includes(archiveSearchTrimmed) || g.project_id.toLowerCase().includes(archiveSearchTrimmed)
     );
   }, [archivedProjects, archiveSearchTrimmed, isDeepSearch, deepSearchResults]);
+
+  useEffect(() => {
+    if (!initializedArchiveCollapseRef.current && archivedProjects.length > 0) {
+      setCollapsedGroups((prev) => {
+        const next = new Set(prev);
+        archivedProjects.forEach((group) => next.add(`archive-${group.project_id}`));
+        return next;
+      });
+      initializedArchiveCollapseRef.current = true;
+    }
+  }, [archivedProjects]);
 
   const { totalItems, lastCompletedStr } = useMemo(() => {
     let total = 0;
