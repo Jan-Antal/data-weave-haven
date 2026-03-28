@@ -271,6 +271,17 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
 
   const totalItemCount = projects.reduce((s, p) => s + p.items.length, 0);
 
+  // FIX 4: Only show projects with scheduled items in future weeks
+  const currentMondayISO = useMemo(() => {
+    const now = new Date();
+    const d = new Date(now);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    d.setDate(diff);
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString().split("T")[0];
+  }, []);
+
   const { completedProjects, reserveProjects, missingItemProjects } = useMemo(() => {
     if (!progressData) return { completedProjects: [], reserveProjects: [], missingItemProjects: [] };
     const activeProjectIds = new Set(projects.map(p => p.project_id));
@@ -278,10 +289,21 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     // Projects with missing items stay in active inbox area
     const missing = allFromProgress.filter(p => p.missing > 0 && !p.is_blocker_only && !p.is_complete);
     const allCompleted = allFromProgress.filter(p => (p.is_complete || p.is_blocker_only));
-    const regular = allCompleted.filter(p => !p.is_blocker_only);
+    // Filter: only show projects that have at least one scheduled item in future weeks
+    const regular = allCompleted.filter(p => {
+      if (p.is_blocker_only) return false;
+      // Check if project has any schedule items in current or future weeks
+      if (!scheduleData) return true;
+      for (const [weekKey, silo] of scheduleData) {
+        if (weekKey >= currentMondayISO) {
+          if (silo.bundles.some(b => b.project_id === p.project_id)) return true;
+        }
+      }
+      return false;
+    });
     const reserve = allCompleted.filter(p => p.is_blocker_only);
     return { completedProjects: regular, reserveProjects: reserve, missingItemProjects: missing };
-  }, [progressData, projects]);
+  }, [progressData, projects, scheduleData, currentMondayISO]);
 
   const allProjectOptions = useMemo(() => {
     const seen = new Set<string>();

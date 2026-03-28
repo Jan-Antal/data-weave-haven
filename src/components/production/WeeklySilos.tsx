@@ -1001,10 +1001,26 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       if (isBlocker) blockers.push(b);
       else regular.push(b);
     }
+    // FIX 5: Sort active projects first, completed/terminal projects bottom
     regular.sort((a, b) => {
-      const aDone = a.items.length > 0 && a.items.every(i => i.status === "expedice" || i.status === "completed");
-      const bDone = b.items.length > 0 && b.items.every(i => i.status === "expedice" || i.status === "completed");
-      if (aDone === bDone) return 0;
+      const projA = projectLookup.get(a.project_id);
+      const projB = projectLookup.get(b.project_id);
+      const terminalStatusesSet = ["Dokončeno", "Fakturace", "Expedice", "Montáž"];
+      const isTerminalA = terminalStatusesSet.some(s => (projA?.status ?? "").toLowerCase() === s.toLowerCase());
+      const isTerminalB = terminalStatusesSet.some(s => (projB?.status ?? "").toLowerCase() === s.toLowerCase());
+      const aDone = isTerminalA || (a.items.length > 0 && a.items.every(i => i.status === "expedice" || i.status === "completed"));
+      const bDone = isTerminalB || (b.items.length > 0 && b.items.every(i => i.status === "expedice" || i.status === "completed"));
+      if (aDone === bDone) {
+        // Within same group, sort by urgency (overdue first)
+        if (!aDone) {
+          const deadlineA = resolveDeadline({ expedice: projA?.expedice ?? null, montaz: projA?.montaz ?? null, datum_smluvni: projA?.datum_smluvni ?? null });
+          const deadlineB = resolveDeadline({ expedice: projB?.expedice ?? null, montaz: projB?.montaz ?? null, datum_smluvni: projB?.datum_smluvni ?? null });
+          const dA = deadlineA ? deadlineA.date.getTime() : Infinity;
+          const dB = deadlineB ? deadlineB.date.getTime() : Infinity;
+          return dA - dB;
+        }
+        return 0;
+      }
       return aDone ? 1 : -1;
     });
     return { realBundles: regular, blockerBundles: blockers };
@@ -1205,8 +1221,20 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const project = projectLookup.get(bundle.project_id);
   const isMidflightBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_midflight);
   // Deadline fallback chain: expedice → montáž → předání → smluvní
+  // For legacy (midflight) bundles, show only Smluvní termín from the project
   const deadlineInfo = useMemo(() => {
-    if (isMidflightBundle) return null;
+    if (isMidflightBundle) {
+      // Legacy bundles: show project's Smluvní termín if available
+      const sml = project?.datum_smluvni;
+      if (sml) {
+        const parsed = parseAppDate(sml);
+        const formatted = formatDateShortYY(sml);
+        if (parsed && formatted) {
+          return { label: "Sml", dateStr: formatted, parsed, days: differenceInDays(parsed, new Date()) };
+        }
+      }
+      return null;
+    }
     const fields: { key: string; label: string; value: string | null | undefined }[] = [
       { key: "expedice", label: "Exp", value: project?.expedice },
       { key: "montaz", label: "Mnt", value: project?.montaz },
