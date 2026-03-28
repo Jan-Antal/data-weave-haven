@@ -863,21 +863,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
             )}
           </div>
           {weeks.map((week, idx) => {
-            // Month boundary: check if next week is in a different month
-            const nextWeek = weeks[idx + 1];
-            const isMonthBoundary = nextWeek && nextWeek.start.getMonth() !== week.start.getMonth();
-            const nextMonthName = isMonthBoundary ? MONTH_NAMES[nextWeek.start.getMonth()] : null;
             return (
               <div key={week.key} className="relative shrink-0 flex flex-col" style={{ width: 252 }}>
-                {/* Month boundary separator */}
-                {isMonthBoundary && (
-                  <div className="absolute right-0 top-0 bottom-0 z-10 flex flex-col items-end" style={{ width: 0 }}>
-                    <div className="absolute right-0 top-0 bottom-0" style={{ width: 2, backgroundColor: "hsl(var(--muted-foreground) / 0.25)" }} />
-                    <div className="absolute right-1 top-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold whitespace-nowrap" style={{ color: "hsl(var(--muted-foreground))", backgroundColor: "hsl(var(--background))" }}>
-                      {nextMonthName} →
-                    </div>
-                  </div>
-                )}
                 <SiloColumn
                   weekKey={week.key} weekNum={week.weekNum}
                   startDate={week.start} endDate={week.end}
