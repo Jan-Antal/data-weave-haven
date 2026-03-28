@@ -13,10 +13,10 @@ import { getProjectColor } from "@/lib/projectColors";
 import { exportToExcel } from "@/lib/exportExcel";
 import { buildPrintableHtml } from "@/lib/exportPdf";
 import { parseAppDate } from "@/lib/dateFormat";
-import { format, differenceInDays, addDays } from "date-fns";
+import { format, differenceInDays, addDays, subWeeks, startOfWeek } from "date-fns";
 import { resolveDeadline } from "@/lib/deadlineWarning";
 import { cs } from "date-fns/locale";
-import { Download, ChevronRight, ChevronDown, Plus, ArrowRight, Inbox, CheckCircle2, XCircle, FileSpreadsheet, FileText, AlertTriangle } from "lucide-react";
+import { Download, ChevronRight, ChevronDown, Plus, ArrowRight, Inbox, CheckCircle2, XCircle, FileSpreadsheet, FileText, AlertTriangle, Search, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -114,6 +114,8 @@ interface ProjectRow {
   expediceTotalHours: number;
   expediceTotalCzk: number;
   isBlockerOnly: boolean;
+  /** Section classification for grouping */
+  section?: "inbox" | "vyroba" | "expedice" | "archiv";
 }
 
 function getCollapsedCellStyle(proj: ProjectRow, weekKey: string): { bg: string; text: string; border: string } {
@@ -140,7 +142,6 @@ function getCollapsedCellStyle(proj: ProjectRow, weekKey: string): { bg: string;
 
 const CELL_W = 132;
 const INBOX_W = 100;
-const EXPEDICE_W = 100;
 const LEFT_COL_W = 280;
 
 export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateToTPV, onOpenProjectDetail }: Props) {
@@ -156,6 +157,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   const qc = useQueryClient();
   const [sortMode, setSortMode] = useState<SortMode>("project");
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(["archiv"]));
+  const [localSearch, setLocalSearch] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialScrollDone = useRef(false);
 
