@@ -33,7 +33,7 @@ export interface UndoEntry {
 }
 
 interface UndoRedoState {
-  pushUndo: (entry: Omit<UndoEntry, "id" | "timestamp">) => void;
+  pushUndo: (entry: Omit<UndoEntry, "id" | "timestamp">, groupId?: string) => void;
   popLastUndo: (page?: UndoPage) => UndoEntry | null;
   undo: (page?: UndoPage) => void;
   redo: (page?: UndoPage) => void;
@@ -105,6 +105,7 @@ async function persistToDb(entry: UndoEntry, userId: string): Promise<string | n
     undo_payload: entry.undoPayload,
     redo_payload: entry.redoPayload,
     expires_at: expiresAt,
+    group_id: entry.groupId ?? null,
   } as any).select("id").single();
   if (error) {
     console.warn("Failed to persist undo entry:", error.message);
