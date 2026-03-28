@@ -1,0 +1,1 @@
+ALTER TABLE public.undo_sessions ADD COLUMN IF NOT EXISTS group_id UUID;
