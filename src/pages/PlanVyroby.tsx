@@ -1047,10 +1047,11 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
     return d.toISOString().split("T")[0];
   }, []);
 
-  // Week keys whose Monday falls in the visible month
+  // Week keys whose Monday falls in the visible month (strict: Monday must be in the month)
   const visibleMonthWeekKeys = useMemo(() => {
     const { month, year } = visibleMonth;
-    const keys: string[] = [];
+    const keysSet = new Set<string>();
+    // Walk from the Monday on or before the 1st, adding weeks whose Monday is in this month
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const d = new Date(firstDay);
@@ -1058,23 +1059,12 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
     d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
     while (d <= lastDay) {
       if (d.getMonth() === month && d.getFullYear() === year) {
-        keys.push(d.toISOString().split("T")[0]);
+        keysSet.add(d.toISOString().split("T")[0]);
       }
       d.setDate(d.getDate() + 7);
     }
-    if (scheduleData) {
-      for (const weekKey of scheduleData.keys()) {
-        const monday = new Date(weekKey + "T00:00:00");
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        if ((monday.getMonth() === month && monday.getFullYear() === year) ||
-            (sunday.getMonth() === month && sunday.getFullYear() === year)) {
-          if (!keys.includes(weekKey)) keys.push(weekKey);
-        }
-      }
-    }
-    return keys;
-  }, [visibleMonth, scheduleData]);
+    return Array.from(keysSet);
+  }, [visibleMonth]);
 
   // FIX: Fetch plan hours and real hours for prodej calculation (same as Kanban silos)
   const { data: planHoursData } = useQuery({
