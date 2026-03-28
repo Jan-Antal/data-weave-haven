@@ -116,6 +116,13 @@ export default function PlanVyroby() {
   const { setCurrentPage, popLastUndo } = useUndoRedo();
   const [displayMode, setDisplayMode] = useState<DisplayMode>("hours");
   const [viewTab, setViewTab] = useState<ViewTab>("kanban");
+  const [visibleMonth, setVisibleMonth] = useState<{ month: number; year: number }>(() => {
+    const now = new Date();
+    return { month: now.getMonth(), year: now.getFullYear() };
+  });
+  const handleVisibleMonthChange = useCallback((month: number, year: number) => {
+    setVisibleMonth(prev => (prev.month === month && prev.year === year) ? prev : { month, year });
+  }, []);
   const forecast = useForecastMode();
   const [overbookDialogOpen, setOverbookDialogOpen] = useState(false);
   const prevOverbookedRef = useRef(0);
@@ -825,6 +832,7 @@ export default function PlanVyroby() {
                       is_forecast: true,
                     });
                   } : undefined}
+                  onVisibleMonthChange={handleVisibleMonthChange}
                 />
                 {!forecast.forecastActive && (
                   <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />
