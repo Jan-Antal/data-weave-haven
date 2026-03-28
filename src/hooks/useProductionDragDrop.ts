@@ -609,6 +609,15 @@ export function useProductionDragDrop() {
         return null;
       }
 
+      // Check if all parts are in the same week — block cross-week merge
+      if (!onlyInWeek) {
+        const weeks = new Set(parts.map(p => p.scheduled_week));
+        if (weeks.size > 1) {
+          if (!silent) toast({ title: "Nelze sloučit", description: "Nelze sloučit položky v různých týdnech.", variant: "destructive" });
+          return null;
+        }
+      }
+
       const totalHours = parts.reduce((s, p) => s + p.scheduled_hours, 0);
       const totalCzk = parts.reduce((s, p) => s + p.scheduled_czk, 0);
       const primary = parts[0];
