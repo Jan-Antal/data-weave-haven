@@ -283,15 +283,29 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      redoStackRef.current = [...redoStackRef.current.slice(0, idx), ...redoStackRef.current.slice(idx + 1)];
+      // Collect all entries with the same groupId (batch redo)
+      let entriesToRedo: UndoEntry[];
+      if (entry.groupId) {
+        entriesToRedo = redoStackRef.current.filter(e => e.groupId === entry.groupId);
+        redoStackRef.current = redoStackRef.current.filter(e => e.groupId !== entry.groupId);
+      } else {
+        entriesToRedo = [entry];
+        redoStackRef.current = [...redoStackRef.current.slice(0, idx), ...redoStackRef.current.slice(idx + 1)];
+      }
+
       const maxForPage = PAGE_MAX_STACK[entry.page] ?? DEFAULT_MAX_STACK;
-      undoStackRef.current = [...undoStackRef.current, entry].slice(-maxForPage);
+      undoStackRef.current = [...undoStackRef.current, ...entriesToRedo].slice(-maxForPage);
       bump();
 
       executingRef.current = true;
       try {
-        await entry.redo();
-        toast({ title: `→ Opakováno: ${entry.description}`, duration: 2000 });
+        for (const e of entriesToRedo) {
+          await e.redo();
+        }
+        const desc = entriesToRedo.length > 1
+          ? `${entry.description} (${entriesToRedo.length}×)`
+          : entry.description;
+        toast({ title: `→ Opakováno: ${desc}`, duration: 2000 });
       } catch (err: any) {
         toast({
           title: "Nelze obnovit — data se změnila",
