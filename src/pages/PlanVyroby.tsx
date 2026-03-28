@@ -1116,6 +1116,7 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
     let hours = 0;
     let czk = 0;
     // Aggregate hours per project across the visible month for prodej calc
+    // NOTE: Do NOT skip is_midflight — silos include them in their totals
     const projectHoursInMonth = new Map<string, number>();
     for (const wk of visibleMonthWeekKeys) {
       cap += getWeekCapacity(wk);
@@ -1127,7 +1128,6 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
         }
         for (const b of silo.bundles) {
           for (const i of b.items) {
-            if (i.is_midflight) continue;
             if (i.status === "paused") continue;
             const prev = projectHoursInMonth.get(b.project_id) ?? 0;
             projectHoursInMonth.set(b.project_id, prev + i.scheduled_hours);
@@ -1136,7 +1136,6 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
       }
     }
     // Use same calcProdejValue logic as Kanban silos
-    const debugRows: { pid: string; scheduledH: number; prodejniCena: number; planH: number; realH: number; effectiveH: number; share: number; contrib: number }[] = [];
     for (const [pid, scheduledH] of projectHoursInMonth) {
       const proj = projectLookup.get(pid);
       const prodejniCena = proj?.prodejni_cena ?? 0;
@@ -1146,11 +1145,8 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
       const effectiveHours = Math.max(planHours, realHours);
       if (effectiveHours <= 0) continue;
       const share = scheduledH / effectiveHours;
-      const contrib = share * prodejniCena;
-      czk += contrib;
-      debugRows.push({ pid, scheduledH, prodejniCena, planH: planHours, realH: realHours, effectiveH: effectiveHours, share, contrib });
+      czk += share * prodejniCena;
     }
-    console.log("[HEADER DEBUG]", { visibleMonthWeekKeys, projectCount: projectHoursInMonth.size, czk, cap, hours, debugRows, planHoursDataSize: planHoursData?.size, realHoursDataSize: realHoursData?.size, projectLookupSize: projectLookup.size });
     return { capacityHours: cap, scheduledHours: hours, scheduledCzk: czk };
   }, [scheduleData, visibleMonthWeekKeys, getWeekCapacity, projectLookup, planHoursData, realHoursData, currentWeekKey]);
 
