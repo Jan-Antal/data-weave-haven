@@ -184,8 +184,35 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const qc = useQueryClient();
   const getWeekCapacity = useWeekCapacityLookup();
 
+  // FIX 6: Fetch plan hours and real hours for prodej calculation
+  const { data: planHoursData } = useQuery({
+    queryKey: ["project-plan-hours-lookup"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("project_plan_hours").select("project_id, hodiny_plan");
+      if (error) throw error;
+      const map = new Map<string, number>();
+      for (const row of data || []) map.set(row.project_id, row.hodiny_plan);
+      return map;
+    },
+  });
+
+  const { data: realHoursData } = useQuery({
+    queryKey: ["real-hours-by-project"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_hours_by_project");
+      if (error) throw error;
+      const map = new Map<string, number>();
+      for (const row of data || []) map.set(row.ami_project_id, Number(row.total_hodiny));
+      return map;
+    },
+  });
+
   const projectLookup = useMemo(() => {
-    const map = new Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null; cost_production_pct?: number | null; marze?: string | null }>();
+    const map = new Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null; cost_production_pct?: number | null; marze?: string | null; prodejni_cena?: number | null }>();
     for (const p of allProjects) map.set(p.project_id, p);
     return map;
   }, [allProjects]);
