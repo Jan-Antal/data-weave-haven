@@ -1108,6 +1108,7 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
     let cap = 0;
     let hours = 0;
     let czk = 0;
+    const projectHoursInMonth = new Map<string, number>();
 
     for (const wk of visibleMonthWeekKeys) {
       cap += getWeekCapacity(wk);
@@ -1123,13 +1124,26 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
       for (const b of silo.bundles) {
         for (const i of b.items) {
           if (i.status === "paused") continue;
-          czk += Number(i.scheduled_czk ?? 0);
+          const prev = projectHoursInMonth.get(b.project_id) ?? 0;
+          projectHoursInMonth.set(b.project_id, prev + i.scheduled_hours);
         }
       }
     }
 
+    // Use same calcProdejValue logic as Kanban silos: (scheduledH / effectiveH) * prodejniCena
+    for (const [pid, scheduledH] of projectHoursInMonth) {
+      const proj = projectLookup.get(pid);
+      const prodejniCena = proj?.prodejni_cena ?? 0;
+      if (!prodejniCena || prodejniCena <= 0 || scheduledH <= 0) continue;
+      const planH = planHoursData?.get(pid) ?? 0;
+      const realH = realHoursData?.get(pid) ?? 0;
+      const effectiveH = Math.max(planH, realH);
+      if (effectiveH <= 0) continue;
+      czk += (scheduledH / effectiveH) * prodejniCena;
+    }
+
     return { capacityHours: cap, scheduledHours: hours, scheduledCzk: czk };
-  }, [scheduleData, visibleMonthWeekKeys, getWeekCapacity, currentWeekKey]);
+  }, [scheduleData, visibleMonthWeekKeys, getWeekCapacity, currentWeekKey, projectLookup, planHoursData, realHoursData]);
 
   const isOverCapacity = scheduledHours > capacityHours;
   const displayCzk = scheduledCzk;
