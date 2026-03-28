@@ -161,6 +161,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   const [localSearch, setLocalSearch] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialScrollDone = useRef(false);
+  const [historyOffset, setHistoryOffset] = useState(0); // number of extra 4-week chunks to show in the past
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
@@ -227,21 +228,18 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   const weeks = useMemo<WeekColumn[]>(() => {
     const monday = getMonday(new Date());
     const currentWeekKey = monday.toISOString().split("T")[0];
-    // Start from currentWeek - 1
+    // Start from currentWeek - 1 - (historyOffset * 4 weeks)
     const startMonday = new Date(monday);
-    startMonday.setDate(startMonday.getDate() - 7);
-    const startKey = startMonday.toISOString().split("T")[0];
-    // Find the last scheduled week from data (non-midflight only)
+    startMonday.setDate(startMonday.getDate() - 7 - historyOffset * 4 * 7);
+    // Find the last scheduled week from data
     let latestDataWeek = currentWeekKey;
     if (scheduleData) {
-      for (const [weekKey, silo] of scheduleData) {
-        if (weekKey < startKey) continue; // skip weeks before our range
-        const hasNonMidflight = silo.bundles.some(b => b.items.some(i => !i.is_midflight));
-        if (hasNonMidflight && weekKey > latestDataWeek) latestDataWeek = weekKey;
+      for (const [weekKey] of scheduleData) {
+        if (weekKey > latestDataWeek) latestDataWeek = weekKey;
       }
     }
-    // Ensure at least 12 weeks from start
-    const minEnd = new Date(startMonday);
+    // Ensure at least 12 weeks from current monday
+    const minEnd = new Date(monday);
     minEnd.setDate(minEnd.getDate() + 12 * 7);
     const minEndKey = minEnd.toISOString().split("T")[0];
     const endKey = latestDataWeek > minEndKey ? latestDataWeek : minEndKey;
@@ -256,7 +254,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
       cursor.setDate(cursor.getDate() + 7);
     }
     return result;
-  }, [scheduleData]);
+  }, [scheduleData, historyOffset]);
 
   // Next 8 weeks from current for move targets
   const moveTargetWeeks = useMemo(() => {
