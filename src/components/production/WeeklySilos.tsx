@@ -1274,15 +1274,15 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts2), [statusOpts2]);
   const [expanded, setExpanded] = useState(false);
   const color = getProjectColor(bundle.project_id);
+  const project = projectLookup.get(bundle.project_id);
+  const isMidflightBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_midflight);
+  const isProjectDone = terminalStatuses.has(project?.status ?? "");
   const completedCount = bundle.items.filter(i => i.status === "expedice" || i.status === "completed").length;
   const totalCount = bundle.items.length;
   // Use project terminal status as primary "done" signal (schedule no longer uses completed/expedice statuses)
   const allCompleted = isProjectDone || (completedCount === totalCount && totalCount > 0);
   const hasUncompleted = !allCompleted;
   const isBlockerBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_blocker);
-
-  const project = projectLookup.get(bundle.project_id);
-  const isMidflightBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_midflight);
   // Deadline fallback chain: expedice → montáž → předání → smluvní
   // For legacy (midflight) bundles, show only Smluvní termín from the project
   const deadlineInfo = useMemo(() => {
