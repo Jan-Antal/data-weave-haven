@@ -1790,7 +1790,7 @@ function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCe
   projectColor?: string;
   moveTargetWeeks: { key: string; weekNum: number; label: string }[];
   getWeekCapacity: (weekKey: string) => number;
-  weekCapacities: Map<string, number>;
+  weekCapacities: Map<string, { hours: number; czk: number }>;
   onMoveToWeek: (ids: string[], weekKey: string) => Promise<void>;
   onReturnToInbox: (ids: string[]) => Promise<void>;
   onComplete: (ids: string[]) => Promise<void>;
