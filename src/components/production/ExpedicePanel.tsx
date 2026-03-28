@@ -120,14 +120,70 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     return { activeProjects: active, archivedProjects: archived };
   }, [projects]);
 
-  // Filtered archive
+  // Deep archive search query (no 30-day limit, triggered when archiveSearch >= 3 chars)
+  const archiveSearchTrimmed = archiveSearch.trim().toLowerCase();
+  const isDeepSearch = archiveSearchTrimmed.length >= 3;
+
+  const { data: deepSearchResults = [] } = useQuery({
+    queryKey: ["production-expedice-search", archiveSearchTrimmed],
+    enabled: isDeepSearch,
+    staleTime: 15_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("production_schedule")
+        .select("*, projects!production_schedule_project_id_fkey(project_name)")
+        .or(
+          'and(status.eq.completed,is_midflight.is.null),' +
+          'and(status.eq.completed,is_midflight.eq.false),' +
+          'and(status.eq.completed,item_code.eq.EXPEDICE_MIDFLIGHT)'
+        )
+        .order("completed_at", { ascending: false });
+      if (error) throw error;
+
+      const q = archiveSearchTrimmed;
+      const grouped = new Map<string, { project_id: string; project_name: string; items: ScheduleItem[]; count: number }>();
+      for (const row of data || []) {
+        const pid = row.project_id;
+        const pname = (row as any).projects?.project_name || pid;
+        if (!pid.toLowerCase().includes(q) && !pname.toLowerCase().includes(q)) continue;
+        if (!grouped.has(pid)) {
+          grouped.set(pid, { project_id: pid, project_name: pname, items: [], count: 0 });
+        }
+        const g = grouped.get(pid)!;
+        g.items.push({
+          id: row.id, project_id: row.project_id,
+          project_name: pname,
+          stage_id: row.stage_id, item_name: row.item_name,
+          item_code: row.item_code ?? null, scheduled_week: row.scheduled_week,
+          scheduled_hours: row.scheduled_hours, scheduled_czk: row.scheduled_czk,
+          position: row.position, status: row.status,
+          completed_at: row.completed_at, completed_by: row.completed_by,
+          expediced_at: (row as any).expediced_at ?? null,
+          split_group_id: (row as any).split_group_id ?? null,
+          split_part: (row as any).split_part ?? null,
+          split_total: (row as any).split_total ?? null,
+          pause_reason: null, pause_expected_date: null,
+          adhoc_reason: (row as any).adhoc_reason ?? null,
+          cancel_reason: null,
+          is_blocker: (row as any).is_blocker ?? false,
+          is_midflight: (row as any).is_midflight ?? false,
+          tpv_expected_date: (row as any).tpv_expected_date ?? null,
+        });
+        g.count++;
+      }
+      // Only return projects where ALL items are expediced (archive-worthy)
+      return Array.from(grouped.values()).filter(g => g.items.every(i => i.expediced_at));
+    },
+  });
+
+  // Filtered archive: use deep search results when searching, otherwise 30-day list
   const filteredArchive = useMemo(() => {
-    if (!archiveSearch.trim()) return archivedProjects;
-    const q = archiveSearch.toLowerCase();
+    if (isDeepSearch) return deepSearchResults;
+    if (!archiveSearchTrimmed) return archivedProjects;
     return archivedProjects.filter(g =>
-      g.project_name.toLowerCase().includes(q) || g.project_id.toLowerCase().includes(q)
+      g.project_name.toLowerCase().includes(archiveSearchTrimmed) || g.project_id.toLowerCase().includes(archiveSearchTrimmed)
     );
-  }, [archivedProjects, archiveSearch]);
+  }, [archivedProjects, archiveSearchTrimmed, isDeepSearch, deepSearchResults]);
 
   // Compute total items per project
   const projectTotalItems = useMemo(() => {
