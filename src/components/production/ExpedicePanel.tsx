@@ -66,6 +66,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const initializedArchiveCollapseRef = useRef(false);
   const [archiveSearch, setArchiveSearch] = useState("");
 
   const invalidateAll = useCallback(() => {
