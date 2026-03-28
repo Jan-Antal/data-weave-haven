@@ -697,6 +697,7 @@ export default function PlanVyroby() {
         {/* Row 2: Tabs + Search + Display mode + Stats + Period + Forecast toggle — desktop only */}
         {!isMobile && (
         <ToolbarRow2
+          visibleMonth={visibleMonth}
           viewTab={viewTab}
           setViewTab={setViewTab}
           displayMode={displayMode}
