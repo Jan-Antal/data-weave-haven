@@ -503,51 +503,86 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   // Section classification
   const currentMondayKey = useMemo(() => getMonday(new Date()).toISOString().split("T")[0], []);
 
-  const sectionedRows = useMemo(() => {
+  // Build sets for section classification from raw data
+  const inboxProjectIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of inboxProjects) {
+      if (p.items.some(i => i.status === "pending")) set.add(p.project_id);
+    }
+    return set;
+  }, [inboxProjects]);
+
+  const vyrobaProjectIds = useMemo(() => {
+    const set = new Set<string>();
+    if (!scheduleData) return set;
+    for (const [weekKey, silo] of scheduleData) {
+      if (weekKey < currentMondayKey) continue;
+      for (const bundle of silo.bundles) {
+        const hasNonMidflight = bundle.items.some(i =>
+          !i.is_midflight && ["scheduled", "in_progress", "paused"].includes(i.status)
+        );
+        if (hasNonMidflight) set.add(bundle.project_id);
+      }
+    }
+    return set;
+  }, [scheduleData, currentMondayKey]);
+
+  const expediceActiveProjectIds = useMemo(() => {
+    const set = new Set<string>();
+    if (!expediceData) return set;
+    for (const g of expediceData) {
+      if (g.items.some(i => !i.expediced_at)) set.add(g.project_id);
+    }
+    return set;
+  }, [expediceData]);
+
+  const archivProjectIds = useMemo(() => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const set = new Set<string>();
+    if (!expediceData) return set;
+    for (const g of expediceData) {
+      if (g.items.some(i => i.expediced_at && new Date(i.expediced_at) >= thirtyDaysAgo)) {
+        set.add(g.project_id);
+      }
+    }
+    return set;
+  }, [expediceData]);
 
+  const sectionedRows = useMemo(() => {
     const inboxSection: ProjectRow[] = [];
     const vyrobaSection: ProjectRow[] = [];
     const expediceSection: ProjectRow[] = [];
     const archivSection: ProjectRow[] = [];
 
     for (const row of filteredRows) {
-      // Check if project has inbox items
-      const hasInbox = row.inboxTotalHours > 0;
+      const pid = row.projectId;
 
-      // Check if project has non-midflight scheduled items in current/future weeks
-      const hasActiveSchedule = row.items.some(item => {
-        for (const [weekKey, alloc] of item.weekAllocations) {
-          if (weekKey >= currentMondayKey && alloc.hours > 0 && (alloc.status === "scheduled" || alloc.status === "in_progress" || alloc.status === "paused")) {
-            return true;
-          }
-        }
-        return false;
-      });
-
-      // Check expedice status from expediceData
-      const expGroup = expediceData?.find(g => g.project_id === row.projectId);
-      const hasActiveExpedice = expGroup?.items.some(i => !i.expediced_at) ?? false;
-      const hasArchived = expGroup?.items.some(i => i.expediced_at && new Date(i.expediced_at) >= thirtyDaysAgo) ?? false;
-
-      // Classify — a project can only appear in one section, priority order
-      if (hasInbox) {
+      // Priority 1: Inbox
+      if (inboxProjectIds.has(pid)) {
         inboxSection.push({ ...row, section: "inbox" });
-      } else if (hasActiveSchedule) {
-        vyrobaSection.push({ ...row, section: "vyroba" });
-      } else if (hasActiveExpedice) {
-        expediceSection.push({ ...row, section: "expedice" });
-      } else if (hasArchived || row.expediceTotalHours > 0) {
-        archivSection.push({ ...row, section: "archiv" });
-      } else if (row.items.some(i => i.weekAllocations.size > 0)) {
-        // Has past schedule data — put in výroba
-        vyrobaSection.push({ ...row, section: "vyroba" });
+        continue;
       }
+      // Priority 2: Ve výrobě (non-midflight, current/future weeks)
+      if (vyrobaProjectIds.has(pid)) {
+        vyrobaSection.push({ ...row, section: "vyroba" });
+        continue;
+      }
+      // Priority 3: Expedice (expediced_at IS NULL)
+      if (expediceActiveProjectIds.has(pid)) {
+        expediceSection.push({ ...row, section: "expedice" });
+        continue;
+      }
+      // Priority 4: Archív (expediced_at IS NOT NULL, last 30 days)
+      if (archivProjectIds.has(pid)) {
+        archivSection.push({ ...row, section: "archiv" });
+        continue;
+      }
+      // Priority 5: skip — not relevant
     }
 
     return { inboxSection, vyrobaSection, expediceSection, archivSection };
-  }, [filteredRows, expediceData, currentMondayKey]);
+  }, [filteredRows, inboxProjectIds, vyrobaProjectIds, expediceActiveProjectIds, archivProjectIds]);
 
   const toggleSection = (section: string) => {
     setCollapsedSections(prev => {
