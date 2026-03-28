@@ -1276,8 +1276,9 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const color = getProjectColor(bundle.project_id);
   const completedCount = bundle.items.filter(i => i.status === "expedice" || i.status === "completed").length;
   const totalCount = bundle.items.length;
-  const allCompleted = completedCount === totalCount && totalCount > 0;
-  const hasUncompleted = completedCount < totalCount;
+  // Use project terminal status as primary "done" signal (schedule no longer uses completed/expedice statuses)
+  const allCompleted = isProjectDone || (completedCount === totalCount && totalCount > 0);
+  const hasUncompleted = !allCompleted;
   const isBlockerBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_blocker);
 
   const project = projectLookup.get(bundle.project_id);
@@ -1359,7 +1360,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const shouldHighlightOverdue = !isMidflightBundle && ((daysUntilExp !== null && daysUntilExp < 0) || isOverdueProject);
 
   const borderLeftColor = isMidflightBundle ? "#b0bab8"
-    : allCompleted ? "#3a8a36"
+    : isProjectDone ? "#9ca3af"
     : shouldHighlightOverdue ? "hsl(0 70% 50%)"
     : expSeverity === "urgent" ? "#d97706"
     : color;
