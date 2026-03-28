@@ -1051,7 +1051,12 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
   const visibleMonthWeekKeys = useMemo(() => {
     const { month, year } = visibleMonth;
     const keysSet = new Set<string>();
-    // Walk from the Monday on or before the 1st, adding weeks whose Monday is in this month
+    const toDateStr = (dt: Date) => {
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, "0");
+      const dd = String(dt.getDate()).padStart(2, "0");
+      return `${y}-${m}-${dd}`;
+    };
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const d = new Date(firstDay);
@@ -1059,7 +1064,7 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
     d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
     while (d <= lastDay) {
       if (d.getMonth() === month && d.getFullYear() === year) {
-        keysSet.add(d.toISOString().split("T")[0]);
+        keysSet.add(toDateStr(d));
       }
       d.setDate(d.getDate() + 7);
     }
@@ -1100,14 +1105,14 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
   }, [allProjects]);
 
   const { capacityHours, scheduledHours, scheduledCzk } = useMemo(() => {
-    if (!scheduleData) return { capacityHours: 0, scheduledHours: 0, scheduledCzk: 0 };
-
     let cap = 0;
     let hours = 0;
     let czk = 0;
+    const projectHoursInMonth = new Map<string, number>();
 
     for (const wk of visibleMonthWeekKeys) {
       cap += getWeekCapacity(wk);
+      if (!scheduleData) continue;
       const silo = scheduleData.get(wk);
       if (!silo) continue;
 
@@ -1119,13 +1124,26 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
       for (const b of silo.bundles) {
         for (const i of b.items) {
           if (i.status === "paused") continue;
-          czk += Number(i.scheduled_czk ?? 0);
+          const prev = projectHoursInMonth.get(b.project_id) ?? 0;
+          projectHoursInMonth.set(b.project_id, prev + i.scheduled_hours);
         }
       }
     }
 
+    // Use same calcProdejValue logic as Kanban silos: (scheduledH / effectiveH) * prodejniCena
+    for (const [pid, scheduledH] of projectHoursInMonth) {
+      const proj = projectLookup.get(pid);
+      const prodejniCena = proj?.prodejni_cena ?? 0;
+      if (!prodejniCena || prodejniCena <= 0 || scheduledH <= 0) continue;
+      const planH = planHoursData?.get(pid) ?? 0;
+      const realH = realHoursData?.get(pid) ?? 0;
+      const effectiveH = Math.max(planH, realH);
+      if (effectiveH <= 0) continue;
+      czk += (scheduledH / effectiveH) * prodejniCena;
+    }
+
     return { capacityHours: cap, scheduledHours: hours, scheduledCzk: czk };
-  }, [scheduleData, visibleMonthWeekKeys, getWeekCapacity, currentWeekKey]);
+  }, [scheduleData, visibleMonthWeekKeys, getWeekCapacity, currentWeekKey, projectLookup, planHoursData, realHoursData]);
 
   const isOverCapacity = scheduledHours > capacityHours;
   const displayCzk = scheduledCzk;
