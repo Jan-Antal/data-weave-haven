@@ -272,7 +272,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     try {
       const { error } = await supabase
         .from("production_schedule")
-        .update({ expediced_at: null } as any)
+        .update({ status: "expedice", expediced_at: null } as any)
         .eq("id", itemId);
       if (error) throw error;
       invalidateAll();
@@ -288,13 +288,12 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
         .from("production_schedule")
         .select("id")
         .eq("project_id", projectId)
-        .eq("status", "completed")
-        .not("expediced_at", "is", null);
+        .eq("status", "completed");
       if (fetchErr) throw fetchErr;
       if (!items || items.length === 0) return;
       const { error } = await supabase
         .from("production_schedule")
-        .update({ expediced_at: null } as any)
+        .update({ status: "expedice", expediced_at: null } as any)
         .in("id", items.map(i => i.id));
       if (error) throw error;
       invalidateAll();
@@ -310,7 +309,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
         .from("production_schedule")
         .select("id")
         .eq("project_id", projectId)
-        .eq("status", "completed");
+        .in("status", ["expedice", "completed"]);
       if (fetchErr) throw fetchErr;
       if (!items || items.length === 0) return;
       for (const item of items) {
@@ -328,7 +327,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
         .from("production_schedule")
         .select("id")
         .eq("project_id", projectId)
-        .eq("status", "completed");
+        .in("status", ["expedice", "completed"]);
       if (fetchErr) throw fetchErr;
       if (!items || items.length === 0) return;
       for (const item of items) {
