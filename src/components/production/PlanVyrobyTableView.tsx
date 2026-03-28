@@ -640,16 +640,24 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     return () => document.removeEventListener("mousedown", handler);
   }, [exportDropdownOpen]);
 
-  // Initial scroll — show current week as first visible week column
+  // Initial scroll — show (current week - 1) as first visible week column
   useEffect(() => {
     if (initialScrollDone.current || weeks.length === 0) return;
     const el = scrollRef.current;
     if (!el) return;
-    const currentMonday = getMonday(new Date());
-    const currentWeekKey = currentMonday.toISOString().split("T")[0];
-    const currentWeekIdx = weeks.findIndex(w => w.key === currentWeekKey);
-    if (currentWeekIdx > 0) {
-      el.scrollLeft = currentWeekIdx * CELL_W;
+    const targetWeek = subWeeks(startOfWeek(new Date(), { weekStartsOn: 1 }), 1);
+    const targetKey = targetWeek.toISOString().split("T")[0];
+    const targetIdx = weeks.findIndex(w => w.key === targetKey);
+    if (targetIdx >= 0) {
+      el.scrollLeft = targetIdx * CELL_W;
+    } else {
+      // Fallback: scroll to current week - 1 index
+      const currentMonday = getMonday(new Date());
+      const currentKey = currentMonday.toISOString().split("T")[0];
+      const currentIdx = weeks.findIndex(w => w.key === currentKey);
+      if (currentIdx > 0) {
+        el.scrollLeft = (currentIdx - 1) * CELL_W;
+      }
     }
     initialScrollDone.current = true;
   }, [weeks]);
