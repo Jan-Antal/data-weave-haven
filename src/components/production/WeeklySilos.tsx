@@ -1219,7 +1219,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
                 forecastDarkMode={forecastDarkMode}
                 isFocusedMatch={focusedMatchKey === `${weekKey}::${bundle.project_id}`}
                 searchMatchedProjectIds={searchMatchedProjectIds}
-                searchActive={searchActive} />
+                searchActive={searchActive}
+                isWeekLocked={isWeekLocked} />
             ))}
           </>
         )}
@@ -1282,7 +1283,7 @@ function formatDateShortYY(dateStr: string | null | undefined): string | null {
   return `${dd}.${mm}.${yy}`;
 }
 
-function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCapacity, onBundleContextMenu, onItemContextMenu, projectLookup, planHoursMap, realHoursMap, isSelected, onSelectProject, displayMode, searchQuery = "", forecastDarkMode, isFocusedMatch, searchMatchedProjectIds, searchActive }: {
+function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCapacity, onBundleContextMenu, onItemContextMenu, projectLookup, planHoursMap, realHoursMap, isSelected, onSelectProject, displayMode, searchQuery = "", forecastDarkMode, isFocusedMatch, searchMatchedProjectIds, searchActive, isWeekLocked }: {
   bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number; weeklyCapacity: number;
   displayMode: DisplayMode;
   onBundleContextMenu: (e: React.MouseEvent, bundle: ScheduleBundle, toggleExpand: () => void) => void;
@@ -1297,6 +1298,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   isFocusedMatch?: boolean;
   searchMatchedProjectIds?: Set<string>;
   searchActive?: boolean;
+  isWeekLocked?: boolean;
 }) {
   const { data: statusOpts2 = [] } = useProjectStatusOptions();
   const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts2), [statusOpts2]);
