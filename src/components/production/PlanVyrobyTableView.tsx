@@ -632,7 +632,6 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
         let activeCzk = 0;
         for (const b of silo.bundles) {
           for (const i of b.items) {
-            if (i.is_midflight) continue;
             if (i.status === "paused") continue;
             activeHours += i.scheduled_hours;
             activeCzk += i.scheduled_czk;
