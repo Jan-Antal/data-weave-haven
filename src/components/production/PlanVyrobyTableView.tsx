@@ -1316,353 +1316,302 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
             })}
           </div>
 
-          {/* Project rows */}
-          <div className="flex flex-col" style={{ gap: 6, paddingTop: 6 }}>
-            {(() => {
-              const regular = filteredRows.filter(r => !r.isBlockerOnly);
-              const blockers = filteredRows.filter(r => r.isBlockerOnly);
-              const combined = [...regular];
-              if (blockers.length > 0) {
-                combined.push({ __separator: true, count: blockers.length } as any);
-                combined.push(...blockers);
-              }
-              return combined;
-            })().map((proj: any) => {
-              if (proj.__separator) {
-                return (
-                  <div key="blocker-separator" className="flex items-center gap-2 mt-3 mb-1 px-2">
-                    <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
-                    <span className="px-2 whitespace-nowrap" style={{ fontSize: 11, color: "#6b7280" }}>
-                      ⏳ Rezerva kapacit ({proj.count})
-                    </span>
-                    <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
-                  </div>
-                );
-              }
-              const isExpanded = expandedProjects.has(proj.projectId);
-              const isOverdueProject = (() => {
-                const pd = projectDateLookup.get(proj.projectId);
-                if (!pd) return false;
-
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-
-                const expediceDate = pd?.expedice ? parseAppDate(pd.expedice) : null;
-                if (expediceDate) {
-                  const exp = new Date(expediceDate);
-                  exp.setHours(0, 0, 0, 0);
-                  if (exp < today) return true;
-                }
-
-                const deadline = resolveDeadline({
-                  expedice: pd?.expedice ?? null,
-                  montaz: pd?.montaz ?? null,
-                  datum_smluvni: pd?.datum_smluvni ?? null,
-                });
-                if (!deadline) return false;
-                const dl = new Date(deadline.date);
-                dl.setHours(0, 0, 0, 0);
-                return dl < today;
-              })();
+          {/* Project rows — organized in sections */}
+          <div className="flex flex-col" style={{ gap: 0, paddingTop: 6 }}>
+            {[
+              { key: "inbox", label: "📥 Inbox", rows: sectionedRows.inboxSection },
+              { key: "vyroba", label: "🔧 Ve výrobě", rows: sectionedRows.vyrobaSection },
+              { key: "expedice", label: "📦 Expedice", rows: sectionedRows.expediceSection },
+              { key: "archiv", label: "✅ Archív", rows: sectionedRows.archivSection },
+            ].filter(s => s.rows.length > 0).map(section => {
+              const isCollapsed = collapsedSections.has(section.key);
               return (
-                <div key={proj.projectId} style={{ marginLeft: 4, marginRight: 4 }}>
-                  {/* Project header row */}
+                <div key={section.key}>
+                  {/* Section header */}
                   <div
-                    className="flex cursor-pointer transition-all"
-                    onClick={() => toggleProject(proj.projectId)}
-                    onContextMenu={(e) => handleProjectContextMenu(e, proj)}
-                    style={{ height: 48, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
+                    className="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none sticky left-0 z-10"
+                    onClick={() => toggleSection(section.key)}
+                    style={{ backgroundColor: "#fafaf8" }}
                   >
-                    <div
-                      className="shrink-0 flex items-center gap-2.5 px-3 sticky left-0 z-20"
-                      style={{
-                        width: LEFT_COL_W,
-                        backgroundColor: isOverdueProject ? "hsl(0 75% 93%)" : "#fff",
-                        borderLeft: `4px solid ${isOverdueProject ? "hsl(0 70% 50%)" : proj.color}`,
-                        borderRight: `1px solid ${isOverdueProject ? "hsl(0 60% 82%)" : "#e5e2dd"}`,
-                        borderTop: `1px solid ${isOverdueProject ? "hsl(0 60% 82%)" : "#e5e2dd"}`,
-                        borderBottom: `1px solid ${isOverdueProject ? "hsl(0 60% 82%)" : "#e5e2dd"}`,
-                        borderRadius: "6px 0 0 6px",
-                      }}
-                    >
-                      {isExpanded
-                        ? <ChevronDown className="h-4 w-4 shrink-0" style={{ color: proj.color }} />
-                        : <ChevronRight className="h-4 w-4 shrink-0" style={{ color: proj.items.length > 0 ? "#ea580c" : "#99a5a3" }} />
-                      }
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[14px] truncate leading-tight" style={{
-                          color: (proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0)) ? "#9ca3af" : "#1a1a1a",
-                          fontWeight: (proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0)) ? 400 : 500,
-                        }}>{proj.projectName}</div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-muted-foreground font-sans leading-tight">{proj.projectId}</span>
-                          {(() => {
-                            const pd = projectDateLookup.get(proj.projectId);
-                            if (!pd) return null;
-                            const allShipped = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
-                            const isProjectDone = terminalStatuses.has(pd?.status ?? "");
-                            const fields: { label: string; value: string | null | undefined }[] = [
-                              { label: "Exp", value: pd.expedice },
-                              { label: "Mnt", value: pd.montaz },
-                              { label: "Před", value: pd.predani },
-                              { label: "Sml", value: pd.datum_smluvni },
-                            ];
-                            for (const f of fields) {
-                              if (!f.value) continue;
-                              const parsed = parseAppDate(f.value);
-                              if (!parsed) continue;
-                              const fmtD = (d: Date) => `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getFullYear()).slice(-2)}`;
-                              const days = differenceInDays(parsed, new Date());
-                              const clr = !allShipped && !isProjectDone && days < 0 ? "#dc2626" : !allShipped && !isProjectDone && days <= 14 ? "#d97706" : "#7aa8a4";
-                              return (
-                                <span className="text-[10px] truncate" style={{ color: clr }}>
-                                  · {f.label}: {fmtD(parsed)}
-                                </span>
-                              );
-                            }
-                            if (!allShipped && !isProjectDone) {
-                              return (
-                                <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.1)", color: "#D97706" }}>
-                                  ⚠ BEZ TERMÍNU
-                                </span>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </div>
-                      </div>
-                      {/* Inline deadline warning */}
-                      {(() => {
-                        const pd = projectDateLookup.get(proj.projectId);
-                        const exp = pd?.expedice ? parseAppDate(pd.expedice) : null;
-                        if (!exp) return null;
-                        const isProjectDone = terminalStatuses.has(pd?.status ?? "");
-                        const allItemsDone = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
-                        if (isProjectDone || allItemsDone) return null;
-                        const days = differenceInDays(exp, new Date());
-                        if (days >= 0 && days > 3) return null;
-                        const warnColor = days < 0 ? "#dc3545" : "#d97706";
-                        const tooltipText = days < 0
-                          ? `Expedice ${format(exp, "dd.MM.yyyy")} — po termínu o ${Math.abs(days)} dní`
-                          : `Expedice za ${days} dní (${format(exp, "dd.MM.yyyy")})`;
-                        return (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <AlertTriangle size={14} style={{ color: warnColor }} className="shrink-0" />
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="z-[9999] text-xs">{tooltipText}</TooltipContent>
-                          </Tooltip>
-                        );
-                      })()}
-                      <div
-                        className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-sans font-bold"
-                        style={{ backgroundColor: proj.color + "18", color: proj.color }}
-                      >
-                        {formatProjectTotal(proj)}
-                      </div>
-                    </div>
-                    {/* Inbox cell */}
-                    {hasAnyInbox && (
-                      <div
-                        className="shrink-0 flex items-center justify-center px-1.5 sticky z-20"
-                        onContextMenu={(e) => { if (proj.inboxTotalHours > 0) { e.stopPropagation(); handleInboxProjectContextMenu(e, proj); } }}
-                        style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff", borderTop: "1px solid #e5e2dd", borderBottom: "1px solid #e5e2dd" }}
-                      >
-                        {proj.inboxTotalHours > 0 && (
-                          <div className="rounded-md px-2 py-0.5 text-center text-[10px] font-sans font-bold" style={{ backgroundColor: "#ffedd5", color: "#c2410c" }}>
-                            {formatInboxValue(proj.inboxTotalHours, proj.inboxTotalCzk, proj.totalHours, proj.projectId)}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {/* Week cells */}
-                    {weeks.map(week => {
-                      const wt = proj.weekTotals.get(week.key);
-                      return (
-                        <div
-                          key={week.key}
-                          className="shrink-0 flex items-center justify-center px-1.5"
-                          onContextMenu={(e) => { if (wt && wt.hours > 0) { e.stopPropagation(); handleBundleContextMenu(e, proj.projectId, week.key, false); } }}
-                          style={{
-                            width: CELL_W,
-                            backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : "#fff",
-                            borderTop: "1px solid #e5e2dd",
-                            borderBottom: "1px solid #e5e2dd",
-                          }}
-                        >
-                          {!isExpanded && wt && wt.hours > 0 && (() => {
-                            const cellStyle = getCollapsedCellStyle(proj, week.key);
-                            return (
-                              <div
-                                className="w-full rounded px-1 py-0.5 text-center text-[9px] font-sans font-bold"
-                                style={{ backgroundColor: cellStyle.bg, color: cellStyle.text, border: `1px solid ${cellStyle.border}` }}
-                              >
-                                {formatWeekTotal(wt.hours, wt.czk, week.key, proj.projectId)}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      );
-                    })}
-                    {/* Expedice cell */}
-                    {hasAnyExpedice && (
-                      <div
-                        className="shrink-0 flex items-center justify-center px-1.5 sticky right-0 z-20"
-                        onContextMenu={(e) => { if (proj.expediceTotalHours > 0) { e.stopPropagation(); handleExpediceItemContextMenu(e, proj.projectId); } }}
-                        style={{
-                          width: EXPEDICE_W,
-                          backgroundColor: "#fff",
-                          borderTop: "1px solid #e5e2dd",
-                          borderBottom: "1px solid #e5e2dd",
-                          borderRight: "1px solid #e5e2dd",
-                          borderRadius: "0 6px 6px 0",
-                        }}
-                      >
-                        {proj.expediceTotalHours > 0 && (
-                          <div className="rounded-md px-2 py-0.5 text-center text-[10px] font-sans font-bold" style={{ backgroundColor: "#dcfce7", color: "#15803d" }}>
-                            ✓ {formatExpediceValue(proj.expediceTotalHours, proj.expediceTotalCzk, proj.totalHours, proj.projectId)}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    {isCollapsed
+                      ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                      : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    }
+                    <span className="text-[11px] font-semibold text-muted-foreground">{section.label}</span>
+                    <span className="text-[10px] font-sans text-muted-foreground/70">{section.rows.length}</span>
+                    <div className="flex-1 h-px bg-border/50" />
                   </div>
 
-                  {/* Item rows — only when expanded */}
-                  {isExpanded && (() => {
-                    // Sort: active items first, completed items last
-                    const activeItems = proj.items.filter(i => {
-                      const hasOnlyExpedice = i.expediceHours > 0 && i.weekAllocations.size === 0 && i.inboxHours === 0;
-                      const allCompleted = [...i.weekAllocations.values()].every(a => a.status === "expedice" || a.status === "completed");
-                      return !hasOnlyExpedice && !allCompleted;
-                    });
-                    const completedItems = proj.items.filter(i => !activeItems.includes(i));
-                    const sortedItems = [...activeItems, ...completedItems];
-                    const firstCompletedIdx = activeItems.length;
-                    return (
-                    <div>
-                      {sortedItems.map((item, idx) => {
-                        const isCompletedItem = idx >= firstCompletedIdx;
-                        const isFirstCompleted = idx === firstCompletedIdx && completedItems.length > 0;
+                  {/* Section rows */}
+                  {!isCollapsed && (
+                    <div className="flex flex-col" style={{ gap: 6, padding: "4px 0" }}>
+                      {section.rows.map((proj: ProjectRow) => {
+                        const isExpanded = expandedProjects.has(proj.projectId);
                         return (
-                        <div key={item.id}>
-                          {isFirstCompleted && (
-                            <div className="flex items-center gap-1.5 px-3 py-1" style={{ backgroundColor: "#fafaf8" }}>
-                              <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
-                              <span className="text-[8px] font-medium" style={{ color: "#b0bab8" }}>Dokončeno</span>
-                              <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
-                            </div>
-                          )}
-                          <div
-                            className="flex"
-                            style={{
-                              height: 32,
-                              borderBottom: idx < sortedItems.length - 1 ? "1px solid #f5f3f0" : undefined,
-                              opacity: isCompletedItem ? 0.5 : 1,
-                            }}
-                          >
-                          <div
-                            className="shrink-0 flex items-center gap-2 pr-2 sticky left-0 z-20"
-                            onContextMenu={(e) => handleItemContextMenu(e, item)}
-                            style={{
-                              width: LEFT_COL_W,
-                              backgroundColor: "#fff",
-                              borderRight: "1px solid #e5e2dd",
-                              paddingLeft: 28,
-                              borderLeft: "2px dashed #e5e2dd",
-                            }}
-                          >
-                            {item.itemCode && (
-                              <span className="font-sans font-bold text-[11px] shrink-0" style={{ color: "#223937" }}>{item.itemCode}</span>
-                            )}
-                            <span className="text-[12px] truncate text-foreground">{item.itemName}</span>
-                            <span className="text-[10px] font-sans shrink-0 ml-auto" style={{ color: "#99a5a3" }}>{formatItemTotal(item, item.projectId)}</span>
-                          </div>
-                          {/* Inbox cell */}
-                          {hasAnyInbox && (
+                          <div key={proj.projectId} style={{ marginLeft: 4, marginRight: 4 }}>
+                            {/* Project header row */}
                             <div
-                              className="shrink-0 flex items-center justify-center px-1 sticky z-20"
-                              onContextMenu={(e) => { if (item.inboxHours > 0) { e.stopPropagation(); handleInboxItemContextMenu(e, item); } }}
-                              style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff" }}
+                              className="flex cursor-pointer transition-all"
+                              onClick={() => toggleProject(proj.projectId)}
+                              onContextMenu={(e) => handleProjectContextMenu(e, proj)}
+                              style={{ height: 48, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
                             >
-                              {item.inboxHours > 0 && (
-                                <div className="rounded-md px-2 py-0.5 text-center text-[9px] font-sans font-semibold" style={{ backgroundColor: "#ffedd5", color: "#c2410c" }}>
-                                  {formatInboxValue(item.inboxHours, item.inboxCzk, item.totalHours, item.projectId)}
+                              <div
+                                className="shrink-0 flex items-center gap-2.5 px-3 sticky left-0 z-20"
+                                style={{
+                                  width: LEFT_COL_W,
+                                  backgroundColor: "#fff",
+                                  borderLeft: `4px solid ${proj.color}`,
+                                  borderRight: "1px solid #e5e2dd",
+                                  borderTop: "1px solid #e5e2dd",
+                                  borderBottom: "1px solid #e5e2dd",
+                                  borderRadius: "6px 0 0 6px",
+                                }}
+                              >
+                                {isExpanded
+                                  ? <ChevronDown className="h-4 w-4 shrink-0" style={{ color: proj.color }} />
+                                  : <ChevronRight className="h-4 w-4 shrink-0" style={{ color: proj.items.length > 0 ? "#ea580c" : "#99a5a3" }} />
+                                }
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-[14px] truncate leading-tight" style={{
+                                    color: (proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0)) ? "#9ca3af" : "#1a1a1a",
+                                    fontWeight: (proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0)) ? 400 : 500,
+                                  }}>{proj.projectName}</div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-muted-foreground font-sans leading-tight">{proj.projectId}</span>
+                                    {(() => {
+                                      const pd = projectDateLookup.get(proj.projectId);
+                                      if (!pd) return null;
+                                      const allShipped = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
+                                      const isProjectDone = terminalStatuses.has(pd?.status ?? "");
+                                      const fields: { label: string; value: string | null | undefined }[] = [
+                                        { label: "Exp", value: pd.expedice },
+                                        { label: "Mnt", value: pd.montaz },
+                                        { label: "Před", value: pd.predani },
+                                        { label: "Sml", value: pd.datum_smluvni },
+                                      ];
+                                      for (const f of fields) {
+                                        if (!f.value) continue;
+                                        const parsed = parseAppDate(f.value);
+                                        if (!parsed) continue;
+                                        const fmtD = (d: Date) => `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getFullYear()).slice(-2)}`;
+                                        const days = differenceInDays(parsed, new Date());
+                                        const clr = !allShipped && !isProjectDone && days < 0 ? "#dc2626" : !allShipped && !isProjectDone && days <= 14 ? "#d97706" : "#7aa8a4";
+                                        return (
+                                          <span key={f.label} className="text-[10px] truncate" style={{ color: clr }}>
+                                            · {f.label}: {fmtD(parsed)}
+                                          </span>
+                                        );
+                                      }
+                                      if (!allShipped && !isProjectDone) {
+                                        return (
+                                          <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.1)", color: "#D97706" }}>
+                                            ⚠ BEZ TERMÍNU
+                                          </span>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                          )}
-                          {/* Week cells — interactive + droppable */}
-                          {weeks.map(week => {
-                            const alloc = item.weekAllocations.get(week.key);
-                            if (alloc) {
-                              return (
-                                <DroppableWeekCell key={week.key} droppableId={`${week.key}-${item.id}`} weekKey={week.key} isCurrent={week.isCurrent}>
-                                  <FilledWeekCell
-                                    weekKey={week.key}
-                                    isCurrent={week.isCurrent}
-                                    alloc={alloc}
-                                    item={item}
-                                    displayMode={displayMode}
-                                    formatCellValue={formatCellValue}
-                                    getCellStyle={(status: string) => getCellStyle(status, getProjectColor(item.projectId))}
-                                    projectColor={getProjectColor(item.projectId)}
-                                    moveTargetWeeks={moveTargetWeeks}
-                                    getWeekCapacity={getWeekCapacity}
-                                    weekCapacities={weekCapacities}
-                                    onMoveToWeek={handleMoveToWeek}
-                                    onReturnToInbox={handleReturnToInbox}
-                                    onComplete={handleComplete}
-                                    onCancel={(ids) => {
-                                      setCancelDialog({
-                                        open: true,
-                                        itemId: ids[0],
-                                        itemName: item.itemName,
-                                        itemCode: item.itemCode,
-                                        hours: alloc.hours,
-                                        projectName: item.projectName,
-                                        projectId: item.projectId,
-                                      });
-                                    }}
-                                    onContextMenu={handleWeekCellContextMenu}
-                                  />
-                                </DroppableWeekCell>
-                              );
-                            }
-                            return (
-                              <DroppableWeekCell key={week.key} droppableId={`${week.key}-${item.id}`} weekKey={week.key} isCurrent={week.isCurrent}>
-                                <EmptyWeekCell
-                                  weekKey={week.key}
-                                  isCurrent={week.isCurrent}
-                                  item={item}
-                                  onSchedule={handleScheduleFromInbox}
-                                />
-                              </DroppableWeekCell>
-                            );
-                          })}
-                          {/* Expedice cell */}
-                          {hasAnyExpedice && (
-                            <div
-                              className="shrink-0 flex items-center justify-center px-1 sticky right-0 z-20"
-                              onContextMenu={(e) => { if (item.expediceHours > 0) { e.stopPropagation(); handleExpediceItemContextMenu(e, item.projectId, item.itemName); } }}
-                              style={{ width: EXPEDICE_W, backgroundColor: "#f0fdf4" }}
-                            >
-                              {item.expediceHours > 0 && (
+                                {/* Inline deadline warning */}
+                                {(() => {
+                                  const pd = projectDateLookup.get(proj.projectId);
+                                  const exp = pd?.expedice ? parseAppDate(pd.expedice) : null;
+                                  if (!exp) return null;
+                                  const isProjectDone = terminalStatuses.has(pd?.status ?? "");
+                                  const allItemsDone = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
+                                  if (isProjectDone || allItemsDone) return null;
+                                  const days = differenceInDays(exp, new Date());
+                                  if (days >= 0 && days > 3) return null;
+                                  const warnColor = days < 0 ? "#dc3545" : "#d97706";
+                                  const tooltipText = days < 0
+                                    ? `Expedice ${format(exp, "dd.MM.yyyy")} — po termínu o ${Math.abs(days)} dní`
+                                    : `Expedice za ${days} dní (${format(exp, "dd.MM.yyyy")})`;
+                                  return (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <AlertTriangle size={14} style={{ color: warnColor }} className="shrink-0" />
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="z-[9999] text-xs">{tooltipText}</TooltipContent>
+                                    </Tooltip>
+                                  );
+                                })()}
                                 <div
-                                  className="rounded-md px-2 py-0.5 text-center text-[9px] font-sans font-semibold"
-                                  style={{ backgroundColor: "#dcfce7", color: "#15803d" }}
+                                  className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-sans font-bold"
+                                  style={{ backgroundColor: proj.color + "18", color: proj.color }}
                                 >
-                                  ✓ {formatExpediceValue(item.expediceHours, item.expediceCzk, item.totalHours, item.projectId)}
+                                  {formatProjectTotal(proj)}
+                                </div>
+                              </div>
+                              {/* Inbox cell */}
+                              {hasAnyInbox && (
+                                <div
+                                  className="shrink-0 flex items-center justify-center px-1.5 sticky z-20"
+                                  onContextMenu={(e) => { if (proj.inboxTotalHours > 0) { e.stopPropagation(); handleInboxProjectContextMenu(e, proj); } }}
+                                  style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff", borderTop: "1px solid #e5e2dd", borderBottom: "1px solid #e5e2dd" }}
+                                >
+                                  {proj.inboxTotalHours > 0 && (
+                                    <div className="rounded-md px-2 py-0.5 text-center text-[10px] font-sans font-bold" style={{ backgroundColor: "#ffedd5", color: "#c2410c" }}>
+                                      {formatInboxValue(proj.inboxTotalHours, proj.inboxTotalCzk, proj.totalHours, proj.projectId)}
+                                    </div>
+                                  )}
                                 </div>
                               )}
+                              {/* Week cells */}
+                              {weeks.map(week => {
+                                const wt = proj.weekTotals.get(week.key);
+                                return (
+                                  <div
+                                    key={week.key}
+                                    className="shrink-0 flex items-center justify-center px-1.5"
+                                    onContextMenu={(e) => { if (wt && wt.hours > 0) { e.stopPropagation(); handleBundleContextMenu(e, proj.projectId, week.key, false); } }}
+                                    style={{
+                                      width: CELL_W,
+                                      backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : "#fff",
+                                      borderTop: "1px solid #e5e2dd",
+                                      borderBottom: "1px solid #e5e2dd",
+                                    }}
+                                  >
+                                    {!isExpanded && wt && wt.hours > 0 && (() => {
+                                      const cellStyle = getCollapsedCellStyle(proj, week.key);
+                                      return (
+                                        <div
+                                          className="w-full rounded px-1 py-0.5 text-center text-[9px] font-sans font-bold"
+                                          style={{ backgroundColor: cellStyle.bg, color: cellStyle.text, border: `1px solid ${cellStyle.border}` }}
+                                        >
+                                          {formatWeekTotal(wt.hours, wt.czk, week.key, proj.projectId)}
+                                        </div>
+                                      );
+                                    })()}
+                                  </div>
+                                );
+                              })}
                             </div>
-                          )}
-                        </div>
-                        </div>
+
+                            {/* Item rows — only when expanded */}
+                            {isExpanded && (() => {
+                              const activeItems = proj.items.filter(i => {
+                                const hasOnlyExpedice = i.expediceHours > 0 && i.weekAllocations.size === 0 && i.inboxHours === 0;
+                                const allCompleted = [...i.weekAllocations.values()].every(a => a.status === "expedice" || a.status === "completed");
+                                return !hasOnlyExpedice && !allCompleted;
+                              });
+                              const completedItems = proj.items.filter(i => !activeItems.includes(i));
+                              const sortedItems = [...activeItems, ...completedItems];
+                              const firstCompletedIdx = activeItems.length;
+                              return (
+                              <div>
+                                {sortedItems.map((item, idx) => {
+                                  const isCompletedItem = idx >= firstCompletedIdx;
+                                  const isFirstCompleted = idx === firstCompletedIdx && completedItems.length > 0;
+                                  return (
+                                  <div key={item.id}>
+                                    {isFirstCompleted && (
+                                      <div className="flex items-center gap-1.5 px-3 py-1" style={{ backgroundColor: "#fafaf8" }}>
+                                        <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+                                        <span className="text-[8px] font-medium" style={{ color: "#b0bab8" }}>Dokončeno</span>
+                                        <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+                                      </div>
+                                    )}
+                                    <div
+                                      className="flex"
+                                      style={{
+                                        height: 32,
+                                        borderBottom: idx < sortedItems.length - 1 ? "1px solid #f5f3f0" : undefined,
+                                        opacity: isCompletedItem ? 0.5 : 1,
+                                      }}
+                                    >
+                                    <div
+                                      className="shrink-0 flex items-center gap-2 pr-2 sticky left-0 z-20"
+                                      onContextMenu={(e) => handleItemContextMenu(e, item)}
+                                      style={{
+                                        width: LEFT_COL_W,
+                                        backgroundColor: "#fff",
+                                        borderRight: "1px solid #e5e2dd",
+                                        paddingLeft: 28,
+                                        borderLeft: "2px dashed #e5e2dd",
+                                      }}
+                                    >
+                                      {item.itemCode && (
+                                        <span className="font-sans font-bold text-[11px] shrink-0" style={{ color: "#223937" }}>{item.itemCode}</span>
+                                      )}
+                                      <span className="text-[12px] truncate text-foreground">{item.itemName}</span>
+                                      <span className="text-[10px] font-sans shrink-0 ml-auto" style={{ color: "#99a5a3" }}>{formatItemTotal(item, item.projectId)}</span>
+                                    </div>
+                                    {/* Inbox cell */}
+                                    {hasAnyInbox && (
+                                      <div
+                                        className="shrink-0 flex items-center justify-center px-1 sticky z-20"
+                                        onContextMenu={(e) => { if (item.inboxHours > 0) { e.stopPropagation(); handleInboxItemContextMenu(e, item); } }}
+                                        style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff" }}
+                                      >
+                                        {item.inboxHours > 0 && (
+                                          <div className="rounded-md px-2 py-0.5 text-center text-[9px] font-sans font-semibold" style={{ backgroundColor: "#ffedd5", color: "#c2410c" }}>
+                                            {formatInboxValue(item.inboxHours, item.inboxCzk, item.totalHours, item.projectId)}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                    {/* Week cells — interactive + droppable */}
+                                    {weeks.map(week => {
+                                      const alloc = item.weekAllocations.get(week.key);
+                                      if (alloc) {
+                                        return (
+                                          <DroppableWeekCell key={week.key} droppableId={`${week.key}-${item.id}`} weekKey={week.key} isCurrent={week.isCurrent}>
+                                            <FilledWeekCell
+                                              weekKey={week.key}
+                                              isCurrent={week.isCurrent}
+                                              alloc={alloc}
+                                              item={item}
+                                              displayMode={displayMode}
+                                              formatCellValue={formatCellValue}
+                                              getCellStyle={(status: string) => getCellStyle(status, getProjectColor(item.projectId))}
+                                              projectColor={getProjectColor(item.projectId)}
+                                              moveTargetWeeks={moveTargetWeeks}
+                                              getWeekCapacity={getWeekCapacity}
+                                              weekCapacities={weekCapacities}
+                                              onMoveToWeek={handleMoveToWeek}
+                                              onReturnToInbox={handleReturnToInbox}
+                                              onComplete={handleComplete}
+                                              onCancel={(ids) => {
+                                                setCancelDialog({
+                                                  open: true,
+                                                  itemId: ids[0],
+                                                  itemName: item.itemName,
+                                                  itemCode: item.itemCode,
+                                                  hours: alloc.hours,
+                                                  projectName: item.projectName,
+                                                  projectId: item.projectId,
+                                                });
+                                              }}
+                                              onContextMenu={handleWeekCellContextMenu}
+                                            />
+                                          </DroppableWeekCell>
+                                        );
+                                      }
+                                      return (
+                                        <DroppableWeekCell key={week.key} droppableId={`${week.key}-${item.id}`} weekKey={week.key} isCurrent={week.isCurrent}>
+                                          <EmptyWeekCell
+                                            weekKey={week.key}
+                                            isCurrent={week.isCurrent}
+                                            item={item}
+                                            onSchedule={handleScheduleFromInbox}
+                                          />
+                                        </DroppableWeekCell>
+                                      );
+                                    })}
+                                  </div>
+                                  </div>
+                                  );
+                                })}
+                              </div>
+                              );
+                            })()}
+                          </div>
                         );
                       })}
                     </div>
-                    );
-                  })()}
+                  )}
                 </div>
               );
             })}
