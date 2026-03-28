@@ -1343,7 +1343,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                 <span className="text-[8px] text-muted-foreground leading-tight">Historie</span>
               </div>
             </div>
-            {weeks.map(week => {
+            {weeks.map((week, idx) => {
               const weekData = weekCapacities.get(week.key);
               const used = weekData?.hours ?? 0;
               const cap = getWeekCapacity(week.key);
@@ -1357,16 +1357,28 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                 : isWarning ? "linear-gradient(90deg, #fcd34d, #d97706)"
                 : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
               const borderColor = isPast ? "#b0bab8" : isOverloaded ? "rgba(220,53,69,0.4)" : isWarning ? "#d97706" : "#4ADE80";
+              // Month boundary check
+              const nextWeek = weeks[idx + 1];
+              const isMonthBoundary = nextWeek && nextWeek.start.getMonth() !== week.start.getMonth();
+              const MONTH_NAMES_TBL = ["Leden", "Únor", "Březen", "Duben", "Květen", "Červen", "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec"];
+              const nextMonthName = isMonthBoundary ? MONTH_NAMES_TBL[nextWeek.start.getMonth()] : null;
               return (
                 <div
                   key={week.key}
-                  className="shrink-0 text-center px-2 py-2 border-r border-border/50 bg-card"
+                  className="shrink-0 text-center px-2 py-2 border-r border-border/50 bg-card relative"
                   style={{
                     width: CELL_W,
                     backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : undefined,
                     borderBottom: `2px solid ${borderColor}`,
+                    borderRightWidth: isMonthBoundary ? 2 : undefined,
+                    borderRightColor: isMonthBoundary ? "hsl(var(--muted-foreground) / 0.3)" : undefined,
                   }}
                 >
+                  {isMonthBoundary && nextMonthName && (
+                    <div className="absolute -top-0.5 right-1 text-[8px] font-semibold" style={{ color: "hsl(var(--muted-foreground))" }}>
+                      {nextMonthName} →
+                    </div>
+                  )}
                   <div className="font-semibold text-base text-foreground leading-tight">
                     T{week.weekNum}{week.isCurrent && <span className="ml-0.5" style={{ color: "#3a8a36" }}>•</span>}
                   </div>
