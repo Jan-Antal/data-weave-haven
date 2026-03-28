@@ -6,6 +6,10 @@ import { useQueryClient } from "@tanstack/react-query";
 // ── Types ─────────────────────────────────────────────────────────────
 export type UndoPage = "plan-vyroby" | "vyroba" | "project-table" | "tpv-list" | "settings";
 
+export function generateUndoGroupId(): string {
+  return crypto.randomUUID();
+}
+
 export interface UndoPayload {
   table: string;
   operation: "update" | "delete" | "insert" | "multi";
@@ -25,10 +29,11 @@ export interface UndoEntry {
   undoPayload?: UndoPayload;
   redoPayload?: UndoPayload;
   dbId?: string; // id in undo_sessions table
+  groupId?: string; // shared group id for batch undo
 }
 
 interface UndoRedoState {
-  pushUndo: (entry: Omit<UndoEntry, "id" | "timestamp">) => void;
+  pushUndo: (entry: Omit<UndoEntry, "id" | "timestamp">, groupId?: string) => void;
   popLastUndo: (page?: UndoPage) => UndoEntry | null;
   undo: (page?: UndoPage) => void;
   redo: (page?: UndoPage) => void;
@@ -100,6 +105,7 @@ async function persistToDb(entry: UndoEntry, userId: string): Promise<string | n
     undo_payload: entry.undoPayload,
     redo_payload: entry.redoPayload,
     expires_at: expiresAt,
+    group_id: entry.groupId ?? null,
   } as any).select("id").single();
   if (error) {
     console.warn("Failed to persist undo entry:", error.message);
@@ -177,6 +183,7 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
         undoPayload: row.undo_payload as UndoPayload,
         redoPayload: row.redo_payload as UndoPayload,
         dbId: row.id,
+        groupId: row.group_id ?? undefined,
         undo: reconstructFromPayload(row.undo_payload as UndoPayload, queryClient),
         redo: reconstructFromPayload(row.redo_payload as UndoPayload, queryClient),
       }));
@@ -213,18 +220,34 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      undoStackRef.current = [...undoStackRef.current.slice(0, idx), ...undoStackRef.current.slice(idx + 1)];
+      // Collect all entries with the same groupId (batch undo)
+      let entriesToUndo: UndoEntry[];
+      if (entry.groupId) {
+        entriesToUndo = undoStackRef.current.filter(e => e.groupId === entry.groupId);
+        undoStackRef.current = undoStackRef.current.filter(e => e.groupId !== entry.groupId);
+      } else {
+        entriesToUndo = [entry];
+        undoStackRef.current = [...undoStackRef.current.slice(0, idx), ...undoStackRef.current.slice(idx + 1)];
+      }
+
       const maxForPage = PAGE_MAX_STACK[entry.page] ?? DEFAULT_MAX_STACK;
-      redoStackRef.current = [...redoStackRef.current, entry].slice(-maxForPage);
+      redoStackRef.current = [...redoStackRef.current, ...entriesToUndo].slice(-maxForPage);
       bump();
 
       // Remove from DB on undo
-      if (entry.dbId) removeFromDb(entry.dbId);
+      for (const e of entriesToUndo) {
+        if (e.dbId) removeFromDb(e.dbId);
+      }
 
       executingRef.current = true;
       try {
-        await entry.undo();
-        toast({ title: `← Vráceno: ${entry.description}`, duration: 2000 });
+        for (const e of entriesToUndo) {
+          await e.undo();
+        }
+        const desc = entriesToUndo.length > 1
+          ? `${entry.description} (${entriesToUndo.length}×)`
+          : entry.description;
+        toast({ title: `← Vráceno: ${desc}`, duration: 2000 });
       } catch (err: any) {
         toast({
           title: "Nelze vrátit — data se změnila",
@@ -260,15 +283,29 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      redoStackRef.current = [...redoStackRef.current.slice(0, idx), ...redoStackRef.current.slice(idx + 1)];
+      // Collect all entries with the same groupId (batch redo)
+      let entriesToRedo: UndoEntry[];
+      if (entry.groupId) {
+        entriesToRedo = redoStackRef.current.filter(e => e.groupId === entry.groupId);
+        redoStackRef.current = redoStackRef.current.filter(e => e.groupId !== entry.groupId);
+      } else {
+        entriesToRedo = [entry];
+        redoStackRef.current = [...redoStackRef.current.slice(0, idx), ...redoStackRef.current.slice(idx + 1)];
+      }
+
       const maxForPage = PAGE_MAX_STACK[entry.page] ?? DEFAULT_MAX_STACK;
-      undoStackRef.current = [...undoStackRef.current, entry].slice(-maxForPage);
+      undoStackRef.current = [...undoStackRef.current, ...entriesToRedo].slice(-maxForPage);
       bump();
 
       executingRef.current = true;
       try {
-        await entry.redo();
-        toast({ title: `→ Opakováno: ${entry.description}`, duration: 2000 });
+        for (const e of entriesToRedo) {
+          await e.redo();
+        }
+        const desc = entriesToRedo.length > 1
+          ? `${entry.description} (${entriesToRedo.length}×)`
+          : entry.description;
+        toast({ title: `→ Opakováno: ${desc}`, duration: 2000 });
       } catch (err: any) {
         toast({
           title: "Nelze obnovit — data se změnila",
@@ -283,11 +320,12 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
   );
 
   const pushUndo = useCallback(
-    (entry: Omit<UndoEntry, "id" | "timestamp">) => {
+    (entry: Omit<UndoEntry, "id" | "timestamp">, groupId?: string) => {
       const full: UndoEntry = {
         ...entry,
         id: crypto.randomUUID(),
         timestamp: new Date(),
+        groupId: groupId ?? entry.groupId,
       };
       const maxForPage = PAGE_MAX_STACK[entry.page] ?? DEFAULT_MAX_STACK;
       const newStack = [...undoStackRef.current, full];

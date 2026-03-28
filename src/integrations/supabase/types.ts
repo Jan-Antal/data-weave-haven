@@ -1290,6 +1290,7 @@ export type Database = {
           created_at: string | null
           description: string
           expires_at: string
+          group_id: string | null
           id: string
           page: string
           redo_payload: Json
@@ -1301,6 +1302,7 @@ export type Database = {
           created_at?: string | null
           description: string
           expires_at: string
+          group_id?: string | null
           id?: string
           page: string
           redo_payload: Json
@@ -1312,6 +1314,7 @@ export type Database = {
           created_at?: string | null
           description?: string
           expires_at?: string
+          group_id?: string | null
           id?: string
           page?: string
           redo_payload?: Json
