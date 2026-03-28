@@ -482,9 +482,9 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
         return;
       }
 
-      const activeItems = bundle.items.filter(i => i.status !== "completed" && i.status !== "paused" && i.status !== "cancelled");
+      const activeItems = bundle.items.filter(i => i.status !== "expedice" && i.status !== "completed" && i.status !== "paused" && i.status !== "cancelled");
       const hasUncompleted = activeItems.length > 0;
-      const completedItems = bundle.items.filter(i => i.status === "completed");
+      const completedItems = bundle.items.filter(i => i.status === "expedice" || i.status === "completed");
       const allCompleted = completedItems.length > 0 && activeItems.length === 0 && bundle.items.filter(i => i.status === "paused").length === 0;
       const pausedItems = bundle.items.filter(i => i.status === "paused");
       const actions: ContextMenuAction[] = [];
@@ -533,12 +533,12 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       // Merge option for bundles containing split items
       const splitGroupIds = new Set<string>();
       for (const item of bundle.items) {
-        if (item.split_group_id && item.status !== "completed" && item.status !== "cancelled") {
+        if (item.split_group_id && item.status !== "expedice" && item.status !== "completed" && item.status !== "cancelled") {
           splitGroupIds.add(item.split_group_id);
         }
       }
       const mergeableSplitGroups = Array.from(splitGroupIds).filter(sgId => {
-        const siblingsInWeek = bundle.items.filter(i => i.split_group_id === sgId && i.status !== "completed" && i.status !== "cancelled");
+        const siblingsInWeek = bundle.items.filter(i => i.split_group_id === sgId && i.status !== "expedice" && i.status !== "completed" && i.status !== "cancelled");
         return siblingsInWeek.length >= 2;
       });
       if (mergeableSplitGroups.length > 0) {
@@ -601,7 +601,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const handleItemContextMenu = useCallback(
     (e: React.MouseEvent, item: ScheduleItem, weekKey: string, weekNum: number, startDate: Date, endDate: Date, bundle: ScheduleBundle) => {
       e.preventDefault(); e.stopPropagation();
-      const isCompleted = item.status === "completed";
+      const isCompleted = item.status === "expedice" || item.status === "completed";
       const isPaused = item.status === "paused";
       const actions: ContextMenuAction[] = [];
 
@@ -1002,8 +1002,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       else regular.push(b);
     }
     regular.sort((a, b) => {
-      const aDone = a.items.length > 0 && a.items.every(i => i.status === "completed");
-      const bDone = b.items.length > 0 && b.items.every(i => i.status === "completed");
+      const aDone = a.items.length > 0 && a.items.every(i => i.status === "expedice" || i.status === "completed");
+      const bDone = b.items.length > 0 && b.items.every(i => i.status === "expedice" || i.status === "completed");
       if (aDone === bDone) return 0;
       return aDone ? 1 : -1;
     });
@@ -1196,7 +1196,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts2), [statusOpts2]);
   const [expanded, setExpanded] = useState(false);
   const color = getProjectColor(bundle.project_id);
-  const completedCount = bundle.items.filter(i => i.status === "completed").length;
+  const completedCount = bundle.items.filter(i => i.status === "expedice" || i.status === "completed").length;
   const totalCount = bundle.items.length;
   const allCompleted = completedCount === totalCount && totalCount > 0;
   const hasUncompleted = completedCount < totalCount;
@@ -1441,8 +1441,8 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
         </div>
       </div>
       {expanded && (() => {
-        const activeItems = bundle.items.filter(i => i.status !== "completed");
-        const completedItems = bundle.items.filter(i => i.status === "completed");
+        const activeItems = bundle.items.filter(i => i.status !== "expedice" && i.status !== "completed");
+        const completedItems = bundle.items.filter(i => i.status === "expedice" || i.status === "completed");
         return (
           <div className="px-[3px] py-[2px]" onContextMenu={e => e.stopPropagation()}>
             {activeItems.map(item =>
