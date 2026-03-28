@@ -861,6 +861,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               onItemContextMenu={(e, item, bundle) => handleItemContextMenu(e, item, week.key, week.weekNum, week.start, week.end, bundle)}
               allWeeksData={weeksCapacityMap} weekKeys={weekKeys} registerRef={registerSiloRef}
               projectLookup={projectLookup}
+              planHoursMap={planHoursData}
+              realHoursMap={realHoursData}
               spillDismissed={dismissedSpillWeeks.has(week.key)}
               onDismissSpill={() => handleDismissSpill(week.key)}
               onReopenSpill={() => handleReopenSpill(week.key)}
@@ -1158,6 +1160,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             onBundleContextMenu={onBundleContextMenu}
             onItemContextMenu={onItemContextMenu}
             projectLookup={projectLookup}
+            planHoursMap={planHoursMap}
+            realHoursMap={realHoursMap}
             isSelected={selectedProjectId === bundle.project_id}
             onSelectProject={onSelectProject} searchQuery={searchQuery}
             forecastDarkMode={forecastDarkMode}
