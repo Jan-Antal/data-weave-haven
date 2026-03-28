@@ -1395,10 +1395,11 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
     : expSeverity === "urgent" ? "#d97706"
     : color;
 
+  const bundleDragDisabled = allCompleted || !!forecastDarkMode || isMidflightBundle || !!isWeekLocked;
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: `silo-bundle-${bundle.project_id}-${weekKey}`,
     data: { type: "silo-bundle", projectId: bundle.project_id, projectName: bundle.project_name, weekDate: weekKey, hours: bundle.total_hours, itemCount: bundle.items.length },
-    disabled: allCompleted || !!forecastDarkMode,
+    disabled: bundleDragDisabled,
   });
   const toggleExpand = useCallback(() => setExpanded(v => !v), []);
   const isMatch = searchMatchedProjectIds?.has(bundle.project_id) ?? false;
@@ -1570,7 +1571,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
               item.status === "paused" ? (
                 <PausedSiloItem key={item.id} item={item} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
               ) : (
-                <DraggableSiloItem key={item.id} item={item} weekKey={weekKey} showCzk={showCzk} disabled={!!forecastDarkMode} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
+                <DraggableSiloItem key={item.id} item={item} weekKey={weekKey} showCzk={showCzk} disabled={!!forecastDarkMode || isMidflightBundle || !!isWeekLocked} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
               )
             )}
             {completedItems.length > 0 && (
