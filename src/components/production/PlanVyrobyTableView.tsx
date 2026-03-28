@@ -1172,7 +1172,6 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   }, [handleMoveToWeek]);
 
   const hasAnyInbox = true;
-  const hasAnyExpedice = true;
 
   return (
     <DndContext onDragEnd={handleTableDragEnd} collisionDetection={closestCenter}>
