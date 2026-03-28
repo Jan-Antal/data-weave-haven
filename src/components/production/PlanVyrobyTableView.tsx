@@ -1883,7 +1883,7 @@ function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCe
               </div>
               <div className="max-h-[200px] overflow-y-auto">
                 {moveTargetWeeks.map(tw => {
-                  const used = weekCapacities.get(tw.key) ?? 0;
+                  const used = weekCapacities.get(tw.key)?.hours ?? 0;
                   const cap = getWeekCapacity(tw.key);
                   const remaining = Math.max(0, cap - used);
                   const isFull = remaining <= 0;
