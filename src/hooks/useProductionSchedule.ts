@@ -52,6 +52,7 @@ export function useProductionSchedule() {
         .from("production_schedule")
         .select("*, projects!production_schedule_project_id_fkey(project_name)")
         .in("status", ["scheduled", "in_progress", "completed", "paused"])
+        .not("item_code", "in", '("EXPEDICE_MIDFLIGHT","DONE_MIDFLIGHT")')
         .order("position", { ascending: true });
       if (error) throw error;
 
