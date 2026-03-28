@@ -1313,7 +1313,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
               </div>
             )}
             {weeks.map(week => {
-              const used = weekCapacities.get(week.key) ?? 0;
+              const weekData = weekCapacities.get(week.key);
+              const used = weekData?.hours ?? 0;
               const cap = getWeekCapacity(week.key);
               const pct = cap > 0 ? (used / cap) * 100 : 0;
               const isPast = week.end < new Date();
