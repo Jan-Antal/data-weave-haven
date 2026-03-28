@@ -320,11 +320,12 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
   );
 
   const pushUndo = useCallback(
-    (entry: Omit<UndoEntry, "id" | "timestamp">) => {
+    (entry: Omit<UndoEntry, "id" | "timestamp">, groupId?: string) => {
       const full: UndoEntry = {
         ...entry,
         id: crypto.randomUUID(),
         timestamp: new Date(),
+        groupId: groupId ?? entry.groupId,
       };
       const maxForPage = PAGE_MAX_STACK[entry.page] ?? DEFAULT_MAX_STACK;
       const newStack = [...undoStackRef.current, full];
