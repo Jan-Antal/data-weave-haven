@@ -317,8 +317,6 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
       for (const [weekKey, silo] of scheduleData) {
         for (const bundle of silo.bundles) {
           for (const item of bundle.items) {
-            // Exclude midflight (HIST_) items from Tabulka
-            if (item.is_midflight) continue;
             if (!projectMap.has(bundle.project_id)) {
               projectMap.set(bundle.project_id, { projectName: bundle.project_name, items: new Map() });
             }
