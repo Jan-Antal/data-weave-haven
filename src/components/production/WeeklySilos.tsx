@@ -110,6 +110,8 @@ interface Props {
   searchMatchedProjectIds?: Set<string>;
   /** Whether search is active (>= 3 chars) */
   searchActive?: boolean;
+  /** Called when the leftmost visible week changes — reports its month + year */
+  onVisibleMonthChange?: (month: number, year: number) => void;
 }
 
 interface ContextMenuState {
