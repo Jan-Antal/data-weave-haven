@@ -8,7 +8,7 @@ interface LegacyArchiveSectionProps {
 }
 
 export function LegacyArchiveSection({ showLegacy, onToggle }: LegacyArchiveSectionProps) {
-  const { data: expediceData } = useProductionExpedice();
+  const { data: expediceData } = useProductionExpediceData();
 
   const legacyProjects = useMemo(() => {
     if (!expediceData) return [];

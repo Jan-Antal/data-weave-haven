@@ -145,7 +145,7 @@ const LEFT_COL_W = 280;
 
 export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateToTPV, onOpenProjectDetail }: Props) {
   const { data: scheduleData } = useProductionSchedule();
-  const { data: expediceData } = useProductionExpedice();
+  const { data: expediceData } = useProductionExpediceData();
   const { data: inboxProjects = [] } = useProductionInbox();
   const { data: settings } = useProductionSettings();
   const { data: allProjects = [] } = useProjects();
