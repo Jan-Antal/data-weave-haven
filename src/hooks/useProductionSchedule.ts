@@ -48,17 +48,38 @@ export function useProductionSchedule() {
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
+      // Fetch schedule items (only active statuses now)
       const { data, error } = await supabase
         .from("production_schedule")
         .select("*, projects!production_schedule_project_id_fkey(project_name)")
         .in("status", ["scheduled", "in_progress", "paused"])
-        .not("item_code", "in", '("EXPEDICE_MIDFLIGHT","DONE_MIDFLIGHT")')
         .order("position", { ascending: true });
       if (error) throw error;
+
+      // Fetch completed schedule IDs from production_expedice
+      const { data: expediceData } = await supabase
+        .from("production_expedice" as any)
+        .select("source_schedule_id, expediced_at");
+      const expediceMap = new Map<string, string | null>();
+      for (const row of expediceData || []) {
+        const sid = (row as any).source_schedule_id;
+        if (sid) expediceMap.set(sid, (row as any).expediced_at);
+      }
 
       const byWeek = new Map<string, Map<string, ScheduleBundle>>();
 
       for (const row of data || []) {
+        // Apply virtual status from production_expedice
+        let virtualStatus = row.status;
+        let virtualCompletedAt = row.completed_at;
+        let virtualExpedicedAt = (row as any).expediced_at ?? null;
+        if (expediceMap.has(row.id)) {
+          const expAt = expediceMap.get(row.id);
+          virtualStatus = expAt ? "completed" : "expedice";
+          virtualCompletedAt = virtualCompletedAt || new Date().toISOString();
+          virtualExpedicedAt = expAt || null;
+        }
+
         const week = row.scheduled_week;
         const pid = row.project_id;
         if (!byWeek.has(week)) byWeek.set(week, new Map());
@@ -83,10 +104,10 @@ export function useProductionSchedule() {
           scheduled_hours: row.scheduled_hours,
           scheduled_czk: row.scheduled_czk,
           position: row.position,
-          status: row.status,
-          completed_at: row.completed_at,
+          status: virtualStatus,
+          completed_at: virtualCompletedAt,
           completed_by: row.completed_by,
-          expediced_at: (row as any).expediced_at ?? null,
+          expediced_at: virtualExpedicedAt,
           split_group_id: (row as any).split_group_id ?? null,
           split_part: (row as any).split_part ?? null,
           split_total: (row as any).split_total ?? null,
@@ -112,52 +133,6 @@ export function useProductionSchedule() {
         });
       }
       return result;
-    },
-  });
-}
-
-export function useProductionExpedice() {
-  return useQuery({
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
-    queryKey: ["production-expedice"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("production_schedule")
-        .select("*, projects!production_schedule_project_id_fkey(project_name)")
-        .in("status", ["expedice", "completed"])
-        .order("completed_at", { ascending: false });
-      if (error) throw error;
-
-      const grouped = new Map<string, { project_id: string; project_name: string; items: ScheduleItem[]; count: number }>();
-      for (const row of data || []) {
-        const pid = row.project_id;
-        if (!grouped.has(pid)) {
-          grouped.set(pid, { project_id: pid, project_name: (row as any).projects?.project_name || pid, items: [], count: 0 });
-        }
-        const g = grouped.get(pid)!;
-        g.items.push({
-          id: row.id, project_id: row.project_id,
-          project_name: (row as any).projects?.project_name || pid,
-          stage_id: row.stage_id, item_name: row.item_name,
-          item_code: row.item_code ?? null, scheduled_week: row.scheduled_week,
-          scheduled_hours: row.scheduled_hours, scheduled_czk: row.scheduled_czk,
-          position: row.position, status: row.status,
-          completed_at: row.completed_at, completed_by: row.completed_by,
-          expediced_at: (row as any).expediced_at ?? null,
-          split_group_id: (row as any).split_group_id ?? null,
-          split_part: (row as any).split_part ?? null,
-          split_total: (row as any).split_total ?? null,
-          pause_reason: null, pause_expected_date: null,
-          adhoc_reason: (row as any).adhoc_reason ?? null,
-          cancel_reason: null,
-          is_blocker: (row as any).is_blocker ?? false,
-          is_midflight: (row as any).is_midflight ?? false,
-          tpv_expected_date: (row as any).tpv_expected_date ?? null,
-        });
-        g.count++;
-      }
-      return Array.from(grouped.values());
     },
   });
 }

@@ -1,13 +1,12 @@
 import { useState, useCallback, useMemo } from "react";
-import { useProductionExpedice, type ScheduleItem } from "@/hooks/useProductionSchedule";
-import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
+import { useProductionExpediceData, type ExpediceItem, type ExpediceProject } from "@/hooks/useProductionExpedice";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useProductionSchedule } from "@/hooks/useProductionSchedule";
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProjects } from "@/hooks/useProjects";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, isPast, isFuture, differenceInDays } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { getProjectColor } from "@/lib/projectColors";
 import { resolveDeadline } from "@/lib/deadlineWarning";
@@ -56,11 +55,10 @@ interface ExpedicePanelProps {
 }
 
 export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, selectedProjectId, onSelectProject, searchQuery = "" }: ExpedicePanelProps) {
-  const { data: projects = [] } = useProductionExpedice();
+  const { data: projects = [] } = useProductionExpediceData();
   const { data: allProjects = [] } = useProjects();
   const { data: scheduleData } = useProductionSchedule();
   const { data: inboxProjects = [] } = useProductionInbox();
-  const { returnToProduction, moveItemBackToInbox } = useProductionDragDrop();
   const { data: settings } = useProductionSettings();
   const qc = useQueryClient();
   const hourlyRate = settings?.hourly_rate ?? 550;
@@ -72,12 +70,12 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
 
   const invalidateAll = useCallback(() => {
     qc.invalidateQueries({ queryKey: ["production-expedice"] });
+    qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
     qc.invalidateQueries({ queryKey: ["production-inbox"] });
     qc.invalidateQueries({ queryKey: ["production-progress"] });
   }, [qc]);
 
-  // Map project_id → deadline fields for resolveDeadline
   const projectDeadlineMap = useMemo(() => {
     const m = new Map<string, { expedice?: string | null; montaz?: string | null; predani?: string | null; datum_smluvni?: string | null }>();
     for (const p of allProjects) m.set(p.project_id, {
@@ -89,37 +87,32 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     return m;
   }, [allProjects]);
 
-  // Split projects into active (has at least one non-expediced item) and archived (all expediced)
+  // Split projects into active (not yet expediced) and archived (expediced)
   const { activeProjects, archivedProjects } = useMemo(() => {
-    const active: typeof projects = [];
-    const archived: typeof projects = [];
+    const active: ExpediceProject[] = [];
+    const archived: ExpediceProject[] = [];
 
     for (const group of projects) {
-      // 'expedice' status = active Expedice, 'completed' status = archived
-      const hasExpedice = group.items.some(i => i.status === "expedice");
-      const hasCompleted = group.items.some(i => i.status === "completed");
-      if (hasExpedice) {
-        active.push(group);
+      const activeItems = group.items.filter(i => !i.expediced_at);
+      const archivedItems = group.items.filter(i => !!i.expediced_at);
+      if (activeItems.length > 0) {
+        active.push({ ...group, items: activeItems, count: activeItems.length });
       }
-      if (hasCompleted) {
-        archived.push({
-          ...group,
-          items: group.items.filter(i => i.status === "completed"),
-          count: group.items.filter(i => i.status === "completed").length,
-        });
+      if (archivedItems.length > 0) {
+        archived.push({ ...group, items: archivedItems, count: archivedItems.length });
       }
     }
 
     archived.sort((a, b) => {
-      const latestA = Math.max(...a.items.map(i => parseDate(i.expediced_at || i.completed_at)?.getTime() ?? 0));
-      const latestB = Math.max(...b.items.map(i => parseDate(i.expediced_at || i.completed_at)?.getTime() ?? 0));
+      const latestA = Math.max(...a.items.map(i => parseDate(i.expediced_at)?.getTime() ?? 0));
+      const latestB = Math.max(...b.items.map(i => parseDate(i.expediced_at)?.getTime() ?? 0));
       return latestB - latestA;
     });
 
     return { activeProjects: active, archivedProjects: archived };
   }, [projects]);
 
-  // Deep archive search query (no 30-day limit, triggered when archiveSearch >= 3 chars)
+  // Deep archive search
   const archiveSearchTrimmed = archiveSearch.trim().toLowerCase();
   const isDeepSearch = archiveSearchTrimmed.length >= 3;
 
@@ -129,16 +122,16 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     staleTime: 15_000,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("production_schedule")
-        .select("*, projects!production_schedule_project_id_fkey(project_name)")
-        .in("status", ["expedice", "completed"])
-        .order("completed_at", { ascending: false });
+        .from("production_expedice" as any)
+        .select("*, projects!production_expedice_project_id_fkey(project_name)")
+        .not("expediced_at", "is", null)
+        .order("expediced_at", { ascending: false });
       if (error) throw error;
 
       const q = archiveSearchTrimmed;
-      const grouped = new Map<string, { project_id: string; project_name: string; items: ScheduleItem[]; count: number }>();
+      const grouped = new Map<string, ExpediceProject>();
       for (const row of data || []) {
-        const pid = row.project_id;
+        const pid = (row as any).project_id;
         const pname = (row as any).projects?.project_name || pid;
         if (!pid.toLowerCase().includes(q) && !pname.toLowerCase().includes(q)) continue;
         if (!grouped.has(pid)) {
@@ -146,32 +139,23 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
         }
         const g = grouped.get(pid)!;
         g.items.push({
-          id: row.id, project_id: row.project_id,
-          project_name: pname,
-          stage_id: row.stage_id, item_name: row.item_name,
-          item_code: row.item_code ?? null, scheduled_week: row.scheduled_week,
-          scheduled_hours: row.scheduled_hours, scheduled_czk: row.scheduled_czk,
-          position: row.position, status: row.status,
-          completed_at: row.completed_at, completed_by: row.completed_by,
+          id: (row as any).id,
+          project_id: pid,
+          stage_id: (row as any).stage_id ?? null,
+          item_name: (row as any).item_name,
+          item_code: (row as any).item_code ?? null,
+          source_schedule_id: (row as any).source_schedule_id ?? null,
+          manufactured_at: (row as any).manufactured_at,
           expediced_at: (row as any).expediced_at ?? null,
-          split_group_id: (row as any).split_group_id ?? null,
-          split_part: (row as any).split_part ?? null,
-          split_total: (row as any).split_total ?? null,
-          pause_reason: null, pause_expected_date: null,
-          adhoc_reason: (row as any).adhoc_reason ?? null,
-          cancel_reason: null,
-          is_blocker: (row as any).is_blocker ?? false,
           is_midflight: (row as any).is_midflight ?? false,
-          tpv_expected_date: (row as any).tpv_expected_date ?? null,
+          created_at: (row as any).created_at,
         });
         g.count++;
       }
-      // Only return projects where ALL items are expediced (archive-worthy)
-      return Array.from(grouped.values()).filter(g => g.items.some(i => i.status === "completed"));
+      return Array.from(grouped.values());
     },
   });
 
-  // Filtered archive: use deep search results when searching, otherwise 30-day list
   const filteredArchive = useMemo(() => {
     if (isDeepSearch) return deepSearchResults;
     if (!archiveSearchTrimmed) return archivedProjects;
@@ -180,41 +164,13 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     );
   }, [archivedProjects, archiveSearchTrimmed, isDeepSearch, deepSearchResults]);
 
-  // Compute total items per project
-  const projectTotalItems = useMemo(() => {
-    const m = new Map<string, { total: number; nonCompleted: ScheduleItem[] }>();
-    if (scheduleData) {
-      for (const [, silo] of scheduleData) {
-        for (const bundle of silo.bundles) {
-          for (const item of bundle.items) {
-            if (!m.has(item.project_id)) m.set(item.project_id, { total: 0, nonCompleted: [] });
-            const entry = m.get(item.project_id)!;
-            entry.total++;
-            if (item.status !== "completed") entry.nonCompleted.push(item);
-          }
-        }
-      }
-    }
-    for (const group of projects) {
-      if (!m.has(group.project_id)) m.set(group.project_id, { total: 0, nonCompleted: [] });
-      const entry = m.get(group.project_id)!;
-      entry.total += group.count;
-    }
-    for (const inbox of inboxProjects) {
-      if (!m.has(inbox.project_id)) m.set(inbox.project_id, { total: 0, nonCompleted: [] });
-      const entry = m.get(inbox.project_id)!;
-      entry.total += inbox.items.length;
-    }
-    return m;
-  }, [scheduleData, projects, inboxProjects]);
-
   const { totalItems, lastCompletedStr } = useMemo(() => {
     let total = 0;
     let latest: Date | null = null;
     for (const g of activeProjects) {
       total += g.count;
       for (const item of g.items) {
-        const d = parseDate(item.completed_at);
+        const d = parseDate(item.manufactured_at);
         if (d && (!latest || d > latest)) latest = d;
       }
     }
@@ -230,12 +186,12 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     }
   };
 
-  // === EXPEDICE ACTIONS ===
+  // === EXPEDICE ACTIONS (now using production_expedice table) ===
   const markAsExpediced = useCallback(async (itemId: string) => {
     try {
       const { error } = await supabase
-        .from("production_schedule")
-        .update({ status: "completed", expediced_at: new Date().toISOString() } as any)
+        .from("production_expedice" as any)
+        .update({ expediced_at: new Date().toISOString() })
         .eq("id", itemId);
       if (error) throw error;
       invalidateAll();
@@ -247,19 +203,18 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
 
   const markAllAsExpediced = useCallback(async (projectId: string) => {
     try {
-      // Get all completed items for this project that aren't yet expediced
       const { data: items, error: fetchErr } = await supabase
-        .from("production_schedule")
+        .from("production_expedice" as any)
         .select("id")
         .eq("project_id", projectId)
-        .eq("status", "expedice");
+        .is("expediced_at", null);
       if (fetchErr) throw fetchErr;
       if (!items || items.length === 0) return;
 
       const { error } = await supabase
-        .from("production_schedule")
-        .update({ status: "completed", expediced_at: new Date().toISOString() } as any)
-        .in("id", items.map(i => i.id));
+        .from("production_expedice" as any)
+        .update({ expediced_at: new Date().toISOString() })
+        .in("id", (items as any[]).map(i => i.id));
       if (error) throw error;
       invalidateAll();
       toast({ title: `📦 ${items.length} položek expedováno` });
@@ -271,8 +226,8 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
   const unExpedice = useCallback(async (itemId: string) => {
     try {
       const { error } = await supabase
-        .from("production_schedule")
-        .update({ status: "expedice", expediced_at: null } as any)
+        .from("production_expedice" as any)
+        .update({ expediced_at: null })
         .eq("id", itemId);
       if (error) throw error;
       invalidateAll();
@@ -285,16 +240,16 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
   const unExpediceAll = useCallback(async (projectId: string) => {
     try {
       const { data: items, error: fetchErr } = await supabase
-        .from("production_schedule")
+        .from("production_expedice" as any)
         .select("id")
         .eq("project_id", projectId)
-        .eq("status", "completed");
+        .not("expediced_at", "is", null);
       if (fetchErr) throw fetchErr;
       if (!items || items.length === 0) return;
       const { error } = await supabase
-        .from("production_schedule")
-        .update({ status: "expedice", expediced_at: null } as any)
-        .in("id", items.map(i => i.id));
+        .from("production_expedice" as any)
+        .update({ expediced_at: null })
+        .in("id", (items as any[]).map(i => i.id));
       if (error) throw error;
       invalidateAll();
       toast({ title: `↩ ${items.length} položek vráceno do Expedice` });
@@ -303,72 +258,109 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     }
   }, [invalidateAll]);
 
+  const returnToProduction = useCallback(async (expediceItemId: string) => {
+    try {
+      // Delete from production_expedice → schedule item returns to active in silos
+      const { error } = await supabase
+        .from("production_expedice" as any)
+        .delete()
+        .eq("id", expediceItemId);
+      if (error) throw error;
+      invalidateAll();
+      toast({ title: "↩ Vráceno do výroby" });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+    }
+  }, [invalidateAll]);
+
   const returnAllToProduction = useCallback(async (projectId: string) => {
     try {
       const { data: items, error: fetchErr } = await supabase
-        .from("production_schedule")
+        .from("production_expedice" as any)
         .select("id")
-        .eq("project_id", projectId)
-        .in("status", ["expedice", "completed"]);
+        .eq("project_id", projectId);
       if (fetchErr) throw fetchErr;
       if (!items || items.length === 0) return;
-      for (const item of items) {
-        await returnToProduction(item.id);
-      }
+      const { error } = await supabase
+        .from("production_expedice" as any)
+        .delete()
+        .in("id", (items as any[]).map(i => i.id));
+      if (error) throw error;
+      invalidateAll();
       toast({ title: `↩ ${items.length} položek vráceno do výroby` });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
-  }, [returnToProduction]);
+  }, [invalidateAll]);
 
   const returnAllToInbox = useCallback(async (projectId: string) => {
     try {
-      const { data: items, error: fetchErr } = await supabase
-        .from("production_schedule")
-        .select("id")
-        .eq("project_id", projectId)
-        .in("status", ["expedice", "completed"]);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      
+      // Get expedice items with their source_schedule_ids
+      const { data: expItems, error: fetchErr } = await supabase
+        .from("production_expedice" as any)
+        .select("id, source_schedule_id, project_id, item_name, item_code")
+        .eq("project_id", projectId);
       if (fetchErr) throw fetchErr;
-      if (!items || items.length === 0) return;
-      for (const item of items) {
-        await moveItemBackToInbox(item.id);
+      if (!expItems || expItems.length === 0) return;
+
+      // For each expedice item: delete from expedice, delete schedule row, create inbox item
+      for (const item of expItems as any[]) {
+        // Delete from expedice
+        await supabase.from("production_expedice" as any).delete().eq("id", item.id);
+        
+        // If there's a source schedule row, get its details and delete it
+        if (item.source_schedule_id) {
+          const { data: schedItem } = await supabase
+            .from("production_schedule")
+            .select("*")
+            .eq("id", item.source_schedule_id)
+            .single();
+          if (schedItem) {
+            await supabase.from("production_schedule").delete().eq("id", schedItem.id);
+            // Create inbox item
+            if (schedItem.inbox_item_id) {
+              await supabase.from("production_inbox").update({ status: "pending" }).eq("id", schedItem.inbox_item_id);
+            } else {
+              await supabase.from("production_inbox").insert({
+                project_id: schedItem.project_id,
+                stage_id: schedItem.stage_id,
+                item_name: schedItem.item_name,
+                item_code: schedItem.item_code,
+                estimated_hours: schedItem.scheduled_hours,
+                estimated_czk: schedItem.scheduled_czk,
+                sent_by: user.id,
+                status: "pending",
+              });
+            }
+          }
+        }
       }
-      toast({ title: `📥 ${items.length} položek vráceno do Inboxu` });
+      invalidateAll();
+      toast({ title: `📥 ${expItems.length} položek vráceno do Inboxu` });
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
-  }, [moveItemBackToInbox]);
+  }, [invalidateAll]);
 
   // === CONTEXT MENUS ===
   const buildContextActions = useCallback(
-    (item: ScheduleItem | null, projectId: string, isArchive = false) => {
-      const weekNum = item ? (() => {
-        const d = new Date(item.scheduled_week);
-        const dayNum = d.getUTCDay() || 7;
-        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-        return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-      })() : 0;
-
+    (item: ExpediceItem | null, projectId: string, isArchive = false) => {
       const actions: ContextMenuAction[] = [];
 
       if (isArchive && item) {
-        // Archive item context menu
         actions.push({ label: "Vrátit do Expedice", icon: "↩", onClick: () => unExpedice(item.id) });
-        actions.push({ label: `Vrátit do výroby (T${weekNum})`, icon: "🔧", onClick: () => returnToProduction(item.id) });
-        actions.push({ label: "Vrátit do Inboxu", icon: "📥", onClick: () => moveItemBackToInbox(item.id) });
+        actions.push({ label: "Vrátit do výroby", icon: "🔧", onClick: () => returnToProduction(item.id) });
       } else if (isArchive && !item) {
-        // Archive project header context menu
         actions.push({ label: "Vrátit do Expedice", icon: "↩", onClick: () => unExpediceAll(projectId) });
         actions.push({ label: "Vrátit do Výroby", icon: "🔧", onClick: () => returnAllToProduction(projectId) });
         actions.push({ label: "Vrátit do Inboxu", icon: "📥", onClick: () => returnAllToInbox(projectId) });
       } else if (item) {
-        // Active Expedice item context menu
         actions.push({ label: "Expedováno ✓", icon: "📦", onClick: () => markAsExpediced(item.id) });
-        actions.push({ label: `Vrátit do výroby (T${weekNum})`, icon: "↩", onClick: () => returnToProduction(item.id) });
-        actions.push({ label: "Vrátit do Inboxu", icon: "↩", onClick: () => moveItemBackToInbox(item.id) });
+        actions.push({ label: "Vrátit do výroby", icon: "↩", onClick: () => returnToProduction(item.id) });
       } else {
-        // Active project header context menu — same scope as item actions
         actions.push({ label: "Expedovat vše", icon: "📦", onClick: () => markAllAsExpediced(projectId) });
         actions.push({ label: "Vrátit do Výroby", icon: "↩", onClick: () => returnAllToProduction(projectId) });
         actions.push({ label: "Vrátit do Inboxu", icon: "📥", onClick: () => returnAllToInbox(projectId) });
@@ -383,11 +375,11 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
 
       return actions;
     },
-    [returnToProduction, moveItemBackToInbox, onNavigateToTPV, onOpenProjectDetail, markAsExpediced, markAllAsExpediced, unExpedice, unExpediceAll, returnAllToProduction, returnAllToInbox]
+    [returnToProduction, onNavigateToTPV, onOpenProjectDetail, markAsExpediced, markAllAsExpediced, unExpedice, unExpediceAll, returnAllToProduction, returnAllToInbox]
   );
 
   const handleItemContextMenu = useCallback(
-    (e: React.MouseEvent, item: ScheduleItem, isArchive = false) => {
+    (e: React.MouseEvent, item: ExpediceItem, isArchive = false) => {
       e.preventDefault();
       e.stopPropagation();
       setContextMenu({ x: e.clientX, y: e.clientY, actions: buildContextActions(item, item.project_id, isArchive) });
@@ -482,9 +474,6 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
             key={group.project_id}
             group={group}
             projectDeadlineMap={projectDeadlineMap}
-            projectTotalItems={projectTotalItems}
-            scheduleData={scheduleData}
-            inboxProjects={inboxProjects}
             isGroupCollapsed={collapsedGroups.has(group.project_id)}
             toggleGroup={() => setCollapsedGroups(prev => {
               const next = new Set(prev);
@@ -567,9 +556,6 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
                 key={group.project_id}
                 group={group}
                 projectDeadlineMap={projectDeadlineMap}
-                projectTotalItems={projectTotalItems}
-                scheduleData={scheduleData}
-                inboxProjects={inboxProjects}
                 isGroupCollapsed={collapsedGroups.has(`archive-${group.project_id}`)}
                 toggleGroup={() => setCollapsedGroups(prev => {
                   const key = `archive-${group.project_id}`;
@@ -604,15 +590,12 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
 
 // === PROJECT GROUP COMPONENT ===
 interface ProjectGroupProps {
-  group: { project_id: string; project_name: string; items: ScheduleItem[]; count: number };
+  group: ExpediceProject;
   projectDeadlineMap: Map<string, { expedice?: string | null; montaz?: string | null; predani?: string | null; datum_smluvni?: string | null }>;
-  projectTotalItems: Map<string, { total: number; nonCompleted: ScheduleItem[] }>;
-  scheduleData: any;
-  inboxProjects: any[];
   isGroupCollapsed: boolean;
   toggleGroup: () => void;
   onProjectContextMenu: (e: React.MouseEvent, projectId: string, isArchive?: boolean) => void;
-  onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem) => void;
+  onItemContextMenu: (e: React.MouseEvent, item: ExpediceItem) => void;
   onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void;
   isArchive: boolean;
   isSelected?: boolean;
@@ -627,7 +610,7 @@ const DEADLINE_SHORT_LABELS: Record<string, string> = {
 };
 
 function ProjectGroup({
-  group, projectDeadlineMap, projectTotalItems,
+  group, projectDeadlineMap,
   isGroupCollapsed, toggleGroup,
   onProjectContextMenu, onItemContextMenu, onNavigateToTPV,
   isArchive, isSelected, onSelectProject,
@@ -638,13 +621,6 @@ function ProjectGroup({
   const deadlineStr = deadlineDate ? formatShortDate(deadlineDate.toISOString()) : null;
   const deadlineLabel = resolved ? (DEADLINE_SHORT_LABELS[resolved.fieldName] ?? "Exp") : "Exp";
 
-  const totals = projectTotalItems.get(group.project_id);
-  const completedCount = group.count;
-  const totalCount = totals ? totals.total : completedCount;
-  const allDone = completedCount >= totalCount;
-  const missingItems = totals?.nonCompleted ?? [];
-
-  // For archive, find latest expediced_at date
   const latestExpedicedStr = isArchive
     ? formatShortDate(
         group.items.reduce((latest, i) => {
@@ -691,21 +667,19 @@ function ProjectGroup({
             <span
               className="rounded-full shrink-0 text-center"
               style={{
-                fontSize: 11,
-                fontWeight: 600,
-                padding: "2px 7px",
+                fontSize: 11, fontWeight: 600, padding: "2px 7px",
                 ...(isArchive ? {
                   backgroundColor: "hsl(var(--muted))",
                   color: "hsl(var(--muted-foreground))",
                   minWidth: 40,
                 } : {
-                  backgroundColor: allDone ? "rgba(22,163,74,0.12)" : "rgba(217,151,6,0.12)",
-                  color: allDone ? "#16A34A" : "#d97706",
+                  backgroundColor: "rgba(22,163,74,0.12)",
+                  color: "#16A34A",
                   minWidth: 40,
                 }),
               }}
             >
-              {completedCount}/{totalCount}
+              {group.count}
             </span>
           </div>
           <div className="flex items-center justify-between">
@@ -731,36 +705,10 @@ function ProjectGroup({
 
       {!isGroupCollapsed && (
         <div className="px-2.5 pb-2 space-y-1.5">
-          {/* Missing items indicator (active only) */}
-          {!isArchive && !allDone && missingItems.length > 0 && (
-            <div className="text-[8px] text-muted-foreground px-0.5">
-              {missingItems.length <= 2 ? (
-                <span>
-                  Zbývá: {missingItems.map((mi, idx) => (
-                    <span key={mi.id}>
-                      {idx > 0 && " · "}
-                      <span className="font-medium">{mi.item_code || mi.item_name}</span>
-                    </span>
-                  ))}
-                </span>
-              ) : (
-                <span
-                  className="cursor-pointer hover:underline"
-                  style={{ fontSize: 11, color: "#d97706", fontWeight: 500 }}
-                  onClick={() => {
-                    if (onNavigateToTPV) onNavigateToTPV(group.project_id);
-                  }}
-                >
-                  {missingItems.length} položek zbývá →
-                </span>
-              )}
-            </div>
-          )}
-
           <div className="space-y-[2px]">
             {group.items.map((item) => {
               const isItemExpediced = !!item.expediced_at;
-              const completedStr = formatShortDate(item.completed_at);
+              const manufacturedStr = formatShortDate(item.manufactured_at);
               const expedicedCompactStr = formatShortDateCompact(item.expediced_at);
 
               return (
@@ -805,9 +753,9 @@ function ProjectGroup({
                     )
                   ) : (
                     <div className="ml-[18px] flex flex-col gap-0">
-                      {completedStr && (
+                      {manufacturedStr && (
                         <span style={{ fontSize: 10, color: "#9ca3af" }}>
-                          Dokončeno: {completedStr}
+                          Dokončeno: {manufacturedStr}
                         </span>
                       )}
                     </div>
