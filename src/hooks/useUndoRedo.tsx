@@ -6,6 +6,10 @@ import { useQueryClient } from "@tanstack/react-query";
 // ── Types ─────────────────────────────────────────────────────────────
 export type UndoPage = "plan-vyroby" | "vyroba" | "project-table" | "tpv-list" | "settings";
 
+export function generateUndoGroupId(): string {
+  return crypto.randomUUID();
+}
+
 export interface UndoPayload {
   table: string;
   operation: "update" | "delete" | "insert" | "multi";
@@ -25,6 +29,7 @@ export interface UndoEntry {
   undoPayload?: UndoPayload;
   redoPayload?: UndoPayload;
   dbId?: string; // id in undo_sessions table
+  groupId?: string; // shared group id for batch undo
 }
 
 interface UndoRedoState {
