@@ -1204,7 +1204,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                     width: CELL_W,
                     backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : undefined,
                     borderBottom: `2px solid ${borderColor}`,
-                    opacity: isPast ? 0.6 : 1,
+                    opacity: 1,
                   }}
                 >
                   {/* Week number */}
