@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { productionCzkToSellingPrice } from "@/lib/currency";
-import { GripVertical, ChevronRight, AlertTriangle } from "lucide-react";
+import { GripVertical, ChevronRight, AlertTriangle, Lock } from "lucide-react";
 import type { ForecastBlock } from "@/hooks/useForecastMode";
 import { differenceInDays, format } from "date-fns";
 import { useProductionSchedule, getISOWeekNumber, type WeekSilo, type ScheduleBundle, type ScheduleItem } from "@/hooks/useProductionSchedule";
@@ -1010,9 +1010,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
     return { realBundles: regular, blockerBundles: blockers };
   }, [silo, hideRealCards]);
 
-  const barColor = isPast ? "#b0bab8" : isOverloaded ? "#c0392b" : isWarning ? "#d97706" : "#3a8a36";
-  const barBg = isPast ? "linear-gradient(90deg, #d0d7d5, #b0bab8)"
-    : isOverloaded ? "linear-gradient(90deg, #fca5a5, #c0392b)"
+  const barColor = isOverloaded ? "#c0392b" : isWarning ? "#d97706" : "#3a8a36";
+  const barBg = isOverloaded ? "linear-gradient(90deg, #fca5a5, #c0392b)"
     : isWarning ? "linear-gradient(90deg, #fcd34d, #d97706)"
     : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
 
@@ -1020,10 +1019,10 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
   const highlighted = !isPast && (isOver || isOverTarget);
   const dropBorderColor = highlighted ? (isOverloaded ? "#d97706" : "#3b82f6") : undefined;
   const headerColor = forecastDarkMode
-    ? (isPast ? "#4a5a58" : isCurrent ? "#4a9e96" : "#7aa8a4")
-    : (isPast ? "#9ca3af" : isCurrent ? "#223937" : "#1a1a1a");
-  const headerWeight = isCurrent ? 700 : isPast ? 500 : 600;
-  const dateRangeColor = forecastDarkMode ? "#4a5a58" : (isPast ? "#b0b7c3" : "#6b7280");
+    ? (isCurrent ? "#4a9e96" : "#7aa8a4")
+    : (isCurrent ? "#223937" : "#1a1a1a");
+  const headerWeight = isCurrent ? 700 : 600;
+  const dateRangeColor = forecastDarkMode ? "#4a5a58" : "#6b7280";
 
   const combinedRef = useCallback((el: HTMLDivElement | null) => { setNodeRef(el); registerRef(weekKey, el); }, [setNodeRef, registerRef, weekKey]);
 
@@ -1041,11 +1040,12 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       {/* Header */}
       <div className="px-2.5 py-1.5 text-center" style={{ borderBottom: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #ece8e2" }}>
         <div className="flex items-center justify-center gap-1.5">
+          {isPast && <Lock size={11} style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }} />}
           <span className="font-sans text-[14px]" style={{ color: headerColor, fontWeight: headerWeight }}>T{weekNum}</span>
           {isCurrent && <span className="w-[5px] h-[5px] rounded-full" style={{ backgroundColor: forecastDarkMode ? "#4a9e96" : "#3a8a36" }} />}
         </div>
         <div className="text-[9px] mt-0.5" style={{ color: dateRangeColor }}>{formatDateShort(startDate)} – {formatDateShort(endDate)}</div>
-        <div className="mt-1.5" style={{ opacity: isPast ? 0.8 : 1 }}>
+        <div className="mt-1.5">
           <div className="h-[7px] rounded" style={{ backgroundColor: "#f0eee9", overflow: "hidden" }}>
             <div className="h-full rounded transition-all duration-300" style={{ width: `${Math.min(pct, 100)}%`, background: barBg }} />
           </div>
