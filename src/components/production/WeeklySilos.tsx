@@ -949,7 +949,26 @@ function ToolbarButton({ active, disabled, label, onClick }: { active?: boolean;
   );
 }
 
-type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null; cost_production_pct?: number | null; marze?: string | null }>;
+type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null; cost_production_pct?: number | null; marze?: string | null; prodejni_cena?: number | null }>;
+
+/** FIX 6: Calculate prodej value for a project's hours in a week silo */
+function calcProdejValue(
+  scheduledHours: number,
+  projectId: string,
+  projectLookup: ProjectLookup,
+  planHoursMap: Map<string, number> | undefined,
+  realHoursMap: Map<string, number> | undefined,
+): number {
+  const proj = projectLookup.get(projectId);
+  const prodejniCena = proj?.prodejni_cena ?? 0;
+  if (!prodejniCena || prodejniCena <= 0 || scheduledHours <= 0) return 0;
+  const planHours = planHoursMap?.get(projectId) ?? 0;
+  const realHours = realHoursMap?.get(projectId) ?? 0;
+  const effectiveHours = Math.max(planHours, realHours);
+  if (effectiveHours <= 0) return 0;
+  const weekShare = scheduledHours / effectiveHours;
+  return weekShare * prodejniCena;
+}
 
 interface SiloProps {
   weekKey: string; weekNum: number; startDate: Date; endDate: Date;
@@ -961,6 +980,8 @@ interface SiloProps {
   allWeeksData: Map<string, { total_hours: number }>; weekKeys: string[];
   registerRef: (key: string, el: HTMLDivElement | null) => void;
   projectLookup: ProjectLookup;
+  planHoursMap?: Map<string, number>;
+  realHoursMap?: Map<string, number>;
   spillDismissed: boolean;
   onDismissSpill: () => void;
   onReopenSpill: () => void;
