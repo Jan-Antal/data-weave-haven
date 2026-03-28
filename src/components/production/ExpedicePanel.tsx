@@ -537,15 +537,29 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3" style={{ color: "#b0bab8" }} />
               <input
                 type="text"
-                placeholder="Hledat projekt..."
+                placeholder="Hledat v archivu..."
                 value={archiveSearch}
                 onChange={(e) => setArchiveSearch(e.target.value)}
-                className="w-full border rounded px-2 py-1 text-[11px] pl-6"
+                className="w-full border rounded px-2 py-1 text-[11px] pl-6 pr-6"
                 style={{ borderColor: "#ece8e2", outline: "none" }}
                 onFocus={(e) => (e.target.style.borderColor = "#99a5a3")}
                 onBlur={(e) => (e.target.style.borderColor = "#ece8e2")}
               />
+              {archiveSearch && (
+                <button
+                  onClick={() => setArchiveSearch("")}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-gray-200 transition-colors"
+                >
+                  <X className="h-3 w-3 text-muted-foreground" />
+                </button>
+              )}
             </div>
+
+            {isDeepSearch && (
+              <div className="text-[10px] text-muted-foreground px-1">
+                {filteredArchive.length} výsledkov pre „{archiveSearch.trim()}"
+              </div>
+            )}
 
             {filteredArchive.length === 0 && (
               <div className="text-center py-4">
