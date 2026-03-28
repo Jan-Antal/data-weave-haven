@@ -51,7 +51,7 @@ export function useProductionSchedule() {
       const { data, error } = await supabase
         .from("production_schedule")
         .select("*, projects!production_schedule_project_id_fkey(project_name)")
-        .in("status", ["scheduled", "in_progress", "completed", "paused"])
+        .in("status", ["scheduled", "in_progress", "paused"])
         .not("item_code", "in", '("EXPEDICE_MIDFLIGHT","DONE_MIDFLIGHT")')
         .order("position", { ascending: true });
       if (error) throw error;
@@ -125,11 +125,7 @@ export function useProductionExpedice() {
       const { data, error } = await supabase
         .from("production_schedule")
         .select("*, projects!production_schedule_project_id_fkey(project_name)")
-        .or(
-          'and(status.eq.completed,is_midflight.is.null),' +
-          'and(status.eq.completed,is_midflight.eq.false),' +
-          'and(status.eq.completed,item_code.eq.EXPEDICE_MIDFLIGHT)'
-        )
+        .in("status", ["expedice", "completed"])
         .order("completed_at", { ascending: false });
       if (error) throw error;
 

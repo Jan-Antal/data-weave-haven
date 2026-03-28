@@ -57,14 +57,10 @@ export function useProductionStatuses(projectId: string) {
       if (!map.has(key)) map.set(key, []);
 
       let status: ProductionStatus;
-      if (row.status === "completed") {
-        // Check if item has been expedited or project is in Expedice status
-        const isExpedited = !!(row as any).expediced_at || projectStatus === "Expedice";
-        if (isExpedited) {
-          status = { label: "Expedováno", color: "#223937" };
-        } else {
-          status = { label: "Čeká na expedici", color: "#3a8a36" };
-        }
+      if (row.status === "expedice") {
+        status = { label: "Čeká na expedici", color: "#3a8a36" };
+      } else if (row.status === "completed") {
+        status = { label: "Expedováno", color: "#223937" };
       } else if (row.status === "paused") {
         const pauseReason = (row as any).pause_reason || "Pozastaveno";
         const expDate = (row as any).pause_expected_date;

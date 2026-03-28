@@ -410,7 +410,7 @@ export function useProductionDragDrop() {
 
       const { error } = await supabase
         .from("production_schedule")
-        .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user.id })
+        .update({ status: "expedice", completed_at: new Date().toISOString(), completed_by: user.id })
         .in("id", itemIds);
       if (error) throw error;
 
@@ -443,7 +443,7 @@ export function useProductionDragDrop() {
         redo: async () => {
           const { data: { user: u } } = await supabase.auth.getUser();
           await supabase.from("production_schedule")
-            .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: u?.id })
+            .update({ status: "expedice", completed_at: new Date().toISOString(), completed_by: u?.id })
             .in("id", itemIds);
           invalidateAll();
         },

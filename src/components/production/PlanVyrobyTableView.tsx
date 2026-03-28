@@ -517,6 +517,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     inbox:       { bg: "#FEE2CD", text: "#EA580C", border: "#EA580C" },
     scheduled:   { bg: "#DBEAFE", text: "#2563EB", border: "#2563EB" },
     in_progress: { bg: "#D1FAE5", text: "#059669", border: "#059669" },
+    expedice:    { bg: "#BBF7D0", text: "#16A34A", border: "#16A34A" },
     completed:   { bg: "#BBF7D0", text: "#16A34A", border: "#16A34A" },
     paused:      { bg: "#F3F4F6", text: "#6B7280", border: "#6B7280" },
     overdue:     { bg: "#FEE2E2", text: "#DC2626", border: "#DC2626" },
@@ -524,10 +525,11 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
 
   const getCellStyle = (status: string, projectColor?: string) => {
     if (projectColor && status !== "paused") {
-      if (status === "completed") return { bg: projectColor + "25", text: projectColor, border: projectColor + "60" };
+      if (status === "expedice" || status === "completed") return { bg: projectColor + "25", text: projectColor, border: projectColor + "60" };
       return { bg: projectColor + "18", text: projectColor, border: projectColor + "40" };
     }
     switch (status) {
+      case "expedice":
       case "completed": return STATUS_COLORS.completed;
       case "in_progress": return STATUS_COLORS.in_progress;
       case "paused": return STATUS_COLORS.paused;
@@ -548,7 +550,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     const splitLabel = splitPart && splitTotal
       ? ` ${["½", "²⁄₂", "⅓", "²⁄₃", "¼", "²⁄₄", "¾"][splitPart === 1 && splitTotal === 2 ? 0 : splitPart === 2 && splitTotal === 2 ? 1 : 0] || `${splitPart}/${splitTotal}`}`
       : "";
-    const prefix = status === "completed" ? "✓ " : status === "paused" ? "⏸ " : "";
+    const prefix = (status === "expedice" || status === "completed") ? "✓ " : status === "paused" ? "⏸ " : "";
     if (displayMode === "percent") {
       const pct = totalItemHours > 0 ? Math.round((hours / totalItemHours) * 100) : 0;
       return `${prefix}${pct}%${splitLabel}`;
@@ -867,8 +869,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     const weekNum = week?.weekNum ?? 0;
     const startDate = week?.start ?? new Date();
     const endDate = week?.end ?? new Date();
-    const activeItems = bundle.items.filter(i => i.status !== "completed" && i.status !== "paused" && i.status !== "cancelled");
-    const completedItems = bundle.items.filter(i => i.status === "completed");
+    const activeItems = bundle.items.filter(i => i.status !== "expedice" && i.status !== "completed" && i.status !== "paused" && i.status !== "cancelled");
+    const completedItems = bundle.items.filter(i => i.status === "expedice" || i.status === "completed");
     const pausedItems = bundle.items.filter(i => i.status === "paused");
     const allCompleted = completedItems.length > 0 && activeItems.length === 0 && pausedItems.length === 0;
     const actions: ContextMenuAction[] = [];
@@ -896,9 +898,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     // Merge option
     const splitGroupIds = new Set<string>();
     for (const item of bundle.items) {
-      if (item.split_group_id && item.status !== "completed" && item.status !== "cancelled") splitGroupIds.add(item.split_group_id);
+      if (item.split_group_id && item.status !== "expedice" && item.status !== "completed" && item.status !== "cancelled") splitGroupIds.add(item.split_group_id);
     }
-    const mergeableSplitGroups = Array.from(splitGroupIds).filter(sgId => bundle.items.filter(i => i.split_group_id === sgId && i.status !== "completed" && i.status !== "cancelled").length >= 2);
+    const mergeableSplitGroups = Array.from(splitGroupIds).filter(sgId => bundle.items.filter(i => i.split_group_id === sgId && i.status !== "expedice" && i.status !== "completed" && i.status !== "cancelled").length >= 2);
     if (mergeableSplitGroups.length > 0) {
       actions.push({ label: `Spojit části (${mergeableSplitGroups.length} skupin)`, icon: "🔗", onClick: async () => { await mergeBundleSplitGroups(mergeableSplitGroups); } });
     }
@@ -926,7 +928,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     const weekNum = week?.weekNum ?? 0;
     const startDate = week?.start ?? new Date();
     const endDate = week?.end ?? new Date();
-    const isCompleted = item.status === "completed";
+    const isCompleted = item.status === "expedice" || item.status === "completed";
     const isPaused = item.status === "paused";
     const actions: ContextMenuAction[] = [];
 
@@ -1073,7 +1075,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
       },
     });
     actions.push({ label: "Vrátit do Inboxu", icon: "📥", onClick: () => handleReturnToInbox(ids) });
-    if (alloc.status !== "completed") {
+    if (alloc.status !== "expedice" && alloc.status !== "completed") {
       actions.push({ label: "Dokončit → Expedice", icon: "✓", onClick: () => handleComplete(ids) });
     }
     if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📦", dividerBefore: true, onClick: () => onNavigateToTPV(item.projectId) });
@@ -1462,7 +1464,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                     // Sort: active items first, completed items last
                     const activeItems = proj.items.filter(i => {
                       const hasOnlyExpedice = i.expediceHours > 0 && i.weekAllocations.size === 0 && i.inboxHours === 0;
-                      const allCompleted = [...i.weekAllocations.values()].every(a => a.status === "completed");
+                      const allCompleted = [...i.weekAllocations.values()].every(a => a.status === "expedice" || a.status === "completed");
                       return !hasOnlyExpedice && !allCompleted;
                     });
                     const completedItems = proj.items.filter(i => !activeItems.includes(i));
@@ -1612,7 +1614,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
           { label: "Inbox", bg: STATUS_COLORS.inbox.bg, border: STATUS_COLORS.inbox.border },
           { label: "Naplánováno", bg: STATUS_COLORS.scheduled.bg, border: STATUS_COLORS.scheduled.border },
           { label: "Ve výrobě", bg: STATUS_COLORS.in_progress.bg, border: STATUS_COLORS.in_progress.border },
-          { label: "✓ Dokončeno", bg: STATUS_COLORS.completed.bg, border: STATUS_COLORS.completed.border },
+          { label: "✓ Expedice", bg: STATUS_COLORS.expedice.bg, border: STATUS_COLORS.expedice.border },
           { label: "⏸ Pozastaveno", bg: STATUS_COLORS.paused.bg, border: STATUS_COLORS.paused.border },
         ].map(l => (
           <div key={l.label} className="flex items-center gap-1.5">
@@ -1795,7 +1797,7 @@ function FilledWeekCell({ weekKey, isCurrent, alloc, item, displayMode, formatCe
                 <Inbox className="h-3 w-3 text-muted-foreground" />
                 Vrátit do Inboxu
               </button>
-              {alloc.status !== "completed" && (
+              {alloc.status !== "expedice" && alloc.status !== "completed" && (
                 <button
                   className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 transition-colors hover:bg-accent"
                   onClick={() => handleAction(() => onComplete(ids))}

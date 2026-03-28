@@ -93,27 +93,26 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
   const { activeProjects, archivedProjects } = useMemo(() => {
     const active: typeof projects = [];
     const archived: typeof projects = [];
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     for (const group of projects) {
-      const hasNonExpediced = group.items.some(i => !i.expediced_at);
-      if (hasNonExpediced) {
+      // 'expedice' status = active Expedice, 'completed' status = archived
+      const hasExpedice = group.items.some(i => i.status === "expedice");
+      const hasCompleted = group.items.some(i => i.status === "completed");
+      if (hasExpedice) {
         active.push(group);
-      } else {
-        const allRecent = group.items.every(i => {
-          const d = parseDate(i.expediced_at);
-          return d && d >= thirtyDaysAgo;
+      }
+      if (hasCompleted) {
+        archived.push({
+          ...group,
+          items: group.items.filter(i => i.status === "completed"),
+          count: group.items.filter(i => i.status === "completed").length,
         });
-        if (allRecent) {
-          archived.push(group);
-        }
       }
     }
 
     archived.sort((a, b) => {
-      const latestA = Math.max(...a.items.map(i => parseDate(i.expediced_at)?.getTime() ?? 0));
-      const latestB = Math.max(...b.items.map(i => parseDate(i.expediced_at)?.getTime() ?? 0));
+      const latestA = Math.max(...a.items.map(i => parseDate(i.expediced_at || i.completed_at)?.getTime() ?? 0));
+      const latestB = Math.max(...b.items.map(i => parseDate(i.expediced_at || i.completed_at)?.getTime() ?? 0));
       return latestB - latestA;
     });
 
@@ -132,11 +131,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
       const { data, error } = await supabase
         .from("production_schedule")
         .select("*, projects!production_schedule_project_id_fkey(project_name)")
-        .or(
-          'and(status.eq.completed,is_midflight.is.null),' +
-          'and(status.eq.completed,is_midflight.eq.false),' +
-          'and(status.eq.completed,item_code.eq.EXPEDICE_MIDFLIGHT)'
-        )
+        .in("status", ["expedice", "completed"])
         .order("completed_at", { ascending: false });
       if (error) throw error;
 
@@ -172,7 +167,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
         g.count++;
       }
       // Only return projects where ALL items are expediced (archive-worthy)
-      return Array.from(grouped.values()).filter(g => g.items.every(i => i.expediced_at));
+      return Array.from(grouped.values()).filter(g => g.items.some(i => i.status === "completed"));
     },
   });
 
@@ -240,7 +235,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     try {
       const { error } = await supabase
         .from("production_schedule")
-        .update({ expediced_at: new Date().toISOString() } as any)
+        .update({ status: "completed", expediced_at: new Date().toISOString() } as any)
         .eq("id", itemId);
       if (error) throw error;
       invalidateAll();
@@ -257,14 +252,13 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
         .from("production_schedule")
         .select("id")
         .eq("project_id", projectId)
-        .eq("status", "completed")
-        .is("expediced_at", null);
+        .eq("status", "expedice");
       if (fetchErr) throw fetchErr;
       if (!items || items.length === 0) return;
 
       const { error } = await supabase
         .from("production_schedule")
-        .update({ expediced_at: new Date().toISOString() } as any)
+        .update({ status: "completed", expediced_at: new Date().toISOString() } as any)
         .in("id", items.map(i => i.id));
       if (error) throw error;
       invalidateAll();
@@ -278,7 +272,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     try {
       const { error } = await supabase
         .from("production_schedule")
-        .update({ expediced_at: null } as any)
+        .update({ status: "expedice", expediced_at: null } as any)
         .eq("id", itemId);
       if (error) throw error;
       invalidateAll();
@@ -294,13 +288,12 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
         .from("production_schedule")
         .select("id")
         .eq("project_id", projectId)
-        .eq("status", "completed")
-        .not("expediced_at", "is", null);
+        .eq("status", "completed");
       if (fetchErr) throw fetchErr;
       if (!items || items.length === 0) return;
       const { error } = await supabase
         .from("production_schedule")
-        .update({ expediced_at: null } as any)
+        .update({ status: "expedice", expediced_at: null } as any)
         .in("id", items.map(i => i.id));
       if (error) throw error;
       invalidateAll();
@@ -316,7 +309,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
         .from("production_schedule")
         .select("id")
         .eq("project_id", projectId)
-        .eq("status", "completed");
+        .in("status", ["expedice", "completed"]);
       if (fetchErr) throw fetchErr;
       if (!items || items.length === 0) return;
       for (const item of items) {
@@ -334,7 +327,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
         .from("production_schedule")
         .select("id")
         .eq("project_id", projectId)
-        .eq("status", "completed");
+        .in("status", ["expedice", "completed"]);
       if (fetchErr) throw fetchErr;
       if (!items || items.length === 0) return;
       for (const item of items) {
