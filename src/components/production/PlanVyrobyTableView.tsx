@@ -274,11 +274,11 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     const map = new Map<string, { items: { name: string; code: string | null; hours: number; czk: number }[]; totalHours: number; totalCzk: number }>();
     if (!expediceData) return map;
     for (const g of expediceData) {
-      const totalHours = g.items.reduce((s, i) => s + i.scheduled_hours, 0);
-      const totalCzk = g.items.reduce((s, i) => s + i.scheduled_czk, 0);
-      if (totalHours <= 0) continue;
+      const totalHours = g.items.reduce((s, _i) => s + 0, 0);
+      const totalCzk = g.items.reduce((s, _i) => s + 0, 0);
+      if (g.items.length === 0) continue;
       map.set(g.project_id, {
-        items: g.items.map(i => ({ name: i.item_name, code: i.item_code, hours: i.scheduled_hours, czk: i.scheduled_czk })),
+        items: g.items.map(i => ({ name: i.item_name, code: i.item_code, hours: 0, czk: 0 })),
         totalHours,
         totalCzk,
       });
@@ -1003,7 +1003,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
       const expItems = itemName ? expGroup.items.filter(i => cleanSplitName(i.item_name) === itemName) : expGroup.items;
       if (expItems.length > 0) {
         actions.push({ label: "Vrátit do výroby", icon: "↩", dividerBefore: true, onClick: async () => { for (const i of expItems) await returnToProduction(i.id); toast({ title: `↩ ${expItems.length} položek vráceno do výroby` }); } });
-        actions.push({ label: "Zrušit", icon: "✕", danger: true, onClick: () => setCancelDialog({ open: true, itemId: expItems.map(i => i.id).join(","), itemName: itemName || projectId, itemCode: null, hours: expItems.reduce((s, i) => s + i.scheduled_hours, 0), projectName: expGroup.project_name, projectId, splitGroupId: null, cancelAll: expItems.length > 1 }) });
+        actions.push({ label: "Zrušit", icon: "✕", danger: true, onClick: () => setCancelDialog({ open: true, itemId: expItems.map(i => i.id).join(","), itemName: itemName || projectId, itemCode: null, hours: 0, projectName: expGroup.project_name, projectId, splitGroupId: null, cancelAll: expItems.length > 1 }) });
       }
     }
     if (actions.length > 0) setContextMenu({ x: e.clientX, y: e.clientY, actions });

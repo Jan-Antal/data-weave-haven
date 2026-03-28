@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useProductionExpediceData } from "@/hooks/useProductionExpedice";
+import { useProductionExpediceData, type ExpediceItem } from "@/hooks/useProductionExpedice";
 
 interface LegacyArchiveSectionProps {
   showLegacy: boolean;
@@ -16,8 +16,8 @@ export function LegacyArchiveSection({ showLegacy, onToggle }: LegacyArchiveSect
       .map(p => {
         const midflightItems = p.items.filter(i => i.is_midflight);
         if (midflightItems.length === 0) return null;
-        const totalHours = midflightItems.reduce((s, i) => s + i.scheduled_hours, 0);
-        const weeks = midflightItems.map(i => i.scheduled_week).filter(Boolean).sort();
+        const totalHours = 0;
+        const weeks: string[] = [];
         const weekRange = weeks.length > 0
           ? weeks.length === 1
             ? weeks[0]
@@ -34,7 +34,7 @@ export function LegacyArchiveSection({ showLegacy, onToggle }: LegacyArchiveSect
       .filter(Boolean) as Array<{
         project_id: string;
         project_name: string;
-        items: Array<{ id: string; item_name: string; item_code: string | null; scheduled_hours: number; scheduled_week: string }>;
+        items: ExpediceItem[];
         totalHours: number;
         weekRange: string | null;
       }>;
@@ -122,10 +122,7 @@ function LegacyProjectCard({ project }: { project: { project_id: string; project
                 {item.item_name}
               </span>
               <span className="text-[9px] font-sans shrink-0" style={{ color: "#c4ccc9" }}>
-                {item.scheduled_week}
-              </span>
-              <span className="text-[9px] font-sans shrink-0" style={{ color: "#c4ccc9" }}>
-                {item.scheduled_hours}h
+                {item.manufactured_at?.slice(0, 10) ?? ""}
               </span>
             </div>
           ))}
