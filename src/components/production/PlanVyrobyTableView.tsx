@@ -437,7 +437,23 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
         }
       }
 
+      // Keep items with hours, inbox data, or expedice data (expedice items have 0 hours but still need to be visible)
+      const hasExpediceData = expedice && expedice.items.length > 0;
       const visibleItems = items.filter(i => i.totalHours > 0 || i.inboxHours > 0 || i.expediceHours > 0);
+      // If no visible items but project has expedice data, create a placeholder row
+      if (visibleItems.length === 0 && hasExpediceData) {
+        for (const exItem of expedice!.items) {
+          visibleItems.push({
+            id: Math.random().toString(36),
+            itemName: cleanSplitName(exItem.name), itemCode: exItem.code,
+            totalHours: 0, totalCzk: 0,
+            weekAllocations: new Map(),
+            inboxHours: 0, inboxCzk: 0, inboxItemIds: [],
+            expediceHours: 0, expediceCzk: 0,
+            projectId: pid, projectName: realName, stageId: null,
+          });
+        }
+      }
       if (visibleItems.length === 0) continue;
 
       const weekTotals = new Map<string, { hours: number; czk: number }>();
