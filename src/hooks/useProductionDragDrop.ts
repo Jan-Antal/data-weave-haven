@@ -617,19 +617,19 @@ export function useProductionDragDrop() {
       const hasRemaining = remainingParts.length > 0;
       const otherIds = parts.filter(p => p.id !== primary.id).map(p => p.id);
 
-      await Promise.all([
-        supabase.from("production_schedule").update({
-          scheduled_hours: totalHours,
-          scheduled_czk: totalCzk,
-          item_name: cleanName,
-          split_group_id: hasRemaining ? splitGroupId : null,
-          split_part: null,
-          split_total: null,
-        }).eq("id", primary.id),
-        otherIds.length > 0
-          ? supabase.from("production_schedule").delete().in("id", otherIds)
-          : Promise.resolve(),
-      ]);
+      // Delete other parts first to avoid unique constraint violation
+      if (otherIds.length > 0) {
+        await supabase.from("production_schedule").delete().in("id", otherIds);
+      }
+      // Then update the primary part
+      await supabase.from("production_schedule").update({
+        scheduled_hours: totalHours,
+        scheduled_czk: totalCzk,
+        item_name: cleanName,
+        split_group_id: hasRemaining ? splitGroupId : null,
+        split_part: null,
+        split_total: null,
+      }).eq("id", primary.id);
 
       if (hasRemaining) {
         const allRemaining = [primary.id, ...remainingParts.map(p => p.id)];
