@@ -480,14 +480,16 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     return rows;
   }, [scheduleData, expediceData, inboxByProject, expediceByProject, inboxProjects, sortMode, weeks]);
 
+  // Combine search from parent + local search
+  const effectiveSearch = localSearch.length >= 3 ? localSearch : searchQuery;
+
   const filteredRows = useMemo(() => {
-    if (!searchQuery.trim()) return projectRows;
-    const q = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (!effectiveSearch.trim()) return projectRows;
+    const q = effectiveSearch.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     return projectRows.filter(p => {
       const pName = p.projectName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       const pId = p.projectId.toLowerCase();
       if (pName.includes(q) || pId.includes(q)) return true;
-      // Match PM
       const proj = allProjects.find(ap => ap.project_id === p.projectId);
       if (proj?.pm && proj.pm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(q)) return true;
       return p.items.some(i => {
@@ -496,7 +498,65 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
         return iName.includes(q) || iCode.includes(q);
       });
     });
-  }, [projectRows, searchQuery, allProjects]);
+  }, [projectRows, effectiveSearch, allProjects]);
+
+  // Section classification
+  const currentMondayKey = useMemo(() => getMonday(new Date()).toISOString().split("T")[0], []);
+
+  const sectionedRows = useMemo(() => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const inboxSection: ProjectRow[] = [];
+    const vyrobaSection: ProjectRow[] = [];
+    const expediceSection: ProjectRow[] = [];
+    const archivSection: ProjectRow[] = [];
+
+    for (const row of filteredRows) {
+      // Check if project has inbox items
+      const hasInbox = row.inboxTotalHours > 0;
+
+      // Check if project has non-midflight scheduled items in current/future weeks
+      const hasActiveSchedule = row.items.some(item => {
+        for (const [weekKey, alloc] of item.weekAllocations) {
+          if (weekKey >= currentMondayKey && alloc.hours > 0 && (alloc.status === "scheduled" || alloc.status === "in_progress" || alloc.status === "paused")) {
+            return true;
+          }
+        }
+        return false;
+      });
+
+      // Check expedice status from expediceData
+      const expGroup = expediceData?.find(g => g.project_id === row.projectId);
+      const hasActiveExpedice = expGroup?.items.some(i => !i.expediced_at) ?? false;
+      const hasArchived = expGroup?.items.some(i => i.expediced_at && new Date(i.expediced_at) >= thirtyDaysAgo) ?? false;
+
+      // Classify — a project can only appear in one section, priority order
+      if (hasInbox) {
+        inboxSection.push({ ...row, section: "inbox" });
+      } else if (hasActiveSchedule) {
+        vyrobaSection.push({ ...row, section: "vyroba" });
+      } else if (hasActiveExpedice) {
+        expediceSection.push({ ...row, section: "expedice" });
+      } else if (hasArchived || row.expediceTotalHours > 0) {
+        archivSection.push({ ...row, section: "archiv" });
+      } else if (row.items.some(i => i.weekAllocations.size > 0)) {
+        // Has past schedule data — put in výroba
+        vyrobaSection.push({ ...row, section: "vyroba" });
+      }
+    }
+
+    return { inboxSection, vyrobaSection, expediceSection, archivSection };
+  }, [filteredRows, expediceData, currentMondayKey]);
+
+  const toggleSection = (section: string) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      return next;
+    });
+  };
 
   const regularRows = useMemo(() => filteredRows.filter(r => !r.isBlockerOnly), [filteredRows]);
   const blockerRows = useMemo(() => filteredRows.filter(r => r.isBlockerOnly), [filteredRows]);
