@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useProductionExpedice } from "@/hooks/useProductionSchedule";
+import { useProductionExpediceData } from "@/hooks/useProductionExpedice";
 
 interface LegacyArchiveSectionProps {
   showLegacy: boolean;

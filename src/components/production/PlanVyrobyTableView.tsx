@@ -1,6 +1,7 @@
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { productionCzkToSellingPrice } from "@/lib/currency";
-import { useProductionSchedule, useProductionExpedice, getISOWeekNumber, type ScheduleItem, type ScheduleBundle } from "@/hooks/useProductionSchedule";
+import { useProductionSchedule, getISOWeekNumber, type ScheduleItem, type ScheduleBundle } from "@/hooks/useProductionSchedule";
+import { useProductionExpediceData } from "@/hooks/useProductionExpedice";
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
