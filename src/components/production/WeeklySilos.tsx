@@ -1486,9 +1486,9 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
         </div>
 
         {/* Right portion: drag handle + bundle info */}
-        <div ref={setDragRef} {...attributes} {...(hasUncompleted ? listeners : {})}
+        <div ref={setDragRef} {...attributes} {...(!bundleDragDisabled && hasUncompleted ? listeners : {})}
           data-context="bundle"
-          className={`flex items-center gap-1 flex-1 min-w-0 pr-[6px] py-[5px] ${hasUncompleted ? "cursor-grab" : "cursor-default"}`}
+          className={`flex items-center gap-1 flex-1 min-w-0 pr-[6px] py-[5px] ${!bundleDragDisabled && hasUncompleted ? "cursor-grab" : "cursor-default"}`}
           onClick={e => { e.stopPropagation(); onSelectProject?.(bundle.project_id); }}
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onBundleContextMenu(e, bundle, toggleExpand); }}
         >
