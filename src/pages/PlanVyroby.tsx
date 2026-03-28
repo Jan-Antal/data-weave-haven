@@ -1105,14 +1105,13 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
   }, [allProjects]);
 
   const { capacityHours, scheduledHours, scheduledCzk } = useMemo(() => {
-    if (!scheduleData) return { capacityHours: 0, scheduledHours: 0, scheduledCzk: 0 };
-
     let cap = 0;
     let hours = 0;
     let czk = 0;
 
     for (const wk of visibleMonthWeekKeys) {
       cap += getWeekCapacity(wk);
+      if (!scheduleData) continue;
       const silo = scheduleData.get(wk);
       if (!silo) continue;
 
