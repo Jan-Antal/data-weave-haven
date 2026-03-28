@@ -45,26 +45,33 @@ export async function midflightImportPlanVyroby(
     return { created, skipped, errors };
   }
 
-  // ═══ FULL RESET — delete all previous midflight data ═══
-  onProgress?.("Čistím predchádzajúce midflight dáta...");
+  // ━━━ HARD RESET ━━━
+  onProgress?.("[midflight] Resetujem všetky midflight dáta...");
 
-  // 1. Delete all midflight historical entries from production_schedule
-  const { error: resetScheduleErr } = await (supabaseClient as any)
+  // 1. Delete ALL midflight entries from production_schedule
+  const { error: err1 } = await (supabaseClient as any)
     .from("production_schedule")
     .delete()
     .eq("is_midflight", true);
-  if (resetScheduleErr) {
-    errors.push(`Reset schedule error: ${resetScheduleErr.message}`);
-  }
+  if (err1) throw new Error("Reset schedule failed: " + err1.message);
 
-  // 2. Delete all midflight entries from production_inbox
-  const { error: resetInboxErr } = await (supabaseClient as any)
+  // 2. Delete ALL midflight entries from production_inbox
+  const { error: err2 } = await (supabaseClient as any)
     .from("production_inbox")
     .delete()
     .like("adhoc_reason", "midflight%");
-  if (resetInboxErr) {
-    errors.push(`Reset inbox error: ${resetInboxErr.message}`);
-  }
+  if (err2) throw new Error("Reset inbox failed: " + err2.message);
+
+  // 3. Also delete any HIST_ or EXPEDICE_MIDFLIGHT that may have
+  //    is_midflight=false due to previous bugs
+  const { error: err3 } = await (supabaseClient as any)
+    .from("production_schedule")
+    .delete()
+    .or("item_code.eq.EXPEDICE_MIDFLIGHT,item_code.eq.DONE_MIDFLIGHT,item_code.like.HIST_%");
+  if (err3) console.warn("Cleanup fallback failed:", err3.message);
+
+  onProgress?.("[midflight] Reset hotový. Spúšťam import...");
+  // ━━━ END RESET ━━━
 
   onProgress?.("Načítám production_hours_log...");
 
