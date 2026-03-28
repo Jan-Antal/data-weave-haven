@@ -183,6 +183,7 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
         undoPayload: row.undo_payload as UndoPayload,
         redoPayload: row.redo_payload as UndoPayload,
         dbId: row.id,
+        groupId: row.group_id ?? undefined,
         undo: reconstructFromPayload(row.undo_payload as UndoPayload, queryClient),
         redo: reconstructFromPayload(row.redo_payload as UndoPayload, queryClient),
       }));
