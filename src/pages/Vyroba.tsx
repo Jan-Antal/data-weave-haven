@@ -2960,7 +2960,7 @@ function ProjectRow({
 
   return (
     <div
-      className="overflow-hidden"
+      className="overflow-hidden shrink-0"
       style={{
         borderRadius: isMobile ? 10 : 8,
         margin: isMobile ? "0 12px 8px 12px" : "0 6px 4px 6px",
