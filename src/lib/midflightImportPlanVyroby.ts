@@ -191,7 +191,9 @@ export async function midflightImportPlanVyroby(
     if (!prev || monday > prev) projectLatestMonday.set(projectId, monday);
 
     if (monday <= currentMonday) {
-      // Historical (including current week) → production_schedule as completed midflight items
+      // Skip weeks with negligible hours (< 0.05h)
+      if (totalHours < 0.05) continue;
+
       const itemCode = `HIST_${monday.replace(/-/g, "")}`;
 
       scheduleInserts.push({
@@ -199,7 +201,7 @@ export async function midflightImportPlanVyroby(
         item_code: itemCode,
         item_name: `${projectName} — história ${monday}`,
         scheduled_week: monday,
-        scheduled_hours: Math.round(totalHours * 100) / 100,
+        scheduled_hours: Math.round(totalHours * 10) / 10,
         scheduled_czk: 0,
         status: "scheduled",
         is_midflight: true,
