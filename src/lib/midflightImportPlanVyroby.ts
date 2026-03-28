@@ -233,7 +233,7 @@ export async function midflightImportPlanVyroby(
       expCompletedAt = new Date(latestDatum).toISOString();
     } else {
       expWeek = prevMondayFallbackStr;
-      expCompletedAt = new Date().toISOString();
+      expCompletedAt = new Date('2025-12-31').toISOString();
     }
 
     scheduleInserts.push({
