@@ -80,7 +80,7 @@ export function CompletionDialog({
         const { error } = await supabase
           .from("production_schedule")
           .update({
-            status: "completed",
+            status: "expedice",
             completed_at: new Date().toISOString(),
             completed_by: user.id,
           })
@@ -100,7 +100,7 @@ export function CompletionDialog({
         await supabase.from("production_schedule").update({
           scheduled_hours: doneHours,
           scheduled_czk: doneHours * czkPerHour,
-          status: "completed",
+          status: "expedice",
           completed_at: new Date().toISOString(),
           completed_by: user.id,
           split_group_id: groupId,
@@ -166,7 +166,7 @@ export function CompletionDialog({
 
         {/* Select all / Deselect all */}
         {(() => {
-          const uncompleted = items.filter(i => i.status !== "completed");
+          const uncompleted = items.filter(i => i.status !== "expedice" && i.status !== "completed");
           const allChecked = uncompleted.length > 0 && uncompleted.every(i => checkedIds.has(i.id));
           return uncompleted.length > 1 ? (
             <div className="px-5 pb-1.5">
@@ -195,7 +195,7 @@ export function CompletionDialog({
 
         <div className="px-5 pb-3 space-y-1 max-h-[400px] overflow-y-auto">
           {items.map(item => {
-            const isCompleted = item.status === "completed";
+            const isCompleted = item.status === "expedice" || item.status === "completed";
             const isChecked = checkedIds.has(item.id);
             const config = getConfig(item.id);
             const isSplitOpen = splitOpenId === item.id && isChecked && !isCompleted;
