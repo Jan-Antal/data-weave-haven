@@ -227,22 +227,33 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   const weeks = useMemo<WeekColumn[]>(() => {
     const monday = getMonday(new Date());
     const currentWeekKey = monday.toISOString().split("T")[0];
-    let earliestDataWeek = currentWeekKey;
+    // Start from currentWeek - 1
+    const startMonday = new Date(monday);
+    startMonday.setDate(startMonday.getDate() - 7);
+    const startKey = startMonday.toISOString().split("T")[0];
+    // Find the last scheduled week from data (non-midflight only)
+    let latestDataWeek = currentWeekKey;
     if (scheduleData) {
-      for (const weekKey of scheduleData.keys()) {
-        if (weekKey < earliestDataWeek) earliestDataWeek = weekKey;
+      for (const [weekKey, silo] of scheduleData) {
+        if (weekKey < startKey) continue; // skip weeks before our range
+        const hasNonMidflight = silo.bundles.some(b => b.items.some(i => !i.is_midflight));
+        if (hasNonMidflight && weekKey > latestDataWeek) latestDataWeek = weekKey;
       }
     }
-    const startMonday = new Date(earliestDataWeek < currentWeekKey ? earliestDataWeek : currentWeekKey);
-    startMonday.setDate(startMonday.getDate() - 7);
+    // Ensure at least 12 weeks from start
+    const minEnd = new Date(startMonday);
+    minEnd.setDate(minEnd.getDate() + 12 * 7);
+    const minEndKey = minEnd.toISOString().split("T")[0];
+    const endKey = latestDataWeek > minEndKey ? latestDataWeek : minEndKey;
     const result: WeekColumn[] = [];
-    for (let i = 0; i < 18; i++) {
-      const start = new Date(startMonday);
-      start.setDate(startMonday.getDate() + i * 7);
-      const end = new Date(start);
-      end.setDate(start.getDate() + 6);
-      const key = start.toISOString().split("T")[0];
-      result.push({ key, weekNum: getISOWeekNumber(start), start, end, isCurrent: key === currentWeekKey });
+    const cursor = new Date(startMonday);
+    while (true) {
+      const key = cursor.toISOString().split("T")[0];
+      if (key > endKey) break;
+      const end = new Date(cursor);
+      end.setDate(cursor.getDate() + 6);
+      result.push({ key, weekNum: getISOWeekNumber(cursor), start: new Date(cursor), end, isCurrent: key === currentWeekKey });
+      cursor.setDate(cursor.getDate() + 7);
     }
     return result;
   }, [scheduleData]);
@@ -307,11 +318,13 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     if (scheduleData) {
       for (const [weekKey, silo] of scheduleData) {
         for (const bundle of silo.bundles) {
-          if (!projectMap.has(bundle.project_id)) {
-            projectMap.set(bundle.project_id, { projectName: bundle.project_name, items: new Map() });
-          }
-          const proj = projectMap.get(bundle.project_id)!;
           for (const item of bundle.items) {
+            // Exclude midflight (HIST_) items from Tabulka
+            if (item.is_midflight) continue;
+            if (!projectMap.has(bundle.project_id)) {
+              projectMap.set(bundle.project_id, { projectName: bundle.project_name, items: new Map() });
+            }
+            const proj = projectMap.get(bundle.project_id)!;
             const itemKey = item.split_group_id || item.id;
             if (!proj.items.has(itemKey)) {
               proj.items.set(itemKey, { itemName: cleanSplitName(item.item_name), itemCode: item.item_code, stageId: item.stage_id, weekAllocations: new Map(), totalHours: 0, totalCzk: 0 });
@@ -600,12 +613,20 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   const totalItems = filteredRows.reduce((s, p) => s + p.items.length, 0);
 
   const weekCapacities = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, { hours: number; czk: number }>();
     if (scheduleData) {
       for (const [weekKey, silo] of scheduleData) {
-        const activeHours = silo.bundles.reduce((sum, b) =>
-          sum + b.items.reduce((s, i) => s + (i.status === "paused" ? 0 : i.scheduled_hours), 0), 0);
-        map.set(weekKey, activeHours);
+        let activeHours = 0;
+        let activeCzk = 0;
+        for (const b of silo.bundles) {
+          for (const i of b.items) {
+            if (i.is_midflight) continue;
+            if (i.status === "paused") continue;
+            activeHours += i.scheduled_hours;
+            activeCzk += i.scheduled_czk;
+          }
+        }
+        map.set(weekKey, { hours: activeHours, czk: activeCzk });
       }
     }
     return map;
@@ -663,8 +684,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
 
   const formatCapacity = (used: number, weekKey: string) => {
     const cap = getWeekCapacity(weekKey);
+    const weekData = weekCapacities.get(weekKey);
     if (displayMode === "percent") return `${cap > 0 ? Math.round((used / cap) * 100) : 0}%`;
-    if (displayMode === "czk") return `${formatCzk(Math.round(used * hourlyRate))}`;
+    if (displayMode === "czk") return `${formatCzk(Math.round(weekData?.czk ?? 0))}`;
     return `${Math.round(used)}h / ${cap}h`;
   };
 
@@ -735,25 +757,12 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     return () => document.removeEventListener("mousedown", handler);
   }, [exportDropdownOpen]);
 
-  // Initial scroll — show (current week - 1) as first visible week column
+  // Initial scroll — currentWeek-1 is now the first column (index 0), so scroll to 0
   useEffect(() => {
     if (initialScrollDone.current || weeks.length === 0) return;
     const el = scrollRef.current;
     if (!el) return;
-    const targetWeek = subWeeks(startOfWeek(new Date(), { weekStartsOn: 1 }), 1);
-    const targetKey = targetWeek.toISOString().split("T")[0];
-    const targetIdx = weeks.findIndex(w => w.key === targetKey);
-    if (targetIdx >= 0) {
-      el.scrollLeft = targetIdx * CELL_W;
-    } else {
-      // Fallback: scroll to current week - 1 index
-      const currentMonday = getMonday(new Date());
-      const currentKey = currentMonday.toISOString().split("T")[0];
-      const currentIdx = weeks.findIndex(w => w.key === currentKey);
-      if (currentIdx > 0) {
-        el.scrollLeft = (currentIdx - 1) * CELL_W;
-      }
-    }
+    el.scrollLeft = 0;
     initialScrollDone.current = true;
   }, [weeks]);
 
