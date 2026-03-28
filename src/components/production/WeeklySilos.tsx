@@ -21,7 +21,7 @@ import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { getTerminalStatuses } from "@/lib/statusHelpers";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { parseAppDate } from "@/lib/dateFormat";
 import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
@@ -184,8 +184,35 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const qc = useQueryClient();
   const getWeekCapacity = useWeekCapacityLookup();
 
+  // FIX 6: Fetch plan hours and real hours for prodej calculation
+  const { data: planHoursData } = useQuery({
+    queryKey: ["project-plan-hours-lookup"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("project_plan_hours").select("project_id, hodiny_plan");
+      if (error) throw error;
+      const map = new Map<string, number>();
+      for (const row of data || []) map.set(row.project_id, row.hodiny_plan);
+      return map;
+    },
+  });
+
+  const { data: realHoursData } = useQuery({
+    queryKey: ["real-hours-by-project"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_hours_by_project");
+      if (error) throw error;
+      const map = new Map<string, number>();
+      for (const row of data || []) map.set(row.ami_project_id, Number(row.total_hodiny));
+      return map;
+    },
+  });
+
   const projectLookup = useMemo(() => {
-    const map = new Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null; cost_production_pct?: number | null; marze?: string | null }>();
+    const map = new Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null; cost_production_pct?: number | null; marze?: string | null; prodejni_cena?: number | null }>();
     for (const p of allProjects) map.set(p.project_id, p);
     return map;
   }, [allProjects]);
@@ -834,6 +861,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               onItemContextMenu={(e, item, bundle) => handleItemContextMenu(e, item, week.key, week.weekNum, week.start, week.end, bundle)}
               allWeeksData={weeksCapacityMap} weekKeys={weekKeys} registerRef={registerSiloRef}
               projectLookup={projectLookup}
+              planHoursMap={planHoursData}
+              realHoursMap={realHoursData}
               spillDismissed={dismissedSpillWeeks.has(week.key)}
               onDismissSpill={() => handleDismissSpill(week.key)}
               onReopenSpill={() => handleReopenSpill(week.key)}
@@ -922,7 +951,26 @@ function ToolbarButton({ active, disabled, label, onClick }: { active?: boolean;
   );
 }
 
-type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null; cost_production_pct?: number | null; marze?: string | null }>;
+type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null; cost_production_pct?: number | null; marze?: string | null; prodejni_cena?: number | null }>;
+
+/** FIX 6: Calculate prodej value for a project's hours in a week silo */
+function calcProdejValue(
+  scheduledHours: number,
+  projectId: string,
+  projectLookup: ProjectLookup,
+  planHoursMap: Map<string, number> | undefined,
+  realHoursMap: Map<string, number> | undefined,
+): number {
+  const proj = projectLookup.get(projectId);
+  const prodejniCena = proj?.prodejni_cena ?? 0;
+  if (!prodejniCena || prodejniCena <= 0 || scheduledHours <= 0) return 0;
+  const planHours = planHoursMap?.get(projectId) ?? 0;
+  const realHours = realHoursMap?.get(projectId) ?? 0;
+  const effectiveHours = Math.max(planHours, realHours);
+  if (effectiveHours <= 0) return 0;
+  const weekShare = scheduledHours / effectiveHours;
+  return weekShare * prodejniCena;
+}
 
 interface SiloProps {
   weekKey: string; weekNum: number; startDate: Date; endDate: Date;
@@ -934,6 +982,8 @@ interface SiloProps {
   allWeeksData: Map<string, { total_hours: number }>; weekKeys: string[];
   registerRef: (key: string, el: HTMLDivElement | null) => void;
   projectLookup: ProjectLookup;
+  planHoursMap?: Map<string, number>;
+  realHoursMap?: Map<string, number>;
   spillDismissed: boolean;
   onDismissSpill: () => void;
   onReopenSpill: () => void;
@@ -954,7 +1004,7 @@ interface SiloProps {
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, planHoursMap, realHoursMap, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive }: SiloProps) {
   // Capacity calculation: exclude paused items
   // Active hours (excl. paused), split into blocker and non-blocker
   const { activeHours, blockerHours, activeSellingCzk, blockerSellingCzk } = useMemo(() => {
@@ -963,18 +1013,24 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
     let blocker = 0;
     let activeSelling = 0;
     let blockerSelling = 0;
+    // Aggregate hours per project for prodej calc
+    const projectHoursInWeek = new Map<string, { active: number; blocker: number }>();
     for (const b of silo.bundles) {
-      const proj = projectLookup.get(b.project_id);
       for (const i of b.items) {
         if (i.status === "paused") continue;
-        const prodCzk = i.scheduled_hours * hourlyRate;
-        const sellCzk = productionCzkToSellingPrice(prodCzk, proj?.cost_production_pct, proj?.marze);
-        if (i.is_blocker) { blocker += i.scheduled_hours; blockerSelling += sellCzk; }
-        else { active += i.scheduled_hours; activeSelling += sellCzk; }
+        const prev = projectHoursInWeek.get(b.project_id) || { active: 0, blocker: 0 };
+        if (i.is_blocker) { blocker += i.scheduled_hours; prev.blocker += i.scheduled_hours; }
+        else { active += i.scheduled_hours; prev.active += i.scheduled_hours; }
+        projectHoursInWeek.set(b.project_id, prev);
       }
     }
+    // FIX 6: Use MAX(plan_hours, real_hours) for prodej calculation
+    for (const [pid, hours] of projectHoursInWeek) {
+      if (hours.active > 0) activeSelling += calcProdejValue(hours.active, pid, projectLookup, planHoursMap, realHoursMap);
+      if (hours.blocker > 0) blockerSelling += calcProdejValue(hours.blocker, pid, projectLookup, planHoursMap, realHoursMap);
+    }
     return { activeHours: active, blockerHours: blocker, activeSellingCzk: activeSelling, blockerSellingCzk: blockerSelling };
-  }, [silo, projectLookup, hourlyRate]);
+  }, [silo, projectLookup, hourlyRate, planHoursMap, realHoursMap]);
 
   // Forecast layer is isolated and read-only, rendered separately per week
   const weekForecastBlocks = useMemo(() => {
@@ -1001,10 +1057,26 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       if (isBlocker) blockers.push(b);
       else regular.push(b);
     }
+    // FIX 5: Sort active projects first, completed/terminal projects bottom
     regular.sort((a, b) => {
-      const aDone = a.items.length > 0 && a.items.every(i => i.status === "expedice" || i.status === "completed");
-      const bDone = b.items.length > 0 && b.items.every(i => i.status === "expedice" || i.status === "completed");
-      if (aDone === bDone) return 0;
+      const projA = projectLookup.get(a.project_id);
+      const projB = projectLookup.get(b.project_id);
+      const terminalStatusesSet = ["Dokončeno", "Fakturace", "Expedice", "Montáž"];
+      const isTerminalA = terminalStatusesSet.some(s => (projA?.status ?? "").toLowerCase() === s.toLowerCase());
+      const isTerminalB = terminalStatusesSet.some(s => (projB?.status ?? "").toLowerCase() === s.toLowerCase());
+      const aDone = isTerminalA || (a.items.length > 0 && a.items.every(i => i.status === "expedice" || i.status === "completed"));
+      const bDone = isTerminalB || (b.items.length > 0 && b.items.every(i => i.status === "expedice" || i.status === "completed"));
+      if (aDone === bDone) {
+        // Within same group, sort by urgency (overdue first)
+        if (!aDone) {
+          const deadlineA = resolveDeadline({ expedice: projA?.expedice ?? null, montaz: projA?.montaz ?? null, datum_smluvni: projA?.datum_smluvni ?? null });
+          const deadlineB = resolveDeadline({ expedice: projB?.expedice ?? null, montaz: projB?.montaz ?? null, datum_smluvni: projB?.datum_smluvni ?? null });
+          const dA = deadlineA ? deadlineA.date.getTime() : Infinity;
+          const dB = deadlineB ? deadlineB.date.getTime() : Infinity;
+          return dA - dB;
+        }
+        return 0;
+      }
       return aDone ? 1 : -1;
     });
     return { realBundles: regular, blockerBundles: blockers };
@@ -1088,6 +1160,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             onBundleContextMenu={onBundleContextMenu}
             onItemContextMenu={onItemContextMenu}
             projectLookup={projectLookup}
+            planHoursMap={planHoursMap}
+            realHoursMap={realHoursMap}
             isSelected={selectedProjectId === bundle.project_id}
             onSelectProject={onSelectProject} searchQuery={searchQuery}
             forecastDarkMode={forecastDarkMode}
@@ -1110,6 +1184,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
                 onBundleContextMenu={onBundleContextMenu}
                 onItemContextMenu={onItemContextMenu}
                 projectLookup={projectLookup}
+                planHoursMap={planHoursMap}
+                realHoursMap={realHoursMap}
                 isSelected={selectedProjectId === bundle.project_id}
                 onSelectProject={onSelectProject} searchQuery={searchQuery}
                 forecastDarkMode={forecastDarkMode}
@@ -1178,12 +1254,14 @@ function formatDateShortYY(dateStr: string | null | undefined): string | null {
   return `${dd}.${mm}.${yy}`;
 }
 
-function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCapacity, onBundleContextMenu, onItemContextMenu, projectLookup, isSelected, onSelectProject, displayMode, searchQuery = "", forecastDarkMode, isFocusedMatch, searchMatchedProjectIds, searchActive }: {
+function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCapacity, onBundleContextMenu, onItemContextMenu, projectLookup, planHoursMap, realHoursMap, isSelected, onSelectProject, displayMode, searchQuery = "", forecastDarkMode, isFocusedMatch, searchMatchedProjectIds, searchActive }: {
   bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number; weeklyCapacity: number;
   displayMode: DisplayMode;
   onBundleContextMenu: (e: React.MouseEvent, bundle: ScheduleBundle, toggleExpand: () => void) => void;
   onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem, bundle: ScheduleBundle) => void;
   projectLookup: ProjectLookup;
+  planHoursMap?: Map<string, number>;
+  realHoursMap?: Map<string, number>;
   isSelected?: boolean;
   onSelectProject?: (projectId: string) => void;
   searchQuery?: string;
@@ -1205,8 +1283,20 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const project = projectLookup.get(bundle.project_id);
   const isMidflightBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_midflight);
   // Deadline fallback chain: expedice → montáž → předání → smluvní
+  // For legacy (midflight) bundles, show only Smluvní termín from the project
   const deadlineInfo = useMemo(() => {
-    if (isMidflightBundle) return null;
+    if (isMidflightBundle) {
+      // Legacy bundles: show project's Smluvní termín if available
+      const sml = project?.datum_smluvni;
+      if (sml) {
+        const parsed = parseAppDate(sml);
+        const formatted = formatDateShortYY(sml);
+        if (parsed && formatted) {
+          return { label: "Sml", dateStr: formatted, parsed, days: differenceInDays(parsed, new Date()) };
+        }
+      }
+      return null;
+    }
     const fields: { key: string; label: string; value: string | null | undefined }[] = [
       { key: "expedice", label: "Exp", value: project?.expedice },
       { key: "montaz", label: "Mnt", value: project?.montaz },
@@ -1318,7 +1408,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
         <div className="flex items-center justify-between mt-0.5">
           <span className="text-[9px] rounded-full px-1.5 py-0.5" style={{ backgroundColor: "#374151", color: "#9ca3af", fontWeight: 600 }}>⏳ Rezerva</span>
           <span className="font-sans text-[11px] font-bold" style={{ color: "#6b7280" }}>
-            ~{displayMode === "czk" ? formatCompactCzk(productionCzkToSellingPrice(bundle.total_hours * hourlyRate, projectLookup.get(bundle.project_id)?.cost_production_pct, projectLookup.get(bundle.project_id)?.marze)) : `${Math.round(bundle.total_hours)}h`}
+            ~{displayMode === "czk" ? formatCompactCzk(calcProdejValue(bundle.total_hours, bundle.project_id, projectLookup, planHoursMap, realHoursMap)) : `${Math.round(bundle.total_hours)}h`}
           </span>
         </div>
         {tpvWeekLabel && (
@@ -1431,7 +1521,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
             })()}
             {!isMidflightBundle && completedCount > 0 && <span className="text-[9px]" style={{ color: "#3a8a36", fontWeight: 600 }}>{completedCount}/{totalCount} ✓</span>}
             {displayMode === "czk" ? (
-              <span className="font-sans" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{formatCompactCzk(productionCzkToSellingPrice(bundle.total_hours * hourlyRate, projectLookup.get(bundle.project_id)?.cost_production_pct, projectLookup.get(bundle.project_id)?.marze))}</span>
+              <span className="font-sans" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{formatCompactCzk(calcProdejValue(bundle.total_hours, bundle.project_id, projectLookup, planHoursMap, realHoursMap))}</span>
             ) : displayMode === "percent" ? (
               <span className="font-sans" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{weeklyCapacity > 0 ? Math.round((bundle.total_hours / weeklyCapacity) * 100) : 0}%</span>
             ) : (
