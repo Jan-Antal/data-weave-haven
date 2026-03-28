@@ -1274,14 +1274,15 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts2), [statusOpts2]);
   const [expanded, setExpanded] = useState(false);
   const color = getProjectColor(bundle.project_id);
-  const completedCount = bundle.items.filter(i => i.status === "expedice" || i.status === "completed").length;
-  const totalCount = bundle.items.length;
-  const allCompleted = completedCount === totalCount && totalCount > 0;
-  const hasUncompleted = completedCount < totalCount;
-  const isBlockerBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_blocker);
-
   const project = projectLookup.get(bundle.project_id);
   const isMidflightBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_midflight);
+  const isProjectDone = terminalStatuses.has(project?.status ?? "");
+  const completedCount = bundle.items.filter(i => i.status === "expedice" || i.status === "completed").length;
+  const totalCount = bundle.items.length;
+  // Use project terminal status as primary "done" signal (schedule no longer uses completed/expedice statuses)
+  const allCompleted = isProjectDone || (completedCount === totalCount && totalCount > 0);
+  const hasUncompleted = !allCompleted;
+  const isBlockerBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_blocker);
   // Deadline fallback chain: expedice → montáž → předání → smluvní
   // For legacy (midflight) bundles, show only Smluvní termín from the project
   const deadlineInfo = useMemo(() => {
@@ -1317,7 +1318,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const expDate = deadlineInfo?.dateStr ?? null;
   const daysUntilExp = deadlineInfo?.days ?? null;
   const deadlineLabel = deadlineInfo?.label ?? "Exp";
-  const isProjectDone = terminalStatuses.has(project?.status ?? "");
+  // isProjectDone already declared above
   const expSeverity: "overdue" | "urgent" | null = (!isProjectDone && !allCompleted && daysUntilExp !== null)
     ? (daysUntilExp < 0 ? "overdue" : daysUntilExp <= 3 ? "urgent" : null)
     : null;
@@ -1359,7 +1360,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const shouldHighlightOverdue = !isMidflightBundle && ((daysUntilExp !== null && daysUntilExp < 0) || isOverdueProject);
 
   const borderLeftColor = isMidflightBundle ? "#b0bab8"
-    : allCompleted ? "#3a8a36"
+    : isProjectDone ? "#9ca3af"
     : shouldHighlightOverdue ? "hsl(0 70% 50%)"
     : expSeverity === "urgent" ? "#d97706"
     : color;
