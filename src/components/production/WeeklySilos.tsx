@@ -1203,8 +1203,10 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const isBlockerBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_blocker);
 
   const project = projectLookup.get(bundle.project_id);
+  const isMidflightBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_midflight);
   // Deadline fallback chain: expedice → montáž → předání → smluvní
   const deadlineInfo = useMemo(() => {
+    if (isMidflightBundle) return null;
     const fields: { key: string; label: string; value: string | null | undefined }[] = [
       { key: "expedice", label: "Exp", value: project?.expedice },
       { key: "montaz", label: "Mnt", value: project?.montaz },
@@ -1248,6 +1250,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
 
   // Urgency badge logic (same as Inbox)
   const urgencyInfo = useMemo(() => {
+    if (isMidflightBundle) return null;
     if (isProjectDone || allCompleted) return null;
     if (!project) return null;
     const dates = [project.expedice, project.montaz, project.predani, project.datum_smluvni].filter(Boolean);
@@ -1263,9 +1266,10 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
     return null;
   }, [project, isProjectDone, allCompleted]);
 
-  const shouldHighlightOverdue = (daysUntilExp !== null && daysUntilExp < 0) || isOverdueProject;
+  const shouldHighlightOverdue = !isMidflightBundle && ((daysUntilExp !== null && daysUntilExp < 0) || isOverdueProject);
 
-  const borderLeftColor = allCompleted ? "#3a8a36"
+  const borderLeftColor = isMidflightBundle ? "#b0bab8"
+    : allCompleted ? "#3a8a36"
     : shouldHighlightOverdue ? "hsl(0 70% 50%)"
     : expSeverity === "urgent" ? "#d97706"
     : color;
@@ -1402,10 +1406,16 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
                 </span>
               )}
             </div>
-            <div style={{ fontSize: 11, color: "#5c706f", marginTop: 1 }}>{bundle.items.length} položek</div>
+            {isMidflightBundle ? (
+              <div style={{ fontSize: 10, marginTop: 1 }}>
+                <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-300 rounded px-1 font-medium tracking-wide">Legacy</span>
+              </div>
+            ) : (
+              <div style={{ fontSize: 11, color: "#5c706f", marginTop: 1 }}>{bundle.items.length} položek</div>
+            )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            {expSeverity && !allCompleted && deadlineInfo?.parsed && (() => {
+            {!isMidflightBundle && expSeverity && !allCompleted && deadlineInfo?.parsed && (() => {
               const warnColor = expSeverity === "overdue" ? "#dc3545" : "#d97706";
               const tooltipText = expSeverity === "overdue"
                 ? `${deadlineLabel} ${format(deadlineInfo.parsed, "dd.MM.yyyy")} — po termínu o ${differenceInDays(new Date(), deadlineInfo.parsed)} dní`
@@ -1419,7 +1429,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
                 </Tooltip>
               );
             })()}
-            {completedCount > 0 && <span className="text-[9px]" style={{ color: "#3a8a36", fontWeight: 600 }}>{completedCount}/{totalCount} ✓</span>}
+            {!isMidflightBundle && completedCount > 0 && <span className="text-[9px]" style={{ color: "#3a8a36", fontWeight: 600 }}>{completedCount}/{totalCount} ✓</span>}
             {displayMode === "czk" ? (
               <span className="font-sans" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{formatCompactCzk(productionCzkToSellingPrice(bundle.total_hours * hourlyRate, projectLookup.get(bundle.project_id)?.cost_production_pct, projectLookup.get(bundle.project_id)?.marze))}</span>
             ) : displayMode === "percent" ? (
