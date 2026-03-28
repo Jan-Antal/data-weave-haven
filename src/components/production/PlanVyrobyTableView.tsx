@@ -1533,6 +1533,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                                   )}
                                 </div>
                               )}
+                              {/* History spacer */}
+                              <div className="shrink-0" style={{ width: 48, backgroundColor: "#fff", borderTop: "1px solid #e5e2dd", borderBottom: "1px solid #e5e2dd" }} />
                               {/* Week cells */}
                               {weeks.map(week => {
                                 const wt = proj.weekTotals.get(week.key);
@@ -1627,6 +1629,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                                         )}
                                       </div>
                                     )}
+                                    {/* History spacer */}
+                                    <div className="shrink-0" style={{ width: 48, backgroundColor: "#fff" }} />
                                     {/* Week cells — interactive + droppable */}
                                     {weeks.map(week => {
                                       const alloc = item.weekAllocations.get(week.key);
