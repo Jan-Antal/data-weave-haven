@@ -116,6 +116,13 @@ export default function PlanVyroby() {
   const { setCurrentPage, popLastUndo } = useUndoRedo();
   const [displayMode, setDisplayMode] = useState<DisplayMode>("hours");
   const [viewTab, setViewTab] = useState<ViewTab>("kanban");
+  const [visibleMonth, setVisibleMonth] = useState<{ month: number; year: number }>(() => {
+    const now = new Date();
+    return { month: now.getMonth(), year: now.getFullYear() };
+  });
+  const handleVisibleMonthChange = useCallback((month: number, year: number) => {
+    setVisibleMonth(prev => (prev.month === month && prev.year === year) ? prev : { month, year });
+  }, []);
   const forecast = useForecastMode();
   const [overbookDialogOpen, setOverbookDialogOpen] = useState(false);
   const prevOverbookedRef = useRef(0);
@@ -690,6 +697,7 @@ export default function PlanVyroby() {
         {/* Row 2: Tabs + Search + Display mode + Stats + Period + Forecast toggle — desktop only */}
         {!isMobile && (
         <ToolbarRow2
+          visibleMonth={visibleMonth}
           viewTab={viewTab}
           setViewTab={setViewTab}
           displayMode={displayMode}
@@ -825,6 +833,7 @@ export default function PlanVyroby() {
                       is_forecast: true,
                     });
                   } : undefined}
+                  onVisibleMonthChange={handleVisibleMonthChange}
                 />
                 {!forecast.forecastActive && (
                   <ExpedicePanel showCzk={showCzk} onNavigateToTPV={handleNavigateToTPV} onOpenProjectDetail={handleOpenProjectDetail} selectedProjectId={selectedProjectId} onSelectProject={handleSelectProject} searchQuery={searchQuery} />
@@ -989,7 +998,8 @@ export default function PlanVyroby() {
 }
 
 
-function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchNavActive = false, searchNavTotalCount = 0, searchNavCurrentIndex = 0, searchNavGoNext, searchNavGoPrev, overbookedWeekCount = 0, onOverbookBadgeClick, isAdmin, recalculating, onRecalculateHours, midflightRunning, onMidflightImport }: {
+function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchNavActive = false, searchNavTotalCount = 0, searchNavCurrentIndex = 0, searchNavGoNext, searchNavGoPrev, overbookedWeekCount = 0, onOverbookBadgeClick, isAdmin, recalculating, onRecalculateHours, midflightRunning, onMidflightImport }: {
+  visibleMonth: { month: number; year: number };
   viewTab: "kanban" | "table";
   setViewTab: (v: "kanban" | "table") => void;
   displayMode: DisplayMode;
@@ -1023,8 +1033,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
   const { data: allProjects = [] } = useProjects();
   const getWeekCapacity = useWeekCapacityLookup();
 
-   type StatsScope = "week" | "month" | "all";
-  const statsScope: StatsScope = "month";
+  const MONTHS_CZ = ["Leden", "Únor", "Březen", "Duben", "Květen", "Červen", "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec"];
 
   const hourlyRate = settings?.hourly_rate ?? 550;
   const inboxHours = inboxProjects.reduce((s, p) => s + p.total_hours, 0);
@@ -1038,28 +1047,21 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
     return d.toISOString().split("T")[0];
   }, []);
 
-  // Current month boundaries (week keys whose Monday falls in the current month)
-  const currentMonthWeekKeys = useMemo(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
+  // Week keys whose Monday falls in the visible month
+  const visibleMonthWeekKeys = useMemo(() => {
+    const { month, year } = visibleMonth;
     const keys: string[] = [];
-    // Generate all Mondays that fall within this calendar month
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    // Find the Monday on or before first day of month
     const d = new Date(firstDay);
     const day = d.getDay();
     d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
-    // Iterate through Mondays
     while (d <= lastDay) {
-      // Include if Monday falls within this month
       if (d.getMonth() === month && d.getFullYear() === year) {
         keys.push(d.toISOString().split("T")[0]);
       }
       d.setDate(d.getDate() + 7);
     }
-    // Also check weeks from schedule data that have any day in this month
     if (scheduleData) {
       for (const weekKey of scheduleData.keys()) {
         const monday = new Date(weekKey + "T00:00:00");
@@ -1072,26 +1074,31 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       }
     }
     return keys;
-  }, [scheduleData]);
+  }, [visibleMonth, scheduleData]);
 
   const { capacityHours, scheduledHours, scheduledCzk } = useMemo(() => {
     if (!scheduleData) return { capacityHours: 0, scheduledHours: 0, scheduledCzk: 0 };
 
-    // Build project lookup for selling price conversion
     const projMap = new Map<string, { cost_production_pct?: number | null; marze?: string | null }>();
     for (const p of (allProjects ?? [])) projMap.set(p.project_id, p);
 
     let cap = 0;
     let hours = 0;
     let czk = 0;
-    for (const wk of currentMonthWeekKeys) {
+    for (const wk of visibleMonthWeekKeys) {
       cap += getWeekCapacity(wk);
       const silo = scheduleData.get(wk);
       if (silo) {
-        hours += silo.total_hours;
+        // Plán: only count current week + future weeks
+        const isPastWeek = wk < currentWeekKey;
+        if (!isPastWeek) {
+          hours += silo.total_hours;
+        }
         for (const b of silo.bundles) {
           const proj = projMap.get(b.project_id);
           for (const i of b.items) {
+            if (i.is_midflight) continue;
+            if (!["scheduled", "in_progress", "paused"].includes(i.status)) continue;
             const prodCzk = i.scheduled_hours * hourlyRate;
             czk += productionCzkToSellingPrice(prodCzk, proj?.cost_production_pct, proj?.marze);
           }
@@ -1099,7 +1106,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       }
     }
     return { capacityHours: cap, scheduledHours: hours, scheduledCzk: czk };
-  }, [scheduleData, currentMonthWeekKeys, getWeekCapacity, allProjects, hourlyRate]);
+  }, [scheduleData, visibleMonthWeekKeys, getWeekCapacity, allProjects, hourlyRate, currentWeekKey]);
 
   const isOverCapacity = scheduledHours > capacityHours;
   const displayCzk = scheduledCzk;
@@ -1110,20 +1117,7 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
     return compact ? v.toLocaleString("cs-CZ") : `${v.toLocaleString("cs-CZ")} Kč`;
   };
 
-  const periodLabel = useMemo(() => {
-    if (!scheduleData || scheduleData.size === 0) return "";
-    const weeks = Array.from(scheduleData.keys()).sort();
-    const first = new Date(weeks[0] + "T00:00:00");
-    const last = new Date(weeks[weeks.length - 1] + "T00:00:00");
-    const months = ["Leden", "Únor", "Březen", "Duben", "Květen", "Červen", "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec"];
-    if (first.getMonth() === last.getMonth() && first.getFullYear() === last.getFullYear()) {
-      return `${months[first.getMonth()]} ${first.getFullYear()}`;
-    }
-    if (first.getFullYear() === last.getFullYear()) {
-      return `${months[first.getMonth()]} – ${months[last.getMonth()]} ${first.getFullYear()}`;
-    }
-    return `${months[first.getMonth()]} ${first.getFullYear()} – ${months[last.getMonth()]} ${last.getFullYear()}`;
-  }, [scheduleData]);
+  const monthLabel = `${MONTHS_CZ[visibleMonth.month]} ${visibleMonth.year}`;
 
 
   return (
@@ -1227,14 +1221,16 @@ function ToolbarRow2({ viewTab, setViewTab, displayMode, onDisplayModeChange, se
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Center: Stats */}
+      {/* Center: Stats with month label */}
       <div className="flex items-center gap-2 min-w-0 shrink">
-        <div className="flex items-center gap-1 text-xs font-sans whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: forecastActive ? "#a8c5c2" : undefined }}>
+        <div className="flex items-center gap-1.5 text-xs font-sans whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: forecastActive ? "#a8c5c2" : undefined }}>
+          <span className="font-semibold text-[13px]" style={{ color: forecastActive ? "#e5e7eb" : "hsl(var(--foreground))" }}>{monthLabel}</span>
+          <span style={{ color: forecastActive ? "#2a4a46" : "hsl(var(--border))" }}>|</span>
           <span>{forecastActive ? "Kap." : "Kapacita"} <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{Math.round(capacityHours).toLocaleString("cs-CZ")}h</span></span>
           <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
-          <span>{forecastActive ? "Prodej" : "Prodej"} <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{formatCzk(displayCzk, forecastActive)}</span></span>
+          <span>Prodej <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{formatCzk(displayCzk, forecastActive)}</span></span>
           <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
-          <span>{forecastActive ? "Nap." : "Naplánováno"} <span style={{ fontWeight: 600, color: isOverCapacity ? "hsl(var(--destructive))" : "hsl(142 76% 36%)" }}>{Math.round(scheduledHours).toLocaleString("cs-CZ")}h</span></span>
+          <span>Plán <span style={{ fontWeight: 600, color: isOverCapacity ? "hsl(var(--destructive))" : "hsl(142 76% 36%)" }}>{Math.round(scheduledHours).toLocaleString("cs-CZ")}h</span></span>
           <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
           <span>{forecastActive ? "Inbox" : "V Inboxu"} <span style={{ fontWeight: 600, color: "#d97706" }}>{Math.round(inboxHours).toLocaleString("cs-CZ")}h</span></span>
         </div>
