@@ -21,7 +21,7 @@ import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { getTerminalStatuses } from "@/lib/statusHelpers";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { parseAppDate } from "@/lib/dateFormat";
 import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
