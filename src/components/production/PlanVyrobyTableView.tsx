@@ -1236,9 +1236,21 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
         <div className="min-w-max">
           {/* Header row */}
           <div className="flex sticky top-0 z-30" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            <div className="shrink-0 sticky left-0 z-40 border-r border-b border-border bg-card flex items-end" style={{ width: LEFT_COL_W }}>
-              <div className="px-3 pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                Projekt / Položka
+            <div className="shrink-0 sticky left-0 z-40 border-r border-b border-border bg-card flex flex-col justify-end" style={{ width: LEFT_COL_W }}>
+              <div className="px-2 pb-1.5 flex items-center gap-1.5">
+                <Search className="h-3 w-3 text-muted-foreground shrink-0" />
+                <input
+                  type="text"
+                  value={localSearch}
+                  onChange={(e) => setLocalSearch(e.target.value)}
+                  placeholder="Hledat projekt / položku…"
+                  className="flex-1 text-[11px] bg-transparent border-none outline-none placeholder:text-muted-foreground/50 text-foreground"
+                />
+                {localSearch && (
+                  <button onClick={() => setLocalSearch("")} className="shrink-0">
+                    <X className="h-3 w-3 text-muted-foreground hover:text-foreground transition-colors" />
+                  </button>
+                )}
               </div>
             </div>
             {hasAnyInbox && (
@@ -1278,28 +1290,20 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                     width: CELL_W,
                     backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : undefined,
                     borderBottom: `2px solid ${borderColor}`,
-                    opacity: 1,
                   }}
                 >
-                  {/* Week number */}
                   <div className="font-semibold text-base text-foreground leading-tight">
                     T{week.weekNum}{week.isCurrent && <span className="ml-0.5" style={{ color: "#3a8a36" }}>•</span>}
                   </div>
-                  {/* Date range */}
                   <div className="text-xs text-muted-foreground mt-0.5">
                     {formatDateShort(week.start)} – {formatDateShort(week.end)}
                   </div>
-                  {/* Capacity bar — matching Kanban WeeklySilos */}
                   <div className="relative w-full rounded overflow-hidden my-1" style={{ height: '7px', backgroundColor: '#f0eee9' }}>
                     <div
                       className="h-full rounded transition-all duration-300"
-                      style={{
-                        width: `${Math.min(pct, 100)}%`,
-                        background: barBg,
-                      }}
+                      style={{ width: `${Math.min(pct, 100)}%`, background: barBg }}
                     />
                   </div>
-                  {/* Hours row */}
                   <div className="flex items-center justify-between mt-[3px] font-sans text-[9px]">
                     <div>
                       <span className="font-bold" style={{ color: barColor }}>{Math.round(used)}h</span>
@@ -1310,14 +1314,6 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                 </div>
               );
             })}
-            {hasAnyExpedice && (
-              <div
-                className="shrink-0 px-2 py-2 border-b border-l border-border/50 sticky right-0 z-40 flex flex-col items-center justify-center"
-                style={{ width: EXPEDICE_W, backgroundColor: "#f0fdf4" }}
-              >
-                <div className="text-sm font-semibold" style={{ color: "#16A34A" }}>📦 Expedice</div>
-              </div>
-            )}
           </div>
 
           {/* Project rows */}
