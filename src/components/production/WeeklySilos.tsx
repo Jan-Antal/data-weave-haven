@@ -1184,6 +1184,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
                 onBundleContextMenu={onBundleContextMenu}
                 onItemContextMenu={onItemContextMenu}
                 projectLookup={projectLookup}
+                planHoursMap={planHoursMap}
+                realHoursMap={realHoursMap}
                 isSelected={selectedProjectId === bundle.project_id}
                 onSelectProject={onSelectProject} searchQuery={searchQuery}
                 forecastDarkMode={forecastDarkMode}
@@ -1252,12 +1254,14 @@ function formatDateShortYY(dateStr: string | null | undefined): string | null {
   return `${dd}.${mm}.${yy}`;
 }
 
-function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCapacity, onBundleContextMenu, onItemContextMenu, projectLookup, isSelected, onSelectProject, displayMode, searchQuery = "", forecastDarkMode, isFocusedMatch, searchMatchedProjectIds, searchActive }: {
+function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCapacity, onBundleContextMenu, onItemContextMenu, projectLookup, planHoursMap, realHoursMap, isSelected, onSelectProject, displayMode, searchQuery = "", forecastDarkMode, isFocusedMatch, searchMatchedProjectIds, searchActive }: {
   bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number; weeklyCapacity: number;
   displayMode: DisplayMode;
   onBundleContextMenu: (e: React.MouseEvent, bundle: ScheduleBundle, toggleExpand: () => void) => void;
   onItemContextMenu: (e: React.MouseEvent, item: ScheduleItem, bundle: ScheduleBundle) => void;
   projectLookup: ProjectLookup;
+  planHoursMap?: Map<string, number>;
+  realHoursMap?: Map<string, number>;
   isSelected?: boolean;
   onSelectProject?: (projectId: string) => void;
   searchQuery?: string;
