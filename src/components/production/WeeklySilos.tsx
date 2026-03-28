@@ -1100,8 +1100,9 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
     : isWarning ? "linear-gradient(90deg, #fcd34d, #d97706)"
     : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
 
-  const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}`, disabled: isPast });
-  const highlighted = !isPast && (isOver || isOverTarget);
+  const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}`, disabled: !!isWeekLocked });
+  const highlighted = !isWeekLocked && (isOver || isOverTarget);
+  const isUnlockedPast = isPast && !isWeekLocked;
   const dropBorderColor = highlighted ? (isOverloaded ? "#d97706" : "#3b82f6") : undefined;
   const headerColor = forecastDarkMode
     ? (isCurrent ? "#4a9e96" : "#7aa8a4")
@@ -1116,16 +1117,29 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       style={{
         backgroundColor: forecastDarkMode ? "#1f2e2c" : "#ffffff", borderRadius: 9,
         border: highlighted ? `2px solid ${dropBorderColor}`
+          : isUnlockedPast ? "1.5px solid #d97706"
           : isCurrent ? (forecastDarkMode ? "2.5px solid #4a9e96" : "2.5px solid #3a8a36")
           : isOverloaded && !isPast ? (forecastDarkMode ? "1px solid rgba(192,57,43,0.5)" : "1px solid rgba(220,53,69,0.4)")
           : forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #ece8e2",
-        boxShadow: isCurrent ? (forecastDarkMode ? "0 0 12px rgba(74,158,150,0.15)" : "0 0 12px rgba(58,138,54,0.12)") : undefined,
+        boxShadow: isCurrent ? (forecastDarkMode ? "0 0 12px rgba(74,158,150,0.15)" : "0 0 12px rgba(58,138,54,0.12)")
+          : isUnlockedPast ? "0 0 8px rgba(217,119,6,0.12)" : undefined,
       }}
     >
       {/* Header */}
       <div className="px-2.5 py-1.5 text-center" style={{ borderBottom: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #ece8e2" }}>
         <div className="flex items-center justify-center gap-1.5">
-          {isPast && <Lock size={11} style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }} />}
+          {isPast && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleLock?.(); }}
+              className="p-0.5 rounded hover:bg-muted/50 transition-colors"
+              title={isWeekLocked ? "Odemknout týden" : "Zamknout týden"}
+            >
+              {isWeekLocked
+                ? <Lock size={11} style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }} />
+                : <LockOpen size={11} style={{ color: "#d97706" }} />
+              }
+            </button>
+          )}
           <span className="font-sans text-[14px]" style={{ color: headerColor, fontWeight: headerWeight }}>T{weekNum}</span>
           {isCurrent && <span className="w-[5px] h-[5px] rounded-full" style={{ backgroundColor: forecastDarkMode ? "#4a9e96" : "#3a8a36" }} />}
         </div>
