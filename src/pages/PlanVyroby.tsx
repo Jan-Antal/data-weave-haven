@@ -1218,22 +1218,20 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
         </div>
       )}
 
-      {/* Spacer */}
-      <div className="flex-1" />
+      {/* Separator + Month label (center) */}
+      <div className="shrink-0 h-6 mx-1" style={{ borderLeft: forecastActive ? "1px solid #2a4a46" : "1px solid hsl(var(--border))" }} />
+      <span className="font-semibold text-[13px] shrink-0 whitespace-nowrap" style={{ color: forecastActive ? "#e5e7eb" : "hsl(var(--foreground))" }}>{monthLabel}</span>
+      <div className="shrink-0 h-6 mx-1" style={{ borderLeft: forecastActive ? "1px solid #2a4a46" : "1px solid hsl(var(--border))" }} />
 
-      {/* Center: Stats with month label */}
-      <div className="flex items-center gap-2 min-w-0 shrink">
-        <div className="flex items-center gap-1.5 text-xs font-sans whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: forecastActive ? "#a8c5c2" : undefined }}>
-          <span className="font-semibold text-[13px]" style={{ color: forecastActive ? "#e5e7eb" : "hsl(var(--foreground))" }}>{monthLabel}</span>
-          <span style={{ color: forecastActive ? "#2a4a46" : "hsl(var(--border))" }}>|</span>
-          <span>{forecastActive ? "Kap." : "Kapacita"} <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{Math.round(capacityHours).toLocaleString("cs-CZ")}h</span></span>
-          <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
-          <span>Prodej <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{formatCzk(displayCzk, forecastActive)}</span></span>
-          <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
-          <span>Plán <span style={{ fontWeight: 600, color: isOverCapacity ? "hsl(var(--destructive))" : "hsl(142 76% 36%)" }}>{Math.round(scheduledHours).toLocaleString("cs-CZ")}h</span></span>
-          <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
-          <span>{forecastActive ? "Inbox" : "V Inboxu"} <span style={{ fontWeight: 600, color: "#d97706" }}>{Math.round(inboxHours).toLocaleString("cs-CZ")}h</span></span>
-        </div>
+      {/* Metrics */}
+      <div className="flex items-center gap-1.5 text-xs font-sans whitespace-nowrap shrink-0" style={{ color: forecastActive ? "#a8c5c2" : undefined }}>
+        <span>{forecastActive ? "Kap." : "Kapacita"} <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{Math.round(capacityHours).toLocaleString("cs-CZ")}h</span></span>
+        <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
+        <span>Prodej <span className="font-semibold" style={{ color: forecastActive ? "#e5e7eb" : undefined }}>{formatCzk(displayCzk, forecastActive)}</span></span>
+        <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
+        <span>Plán <span style={{ fontWeight: 600, color: isOverCapacity ? "hsl(var(--destructive))" : "hsl(142 76% 36%)" }}>{Math.round(scheduledHours).toLocaleString("cs-CZ")}h</span></span>
+        <span style={{ color: forecastActive ? "#2a4a46" : undefined }}>·</span>
+        <span>{forecastActive ? "Inbox" : "V Inboxu"} <span style={{ fontWeight: 600, color: "#d97706" }}>{Math.round(inboxHours).toLocaleString("cs-CZ")}h</span></span>
       </div>
 
       {/* Spacer */}
