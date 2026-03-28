@@ -125,8 +125,11 @@ export function useProductionExpedice() {
       const { data, error } = await supabase
         .from("production_schedule")
         .select("*, projects!production_schedule_project_id_fkey(project_name)")
-        .eq("status", "completed")
-        .or("is_midflight.is.null,is_midflight.eq.false,item_code.eq.EXPEDICE_MIDFLIGHT")
+        .or(
+          'and(status.eq.completed,is_midflight.is.null),' +
+          'and(status.eq.completed,is_midflight.eq.false),' +
+          'and(status.eq.completed,item_code.eq.EXPEDICE_MIDFLIGHT)'
+        )
         .order("completed_at", { ascending: false });
       if (error) throw error;
 
