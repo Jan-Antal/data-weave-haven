@@ -1105,40 +1105,27 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
     let cap = 0;
     let hours = 0;
     let czk = 0;
-    // Aggregate hours per project across the visible month for prodej calc
-    // NOTE: Do NOT skip is_midflight — silos include them in their totals
-    const projectHoursInMonth = new Map<string, number>();
+
     for (const wk of visibleMonthWeekKeys) {
       cap += getWeekCapacity(wk);
       const silo = scheduleData.get(wk);
-      if (silo) {
-        const isPastWeek = wk < currentWeekKey;
-        if (!isPastWeek) {
-          hours += silo.total_hours;
-        }
-        for (const b of silo.bundles) {
-          for (const i of b.items) {
-            if (i.status === "paused") continue;
-            const prev = projectHoursInMonth.get(b.project_id) ?? 0;
-            projectHoursInMonth.set(b.project_id, prev + i.scheduled_hours);
-          }
+      if (!silo) continue;
+
+      const isPastWeek = wk < currentWeekKey;
+      if (!isPastWeek) {
+        hours += silo.total_hours;
+      }
+
+      for (const b of silo.bundles) {
+        for (const i of b.items) {
+          if (i.status === "paused") continue;
+          czk += Number(i.scheduled_czk ?? 0);
         }
       }
     }
-    // Use same calcProdejValue logic as Kanban silos
-    for (const [pid, scheduledH] of projectHoursInMonth) {
-      const proj = projectLookup.get(pid);
-      const prodejniCena = proj?.prodejni_cena ?? 0;
-      if (!prodejniCena || prodejniCena <= 0 || scheduledH <= 0) continue;
-      const planHours = planHoursData?.get(pid) ?? 0;
-      const realHours = realHoursData?.get(pid) ?? 0;
-      const effectiveHours = Math.max(planHours, realHours);
-      if (effectiveHours <= 0) continue;
-      const share = scheduledH / effectiveHours;
-      czk += share * prodejniCena;
-    }
+
     return { capacityHours: cap, scheduledHours: hours, scheduledCzk: czk };
-  }, [scheduleData, visibleMonthWeekKeys, getWeekCapacity, projectLookup, planHoursData, realHoursData, currentWeekKey]);
+  }, [scheduleData, visibleMonthWeekKeys, getWeekCapacity, currentWeekKey]);
 
   const isOverCapacity = scheduledHours > capacityHours;
   const displayCzk = scheduledCzk;
