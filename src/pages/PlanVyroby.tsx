@@ -1116,6 +1116,7 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
     let hours = 0;
     let czk = 0;
     // Aggregate hours per project across the visible month for prodej calc
+    // NOTE: Do NOT skip is_midflight — silos include them in their totals
     const projectHoursInMonth = new Map<string, number>();
     for (const wk of visibleMonthWeekKeys) {
       cap += getWeekCapacity(wk);
@@ -1127,7 +1128,6 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
         }
         for (const b of silo.bundles) {
           for (const i of b.items) {
-            if (i.is_midflight) continue;
             if (i.status === "paused") continue;
             const prev = projectHoursInMonth.get(b.project_id) ?? 0;
             projectHoursInMonth.set(b.project_id, prev + i.scheduled_hours);
