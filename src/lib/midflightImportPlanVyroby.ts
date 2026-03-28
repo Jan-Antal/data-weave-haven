@@ -206,33 +206,50 @@ export async function midflightImportPlanVyroby(
   // Expedice/Montáž/Dokončeno/Fakturace → EXPEDICE_MIDFLIGHT marker entry
   const expediceMarkerStatuses = new Set(["expedice", "montáž", "dokončeno", "fakturace"]);
 
-  for (const projectId of projectsInHours) {
-    const status = validProjectMap.get(projectId)?.status || "";
-    if (!expediceMarkerStatuses.has(status)) continue;
+  // Iterate ALL valid projects (not just those with hours) to catch Dokončeno/Fakturace with no hours
+  let expediceCount = 0;
+  const prevMondayFallback = new Date(currentMonday);
+  prevMondayFallback.setDate(prevMondayFallback.getDate() - 7);
+  const prevMondayFallbackStr = prevMondayFallback.toISOString().split("T")[0];
+
+  for (const [projectId, projectInfo] of validProjectMap) {
+    if (!expediceMarkerStatuses.has(projectInfo.status)) continue;
 
     // Only create if no future scheduled work exists
     if (projectsWithFutureWork.has(projectId)) continue;
 
-    const projectName = validProjectMap.get(projectId)?.name || projectId;
+    const projectName = projectInfo.name || projectId;
     const latestDatum = projectLatestDatum.get(projectId);
 
-    // Always place EXPEDICE_MIDFLIGHT in the week before current to avoid cluttering current silos
-    const prevMonday = new Date(currentMonday);
-    prevMonday.setDate(prevMonday.getDate() - 7);
-    const prevMondayStr = prevMonday.toISOString().split("T")[0];
+    // scheduled_week = monday of MAX(datum_sync), or prev week if no hours
+    let expWeek: string;
+    let expCompletedAt: string;
+    if (latestDatum) {
+      expWeek = getMondayOfWeek(latestDatum);
+      // If that falls on current week, push to previous week to avoid cluttering current silo
+      if (expWeek >= currentMonday) {
+        expWeek = prevMondayFallbackStr;
+      }
+      expCompletedAt = new Date(latestDatum).toISOString();
+    } else {
+      expWeek = prevMondayFallbackStr;
+      expCompletedAt = new Date().toISOString();
+    }
 
     scheduleInserts.push({
       project_id: projectId,
       item_code: "EXPEDICE_MIDFLIGHT",
       item_name: projectName,
-      scheduled_week: prevMondayStr,
+      scheduled_week: expWeek,
       scheduled_hours: 0,
       scheduled_czk: 0,
       status: "completed",
-      completed_at: latestDatum ? new Date(latestDatum).toISOString() : new Date().toISOString(),
+      completed_at: expCompletedAt,
       is_midflight: true,
     });
+    expediceCount++;
   }
+  console.log('[midflight] EXPEDICE_MIDFLIGHT created:', expediceCount);
 
   // Batch insert all items to production_schedule
   if (scheduleInserts.length > 0) {
