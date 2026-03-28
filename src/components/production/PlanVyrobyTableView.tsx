@@ -13,10 +13,10 @@ import { getProjectColor } from "@/lib/projectColors";
 import { exportToExcel } from "@/lib/exportExcel";
 import { buildPrintableHtml } from "@/lib/exportPdf";
 import { parseAppDate } from "@/lib/dateFormat";
-import { format, differenceInDays, addDays } from "date-fns";
+import { format, differenceInDays, addDays, subWeeks, startOfWeek } from "date-fns";
 import { resolveDeadline } from "@/lib/deadlineWarning";
 import { cs } from "date-fns/locale";
-import { Download, ChevronRight, ChevronDown, Plus, ArrowRight, Inbox, CheckCircle2, XCircle, FileSpreadsheet, FileText, AlertTriangle } from "lucide-react";
+import { Download, ChevronRight, ChevronDown, Plus, ArrowRight, Inbox, CheckCircle2, XCircle, FileSpreadsheet, FileText, AlertTriangle, Search, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -114,6 +114,8 @@ interface ProjectRow {
   expediceTotalHours: number;
   expediceTotalCzk: number;
   isBlockerOnly: boolean;
+  /** Section classification for grouping */
+  section?: "inbox" | "vyroba" | "expedice" | "archiv";
 }
 
 function getCollapsedCellStyle(proj: ProjectRow, weekKey: string): { bg: string; text: string; border: string } {
@@ -140,7 +142,6 @@ function getCollapsedCellStyle(proj: ProjectRow, weekKey: string): { bg: string;
 
 const CELL_W = 132;
 const INBOX_W = 100;
-const EXPEDICE_W = 100;
 const LEFT_COL_W = 280;
 
 export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateToTPV, onOpenProjectDetail }: Props) {
@@ -156,6 +157,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   const qc = useQueryClient();
   const [sortMode, setSortMode] = useState<SortMode>("project");
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(["archiv"]));
+  const [localSearch, setLocalSearch] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialScrollDone = useRef(false);
 
@@ -477,14 +480,16 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     return rows;
   }, [scheduleData, expediceData, inboxByProject, expediceByProject, inboxProjects, sortMode, weeks]);
 
+  // Combine search from parent + local search
+  const effectiveSearch = localSearch.length >= 3 ? localSearch : searchQuery;
+
   const filteredRows = useMemo(() => {
-    if (!searchQuery.trim()) return projectRows;
-    const q = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (!effectiveSearch.trim()) return projectRows;
+    const q = effectiveSearch.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     return projectRows.filter(p => {
       const pName = p.projectName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       const pId = p.projectId.toLowerCase();
       if (pName.includes(q) || pId.includes(q)) return true;
-      // Match PM
       const proj = allProjects.find(ap => ap.project_id === p.projectId);
       if (proj?.pm && proj.pm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(q)) return true;
       return p.items.some(i => {
@@ -493,7 +498,65 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
         return iName.includes(q) || iCode.includes(q);
       });
     });
-  }, [projectRows, searchQuery, allProjects]);
+  }, [projectRows, effectiveSearch, allProjects]);
+
+  // Section classification
+  const currentMondayKey = useMemo(() => getMonday(new Date()).toISOString().split("T")[0], []);
+
+  const sectionedRows = useMemo(() => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const inboxSection: ProjectRow[] = [];
+    const vyrobaSection: ProjectRow[] = [];
+    const expediceSection: ProjectRow[] = [];
+    const archivSection: ProjectRow[] = [];
+
+    for (const row of filteredRows) {
+      // Check if project has inbox items
+      const hasInbox = row.inboxTotalHours > 0;
+
+      // Check if project has non-midflight scheduled items in current/future weeks
+      const hasActiveSchedule = row.items.some(item => {
+        for (const [weekKey, alloc] of item.weekAllocations) {
+          if (weekKey >= currentMondayKey && alloc.hours > 0 && (alloc.status === "scheduled" || alloc.status === "in_progress" || alloc.status === "paused")) {
+            return true;
+          }
+        }
+        return false;
+      });
+
+      // Check expedice status from expediceData
+      const expGroup = expediceData?.find(g => g.project_id === row.projectId);
+      const hasActiveExpedice = expGroup?.items.some(i => !i.expediced_at) ?? false;
+      const hasArchived = expGroup?.items.some(i => i.expediced_at && new Date(i.expediced_at) >= thirtyDaysAgo) ?? false;
+
+      // Classify — a project can only appear in one section, priority order
+      if (hasInbox) {
+        inboxSection.push({ ...row, section: "inbox" });
+      } else if (hasActiveSchedule) {
+        vyrobaSection.push({ ...row, section: "vyroba" });
+      } else if (hasActiveExpedice) {
+        expediceSection.push({ ...row, section: "expedice" });
+      } else if (hasArchived || row.expediceTotalHours > 0) {
+        archivSection.push({ ...row, section: "archiv" });
+      } else if (row.items.some(i => i.weekAllocations.size > 0)) {
+        // Has past schedule data — put in výroba
+        vyrobaSection.push({ ...row, section: "vyroba" });
+      }
+    }
+
+    return { inboxSection, vyrobaSection, expediceSection, archivSection };
+  }, [filteredRows, expediceData, currentMondayKey]);
+
+  const toggleSection = (section: string) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      return next;
+    });
+  };
 
   const regularRows = useMemo(() => filteredRows.filter(r => !r.isBlockerOnly), [filteredRows]);
   const blockerRows = useMemo(() => filteredRows.filter(r => r.isBlockerOnly), [filteredRows]);
@@ -637,16 +700,24 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     return () => document.removeEventListener("mousedown", handler);
   }, [exportDropdownOpen]);
 
-  // Initial scroll — show current week as first visible week column
+  // Initial scroll — show (current week - 1) as first visible week column
   useEffect(() => {
     if (initialScrollDone.current || weeks.length === 0) return;
     const el = scrollRef.current;
     if (!el) return;
-    const currentMonday = getMonday(new Date());
-    const currentWeekKey = currentMonday.toISOString().split("T")[0];
-    const currentWeekIdx = weeks.findIndex(w => w.key === currentWeekKey);
-    if (currentWeekIdx > 0) {
-      el.scrollLeft = currentWeekIdx * CELL_W;
+    const targetWeek = subWeeks(startOfWeek(new Date(), { weekStartsOn: 1 }), 1);
+    const targetKey = targetWeek.toISOString().split("T")[0];
+    const targetIdx = weeks.findIndex(w => w.key === targetKey);
+    if (targetIdx >= 0) {
+      el.scrollLeft = targetIdx * CELL_W;
+    } else {
+      // Fallback: scroll to current week - 1 index
+      const currentMonday = getMonday(new Date());
+      const currentKey = currentMonday.toISOString().split("T")[0];
+      const currentIdx = weeks.findIndex(w => w.key === currentKey);
+      if (currentIdx > 0) {
+        el.scrollLeft = (currentIdx - 1) * CELL_W;
+      }
     }
     initialScrollDone.current = true;
   }, [weeks]);
@@ -1101,7 +1172,6 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   }, [handleMoveToWeek]);
 
   const hasAnyInbox = true;
-  const hasAnyExpedice = true;
 
   return (
     <DndContext onDragEnd={handleTableDragEnd} collisionDetection={closestCenter}>
@@ -1165,9 +1235,21 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
         <div className="min-w-max">
           {/* Header row */}
           <div className="flex sticky top-0 z-30" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            <div className="shrink-0 sticky left-0 z-40 border-r border-b border-border bg-card flex items-end" style={{ width: LEFT_COL_W }}>
-              <div className="px-3 pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                Projekt / Položka
+            <div className="shrink-0 sticky left-0 z-40 border-r border-b border-border bg-card flex flex-col justify-end" style={{ width: LEFT_COL_W }}>
+              <div className="px-2 pb-1.5 flex items-center gap-1.5">
+                <Search className="h-3 w-3 text-muted-foreground shrink-0" />
+                <input
+                  type="text"
+                  value={localSearch}
+                  onChange={(e) => setLocalSearch(e.target.value)}
+                  placeholder="Hledat projekt / položku…"
+                  className="flex-1 text-[11px] bg-transparent border-none outline-none placeholder:text-muted-foreground/50 text-foreground"
+                />
+                {localSearch && (
+                  <button onClick={() => setLocalSearch("")} className="shrink-0">
+                    <X className="h-3 w-3 text-muted-foreground hover:text-foreground transition-colors" />
+                  </button>
+                )}
               </div>
             </div>
             {hasAnyInbox && (
@@ -1207,28 +1289,20 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                     width: CELL_W,
                     backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : undefined,
                     borderBottom: `2px solid ${borderColor}`,
-                    opacity: 1,
                   }}
                 >
-                  {/* Week number */}
                   <div className="font-semibold text-base text-foreground leading-tight">
                     T{week.weekNum}{week.isCurrent && <span className="ml-0.5" style={{ color: "#3a8a36" }}>•</span>}
                   </div>
-                  {/* Date range */}
                   <div className="text-xs text-muted-foreground mt-0.5">
                     {formatDateShort(week.start)} – {formatDateShort(week.end)}
                   </div>
-                  {/* Capacity bar — matching Kanban WeeklySilos */}
                   <div className="relative w-full rounded overflow-hidden my-1" style={{ height: '7px', backgroundColor: '#f0eee9' }}>
                     <div
                       className="h-full rounded transition-all duration-300"
-                      style={{
-                        width: `${Math.min(pct, 100)}%`,
-                        background: barBg,
-                      }}
+                      style={{ width: `${Math.min(pct, 100)}%`, background: barBg }}
                     />
                   </div>
-                  {/* Hours row */}
                   <div className="flex items-center justify-between mt-[3px] font-sans text-[9px]">
                     <div>
                       <span className="font-bold" style={{ color: barColor }}>{Math.round(used)}h</span>
@@ -1239,363 +1313,304 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                 </div>
               );
             })}
-            {hasAnyExpedice && (
-              <div
-                className="shrink-0 px-2 py-2 border-b border-l border-border/50 sticky right-0 z-40 flex flex-col items-center justify-center"
-                style={{ width: EXPEDICE_W, backgroundColor: "#f0fdf4" }}
-              >
-                <div className="text-sm font-semibold" style={{ color: "#16A34A" }}>📦 Expedice</div>
-              </div>
-            )}
           </div>
 
-          {/* Project rows */}
-          <div className="flex flex-col" style={{ gap: 6, paddingTop: 6 }}>
-            {(() => {
-              const regular = filteredRows.filter(r => !r.isBlockerOnly);
-              const blockers = filteredRows.filter(r => r.isBlockerOnly);
-              const combined = [...regular];
-              if (blockers.length > 0) {
-                combined.push({ __separator: true, count: blockers.length } as any);
-                combined.push(...blockers);
-              }
-              return combined;
-            })().map((proj: any) => {
-              if (proj.__separator) {
-                return (
-                  <div key="blocker-separator" className="flex items-center gap-2 mt-3 mb-1 px-2">
-                    <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
-                    <span className="px-2 whitespace-nowrap" style={{ fontSize: 11, color: "#6b7280" }}>
-                      ⏳ Rezerva kapacit ({proj.count})
-                    </span>
-                    <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
-                  </div>
-                );
-              }
-              const isExpanded = expandedProjects.has(proj.projectId);
-              const isOverdueProject = (() => {
-                const pd = projectDateLookup.get(proj.projectId);
-                if (!pd) return false;
-
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-
-                const expediceDate = pd?.expedice ? parseAppDate(pd.expedice) : null;
-                if (expediceDate) {
-                  const exp = new Date(expediceDate);
-                  exp.setHours(0, 0, 0, 0);
-                  if (exp < today) return true;
-                }
-
-                const deadline = resolveDeadline({
-                  expedice: pd?.expedice ?? null,
-                  montaz: pd?.montaz ?? null,
-                  datum_smluvni: pd?.datum_smluvni ?? null,
-                });
-                if (!deadline) return false;
-                const dl = new Date(deadline.date);
-                dl.setHours(0, 0, 0, 0);
-                return dl < today;
-              })();
+          {/* Project rows — organized in sections */}
+          <div className="flex flex-col" style={{ gap: 0, paddingTop: 6 }}>
+            {[
+              { key: "inbox", label: "📥 Inbox", rows: sectionedRows.inboxSection },
+              { key: "vyroba", label: "🔧 Ve výrobě", rows: sectionedRows.vyrobaSection },
+              { key: "expedice", label: "📦 Expedice", rows: sectionedRows.expediceSection },
+              { key: "archiv", label: "✅ Archív", rows: sectionedRows.archivSection },
+            ].filter(s => s.rows.length > 0).map(section => {
+              const isCollapsed = collapsedSections.has(section.key);
               return (
-                <div key={proj.projectId} style={{ marginLeft: 4, marginRight: 4 }}>
-                  {/* Project header row */}
+                <div key={section.key}>
+                  {/* Section header */}
                   <div
-                    className="flex cursor-pointer transition-all"
-                    onClick={() => toggleProject(proj.projectId)}
-                    onContextMenu={(e) => handleProjectContextMenu(e, proj)}
-                    style={{ height: 48, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
+                    className="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none sticky left-0 z-10"
+                    onClick={() => toggleSection(section.key)}
+                    style={{ backgroundColor: "#fafaf8" }}
                   >
-                    <div
-                      className="shrink-0 flex items-center gap-2.5 px-3 sticky left-0 z-20"
-                      style={{
-                        width: LEFT_COL_W,
-                        backgroundColor: isOverdueProject ? "hsl(0 75% 93%)" : "#fff",
-                        borderLeft: `4px solid ${isOverdueProject ? "hsl(0 70% 50%)" : proj.color}`,
-                        borderRight: `1px solid ${isOverdueProject ? "hsl(0 60% 82%)" : "#e5e2dd"}`,
-                        borderTop: `1px solid ${isOverdueProject ? "hsl(0 60% 82%)" : "#e5e2dd"}`,
-                        borderBottom: `1px solid ${isOverdueProject ? "hsl(0 60% 82%)" : "#e5e2dd"}`,
-                        borderRadius: "6px 0 0 6px",
-                      }}
-                    >
-                      {isExpanded
-                        ? <ChevronDown className="h-4 w-4 shrink-0" style={{ color: proj.color }} />
-                        : <ChevronRight className="h-4 w-4 shrink-0" style={{ color: proj.items.length > 0 ? "#ea580c" : "#99a5a3" }} />
-                      }
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[14px] truncate leading-tight" style={{
-                          color: (proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0)) ? "#9ca3af" : "#1a1a1a",
-                          fontWeight: (proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0)) ? 400 : 500,
-                        }}>{proj.projectName}</div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-muted-foreground font-sans leading-tight">{proj.projectId}</span>
-                          {(() => {
-                            const pd = projectDateLookup.get(proj.projectId);
-                            if (!pd) return null;
-                            const allShipped = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
-                            const isProjectDone = terminalStatuses.has(pd?.status ?? "");
-                            const fields: { label: string; value: string | null | undefined }[] = [
-                              { label: "Exp", value: pd.expedice },
-                              { label: "Mnt", value: pd.montaz },
-                              { label: "Před", value: pd.predani },
-                              { label: "Sml", value: pd.datum_smluvni },
-                            ];
-                            for (const f of fields) {
-                              if (!f.value) continue;
-                              const parsed = parseAppDate(f.value);
-                              if (!parsed) continue;
-                              const fmtD = (d: Date) => `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getFullYear()).slice(-2)}`;
-                              const days = differenceInDays(parsed, new Date());
-                              const clr = !allShipped && !isProjectDone && days < 0 ? "#dc2626" : !allShipped && !isProjectDone && days <= 14 ? "#d97706" : "#7aa8a4";
-                              return (
-                                <span className="text-[10px] truncate" style={{ color: clr }}>
-                                  · {f.label}: {fmtD(parsed)}
-                                </span>
-                              );
-                            }
-                            if (!allShipped && !isProjectDone) {
-                              return (
-                                <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.1)", color: "#D97706" }}>
-                                  ⚠ BEZ TERMÍNU
-                                </span>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </div>
-                      </div>
-                      {/* Inline deadline warning */}
-                      {(() => {
-                        const pd = projectDateLookup.get(proj.projectId);
-                        const exp = pd?.expedice ? parseAppDate(pd.expedice) : null;
-                        if (!exp) return null;
-                        const isProjectDone = terminalStatuses.has(pd?.status ?? "");
-                        const allItemsDone = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
-                        if (isProjectDone || allItemsDone) return null;
-                        const days = differenceInDays(exp, new Date());
-                        if (days >= 0 && days > 3) return null;
-                        const warnColor = days < 0 ? "#dc3545" : "#d97706";
-                        const tooltipText = days < 0
-                          ? `Expedice ${format(exp, "dd.MM.yyyy")} — po termínu o ${Math.abs(days)} dní`
-                          : `Expedice za ${days} dní (${format(exp, "dd.MM.yyyy")})`;
-                        return (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <AlertTriangle size={14} style={{ color: warnColor }} className="shrink-0" />
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="z-[9999] text-xs">{tooltipText}</TooltipContent>
-                          </Tooltip>
-                        );
-                      })()}
-                      <div
-                        className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-sans font-bold"
-                        style={{ backgroundColor: proj.color + "18", color: proj.color }}
-                      >
-                        {formatProjectTotal(proj)}
-                      </div>
-                    </div>
-                    {/* Inbox cell */}
-                    {hasAnyInbox && (
-                      <div
-                        className="shrink-0 flex items-center justify-center px-1.5 sticky z-20"
-                        onContextMenu={(e) => { if (proj.inboxTotalHours > 0) { e.stopPropagation(); handleInboxProjectContextMenu(e, proj); } }}
-                        style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff", borderTop: "1px solid #e5e2dd", borderBottom: "1px solid #e5e2dd" }}
-                      >
-                        {proj.inboxTotalHours > 0 && (
-                          <div className="rounded-md px-2 py-0.5 text-center text-[10px] font-sans font-bold" style={{ backgroundColor: "#ffedd5", color: "#c2410c" }}>
-                            {formatInboxValue(proj.inboxTotalHours, proj.inboxTotalCzk, proj.totalHours, proj.projectId)}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {/* Week cells */}
-                    {weeks.map(week => {
-                      const wt = proj.weekTotals.get(week.key);
-                      return (
-                        <div
-                          key={week.key}
-                          className="shrink-0 flex items-center justify-center px-1.5"
-                          onContextMenu={(e) => { if (wt && wt.hours > 0) { e.stopPropagation(); handleBundleContextMenu(e, proj.projectId, week.key, false); } }}
-                          style={{
-                            width: CELL_W,
-                            backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : "#fff",
-                            borderTop: "1px solid #e5e2dd",
-                            borderBottom: "1px solid #e5e2dd",
-                          }}
-                        >
-                          {!isExpanded && wt && wt.hours > 0 && (() => {
-                            const cellStyle = getCollapsedCellStyle(proj, week.key);
-                            return (
-                              <div
-                                className="w-full rounded px-1 py-0.5 text-center text-[9px] font-sans font-bold"
-                                style={{ backgroundColor: cellStyle.bg, color: cellStyle.text, border: `1px solid ${cellStyle.border}` }}
-                              >
-                                {formatWeekTotal(wt.hours, wt.czk, week.key, proj.projectId)}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      );
-                    })}
-                    {/* Expedice cell */}
-                    {hasAnyExpedice && (
-                      <div
-                        className="shrink-0 flex items-center justify-center px-1.5 sticky right-0 z-20"
-                        onContextMenu={(e) => { if (proj.expediceTotalHours > 0) { e.stopPropagation(); handleExpediceItemContextMenu(e, proj.projectId); } }}
-                        style={{
-                          width: EXPEDICE_W,
-                          backgroundColor: "#fff",
-                          borderTop: "1px solid #e5e2dd",
-                          borderBottom: "1px solid #e5e2dd",
-                          borderRight: "1px solid #e5e2dd",
-                          borderRadius: "0 6px 6px 0",
-                        }}
-                      >
-                        {proj.expediceTotalHours > 0 && (
-                          <div className="rounded-md px-2 py-0.5 text-center text-[10px] font-sans font-bold" style={{ backgroundColor: "#dcfce7", color: "#15803d" }}>
-                            ✓ {formatExpediceValue(proj.expediceTotalHours, proj.expediceTotalCzk, proj.totalHours, proj.projectId)}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    {isCollapsed
+                      ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                      : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    }
+                    <span className="text-[11px] font-semibold text-muted-foreground">{section.label}</span>
+                    <span className="text-[10px] font-sans text-muted-foreground/70">{section.rows.length}</span>
+                    <div className="flex-1 h-px bg-border/50" />
                   </div>
 
-                  {/* Item rows — only when expanded */}
-                  {isExpanded && (() => {
-                    // Sort: active items first, completed items last
-                    const activeItems = proj.items.filter(i => {
-                      const hasOnlyExpedice = i.expediceHours > 0 && i.weekAllocations.size === 0 && i.inboxHours === 0;
-                      const allCompleted = [...i.weekAllocations.values()].every(a => a.status === "expedice" || a.status === "completed");
-                      return !hasOnlyExpedice && !allCompleted;
-                    });
-                    const completedItems = proj.items.filter(i => !activeItems.includes(i));
-                    const sortedItems = [...activeItems, ...completedItems];
-                    const firstCompletedIdx = activeItems.length;
-                    return (
-                    <div>
-                      {sortedItems.map((item, idx) => {
-                        const isCompletedItem = idx >= firstCompletedIdx;
-                        const isFirstCompleted = idx === firstCompletedIdx && completedItems.length > 0;
+                  {/* Section rows */}
+                  {!isCollapsed && (
+                    <div className="flex flex-col" style={{ gap: 6, padding: "4px 0" }}>
+                      {section.rows.map((proj: ProjectRow) => {
+                        const isExpanded = expandedProjects.has(proj.projectId);
                         return (
-                        <div key={item.id}>
-                          {isFirstCompleted && (
-                            <div className="flex items-center gap-1.5 px-3 py-1" style={{ backgroundColor: "#fafaf8" }}>
-                              <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
-                              <span className="text-[8px] font-medium" style={{ color: "#b0bab8" }}>Dokončeno</span>
-                              <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
-                            </div>
-                          )}
-                          <div
-                            className="flex"
-                            style={{
-                              height: 32,
-                              borderBottom: idx < sortedItems.length - 1 ? "1px solid #f5f3f0" : undefined,
-                              opacity: isCompletedItem ? 0.5 : 1,
-                            }}
-                          >
-                          <div
-                            className="shrink-0 flex items-center gap-2 pr-2 sticky left-0 z-20"
-                            onContextMenu={(e) => handleItemContextMenu(e, item)}
-                            style={{
-                              width: LEFT_COL_W,
-                              backgroundColor: "#fff",
-                              borderRight: "1px solid #e5e2dd",
-                              paddingLeft: 28,
-                              borderLeft: "2px dashed #e5e2dd",
-                            }}
-                          >
-                            {item.itemCode && (
-                              <span className="font-sans font-bold text-[11px] shrink-0" style={{ color: "#223937" }}>{item.itemCode}</span>
-                            )}
-                            <span className="text-[12px] truncate text-foreground">{item.itemName}</span>
-                            <span className="text-[10px] font-sans shrink-0 ml-auto" style={{ color: "#99a5a3" }}>{formatItemTotal(item, item.projectId)}</span>
-                          </div>
-                          {/* Inbox cell */}
-                          {hasAnyInbox && (
+                          <div key={proj.projectId} style={{ marginLeft: 4, marginRight: 4 }}>
+                            {/* Project header row */}
                             <div
-                              className="shrink-0 flex items-center justify-center px-1 sticky z-20"
-                              onContextMenu={(e) => { if (item.inboxHours > 0) { e.stopPropagation(); handleInboxItemContextMenu(e, item); } }}
-                              style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff" }}
+                              className="flex cursor-pointer transition-all"
+                              onClick={() => toggleProject(proj.projectId)}
+                              onContextMenu={(e) => handleProjectContextMenu(e, proj)}
+                              style={{ height: 48, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
                             >
-                              {item.inboxHours > 0 && (
-                                <div className="rounded-md px-2 py-0.5 text-center text-[9px] font-sans font-semibold" style={{ backgroundColor: "#ffedd5", color: "#c2410c" }}>
-                                  {formatInboxValue(item.inboxHours, item.inboxCzk, item.totalHours, item.projectId)}
+                              <div
+                                className="shrink-0 flex items-center gap-2.5 px-3 sticky left-0 z-20"
+                                style={{
+                                  width: LEFT_COL_W,
+                                  backgroundColor: "#fff",
+                                  borderLeft: `4px solid ${proj.color}`,
+                                  borderRight: "1px solid #e5e2dd",
+                                  borderTop: "1px solid #e5e2dd",
+                                  borderBottom: "1px solid #e5e2dd",
+                                  borderRadius: "6px 0 0 6px",
+                                }}
+                              >
+                                {isExpanded
+                                  ? <ChevronDown className="h-4 w-4 shrink-0" style={{ color: proj.color }} />
+                                  : <ChevronRight className="h-4 w-4 shrink-0" style={{ color: proj.items.length > 0 ? "#ea580c" : "#99a5a3" }} />
+                                }
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-[14px] truncate leading-tight" style={{
+                                    color: (proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0)) ? "#9ca3af" : "#1a1a1a",
+                                    fontWeight: (proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0)) ? 400 : 500,
+                                  }}>{proj.projectName}</div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-muted-foreground font-sans leading-tight">{proj.projectId}</span>
+                                    {(() => {
+                                      const pd = projectDateLookup.get(proj.projectId);
+                                      if (!pd) return null;
+                                      const allShipped = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
+                                      const isProjectDone = terminalStatuses.has(pd?.status ?? "");
+                                      const fields: { label: string; value: string | null | undefined }[] = [
+                                        { label: "Exp", value: pd.expedice },
+                                        { label: "Mnt", value: pd.montaz },
+                                        { label: "Před", value: pd.predani },
+                                        { label: "Sml", value: pd.datum_smluvni },
+                                      ];
+                                      for (const f of fields) {
+                                        if (!f.value) continue;
+                                        const parsed = parseAppDate(f.value);
+                                        if (!parsed) continue;
+                                        const fmtD = (d: Date) => `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getFullYear()).slice(-2)}`;
+                                        const days = differenceInDays(parsed, new Date());
+                                        const clr = !allShipped && !isProjectDone && days < 0 ? "#dc2626" : !allShipped && !isProjectDone && days <= 14 ? "#d97706" : "#7aa8a4";
+                                        return (
+                                          <span key={f.label} className="text-[10px] truncate" style={{ color: clr }}>
+                                            · {f.label}: {fmtD(parsed)}
+                                          </span>
+                                        );
+                                      }
+                                      if (!allShipped && !isProjectDone) {
+                                        return (
+                                          <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.1)", color: "#D97706" }}>
+                                            ⚠ BEZ TERMÍNU
+                                          </span>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                          )}
-                          {/* Week cells — interactive + droppable */}
-                          {weeks.map(week => {
-                            const alloc = item.weekAllocations.get(week.key);
-                            if (alloc) {
-                              return (
-                                <DroppableWeekCell key={week.key} droppableId={`${week.key}-${item.id}`} weekKey={week.key} isCurrent={week.isCurrent}>
-                                  <FilledWeekCell
-                                    weekKey={week.key}
-                                    isCurrent={week.isCurrent}
-                                    alloc={alloc}
-                                    item={item}
-                                    displayMode={displayMode}
-                                    formatCellValue={formatCellValue}
-                                    getCellStyle={(status: string) => getCellStyle(status, getProjectColor(item.projectId))}
-                                    projectColor={getProjectColor(item.projectId)}
-                                    moveTargetWeeks={moveTargetWeeks}
-                                    getWeekCapacity={getWeekCapacity}
-                                    weekCapacities={weekCapacities}
-                                    onMoveToWeek={handleMoveToWeek}
-                                    onReturnToInbox={handleReturnToInbox}
-                                    onComplete={handleComplete}
-                                    onCancel={(ids) => {
-                                      setCancelDialog({
-                                        open: true,
-                                        itemId: ids[0],
-                                        itemName: item.itemName,
-                                        itemCode: item.itemCode,
-                                        hours: alloc.hours,
-                                        projectName: item.projectName,
-                                        projectId: item.projectId,
-                                      });
-                                    }}
-                                    onContextMenu={handleWeekCellContextMenu}
-                                  />
-                                </DroppableWeekCell>
-                              );
-                            }
-                            return (
-                              <DroppableWeekCell key={week.key} droppableId={`${week.key}-${item.id}`} weekKey={week.key} isCurrent={week.isCurrent}>
-                                <EmptyWeekCell
-                                  weekKey={week.key}
-                                  isCurrent={week.isCurrent}
-                                  item={item}
-                                  onSchedule={handleScheduleFromInbox}
-                                />
-                              </DroppableWeekCell>
-                            );
-                          })}
-                          {/* Expedice cell */}
-                          {hasAnyExpedice && (
-                            <div
-                              className="shrink-0 flex items-center justify-center px-1 sticky right-0 z-20"
-                              onContextMenu={(e) => { if (item.expediceHours > 0) { e.stopPropagation(); handleExpediceItemContextMenu(e, item.projectId, item.itemName); } }}
-                              style={{ width: EXPEDICE_W, backgroundColor: "#f0fdf4" }}
-                            >
-                              {item.expediceHours > 0 && (
+                                {/* Inline deadline warning */}
+                                {(() => {
+                                  const pd = projectDateLookup.get(proj.projectId);
+                                  const exp = pd?.expedice ? parseAppDate(pd.expedice) : null;
+                                  if (!exp) return null;
+                                  const isProjectDone = terminalStatuses.has(pd?.status ?? "");
+                                  const allItemsDone = proj.items.length > 0 && proj.items.every(i => i.expediceHours > 0);
+                                  if (isProjectDone || allItemsDone) return null;
+                                  const days = differenceInDays(exp, new Date());
+                                  if (days >= 0 && days > 3) return null;
+                                  const warnColor = days < 0 ? "#dc3545" : "#d97706";
+                                  const tooltipText = days < 0
+                                    ? `Expedice ${format(exp, "dd.MM.yyyy")} — po termínu o ${Math.abs(days)} dní`
+                                    : `Expedice za ${days} dní (${format(exp, "dd.MM.yyyy")})`;
+                                  return (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <AlertTriangle size={14} style={{ color: warnColor }} className="shrink-0" />
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="z-[9999] text-xs">{tooltipText}</TooltipContent>
+                                    </Tooltip>
+                                  );
+                                })()}
                                 <div
-                                  className="rounded-md px-2 py-0.5 text-center text-[9px] font-sans font-semibold"
-                                  style={{ backgroundColor: "#dcfce7", color: "#15803d" }}
+                                  className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-sans font-bold"
+                                  style={{ backgroundColor: proj.color + "18", color: proj.color }}
                                 >
-                                  ✓ {formatExpediceValue(item.expediceHours, item.expediceCzk, item.totalHours, item.projectId)}
+                                  {formatProjectTotal(proj)}
+                                </div>
+                              </div>
+                              {/* Inbox cell */}
+                              {hasAnyInbox && (
+                                <div
+                                  className="shrink-0 flex items-center justify-center px-1.5 sticky z-20"
+                                  onContextMenu={(e) => { if (proj.inboxTotalHours > 0) { e.stopPropagation(); handleInboxProjectContextMenu(e, proj); } }}
+                                  style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff", borderTop: "1px solid #e5e2dd", borderBottom: "1px solid #e5e2dd" }}
+                                >
+                                  {proj.inboxTotalHours > 0 && (
+                                    <div className="rounded-md px-2 py-0.5 text-center text-[10px] font-sans font-bold" style={{ backgroundColor: "#ffedd5", color: "#c2410c" }}>
+                                      {formatInboxValue(proj.inboxTotalHours, proj.inboxTotalCzk, proj.totalHours, proj.projectId)}
+                                    </div>
+                                  )}
                                 </div>
                               )}
+                              {/* Week cells */}
+                              {weeks.map(week => {
+                                const wt = proj.weekTotals.get(week.key);
+                                return (
+                                  <div
+                                    key={week.key}
+                                    className="shrink-0 flex items-center justify-center px-1.5"
+                                    onContextMenu={(e) => { if (wt && wt.hours > 0) { e.stopPropagation(); handleBundleContextMenu(e, proj.projectId, week.key, false); } }}
+                                    style={{
+                                      width: CELL_W,
+                                      backgroundColor: week.isCurrent ? "hsl(142 76% 97%)" : "#fff",
+                                      borderTop: "1px solid #e5e2dd",
+                                      borderBottom: "1px solid #e5e2dd",
+                                    }}
+                                  >
+                                    {!isExpanded && wt && wt.hours > 0 && (() => {
+                                      const cellStyle = getCollapsedCellStyle(proj, week.key);
+                                      return (
+                                        <div
+                                          className="w-full rounded px-1 py-0.5 text-center text-[9px] font-sans font-bold"
+                                          style={{ backgroundColor: cellStyle.bg, color: cellStyle.text, border: `1px solid ${cellStyle.border}` }}
+                                        >
+                                          {formatWeekTotal(wt.hours, wt.czk, week.key, proj.projectId)}
+                                        </div>
+                                      );
+                                    })()}
+                                  </div>
+                                );
+                              })}
                             </div>
-                          )}
-                        </div>
-                        </div>
+
+                            {/* Item rows — only when expanded */}
+                            {isExpanded && (() => {
+                              const activeItems = proj.items.filter(i => {
+                                const hasOnlyExpedice = i.expediceHours > 0 && i.weekAllocations.size === 0 && i.inboxHours === 0;
+                                const allCompleted = [...i.weekAllocations.values()].every(a => a.status === "expedice" || a.status === "completed");
+                                return !hasOnlyExpedice && !allCompleted;
+                              });
+                              const completedItems = proj.items.filter(i => !activeItems.includes(i));
+                              const sortedItems = [...activeItems, ...completedItems];
+                              const firstCompletedIdx = activeItems.length;
+                              return (
+                              <div>
+                                {sortedItems.map((item, idx) => {
+                                  const isCompletedItem = idx >= firstCompletedIdx;
+                                  const isFirstCompleted = idx === firstCompletedIdx && completedItems.length > 0;
+                                  return (
+                                  <div key={item.id}>
+                                    {isFirstCompleted && (
+                                      <div className="flex items-center gap-1.5 px-3 py-1" style={{ backgroundColor: "#fafaf8" }}>
+                                        <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+                                        <span className="text-[8px] font-medium" style={{ color: "#b0bab8" }}>Dokončeno</span>
+                                        <div className="flex-1 h-px" style={{ backgroundColor: "#e2ddd6" }} />
+                                      </div>
+                                    )}
+                                    <div
+                                      className="flex"
+                                      style={{
+                                        height: 32,
+                                        borderBottom: idx < sortedItems.length - 1 ? "1px solid #f5f3f0" : undefined,
+                                        opacity: isCompletedItem ? 0.5 : 1,
+                                      }}
+                                    >
+                                    <div
+                                      className="shrink-0 flex items-center gap-2 pr-2 sticky left-0 z-20"
+                                      onContextMenu={(e) => handleItemContextMenu(e, item)}
+                                      style={{
+                                        width: LEFT_COL_W,
+                                        backgroundColor: "#fff",
+                                        borderRight: "1px solid #e5e2dd",
+                                        paddingLeft: 28,
+                                        borderLeft: "2px dashed #e5e2dd",
+                                      }}
+                                    >
+                                      {item.itemCode && (
+                                        <span className="font-sans font-bold text-[11px] shrink-0" style={{ color: "#223937" }}>{item.itemCode}</span>
+                                      )}
+                                      <span className="text-[12px] truncate text-foreground">{item.itemName}</span>
+                                      <span className="text-[10px] font-sans shrink-0 ml-auto" style={{ color: "#99a5a3" }}>{formatItemTotal(item, item.projectId)}</span>
+                                    </div>
+                                    {/* Inbox cell */}
+                                    {hasAnyInbox && (
+                                      <div
+                                        className="shrink-0 flex items-center justify-center px-1 sticky z-20"
+                                        onContextMenu={(e) => { if (item.inboxHours > 0) { e.stopPropagation(); handleInboxItemContextMenu(e, item); } }}
+                                        style={{ width: INBOX_W, left: LEFT_COL_W, backgroundColor: "#fff" }}
+                                      >
+                                        {item.inboxHours > 0 && (
+                                          <div className="rounded-md px-2 py-0.5 text-center text-[9px] font-sans font-semibold" style={{ backgroundColor: "#ffedd5", color: "#c2410c" }}>
+                                            {formatInboxValue(item.inboxHours, item.inboxCzk, item.totalHours, item.projectId)}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                    {/* Week cells — interactive + droppable */}
+                                    {weeks.map(week => {
+                                      const alloc = item.weekAllocations.get(week.key);
+                                      if (alloc) {
+                                        return (
+                                          <DroppableWeekCell key={week.key} droppableId={`${week.key}-${item.id}`} weekKey={week.key} isCurrent={week.isCurrent}>
+                                            <FilledWeekCell
+                                              weekKey={week.key}
+                                              isCurrent={week.isCurrent}
+                                              alloc={alloc}
+                                              item={item}
+                                              displayMode={displayMode}
+                                              formatCellValue={formatCellValue}
+                                              getCellStyle={(status: string) => getCellStyle(status, getProjectColor(item.projectId))}
+                                              projectColor={getProjectColor(item.projectId)}
+                                              moveTargetWeeks={moveTargetWeeks}
+                                              getWeekCapacity={getWeekCapacity}
+                                              weekCapacities={weekCapacities}
+                                              onMoveToWeek={handleMoveToWeek}
+                                              onReturnToInbox={handleReturnToInbox}
+                                              onComplete={handleComplete}
+                                              onCancel={(ids) => {
+                                                setCancelDialog({
+                                                  open: true,
+                                                  itemId: ids[0],
+                                                  itemName: item.itemName,
+                                                  itemCode: item.itemCode,
+                                                  hours: alloc.hours,
+                                                  projectName: item.projectName,
+                                                  projectId: item.projectId,
+                                                });
+                                              }}
+                                              onContextMenu={handleWeekCellContextMenu}
+                                            />
+                                          </DroppableWeekCell>
+                                        );
+                                      }
+                                      return (
+                                        <DroppableWeekCell key={week.key} droppableId={`${week.key}-${item.id}`} weekKey={week.key} isCurrent={week.isCurrent}>
+                                          <EmptyWeekCell
+                                            weekKey={week.key}
+                                            isCurrent={week.isCurrent}
+                                            item={item}
+                                            onSchedule={handleScheduleFromInbox}
+                                          />
+                                        </DroppableWeekCell>
+                                      );
+                                    })}
+                                  </div>
+                                  </div>
+                                  );
+                                })}
+                              </div>
+                              );
+                            })()}
+                          </div>
                         );
                       })}
                     </div>
-                    );
-                  })()}
+                  )}
                 </div>
               );
             })}
