@@ -220,18 +220,34 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      undoStackRef.current = [...undoStackRef.current.slice(0, idx), ...undoStackRef.current.slice(idx + 1)];
+      // Collect all entries with the same groupId (batch undo)
+      let entriesToUndo: UndoEntry[];
+      if (entry.groupId) {
+        entriesToUndo = undoStackRef.current.filter(e => e.groupId === entry.groupId);
+        undoStackRef.current = undoStackRef.current.filter(e => e.groupId !== entry.groupId);
+      } else {
+        entriesToUndo = [entry];
+        undoStackRef.current = [...undoStackRef.current.slice(0, idx), ...undoStackRef.current.slice(idx + 1)];
+      }
+
       const maxForPage = PAGE_MAX_STACK[entry.page] ?? DEFAULT_MAX_STACK;
-      redoStackRef.current = [...redoStackRef.current, entry].slice(-maxForPage);
+      redoStackRef.current = [...redoStackRef.current, ...entriesToUndo].slice(-maxForPage);
       bump();
 
       // Remove from DB on undo
-      if (entry.dbId) removeFromDb(entry.dbId);
+      for (const e of entriesToUndo) {
+        if (e.dbId) removeFromDb(e.dbId);
+      }
 
       executingRef.current = true;
       try {
-        await entry.undo();
-        toast({ title: `← Vráceno: ${entry.description}`, duration: 2000 });
+        for (const e of entriesToUndo) {
+          await e.undo();
+        }
+        const desc = entriesToUndo.length > 1
+          ? `${entry.description} (${entriesToUndo.length}×)`
+          : entry.description;
+        toast({ title: `← Vráceno: ${desc}`, duration: 2000 });
       } catch (err: any) {
         toast({
           title: "Nelze vrátit — data se změnila",
