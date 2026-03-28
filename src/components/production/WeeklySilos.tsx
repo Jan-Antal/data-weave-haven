@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { productionCzkToSellingPrice } from "@/lib/currency";
-import { GripVertical, ChevronRight, AlertTriangle, Lock } from "lucide-react";
+import { GripVertical, ChevronRight, AlertTriangle, Lock, LockOpen } from "lucide-react";
 import type { ForecastBlock } from "@/hooks/useForecastMode";
 import { differenceInDays, format } from "date-fns";
 import { useProductionSchedule, getISOWeekNumber, type WeekSilo, type ScheduleBundle, type ScheduleItem } from "@/hooks/useProductionSchedule";
@@ -230,6 +230,15 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const initialScrollDone = useRef(false);
   const [pastWeeksLoaded, setPastWeeksLoaded] = useState(4);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [unlockedWeeks, setUnlockedWeeks] = useState<Set<string>>(new Set());
+
+  const toggleWeekLock = useCallback((weekKey: string) => {
+    setUnlockedWeeks(prev => {
+      const next = new Set(prev);
+      next.has(weekKey) ? next.delete(weekKey) : next.add(weekKey);
+      return next;
+    });
+  }, []);
 
   const defaultWeeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
@@ -880,6 +889,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               focusedMatchKey={focusedMatchKey}
               searchMatchedProjectIds={searchMatchedProjectIds}
               searchActive={searchActive}
+              isWeekLocked={week.isPast && !unlockedWeeks.has(week.key)}
+              onToggleLock={() => toggleWeekLock(week.key)}
             />
           ))}
         </div>
@@ -1001,10 +1012,12 @@ interface SiloProps {
   focusedMatchKey?: string | null;
   searchMatchedProjectIds?: Set<string>;
   searchActive?: boolean;
+  isWeekLocked?: boolean;
+  onToggleLock?: () => void;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, planHoursMap, realHoursMap, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, planHoursMap, realHoursMap, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive, isWeekLocked, onToggleLock }: SiloProps) {
   // Capacity calculation: exclude paused items
   // Active hours (excl. paused), split into blocker and non-blocker
   const { activeHours, blockerHours, activeSellingCzk, blockerSellingCzk } = useMemo(() => {
@@ -1087,8 +1100,9 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
     : isWarning ? "linear-gradient(90deg, #fcd34d, #d97706)"
     : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
 
-  const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}`, disabled: isPast });
-  const highlighted = !isPast && (isOver || isOverTarget);
+  const { setNodeRef, isOver } = useDroppable({ id: `silo-week-${weekKey}`, disabled: !!isWeekLocked });
+  const highlighted = !isWeekLocked && (isOver || isOverTarget);
+  const isUnlockedPast = isPast && !isWeekLocked;
   const dropBorderColor = highlighted ? (isOverloaded ? "#d97706" : "#3b82f6") : undefined;
   const headerColor = forecastDarkMode
     ? (isCurrent ? "#4a9e96" : "#7aa8a4")
@@ -1103,16 +1117,29 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
       style={{
         backgroundColor: forecastDarkMode ? "#1f2e2c" : "#ffffff", borderRadius: 9,
         border: highlighted ? `2px solid ${dropBorderColor}`
+          : isUnlockedPast ? "1.5px solid #d97706"
           : isCurrent ? (forecastDarkMode ? "2.5px solid #4a9e96" : "2.5px solid #3a8a36")
           : isOverloaded && !isPast ? (forecastDarkMode ? "1px solid rgba(192,57,43,0.5)" : "1px solid rgba(220,53,69,0.4)")
           : forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #ece8e2",
-        boxShadow: isCurrent ? (forecastDarkMode ? "0 0 12px rgba(74,158,150,0.15)" : "0 0 12px rgba(58,138,54,0.12)") : undefined,
+        boxShadow: isCurrent ? (forecastDarkMode ? "0 0 12px rgba(74,158,150,0.15)" : "0 0 12px rgba(58,138,54,0.12)")
+          : isUnlockedPast ? "0 0 8px rgba(217,119,6,0.12)" : undefined,
       }}
     >
       {/* Header */}
       <div className="px-2.5 py-1.5 text-center" style={{ borderBottom: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #ece8e2" }}>
         <div className="flex items-center justify-center gap-1.5">
-          {isPast && <Lock size={11} style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }} />}
+          {isPast && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleLock?.(); }}
+              className="p-0.5 rounded hover:bg-muted/50 transition-colors"
+              title={isWeekLocked ? "Odemknout týden" : "Zamknout týden"}
+            >
+              {isWeekLocked
+                ? <Lock size={11} style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }} />
+                : <LockOpen size={11} style={{ color: "#d97706" }} />
+              }
+            </button>
+          )}
           <span className="font-sans text-[14px]" style={{ color: headerColor, fontWeight: headerWeight }}>T{weekNum}</span>
           {isCurrent && <span className="w-[5px] h-[5px] rounded-full" style={{ backgroundColor: forecastDarkMode ? "#4a9e96" : "#3a8a36" }} />}
         </div>
@@ -1167,7 +1194,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             forecastDarkMode={forecastDarkMode}
             isFocusedMatch={focusedMatchKey === `${weekKey}::${bundle.project_id}`}
             searchMatchedProjectIds={searchMatchedProjectIds}
-            searchActive={searchActive} />
+            searchActive={searchActive}
+            isWeekLocked={isWeekLocked} />
         ))}
 
         {/* Rezerva kapacit section — blocker bundles separated */}
@@ -1191,7 +1219,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
                 forecastDarkMode={forecastDarkMode}
                 isFocusedMatch={focusedMatchKey === `${weekKey}::${bundle.project_id}`}
                 searchMatchedProjectIds={searchMatchedProjectIds}
-                searchActive={searchActive} />
+                searchActive={searchActive}
+                isWeekLocked={isWeekLocked} />
             ))}
           </>
         )}
@@ -1254,7 +1283,7 @@ function formatDateShortYY(dateStr: string | null | undefined): string | null {
   return `${dd}.${mm}.${yy}`;
 }
 
-function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCapacity, onBundleContextMenu, onItemContextMenu, projectLookup, planHoursMap, realHoursMap, isSelected, onSelectProject, displayMode, searchQuery = "", forecastDarkMode, isFocusedMatch, searchMatchedProjectIds, searchActive }: {
+function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCapacity, onBundleContextMenu, onItemContextMenu, projectLookup, planHoursMap, realHoursMap, isSelected, onSelectProject, displayMode, searchQuery = "", forecastDarkMode, isFocusedMatch, searchMatchedProjectIds, searchActive, isWeekLocked }: {
   bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number; weeklyCapacity: number;
   displayMode: DisplayMode;
   onBundleContextMenu: (e: React.MouseEvent, bundle: ScheduleBundle, toggleExpand: () => void) => void;
@@ -1269,6 +1298,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   isFocusedMatch?: boolean;
   searchMatchedProjectIds?: Set<string>;
   searchActive?: boolean;
+  isWeekLocked?: boolean;
 }) {
   const { data: statusOpts2 = [] } = useProjectStatusOptions();
   const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts2), [statusOpts2]);
@@ -1365,10 +1395,11 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
     : expSeverity === "urgent" ? "#d97706"
     : color;
 
+  const bundleDragDisabled = allCompleted || !!forecastDarkMode || isMidflightBundle || !!isWeekLocked;
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: `silo-bundle-${bundle.project_id}-${weekKey}`,
     data: { type: "silo-bundle", projectId: bundle.project_id, projectName: bundle.project_name, weekDate: weekKey, hours: bundle.total_hours, itemCount: bundle.items.length },
-    disabled: allCompleted || !!forecastDarkMode,
+    disabled: bundleDragDisabled,
   });
   const toggleExpand = useCallback(() => setExpanded(v => !v), []);
   const isMatch = searchMatchedProjectIds?.has(bundle.project_id) ?? false;
@@ -1455,9 +1486,9 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
         </div>
 
         {/* Right portion: drag handle + bundle info */}
-        <div ref={setDragRef} {...attributes} {...(hasUncompleted ? listeners : {})}
+        <div ref={setDragRef} {...attributes} {...(!bundleDragDisabled && hasUncompleted ? listeners : {})}
           data-context="bundle"
-          className={`flex items-center gap-1 flex-1 min-w-0 pr-[6px] py-[5px] ${hasUncompleted ? "cursor-grab" : "cursor-default"}`}
+          className={`flex items-center gap-1 flex-1 min-w-0 pr-[6px] py-[5px] ${!bundleDragDisabled && hasUncompleted ? "cursor-grab" : "cursor-default"}`}
           onClick={e => { e.stopPropagation(); onSelectProject?.(bundle.project_id); }}
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onBundleContextMenu(e, bundle, toggleExpand); }}
         >
@@ -1540,7 +1571,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
               item.status === "paused" ? (
                 <PausedSiloItem key={item.id} item={item} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
               ) : (
-                <DraggableSiloItem key={item.id} item={item} weekKey={weekKey} showCzk={showCzk} disabled={!!forecastDarkMode} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
+                <DraggableSiloItem key={item.id} item={item} weekKey={weekKey} showCzk={showCzk} disabled={!!forecastDarkMode || isMidflightBundle || !!isWeekLocked} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
               )
             )}
             {completedItems.length > 0 && (
@@ -1650,15 +1681,15 @@ function DraggableSiloItem({ item, weekKey, showCzk, onContextMenu, disabled = f
   }, [onContextMenu]);
 
   return (
-    <div ref={setNodeRef} {...attributes} {...listeners}
+    <div ref={setNodeRef} {...attributes} {...(disabled ? {} : listeners)}
       data-context="item"
-      className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-grab transition-colors"
+      className={`flex items-center gap-[3px] px-[6px] py-[3px] rounded ${disabled ? "cursor-default" : "cursor-grab"} transition-colors`}
       style={{ opacity: isDragging ? 0.3 : 1, borderLeft: isSplit ? "2px dashed #99a5a3" : undefined }}
       onMouseEnter={e => { if (!isDragging) e.currentTarget.style.backgroundColor = "#f8f7f5"; }}
       onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
       onContextMenu={handleContextMenu}
     >
-      <GripVertical className="shrink-0" style={{ width: 8, height: 8, color: "#99a5a3" }} />
+      <GripVertical className="shrink-0" style={{ width: 8, height: 8, color: "#99a5a3", opacity: disabled ? 0.3 : 1 }} />
       {adhocReason && (
         <span className="text-[8px] shrink-0" style={{ color: "#d97706" }}>
           {adhocReason === "oprava" ? "🔧" : adhocReason === "dodatecna" ? "➕" : "📝"}
