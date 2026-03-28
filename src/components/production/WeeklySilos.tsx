@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { productionCzkToSellingPrice } from "@/lib/currency";
-import { GripVertical, ChevronRight, AlertTriangle, Lock } from "lucide-react";
+import { GripVertical, ChevronRight, AlertTriangle, Lock, LockOpen } from "lucide-react";
 import type { ForecastBlock } from "@/hooks/useForecastMode";
 import { differenceInDays, format } from "date-fns";
 import { useProductionSchedule, getISOWeekNumber, type WeekSilo, type ScheduleBundle, type ScheduleItem } from "@/hooks/useProductionSchedule";
@@ -230,6 +230,15 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const initialScrollDone = useRef(false);
   const [pastWeeksLoaded, setPastWeeksLoaded] = useState(4);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [unlockedWeeks, setUnlockedWeeks] = useState<Set<string>>(new Set());
+
+  const toggleWeekLock = useCallback((weekKey: string) => {
+    setUnlockedWeeks(prev => {
+      const next = new Set(prev);
+      next.has(weekKey) ? next.delete(weekKey) : next.add(weekKey);
+      return next;
+    });
+  }, []);
 
   const defaultWeeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
   const hourlyRate = settings?.hourly_rate ?? 550;
