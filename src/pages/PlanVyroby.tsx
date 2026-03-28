@@ -1038,38 +1038,73 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
   const hourlyRate = settings?.hourly_rate ?? 550;
   const inboxHours = inboxProjects.reduce((s, p) => s + p.total_hours, 0);
 
+  const toLocalDateKey = useCallback((date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }, []);
+
+  const countWeekdaysInRange = useCallback((start: Date, end: Date) => {
+    const cursor = new Date(start);
+    cursor.setHours(0, 0, 0, 0);
+    const endAt = new Date(end);
+    endAt.setHours(0, 0, 0, 0);
+    let count = 0;
+
+    while (cursor <= endAt) {
+      const day = cursor.getDay();
+      if (day !== 0 && day !== 6) count += 1;
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return count;
+  }, []);
+
   // Current week key
   const currentWeekKey = useMemo(() => {
     const d = new Date();
     const day = d.getDay();
     d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
     d.setHours(0, 0, 0, 0);
-    return d.toISOString().split("T")[0];
-  }, []);
+    return toLocalDateKey(d);
+  }, [toLocalDateKey]);
 
-  // Week keys whose Monday falls in the visible month (strict: Monday must be in the month)
-  const visibleMonthWeekKeys = useMemo(() => {
+  const visibleMonthWeeks = useMemo(() => {
     const { month, year } = visibleMonth;
-    const keysSet = new Set<string>();
-    const toDateStr = (dt: Date) => {
-      const y = dt.getFullYear();
-      const m = String(dt.getMonth() + 1).padStart(2, "0");
-      const dd = String(dt.getDate()).padStart(2, "0");
-      return `${y}-${m}-${dd}`;
-    };
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const d = new Date(firstDay);
-    const day = d.getDay();
-    d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
-    while (d <= lastDay) {
-      if (d.getMonth() === month && d.getFullYear() === year) {
-        keysSet.add(toDateStr(d));
+    const monthStart = new Date(year, month, 1);
+    monthStart.setHours(0, 0, 0, 0);
+    const monthEnd = new Date(year, month + 1, 0);
+    monthEnd.setHours(0, 0, 0, 0);
+
+    const firstWeekMonday = new Date(monthStart);
+    const startDay = firstWeekMonday.getDay();
+    firstWeekMonday.setDate(firstWeekMonday.getDate() - startDay + (startDay === 0 ? -6 : 1));
+    firstWeekMonday.setHours(0, 0, 0, 0);
+
+    const weeks: Array<{ weekKey: string; fraction: number }> = [];
+    const cursor = new Date(firstWeekMonday);
+
+    while (cursor <= monthEnd) {
+      const weekStart = new Date(cursor);
+      const weekEnd = new Date(cursor);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+
+      const overlapStart = weekStart > monthStart ? weekStart : monthStart;
+      const overlapEnd = weekEnd < monthEnd ? weekEnd : monthEnd;
+      const overlapWeekdays = overlapStart <= overlapEnd ? countWeekdaysInRange(overlapStart, overlapEnd) : 0;
+      const totalWeekdays = countWeekdaysInRange(weekStart, weekEnd);
+      const fraction = totalWeekdays > 0 ? overlapWeekdays / totalWeekdays : 0;
+
+      if (fraction > 0) {
+        weeks.push({ weekKey: toLocalDateKey(weekStart), fraction });
       }
-      d.setDate(d.getDate() + 7);
+
+      cursor.setDate(cursor.getDate() + 7);
     }
-    return Array.from(keysSet);
-  }, [visibleMonth]);
+
+    return weeks;
+  }, [visibleMonth, countWeekdaysInRange, toLocalDateKey]);
 
   // FIX: Fetch plan hours and real hours for prodej calculation (same as Kanban silos)
   const { data: planHoursData } = useQuery({
@@ -1110,27 +1145,26 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
     let czk = 0;
     const projectHoursInMonth = new Map<string, number>();
 
-    for (const wk of visibleMonthWeekKeys) {
-      cap += getWeekCapacity(wk);
+    for (const { weekKey, fraction } of visibleMonthWeeks) {
+      cap += getWeekCapacity(weekKey) * fraction;
       if (!scheduleData) continue;
-      const silo = scheduleData.get(wk);
+      const silo = scheduleData.get(weekKey);
       if (!silo) continue;
 
-      const isPastWeek = wk < currentWeekKey;
+      const isPastWeek = weekKey < currentWeekKey;
       if (!isPastWeek) {
-        hours += silo.total_hours;
+        hours += silo.total_hours * fraction;
       }
 
       for (const b of silo.bundles) {
         for (const i of b.items) {
           if (i.status === "paused") continue;
           const prev = projectHoursInMonth.get(b.project_id) ?? 0;
-          projectHoursInMonth.set(b.project_id, prev + i.scheduled_hours);
+          projectHoursInMonth.set(b.project_id, prev + (i.scheduled_hours * fraction));
         }
       }
     }
 
-    // Use same calcProdejValue logic as Kanban silos: (scheduledH / effectiveH) * prodejniCena
     for (const [pid, scheduledH] of projectHoursInMonth) {
       const proj = projectLookup.get(pid);
       const prodejniCena = proj?.prodejni_cena ?? 0;
@@ -1143,7 +1177,7 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
     }
 
     return { capacityHours: cap, scheduledHours: hours, scheduledCzk: czk };
-  }, [scheduleData, visibleMonthWeekKeys, getWeekCapacity, currentWeekKey, projectLookup, planHoursData, realHoursData]);
+  }, [scheduleData, visibleMonthWeeks, getWeekCapacity, currentWeekKey, projectLookup, planHoursData, realHoursData]);
 
   const isOverCapacity = scheduledHours > capacityHours;
   const displayCzk = scheduledCzk;
