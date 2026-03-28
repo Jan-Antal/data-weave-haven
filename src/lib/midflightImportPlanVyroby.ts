@@ -195,8 +195,7 @@ export async function midflightImportPlanVyroby(
         scheduled_week: monday,
         scheduled_hours: Math.round(totalHours * 100) / 100,
         scheduled_czk: 0,
-        status: "completed",
-        completed_at: new Date().toISOString(),
+        status: "scheduled",
         is_midflight: true,
       });
     }
