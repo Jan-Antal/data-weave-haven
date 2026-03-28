@@ -161,6 +161,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   const [localSearch, setLocalSearch] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialScrollDone = useRef(false);
+  const [historyOffset, setHistoryOffset] = useState(0); // number of extra 4-week chunks to show in the past
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; actions: ContextMenuAction[] } | null>(null);
@@ -227,21 +228,18 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   const weeks = useMemo<WeekColumn[]>(() => {
     const monday = getMonday(new Date());
     const currentWeekKey = monday.toISOString().split("T")[0];
-    // Start from currentWeek - 1
+    // Start from currentWeek - 1 - (historyOffset * 4 weeks)
     const startMonday = new Date(monday);
-    startMonday.setDate(startMonday.getDate() - 7);
-    const startKey = startMonday.toISOString().split("T")[0];
-    // Find the last scheduled week from data (non-midflight only)
+    startMonday.setDate(startMonday.getDate() - 7 - historyOffset * 4 * 7);
+    // Find the last scheduled week from data
     let latestDataWeek = currentWeekKey;
     if (scheduleData) {
-      for (const [weekKey, silo] of scheduleData) {
-        if (weekKey < startKey) continue; // skip weeks before our range
-        const hasNonMidflight = silo.bundles.some(b => b.items.some(i => !i.is_midflight));
-        if (hasNonMidflight && weekKey > latestDataWeek) latestDataWeek = weekKey;
+      for (const [weekKey] of scheduleData) {
+        if (weekKey > latestDataWeek) latestDataWeek = weekKey;
       }
     }
-    // Ensure at least 12 weeks from start
-    const minEnd = new Date(startMonday);
+    // Ensure at least 12 weeks from current monday
+    const minEnd = new Date(monday);
     minEnd.setDate(minEnd.getDate() + 12 * 7);
     const minEndKey = minEnd.toISOString().split("T")[0];
     const endKey = latestDataWeek > minEndKey ? latestDataWeek : minEndKey;
@@ -256,7 +254,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
       cursor.setDate(cursor.getDate() + 7);
     }
     return result;
-  }, [scheduleData]);
+  }, [scheduleData, historyOffset]);
 
   // Next 8 weeks from current for move targets
   const moveTargetWeeks = useMemo(() => {
@@ -319,8 +317,6 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
       for (const [weekKey, silo] of scheduleData) {
         for (const bundle of silo.bundles) {
           for (const item of bundle.items) {
-            // Exclude midflight (HIST_) items from Tabulka
-            if (item.is_midflight) continue;
             if (!projectMap.has(bundle.project_id)) {
               projectMap.set(bundle.project_id, { projectName: bundle.project_name, items: new Map() });
             }
@@ -441,7 +437,23 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
         }
       }
 
+      // Keep items with hours, inbox data, or expedice data (expedice items have 0 hours but still need to be visible)
+      const hasExpediceData = expedice && expedice.items.length > 0;
       const visibleItems = items.filter(i => i.totalHours > 0 || i.inboxHours > 0 || i.expediceHours > 0);
+      // If no visible items but project has expedice data, create a placeholder row
+      if (visibleItems.length === 0 && hasExpediceData) {
+        for (const exItem of expedice!.items) {
+          visibleItems.push({
+            id: Math.random().toString(36),
+            itemName: cleanSplitName(exItem.name), itemCode: exItem.code,
+            totalHours: 0, totalCzk: 0,
+            weekAllocations: new Map(),
+            inboxHours: 0, inboxCzk: 0, inboxItemIds: [],
+            expediceHours: 0, expediceCzk: 0,
+            projectId: pid, projectName: realName, stageId: null,
+          });
+        }
+      }
       if (visibleItems.length === 0) continue;
 
       const weekTotals = new Map<string, { hours: number; czk: number }>();
@@ -620,7 +632,6 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
         let activeCzk = 0;
         for (const b of silo.bundles) {
           for (const i of b.items) {
-            if (i.is_midflight) continue;
             if (i.status === "paused") continue;
             activeHours += i.scheduled_hours;
             activeCzk += i.scheduled_czk;
@@ -1312,6 +1323,26 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                 })()}
               </div>
             )}
+            {/* History load button */}
+            <div
+              className="shrink-0 flex items-center justify-center border-r border-border/50 bg-card cursor-pointer hover:bg-accent/50 transition-colors"
+              style={{ width: 48 }}
+              onClick={() => {
+                setHistoryOffset(prev => prev + 1);
+                // Maintain scroll position after prepending
+                const el = scrollRef.current;
+                if (el) {
+                  const prevScroll = el.scrollLeft;
+                  requestAnimationFrame(() => { el.scrollLeft = prevScroll + 4 * CELL_W; });
+                }
+              }}
+              title="Zobrazit 4 starší týdny"
+            >
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-[10px] text-muted-foreground font-medium">←</span>
+                <span className="text-[8px] text-muted-foreground leading-tight">Historie</span>
+              </div>
+            </div>
             {weeks.map(week => {
               const weekData = weekCapacities.get(week.key);
               const used = weekData?.hours ?? 0;
@@ -1501,6 +1532,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                                   )}
                                 </div>
                               )}
+                              {/* History spacer */}
+                              <div className="shrink-0" style={{ width: 48, backgroundColor: "#fff", borderTop: "1px solid #e5e2dd", borderBottom: "1px solid #e5e2dd" }} />
                               {/* Week cells */}
                               {weeks.map(week => {
                                 const wt = proj.weekTotals.get(week.key);
@@ -1595,6 +1628,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                                         )}
                                       </div>
                                     )}
+                                    {/* History spacer */}
+                                    <div className="shrink-0" style={{ width: 48, backgroundColor: "#fff" }} />
                                     {/* Week cells — interactive + droppable */}
                                     {weeks.map(week => {
                                       const alloc = item.weekAllocations.get(week.key);
