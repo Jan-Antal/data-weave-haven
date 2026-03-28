@@ -177,8 +177,8 @@ export async function midflightImportPlanVyroby(
     const prev = projectLatestMonday.get(projectId);
     if (!prev || monday > prev) projectLatestMonday.set(projectId, monday);
 
-    if (monday < currentMonday) {
-      // Historical → production_schedule as completed midflight items
+    if (monday <= currentMonday) {
+      // Historical (including current week) → production_schedule as completed midflight items
       const itemCode = `HIST_${monday.replace(/-/g, "")}`;
 
       scheduleInserts.push({
@@ -192,21 +192,6 @@ export async function midflightImportPlanVyroby(
         completed_at: new Date().toISOString(),
         is_midflight: true,
       });
-    } else if (monday === currentMonday) {
-      // Current week: reduce inbox hours
-      const inboxEntries = inboxByProject.get(projectId);
-      if (inboxEntries && inboxEntries.length > 0) {
-        for (const entry of inboxEntries) {
-          const remaining = Math.max(0, entry.estimated_hours - totalHours);
-          const { error: updErr } = await (supabaseClient as any)
-            .from("production_inbox")
-            .update({ estimated_hours: remaining })
-            .eq("id", entry.id);
-          if (updErr) {
-            errors.push(`Inbox update error ${projectId}: ${updErr.message}`);
-          }
-        }
-      }
     }
     // future weeks: skip
   }
@@ -222,14 +207,18 @@ export async function midflightImportPlanVyroby(
     if (projectsWithFutureWork.has(projectId)) continue;
 
     const projectName = validProjectMap.get(projectId)?.name || projectId;
-    const latestMonday = projectLatestMonday.get(projectId) || currentMonday;
     const latestDatum = projectLatestDatum.get(projectId);
+
+    // Always place EXPEDICE_MIDFLIGHT in the week before current to avoid cluttering current silos
+    const prevMonday = new Date(currentMonday);
+    prevMonday.setDate(prevMonday.getDate() - 7);
+    const prevMondayStr = prevMonday.toISOString().split("T")[0];
 
     scheduleInserts.push({
       project_id: projectId,
       item_code: "EXPEDICE_MIDFLIGHT",
       item_name: projectName,
-      scheduled_week: latestMonday,
+      scheduled_week: prevMondayStr,
       scheduled_hours: 0,
       scheduled_czk: 0,
       status: "completed",
