@@ -1002,7 +1002,7 @@ interface SiloProps {
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, planHoursMap, realHoursMap, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive }: SiloProps) {
   // Capacity calculation: exclude paused items
   // Active hours (excl. paused), split into blocker and non-blocker
   const { activeHours, blockerHours, activeSellingCzk, blockerSellingCzk } = useMemo(() => {
@@ -1011,18 +1011,24 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
     let blocker = 0;
     let activeSelling = 0;
     let blockerSelling = 0;
+    // Aggregate hours per project for prodej calc
+    const projectHoursInWeek = new Map<string, { active: number; blocker: number }>();
     for (const b of silo.bundles) {
-      const proj = projectLookup.get(b.project_id);
       for (const i of b.items) {
         if (i.status === "paused") continue;
-        const prodCzk = i.scheduled_hours * hourlyRate;
-        const sellCzk = productionCzkToSellingPrice(prodCzk, proj?.cost_production_pct, proj?.marze);
-        if (i.is_blocker) { blocker += i.scheduled_hours; blockerSelling += sellCzk; }
-        else { active += i.scheduled_hours; activeSelling += sellCzk; }
+        const prev = projectHoursInWeek.get(b.project_id) || { active: 0, blocker: 0 };
+        if (i.is_blocker) { blocker += i.scheduled_hours; prev.blocker += i.scheduled_hours; }
+        else { active += i.scheduled_hours; prev.active += i.scheduled_hours; }
+        projectHoursInWeek.set(b.project_id, prev);
       }
     }
+    // FIX 6: Use MAX(plan_hours, real_hours) for prodej calculation
+    for (const [pid, hours] of projectHoursInWeek) {
+      if (hours.active > 0) activeSelling += calcProdejValue(hours.active, pid, projectLookup, planHoursMap, realHoursMap);
+      if (hours.blocker > 0) blockerSelling += calcProdejValue(hours.blocker, pid, projectLookup, planHoursMap, realHoursMap);
+    }
     return { activeHours: active, blockerHours: blocker, activeSellingCzk: activeSelling, blockerSellingCzk: blockerSelling };
-  }, [silo, projectLookup, hourlyRate]);
+  }, [silo, projectLookup, hourlyRate, planHoursMap, realHoursMap]);
 
   // Forecast layer is isolated and read-only, rendered separately per week
   const weekForecastBlocks = useMemo(() => {
