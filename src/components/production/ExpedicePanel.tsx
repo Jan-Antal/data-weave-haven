@@ -235,7 +235,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     try {
       const { error } = await supabase
         .from("production_schedule")
-        .update({ expediced_at: new Date().toISOString() } as any)
+        .update({ status: "completed", expediced_at: new Date().toISOString() } as any)
         .eq("id", itemId);
       if (error) throw error;
       invalidateAll();
@@ -252,14 +252,13 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
         .from("production_schedule")
         .select("id")
         .eq("project_id", projectId)
-        .eq("status", "completed")
-        .is("expediced_at", null);
+        .eq("status", "expedice");
       if (fetchErr) throw fetchErr;
       if (!items || items.length === 0) return;
 
       const { error } = await supabase
         .from("production_schedule")
-        .update({ expediced_at: new Date().toISOString() } as any)
+        .update({ status: "completed", expediced_at: new Date().toISOString() } as any)
         .in("id", items.map(i => i.id));
       if (error) throw error;
       invalidateAll();
