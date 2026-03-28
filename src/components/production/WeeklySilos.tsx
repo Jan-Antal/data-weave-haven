@@ -889,6 +889,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
               focusedMatchKey={focusedMatchKey}
               searchMatchedProjectIds={searchMatchedProjectIds}
               searchActive={searchActive}
+              isWeekLocked={week.isPast && !unlockedWeeks.has(week.key)}
+              onToggleLock={() => toggleWeekLock(week.key)}
             />
           ))}
         </div>
