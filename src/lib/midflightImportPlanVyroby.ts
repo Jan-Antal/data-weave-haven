@@ -212,6 +212,9 @@ export async function midflightImportPlanVyroby(
   prevMondayFallback.setDate(prevMondayFallback.getDate() - 7);
   const prevMondayFallbackStr = prevMondayFallback.toISOString().split("T")[0];
 
+  const activeExpediceStatuses = new Set(["expedice", "montáž"]);
+  const archiveStatuses = new Set(["dokončeno", "fakturace"]);
+
   for (const [projectId, projectInfo] of validProjectMap) {
     if (!expediceMarkerStatuses.has(projectInfo.status)) continue;
 
@@ -224,16 +227,36 @@ export async function midflightImportPlanVyroby(
     // scheduled_week = monday of MAX(datum_sync), or prev week if no hours
     let expWeek: string;
     let expCompletedAt: string;
-    if (latestDatum) {
-      expWeek = getMondayOfWeek(latestDatum);
-      // If that falls on current week, push to previous week to avoid cluttering current silo
-      if (expWeek >= currentMonday) {
+    let expExpedicedAt: string | null = null;
+    let expStatus: string;
+
+    if (activeExpediceStatuses.has(projectInfo.status)) {
+      // Expedice/Montáž → active expedice
+      expStatus = "expedice";
+      expCompletedAt = new Date().toISOString();
+      expExpedicedAt = null;
+      if (latestDatum) {
+        expWeek = getMondayOfWeek(latestDatum);
+        if (expWeek >= currentMonday) expWeek = prevMondayFallbackStr;
+      } else {
         expWeek = prevMondayFallbackStr;
       }
-      expCompletedAt = new Date(latestDatum).toISOString();
     } else {
-      expWeek = prevMondayFallbackStr;
-      expCompletedAt = new Date('2025-12-31').toISOString();
+      // Dokončeno/Fakturace → archived (completed)
+      expStatus = "completed";
+      if (latestDatum) {
+        expWeek = getMondayOfWeek(latestDatum);
+        if (expWeek >= currentMonday) expWeek = prevMondayFallbackStr;
+        // completed_at and expediced_at = MAX(datum_sync) + 1 day
+        const nextDay = new Date(latestDatum);
+        nextDay.setDate(nextDay.getDate() + 1);
+        expCompletedAt = nextDay.toISOString();
+        expExpedicedAt = nextDay.toISOString();
+      } else {
+        expWeek = prevMondayFallbackStr;
+        expCompletedAt = new Date('2025-12-31').toISOString();
+        expExpedicedAt = new Date('2025-12-31').toISOString();
+      }
     }
 
     scheduleInserts.push({
@@ -243,8 +266,9 @@ export async function midflightImportPlanVyroby(
       scheduled_week: expWeek,
       scheduled_hours: 0,
       scheduled_czk: 0,
-      status: "completed",
+      status: expStatus,
       completed_at: expCompletedAt,
+      expediced_at: expExpedicedAt,
       is_midflight: true,
     });
     expediceCount++;
