@@ -1324,6 +1324,26 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                 })()}
               </div>
             )}
+            {/* History load button */}
+            <div
+              className="shrink-0 flex items-center justify-center border-r border-border/50 bg-card cursor-pointer hover:bg-accent/50 transition-colors"
+              style={{ width: 48 }}
+              onClick={() => {
+                setHistoryOffset(prev => prev + 1);
+                // Maintain scroll position after prepending
+                const el = scrollRef.current;
+                if (el) {
+                  const prevScroll = el.scrollLeft;
+                  requestAnimationFrame(() => { el.scrollLeft = prevScroll + 4 * CELL_W; });
+                }
+              }}
+              title="Zobrazit 4 starší týdny"
+            >
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-[10px] text-muted-foreground font-medium">←</span>
+                <span className="text-[8px] text-muted-foreground leading-tight">Historie</span>
+              </div>
+            </div>
             {weeks.map(week => {
               const weekData = weekCapacities.get(week.key);
               const used = weekData?.hours ?? 0;
