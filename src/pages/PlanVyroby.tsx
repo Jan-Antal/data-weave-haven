@@ -1051,7 +1051,12 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
   const visibleMonthWeekKeys = useMemo(() => {
     const { month, year } = visibleMonth;
     const keysSet = new Set<string>();
-    // Walk from the Monday on or before the 1st, adding weeks whose Monday is in this month
+    const toDateStr = (dt: Date) => {
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, "0");
+      const dd = String(dt.getDate()).padStart(2, "0");
+      return `${y}-${m}-${dd}`;
+    };
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const d = new Date(firstDay);
@@ -1059,7 +1064,7 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
     d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
     while (d <= lastDay) {
       if (d.getMonth() === month && d.getFullYear() === year) {
-        keysSet.add(d.toISOString().split("T")[0]);
+        keysSet.add(toDateStr(d));
       }
       d.setDate(d.getDate() + 7);
     }
