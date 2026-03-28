@@ -1194,7 +1194,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             forecastDarkMode={forecastDarkMode}
             isFocusedMatch={focusedMatchKey === `${weekKey}::${bundle.project_id}`}
             searchMatchedProjectIds={searchMatchedProjectIds}
-            searchActive={searchActive} />
+            searchActive={searchActive}
+            isWeekLocked={isWeekLocked} />
         ))}
 
         {/* Rezerva kapacit section — blocker bundles separated */}
