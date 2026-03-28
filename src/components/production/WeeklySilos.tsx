@@ -1343,7 +1343,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
       backgroundColor: forecastDarkMode
         ? (isHighlighted ? "rgba(217,119,6,0.08)" : "#252a35")
         : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : isHighlighted ? "rgba(217,119,6,0.05)" : "#ffffff"),
-      opacity: isDragging ? 0.3 : isDimmed ? 0.5 : allCompleted ? 0.55 : 1,
+      opacity: isDragging ? 0.3 : isDimmed ? 0.5 : 1,
       outline: isFocusedMatch ? "2px solid #d97706" : undefined,
       outlineOffset: isFocusedMatch ? "2px" : undefined,
       boxShadow: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "inset 0 0 0 1px hsl(0 60% 86%)" : isHighlighted ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined),
