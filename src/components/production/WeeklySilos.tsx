@@ -371,6 +371,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       if (m1 === m2 && y1 === y2) setVisiblePeriodLabel(`${MONTH_NAMES[m1]} ${y1}`);
       else if (y1 === y2) setVisiblePeriodLabel(`${MONTH_NAMES[m1]} – ${MONTH_NAMES[m2]} ${y1}`);
       else setVisiblePeriodLabel(`${MONTH_NAMES[m1]} ${y1} – ${MONTH_NAMES[m2]} ${y2}`);
+      // Report leftmost visible week's month to parent
+      onVisibleMonthChange?.(first.getMonth(), first.getFullYear());
     };
     const observer = new IntersectionObserver(entries => {
       for (const entry of entries) {
@@ -383,7 +385,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     }, { root: container, threshold: 0.3 });
     for (const [, el] of siloRefs.current) observer.observe(el);
     return () => { clearTimeout(debounceTimer); observer.disconnect(); };
-  }, [weeks]);
+  }, [weeks, onVisibleMonthChange]);
 
   const registerSiloRef = useCallback((key: string, el: HTMLDivElement | null) => {
     if (el) siloRefs.current.set(key, el); else siloRefs.current.delete(key);
