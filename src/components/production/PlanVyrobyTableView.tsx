@@ -1328,9 +1328,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                 <div key={section.key}>
                   {/* Section header */}
                   <div
-                    className="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none sticky left-0 z-10"
+                    className="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none sticky left-0 z-25"
                     onClick={() => toggleSection(section.key)}
-                    style={{ backgroundColor: "#fafaf8" }}
+                    style={{ backgroundColor: "#fafaf8", width: LEFT_COL_W }}
                   >
                     {isCollapsed
                       ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1338,7 +1338,6 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
                     }
                     <span className="text-[11px] font-semibold text-muted-foreground">{section.label}</span>
                     <span className="text-[10px] font-sans text-muted-foreground/70">{section.rows.length}</span>
-                    <div className="flex-1 h-px bg-border/50" />
                   </div>
 
                   {/* Section rows */}
