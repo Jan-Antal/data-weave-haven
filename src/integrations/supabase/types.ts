@@ -416,6 +416,67 @@ export type Database = {
         }
         Relationships: []
       }
+      production_expedice: {
+        Row: {
+          created_at: string | null
+          expediced_at: string | null
+          id: string
+          is_midflight: boolean | null
+          item_code: string | null
+          item_name: string
+          manufactured_at: string
+          project_id: string
+          source_schedule_id: string | null
+          stage_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expediced_at?: string | null
+          id?: string
+          is_midflight?: boolean | null
+          item_code?: string | null
+          item_name: string
+          manufactured_at: string
+          project_id: string
+          source_schedule_id?: string | null
+          stage_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expediced_at?: string | null
+          id?: string
+          is_midflight?: boolean | null
+          item_code?: string | null
+          item_name?: string
+          manufactured_at?: string
+          project_id?: string
+          source_schedule_id?: string | null
+          stage_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_expedice_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "production_expedice_source_schedule_id_fkey"
+            columns: ["source_schedule_id"]
+            isOneToOne: false
+            referencedRelation: "production_schedule"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_expedice_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "project_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       production_hours_log: {
         Row: {
           ami_project_id: string
