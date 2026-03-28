@@ -172,6 +172,17 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     );
   }, [archivedProjects, archiveSearchTrimmed, isDeepSearch, deepSearchResults]);
 
+  useEffect(() => {
+    if (!initializedArchiveCollapseRef.current && archivedProjects.length > 0) {
+      setCollapsedGroups((prev) => {
+        const next = new Set(prev);
+        archivedProjects.forEach((group) => next.add(`archive-${group.project_id}`));
+        return next;
+      });
+      initializedArchiveCollapseRef.current = true;
+    }
+  }, [archivedProjects]);
+
   const { totalItems, lastCompletedStr } = useMemo(() => {
     let total = 0;
     let latest: Date | null = null;
