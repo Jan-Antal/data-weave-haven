@@ -62,12 +62,18 @@ export async function midflightImportPlanVyroby(
     .like("adhoc_reason", "midflight%");
   if (err2) throw new Error("Reset inbox failed: " + err2.message);
 
-  // 3. Also delete any HIST_ or EXPEDICE_MIDFLIGHT that may have
-  //    is_midflight=false due to previous bugs
+  // 3. Delete ALL midflight entries from production_expedice
+  const { error: err2b } = await (supabaseClient as any)
+    .from("production_expedice")
+    .delete()
+    .eq("is_midflight", true);
+  if (err2b) throw new Error("Reset expedice failed: " + err2b.message);
+
+  // 4. Cleanup legacy HIST_ rows that may have is_midflight=false
   const { error: err3 } = await (supabaseClient as any)
     .from("production_schedule")
     .delete()
-    .or("item_code.eq.EXPEDICE_MIDFLIGHT,item_code.eq.DONE_MIDFLIGHT,item_code.like.HIST_%");
+    .like("item_code", "HIST_%");
   if (err3) console.warn("Cleanup fallback failed:", err3.message);
 
   onProgress?.("[midflight] Reset hotový. Spúšťam import...");
@@ -202,81 +208,9 @@ export async function midflightImportPlanVyroby(
     // future weeks: skip
   }
 
-  // Expedice/Montáž/Dokončeno/Fakturace → EXPEDICE_MIDFLIGHT marker entry
-  const expediceMarkerStatuses = new Set(["expedice", "montáž", "dokončeno", "fakturace"]);
-
-  // Iterate ALL valid projects (not just those with hours) to catch Dokončeno/Fakturace with no hours
-  let expediceCount = 0;
-  const prevMondayFallback = new Date(currentMonday);
-  prevMondayFallback.setDate(prevMondayFallback.getDate() - 7);
-  const prevMondayFallbackStr = prevMondayFallback.toISOString().split("T")[0];
-
-  const activeExpediceStatuses = new Set(["expedice", "montáž"]);
-  const archiveStatuses = new Set(["dokončeno", "fakturace"]);
-
-  for (const [projectId, projectInfo] of validProjectMap) {
-    if (!expediceMarkerStatuses.has(projectInfo.status)) continue;
-
-    // Only create if no future scheduled work exists
-    if (projectsWithFutureWork.has(projectId)) continue;
-
-    const projectName = projectInfo.name || projectId;
-    const latestDatum = projectLatestDatum.get(projectId);
-
-    // scheduled_week = monday of MAX(datum_sync), or prev week if no hours
-    let expWeek: string;
-    let expCompletedAt: string;
-    let expExpedicedAt: string | null = null;
-    let expStatus: string;
-
-    if (activeExpediceStatuses.has(projectInfo.status)) {
-      // Expedice/Montáž → active expedice
-      expStatus = "expedice";
-      expCompletedAt = new Date().toISOString();
-      expExpedicedAt = null;
-      if (latestDatum) {
-        expWeek = getMondayOfWeek(latestDatum);
-        if (expWeek >= currentMonday) expWeek = prevMondayFallbackStr;
-      } else {
-        expWeek = prevMondayFallbackStr;
-      }
-    } else {
-      // Dokončeno/Fakturace → archived (completed)
-      expStatus = "completed";
-      if (latestDatum) {
-        expWeek = getMondayOfWeek(latestDatum);
-        if (expWeek >= currentMonday) expWeek = prevMondayFallbackStr;
-        // completed_at and expediced_at = MAX(datum_sync) + 1 day
-        const nextDay = new Date(latestDatum);
-        nextDay.setDate(nextDay.getDate() + 1);
-        expCompletedAt = nextDay.toISOString();
-        expExpedicedAt = nextDay.toISOString();
-      } else {
-        expWeek = prevMondayFallbackStr;
-        expCompletedAt = new Date('2025-12-31').toISOString();
-        expExpedicedAt = new Date('2025-12-31').toISOString();
-      }
-    }
-
-    scheduleInserts.push({
-      project_id: projectId,
-      item_code: "EXPEDICE_MIDFLIGHT",
-      item_name: projectName,
-      scheduled_week: expWeek,
-      scheduled_hours: 0,
-      scheduled_czk: 0,
-      status: expStatus,
-      completed_at: expCompletedAt,
-      expediced_at: expExpedicedAt,
-      is_midflight: true,
-    });
-    expediceCount++;
-  }
-  console.log('[midflight] EXPEDICE_MIDFLIGHT created:', expediceCount);
-
-  // Batch insert all items to production_schedule
+  // ━━━ Insert HIST_ bundles to production_schedule ━━━
   if (scheduleInserts.length > 0) {
-    onProgress?.(`Vkládám ${scheduleInserts.length} položek do plánu...`);
+    onProgress?.(`Vkládám ${scheduleInserts.length} HIST_ položek do plánu...`);
     for (let i = 0; i < scheduleInserts.length; i += 200) {
       const chunk = scheduleInserts.slice(i, i + 200);
       const { error: insErr } = await (supabaseClient as any)
@@ -289,6 +223,66 @@ export async function midflightImportPlanVyroby(
       }
     }
   }
+
+  // ━━━ Insert Expedice/Dokončeno markers to production_expedice ━━━
+  const expediceMarkerStatuses = new Set(["expedice", "montáž", "dokončeno", "fakturace"]);
+  const activeExpediceStatuses = new Set(["expedice", "montáž"]);
+  const expediceInserts: any[] = [];
+  let expediceCount = 0;
+
+  for (const [projectId, projectInfo] of validProjectMap) {
+    if (!expediceMarkerStatuses.has(projectInfo.status)) continue;
+    if (projectsWithFutureWork.has(projectId)) continue;
+
+    const projectName = projectInfo.name || projectId;
+    const latestDatum = projectLatestDatum.get(projectId);
+
+    let manufacturedAt: string;
+    let expExpedicedAt: string | null = null;
+
+    if (activeExpediceStatuses.has(projectInfo.status)) {
+      // Expedice/Montáž → active (not yet expediced)
+      manufacturedAt = latestDatum || new Date().toISOString().split("T")[0];
+      expExpedicedAt = null;
+    } else {
+      // Dokončeno/Fakturace → archived
+      if (latestDatum) {
+        const nextDay = new Date(latestDatum);
+        nextDay.setDate(nextDay.getDate() + 1);
+        manufacturedAt = latestDatum;
+        expExpedicedAt = nextDay.toISOString();
+      } else {
+        manufacturedAt = "2025-12-31";
+        expExpedicedAt = new Date("2025-12-31").toISOString();
+      }
+    }
+
+    expediceInserts.push({
+      project_id: projectId,
+      item_code: "EXPEDICE_MIDFLIGHT",
+      item_name: projectName,
+      manufactured_at: manufacturedAt,
+      expediced_at: expExpedicedAt,
+      is_midflight: true,
+    });
+    expediceCount++;
+  }
+
+  if (expediceInserts.length > 0) {
+    onProgress?.(`Vkládám ${expediceInserts.length} expedice záznamov...`);
+    for (let i = 0; i < expediceInserts.length; i += 200) {
+      const chunk = expediceInserts.slice(i, i + 200);
+      const { error: insErr } = await (supabaseClient as any)
+        .from("production_expedice")
+        .insert(chunk);
+      if (insErr) {
+        errors.push(`Expedice insert error (batch ${i}): ${insErr.message}`);
+      } else {
+        created += chunk.length;
+      }
+    }
+  }
+  console.log("[midflight] production_expedice created:", expediceCount);
 
   onProgress?.(`Hotovo. Vytvořeno: ${created}, Přeskočeno: ${skipped}`);
   return { created, skipped, errors };
