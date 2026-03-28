@@ -81,7 +81,7 @@ export function LegacyArchiveSection({ showLegacy, onToggle }: LegacyArchiveSect
   );
 }
 
-function LegacyProjectCard({ project }: { project: { project_id: string; project_name: string; totalHours: number; weekRange: string | null; items: Array<{ id: string; item_name: string; item_code: string | null; scheduled_hours: number; scheduled_week: string }> } }) {
+function LegacyProjectCard({ project }: { project: { project_id: string; project_name: string; totalHours: number; weekRange: string | null; items: ExpediceItem[] } }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
