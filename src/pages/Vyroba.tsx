@@ -3751,59 +3751,67 @@ function UnifiedItemList({
   function handleMarkHotovo() {
     const targetItems =
       selectedItems.size > 0
-        ? dedupedItems.filter((d) => d.mergedIds.some((id) => selectedItems.has(id)) && d.item.status !== "completed")
-        : dedupedItems.filter((d) => d.item.status !== "completed");
+        ? dedupedItems.filter((d) => d.mergedIds.some((id) => selectedItems.has(id)) && !isItemDoneLocal(d.item))
+        : dedupedItems.filter((d) => !isItemDoneLocal(d.item));
 
     if (targetItems.length === 0) return;
 
     const missingQC = targetItems.filter(({ item }) => !checkMap.has(item.id));
 
     if (missingQC.length === 0) {
-      // All have QC — mark as hotovo directly
+      // All have QC — mark as hotovo via production_expedice
       (async () => {
-        const ids = targetItems.flatMap(({ mergedIds }) => mergedIds);
-        const snapshots = targetItems
-          .map(({ mergedIds: mids, item }) => mids.map((mid) => ({ id: mid, prevStatus: item.status })))
-          .flat();
+        const itemsToInsert = targetItems.flatMap(({ mergedIds: mids, item }) =>
+          mids.map((mid) => ({ id: mid, item }))
+        );
         pushUndo({
           page: "vyroba",
           actionType: "item_hotovo",
-          description: `${ids.length} položek dokončeno`,
+          description: `${itemsToInsert.length} položek dokončeno`,
           undo: async () => {
-            for (const snap of snapshots) {
-              await supabase
-                .from("production_schedule")
-                .update({ status: snap.prevStatus, completed_at: null, completed_by: null })
-                .eq("id", snap.id);
+            for (const { id } of itemsToInsert) {
+              await (supabase.from("production_expedice") as any).delete().eq("source_schedule_id", id);
             }
             qc.invalidateQueries({ queryKey: ["production-schedule"] });
+            qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+            qc.invalidateQueries({ queryKey: ["production-expedice"] });
           },
           redo: async () => {
-            const {
-              data: { user },
-            } = await supabase.auth.getUser();
-            await supabase
-              .from("production_schedule")
-              .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null })
-              .in("id", ids);
+            for (const { id, item } of itemsToInsert) {
+              await (supabase.from("production_expedice") as any).insert({
+                project_id: projectId,
+                item_name: item.item_name,
+                item_code: item.item_code || null,
+                source_schedule_id: id,
+                stage_id: item.stage_id || null,
+                manufactured_at: new Date().toISOString(),
+                expediced_at: null,
+                is_midflight: false,
+              });
+            }
             qc.invalidateQueries({ queryKey: ["production-schedule"] });
+            qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+            qc.invalidateQueries({ queryKey: ["production-expedice"] });
           },
         });
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        await supabase
-          .from("production_schedule")
-          .update({
-            status: "completed",
-            completed_at: new Date().toISOString(),
-            completed_by: user?.id || null,
-          })
-          .in("id", ids);
+        for (const { id, item } of itemsToInsert) {
+          await (supabase.from("production_expedice") as any).insert({
+            project_id: projectId,
+            item_name: item.item_name,
+            item_code: item.item_code || null,
+            source_schedule_id: id,
+            stage_id: item.stage_id || null,
+            manufactured_at: new Date().toISOString(),
+            expediced_at: null,
+            is_midflight: false,
+          });
+        }
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+        qc.invalidateQueries({ queryKey: ["production-expedice"] });
         setSelectedItems(new Set());
-        // Check if ALL items are now completed
-        const allNowCompleted = dedupedItems.every(({ item }) => item.status === "completed" || ids.includes(item.id));
+        const ids = itemsToInsert.map(({ id }) => id);
+        const allNowCompleted = dedupedItems.every(({ item }) => isItemDoneLocal(item) || ids.includes(item.id));
         if (allNowCompleted) {
           onOpenExpedice();
         }
