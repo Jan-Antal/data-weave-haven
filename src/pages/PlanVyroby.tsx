@@ -536,7 +536,7 @@ export default function PlanVyroby() {
         if (sibling) {
           const doNormalMove = async () => {
             if (dragData.weekDate !== weekDate) {
-              await moveScheduleItemToWeek(dragData.itemId!, weekDate);
+              await moveScheduleItemToWeek(dragData.itemId!, weekDate, 'separate');
             }
           };
           setMergeState({
