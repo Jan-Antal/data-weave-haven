@@ -3723,7 +3723,22 @@ function UnifiedItemList({
         });
       }
     }
-    return Array.from(grouped.values());
+    const result = Array.from(grouped.values());
+    // Sort completed items to bottom
+    result.sort((a, b) => {
+      const aDone = a.mergedIds.every(id => {
+        const orig = currentItems.find(ci => ci.item.id === id);
+        return orig ? (orig.item.status === 'completed' || orig.item.status === 'expedice') : false;
+      });
+      const bDone = b.mergedIds.every(id => {
+        const orig = currentItems.find(ci => ci.item.id === id);
+        return orig ? (orig.item.status === 'completed' || orig.item.status === 'expedice') : false;
+      });
+      if (aDone && !bDone) return 1;
+      if (!aDone && bDone) return -1;
+      return 0;
+    });
+    return result;
   }, [currentItems]);
 
   const checkMap = useMemo(() => {
