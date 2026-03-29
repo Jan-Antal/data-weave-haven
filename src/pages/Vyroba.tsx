@@ -3611,6 +3611,7 @@ function UnifiedItemList({
   pushUndo,
   areAllPartsCompleted,
   getIncompletePartsInfo,
+  expedicedScheduleIds,
 }: {
   projectId: string;
   currentItems: { item: ScheduleItem; weekKey: string; weekNum: number }[];
@@ -3626,7 +3627,12 @@ function UnifiedItemList({
     itemCode: string | null,
     itemName: string,
   ) => { incomplete: number; total: number; weekNums: number[] };
+  expedicedScheduleIds: Set<string>;
 }) {
+  const isItemDoneLocal = useCallback((item: ScheduleItem): boolean => {
+    if (item.is_midflight) return true;
+    return item.status === "completed" || expedicedScheduleIds.has(item.id);
+  }, [expedicedScheduleIds]);
   const { checks, checkItem, uncheckItem } = useQualityChecks(projectId);
   const { defects, addDefect, resolveDefect } = useQualityDefects(projectId);
   const { profile } = useAuth();
