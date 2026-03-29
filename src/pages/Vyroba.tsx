@@ -1411,16 +1411,12 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   /* ── Return from Expedice ── */
   async function handleReturnFromExpedice(pid: string) {
-    const items = getAllItemsForProject(pid);
-    const completedIds = items.filter((e) => e.item.status === "completed").map((e) => e.item.id);
-    if (completedIds.length > 0) {
-      await supabase
-        .from("production_schedule")
-        .update({ status: "in_progress", completed_at: null, completed_by: null, expediced_at: null })
-        .in("id", completedIds);
-    }
+    // Delete all production_expedice records for this project
+    await (supabase.from("production_expedice") as any).delete().eq("project_id", pid);
     await supabase.from("projects").update({ status: "Ve výrobě" }).eq("project_id", pid);
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
+    qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+    qc.invalidateQueries({ queryKey: ["production-expedice"] });
     qc.invalidateQueries({ queryKey: ["projects"] });
     qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
     toast.success("↩ Vráceno z Expedice", { duration: 2000 });
