@@ -102,12 +102,8 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
   const emptyRowCount = Math.max(0, MIN_ROWS - rows.length);
 
   const tableRows = rows.map(r => {
-    const warnCell = hasUnapproved
-      ? `<td class="c bm" style="color:#f59e0b;font-size:14pt;">${r.isApproved ? "" : "⚠"}</td>`
-      : "";
     return `<tr class="data-row">
-      ${warnCell}
-      <td class="c bt">${r.rowNum}</td>
+      <td class="c bt">${r.isApproved ? r.rowNum : `<span style="color:#e8692a;font-size:10pt;">⚠</span> ${r.rowNum}`}</td>
       <td class="c bt">${esc(r.kodPrvku)}</td>
       <td class="item-name bt">${esc(r.nazevPrvku)}</td>
       <td class="c bt">${esc(r.konstrukter)}</td>
@@ -115,12 +111,10 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
     </tr>`;
   }).join("\n");
 
-  const dataCols = hasUnapproved ? 6 : 5;
+  const dataCols = 5;
   const emptyRows = Array.from({ length: emptyRowCount }, () =>
     `<tr class="data-row">${Array.from({ length: dataCols }, () => `<td class="bt">&nbsp;</td>`).join("")}</tr>`
   ).join("\n");
-
-  const warnTh = hasUnapproved ? `<th class="bm c" style="width:24px;"></th>` : "";
 
   return `<!DOCTYPE html>
 <html lang="cs">
@@ -136,6 +130,13 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
   .wrap { width: 100%; margin: 0 auto; box-sizing: border-box; }
   .logo-bar { width: 100%; margin: 0; padding: 0; line-height: 0; }
   .logo-bar img { object-fit: fill; width: 100%; display: block; }
+
+  .page-footer { display: block; width: 100%; border-top: 1px solid #e8692a; padding: 4px 0; font-family: 'Aptos Narrow','Arial Narrow',Arial,sans-serif; font-size: 7.5pt; color: #e8692a; }
+  .page-footer .footer-inner { display: flex; justify-content: space-between; }
+
+  thead { display: table-header-group; }
+  tbody tr { break-inside: avoid; }
+  @media print { body { padding-bottom: 16mm; } .no-print { display: none !important; } a[href]::after { content: none !important; } .page-footer { position: running(pageFooter); } @page { @bottom-center { content: element(pageFooter); } } }
 
   .bm { border: 1.5px solid #333; }
   .bt { border: 0.75px solid #999; }
@@ -158,9 +159,6 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 
   .footer-row { margin-top: 10px; display: flex; justify-content: space-between; font-size: 10pt; }
 
-  thead { display: table-header-group; }
-  tbody tr { break-inside: avoid; }
-  @media print { body { padding-bottom: 16mm; } .no-print { display: none !important; } a[href]::after { content: none !important; } }
 </style>
 </head>
 <body>
@@ -200,7 +198,6 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 
 <table class="dtable">
   <thead><tr>
-    ${warnTh}
     <th class="num-hdr bm c">#</th>
     <th class="bm c" style="width:100px;">Kód prvku</th>
     <th class="bm">Název prvku</th>
@@ -218,12 +215,15 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
   <span>Datum: ${dateStr}</span>
 </div>
 
-<div style="position:fixed; bottom:0; left:0; right:0; border-top: 0.5px solid #1a3330; padding: 4px 12mm; display:flex; flex-direction:column; align-items:center; font-family:'Aptos Narrow','Arial Narrow',Arial,sans-serif; font-size:7.5pt; color:#2d3a2e;">
-  <span>AM Interior Group, s.r.o. &nbsp;|&nbsp; Záhumení V 322, Louky, 763 02 Zlín &nbsp;|&nbsp; IČ: 23032693 &nbsp;|&nbsp; DIČ: CZ23032693</span>
-  <span>aminterior.cz</span>
+<div class="page-footer">
+  <div class="footer-inner">
+    <span>AM Interior Group, s.r.o. &nbsp;|&nbsp; Záhumení V 322, Louky, 763 02 Zlín &nbsp;|&nbsp; IČ: 23032693 &nbsp;|&nbsp; DIČ: CZ23032693</span>
+    <span>aminterior.cz</span>
+  </div>
 </div>
 
 </div>
+<script>document.title = 'AMI-${format(new Date(), 'yyMMdd')}-Pruvodka-${esc(projectId)}';</script>
 </body>
 </html>`;
 }
