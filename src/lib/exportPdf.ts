@@ -132,7 +132,6 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
   .logo-bar img { object-fit: fill; width: 100%; display: block; }
 
   thead { display: table-header-group; }
-  tfoot { display: table-footer-group; }
   tbody tr { break-inside: avoid; }
   @media print { .no-print { display: none !important; } a[href]::after { content: none !important; } }
 
@@ -155,80 +154,66 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
   .dtable .data-row td { padding: 2px 6px; height: 20pt; vertical-align: middle; }
   .dtable .item-name { text-align: left; padding-left: 10px; }
 
+  .footer-row { margin-top: 10px; display: flex; justify-content: space-between; font-size: 10pt; }
+
 </style>
 </head>
 <body>
 <div class="wrap">
 
-<table style="width:100%; border-collapse:collapse;">
+<div class="logo-bar">
+  <img src="/images/ami-logo-claim.png" alt="A→M Interior" />
+</div>
+<table class="info">
+  <tr>
+    <td class="lbl" style="width:75%;">NÁZEV AKCE:</td>
+    <td class="lbl c" style="width:25%;">Č.ZAKÁZKY:</td>
+  </tr>
+  <tr>
+    <td class="val-name bm">\${esc(projectName)}</td>
+    <td class="val-id bm">\${esc(projectId)}</td>
+  </tr>
+  <tr>
+    <td class="sec-lbl">předání:</td>
+    <td style="text-align:right; font-weight:700; font-size:10pt; white-space:nowrap;">datum a podpis odpovědné osoby:</td>
+  </tr>
+  <tr>
+    <td class="sec-val bt">výpis materiálu a kování k objednání</td>
+    <td class="bt">&nbsp;</td>
+  </tr>
+  <tr>
+    <td class="sec-val bt">kontrola dokumentace vedoucím projekce</td>
+    <td class="bt">&nbsp;</td>
+  </tr>
+  <tr>
+    <td class="sec-val bt">termín výroby</td>
+    <td class="bt">&nbsp;</td>
+  </tr>
+</table>
+
+<table class="dtable">
   <thead>
-    <tr><td style="padding:0; border:none;">
-      <div class="logo-bar">
-        <img src="/images/ami-logo-claim.png" alt="A→M Interior" />
-      </div>
-      <table class="info">
-        <tr>
-          <td class="lbl" style="width:75%;">NÁZEV AKCE:</td>
-          <td class="lbl c" style="width:25%;">Č.ZAKÁZKY:</td>
-        </tr>
-        <tr>
-          <td class="val-name bm">${esc(projectName)}</td>
-          <td class="val-id bm">${esc(projectId)}</td>
-        </tr>
-        <tr>
-          <td class="sec-lbl">předání:</td>
-          <td style="text-align:right; font-weight:700; font-size:10pt; white-space:nowrap;">datum a podpis odpovědné osoby:</td>
-        </tr>
-        <tr>
-          <td class="sec-val bt">výpis materiálu a kování k objednání</td>
-          <td class="bt">&nbsp;</td>
-        </tr>
-        <tr>
-          <td class="sec-val bt">kontrola dokumentace vedoucím projekce</td>
-          <td class="bt">&nbsp;</td>
-        </tr>
-        <tr>
-          <td class="sec-val bt">termín výroby</td>
-          <td class="bt">&nbsp;</td>
-        </tr>
-      </table>
-    </td></tr>
+    <tr>
+      <th class="num-hdr bm c">#</th>
+      <th class="bm c" style="width:100px;">Kód prvku</th>
+      <th class="bm">Název prvku</th>
+      <th class="bm c" style="width:100px;">Konstruktér</th>
+      <th class="bm c" style="width:50px;">Počet</th>
+    </tr>
   </thead>
-  <tfoot>
-    <tr><td style="padding:0; border:none;">
-      <div style="padding-top:6px; font-size:10pt; display:flex; justify-content:space-between;">
-        <span>Vytiskl: ${esc(issuedBy)}</span>
-        <span>Datum: ${dateStr}</span>
-      </div>
-      <div style="margin-top:4px; border-top:1px solid #e8692a; padding-top:3px; display:flex; justify-content:space-between; font-size:7.5pt; color:#e8692a; font-family:'Aptos Narrow','Arial Narrow',Arial,sans-serif;">
-        <span>AM Interior Group, s.r.o. &nbsp;|&nbsp; Záhumení V 322, Louky, 763 02 Zlín &nbsp;|&nbsp; IČ: 23032693 &nbsp;|&nbsp; DIČ: CZ23032693</span>
-        <span>aminterior.cz</span>
-      </div>
-    </td></tr>
-  </tfoot>
   <tbody>
-    <tr><td style="padding:0; border:none; vertical-align:top;">
-      <table class="dtable">
-        <thead>
-          <tr>
-            <th class="num-hdr bm c">#</th>
-            <th class="bm c" style="width:100px;">Kód prvku</th>
-            <th class="bm">Název prvku</th>
-            <th class="bm c" style="width:100px;">Konstruktér</th>
-            <th class="bm c" style="width:50px;">Počet</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${tableRows}
-          ${emptyRows}
-        </tbody>
-      </table>
-    </td></tr>
+    \${tableRows}
+    \${emptyRows}
   </tbody>
 </table>
 
+<div class="footer-row">
+  <span>Vytiskl: \${esc(issuedBy)}</span>
+  <span>Datum: \${dateStr}</span>
 </div>
-<script>document.title = 'AMI-${format(new Date(), 'yyMMdd')}-Pruvodka-${esc(projectId)}';</script>
+
+</div>
+<script>document.title = 'AMI-\${format(new Date(), 'yyMMdd')}-Pruvodka-\${esc(projectId)}';</script>
 </body>
 </html>`;
 }
