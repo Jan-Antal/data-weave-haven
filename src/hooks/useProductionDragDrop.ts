@@ -503,6 +503,19 @@ export function useProductionDragDrop() {
         if (error) throw error;
       }
 
+      // Execute separate-conflict moves with unique item_codes
+      const uniqueSeparateIds = [...new Set(separateConflictIds)].filter(id => !mergedSourceIds.has(id));
+      const separateCodeMap = new Map<string, { oldCode: string | null; newCode: string }>();
+      for (const itemId of uniqueSeparateIds) {
+        const item = movedItems.find(i => i.id === itemId);
+        const uniqueSuffix = `_${Date.now().toString(36).slice(-4)}${Math.random().toString(36).slice(-2)}`;
+        const newItemCode = item?.item_code ? `${item.item_code}${uniqueSuffix}` : item?.item_code ?? null;
+        separateCodeMap.set(itemId, { oldCode: item?.item_code ?? null, newCode: newItemCode! });
+        await supabase.from("production_schedule")
+          .update({ scheduled_week: targetWeekDate, item_code: newItemCode })
+          .eq("id", itemId);
+      }
+
       invalidateAll();
 
       if (mergedSourceIds.size > 0) {
