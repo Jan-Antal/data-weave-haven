@@ -1009,7 +1009,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   function openSpillDialog() {
     if (!selectedProject) return;
     const pct = getLatestPercent(selectedProject.projectId);
-    const doneIds = new Set(selectedProject.scheduleItems.filter((i) => i.status === "completed").map((i) => i.id));
+    const doneIds = new Set(selectedProject.scheduleItems.filter((i) => isItemDone(i)).map((i) => i.id));
     const selected = new Set(
       selectedProject.scheduleItems
         .filter((i) => i.status !== "cancelled" && !doneIds.has(i.id) && getRemainingHours(i, pct) > 0)
