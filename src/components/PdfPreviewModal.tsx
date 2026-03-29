@@ -39,7 +39,7 @@ export function PdfPreviewModal({ html, tabLabel, onClose, portrait = false }: P
         const tabKey = tabLabel.replace(/\s+/g, "");
         doc.title = `AMI-${tabKey}-${today}`;
       }
-      toast.info("Před tiskem odškrtněte v nastavení „Záhlaví a zápatí"", { duration: 4000 });
+      toast.info("Před tiskem odškrtněte v nastavení 'Záhlaví a zápatí'", { duration: 4000 });
       setTimeout(() => win.print(), 400);
     }
   };
