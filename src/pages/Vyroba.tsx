@@ -2220,13 +2220,13 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             <>
               {/* Scrollable content */}
               <div className={isMobile ? "flex-1 overflow-y-auto px-4 pb-4" : ""}>
-                <DialogHeader className={isMobile ? "pb-2" : ""}>
+                <DialogHeader className={isMobile ? "pb-2" : "pb-2"}>
                   <DialogTitle className="flex items-center gap-2">
                     <span className="font-sans text-xs text-muted-foreground">{selectedProject?.projectId}</span>
                     <span>{selectedProject?.projectName}</span>
                   </DialogTitle>
                 </DialogHeader>
-                <div className="space-y-5 py-2">
+                <div className="space-y-4 py-2">
                   <div>
                     <div className="text-xs font-semibold mb-2 text-muted-foreground">
                       {logDayIndex >= 0 ? DAY_NAMES[logDayIndex] : "Dnes"}{" "}
@@ -2241,7 +2241,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                       })()}{" "}
                       — Operace
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-2">
                       {PHASES.map((p) => (
                         <button
                           key={p.name}
@@ -2357,7 +2357,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                         }
                       }}
                       placeholder="Čeho jste dnes dosáhli? Problémy, poznámky..."
-                      className="w-full h-20 text-xs rounded-md p-2 resize-none border border-input bg-background"
+                      className="w-full h-20 text-xs rounded-lg p-2 resize-none border border-input bg-background"
                     />
                   </div>
 
@@ -2471,7 +2471,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
           return (
             <Dialog open={mobileDaylogOpen} onOpenChange={setMobileDaylogOpen}>
-              <DialogContent className="sm:max-w-md p-0 gap-0">{logModalContent}</DialogContent>
+              <DialogContent className="sm:max-w-md p-5 gap-0 max-sm:mx-4">{logModalContent}</DialogContent>
             </Dialog>
           );
         })()}
