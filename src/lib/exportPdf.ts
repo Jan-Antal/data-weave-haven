@@ -136,7 +136,7 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 
   .wrap { width: 100%; margin: 0 auto; }
   .logo-bar { width: 100%; margin: 0; padding: 0; }
-  .logo-bar img { width: 100%; height: auto; display: block; }
+  .logo-bar img { object-fit: fill; width: 100%; display: block; }
   .sep { border: none; border-top: 1.5px solid #1a3330; margin: 4px 0 8px 0; }
 
   .bm { border: 1.5px solid #333; }
@@ -152,7 +152,7 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
   .info .sec-lbl { font-size: 11pt; font-weight: 700; }
   .info .sec-val { font-size: 11pt; }
 
-  .dtable { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 12pt; }
+  .dtable { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12pt; }
   .dtable thead th { background: #f5f5f0; font-weight: 600; font-size: 12pt; padding: 4px 6px; }
   .dtable thead th.num-hdr { font-size: 14pt; width: 30px; }
   .dtable .data-row td { padding: 2px 6px; height: 20pt; vertical-align: middle; }
@@ -183,11 +183,8 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
     <td class="val-id bm">${esc(projectId)}</td>
   </tr>
   <tr>
-    <td class="bm" colspan="2" style="height:16px;">&nbsp;</td>
-  </tr>
-  <tr>
     <td class="sec-lbl">předání:</td>
-    <td class="sec-lbl c">datum a podpis odpovědné osoby:</td>
+    <td class="sec-lbl" style="text-align:right;">datum a podpis odpovědné osoby:</td>
   </tr>
   <tr>
     <td class="sec-val bt">výpis materiálu a kování k objednání</td>
@@ -222,6 +219,10 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 <div class="footer-row">
   <span>Vytiskl: ${esc(issuedBy)}</span>
   <span>Datum: ${dateStr}</span>
+</div>
+
+<div style="margin-top:12px; padding-top:6px; border-top:0.75px solid #ccc; text-align:center; font-size:8pt; color:#6b7280;">
+  AM Interior Group, s.r.o., Záhumení V 322, Louky, 763 02 Zlín &nbsp;|&nbsp; IČ: 23032693, DIČ: CZ23032693 &nbsp;|&nbsp; aminterior.cz
 </div>
 
 </div>
