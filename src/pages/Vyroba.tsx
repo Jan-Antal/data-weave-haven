@@ -82,6 +82,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQualityDefects, type QualityDefect } from "@/hooks/useQualityDefects";
+import { useDocumentCounts } from "@/hooks/useDocumentCounts";
 import { logActivity } from "@/lib/activityLog";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
@@ -341,6 +342,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     setCurrentPage("vyroba");
     return () => setCurrentPage(null);
   }, [setCurrentPage]);
+
+
 
 
 
@@ -608,6 +611,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [mobileVyrobaProjektOpen, setMobileVyrobaProjektOpen] = useState(false);
   const selectedProject = enrichedProjects.find((p) => p.projectId === selectedProjectId) || null;
+
+  // Document counts for Výkresy section
+  const projectIdsList = useMemo(() => enrichedProjects.map((p) => p.projectId), [enrichedProjects]);
+  const { counts: docCounts } = useDocumentCounts(projectIdsList);
 
   // Week picker
   const [weekPickerOpen, setWeekPickerOpen] = useState(false);
@@ -2104,7 +2111,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                   getIncompletePartsInfo={(itemCode, itemName) =>
                     getIncompletePartsInfo(selectedProject.projectId, itemCode, itemName)
                   }
-                  expedicedScheduleIds={expedicedScheduleIds}
+                   expedicedScheduleIds={expedicedScheduleIds}
+                   cachedDocCount={docCounts[selectedProject.projectId]}
                 />
               )}
             </div>
@@ -2211,7 +2219,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                       getIncompletePartsInfo(selectedProject.projectId, itemCode, itemName)
                     }
                     hideLogButton
-                    expedicedScheduleIds={expedicedScheduleIds}
+                     expedicedScheduleIds={expedicedScheduleIds}
+                     cachedDocCount={docCounts[selectedProject.projectId]}
                   />
                 </div>
                 {/* Fixed bottom Log button */}
@@ -3172,6 +3181,7 @@ function DetailPanel({
   getIncompletePartsInfo,
   hideLogButton = false,
   expedicedScheduleIds,
+  cachedDocCount,
 }: {
   project: VyrobaProject;
   weekKey: string;
@@ -3206,6 +3216,7 @@ function DetailPanel({
     itemName: string,
   ) => { incomplete: number; total: number; weekNums: number[] };
   hideLogButton?: boolean;
+  cachedDocCount?: number;
   expedicedScheduleIds: Set<string>;
 }) {
   const isMobile = useIsMobile();
@@ -3383,7 +3394,7 @@ function DetailPanel({
         </div>
 
         {/* ── Výkresy inline ── */}
-        <VykresynSection projectId={project.projectId} />
+        <VykresynSection projectId={project.projectId} cachedDocCount={cachedDocCount} />
       </div>
 
       {/* ── Scrollable body ── */}
@@ -5015,7 +5026,7 @@ function QualityCheckFullDisplay({ check }: { check: any }) {
 /* VÝKRESY SECTION (header collapsible)    */
 /* ═══════════════════════════════════════ */
 
-function VykresynSection({ projectId }: { projectId: string }) {
+function VykresynSection({ projectId, cachedDocCount }: { projectId: string; cachedDocCount?: number }) {
   const [open, setOpen] = useState(false);
   const { filesByCategory, listFiles, getPreview } = useSharePointDocs(projectId);
   const [previewFile, setPreviewFile] = useState<{
@@ -5061,7 +5072,7 @@ function VykresynSection({ projectId }: { projectId: string }) {
         >
           {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           <FileText className="h-3 w-3" />
-          📄 Výkresy ({files.length})
+          📄 Výkresy ({open ? files.length : (cachedDocCount ?? 0)})
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="mt-2 space-y-1">
