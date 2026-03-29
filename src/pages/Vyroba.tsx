@@ -2111,7 +2111,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                   getIncompletePartsInfo={(itemCode, itemName) =>
                     getIncompletePartsInfo(selectedProject.projectId, itemCode, itemName)
                   }
-                  expedicedScheduleIds={expedicedScheduleIds}
+                   expedicedScheduleIds={expedicedScheduleIds}
+                   cachedDocCount={docCounts[selectedProject.projectId]}
                 />
               )}
             </div>
@@ -2218,7 +2219,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                       getIncompletePartsInfo(selectedProject.projectId, itemCode, itemName)
                     }
                     hideLogButton
-                    expedicedScheduleIds={expedicedScheduleIds}
+                     expedicedScheduleIds={expedicedScheduleIds}
+                     cachedDocCount={docCounts[selectedProject.projectId]}
                   />
                 </div>
                 {/* Fixed bottom Log button */}
