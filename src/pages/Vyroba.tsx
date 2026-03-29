@@ -1094,64 +1094,65 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     if (!selectedProject) return;
     const allItems = selectedProject.scheduleItems;
     const prevStatus = selectedProject.projectStatus || "Ve výrobě";
-    const snapshots = allItems.map((i) => ({ id: i.id, prevStatus: i.status }));
     const pid = selectedProject.projectId;
     const pName = selectedProject.projectName;
+    const itemsToExpedice = allItems.filter((i) => !isItemDone(i) && i.status !== "cancelled");
+
     pushUndo({
       page: "vyroba",
       actionType: "expedice",
       description: `${pName} → Expedice`,
       undo: async () => {
         await supabase.from("projects").update({ status: prevStatus }).eq("project_id", pid);
-        for (const snap of snapshots) {
-          await supabase
-            .from("production_schedule")
-            .update({ status: snap.prevStatus, completed_at: null, completed_by: null })
-            .eq("id", snap.id);
+        // Delete expedice records we just created
+        for (const item of itemsToExpedice) {
+          await (supabase.from("production_expedice") as any).delete().eq("source_schedule_id", item.id);
         }
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+        qc.invalidateQueries({ queryKey: ["production-expedice"] });
         qc.invalidateQueries({ queryKey: ["projects"] });
         qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
       },
       redo: async () => {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        const ids = snapshots
-          .filter((s) => s.prevStatus !== "completed" && s.prevStatus !== "cancelled")
-          .map((s) => s.id);
-        if (ids.length > 0) {
-          await supabase
-            .from("production_schedule")
-            .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null })
-            .in("id", ids);
+        for (const item of itemsToExpedice) {
+          await (supabase.from("production_expedice") as any).insert({
+            project_id: pid,
+            item_name: item.item_name,
+            item_code: item.item_code || null,
+            source_schedule_id: item.id,
+            stage_id: item.stage_id || null,
+            manufactured_at: new Date().toISOString(),
+            expediced_at: null,
+            is_midflight: false,
+          });
         }
         await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", pid);
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+        qc.invalidateQueries({ queryKey: ["production-expedice"] });
         qc.invalidateQueries({ queryKey: ["projects"] });
         qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
       },
     });
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const activeItems = selectedProject.scheduleItems.filter(
-      (i) => i.status !== "completed" && i.status !== "cancelled",
-    );
-    if (activeItems.length > 0) {
-      const ids = activeItems.map((i) => i.id);
-      await supabase
-        .from("production_schedule")
-        .update({
-          status: "completed",
-          completed_at: new Date().toISOString(),
-          completed_by: user?.id || null,
-        })
-        .in("id", ids);
+    // Insert into production_expedice for each active item
+    for (const item of itemsToExpedice) {
+      await (supabase.from("production_expedice") as any).insert({
+        project_id: pid,
+        item_name: item.item_name,
+        item_code: item.item_code || null,
+        source_schedule_id: item.id,
+        stage_id: item.stage_id || null,
+        manufactured_at: new Date().toISOString(),
+        expediced_at: null,
+        is_midflight: false,
+      });
     }
     await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", pid);
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
+    qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+    qc.invalidateQueries({ queryKey: ["production-expedice"] });
     qc.invalidateQueries({ queryKey: ["projects"] });
     qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
     qc.invalidateQueries({ queryKey: ["production-statuses", pid] });
