@@ -656,7 +656,22 @@ export default function PlanVyroby() {
               return;
             }
           }
-          const action = async () => { await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate); };
+          const action = async () => {
+            const result = await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate);
+            if (result && 'conflict' in result) {
+              setMergeState({
+                itemName: sourceBundle?.project_name || dragData.projectName || "Bundle",
+                splitGroupIds: result.splitGroupIds,
+                mergeItemCount: result.splitGroupIds.length,
+                draggedItemId: sourceBundle?.items[0]?.id || "",
+                targetWeekKey: weekDate,
+                onKeepSeparate: async () => {
+                  await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate, 'separate');
+                },
+              });
+              return;
+            }
+          };
           if (!checkAndWarnDeadline(dragData.projectId, weekDate, action)) return;
           await action();
         }
