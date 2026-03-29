@@ -2899,6 +2899,15 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
           />
         )}
 
+        {/* ═══ MOBILE PROJECT DETAIL SHEET ═══ */}
+        {isMobile && (
+          <MobileDetailProjektSheet
+            project={mobileDetailProjectId ? (projectDetails?.get(mobileDetailProjectId) ? { ...projectDetails.get(mobileDetailProjectId)!, project_id: mobileDetailProjectId, id: mobileDetailProjectId } : null) : null}
+            open={!!mobileDetailProjectId}
+            onOpenChange={(open) => { if (!open) setMobileDetailProjectId(null); }}
+          />
+        )}
+
         {/* ═══ RETURN FROM EXPEDICE CONFIRM ═══ */}
         <ConfirmDialog
           open={!!returnExpediceConfirm}
