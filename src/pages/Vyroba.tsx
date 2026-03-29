@@ -3212,7 +3212,7 @@ function DetailPanel({
     const completed: { item: ScheduleItem; weekKey: string; weekNum: number }[] = [];
 
     for (const entry of allItems) {
-      if (entry.item.status === "completed") {
+      if (isItemDoneLocal(entry.item)) {
         completed.push(entry);
       } else if (entry.weekKey === weekKey) {
         current.push(entry);
