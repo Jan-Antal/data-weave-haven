@@ -108,14 +108,17 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
     return `<tr class="data-row">
       ${warnCell}
       <td class="c bt">${r.rowNum}</td>
-      <td class="item-name bt" colspan="6">${esc(r.nazevPrvku)}</td>
-      <td class="code-col c bt" colspan="2">${esc(r.kodPrvku)}</td>
+      <td class="c bt">${esc(r.kodPrvku)}</td>
+      <td class="item-name bt">${esc(r.nazevPrvku)}</td>
+      <td class="c bt">${esc(r.konstrukter)}</td>
+      <td class="c bt">${r.pocet != null ? esc(String(r.pocet)) : ""}</td>
+      <td class="bt" style="text-align:left;">${esc(r.notes)}</td>
     </tr>`;
   }).join("\n");
 
-  const emptyCols = hasUnapproved ? 4 : 3;
+  const dataCols = hasUnapproved ? 7 : 6;
   const emptyRows = Array.from({ length: emptyRowCount }, () =>
-    `<tr class="data-row"><td class="c bt" colspan="${emptyCols - 2}">&nbsp;</td><td class="bt" colspan="6">&nbsp;</td><td class="bt" colspan="2">&nbsp;</td></tr>`
+    `<tr class="data-row">${Array.from({ length: dataCols }, () => `<td class="bt">&nbsp;</td>`).join("")}</tr>`
   ).join("\n");
 
   const warnTh = hasUnapproved ? `<th class="bm c" style="width:24px;"></th>` : "";
@@ -129,22 +132,18 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 <style>
   @page { size: A4 portrait; margin: 8mm 12mm 10mm 12mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Aptos Narrow', 'Arial Narrow', Calibri, Arial, sans-serif; font-size: 12pt; color: #1a1a1a; padding: 0 6mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Aptos Narrow', 'Arial Narrow', Calibri, Arial, sans-serif; font-size: 12pt; color: #1a1a1a; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
+  .wrap { width: 100%; margin: 0 auto; }
   .logo-bar { width: 100%; margin: 0; padding: 0; }
   .logo-bar img { width: 100%; height: auto; display: block; }
   .sep { border: none; border-top: 1.5px solid #1a3330; margin: 4px 0 8px 0; }
 
-  /* helper borders */
   .bm { border: 1.5px solid #333; }
   .bt { border: 0.75px solid #999; }
   .bn { border: none; }
-
-  /* alignment */
   .c { text-align: center; }
-  .r { text-align: right; }
 
-  /* info table */
   .info { width: 100%; border-collapse: collapse; margin-bottom: 2px; }
   .info td { padding: 3px 6px; vertical-align: middle; }
   .info .lbl { font-size: 12pt; font-weight: 400; }
@@ -152,20 +151,14 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
   .info .val-id { font-size: 12pt; font-weight: 700; text-align: center; }
   .info .sec-lbl { font-size: 11pt; font-weight: 700; }
   .info .sec-val { font-size: 11pt; }
-  .info .date-val { font-size: 10pt; font-weight: 700; text-align: center; }
-  .info .doc-lbl { font-size: 11pt; }
-  .info .vyroba-val { font-size: 10pt; font-weight: 700; text-align: center; }
 
-  /* main data table */
   .dtable { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 12pt; }
   .dtable thead th { background: #f5f5f0; font-weight: 600; font-size: 12pt; padding: 4px 6px; }
   .dtable thead th.num-hdr { font-size: 14pt; width: 30px; }
   .dtable .data-row td { padding: 2px 6px; height: 20pt; vertical-align: middle; }
   .dtable .item-name { text-align: left; padding-left: 10px; }
-  .dtable .code-col { text-align: center; }
 
   .footer-row { margin-top: 10px; display: flex; justify-content: space-between; font-size: 10pt; }
-  .footer-row span { }
 
   thead { display: table-header-group; }
   tbody tr { break-inside: avoid; }
@@ -173,6 +166,7 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 </style>
 </head>
 <body>
+<div class="wrap">
 
 <div class="logo-bar">
   <img src="/images/ami-logo-claim.png" alt="A→M Interior" />
@@ -204,12 +198,8 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
     <td class="bt">&nbsp;</td>
   </tr>
   <tr>
-    <td class="sec-val bt">termín</td>
-    <td class="date-val bt">${dateStr}</td>
-  </tr>
-  <tr>
-    <td class="doc-lbl bn">dokumentace</td>
-    <td class="vyroba-val bn">Výroba</td>
+    <td class="sec-val bt">termín výroby</td>
+    <td class="bt">&nbsp;</td>
   </tr>
 </table>
 
@@ -217,8 +207,11 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
   <thead><tr>
     ${warnTh}
     <th class="num-hdr bm c">#</th>
-    <th class="bm" colspan="6">OBSAH VÝKRESU:</th>
-    <th class="bm c" colspan="2">Č.VÝKRESU</th>
+    <th class="bm c" style="width:100px;">Kód prvku</th>
+    <th class="bm">Název prvku</th>
+    <th class="bm c" style="width:100px;">Konstruktér</th>
+    <th class="bm c" style="width:50px;">Počet</th>
+    <th class="bm" style="width:140px;">Poznámka</th>
   </tr></thead>
   <tbody>
     ${tableRows}
@@ -227,10 +220,11 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 </table>
 
 <div class="footer-row">
-  <span>Vypracoval: ${esc(issuedBy)}</span>
+  <span>Vytiskl: ${esc(issuedBy)}</span>
   <span>Datum: ${dateStr}</span>
 </div>
 
+</div>
 </body>
 </html>`;
 }
