@@ -151,11 +151,14 @@ function useDocCountCache() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sharepoint_document_cache")
-        .select("project_id, total_count");
+        .select("project_id, total_count, category_counts");
       if (error) throw error;
-      const map: Record<string, number> = {};
+      const map: Record<string, { total: number; categories: Record<string, number> }> = {};
       for (const row of data ?? []) {
-        map[row.project_id] = row.total_count;
+        map[row.project_id] = {
+          total: row.total_count,
+          categories: (row.category_counts as Record<string, number>) ?? {},
+        };
       }
       return map;
     },
