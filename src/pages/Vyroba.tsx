@@ -3394,7 +3394,7 @@ function DetailPanel({
         </div>
 
         {/* ── Výkresy inline ── */}
-        <VykresynSection projectId={project.projectId} cachedDocCount={docCounts[project.projectId]} />
+        <VykresynSection projectId={project.projectId} cachedDocCount={cachedDocCount} />
       </div>
 
       {/* ── Scrollable body ── */}
