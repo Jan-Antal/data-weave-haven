@@ -431,7 +431,8 @@ export function useProductionDragDrop() {
                 mergeActions.push({ sourceId: src.id, targetId: target.id, addHours: totalAddHours, addCzk: totalAddCzk });
               }
             } else if (onConflict === 'separate') {
-              movedWithSg.forEach(i => plainMoveIds.push(i.id));
+              // These items have conflicts — need unique item_codes
+              movedWithSg.forEach(i => separateConflictIds.push(i.id));
             }
           } else {
             movedWithSg.forEach(i => plainMoveIds.push(i.id));
