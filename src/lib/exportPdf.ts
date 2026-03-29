@@ -103,8 +103,8 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 
   const tableRows = rows.map(r => {
     return `<tr class="data-row">
-      <td class="c bt">${r.isApproved ? r.rowNum : `<span style="color:#e8692a;font-size:10pt;">⚠</span> ${r.rowNum}`}</td>
-      <td class="c bt">${esc(r.kodPrvku)}</td>
+      <td class="c bt">${r.rowNum}</td>
+      <td class="c bt">${!r.isApproved ? `<span style="color:#e8692a;font-size:9pt;margin-right:2px;">⚠</span>` : ""}${esc(r.kodPrvku)}</td>
       <td class="item-name bt">${esc(r.nazevPrvku)}</td>
       <td class="c bt">${esc(r.konstrukter)}</td>
       <td class="c bt">${r.pocet != null ? esc(String(r.pocet)) : ""}</td>
@@ -136,7 +136,7 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 
   thead { display: table-header-group; }
   tbody tr { break-inside: avoid; }
-  @media print { body { padding-bottom: 16mm; } .no-print { display: none !important; } a[href]::after { content: none !important; } .page-footer { position: running(pageFooter); } @page { @bottom-center { content: element(pageFooter); } } }
+  @media print { body { padding-bottom: 16mm; } .no-print { display: none !important; } a[href]::after { content: none !important; } }
 
   .bm { border: 1.5px solid #333; }
   .bt { border: 0.75px solid #999; }
@@ -164,46 +164,49 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 <body>
 <div class="wrap">
 
-<div class="logo-bar">
-  <img src="/images/ami-logo-claim.png" alt="A→M Interior" />
-</div>
-
-
-<table class="info">
-  <tr>
-    <td class="lbl" style="width:75%;">NÁZEV AKCE:</td>
-    <td class="lbl c" style="width:25%;">Č.ZAKÁZKY:</td>
-  </tr>
-  <tr>
-    <td class="val-name bm">${esc(projectName)}</td>
-    <td class="val-id bm">${esc(projectId)}</td>
-  </tr>
-  <tr>
-    <td class="sec-lbl">předání:</td>
-    <td style="text-align:right; font-weight:700; font-size:10pt; white-space:nowrap;">datum a podpis odpovědné osoby:</td>
-  </tr>
-  <tr>
-    <td class="sec-val bt">výpis materiálu a kování k objednání</td>
-    <td class="bt">&nbsp;</td>
-  </tr>
-  <tr>
-    <td class="sec-val bt">kontrola dokumentace vedoucím projekce</td>
-    <td class="bt">&nbsp;</td>
-  </tr>
-  <tr>
-    <td class="sec-val bt">termín výroby</td>
-    <td class="bt">&nbsp;</td>
-  </tr>
-</table>
-
 <table class="dtable">
-  <thead><tr>
-    <th class="num-hdr bm c">#</th>
-    <th class="bm c" style="width:100px;">Kód prvku</th>
-    <th class="bm">Název prvku</th>
-    <th class="bm c" style="width:100px;">Konstruktér</th>
-    <th class="bm c" style="width:50px;">Počet</th>
-  </tr></thead>
+  <thead>
+    <tr class="doc-header-repeat">
+      <th colspan="5" style="background:none;border:none;padding:0;">
+        <div class="logo-bar">
+          <img src="/images/ami-logo-claim.png" alt="A→M Interior" />
+        </div>
+        <table class="info">
+          <tr>
+            <td class="lbl" style="width:75%;">NÁZEV AKCE:</td>
+            <td class="lbl c" style="width:25%;">Č.ZAKÁZKY:</td>
+          </tr>
+          <tr>
+            <td class="val-name bm">${esc(projectName)}</td>
+            <td class="val-id bm">${esc(projectId)}</td>
+          </tr>
+          <tr>
+            <td class="sec-lbl">předání:</td>
+            <td style="text-align:right; font-weight:700; font-size:10pt; white-space:nowrap;">datum a podpis odpovědné osoby:</td>
+          </tr>
+          <tr>
+            <td class="sec-val bt">výpis materiálu a kování k objednání</td>
+            <td class="bt">&nbsp;</td>
+          </tr>
+          <tr>
+            <td class="sec-val bt">kontrola dokumentace vedoucím projekce</td>
+            <td class="bt">&nbsp;</td>
+          </tr>
+          <tr>
+            <td class="sec-val bt">termín výroby</td>
+            <td class="bt">&nbsp;</td>
+          </tr>
+        </table>
+      </th>
+    </tr>
+    <tr>
+      <th class="num-hdr bm c">#</th>
+      <th class="bm c" style="width:100px;">Kód prvku</th>
+      <th class="bm">Název prvku</th>
+      <th class="bm c" style="width:100px;">Konstruktér</th>
+      <th class="bm c" style="width:50px;">Počet</th>
+    </tr>
+  </thead>
   <tbody>
     ${tableRows}
     ${emptyRows}
