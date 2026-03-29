@@ -3482,6 +3482,7 @@ function DetailPanel({
           pushUndo={pushUndo}
           areAllPartsCompleted={areAllPartsCompleted}
           getIncompletePartsInfo={getIncompletePartsInfo}
+          expedicedScheduleIds={expedicedScheduleIds}
         />
 
         {/* ── NAPLÁNOVANÉ (future) — collapsible ── */}
