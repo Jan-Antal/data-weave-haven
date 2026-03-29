@@ -64,6 +64,7 @@ import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDia
 import { DataLogPanel } from "@/components/DataLogPanel";
 import { CapacitySettings } from "@/components/production/CapacitySettings";
 import { AdminInboxButton } from "@/components/AdminInbox";
+import { MobileDetailProjektSheet } from "@/components/mobile/MobileDetailProjektSheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { parseAppDate } from "@/lib/dateFormat";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -618,6 +619,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   // Project detail dialog
   const [detailProject, setDetailProject] = useState<any | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  // Mobile project detail sheet
+  const [mobileDetailProjectId, setMobileDetailProjectId] = useState<string | null>(null);
 
   // Close overlays on mobile nav change
   useEffect(() => {
@@ -626,6 +629,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       setMobileVyrobaProjektOpen(false);
       setDetailDialogOpen(false);
       setDetailProject(null);
+      setMobileDetailProjectId(null);
     };
     window.addEventListener("mobile-nav-change", handler);
     return () => window.removeEventListener("mobile-nav-change", handler);
@@ -1476,7 +1480,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   function openProjectDetail(pid: string) {
     if (isMobile) {
-      navigate("/", { state: { openProjectId: pid } });
+      setMobileDetailProjectId(pid);
       return;
     }
     const detail = projectDetails?.get(pid);
@@ -2893,6 +2897,15 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 🔄 Přepočítat hodiny
               </button>
             ) : undefined}
+          />
+        )}
+
+        {/* ═══ MOBILE PROJECT DETAIL SHEET ═══ */}
+        {isMobile && (
+          <MobileDetailProjektSheet
+            project={mobileDetailProjectId ? (projectDetails?.get(mobileDetailProjectId) ? { ...projectDetails.get(mobileDetailProjectId)!, project_id: mobileDetailProjectId, id: mobileDetailProjectId } : null) : null}
+            open={!!mobileDetailProjectId}
+            onOpenChange={(open) => { if (!open) setMobileDetailProjectId(null); }}
           />
         )}
 
