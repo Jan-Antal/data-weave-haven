@@ -132,28 +132,27 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 <style>
   @page { size: A4 portrait; margin: 8mm 12mm 10mm 12mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Aptos Narrow', 'Arial Narrow', Calibri, Arial, sans-serif; font-size: 12pt; color: #1a1a1a; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Aptos Narrow', 'Arial Narrow', Calibri, Arial, sans-serif; font-size: 10pt; color: #1a1a1a; padding: 0; padding-bottom: 20mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
   .wrap { width: 100%; margin: 0 auto; }
-  .logo-bar { width: 100%; margin: 0; padding: 0; }
+  .logo-bar { width: 100%; margin: 0; padding: 0; line-height: 0; }
   .logo-bar img { object-fit: fill; width: 100%; display: block; }
-  .sep { border: none; border-top: 1.5px solid #1a3330; margin: 4px 0 8px 0; }
 
   .bm { border: 1.5px solid #333; }
   .bt { border: 0.75px solid #999; }
   .bn { border: none; }
   .c { text-align: center; }
 
-  .info { width: 100%; border-collapse: collapse; margin-bottom: 2px; }
+  .info { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 2px; }
   .info td { padding: 3px 6px; vertical-align: middle; }
-  .info .lbl { font-size: 12pt; font-weight: 400; }
-  .info .val-name { font-size: 14pt; font-weight: 700; text-align: center; }
-  .info .val-id { font-size: 12pt; font-weight: 700; text-align: center; }
-  .info .sec-lbl { font-size: 11pt; font-weight: 700; }
-  .info .sec-val { font-size: 11pt; }
+  .info .lbl { font-size: 10pt; font-weight: 400; }
+  .info .val-name { font-size: 12pt; font-weight: 700; text-align: center; }
+  .info .val-id { font-size: 11pt; font-weight: 700; text-align: center; }
+  .info .sec-lbl { font-size: 10pt; font-weight: 700; }
+  .info .sec-val { font-size: 10pt; }
 
-  .dtable { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12pt; }
-  .dtable thead th { background: #f5f5f0; font-weight: 600; font-size: 12pt; padding: 4px 6px; }
+  .dtable { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 10pt; }
+  .dtable thead th { background: #f5f5f0; font-weight: 600; font-size: 10pt; padding: 4px 6px; }
   .dtable thead th.num-hdr { font-size: 14pt; width: 30px; }
   .dtable .data-row td { padding: 2px 6px; height: 20pt; vertical-align: middle; }
   .dtable .item-name { text-align: left; padding-left: 10px; }
@@ -162,7 +161,7 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 
   thead { display: table-header-group; }
   tbody tr { break-inside: avoid; }
-  @media print { body { padding: 0; } .no-print { display: none !important; } }
+  @media print { body { padding-bottom: 20mm; } .no-print { display: none !important; } }
 </style>
 </head>
 <body>
@@ -171,7 +170,7 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 <div class="logo-bar">
   <img src="/images/ami-logo-claim.png" alt="A→M Interior" />
 </div>
-<hr class="sep" />
+
 
 <table class="info">
   <tr>
@@ -184,7 +183,7 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
   </tr>
   <tr>
     <td class="sec-lbl">předání:</td>
-    <td class="sec-lbl" style="text-align:right;">datum a podpis odpovědné osoby:</td>
+    <td style="text-align:right; font-weight:700; font-size:10pt; white-space:nowrap;">datum a podpis odpovědné osoby:</td>
   </tr>
   <tr>
     <td class="sec-val bt">výpis materiálu a kování k objednání</td>
@@ -221,8 +220,10 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
   <span>Datum: ${dateStr}</span>
 </div>
 
-<div style="margin-top:12px; padding-top:6px; border-top:0.75px solid #ccc; text-align:center; font-size:8pt; color:#6b7280;">
-  AM Interior Group, s.r.o., Záhumení V 322, Louky, 763 02 Zlín &nbsp;|&nbsp; IČ: 23032693, DIČ: CZ23032693 &nbsp;|&nbsp; aminterior.cz
+<div style="position:fixed; bottom:0; left:0; right:0; border-top: 0.5px solid #1a3330; padding: 4px 12mm; display:flex; justify-content:space-between; align-items:center; font-family:'Aptos Narrow','Arial Narrow',Arial,sans-serif; font-size:7.5pt; color:#2d3a2e;">
+  <span>AM Interior Group, s.r.o., Záhumení V 322, Louky, 763 02 Zlín</span>
+  <span>IČ: 23032693 &nbsp;|&nbsp; DIČ: CZ23032693</span>
+  <span>aminterior.cz</span>
 </div>
 
 </div>
