@@ -344,9 +344,6 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   }, [setCurrentPage]);
 
 
-  // Document counts for Výkresy section
-  const projectIdsList = useMemo(() => enrichedProjects.map((p) => p.projectId), [enrichedProjects]);
-  const { counts: docCounts } = useDocumentCounts(projectIdsList);
 
 
   const [resetDataPreview, setResetDataPreview] = useState<any[] | null>(null);
