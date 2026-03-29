@@ -98,7 +98,7 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
   const dateStr = format(new Date(), "d. MMMM yyyy", { locale: cs });
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
-  const MIN_ROWS = 20;
+  const MIN_ROWS = 14;
   const emptyRowCount = Math.max(0, MIN_ROWS - rows.length);
 
   const tableRows = rows.map(r => {
@@ -112,11 +112,10 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
       <td class="item-name bt">${esc(r.nazevPrvku)}</td>
       <td class="c bt">${esc(r.konstrukter)}</td>
       <td class="c bt">${r.pocet != null ? esc(String(r.pocet)) : ""}</td>
-      <td class="bt" style="text-align:left;">${esc(r.notes)}</td>
     </tr>`;
   }).join("\n");
 
-  const dataCols = hasUnapproved ? 7 : 6;
+  const dataCols = hasUnapproved ? 6 : 5;
   const emptyRows = Array.from({ length: emptyRowCount }, () =>
     `<tr class="data-row">${Array.from({ length: dataCols }, () => `<td class="bt">&nbsp;</td>`).join("")}</tr>`
   ).join("\n");
@@ -128,13 +127,13 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 <head>
 <meta charset="utf-8">
 <base href="${baseUrl}/">
-<title>Průvodka — ${esc(projectId)}</title>
+<title>AMI-${format(new Date(), 'yyMMdd')}-Pruvodka-${esc(projectId)}</title>
 <style>
-  @page { size: A4 portrait; margin: 8mm 12mm 10mm 12mm; }
+  @page { size: A4 portrait; margin: 8mm 14mm 20mm 14mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Aptos Narrow', 'Arial Narrow', Calibri, Arial, sans-serif; font-size: 10pt; color: #1a1a1a; padding: 0; padding-bottom: 20mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Aptos Narrow', 'Arial Narrow', Calibri, Arial, sans-serif; font-size: 10pt; color: #1a1a1a; padding: 0; padding-bottom: 16mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
-  .wrap { width: 100%; margin: 0 auto; }
+  .wrap { width: 100%; margin: 0 auto; box-sizing: border-box; }
   .logo-bar { width: 100%; margin: 0; padding: 0; line-height: 0; }
   .logo-bar img { object-fit: fill; width: 100%; display: block; }
 
@@ -143,7 +142,7 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
   .bn { border: none; }
   .c { text-align: center; }
 
-  .info { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 2px; }
+  .info { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 6px; }
   .info td { padding: 3px 6px; vertical-align: middle; }
   .info .lbl { font-size: 10pt; font-weight: 400; }
   .info .val-name { font-size: 12pt; font-weight: 700; text-align: center; }
@@ -161,7 +160,7 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 
   thead { display: table-header-group; }
   tbody tr { break-inside: avoid; }
-  @media print { body { padding-bottom: 20mm; } .no-print { display: none !important; } }
+  @media print { body { padding-bottom: 16mm; } .no-print { display: none !important; } a[href]::after { content: none !important; } }
 </style>
 </head>
 <body>
@@ -207,7 +206,6 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
     <th class="bm">Název prvku</th>
     <th class="bm c" style="width:100px;">Konstruktér</th>
     <th class="bm c" style="width:50px;">Počet</th>
-    <th class="bm" style="width:140px;">Poznámka</th>
   </tr></thead>
   <tbody>
     ${tableRows}
@@ -220,9 +218,8 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
   <span>Datum: ${dateStr}</span>
 </div>
 
-<div style="position:fixed; bottom:0; left:0; right:0; border-top: 0.5px solid #1a3330; padding: 4px 12mm; display:flex; justify-content:space-between; align-items:center; font-family:'Aptos Narrow','Arial Narrow',Arial,sans-serif; font-size:7.5pt; color:#2d3a2e;">
-  <span>AM Interior Group, s.r.o., Záhumení V 322, Louky, 763 02 Zlín</span>
-  <span>IČ: 23032693 &nbsp;|&nbsp; DIČ: CZ23032693</span>
+<div style="position:fixed; bottom:0; left:0; right:0; border-top: 0.5px solid #1a3330; padding: 4px 12mm; display:flex; flex-direction:column; align-items:center; font-family:'Aptos Narrow','Arial Narrow',Arial,sans-serif; font-size:7.5pt; color:#2d3a2e;">
+  <span>AM Interior Group, s.r.o. &nbsp;|&nbsp; Záhumení V 322, Louky, 763 02 Zlín &nbsp;|&nbsp; IČ: 23032693 &nbsp;|&nbsp; DIČ: CZ23032693</span>
   <span>aminterior.cz</span>
 </div>
 
