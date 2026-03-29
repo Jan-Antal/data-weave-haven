@@ -1475,6 +1475,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   }
 
   function openProjectDetail(pid: string) {
+    if (isMobile) {
+      navigate("/", { state: { openProjectId: pid } });
+      return;
+    }
     const detail = projectDetails?.get(pid);
     if (detail) {
       setDetailProject({ ...detail, project_id: pid });
