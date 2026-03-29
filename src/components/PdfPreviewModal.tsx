@@ -33,9 +33,13 @@ export function PdfPreviewModal({ html, tabLabel, onClose, portrait = false }: P
     const win = iframeRef.current?.contentWindow;
     const doc = iframeRef.current?.contentDocument;
     if (win && doc) {
-      const today = new Date().toISOString().split("T")[0];
-      const tabKey = tabLabel.replace(/\s+/g, "");
-      doc.title = `AMI-${tabKey}-${today}`;
+      // Use the title already set inside the HTML (e.g. Průvodka sets its own)
+      // Fall back to a generated title for other exports
+      if (!doc.title || doc.title === 'about:blank') {
+        const today = new Date().toISOString().split("T")[0];
+        const tabKey = tabLabel.replace(/\s+/g, "");
+        doc.title = `AMI-${tabKey}-${today}`;
+      }
       win.print();
     }
   };
