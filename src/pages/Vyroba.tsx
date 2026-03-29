@@ -4999,7 +4999,15 @@ function QualityCheckFullDisplay({ check }: { check: any }) {
 
 function VykresynSection({ projectId }: { projectId: string }) {
   const [open, setOpen] = useState(false);
-  const { filesByCategory, listFiles } = useSharePointDocs(projectId);
+  const { filesByCategory, listFiles, getPreview } = useSharePointDocs(projectId);
+  const [previewFile, setPreviewFile] = useState<{
+    fileName: string;
+    fileSize?: number;
+    previewUrl: string | null;
+    webUrl: string | null;
+    downloadUrl: string | null;
+    loading: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (open && projectId) listFiles("vykresy");
@@ -5007,62 +5015,84 @@ function VykresynSection({ projectId }: { projectId: string }) {
 
   const files = filesByCategory["vykresy"] || [];
 
+  const handleFileClick = async (file: SPFile) => {
+    setPreviewFile({
+      fileName: file.name,
+      fileSize: file.size,
+      previewUrl: null,
+      webUrl: file.webUrl,
+      downloadUrl: file.downloadUrl,
+      loading: true,
+    });
+    try {
+      const preview = await getPreview(file.itemId);
+      setPreviewFile((prev) =>
+        prev ? { ...prev, previewUrl: preview.previewUrl, webUrl: preview.webUrl ?? prev.webUrl, downloadUrl: preview.downloadUrl ?? prev.downloadUrl, loading: false } : null
+      );
+    } catch {
+      setPreviewFile((prev) => (prev ? { ...prev, loading: false } : null));
+    }
+  };
+
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger
-        className="flex items-center gap-1 text-xs font-semibold cursor-pointer mt-2"
-        style={{ color: "#6b7280" }}
-      >
-        {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-        <FileText className="h-3 w-3" />
-        📄 Výkresy ({files.length})
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="mt-2 space-y-1">
-          {files.length === 0 ? (
-            <div className="text-xs py-3 text-center" style={{ color: "#99a5a3" }}>
-              Žádné výkresy
-            </div>
-          ) : (
-            files.map((file) => (
-              <div
-                key={file.itemId || file.name}
-                className="flex items-center gap-2 px-2.5 py-2 rounded-md"
-                style={{ border: "1px solid #ece8e2", background: "#ffffff" }}
-              >
-                {file.thumbnailUrl && (
-                  <img src={file.thumbnailUrl} alt="" className="w-8 h-8 rounded object-cover shrink-0" />
-                )}
-                <span className="text-[12px] flex-1 truncate" style={{ color: "#1a1a1a" }}>
-                  {file.name}
-                </span>
-                {file.downloadUrl && (
-                  <a
-                    href={file.downloadUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-1 rounded hover:bg-muted transition-colors"
-                  >
-                    <Download className="h-3.5 w-3.5" style={{ color: "#6b7280" }} />
-                  </a>
-                )}
-                {file.webUrl && (
-                  <a
-                    href={file.webUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-1 rounded hover:bg-muted transition-colors"
-                    title="Tisk"
-                  >
-                    <Printer className="h-3.5 w-3.5" style={{ color: "#6b7280" }} />
-                  </a>
-                )}
+    <>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CollapsibleTrigger
+          className="flex items-center gap-1 text-xs font-semibold cursor-pointer mt-2"
+          style={{ color: "#6b7280" }}
+        >
+          {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          <FileText className="h-3 w-3" />
+          📄 Výkresy ({files.length})
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="mt-2 space-y-1">
+            {files.length === 0 ? (
+              <div className="text-xs py-3 text-center" style={{ color: "#99a5a3" }}>
+                Žádné výkresy
               </div>
-            ))
-          )}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+            ) : (
+              files.map((file) => (
+                <button
+                  type="button"
+                  key={file.itemId || file.name}
+                  onClick={() => handleFileClick(file)}
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-md w-full text-left min-h-[44px] hover:bg-muted/50 transition-colors cursor-pointer"
+                  style={{ border: "1px solid #ece8e2", background: "#ffffff" }}
+                >
+                  {file.thumbnailUrl && (
+                    <img src={file.thumbnailUrl} alt="" className="w-8 h-8 rounded object-cover shrink-0" />
+                  )}
+                  <span className="text-[12px] flex-1 truncate" style={{ color: "#1a1a1a" }}>
+                    {file.name}
+                  </span>
+                  {file.downloadUrl && (
+                    <span
+                      onClick={(e) => { e.stopPropagation(); window.open(file.downloadUrl!, "_blank"); }}
+                      className="p-1 rounded hover:bg-muted transition-colors shrink-0"
+                    >
+                      <Download className="h-3.5 w-3.5" style={{ color: "#6b7280" }} />
+                    </span>
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+      {previewFile && (
+        <DocumentPreviewModal
+          open={!!previewFile}
+          onClose={() => setPreviewFile(null)}
+          fileName={previewFile.fileName}
+          fileSize={previewFile.fileSize}
+          previewUrl={previewFile.previewUrl}
+          webUrl={previewFile.webUrl}
+          downloadUrl={previewFile.downloadUrl}
+          loading={previewFile.loading}
+        />
+      )}
+    </>
   );
 }
 
