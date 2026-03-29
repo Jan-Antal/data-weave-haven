@@ -71,6 +71,7 @@ import { useSharePointDocs, type SPFile } from "@/hooks/useSharePointDocs";
 import { PhotoLightbox, isImageFile } from "@/components/PhotoLightbox";
 import { ProductionContextMenu, type ContextMenuAction } from "@/components/production/ProductionContextMenu";
 import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
+import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
 import { PauseItemDialog } from "@/components/production/PauseItemDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
