@@ -504,7 +504,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               i.status === "scheduled" ||
               i.status === "in_progress" ||
               i.status === "paused" ||
-              i.status === "completed",
+              isItemDone(i),
           )
         ) {
           result.push({
@@ -530,7 +530,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     if (prevSilo) {
       for (const b of prevSilo.bundles) {
         if (result.some((r) => r.projectId === b.project_id)) continue;
-        const activeItems = b.items.filter((i) => i.status === "scheduled" || i.status === "in_progress");
+        const activeItems = b.items.filter((i) => (i.status === "scheduled" || i.status === "in_progress") && !isItemDone(i));
         if (activeItems.length === 0) continue;
         result.push({
           projectId: b.project_id,
