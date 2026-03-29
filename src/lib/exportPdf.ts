@@ -170,8 +170,8 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
     <td class="lbl c" style="width:25%;">Č.ZAKÁZKY:</td>
   </tr>
   <tr>
-    <td class="val-name bm">\${esc(projectName)}</td>
-    <td class="val-id bm">\${esc(projectId)}</td>
+    <td class="val-name bm">${esc(projectName)}</td>
+    <td class="val-id bm">${esc(projectId)}</td>
   </tr>
   <tr>
     <td class="sec-lbl">předání:</td>
@@ -202,18 +202,18 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
     </tr>
   </thead>
   <tbody>
-    \${tableRows}
-    \${emptyRows}
+    ${tableRows}
+    ${emptyRows}
   </tbody>
 </table>
 
 <div class="footer-row">
-  <span>Vytiskl: \${esc(issuedBy)}</span>
-  <span>Datum: \${dateStr}</span>
+  <span>Vytiskl: ${esc(issuedBy)}</span>
+  <span>Datum: ${dateStr}</span>
 </div>
 
 </div>
-<script>document.title = 'AMI-\${format(new Date(), 'yyMMdd')}-Pruvodka-\${esc(projectId)}';</script>
+<script>document.title = 'AMI-\${format(new Date(), 'yyMMdd')}-Pruvodka-${esc(projectId)}';</script>
 </body>
 </html>`;
 }
