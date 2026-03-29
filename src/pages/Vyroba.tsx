@@ -1893,7 +1893,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                   />
                 </div>
                 <span className="text-[10px] font-sans" style={{ color: capacityColor }}>
-                  {weekCapacity.used}h/{weekCapacity.total}h · {capacityPct}%
+                  {Math.round(weekCapacity.used)}h/{Math.round(weekCapacity.total)}h · {capacityPct}%
                 </span>
               </div>
 
