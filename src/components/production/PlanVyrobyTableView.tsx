@@ -1081,7 +1081,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
       actions.push({ label: "Pozastavit", icon: "⏸", onClick: () => setPauseState({ itemId: item.id, itemName: item.item_name, itemCode: item.item_code, source: "schedule" }) });
       if (item.split_group_id) {
         const sameWeekSiblings = findSameWeekSiblings(item, weekKey);
-        if (sameWeekSiblings.length > 0) actions.push({ label: `Spojit s ostatními v T${weekNum}`, icon: "🔗", onClick: () => mergeSplitItems(item.split_group_id!) });
+        if (sameWeekSiblings.length > 0) actions.push({ label: `Spojit s ostatními v T${weekNum}`, icon: "🔗", onClick: () => mergeSplitItems(item.split_group_id!, weekKey) });
         actions.push({ label: "Spojit všechny části", icon: "🔗", onClick: () => mergeSplitItems(item.split_group_id!) });
       }
     }
