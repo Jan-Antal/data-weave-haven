@@ -3215,6 +3215,7 @@ function DetailPanel({
     itemName: string,
   ) => { incomplete: number; total: number; weekNums: number[] };
   hideLogButton?: boolean;
+  cachedDocCount?: number;
   expedicedScheduleIds: Set<string>;
 }) {
   const isMobile = useIsMobile();
