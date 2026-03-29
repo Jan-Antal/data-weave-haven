@@ -408,6 +408,7 @@ export function useProductionDragDrop() {
       const splitGroupIds = [...new Set(movedItems.filter(i => i.split_group_id).map(i => i.split_group_id!))];
       const mergeActions: { sourceId: string; targetId: string; addHours: number; addCzk: number; }[] = [];
       const plainMoveIds: string[] = [];
+      const separateConflictIds: string[] = [];
       let hasConflict = false;
 
       if (splitGroupIds.length > 0) {
