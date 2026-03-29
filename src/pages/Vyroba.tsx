@@ -629,6 +629,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       setMobileVyrobaProjektOpen(false);
       setDetailDialogOpen(false);
       setDetailProject(null);
+      setMobileDetailProjectId(null);
     };
     window.addEventListener("mobile-nav-change", handler);
     return () => window.removeEventListener("mobile-nav-change", handler);
