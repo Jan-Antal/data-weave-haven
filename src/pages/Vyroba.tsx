@@ -1706,7 +1706,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 const slideWeekKey = weekKeyStr(slideMonday);
                 const slideWeekNum = getISOWeekNumber(slideMonday);
                 // Compute projects for this specific slide's week
-                const slideProjects = getProjectsForWeek(scheduleData, slideWeekKey, slideMonday, projectDetails);
+                const slideProjects = getProjectsForWeek(scheduleData, slideWeekKey, slideMonday, projectDetails, expedicedScheduleIds);
                 const slideSpilled = slideProjects.filter((p) => p.isSpilled && !p.isPaused);
                 const slideNormal = slideProjects.filter((p) => !p.isSpilled && !p.isPaused);
                 const slidePaused = slideProjects.filter((p) => p.isPaused);
