@@ -437,6 +437,17 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   }, []);
 
   const { data: scheduleData } = useProductionSchedule();
+  const { data: expedicedMap } = useCompletedScheduleIds();
+  const expedicedScheduleIds = useMemo(() => {
+    if (!expedicedMap) return new Set<string>();
+    return new Set(expedicedMap.keys());
+  }, [expedicedMap]);
+
+  /** Check if a schedule item is "done" — either via production_expedice or legacy midflight */
+  const isItemDone = useCallback((item: ScheduleItem): boolean => {
+    if (item.is_midflight) return true;
+    return item.status === "completed" || expedicedScheduleIds.has(item.id);
+  }, [expedicedScheduleIds]);
   // Prefetch daily logs for all 5 pager weeks to avoid blink on swipe
   const pagerWk0 = useProductionDailyLogs(weekKeyStr(addWeeks(currentMonday, -2)));
   const pagerWk1 = useProductionDailyLogs(weekKeyStr(addWeeks(currentMonday, -1)));
