@@ -2663,7 +2663,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                       {allItems.map(({ item, mergedIds: mids, totalHours }) => {
                         const isDone = mids.every((id) => {
                           const orig = rawItems.find((ri) => ri.id === id);
-                          return orig?.status === "completed";
+                          return orig ? isItemDone(orig) : false;
                         });
                         const remaining = Math.round(totalHours * (1 - pct / 100));
                         const isFull = mids.some((id) => spillFullHours.has(id));
@@ -3743,7 +3743,7 @@ function UnifiedItemList({
   }
 
   const allMergedIds = useMemo(() => dedupedItems.flatMap((d) => d.mergedIds), [dedupedItems]);
-  const completedCount = dedupedItems.filter((i) => i.item.status === "completed").length;
+  const completedCount = dedupedItems.filter((i) => isItemDoneLocal(i.item)).length;
   const allSelected =
     dedupedItems.length > 0 && dedupedItems.every((i) => i.mergedIds.every((id) => selectedItems.has(id)));
 
@@ -3963,7 +3963,7 @@ function UnifiedItemList({
             {dedupedItems.map(({ item, mergedIds: mids, thisWeekHours, partsThisWeek, splitTotalFromRow }) => {
               const isCompleted = mids.every((id) => {
                 const orig = currentItems.find((ci) => ci.item.id === id);
-                return orig?.item.status === "completed";
+                return orig ? isItemDoneLocal(orig.item) : false;
               });
               const isPaused = item.status === "paused";
               const isSplit = mids.length > 1 || (item.split_part != null && item.split_total != null);
