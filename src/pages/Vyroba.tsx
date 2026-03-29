@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useProductionSchedule, getISOWeekNumber, type ScheduleItem } from "@/hooks/useProductionSchedule";
+import { useCompletedScheduleIds } from "@/hooks/useProductionExpedice";
 import { useProductionDailyLogs, saveDailyLog, type DailyLog } from "@/hooks/useProductionDailyLogs";
 import { useWeeklyCapacity } from "@/hooks/useWeeklyCapacity";
 import { getProjectColor } from "@/lib/projectColors";
@@ -130,9 +131,11 @@ function getProjectsForWeek(
   slideWeekKey: string,
   slideMonday: Date,
   projectDetailsMap?: Map<string, any>,
+  expedicedIds?: Set<string>,
 ): VyrobaProject[] {
   if (!scheduleData) return [];
   const result: VyrobaProject[] = [];
+  const itemDone = (i: ScheduleItem) => i.is_midflight || i.status === "completed" || (expedicedIds?.has(i.id) ?? false);
 
   // Current week bundles
   const silo = scheduleData.get(slideWeekKey);
@@ -145,7 +148,7 @@ function getProjectsForWeek(
             i.status === "scheduled" ||
             i.status === "in_progress" ||
             i.status === "paused" ||
-            i.status === "completed",
+            itemDone(i),
         )
       ) {
         result.push({
@@ -172,7 +175,7 @@ function getProjectsForWeek(
     for (const b of prevSilo.bundles) {
       if (result.some((r) => r.projectId === b.project_id)) continue;
       const activeItems = b.items.filter((i: ScheduleItem) => i.status === "scheduled" || i.status === "in_progress");
-      if (activeItems.length === 0) continue;
+      if (activeItems.length === 0 || activeItems.every((i: ScheduleItem) => itemDone(i))) continue;
       result.push({
         projectId: b.project_id,
         projectName: b.project_name,
@@ -436,6 +439,17 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   }, []);
 
   const { data: scheduleData } = useProductionSchedule();
+  const { data: expedicedMap } = useCompletedScheduleIds();
+  const expedicedScheduleIds = useMemo(() => {
+    if (!expedicedMap) return new Set<string>();
+    return new Set(expedicedMap.keys());
+  }, [expedicedMap]);
+
+  /** Check if a schedule item is "done" — either via production_expedice or legacy midflight */
+  const isItemDone = useCallback((item: ScheduleItem): boolean => {
+    if (item.is_midflight) return true;
+    return item.status === "completed" || expedicedScheduleIds.has(item.id);
+  }, [expedicedScheduleIds]);
   // Prefetch daily logs for all 5 pager weeks to avoid blink on swipe
   const pagerWk0 = useProductionDailyLogs(weekKeyStr(addWeeks(currentMonday, -2)));
   const pagerWk1 = useProductionDailyLogs(weekKeyStr(addWeeks(currentMonday, -1)));
@@ -490,7 +504,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               i.status === "scheduled" ||
               i.status === "in_progress" ||
               i.status === "paused" ||
-              i.status === "completed",
+              isItemDone(i),
           )
         ) {
           result.push({
@@ -516,7 +530,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     if (prevSilo) {
       for (const b of prevSilo.bundles) {
         if (result.some((r) => r.projectId === b.project_id)) continue;
-        const activeItems = b.items.filter((i) => i.status === "scheduled" || i.status === "in_progress");
+        const activeItems = b.items.filter((i) => (i.status === "scheduled" || i.status === "in_progress") && !isItemDone(i));
         if (activeItems.length === 0) continue;
         result.push({
           projectId: b.project_id,
@@ -536,7 +550,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       return (b.isSpilled ? 1 : 0) - (a.isSpilled ? 1 : 0);
     });
     return result;
-  }, [scheduleData, weekKey, currentMonday]);
+  }, [scheduleData, weekKey, currentMonday, isItemDone]);
 
   // Fetch project details for deadlines/PM
   const { data: projectDetails } = useProjectDetails(projects.map((p) => p.projectId));
@@ -726,7 +740,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     const allItems = getAllItemsForProject(pid);
     const totalHours = allItems.reduce((s, e) => s + e.item.scheduled_hours, 0);
     const completedHours = allItems
-      .filter((e) => e.item.status === "completed")
+      .filter((e) => isItemDone(e.item))
       .reduce((s, e) => s + e.item.scheduled_hours, 0);
 
     // Check daily logs for the latest percent — this reflects actual logged progress
@@ -775,7 +789,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     const activeItems = bundle.items.filter((i) => i.status !== "cancelled");
     const thisWeekHours = activeItems.reduce((s, i) => s + i.scheduled_hours, 0);
     const thisWeekCompleted = activeItems
-      .filter((i) => i.status === "completed")
+      .filter((i) => isItemDone(i))
       .reduce((s, i) => s + i.scheduled_hours, 0);
     return thisWeekHours > 0 && thisWeekCompleted >= thisWeekHours;
   }
@@ -791,7 +805,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       return false;
     });
     if (matching.length === 0) return false;
-    return matching.every((e) => e.item.status === "completed");
+    return matching.every((e) => isItemDone(e.item));
   }
 
   // ── Get incomplete parts info for an item_code across ALL weeks ──
@@ -808,7 +822,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       if (!itemCode && stripSuffix(e.item.item_name) === stripSuffix(itemName)) return true;
       return false;
     });
-    const incomplete = matching.filter((e) => e.item.status !== "completed");
+    const incomplete = matching.filter((e) => !isItemDone(e.item));
     const weekNums = [...new Set(incomplete.map((e) => e.weekNum))];
     return { incomplete: incomplete.length, total: matching.length, weekNums };
   }
@@ -995,7 +1009,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   function openSpillDialog() {
     if (!selectedProject) return;
     const pct = getLatestPercent(selectedProject.projectId);
-    const doneIds = new Set(selectedProject.scheduleItems.filter((i) => i.status === "completed").map((i) => i.id));
+    const doneIds = new Set(selectedProject.scheduleItems.filter((i) => isItemDone(i)).map((i) => i.id));
     const selected = new Set(
       selectedProject.scheduleItems
         .filter((i) => i.status !== "cancelled" && !doneIds.has(i.id) && getRemainingHours(i, pct) > 0)
@@ -1080,64 +1094,65 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     if (!selectedProject) return;
     const allItems = selectedProject.scheduleItems;
     const prevStatus = selectedProject.projectStatus || "Ve výrobě";
-    const snapshots = allItems.map((i) => ({ id: i.id, prevStatus: i.status }));
     const pid = selectedProject.projectId;
     const pName = selectedProject.projectName;
+    const itemsToExpedice = allItems.filter((i) => !isItemDone(i) && i.status !== "cancelled");
+
     pushUndo({
       page: "vyroba",
       actionType: "expedice",
       description: `${pName} → Expedice`,
       undo: async () => {
         await supabase.from("projects").update({ status: prevStatus }).eq("project_id", pid);
-        for (const snap of snapshots) {
-          await supabase
-            .from("production_schedule")
-            .update({ status: snap.prevStatus, completed_at: null, completed_by: null })
-            .eq("id", snap.id);
+        // Delete expedice records we just created
+        for (const item of itemsToExpedice) {
+          await (supabase.from("production_expedice") as any).delete().eq("source_schedule_id", item.id);
         }
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+        qc.invalidateQueries({ queryKey: ["production-expedice"] });
         qc.invalidateQueries({ queryKey: ["projects"] });
         qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
       },
       redo: async () => {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        const ids = snapshots
-          .filter((s) => s.prevStatus !== "completed" && s.prevStatus !== "cancelled")
-          .map((s) => s.id);
-        if (ids.length > 0) {
-          await supabase
-            .from("production_schedule")
-            .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null })
-            .in("id", ids);
+        for (const item of itemsToExpedice) {
+          await (supabase.from("production_expedice") as any).insert({
+            project_id: pid,
+            item_name: item.item_name,
+            item_code: item.item_code || null,
+            source_schedule_id: item.id,
+            stage_id: item.stage_id || null,
+            manufactured_at: new Date().toISOString(),
+            expediced_at: null,
+            is_midflight: false,
+          });
         }
         await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", pid);
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+        qc.invalidateQueries({ queryKey: ["production-expedice"] });
         qc.invalidateQueries({ queryKey: ["projects"] });
         qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
       },
     });
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const activeItems = selectedProject.scheduleItems.filter(
-      (i) => i.status !== "completed" && i.status !== "cancelled",
-    );
-    if (activeItems.length > 0) {
-      const ids = activeItems.map((i) => i.id);
-      await supabase
-        .from("production_schedule")
-        .update({
-          status: "completed",
-          completed_at: new Date().toISOString(),
-          completed_by: user?.id || null,
-        })
-        .in("id", ids);
+    // Insert into production_expedice for each active item
+    for (const item of itemsToExpedice) {
+      await (supabase.from("production_expedice") as any).insert({
+        project_id: pid,
+        item_name: item.item_name,
+        item_code: item.item_code || null,
+        source_schedule_id: item.id,
+        stage_id: item.stage_id || null,
+        manufactured_at: new Date().toISOString(),
+        expediced_at: null,
+        is_midflight: false,
+      });
     }
     await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", pid);
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
+    qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+    qc.invalidateQueries({ queryKey: ["production-expedice"] });
     qc.invalidateQueries({ queryKey: ["projects"] });
     qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
     qc.invalidateQueries({ queryKey: ["production-statuses", pid] });
@@ -1148,75 +1163,94 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   /* ── Toggle single item complete ── */
   async function toggleItemComplete(itemId: string, currentStatus: string) {
-    const newStatus = currentStatus === "completed" ? "scheduled" : "completed";
-    pushUndo({
-      page: "vyroba",
-      actionType: "item_hotovo",
-      description: newStatus === "completed" ? "označení jako hotovo" : "vrácení položky",
-      undo: async () => {
-        if (currentStatus === "completed") {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          await supabase
-            .from("production_schedule")
-            .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null })
-            .eq("id", itemId);
-        } else {
-          await supabase
-            .from("production_schedule")
-            .update({ status: currentStatus, completed_at: null, completed_by: null })
-            .eq("id", itemId);
-        }
-        qc.invalidateQueries({ queryKey: ["production-schedule"] });
-      },
-      redo: async () => {
-        if (newStatus === "completed") {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          await supabase
-            .from("production_schedule")
-            .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null })
-            .eq("id", itemId);
-        } else {
-          await supabase
-            .from("production_schedule")
-            .update({ status: "scheduled", completed_at: null, completed_by: null })
-            .eq("id", itemId);
-        }
-        qc.invalidateQueries({ queryKey: ["production-schedule"] });
-      },
-    });
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (currentStatus === "completed") {
-      await supabase
-        .from("production_schedule")
-        .update({ status: "scheduled", completed_at: null, completed_by: null })
-        .eq("id", itemId);
+    const wasDone = currentStatus === "completed" || expedicedScheduleIds.has(itemId);
+    const item = selectedProject?.scheduleItems.find((i) => i.id === itemId);
+    const pid = item?.project_id || selectedProject?.projectId || "";
+
+    if (wasDone) {
+      // Undo completion: delete from production_expedice
+      pushUndo({
+        page: "vyroba",
+        actionType: "item_hotovo",
+        description: "vrácení položky",
+        undo: async () => {
+          if (item) {
+            await (supabase.from("production_expedice") as any).insert({
+              project_id: pid,
+              item_name: item.item_name,
+              item_code: item.item_code || null,
+              source_schedule_id: itemId,
+              stage_id: item.stage_id || null,
+              manufactured_at: new Date().toISOString(),
+              expediced_at: null,
+              is_midflight: false,
+            });
+          }
+          qc.invalidateQueries({ queryKey: ["production-schedule"] });
+          qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+          qc.invalidateQueries({ queryKey: ["production-expedice"] });
+        },
+        redo: async () => {
+          await (supabase.from("production_expedice") as any).delete().eq("source_schedule_id", itemId);
+          qc.invalidateQueries({ queryKey: ["production-schedule"] });
+          qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+          qc.invalidateQueries({ queryKey: ["production-expedice"] });
+        },
+      });
+      await (supabase.from("production_expedice") as any).delete().eq("source_schedule_id", itemId);
     } else {
-      await supabase
-        .from("production_schedule")
-        .update({
-          status: "completed",
-          completed_at: new Date().toISOString(),
-          completed_by: user?.id || null,
-        })
-        .eq("id", itemId);
+      // Mark as done: insert into production_expedice
+      pushUndo({
+        page: "vyroba",
+        actionType: "item_hotovo",
+        description: "označení jako hotovo",
+        undo: async () => {
+          await (supabase.from("production_expedice") as any).delete().eq("source_schedule_id", itemId);
+          qc.invalidateQueries({ queryKey: ["production-schedule"] });
+          qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+          qc.invalidateQueries({ queryKey: ["production-expedice"] });
+        },
+        redo: async () => {
+          if (item) {
+            await (supabase.from("production_expedice") as any).insert({
+              project_id: pid,
+              item_name: item.item_name,
+              item_code: item.item_code || null,
+              source_schedule_id: itemId,
+              stage_id: item.stage_id || null,
+              manufactured_at: new Date().toISOString(),
+              expediced_at: null,
+              is_midflight: false,
+            });
+          }
+          qc.invalidateQueries({ queryKey: ["production-schedule"] });
+          qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+          qc.invalidateQueries({ queryKey: ["production-expedice"] });
+        },
+      });
+      await (supabase.from("production_expedice") as any).insert({
+        project_id: pid,
+        item_name: item?.item_name || "",
+        item_code: item?.item_code || null,
+        source_schedule_id: itemId,
+        stage_id: item?.stage_id || null,
+        manufactured_at: new Date().toISOString(),
+        expediced_at: null,
+        is_midflight: false,
+      });
+      // Log item hotovo
+      if (selectedProject) {
+        logActivity({
+          projectId: selectedProject.projectId,
+          actionType: "item_hotovo",
+          newValue: item?.item_code || item?.item_name || itemId,
+          detail: "Označeno jako hotovo",
+        });
+      }
     }
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
-    // Log item hotovo
-    if (newStatus === "completed" && selectedProject) {
-      const item = selectedProject.scheduleItems.find((i) => i.id === itemId);
-      logActivity({
-        projectId: selectedProject.projectId,
-        actionType: "item_hotovo",
-        newValue: item?.item_code || item?.item_name || itemId,
-        detail: "Označeno jako hotovo",
-      });
-    }
+    qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+    qc.invalidateQueries({ queryKey: ["production-expedice"] });
   }
 
   // Ref-based swipe-to-dismiss for mobile bottom sheets (vertical only)
@@ -1377,16 +1411,12 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   /* ── Return from Expedice ── */
   async function handleReturnFromExpedice(pid: string) {
-    const items = getAllItemsForProject(pid);
-    const completedIds = items.filter((e) => e.item.status === "completed").map((e) => e.item.id);
-    if (completedIds.length > 0) {
-      await supabase
-        .from("production_schedule")
-        .update({ status: "in_progress", completed_at: null, completed_by: null, expediced_at: null })
-        .in("id", completedIds);
-    }
+    // Delete all production_expedice records for this project
+    await (supabase.from("production_expedice") as any).delete().eq("project_id", pid);
     await supabase.from("projects").update({ status: "Ve výrobě" }).eq("project_id", pid);
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
+    qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+    qc.invalidateQueries({ queryKey: ["production-expedice"] });
     qc.invalidateQueries({ queryKey: ["projects"] });
     qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
     toast.success("↩ Vráceno z Expedice", { duration: 2000 });
@@ -1676,7 +1706,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 const slideWeekKey = weekKeyStr(slideMonday);
                 const slideWeekNum = getISOWeekNumber(slideMonday);
                 // Compute projects for this specific slide's week
-                const slideProjects = getProjectsForWeek(scheduleData, slideWeekKey, slideMonday, projectDetails);
+                const slideProjects = getProjectsForWeek(scheduleData, slideWeekKey, slideMonday, projectDetails, expedicedScheduleIds);
                 const slideSpilled = slideProjects.filter((p) => p.isSpilled && !p.isPaused);
                 const slideNormal = slideProjects.filter((p) => !p.isSpilled && !p.isPaused);
                 const slidePaused = slideProjects.filter((p) => p.isPaused);
@@ -2057,6 +2087,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                   getIncompletePartsInfo={(itemCode, itemName) =>
                     getIncompletePartsInfo(selectedProject.projectId, itemCode, itemName)
                   }
+                  expedicedScheduleIds={expedicedScheduleIds}
                 />
               )}
             </div>
@@ -2163,6 +2194,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                       getIncompletePartsInfo(selectedProject.projectId, itemCode, itemName)
                     }
                     hideLogButton
+                    expedicedScheduleIds={expedicedScheduleIds}
                   />
                 </div>
                 {/* Fixed bottom Log button */}
@@ -2631,7 +2663,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                       {allItems.map(({ item, mergedIds: mids, totalHours }) => {
                         const isDone = mids.every((id) => {
                           const orig = rawItems.find((ri) => ri.id === id);
-                          return orig?.status === "completed";
+                          return orig ? isItemDone(orig) : false;
                         });
                         const remaining = Math.round(totalHours * (1 - pct / 100));
                         const isFull = mids.some((id) => spillFullHours.has(id));
@@ -3113,6 +3145,7 @@ function DetailPanel({
   areAllPartsCompleted,
   getIncompletePartsInfo,
   hideLogButton = false,
+  expedicedScheduleIds,
 }: {
   project: VyrobaProject;
   weekKey: string;
@@ -3147,8 +3180,13 @@ function DetailPanel({
     itemName: string,
   ) => { incomplete: number; total: number; weekNums: number[] };
   hideLogButton?: boolean;
+  expedicedScheduleIds: Set<string>;
 }) {
   const isMobile = useIsMobile();
+  const isItemDoneLocal = useCallback((item: ScheduleItem): boolean => {
+    if (item.is_midflight) return true;
+    return item.status === "completed" || expedicedScheduleIds.has(item.id);
+  }, [expedicedScheduleIds]);
   const expectedPct = todayDayIndex >= 0 ? getExpectedPct(todayDayIndex, weeklyGoal) : 0;
   const isExpanded = expandedMap[bundleId] ?? true;
   const statusColors = { "on-track": "#3a8a36", "at-risk": "#d97706", behind: "#dc2626" };
@@ -3174,7 +3212,7 @@ function DetailPanel({
     const completed: { item: ScheduleItem; weekKey: string; weekNum: number }[] = [];
 
     for (const entry of allItems) {
-      if (entry.item.status === "completed") {
+      if (isItemDoneLocal(entry.item)) {
         completed.push(entry);
       } else if (entry.weekKey === weekKey) {
         current.push(entry);
@@ -3444,6 +3482,7 @@ function DetailPanel({
           pushUndo={pushUndo}
           areAllPartsCompleted={areAllPartsCompleted}
           getIncompletePartsInfo={getIncompletePartsInfo}
+          expedicedScheduleIds={expedicedScheduleIds}
         />
 
         {/* ── NAPLÁNOVANÉ (future) — collapsible ── */}
@@ -3573,6 +3612,7 @@ function UnifiedItemList({
   pushUndo,
   areAllPartsCompleted,
   getIncompletePartsInfo,
+  expedicedScheduleIds,
 }: {
   projectId: string;
   currentItems: { item: ScheduleItem; weekKey: string; weekNum: number }[];
@@ -3588,7 +3628,12 @@ function UnifiedItemList({
     itemCode: string | null,
     itemName: string,
   ) => { incomplete: number; total: number; weekNums: number[] };
+  expedicedScheduleIds: Set<string>;
 }) {
+  const isItemDoneLocal = useCallback((item: ScheduleItem): boolean => {
+    if (item.is_midflight) return true;
+    return item.status === "completed" || expedicedScheduleIds.has(item.id);
+  }, [expedicedScheduleIds]);
   const { checks, checkItem, uncheckItem } = useQualityChecks(projectId);
   const { defects, addDefect, resolveDefect } = useQualityDefects(projectId);
   const { profile } = useAuth();
@@ -3698,7 +3743,7 @@ function UnifiedItemList({
   }
 
   const allMergedIds = useMemo(() => dedupedItems.flatMap((d) => d.mergedIds), [dedupedItems]);
-  const completedCount = dedupedItems.filter((i) => i.item.status === "completed").length;
+  const completedCount = dedupedItems.filter((i) => isItemDoneLocal(i.item)).length;
   const allSelected =
     dedupedItems.length > 0 && dedupedItems.every((i) => i.mergedIds.every((id) => selectedItems.has(id)));
 
@@ -3706,59 +3751,67 @@ function UnifiedItemList({
   function handleMarkHotovo() {
     const targetItems =
       selectedItems.size > 0
-        ? dedupedItems.filter((d) => d.mergedIds.some((id) => selectedItems.has(id)) && d.item.status !== "completed")
-        : dedupedItems.filter((d) => d.item.status !== "completed");
+        ? dedupedItems.filter((d) => d.mergedIds.some((id) => selectedItems.has(id)) && !isItemDoneLocal(d.item))
+        : dedupedItems.filter((d) => !isItemDoneLocal(d.item));
 
     if (targetItems.length === 0) return;
 
     const missingQC = targetItems.filter(({ item }) => !checkMap.has(item.id));
 
     if (missingQC.length === 0) {
-      // All have QC — mark as hotovo directly
+      // All have QC — mark as hotovo via production_expedice
       (async () => {
-        const ids = targetItems.flatMap(({ mergedIds }) => mergedIds);
-        const snapshots = targetItems
-          .map(({ mergedIds: mids, item }) => mids.map((mid) => ({ id: mid, prevStatus: item.status })))
-          .flat();
+        const itemsToInsert = targetItems.flatMap(({ mergedIds: mids, item }) =>
+          mids.map((mid) => ({ id: mid, item }))
+        );
         pushUndo({
           page: "vyroba",
           actionType: "item_hotovo",
-          description: `${ids.length} položek dokončeno`,
+          description: `${itemsToInsert.length} položek dokončeno`,
           undo: async () => {
-            for (const snap of snapshots) {
-              await supabase
-                .from("production_schedule")
-                .update({ status: snap.prevStatus, completed_at: null, completed_by: null })
-                .eq("id", snap.id);
+            for (const { id } of itemsToInsert) {
+              await (supabase.from("production_expedice") as any).delete().eq("source_schedule_id", id);
             }
             qc.invalidateQueries({ queryKey: ["production-schedule"] });
+            qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+            qc.invalidateQueries({ queryKey: ["production-expedice"] });
           },
           redo: async () => {
-            const {
-              data: { user },
-            } = await supabase.auth.getUser();
-            await supabase
-              .from("production_schedule")
-              .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null })
-              .in("id", ids);
+            for (const { id, item } of itemsToInsert) {
+              await (supabase.from("production_expedice") as any).insert({
+                project_id: projectId,
+                item_name: item.item_name,
+                item_code: item.item_code || null,
+                source_schedule_id: id,
+                stage_id: item.stage_id || null,
+                manufactured_at: new Date().toISOString(),
+                expediced_at: null,
+                is_midflight: false,
+              });
+            }
             qc.invalidateQueries({ queryKey: ["production-schedule"] });
+            qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+            qc.invalidateQueries({ queryKey: ["production-expedice"] });
           },
         });
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        await supabase
-          .from("production_schedule")
-          .update({
-            status: "completed",
-            completed_at: new Date().toISOString(),
-            completed_by: user?.id || null,
-          })
-          .in("id", ids);
+        for (const { id, item } of itemsToInsert) {
+          await (supabase.from("production_expedice") as any).insert({
+            project_id: projectId,
+            item_name: item.item_name,
+            item_code: item.item_code || null,
+            source_schedule_id: id,
+            stage_id: item.stage_id || null,
+            manufactured_at: new Date().toISOString(),
+            expediced_at: null,
+            is_midflight: false,
+          });
+        }
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
+        qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+        qc.invalidateQueries({ queryKey: ["production-expedice"] });
         setSelectedItems(new Set());
-        // Check if ALL items are now completed
-        const allNowCompleted = dedupedItems.every(({ item }) => item.status === "completed" || ids.includes(item.id));
+        const ids = itemsToInsert.map(({ id }) => id);
+        const allNowCompleted = dedupedItems.every(({ item }) => isItemDoneLocal(item) || ids.includes(item.id));
         if (allNowCompleted) {
           onOpenExpedice();
         }
@@ -3827,23 +3880,29 @@ function UnifiedItemList({
           });
         }
       }
-      // Now mark ALL target items (selected or all) as completed
+      // Now mark ALL target items (selected or all) as completed via production_expedice
       const targetItems2 =
         selectedItems.size > 0
-          ? dedupedItems.filter((d) => d.mergedIds.some((id) => selectedItems.has(id)) && d.item.status !== "completed")
-          : dedupedItems.filter((d) => d.item.status !== "completed");
-      const ids = targetItems2.flatMap(({ mergedIds }) => mergedIds);
-      if (ids.length > 0) {
-        await supabase
-          .from("production_schedule")
-          .update({
-            status: "completed",
-            completed_at: new Date().toISOString(),
-            completed_by: user?.id || null,
-          })
-          .in("id", ids);
+          ? dedupedItems.filter((d) => d.mergedIds.some((id) => selectedItems.has(id)) && !isItemDoneLocal(d.item))
+          : dedupedItems.filter((d) => !isItemDoneLocal(d.item));
+      const itemsToInsert = targetItems2.flatMap(({ mergedIds: mids, item }) =>
+        mids.map((mid) => ({ id: mid, item }))
+      );
+      for (const { id, item } of itemsToInsert) {
+        await (supabase.from("production_expedice") as any).insert({
+          project_id: projectId,
+          item_name: item.item_name,
+          item_code: item.item_code || null,
+          source_schedule_id: id,
+          stage_id: item.stage_id || null,
+          manufactured_at: new Date().toISOString(),
+          expediced_at: null,
+          is_midflight: false,
+        });
       }
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+      qc.invalidateQueries({ queryKey: ["production-expedice"] });
       qc.invalidateQueries({ queryKey: ["quality-checks", projectId] });
       const qcItemCodes = qcModalItems
         .filter(({ item }) => !checkMap.has(item.id))
@@ -3856,8 +3915,8 @@ function UnifiedItemList({
       });
       setSelectedItems(new Set());
       setQcModalOpen(false);
-      // Check if ALL items are now completed
-      const allNowCompleted = dedupedItems.every(({ item }) => item.status === "completed" || ids.includes(item.id));
+      const ids = itemsToInsert.map(({ id }) => id);
+      const allNowCompleted = dedupedItems.every(({ item }) => isItemDoneLocal(item) || ids.includes(item.id));
       if (allNowCompleted) {
         onOpenExpedice();
       }
@@ -3918,7 +3977,7 @@ function UnifiedItemList({
             {dedupedItems.map(({ item, mergedIds: mids, thisWeekHours, partsThisWeek, splitTotalFromRow }) => {
               const isCompleted = mids.every((id) => {
                 const orig = currentItems.find((ci) => ci.item.id === id);
-                return orig?.item.status === "completed";
+                return orig ? isItemDoneLocal(orig.item) : false;
               });
               const isPaused = item.status === "paused";
               const isSplit = mids.length > 1 || (item.split_part != null && item.split_total != null);
