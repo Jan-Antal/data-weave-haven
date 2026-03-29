@@ -698,7 +698,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
         if (item.split_group_id) {
           const sameWeekSiblings = findSameWeekSiblings(item, weekKey);
           if (sameWeekSiblings.length > 0) {
-            actions.push({ label: `Spojit s ostatními v T${weekNum}`, icon: "🔗", onClick: () => mergeSplitItems(item.split_group_id!) });
+            actions.push({ label: `Spojit s ostatními v T${weekNum}`, icon: "🔗", onClick: () => mergeSplitItems(item.split_group_id!, weekKey) });
           }
           actions.push({ label: "Spojit všechny části", icon: "🔗", onClick: () => mergeSplitItems(item.split_group_id!) });
         }
