@@ -740,7 +740,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     const allItems = getAllItemsForProject(pid);
     const totalHours = allItems.reduce((s, e) => s + e.item.scheduled_hours, 0);
     const completedHours = allItems
-      .filter((e) => e.item.status === "completed")
+      .filter((e) => isItemDone(e.item))
       .reduce((s, e) => s + e.item.scheduled_hours, 0);
 
     // Check daily logs for the latest percent — this reflects actual logged progress
@@ -789,7 +789,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     const activeItems = bundle.items.filter((i) => i.status !== "cancelled");
     const thisWeekHours = activeItems.reduce((s, i) => s + i.scheduled_hours, 0);
     const thisWeekCompleted = activeItems
-      .filter((i) => i.status === "completed")
+      .filter((i) => isItemDone(i))
       .reduce((s, i) => s + i.scheduled_hours, 0);
     return thisWeekHours > 0 && thisWeekCompleted >= thisWeekHours;
   }
@@ -805,7 +805,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       return false;
     });
     if (matching.length === 0) return false;
-    return matching.every((e) => e.item.status === "completed");
+    return matching.every((e) => isItemDone(e.item));
   }
 
   // ── Get incomplete parts info for an item_code across ALL weeks ──
@@ -822,7 +822,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       if (!itemCode && stripSuffix(e.item.item_name) === stripSuffix(itemName)) return true;
       return false;
     });
-    const incomplete = matching.filter((e) => e.item.status !== "completed");
+    const incomplete = matching.filter((e) => !isItemDone(e.item));
     const weekNums = [...new Set(incomplete.map((e) => e.weekNum))];
     return { incomplete: incomplete.length, total: matching.length, weekNums };
   }
