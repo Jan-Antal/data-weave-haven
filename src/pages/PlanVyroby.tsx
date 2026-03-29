@@ -613,7 +613,23 @@ export default function PlanVyroby() {
         await action();
       } else if (dragData.type === "silo-item" && dragData.itemId) {
         if (dragData.weekDate !== weekDate) {
-          const action = async () => { await moveScheduleItemToWeek(dragData.itemId!, weekDate); };
+          const action = async () => {
+            const result = await moveScheduleItemToWeek(dragData.itemId!, weekDate);
+            if (result && 'conflict' in result) {
+              // Conflict detected — show merge dialog
+              setMergeState({
+                itemName: dragData.itemName || "Položka",
+                splitGroupIds: dragData.splitGroupId ? [dragData.splitGroupId] : [],
+                mergeItemCount: 1,
+                draggedItemId: dragData.itemId!,
+                targetWeekKey: weekDate,
+                onKeepSeparate: async () => {
+                  await moveScheduleItemToWeek(dragData.itemId!, weekDate, 'separate');
+                },
+              });
+              return;
+            }
+          };
           if (!checkAndWarnDeadline(projectId, weekDate, action)) return;
           await action();
         }
