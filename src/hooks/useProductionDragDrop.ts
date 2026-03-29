@@ -556,6 +556,12 @@ export function useProductionDragDrop() {
               });
             }
           }
+          // Undo separate-conflict moves: restore original week + item_code
+          for (const [itemId, codes] of separateCodeMap) {
+            await supabase.from("production_schedule")
+              .update({ scheduled_week: sourceWeekDate, item_code: codes.oldCode })
+              .eq("id", itemId);
+          }
           invalidateAll();
         },
         redo: async () => {
@@ -575,6 +581,12 @@ export function useProductionDragDrop() {
             await supabase.from("production_schedule")
               .update({ scheduled_week: targetWeekDate })
               .in("id", uniquePlainMoveIds);
+          }
+          // Redo separate-conflict moves
+          for (const [itemId, codes] of separateCodeMap) {
+            await supabase.from("production_schedule")
+              .update({ scheduled_week: targetWeekDate, item_code: codes.newCode })
+              .eq("id", itemId);
           }
           invalidateAll();
         },
