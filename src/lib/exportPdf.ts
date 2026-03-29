@@ -132,28 +132,27 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 <style>
   @page { size: A4 portrait; margin: 8mm 12mm 10mm 12mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Aptos Narrow', 'Arial Narrow', Calibri, Arial, sans-serif; font-size: 12pt; color: #1a1a1a; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Aptos Narrow', 'Arial Narrow', Calibri, Arial, sans-serif; font-size: 10pt; color: #1a1a1a; padding: 0; padding-bottom: 20mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
   .wrap { width: 100%; margin: 0 auto; }
-  .logo-bar { width: 100%; margin: 0; padding: 0; }
+  .logo-bar { width: 100%; margin: 0; padding: 0; line-height: 0; }
   .logo-bar img { object-fit: fill; width: 100%; display: block; }
-  .sep { border: none; border-top: 1.5px solid #1a3330; margin: 4px 0 8px 0; }
 
   .bm { border: 1.5px solid #333; }
   .bt { border: 0.75px solid #999; }
   .bn { border: none; }
   .c { text-align: center; }
 
-  .info { width: 100%; border-collapse: collapse; margin-bottom: 2px; }
+  .info { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 2px; }
   .info td { padding: 3px 6px; vertical-align: middle; }
-  .info .lbl { font-size: 12pt; font-weight: 400; }
-  .info .val-name { font-size: 14pt; font-weight: 700; text-align: center; }
-  .info .val-id { font-size: 12pt; font-weight: 700; text-align: center; }
-  .info .sec-lbl { font-size: 11pt; font-weight: 700; }
-  .info .sec-val { font-size: 11pt; }
+  .info .lbl { font-size: 10pt; font-weight: 400; }
+  .info .val-name { font-size: 12pt; font-weight: 700; text-align: center; }
+  .info .val-id { font-size: 11pt; font-weight: 700; text-align: center; }
+  .info .sec-lbl { font-size: 10pt; font-weight: 700; }
+  .info .sec-val { font-size: 10pt; }
 
-  .dtable { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12pt; }
-  .dtable thead th { background: #f5f5f0; font-weight: 600; font-size: 12pt; padding: 4px 6px; }
+  .dtable { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 10pt; }
+  .dtable thead th { background: #f5f5f0; font-weight: 600; font-size: 10pt; padding: 4px 6px; }
   .dtable thead th.num-hdr { font-size: 14pt; width: 30px; }
   .dtable .data-row td { padding: 2px 6px; height: 20pt; vertical-align: middle; }
   .dtable .item-name { text-align: left; padding-left: 10px; }
@@ -162,7 +161,7 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 
   thead { display: table-header-group; }
   tbody tr { break-inside: avoid; }
-  @media print { body { padding: 0; } .no-print { display: none !important; } }
+  @media print { body { padding-bottom: 20mm; } .no-print { display: none !important; } }
 </style>
 </head>
 <body>
