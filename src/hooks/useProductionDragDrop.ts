@@ -280,7 +280,44 @@ export function useProductionDragDrop() {
             });
             return;
           }
-          // onConflict === 'separate': fall through to plain move below
+          // onConflict === 'separate': generate unique item_code and move
+          if (onConflict === 'separate') {
+            const uniqueSuffix = `_${Date.now().toString(36).slice(-4)}`;
+            const newItemCode = oldItem.item_code ? `${oldItem.item_code}${uniqueSuffix}` : oldItem.item_code;
+
+            const { error } = await supabase
+              .from("production_schedule")
+              .update({
+                scheduled_week: newWeekDate,
+                item_code: newItemCode,
+              })
+              .eq("id", scheduleItemId);
+            if (error) throw error;
+
+            logActivity({
+              projectId: oldItem.project_id || "",
+              actionType: "item_moved",
+              oldValue: weekLabel(oldWeek || ""),
+              newValue: weekLabel(newWeekDate),
+              detail: JSON.stringify({ item_name: oldItem.item_name, from_week: weekLabel(oldWeek || ""), to_week: weekLabel(newWeekDate) }),
+            });
+            invalidateAll();
+            const capturedOldItemCode = oldItem.item_code;
+            pushUndo({
+              page: "plan-vyroby",
+              actionType: "move_silo_item",
+              description: `Přesun ${oldItem?.item_name || "položky"} → ${weekLabel(newWeekDate)}`,
+              undo: async () => {
+                await supabase.from("production_schedule").update({ scheduled_week: oldWeek, item_code: capturedOldItemCode }).eq("id", scheduleItemId);
+                invalidateAll();
+              },
+              redo: async () => {
+                await supabase.from("production_schedule").update({ scheduled_week: newWeekDate, item_code: newItemCode }).eq("id", scheduleItemId);
+                invalidateAll();
+              },
+            });
+            return;
+          }
         }
       }
 
@@ -371,6 +408,7 @@ export function useProductionDragDrop() {
       const splitGroupIds = [...new Set(movedItems.filter(i => i.split_group_id).map(i => i.split_group_id!))];
       const mergeActions: { sourceId: string; targetId: string; addHours: number; addCzk: number; }[] = [];
       const plainMoveIds: string[] = [];
+      const separateConflictIds: string[] = [];
       let hasConflict = false;
 
       if (splitGroupIds.length > 0) {
@@ -394,7 +432,8 @@ export function useProductionDragDrop() {
                 mergeActions.push({ sourceId: src.id, targetId: target.id, addHours: totalAddHours, addCzk: totalAddCzk });
               }
             } else if (onConflict === 'separate') {
-              movedWithSg.forEach(i => plainMoveIds.push(i.id));
+              // These items have conflicts — need unique item_codes
+              movedWithSg.forEach(i => separateConflictIds.push(i.id));
             }
           } else {
             movedWithSg.forEach(i => plainMoveIds.push(i.id));
@@ -464,6 +503,19 @@ export function useProductionDragDrop() {
         if (error) throw error;
       }
 
+      // Execute separate-conflict moves with unique item_codes
+      const uniqueSeparateIds = [...new Set(separateConflictIds)].filter(id => !mergedSourceIds.has(id));
+      const separateCodeMap = new Map<string, { oldCode: string | null; newCode: string }>();
+      for (const itemId of uniqueSeparateIds) {
+        const item = movedItems.find(i => i.id === itemId);
+        const uniqueSuffix = `_${Date.now().toString(36).slice(-4)}${Math.random().toString(36).slice(-2)}`;
+        const newItemCode = item?.item_code ? `${item.item_code}${uniqueSuffix}` : item?.item_code ?? null;
+        separateCodeMap.set(itemId, { oldCode: item?.item_code ?? null, newCode: newItemCode! });
+        await supabase.from("production_schedule")
+          .update({ scheduled_week: targetWeekDate, item_code: newItemCode })
+          .eq("id", itemId);
+      }
+
       invalidateAll();
 
       if (mergedSourceIds.size > 0) {
@@ -504,6 +556,12 @@ export function useProductionDragDrop() {
               });
             }
           }
+          // Undo separate-conflict moves: restore original week + item_code
+          for (const [itemId, codes] of separateCodeMap) {
+            await supabase.from("production_schedule")
+              .update({ scheduled_week: sourceWeekDate, item_code: codes.oldCode })
+              .eq("id", itemId);
+          }
           invalidateAll();
         },
         redo: async () => {
@@ -523,6 +581,12 @@ export function useProductionDragDrop() {
             await supabase.from("production_schedule")
               .update({ scheduled_week: targetWeekDate })
               .in("id", uniquePlainMoveIds);
+          }
+          // Redo separate-conflict moves
+          for (const [itemId, codes] of separateCodeMap) {
+            await supabase.from("production_schedule")
+              .update({ scheduled_week: targetWeekDate, item_code: codes.newCode })
+              .eq("id", itemId);
           }
           invalidateAll();
         },
