@@ -179,7 +179,11 @@ export function useProductionDragDrop() {
     }
   }, [invalidateAll, pushUndo]);
 
-  const moveScheduleItemToWeek = useCallback(async (scheduleItemId: string, newWeekDate: string) => {
+  const moveScheduleItemToWeek = useCallback(async (
+    scheduleItemId: string,
+    newWeekDate: string,
+    onConflict?: 'merge' | 'separate',
+  ): Promise<{ conflict: true; targetWeek: string; conflictType: 'split_sibling' | 'duplicate_key' } | void> => {
     try {
       // Capture old item for undo
       const { data: oldItem } = await supabase.from("production_schedule")
@@ -188,7 +192,7 @@ export function useProductionDragDrop() {
       if (!oldItem) throw new Error("Item not found");
       const oldWeek = oldItem.scheduled_week;
 
-      // FIX: Check if target week already has a sibling with same split_group_id
+      // Check if target week already has a sibling with same split_group_id
       if (oldItem.split_group_id) {
         const { data: targetSiblings } = await supabase.from("production_schedule")
           .select("*")
@@ -198,84 +202,90 @@ export function useProductionDragDrop() {
           .in("status", ["scheduled", "in_progress"]);
 
         if (targetSiblings && targetSiblings.length > 0) {
-          // Auto-merge: add hours to existing sibling, delete dragged item
-          const target = targetSiblings[0];
-          const newHours = target.scheduled_hours + oldItem.scheduled_hours;
-          const newCzk = target.scheduled_czk + oldItem.scheduled_czk;
-          const snapshot = { ...oldItem };
-
-          await supabase.from("production_schedule").delete().eq("id", scheduleItemId);
-          await supabase.from("production_schedule").update({
-            scheduled_hours: newHours,
-            scheduled_czk: newCzk,
-          }).eq("id", target.id);
-
-          // Renumber remaining siblings
-          const { data: remaining } = await supabase.from("production_schedule")
-            .select("id, scheduled_week")
-            .or(`split_group_id.eq.${oldItem.split_group_id},id.eq.${oldItem.split_group_id}`)
-            .order("scheduled_week", { ascending: true });
-          if (remaining && remaining.length > 1) {
-            const cleanName = oldItem.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
-            await Promise.all(remaining.map((s, i) =>
-              supabase.from("production_schedule").update({
-                item_name: `${cleanName} (${i + 1}/${remaining.length})`,
-                split_part: i + 1,
-                split_total: remaining.length,
-              }).eq("id", s.id)
-            ));
-          } else if (remaining && remaining.length === 1) {
-            const cleanName = oldItem.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
-            await supabase.from("production_schedule").update({
-              item_name: cleanName,
-              split_group_id: null, split_part: null, split_total: null,
-            }).eq("id", remaining[0].id);
+          // If no conflict resolution specified, return conflict signal
+          if (!onConflict) {
+            return { conflict: true, targetWeek: newWeekDate, conflictType: 'split_sibling' };
           }
 
-          invalidateAll();
-          toast({ title: `Položky sloučeny do ${weekLabel(newWeekDate)}` });
+          if (onConflict === 'merge') {
+            // Merge: add hours to existing sibling, delete dragged item
+            const target = targetSiblings[0];
+            const newHours = target.scheduled_hours + oldItem.scheduled_hours;
+            const newCzk = target.scheduled_czk + oldItem.scheduled_czk;
+            const snapshot = { ...oldItem };
 
-          pushUndo({
-            page: "plan-vyroby",
-            actionType: "merge_on_drop",
-            description: `Sloučení do ${weekLabel(newWeekDate)}`,
-            undo: async () => {
-              // Restore original hours on target
+            await supabase.from("production_schedule").delete().eq("id", scheduleItemId);
+            await supabase.from("production_schedule").update({
+              scheduled_hours: newHours,
+              scheduled_czk: newCzk,
+            }).eq("id", target.id);
+
+            // Renumber remaining siblings
+            const { data: remaining } = await supabase.from("production_schedule")
+              .select("id, scheduled_week")
+              .or(`split_group_id.eq.${oldItem.split_group_id},id.eq.${oldItem.split_group_id}`)
+              .order("scheduled_week", { ascending: true });
+            if (remaining && remaining.length > 1) {
+              const cleanName = oldItem.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
+              await Promise.all(remaining.map((s, i) =>
+                supabase.from("production_schedule").update({
+                  item_name: `${cleanName} (${i + 1}/${remaining.length})`,
+                  split_part: i + 1,
+                  split_total: remaining.length,
+                }).eq("id", s.id)
+              ));
+            } else if (remaining && remaining.length === 1) {
+              const cleanName = oldItem.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
               await supabase.from("production_schedule").update({
-                scheduled_hours: target.scheduled_hours,
-                scheduled_czk: target.scheduled_czk,
-              }).eq("id", target.id);
-              // Re-insert dragged item
-              const { data: { user } } = await supabase.auth.getUser();
-              await supabase.from("production_schedule").insert({
-                project_id: snapshot.project_id, stage_id: snapshot.stage_id,
-                item_name: snapshot.item_name, item_code: snapshot.item_code,
-                scheduled_week: snapshot.scheduled_week, scheduled_hours: snapshot.scheduled_hours,
-                scheduled_czk: snapshot.scheduled_czk, position: snapshot.position,
-                status: snapshot.status, created_by: user?.id,
-                split_group_id: snapshot.split_group_id, split_part: snapshot.split_part, split_total: snapshot.split_total,
-              });
-              invalidateAll();
-            },
-            redo: async () => {
-              const { data: reItem } = await supabase.from("production_schedule")
-                .select("id").eq("project_id", snapshot.project_id)
-                .eq("item_name", snapshot.item_name).eq("scheduled_week", snapshot.scheduled_week).limit(1).single();
-              if (reItem) {
-                await supabase.from("production_schedule").delete().eq("id", reItem.id);
+                item_name: cleanName,
+                split_group_id: null, split_part: null, split_total: null,
+              }).eq("id", remaining[0].id);
+            }
+
+            invalidateAll();
+            toast({ title: `Položky sloučeny do ${weekLabel(newWeekDate)}` });
+
+            pushUndo({
+              page: "plan-vyroby",
+              actionType: "merge_on_drop",
+              description: `Sloučení do ${weekLabel(newWeekDate)}`,
+              undo: async () => {
                 await supabase.from("production_schedule").update({
-                  scheduled_hours: newHours, scheduled_czk: newCzk,
+                  scheduled_hours: target.scheduled_hours,
+                  scheduled_czk: target.scheduled_czk,
                 }).eq("id", target.id);
-              }
-              invalidateAll();
-            },
-          });
-          return;
+                const { data: { user } } = await supabase.auth.getUser();
+                await supabase.from("production_schedule").insert({
+                  project_id: snapshot.project_id, stage_id: snapshot.stage_id,
+                  item_name: snapshot.item_name, item_code: snapshot.item_code,
+                  scheduled_week: snapshot.scheduled_week, scheduled_hours: snapshot.scheduled_hours,
+                  scheduled_czk: snapshot.scheduled_czk, position: snapshot.position,
+                  status: snapshot.status, created_by: user?.id,
+                  split_group_id: snapshot.split_group_id, split_part: snapshot.split_part, split_total: snapshot.split_total,
+                });
+                invalidateAll();
+              },
+              redo: async () => {
+                const { data: reItem } = await supabase.from("production_schedule")
+                  .select("id").eq("project_id", snapshot.project_id)
+                  .eq("item_name", snapshot.item_name).eq("scheduled_week", snapshot.scheduled_week).limit(1).single();
+                if (reItem) {
+                  await supabase.from("production_schedule").delete().eq("id", reItem.id);
+                  await supabase.from("production_schedule").update({
+                    scheduled_hours: newHours, scheduled_czk: newCzk,
+                  }).eq("id", target.id);
+                }
+                invalidateAll();
+              },
+            });
+            return;
+          }
+          // onConflict === 'separate': fall through to plain move below
         }
       }
 
-      // Also check for duplicate key: same project_id + item_code + scheduled_week
-      if (oldItem.item_code) {
+      // Check for duplicate key: same project_id + item_code + scheduled_week
+      if (oldItem.item_code && onConflict !== 'separate') {
         const { data: existing } = await supabase.from("production_schedule")
           .select("id, scheduled_hours, scheduled_czk")
           .eq("project_id", oldItem.project_id)
@@ -285,6 +295,10 @@ export function useProductionDragDrop() {
           .in("status", ["scheduled", "in_progress"])
           .limit(1);
         if (existing && existing.length > 0) {
+          if (!onConflict) {
+            return { conflict: true, targetWeek: newWeekDate, conflictType: 'duplicate_key' };
+          }
+          // onConflict === 'merge'
           const target = existing[0];
           const newHours = target.scheduled_hours + oldItem.scheduled_hours;
           const newCzk = target.scheduled_czk + oldItem.scheduled_czk;
@@ -298,12 +312,13 @@ export function useProductionDragDrop() {
         }
       }
 
+      // Plain move
       const { error } = await supabase
         .from("production_schedule")
         .update({ scheduled_week: newWeekDate })
         .eq("id", scheduleItemId);
       if (error) throw error;
-      // Log activity
+
       if (oldItem) {
         logActivity({
           projectId: oldItem.project_id || "",
