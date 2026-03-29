@@ -3880,23 +3880,29 @@ function UnifiedItemList({
           });
         }
       }
-      // Now mark ALL target items (selected or all) as completed
+      // Now mark ALL target items (selected or all) as completed via production_expedice
       const targetItems2 =
         selectedItems.size > 0
-          ? dedupedItems.filter((d) => d.mergedIds.some((id) => selectedItems.has(id)) && d.item.status !== "completed")
-          : dedupedItems.filter((d) => d.item.status !== "completed");
-      const ids = targetItems2.flatMap(({ mergedIds }) => mergedIds);
-      if (ids.length > 0) {
-        await supabase
-          .from("production_schedule")
-          .update({
-            status: "completed",
-            completed_at: new Date().toISOString(),
-            completed_by: user?.id || null,
-          })
-          .in("id", ids);
+          ? dedupedItems.filter((d) => d.mergedIds.some((id) => selectedItems.has(id)) && !isItemDoneLocal(d.item))
+          : dedupedItems.filter((d) => !isItemDoneLocal(d.item));
+      const itemsToInsert = targetItems2.flatMap(({ mergedIds: mids, item }) =>
+        mids.map((mid) => ({ id: mid, item }))
+      );
+      for (const { id, item } of itemsToInsert) {
+        await (supabase.from("production_expedice") as any).insert({
+          project_id: projectId,
+          item_name: item.item_name,
+          item_code: item.item_code || null,
+          source_schedule_id: id,
+          stage_id: item.stage_id || null,
+          manufactured_at: new Date().toISOString(),
+          expediced_at: null,
+          is_midflight: false,
+        });
       }
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+      qc.invalidateQueries({ queryKey: ["production-expedice"] });
       qc.invalidateQueries({ queryKey: ["quality-checks", projectId] });
       const qcItemCodes = qcModalItems
         .filter(({ item }) => !checkMap.has(item.id))
@@ -3909,8 +3915,8 @@ function UnifiedItemList({
       });
       setSelectedItems(new Set());
       setQcModalOpen(false);
-      // Check if ALL items are now completed
-      const allNowCompleted = dedupedItems.every(({ item }) => item.status === "completed" || ids.includes(item.id));
+      const ids = itemsToInsert.map(({ id }) => id);
+      const allNowCompleted = dedupedItems.every(({ item }) => isItemDoneLocal(item) || ids.includes(item.id));
       if (allNowCompleted) {
         onOpenExpedice();
       }
