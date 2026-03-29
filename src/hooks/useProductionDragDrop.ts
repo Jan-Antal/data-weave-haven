@@ -322,14 +322,12 @@ export function useProductionDragDrop() {
 
       // Check for duplicate key: same project_id + item_code + scheduled_week
       if (oldItem.item_code && onConflict !== 'separate') {
-        const { data: existing } = await supabase.from("production_schedule")
-          .select("id, scheduled_hours, scheduled_czk")
-          .eq("project_id", oldItem.project_id)
-          .eq("item_code", oldItem.item_code)
-          .eq("scheduled_week", newWeekDate)
-          .neq("id", scheduleItemId)
-          .in("status", ["scheduled", "in_progress"])
-          .limit(1);
+        // Use pre-fetched allTargetItems instead of another DB query
+        const existing = (allTargetItems || []).filter(t =>
+          t.project_id === oldItem.project_id &&
+          t.item_code === oldItem.item_code &&
+          t.id !== scheduleItemId
+        ).slice(0, 1);
         if (existing && existing.length > 0) {
           if (!onConflict) {
             return { conflict: true, targetWeek: newWeekDate, conflictType: 'duplicate_key' };
