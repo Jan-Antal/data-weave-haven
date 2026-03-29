@@ -612,6 +612,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   const [mobileVyrobaProjektOpen, setMobileVyrobaProjektOpen] = useState(false);
   const selectedProject = enrichedProjects.find((p) => p.projectId === selectedProjectId) || null;
 
+  // Document counts for Výkresy section
+  const projectIdsList = useMemo(() => enrichedProjects.map((p) => p.projectId), [enrichedProjects]);
+  const { counts: docCounts } = useDocumentCounts(projectIdsList);
+
   // Week picker
   const [weekPickerOpen, setWeekPickerOpen] = useState(false);
   const weekPickerRef = useRef<HTMLDivElement>(null);
