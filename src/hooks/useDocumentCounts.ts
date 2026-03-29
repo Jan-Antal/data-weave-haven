@@ -181,13 +181,15 @@ export function useDocumentCounts(
 
   // Build counts from cache + overrides
   const counts: Record<string, number | undefined> = {};
+  const categoryCounts: Record<string, Record<string, number> | undefined> = {};
   for (const id of mainProjectIds) {
     if (id in overrides) {
       const v = overrides[id];
       counts[id] = v === "failed" ? undefined : v;
     } else {
-      counts[id] = cacheMap?.[id] ?? undefined;
+      counts[id] = cacheMap?.[id]?.total ?? undefined;
     }
+    categoryCounts[id] = cacheMap?.[id]?.categories;
   }
 
   // Enqueue projects with no cache entry for background fetch (once per mount)
@@ -223,9 +225,9 @@ export function useDocumentCounts(
       if (absolute !== undefined) {
         setOverrides((prev) => ({ ...prev, [projectId]: absolute }));
         // Update react-query cache for doc-count-cache
-        queryClient.setQueryData<Record<string, number>>(["doc-count-cache"], (old) => {
-          if (!old) return { [projectId]: absolute };
-          return { ...old, [projectId]: absolute };
+        queryClient.setQueryData<Record<string, { total: number; categories: Record<string, number> }>>(["doc-count-cache"], (old) => {
+          if (!old) return { [projectId]: { total: absolute, categories: {} } };
+          return { ...old, [projectId]: { ...old[projectId], total: absolute } };
         });
         return;
       }
@@ -233,14 +235,14 @@ export function useDocumentCounts(
       if (delta !== undefined && delta !== 0) {
         setOverrides((prev) => {
           const current = prev[projectId];
-          const base = typeof current === "number" ? current : (cacheMap?.[projectId] ?? 0);
+          const base = typeof current === "number" ? current : (cacheMap?.[projectId]?.total ?? 0);
           const newVal = Math.max(0, base + delta);
           return { ...prev, [projectId]: newVal };
         });
-        queryClient.setQueryData<Record<string, number>>(["doc-count-cache"], (old) => {
+        queryClient.setQueryData<Record<string, { total: number; categories: Record<string, number> }>>(["doc-count-cache"], (old) => {
           if (!old) return old;
-          const current = old[projectId] ?? 0;
-          return { ...old, [projectId]: Math.max(0, current + delta) };
+          const current = old[projectId]?.total ?? 0;
+          return { ...old, [projectId]: { ...old[projectId], total: Math.max(0, current + delta), categories: old[projectId]?.categories ?? {} } };
         });
       }
     };
@@ -257,5 +259,5 @@ export function useDocumentCounts(
     if (v === "failed") failed.add(id);
   }
 
-  return { counts, loading: false, failed };
+  return { counts, categoryCounts, loading: false, failed };
 }
