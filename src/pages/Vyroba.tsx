@@ -1163,75 +1163,94 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   /* ── Toggle single item complete ── */
   async function toggleItemComplete(itemId: string, currentStatus: string) {
-    const newStatus = currentStatus === "completed" ? "scheduled" : "completed";
-    pushUndo({
-      page: "vyroba",
-      actionType: "item_hotovo",
-      description: newStatus === "completed" ? "označení jako hotovo" : "vrácení položky",
-      undo: async () => {
-        if (currentStatus === "completed") {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          await supabase
-            .from("production_schedule")
-            .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null })
-            .eq("id", itemId);
-        } else {
-          await supabase
-            .from("production_schedule")
-            .update({ status: currentStatus, completed_at: null, completed_by: null })
-            .eq("id", itemId);
-        }
-        qc.invalidateQueries({ queryKey: ["production-schedule"] });
-      },
-      redo: async () => {
-        if (newStatus === "completed") {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          await supabase
-            .from("production_schedule")
-            .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: user?.id || null })
-            .eq("id", itemId);
-        } else {
-          await supabase
-            .from("production_schedule")
-            .update({ status: "scheduled", completed_at: null, completed_by: null })
-            .eq("id", itemId);
-        }
-        qc.invalidateQueries({ queryKey: ["production-schedule"] });
-      },
-    });
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (currentStatus === "completed") {
-      await supabase
-        .from("production_schedule")
-        .update({ status: "scheduled", completed_at: null, completed_by: null })
-        .eq("id", itemId);
+    const wasDone = currentStatus === "completed" || expedicedScheduleIds.has(itemId);
+    const item = selectedProject?.scheduleItems.find((i) => i.id === itemId);
+    const pid = item?.project_id || selectedProject?.projectId || "";
+
+    if (wasDone) {
+      // Undo completion: delete from production_expedice
+      pushUndo({
+        page: "vyroba",
+        actionType: "item_hotovo",
+        description: "vrácení položky",
+        undo: async () => {
+          if (item) {
+            await (supabase.from("production_expedice") as any).insert({
+              project_id: pid,
+              item_name: item.item_name,
+              item_code: item.item_code || null,
+              source_schedule_id: itemId,
+              stage_id: item.stage_id || null,
+              manufactured_at: new Date().toISOString(),
+              expediced_at: null,
+              is_midflight: false,
+            });
+          }
+          qc.invalidateQueries({ queryKey: ["production-schedule"] });
+          qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+          qc.invalidateQueries({ queryKey: ["production-expedice"] });
+        },
+        redo: async () => {
+          await (supabase.from("production_expedice") as any).delete().eq("source_schedule_id", itemId);
+          qc.invalidateQueries({ queryKey: ["production-schedule"] });
+          qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+          qc.invalidateQueries({ queryKey: ["production-expedice"] });
+        },
+      });
+      await (supabase.from("production_expedice") as any).delete().eq("source_schedule_id", itemId);
     } else {
-      await supabase
-        .from("production_schedule")
-        .update({
-          status: "completed",
-          completed_at: new Date().toISOString(),
-          completed_by: user?.id || null,
-        })
-        .eq("id", itemId);
+      // Mark as done: insert into production_expedice
+      pushUndo({
+        page: "vyroba",
+        actionType: "item_hotovo",
+        description: "označení jako hotovo",
+        undo: async () => {
+          await (supabase.from("production_expedice") as any).delete().eq("source_schedule_id", itemId);
+          qc.invalidateQueries({ queryKey: ["production-schedule"] });
+          qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+          qc.invalidateQueries({ queryKey: ["production-expedice"] });
+        },
+        redo: async () => {
+          if (item) {
+            await (supabase.from("production_expedice") as any).insert({
+              project_id: pid,
+              item_name: item.item_name,
+              item_code: item.item_code || null,
+              source_schedule_id: itemId,
+              stage_id: item.stage_id || null,
+              manufactured_at: new Date().toISOString(),
+              expediced_at: null,
+              is_midflight: false,
+            });
+          }
+          qc.invalidateQueries({ queryKey: ["production-schedule"] });
+          qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+          qc.invalidateQueries({ queryKey: ["production-expedice"] });
+        },
+      });
+      await (supabase.from("production_expedice") as any).insert({
+        project_id: pid,
+        item_name: item?.item_name || "",
+        item_code: item?.item_code || null,
+        source_schedule_id: itemId,
+        stage_id: item?.stage_id || null,
+        manufactured_at: new Date().toISOString(),
+        expediced_at: null,
+        is_midflight: false,
+      });
+      // Log item hotovo
+      if (selectedProject) {
+        logActivity({
+          projectId: selectedProject.projectId,
+          actionType: "item_hotovo",
+          newValue: item?.item_code || item?.item_name || itemId,
+          detail: "Označeno jako hotovo",
+        });
+      }
     }
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
-    // Log item hotovo
-    if (newStatus === "completed" && selectedProject) {
-      const item = selectedProject.scheduleItems.find((i) => i.id === itemId);
-      logActivity({
-        projectId: selectedProject.projectId,
-        actionType: "item_hotovo",
-        newValue: item?.item_code || item?.item_name || itemId,
-        detail: "Označeno jako hotovo",
-      });
-    }
+    qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+    qc.invalidateQueries({ queryKey: ["production-expedice"] });
   }
 
   // Ref-based swipe-to-dismiss for mobile bottom sheets (vertical only)
