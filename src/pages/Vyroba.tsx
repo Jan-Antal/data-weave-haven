@@ -32,7 +32,7 @@ import {
   Trash2,
   Loader2,
   Download,
-  Printer,
+  
   FileText,
   AlertTriangle,
   Camera,
