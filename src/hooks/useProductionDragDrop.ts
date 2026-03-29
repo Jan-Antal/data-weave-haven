@@ -185,21 +185,20 @@ export function useProductionDragDrop() {
     onConflict?: 'merge' | 'separate',
   ): Promise<{ conflict: true; targetWeek: string; conflictType: 'split_sibling' | 'duplicate_key' } | void> => {
     try {
-      // Capture old item for undo
-      const { data: oldItem } = await supabase.from("production_schedule")
-        .select("*")
-        .eq("id", scheduleItemId).single();
+      // OPTIMIZATION 1: Fetch oldItem and all target-week items in parallel
+      const [{ data: oldItem }, { data: allTargetItems }] = await Promise.all([
+        supabase.from("production_schedule").select("*").eq("id", scheduleItemId).single(),
+        supabase.from("production_schedule").select("*").eq("scheduled_week", newWeekDate).in("status", ["scheduled", "in_progress"]),
+      ]);
       if (!oldItem) throw new Error("Item not found");
       const oldWeek = oldItem.scheduled_week;
 
-      // Check if target week already has a sibling with same split_group_id
+      // Filter target siblings from pre-fetched data instead of a second query
       if (oldItem.split_group_id) {
-        const { data: targetSiblings } = await supabase.from("production_schedule")
-          .select("*")
-          .eq("scheduled_week", newWeekDate)
-          .or(`split_group_id.eq.${oldItem.split_group_id},id.eq.${oldItem.split_group_id}`)
-          .neq("id", scheduleItemId)
-          .in("status", ["scheduled", "in_progress"]);
+        const targetSiblings = (allTargetItems || []).filter(t =>
+          t.id !== scheduleItemId &&
+          (t.split_group_id === oldItem.split_group_id || t.id === oldItem.split_group_id)
+        );
 
         if (targetSiblings && targetSiblings.length > 0) {
           // If no conflict resolution specified, return conflict signal
@@ -411,16 +410,22 @@ export function useProductionDragDrop() {
       const separateConflictIds: string[] = [];
       let hasConflict = false;
 
+      // OPTIMIZATION 4: Parallelize splitGroupId sibling checks
       if (splitGroupIds.length > 0) {
-        for (const sgId of splitGroupIds) {
-          const { data: targetSiblings } = await supabase.from("production_schedule")
-            .select("id, scheduled_hours, scheduled_czk, split_group_id")
-            .eq("scheduled_week", targetWeekDate)
-            .or(`split_group_id.eq.${sgId},id.eq.${sgId}`)
-            .in("status", ["scheduled", "in_progress"]);
+        const siblingResults = await Promise.all(
+          splitGroupIds.map(sgId =>
+            supabase.from("production_schedule")
+              .select("id, scheduled_hours, scheduled_czk, split_group_id")
+              .eq("scheduled_week", targetWeekDate)
+              .or(`split_group_id.eq.${sgId},id.eq.${sgId}`)
+              .in("status", ["scheduled", "in_progress"])
+              .then(({ data }) => ({ sgId, siblings: data || [] }))
+          )
+        );
 
+        for (const { sgId, siblings } of siblingResults) {
           const movedWithSg = movedItems.filter(i => i.split_group_id === sgId || i.id === sgId);
-          const existingAtTarget = (targetSiblings || []).filter(t => !movedIds.includes(t.id));
+          const existingAtTarget = siblings.filter(t => !movedIds.includes(t.id));
 
           if (existingAtTarget.length > 0) {
             hasConflict = true;
@@ -432,7 +437,6 @@ export function useProductionDragDrop() {
                 mergeActions.push({ sourceId: src.id, targetId: target.id, addHours: totalAddHours, addCzk: totalAddCzk });
               }
             } else if (onConflict === 'separate') {
-              // These items have conflicts — need unique item_codes
               movedWithSg.forEach(i => separateConflictIds.push(i.id));
             }
           } else {
@@ -503,7 +507,7 @@ export function useProductionDragDrop() {
         if (error) throw error;
       }
 
-      // Execute separate-conflict moves with unique item_codes
+      // Execute separate-conflict moves with unique item_codes (parallelized)
       const uniqueSeparateIds = [...new Set(separateConflictIds)].filter(id => !mergedSourceIds.has(id));
       const separateCodeMap = new Map<string, { oldCode: string | null; newCode: string }>();
       for (const itemId of uniqueSeparateIds) {
@@ -511,9 +515,14 @@ export function useProductionDragDrop() {
         const uniqueSuffix = `_${Date.now().toString(36).slice(-4)}${Math.random().toString(36).slice(-2)}`;
         const newItemCode = item?.item_code ? `${item.item_code}${uniqueSuffix}` : item?.item_code ?? null;
         separateCodeMap.set(itemId, { oldCode: item?.item_code ?? null, newCode: newItemCode! });
-        await supabase.from("production_schedule")
-          .update({ scheduled_week: targetWeekDate, item_code: newItemCode })
-          .eq("id", itemId);
+      }
+      if (uniqueSeparateIds.length > 0) {
+        await Promise.all(uniqueSeparateIds.map(itemId => {
+          const codes = separateCodeMap.get(itemId)!;
+          return supabase.from("production_schedule")
+            .update({ scheduled_week: targetWeekDate, item_code: codes.newCode })
+            .eq("id", itemId);
+        }));
       }
 
       invalidateAll();
@@ -953,42 +962,40 @@ export function useProductionDragDrop() {
       const hasRemaining = remainingParts.length > 0;
       const otherIds = parts.filter(p => p.id !== primary.id).map(p => p.id);
 
-      // Delete other parts first to avoid unique constraint violation
-      if (otherIds.length > 0) {
-        await supabase.from("production_schedule").delete().in("id", otherIds);
-      }
-      // Then update the primary part
-      await supabase.from("production_schedule").update({
-        scheduled_hours: totalHours,
-        scheduled_czk: totalCzk,
-        item_name: cleanName,
-        split_group_id: hasRemaining ? splitGroupId : null,
-        split_part: null,
-        split_total: null,
-      }).eq("id", primary.id);
+      // OPTIMIZATION 3: Parallelize delete + update, skip re-fetch for renumbering
+      await Promise.all([
+        otherIds.length > 0
+          ? supabase.from("production_schedule").delete().in("id", otherIds)
+          : Promise.resolve(),
+        supabase.from("production_schedule").update({
+          scheduled_hours: totalHours,
+          scheduled_czk: totalCzk,
+          item_name: cleanName,
+          split_group_id: hasRemaining ? splitGroupId : null,
+          split_part: null,
+          split_total: null,
+        }).eq("id", primary.id),
+      ]);
 
+      // OPTIMIZATION 5: Use in-memory data for renumbering instead of re-fetching
       if (hasRemaining) {
-        const allRemaining = [primary.id, ...remainingParts.map(p => p.id)];
-        const { data: siblings } = await supabase
-          .from("production_schedule")
-          .select("id, scheduled_week")
-          .in("id", allRemaining)
-          .order("scheduled_week", { ascending: true });
-        if (siblings && siblings.length > 1) {
-          await Promise.all(siblings.map((s, i) =>
+        const allRemaining = [primary, ...remainingParts]
+          .sort((a, b) => a.scheduled_week.localeCompare(b.scheduled_week));
+        if (allRemaining.length > 1) {
+          await Promise.all(allRemaining.map((s, i) =>
             supabase.from("production_schedule").update({
-              item_name: `${cleanName} (${i + 1}/${siblings.length})`,
+              item_name: `${cleanName} (${i + 1}/${allRemaining.length})`,
               split_part: i + 1,
-              split_total: siblings.length,
+              split_total: allRemaining.length,
             }).eq("id", s.id)
           ));
-        } else if (siblings && siblings.length === 1) {
+        } else if (allRemaining.length === 1) {
           await supabase.from("production_schedule").update({
             item_name: cleanName,
             split_group_id: null,
             split_part: null,
             split_total: null,
-          }).eq("id", siblings[0].id);
+          }).eq("id", allRemaining[0].id);
         }
       }
 
