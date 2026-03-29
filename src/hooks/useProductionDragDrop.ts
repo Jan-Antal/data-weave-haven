@@ -280,9 +280,45 @@ export function useProductionDragDrop() {
             });
             return;
           }
-          // onConflict === 'separate': fall through to plain move below
+          // onConflict === 'separate': generate unique item_code and move
+          if (onConflict === 'separate') {
+            const uniqueSuffix = `_${Date.now().toString(36).slice(-4)}`;
+            const newItemCode = oldItem.item_code ? `${oldItem.item_code}${uniqueSuffix}` : oldItem.item_code;
+
+            const { error } = await supabase
+              .from("production_schedule")
+              .update({
+                scheduled_week: newWeekDate,
+                item_code: newItemCode,
+              })
+              .eq("id", scheduleItemId);
+            if (error) throw error;
+
+            logActivity({
+              projectId: oldItem.project_id || "",
+              actionType: "item_moved",
+              oldValue: weekLabel(oldWeek || ""),
+              newValue: weekLabel(newWeekDate),
+              detail: JSON.stringify({ item_name: oldItem.item_name, from_week: weekLabel(oldWeek || ""), to_week: weekLabel(newWeekDate) }),
+            });
+            invalidateAll();
+            const capturedOldItemCode = oldItem.item_code;
+            pushUndo({
+              page: "plan-vyroby",
+              actionType: "move_silo_item",
+              description: `Přesun ${oldItem?.item_name || "položky"} → ${weekLabel(newWeekDate)}`,
+              undo: async () => {
+                await supabase.from("production_schedule").update({ scheduled_week: oldWeek, item_code: capturedOldItemCode }).eq("id", scheduleItemId);
+                invalidateAll();
+              },
+              redo: async () => {
+                await supabase.from("production_schedule").update({ scheduled_week: newWeekDate, item_code: newItemCode }).eq("id", scheduleItemId);
+                invalidateAll();
+              },
+            });
+            return;
+          }
         }
-      }
 
       // Check for duplicate key: same project_id + item_code + scheduled_week
       if (oldItem.item_code && onConflict !== 'separate') {
