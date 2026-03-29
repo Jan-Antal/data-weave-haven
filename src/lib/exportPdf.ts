@@ -123,7 +123,7 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 <base href="${baseUrl}/">
 <title>AMI-${format(new Date(), 'yyMMdd')}-Pruvodka-${esc(projectId)}</title>
 <style>
-  @page { size: A4 portrait; margin: 8mm 14mm 14mm 14mm; }
+  @page { size: A4 portrait; margin: 8mm 14mm 20mm 14mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Aptos Narrow', 'Arial Narrow', Calibri, Arial, sans-serif; font-size: 10pt; color: #1a1a1a; padding: 0; padding-bottom: 16mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
