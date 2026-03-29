@@ -847,7 +847,7 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   const handleMoveToWeek = useCallback(async (scheduleItemIds: string[], targetWeekKey: string) => {
     try {
       for (const id of scheduleItemIds) {
-        await moveScheduleItemToWeek(id, targetWeekKey);
+        await moveScheduleItemToWeek(id, targetWeekKey, 'separate');
       }
       toast({ title: `Přesunuto do T${getISOWeekNumber(new Date(targetWeekKey))}` });
     } catch { /* error handled in hook */ }

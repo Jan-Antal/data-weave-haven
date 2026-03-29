@@ -536,7 +536,7 @@ export default function PlanVyroby() {
         if (sibling) {
           const doNormalMove = async () => {
             if (dragData.weekDate !== weekDate) {
-              await moveScheduleItemToWeek(dragData.itemId!, weekDate);
+              await moveScheduleItemToWeek(dragData.itemId!, weekDate, 'separate');
             }
           };
           setMergeState({
@@ -613,7 +613,23 @@ export default function PlanVyroby() {
         await action();
       } else if (dragData.type === "silo-item" && dragData.itemId) {
         if (dragData.weekDate !== weekDate) {
-          const action = async () => { await moveScheduleItemToWeek(dragData.itemId!, weekDate); };
+          const action = async () => {
+            const result = await moveScheduleItemToWeek(dragData.itemId!, weekDate);
+            if (result && 'conflict' in result) {
+              // Conflict detected — show merge dialog
+              setMergeState({
+                itemName: dragData.itemName || "Položka",
+                splitGroupIds: dragData.splitGroupId ? [dragData.splitGroupId] : [],
+                mergeItemCount: 1,
+                draggedItemId: dragData.itemId!,
+                targetWeekKey: weekDate,
+                onKeepSeparate: async () => {
+                  await moveScheduleItemToWeek(dragData.itemId!, weekDate, 'separate');
+                },
+              });
+              return;
+            }
+          };
           if (!checkAndWarnDeadline(projectId, weekDate, action)) return;
           await action();
         }
@@ -634,13 +650,28 @@ export default function PlanVyroby() {
                 draggedItemId: splitItems[0].id,
                 targetWeekKey: weekDate,
                 onKeepSeparate: async () => {
-                  await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate);
+                  await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate, 'separate');
                 },
               });
               return;
             }
           }
-          const action = async () => { await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate); };
+          const action = async () => {
+            const result = await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate);
+            if (result && 'conflict' in result) {
+              setMergeState({
+                itemName: sourceBundle?.project_name || dragData.projectName || "Bundle",
+                splitGroupIds: result.splitGroupIds,
+                mergeItemCount: result.splitGroupIds.length,
+                draggedItemId: sourceBundle?.items[0]?.id || "",
+                targetWeekKey: weekDate,
+                onKeepSeparate: async () => {
+                  await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate, 'separate');
+                },
+              });
+              return;
+            }
+          };
           if (!checkAndWarnDeadline(dragData.projectId, weekDate, action)) return;
           await action();
         }
@@ -860,7 +891,7 @@ export default function PlanVyroby() {
                 onCommitSelected={async () => {
                   if (forecast.selectedBlockIds.size === 0) return;
                   const blockCount = forecast.selectedBlockIds.size;
-                  await forecast.commitRealBundleOverrides(moveBundleToWeek);
+                  await forecast.commitRealBundleOverrides((pid, sw, tw) => moveBundleToWeek(pid, sw, tw, 'separate').then(() => {}));
                   await forecast.commitBlocks(Array.from(forecast.selectedBlockIds));
                   try {
                     const { logActivity } = await import("@/lib/activityLog");
@@ -927,11 +958,15 @@ export default function PlanVyroby() {
           itemName={mergeState.itemName}
           mergeItemCount={mergeState.mergeItemCount}
           onMerge={async () => {
-            await mergeState.onKeepSeparate();
-            // Pop the move undo that was just pushed by the drag handler
-            // so we can combine it with the merge into a single undo entry
-            const moveEntry = popLastUndo("plan-vyroby");
-            await mergeBundleSplitGroups(mergeState.splitGroupIds, mergeState.targetWeekKey, moveEntry);
+            if (mergeState.splitGroupIds.length === 1 && mergeState.draggedItemId) {
+              // Single item merge — hook handles it directly
+              await moveScheduleItemToWeek(mergeState.draggedItemId, mergeState.targetWeekKey, 'merge');
+            } else {
+              // Bundle merge — move with 'separate' first, then merge split groups
+              await mergeState.onKeepSeparate();
+              const moveEntry = popLastUndo("plan-vyroby");
+              await mergeBundleSplitGroups(mergeState.splitGroupIds, mergeState.targetWeekKey, moveEntry);
+            }
           }}
           onKeepSeparate={mergeState.onKeepSeparate}
         />
