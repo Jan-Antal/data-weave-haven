@@ -5319,7 +5319,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
           >
             <Camera className="h-3.5 w-3.5" />
             Přidat foto
-            <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={uploading} />
+            <input type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} disabled={uploading} />
           </label>
         ) : (
           <label
@@ -5336,6 +5336,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              multiple
               className="hidden"
               onChange={handleUpload}
               disabled={uploading}
