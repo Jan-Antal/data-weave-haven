@@ -634,7 +634,7 @@ export default function PlanVyroby() {
                 draggedItemId: splitItems[0].id,
                 targetWeekKey: weekDate,
                 onKeepSeparate: async () => {
-                  await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate);
+                  await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate, 'separate');
                 },
               });
               return;
