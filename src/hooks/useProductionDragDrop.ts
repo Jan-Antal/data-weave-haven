@@ -350,7 +350,12 @@ export function useProductionDragDrop() {
     }
   }, [invalidateAll, pushUndo]);
 
-  const moveBundleToWeek = useCallback(async (projectId: string, sourceWeekDate: string, targetWeekDate: string) => {
+  const moveBundleToWeek = useCallback(async (
+    projectId: string,
+    sourceWeekDate: string,
+    targetWeekDate: string,
+    onConflict?: 'merge' | 'separate',
+  ): Promise<{ conflict: true; targetWeek: string; splitGroupIds: string[] } | void> => {
     try {
       // Capture items being moved
       const { data: movedItems } = await supabase
@@ -362,10 +367,11 @@ export function useProductionDragDrop() {
       if (!movedItems || movedItems.length === 0) return;
       const movedIds = movedItems.map(i => i.id);
 
-      // FIX: Check for split siblings at target week that should be merged
+      // Check for split siblings at target week
       const splitGroupIds = [...new Set(movedItems.filter(i => i.split_group_id).map(i => i.split_group_id!))];
       const mergeActions: { sourceId: string; targetId: string; addHours: number; addCzk: number; }[] = [];
       const plainMoveIds: string[] = [];
+      let hasConflict = false;
 
       if (splitGroupIds.length > 0) {
         for (const sgId of splitGroupIds) {
@@ -379,18 +385,28 @@ export function useProductionDragDrop() {
           const existingAtTarget = (targetSiblings || []).filter(t => !movedIds.includes(t.id));
 
           if (existingAtTarget.length > 0) {
-            // Merge dragged items into existing target
-            const target = existingAtTarget[0];
-            const totalAddHours = movedWithSg.reduce((s, i) => s + i.scheduled_hours, 0);
-            const totalAddCzk = movedWithSg.reduce((s, i) => s + i.scheduled_czk, 0);
-            for (const src of movedWithSg) {
-              mergeActions.push({ sourceId: src.id, targetId: target.id, addHours: totalAddHours, addCzk: totalAddCzk });
+            hasConflict = true;
+            if (onConflict === 'merge') {
+              const target = existingAtTarget[0];
+              const totalAddHours = movedWithSg.reduce((s, i) => s + i.scheduled_hours, 0);
+              const totalAddCzk = movedWithSg.reduce((s, i) => s + i.scheduled_czk, 0);
+              for (const src of movedWithSg) {
+                mergeActions.push({ sourceId: src.id, targetId: target.id, addHours: totalAddHours, addCzk: totalAddCzk });
+              }
+            } else if (onConflict === 'separate') {
+              movedWithSg.forEach(i => plainMoveIds.push(i.id));
             }
           } else {
             movedWithSg.forEach(i => plainMoveIds.push(i.id));
           }
         }
       }
+
+      // If conflict detected and no resolution specified, return signal
+      if (hasConflict && !onConflict) {
+        return { conflict: true, targetWeek: targetWeekDate, splitGroupIds };
+      }
+
       // Items without split_group_id
       movedItems.filter(i => !i.split_group_id).forEach(i => plainMoveIds.push(i.id));
 
@@ -460,15 +476,12 @@ export function useProductionDragDrop() {
         actionType: "move_bundle",
         description: `Přesun balíku ${projectId} → ${weekLabel(targetWeekDate)}`,
         undo: async () => {
-          // Restore plain moves
           if (uniquePlainMoveIds.length > 0) {
             await supabase.from("production_schedule")
               .update({ scheduled_week: sourceWeekDate })
               .in("id", uniquePlainMoveIds);
           }
-          // Restore merged items
           if (mergedSourceIds.size > 0) {
-            // Restore target hours
             for (const [targetId, add] of mergedTargets) {
               const { data: t } = await supabase.from("production_schedule").select("scheduled_hours, scheduled_czk").eq("id", targetId).single();
               if (t) {
@@ -478,7 +491,6 @@ export function useProductionDragDrop() {
                 }).eq("id", targetId);
               }
             }
-            // Re-insert merged source items
             const { data: { user } } = await supabase.auth.getUser();
             const toReinsert = snapshots.filter(s => mergedSourceIds.has(s.id));
             for (const s of toReinsert) {
