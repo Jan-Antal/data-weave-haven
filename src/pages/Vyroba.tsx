@@ -550,7 +550,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       return (b.isSpilled ? 1 : 0) - (a.isSpilled ? 1 : 0);
     });
     return result;
-  }, [scheduleData, weekKey, currentMonday]);
+  }, [scheduleData, weekKey, currentMonday, isItemDone]);
 
   // Fetch project details for deadlines/PM
   const { data: projectDetails } = useProjectDetails(projects.map((p) => p.projectId));
