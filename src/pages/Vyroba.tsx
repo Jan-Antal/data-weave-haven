@@ -3181,6 +3181,7 @@ function DetailPanel({
   getIncompletePartsInfo,
   hideLogButton = false,
   expedicedScheduleIds,
+  cachedDocCount,
 }: {
   project: VyrobaProject;
   weekKey: string;
