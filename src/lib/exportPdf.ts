@@ -125,18 +125,16 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 <style>
   @page { size: A4 portrait; margin: 8mm 14mm 20mm 14mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Aptos Narrow', 'Arial Narrow', Calibri, Arial, sans-serif; font-size: 10pt; color: #1a1a1a; padding: 0; padding-bottom: 16mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Aptos Narrow', 'Arial Narrow', Calibri, Arial, sans-serif; font-size: 10pt; color: #1a1a1a; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
   .wrap { width: 100%; margin: 0 auto; box-sizing: border-box; }
   .logo-bar { width: 100%; margin: 0; padding: 0; line-height: 0; }
   .logo-bar img { object-fit: fill; width: 100%; display: block; }
 
-  .page-footer { display: block; width: 100%; border-top: 1px solid #e8692a; padding: 4px 0; font-family: 'Aptos Narrow','Arial Narrow',Arial,sans-serif; font-size: 7.5pt; color: #e8692a; }
-  .page-footer .footer-inner { display: flex; justify-content: space-between; }
-
   thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
   tbody tr { break-inside: avoid; }
-  @media print { body { padding-bottom: 16mm; } .no-print { display: none !important; } a[href]::after { content: none !important; } }
+  @media print { .no-print { display: none !important; } a[href]::after { content: none !important; } }
 
   .bm { border: 1.5px solid #333; }
   .bt { border: 0.75px solid #999; }
@@ -157,73 +155,77 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
   .dtable .data-row td { padding: 2px 6px; height: 20pt; vertical-align: middle; }
   .dtable .item-name { text-align: left; padding-left: 10px; }
 
-  .footer-row { margin-top: 10px; display: flex; justify-content: space-between; font-size: 10pt; }
-
 </style>
 </head>
 <body>
 <div class="wrap">
 
-<table class="dtable">
+<table style="width:100%; border-collapse:collapse;">
   <thead>
-    <tr class="doc-header-repeat">
-      <th colspan="5" style="background:none;border:none;padding:0;">
-        <div class="logo-bar">
-          <img src="/images/ami-logo-claim.png" alt="A→M Interior" />
-        </div>
-        <table class="info">
-          <tr>
-            <td class="lbl" style="width:75%;">NÁZEV AKCE:</td>
-            <td class="lbl c" style="width:25%;">Č.ZAKÁZKY:</td>
-          </tr>
-          <tr>
-            <td class="val-name bm">${esc(projectName)}</td>
-            <td class="val-id bm">${esc(projectId)}</td>
-          </tr>
-          <tr>
-            <td class="sec-lbl">předání:</td>
-            <td style="text-align:right; font-weight:700; font-size:10pt; white-space:nowrap;">datum a podpis odpovědné osoby:</td>
-          </tr>
-          <tr>
-            <td class="sec-val bt">výpis materiálu a kování k objednání</td>
-            <td class="bt">&nbsp;</td>
-          </tr>
-          <tr>
-            <td class="sec-val bt">kontrola dokumentace vedoucím projekce</td>
-            <td class="bt">&nbsp;</td>
-          </tr>
-          <tr>
-            <td class="sec-val bt">termín výroby</td>
-            <td class="bt">&nbsp;</td>
-          </tr>
-        </table>
-      </th>
-    </tr>
-    <tr>
-      <th class="num-hdr bm c">#</th>
-      <th class="bm c" style="width:100px;">Kód prvku</th>
-      <th class="bm">Název prvku</th>
-      <th class="bm c" style="width:100px;">Konstruktér</th>
-      <th class="bm c" style="width:50px;">Počet</th>
-    </tr>
+    <tr><td style="padding:0; border:none;">
+      <div class="logo-bar">
+        <img src="/images/ami-logo-claim.png" alt="A→M Interior" />
+      </div>
+      <table class="info">
+        <tr>
+          <td class="lbl" style="width:75%;">NÁZEV AKCE:</td>
+          <td class="lbl c" style="width:25%;">Č.ZAKÁZKY:</td>
+        </tr>
+        <tr>
+          <td class="val-name bm">${esc(projectName)}</td>
+          <td class="val-id bm">${esc(projectId)}</td>
+        </tr>
+        <tr>
+          <td class="sec-lbl">předání:</td>
+          <td style="text-align:right; font-weight:700; font-size:10pt; white-space:nowrap;">datum a podpis odpovědné osoby:</td>
+        </tr>
+        <tr>
+          <td class="sec-val bt">výpis materiálu a kování k objednání</td>
+          <td class="bt">&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="sec-val bt">kontrola dokumentace vedoucím projekce</td>
+          <td class="bt">&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="sec-val bt">termín výroby</td>
+          <td class="bt">&nbsp;</td>
+        </tr>
+      </table>
+    </td></tr>
   </thead>
+  <tfoot>
+    <tr><td style="padding:0; border:none;">
+      <div style="padding-top:6px; font-size:10pt; display:flex; justify-content:space-between;">
+        <span>Vytiskl: ${esc(issuedBy)}</span>
+        <span>Datum: ${dateStr}</span>
+      </div>
+      <div style="margin-top:4px; border-top:1px solid #e8692a; padding-top:3px; display:flex; justify-content:space-between; font-size:7.5pt; color:#e8692a; font-family:'Aptos Narrow','Arial Narrow',Arial,sans-serif;">
+        <span>AM Interior Group, s.r.o. &nbsp;|&nbsp; Záhumení V 322, Louky, 763 02 Zlín &nbsp;|&nbsp; IČ: 23032693 &nbsp;|&nbsp; DIČ: CZ23032693</span>
+        <span>aminterior.cz</span>
+      </div>
+    </td></tr>
+  </tfoot>
   <tbody>
-    ${tableRows}
-    ${emptyRows}
+    <tr><td style="padding:0; border:none; vertical-align:top;">
+      <table class="dtable">
+        <thead>
+          <tr>
+            <th class="num-hdr bm c">#</th>
+            <th class="bm c" style="width:100px;">Kód prvku</th>
+            <th class="bm">Název prvku</th>
+            <th class="bm c" style="width:100px;">Konstruktér</th>
+            <th class="bm c" style="width:50px;">Počet</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+          ${emptyRows}
+        </tbody>
+      </table>
+    </td></tr>
   </tbody>
 </table>
-
-<div class="footer-row">
-  <span>Vytiskl: ${esc(issuedBy)}</span>
-  <span>Datum: ${dateStr}</span>
-</div>
-
-<div class="page-footer">
-  <div class="footer-inner">
-    <span>AM Interior Group, s.r.o. &nbsp;|&nbsp; Záhumení V 322, Louky, 763 02 Zlín &nbsp;|&nbsp; IČ: 23032693 &nbsp;|&nbsp; DIČ: CZ23032693</span>
-    <span>aminterior.cz</span>
-  </div>
-</div>
 
 </div>
 <script>document.title = 'AMI-${format(new Date(), 'yyMMdd')}-Pruvodka-${esc(projectId)}';</script>
