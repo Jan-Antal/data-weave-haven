@@ -3143,6 +3143,7 @@ function DetailPanel({
   areAllPartsCompleted,
   getIncompletePartsInfo,
   hideLogButton = false,
+  expedicedScheduleIds,
 }: {
   project: VyrobaProject;
   weekKey: string;
@@ -3177,8 +3178,13 @@ function DetailPanel({
     itemName: string,
   ) => { incomplete: number; total: number; weekNums: number[] };
   hideLogButton?: boolean;
+  expedicedScheduleIds: Set<string>;
 }) {
   const isMobile = useIsMobile();
+  const isItemDoneLocal = useCallback((item: ScheduleItem): boolean => {
+    if (item.is_midflight) return true;
+    return item.status === "completed" || expedicedScheduleIds.has(item.id);
+  }, [expedicedScheduleIds]);
   const expectedPct = todayDayIndex >= 0 ? getExpectedPct(todayDayIndex, weeklyGoal) : 0;
   const isExpanded = expandedMap[bundleId] ?? true;
   const statusColors = { "on-track": "#3a8a36", "at-risk": "#d97706", behind: "#dc2626" };
