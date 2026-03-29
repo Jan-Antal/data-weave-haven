@@ -131,9 +131,11 @@ function getProjectsForWeek(
   slideWeekKey: string,
   slideMonday: Date,
   projectDetailsMap?: Map<string, any>,
+  expedicedIds?: Set<string>,
 ): VyrobaProject[] {
   if (!scheduleData) return [];
   const result: VyrobaProject[] = [];
+  const itemDone = (i: ScheduleItem) => i.is_midflight || i.status === "completed" || (expedicedIds?.has(i.id) ?? false);
 
   // Current week bundles
   const silo = scheduleData.get(slideWeekKey);
@@ -146,7 +148,7 @@ function getProjectsForWeek(
             i.status === "scheduled" ||
             i.status === "in_progress" ||
             i.status === "paused" ||
-            i.status === "completed",
+            itemDone(i),
         )
       ) {
         result.push({
@@ -173,7 +175,7 @@ function getProjectsForWeek(
     for (const b of prevSilo.bundles) {
       if (result.some((r) => r.projectId === b.project_id)) continue;
       const activeItems = b.items.filter((i: ScheduleItem) => i.status === "scheduled" || i.status === "in_progress");
-      if (activeItems.length === 0) continue;
+      if (activeItems.length === 0 || activeItems.every((i: ScheduleItem) => itemDone(i))) continue;
       result.push({
         projectId: b.project_id,
         projectName: b.project_name,
