@@ -199,8 +199,12 @@ function getProjectsForWeek(
     }
   }
 
-  // Sort: spilled first, paused last
+  // Sort: completed last, then spilled first, paused last
   result.sort((a, b) => {
+    const aDone = a.scheduleItems.filter(i => i.status !== "cancelled").every(i => itemDone(i));
+    const bDone = b.scheduleItems.filter(i => i.status !== "cancelled").every(i => itemDone(i));
+    if (aDone && !bDone) return 1;
+    if (!aDone && bDone) return -1;
     if (a.isPaused && !b.isPaused) return 1;
     if (!a.isPaused && b.isPaused) return -1;
     return (b.isSpilled ? 1 : 0) - (a.isSpilled ? 1 : 0);
@@ -543,8 +547,12 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       }
     }
 
-    // Sort: spilled first, paused last
+    // Sort: completed last, then spilled first, paused last
     result.sort((a, b) => {
+      const aDone = a.scheduleItems.filter(i => i.status !== "cancelled").every(i => isItemDone(i));
+      const bDone = b.scheduleItems.filter(i => i.status !== "cancelled").every(i => isItemDone(i));
+      if (aDone && !bDone) return 1;
+      if (!aDone && bDone) return -1;
       if (a.isPaused && !b.isPaused) return 1;
       if (!a.isPaused && b.isPaused) return -1;
       return (b.isSpilled ? 1 : 0) - (a.isSpilled ? 1 : 0);
