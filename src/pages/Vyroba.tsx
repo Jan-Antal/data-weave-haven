@@ -449,6 +449,21 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   const { data: scheduleData } = useProductionSchedule();
   const { data: expedicedMap } = useCompletedScheduleIds();
+
+  // Fetch project_plan_hours for weeklyGoal calculation
+  const { data: planHoursMap } = useQuery({
+    queryKey: ["project-plan-hours-vyroba"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("project_plan_hours")
+        .select("project_id, hodiny_plan");
+      if (error) throw error;
+      const m = new Map<string, number>();
+      for (const row of data || []) m.set(row.project_id, row.hodiny_plan);
+      return m;
+    },
+  });
   const expedicedScheduleIds = useMemo(() => {
     if (!expedicedMap) return new Set<string>();
     return new Set(expedicedMap.keys());
@@ -778,25 +793,36 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return { totalHours, completedHours, bundleProgress };
   }
 
-  // ── WEEKLY GOAL: this week's hours / total hours across all weeks ──
+  // ── WEEKLY GOAL: cumulative expected progress as % of hodiny_plan ──
   function getWeeklyGoal(pid: string): number {
     const projectForGoal = enrichedProjects.find(p => p.projectId === pid);
     if (projectForGoal?.isSpilled) return 100;
     if (!scheduleData) return 100;
-    let thisWeekHours = 0;
-    let totalHours = 0;
+
+    // hodiny_plan from project_plan_hours
+    const hPlan = planHoursMap?.get(pid);
+    if (!hPlan || hPlan <= 0) return 100;
+
+    // Day fraction: Mon=1/5, Tue=2/5, ..., Fri=5/5; weekends=5/5
+    const today = new Date();
+    const dow = today.getDay(); // 0=Sun..6=Sat
+    const dayFraction = (dow === 0 || dow === 6) ? 1 : dow / 5;
+
+    let completedWeeksHours = 0;
+    let currentWeekHours = 0;
     for (const [wk, silo] of scheduleData) {
       for (const bundle of silo.bundles) {
         if (bundle.project_id !== pid) continue;
         const activeHours = bundle.items
           .filter((i: ScheduleItem) => i.status !== "cancelled")
           .reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0);
-        totalHours += activeHours;
-        if (wk === weekKey) thisWeekHours += activeHours;
+        if (wk < weekKey) completedWeeksHours += activeHours;
+        else if (wk === weekKey) currentWeekHours += activeHours;
       }
     }
-    if (totalHours <= 0) return 100;
-    return Math.round((thisWeekHours / totalHours) * 100);
+
+    const expectedHours = completedWeeksHours + currentWeekHours * dayFraction;
+    return Math.min(100, Math.round((expectedHours / hPlan) * 100));
   }
 
   // ── Check if weekly goal is met (this week's completed hours >= this week's total hours) ──

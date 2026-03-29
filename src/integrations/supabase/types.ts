@@ -1494,6 +1494,23 @@ export type Database = {
       clean_test_production_data: { Args: never; Returns: Json }
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
       cleanup_undo_sessions: { Args: never; Returns: undefined }
+      get_daily_report: {
+        Args: { report_date?: string }
+        Returns: {
+          bundle_id: string
+          is_on_track: boolean
+          item_name: string
+          log_day_date: string
+          logged_at: string
+          logged_at_day: string
+          percent: number
+          phase: string
+          project_id: string
+          project_name: string
+          total_plan_hours: number
+          weekly_goal_pct: number
+        }[]
+      }
       get_hours_by_project: {
         Args: never
         Returns: {
