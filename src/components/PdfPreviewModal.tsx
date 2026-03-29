@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface PdfPreviewModalProps {
   html: string;
@@ -33,14 +34,13 @@ export function PdfPreviewModal({ html, tabLabel, onClose, portrait = false }: P
     const win = iframeRef.current?.contentWindow;
     const doc = iframeRef.current?.contentDocument;
     if (win && doc) {
-      // Use the title already set inside the HTML (e.g. Průvodka sets its own)
-      // Fall back to a generated title for other exports
       if (!doc.title || doc.title === 'about:blank') {
         const today = new Date().toISOString().split("T")[0];
         const tabKey = tabLabel.replace(/\s+/g, "");
         doc.title = `AMI-${tabKey}-${today}`;
       }
-      win.print();
+      toast.info("Před tiskem odškrtněte v nastavení „Záhlaví a zápatí"", { duration: 4000 });
+      setTimeout(() => win.print(), 400);
     }
   };
 
