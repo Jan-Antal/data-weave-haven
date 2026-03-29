@@ -614,7 +614,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   // Document counts for Výkresy section
   const projectIdsList = useMemo(() => enrichedProjects.map((p) => p.projectId), [enrichedProjects]);
-  const { counts: docCounts } = useDocumentCounts(projectIdsList);
+  const { categoryCounts } = useDocumentCounts(projectIdsList);
 
   // Week picker
   const [weekPickerOpen, setWeekPickerOpen] = useState(false);
@@ -2112,7 +2112,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     getIncompletePartsInfo(selectedProject.projectId, itemCode, itemName)
                   }
                    expedicedScheduleIds={expedicedScheduleIds}
-                   cachedDocCount={docCounts[selectedProject.projectId]}
+                   cachedDocCount={categoryCounts[selectedProject.projectId]?.vykresy}
                 />
               )}
             </div>
@@ -2220,7 +2220,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     }
                     hideLogButton
                      expedicedScheduleIds={expedicedScheduleIds}
-                     cachedDocCount={docCounts[selectedProject.projectId]}
+                     cachedDocCount={categoryCounts[selectedProject.projectId]?.vykresy}
                   />
                 </div>
                 {/* Fixed bottom Log button */}
