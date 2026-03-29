@@ -860,7 +860,7 @@ export default function PlanVyroby() {
                 onCommitSelected={async () => {
                   if (forecast.selectedBlockIds.size === 0) return;
                   const blockCount = forecast.selectedBlockIds.size;
-                  await forecast.commitRealBundleOverrides(moveBundleToWeek);
+                  await forecast.commitRealBundleOverrides((pid, sw, tw) => moveBundleToWeek(pid, sw, tw, 'separate').then(() => {}));
                   await forecast.commitBlocks(Array.from(forecast.selectedBlockIds));
                   try {
                     const { logActivity } = await import("@/lib/activityLog");
