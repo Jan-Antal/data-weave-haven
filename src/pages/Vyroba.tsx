@@ -344,6 +344,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   }, [setCurrentPage]);
 
 
+  // Document counts for Výkresy section
+  const projectIdsList = useMemo(() => enrichedProjects.map((p) => p.projectId), [enrichedProjects]);
+  const { counts: docCounts } = useDocumentCounts(projectIdsList);
+
 
   const [resetDataPreview, setResetDataPreview] = useState<any[] | null>(null);
   const [resetDataConfirmOpen, setResetDataConfirmOpen] = useState(false);
@@ -3384,7 +3388,7 @@ function DetailPanel({
         </div>
 
         {/* ── Výkresy inline ── */}
-        <VykresynSection projectId={project.projectId} />
+        <VykresynSection projectId={project.projectId} cachedDocCount={docCounts[project.projectId]} />
       </div>
 
       {/* ── Scrollable body ── */}
@@ -5016,7 +5020,7 @@ function QualityCheckFullDisplay({ check }: { check: any }) {
 /* VÝKRESY SECTION (header collapsible)    */
 /* ═══════════════════════════════════════ */
 
-function VykresynSection({ projectId }: { projectId: string }) {
+function VykresynSection({ projectId, cachedDocCount }: { projectId: string; cachedDocCount?: number }) {
   const [open, setOpen] = useState(false);
   const { filesByCategory, listFiles, getPreview } = useSharePointDocs(projectId);
   const [previewFile, setPreviewFile] = useState<{
@@ -5062,7 +5066,7 @@ function VykresynSection({ projectId }: { projectId: string }) {
         >
           {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           <FileText className="h-3 w-3" />
-          📄 Výkresy ({files.length})
+          📄 Výkresy ({open ? files.length : (cachedDocCount ?? 0)})
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="mt-2 space-y-1">
