@@ -319,6 +319,7 @@ export function useProductionDragDrop() {
             return;
           }
         }
+      }
 
       // Check for duplicate key: same project_id + item_code + scheduled_week
       if (oldItem.item_code && onConflict !== 'separate') {
