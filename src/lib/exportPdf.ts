@@ -213,7 +213,7 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
 </div>
 
 </div>
-<script>document.title = 'AMI-\${format(new Date(), 'yyMMdd')}-Pruvodka-${esc(projectId)}';</script>
+<script>document.title = 'AMI-${format(new Date(), 'yyMMdd')}-Pruvodka-${esc(projectId)}';</script>
 </body>
 </html>`;
 }
