@@ -63,20 +63,15 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
   const marze = (() => {
     const raw = Number(project.marze);
     if (!raw || raw <= 0) return 0.15;
-    // If value > 1, it's stored as percentage (e.g., 15) → divide by 100
-    // If value <= 1, it's already decimal (e.g., 0.15) → use as-is
     return raw > 1 ? raw / 100 : raw;
   })();
 
-  // Production pct: normalized share of (material + vyroba + rezie)
-  const rawMaterialPct = preset?.material_pct ?? 0;
-  const rawVyrobaPct =
-    project.cost_production_pct != null
-      ? Number(project.cost_production_pct)
-      : preset?.production_pct ?? 30;
-  const rawReziaPct = preset?.overhead_pct ?? 25;
-  const totalPct = rawMaterialPct + rawVyrobaPct + rawReziaPct;
-  const normalizedProdPct = totalPct > 0 ? rawVyrobaPct / totalPct : rawVyrobaPct / 100;
+  // Production pct: simple percentage / 100
+  const prodPct = project.cost_production_pct != null
+    ? Number(project.cost_production_pct) / 100
+    : preset?.production_pct != null
+      ? Number(preset.production_pct) / 100
+      : 0.3;
 
   const isEur = project.currency === "EUR";
 
