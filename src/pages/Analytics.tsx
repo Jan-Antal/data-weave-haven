@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { recalculateProductionHours } from "@/lib/recalculateProductionHours";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { RecalculateDialog } from "@/components/RecalculateDialog";
 
 function formatHours(n: number | null): string {
   if (n == null) return "—";
@@ -83,10 +84,13 @@ export default function Analytics() {
     setEditMode(false);
   }, []);
 
-  const handleRecalculate = useCallback(async () => {
+  const [recalcDialogOpen, setRecalcDialogOpen] = useState(false);
+
+  const doRecalculate = useCallback(async (recalculateAll: boolean) => {
+    setRecalcDialogOpen(false);
     setRecalculating(true);
     try {
-      const updated = await recalculateProductionHours(supabase, "all");
+      const updated = await recalculateProductionHours(supabase, "all", undefined, recalculateAll);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["analytics"] }),
         queryClient.invalidateQueries({ queryKey: ["production-schedule"] }),
@@ -217,7 +221,7 @@ export default function Analytics() {
                   size="sm"
                   className="h-7 px-2 text-xs gap-1"
                   disabled={recalculating}
-                  onClick={handleRecalculate}
+                  onClick={() => setRecalcDialogOpen(true)}
                 >
                   <RefreshCw className={cn("h-3.5 w-3.5", recalculating && "animate-spin")} />
                   Přepočítat
@@ -347,6 +351,12 @@ export default function Analytics() {
         project={detailProject}
         open={!!detailProjectId}
         onOpenChange={(open) => { if (!open) setDetailProjectId(null); }}
+      />
+      <RecalculateDialog
+        open={recalcDialogOpen}
+        onClose={() => setRecalcDialogOpen(false)}
+        onFutureOnly={() => doRecalculate(false)}
+        onAll={() => doRecalculate(true)}
       />
     </div>
   );

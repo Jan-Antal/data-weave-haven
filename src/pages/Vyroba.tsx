@@ -75,6 +75,7 @@ import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
 import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
 import { PauseItemDialog } from "@/components/production/PauseItemDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { RecalculateDialog } from "@/components/RecalculateDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -641,6 +642,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   // Project detail dialog
   const [detailProject, setDetailProject] = useState<any | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [recalcDetailProjectId, setRecalcDetailProjectId] = useState<string | null>(null);
   // Mobile project detail sheet
   const [mobileDetailProjectId, setMobileDetailProjectId] = useState<string | null>(null);
 
@@ -1362,10 +1364,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
-  async function recalculateScheduledHours(projectId: string) {
+  async function recalculateScheduledHours(projectId: string, recalculateAll = false) {
     try {
       const { recalculateProductionHours } = await import("@/lib/recalculateProductionHours");
-      const updated = await recalculateProductionHours(supabase, [projectId]);
+      const updated = await recalculateProductionHours(supabase, [projectId], undefined, recalculateAll);
       qc.invalidateQueries({ queryKey: ["analytics"] });
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
@@ -2926,7 +2928,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             }}
             extraFooter={!isMobile && (isAdmin || isOwner) ? (
               <button
-                onClick={() => recalculateScheduledHours(detailProject.project_id)}
+                onClick={() => setRecalcDetailProjectId(detailProject.project_id)}
                 className="text-xs px-3 py-1.5 rounded border border-border hover:bg-muted transition-colors"
               >
                 🔄 Přepočítat hodiny
@@ -2934,6 +2936,12 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             ) : undefined}
           />
         )}
+        <RecalculateDialog
+          open={!!recalcDetailProjectId}
+          onClose={() => setRecalcDetailProjectId(null)}
+          onFutureOnly={() => { const pid = recalcDetailProjectId!; setRecalcDetailProjectId(null); recalculateScheduledHours(pid, false); }}
+          onAll={() => { const pid = recalcDetailProjectId!; setRecalcDetailProjectId(null); recalculateScheduledHours(pid, true); }}
+        />
 
         {/* ═══ MOBILE PROJECT DETAIL SHEET ═══ */}
         {isMobile && (

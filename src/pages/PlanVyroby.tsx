@@ -50,6 +50,7 @@ import { useSearchNavigation } from "@/hooks/useSearchNavigation";
 import { DataLogPanel } from "@/components/DataLogPanel";
 import { OverbookWarningDialog, OverbookBadge } from "@/components/production/OverbookWarningDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { RecalculateDialog } from "@/components/RecalculateDialog";
 
 
 export type DisplayMode = "hours" | "czk" | "percent";
@@ -192,12 +193,14 @@ export default function PlanVyroby() {
   const pendingDeadlineAction = useRef<(() => Promise<void>) | null>(null);
 
   const [recalculating, setRecalculating] = useState(false);
+  const [recalcDialogOpen, setRecalcDialogOpen] = useState(false);
 
-  const handleRecalculateHours = useCallback(async () => {
+  const doRecalculate = useCallback(async (recalculateAll: boolean) => {
+    setRecalcDialogOpen(false);
     setRecalculating(true);
     try {
       const { recalculateProductionHours } = await import("@/lib/recalculateProductionHours");
-      const updated = await recalculateProductionHours(supabase, "all");
+      const updated = await recalculateProductionHours(supabase, "all", undefined, recalculateAll);
       qc.invalidateQueries({ queryKey: ["analytics"] });
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
@@ -793,7 +796,7 @@ export default function PlanVyroby() {
           onOverbookBadgeClick={() => setOverbookDialogOpen(true)}
           isAdmin={isAdmin}
           recalculating={recalculating}
-          onRecalculateHours={handleRecalculateHours}
+          onRecalculateHours={() => setRecalcDialogOpen(true)}
           midflightRunning={midflightRunning}
           onMidflightImport={() => setMidflightConfirmOpen(true)}
         />
@@ -1026,6 +1029,12 @@ export default function PlanVyroby() {
         confirmLabel="Importovať"
         cancelLabel="Zrušit"
         variant="default"
+      />
+      <RecalculateDialog
+        open={recalcDialogOpen}
+        onClose={() => setRecalcDialogOpen(false)}
+        onFutureOnly={() => doRecalculate(false)}
+        onAll={() => doRecalculate(true)}
       />
       {isMobile && <MobileBottomNav />}
     </DndContext>
