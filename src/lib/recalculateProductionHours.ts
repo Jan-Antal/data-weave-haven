@@ -93,13 +93,16 @@ export async function recalculateProductionHours(
     }, 0);
     const prodejniCena = Number(proj.prodejni_cena) || 0;
 
-    // Update schedule items (current + future weeks only)
-    const { data: schedItems } = await supabaseClient
+    // Update schedule items
+    let schedQuery = supabaseClient
       .from("production_schedule")
       .select("id, item_code, scheduled_czk, scheduled_hours, scheduled_week, split_part, split_total")
       .eq("project_id", proj.project_id)
-      .in("status", ["scheduled", "in_progress"])
-      .gte("scheduled_week", weekKey);
+      .in("status", ["scheduled", "in_progress"]);
+    if (!recalculateAll) {
+      schedQuery = schedQuery.gte("scheduled_week", weekKey);
+    }
+    const { data: schedItems } = await schedQuery;
 
     for (const item of schedItems || []) {
       if (item.item_code?.startsWith('HIST_')) continue;
