@@ -59,11 +59,14 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
     sorted[0]?.eur_czk ??
     fallbackEurToCzk;
 
-  // Marze: project value if filled and > 0, else 15%
-  const marze =
-    project.marze != null && project.marze !== "" && Number(project.marze) > 0
-      ? Number(project.marze) / 100
-      : 0.15;
+  // Marze: handle both percentage (15) and decimal (0.15) storage formats
+  const marze = (() => {
+    const raw = Number(project.marze);
+    if (!raw || raw <= 0) return 0.15;
+    // If value > 1, it's stored as percentage (e.g., 15) → divide by 100
+    // If value <= 1, it's already decimal (e.g., 0.15) → use as-is
+    return raw > 1 ? raw / 100 : raw;
+  })();
 
   // Production pct: normalized share of (material + vyroba + rezie)
   const rawMaterialPct = preset?.material_pct ?? 0;
