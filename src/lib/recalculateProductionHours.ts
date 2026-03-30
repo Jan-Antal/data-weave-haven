@@ -86,12 +86,16 @@ export async function recalculateProductionHours(
     })();
 
     // Precompute total cost and selling price for proportional share
-    const totalCostCzk = (tpvItems || []).reduce((sum: number, t: any) => {
-      const raw = Number(t.cena) || 0;
-      const czk = isEur ? raw * eurRate : raw;
-      return sum + czk * (Number(t.pocet) || 1);
-    }, 0);
-    const prodejniCena = Number(proj.prodejni_cena) || 0;
+    const totalCostCzk = (tpvItems || [])
+      .filter((t: any) => t.status !== 'Zrušeno' && Number(t.cena) > 0)
+      .reduce((sum: number, t: any) => {
+        const raw = Number(t.cena) || 0;
+        const czk = isEur ? raw * eurRate : raw;
+        return sum + czk * (Number(t.pocet) || 1);
+      }, 0);
+    const prodejniCena = isEur
+      ? (Number(proj.prodejni_cena) || 0) * eurRate
+      : (Number(proj.prodejni_cena) || 0);
 
     // Update schedule items
     let schedQuery = supabaseClient
