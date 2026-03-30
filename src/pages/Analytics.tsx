@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { recalculateProductionHours } from "@/lib/recalculateProductionHours";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { RecalculateDialog } from "@/components/RecalculateDialog";
 
 function formatHours(n: number | null): string {
   if (n == null) return "—";
