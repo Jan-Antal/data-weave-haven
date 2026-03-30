@@ -76,6 +76,10 @@ export async function recalculateProductionHours(
 
     if (!tpvItems?.length && result.hodiny_plan === 0) continue;
 
+    // Precompute total cost and selling price for proportional share
+    const totalCostCzk = (tpvItems || []).reduce((sum: number, t: any) => sum + (Number(t.cena) || 0) * (Number(t.pocet) || 1), 0);
+    const prodejniCena = Number(proj.prodejni_cena) || 0;
+
     // Update schedule items (current + future weeks only)
     const { data: schedItems } = await supabaseClient
       .from("production_schedule")
@@ -88,10 +92,12 @@ export async function recalculateProductionHours(
       const tpv = (tpvItems || []).find((t: any) => t.item_name === item.item_code);
       if (!tpv) continue;
 
-      const correctCzk = (Number(tpv.cena) || 0) * (Number(tpv.pocet) || 1);
+      const itemCostCzk = (Number(tpv.cena) || 0) * (Number(tpv.pocet) || 1);
+      const itemShare = totalCostCzk > 0 ? itemCostCzk / totalCostCzk : 0;
+      const correctCzk = Math.floor(itemShare * prodejniCena);
       const totalHours =
-        correctCzk > 0
-          ? Math.floor((correctCzk * (1 - result.marze_used) * result.prodpct_used) / hourlyRate)
+        itemCostCzk > 0
+          ? Math.floor((itemCostCzk * (1 - result.marze_used) * result.prodpct_used) / hourlyRate)
           : 0;
       const splitTotal = Number(item.split_total) || 1;
       const correctHours = Math.floor(totalHours / splitTotal);
@@ -119,10 +125,12 @@ export async function recalculateProductionHours(
       const tpv = (tpvItems || []).find((t: any) => t.item_name === item.item_code);
       if (!tpv) continue;
 
-      const correctCzk = (Number(tpv.cena) || 0) * (Number(tpv.pocet) || 1);
+      const itemCostCzk = (Number(tpv.cena) || 0) * (Number(tpv.pocet) || 1);
+      const itemShare = totalCostCzk > 0 ? itemCostCzk / totalCostCzk : 0;
+      const correctCzk = Math.floor(itemShare * prodejniCena);
       const totalHours =
-        correctCzk > 0
-          ? Math.floor((correctCzk * (1 - result.marze_used) * result.prodpct_used) / hourlyRate)
+        itemCostCzk > 0
+          ? Math.floor((itemCostCzk * (1 - result.marze_used) * result.prodpct_used) / hourlyRate)
           : 0;
       const splitTotal = Number(item.split_total) || 1;
       const correctHours = Math.floor(totalHours / splitTotal);
