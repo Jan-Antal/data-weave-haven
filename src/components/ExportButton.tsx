@@ -40,9 +40,9 @@ export function ExportButton({ activeTab, personFilter, statusFilter }: ExportBu
     return () => document.removeEventListener("mousedown", handler);
   }, [dropdownOpen, excelPopupOpen]);
 
-  // When on tpv-status tab, check if TPV List is active (has registered meta)
+  // When TPV List is open (has registered meta), always use it regardless of source tab
   const tpvListMeta = getExportMeta("tpv-list");
-  const effectiveTab = activeTab === "tpv-status" && tpvListMeta ? "tpv-list" : activeTab;
+  const effectiveTab = tpvListMeta ? "tpv-list" : activeTab;
   
   const tabInfo = TAB_MAP[effectiveTab];
   if (!tabInfo) return null;
