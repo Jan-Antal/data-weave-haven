@@ -1030,6 +1030,12 @@ export default function PlanVyroby() {
         cancelLabel="Zrušit"
         variant="default"
       />
+      <RecalculateDialog
+        open={recalcDialogOpen}
+        onClose={() => setRecalcDialogOpen(false)}
+        onFutureOnly={() => doRecalculate(false)}
+        onAll={() => doRecalculate(true)}
+      />
       {isMobile && <MobileBottomNav />}
     </DndContext>
   );

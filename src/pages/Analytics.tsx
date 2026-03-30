@@ -84,10 +84,13 @@ export default function Analytics() {
     setEditMode(false);
   }, []);
 
-  const handleRecalculate = useCallback(async () => {
+  const [recalcDialogOpen, setRecalcDialogOpen] = useState(false);
+
+  const doRecalculate = useCallback(async (recalculateAll: boolean) => {
+    setRecalcDialogOpen(false);
     setRecalculating(true);
     try {
-      const updated = await recalculateProductionHours(supabase, "all");
+      const updated = await recalculateProductionHours(supabase, "all", undefined, recalculateAll);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["analytics"] }),
         queryClient.invalidateQueries({ queryKey: ["production-schedule"] }),
@@ -218,7 +221,7 @@ export default function Analytics() {
                   size="sm"
                   className="h-7 px-2 text-xs gap-1"
                   disabled={recalculating}
-                  onClick={handleRecalculate}
+                  onClick={() => setRecalcDialogOpen(true)}
                 >
                   <RefreshCw className={cn("h-3.5 w-3.5", recalculating && "animate-spin")} />
                   Přepočítat

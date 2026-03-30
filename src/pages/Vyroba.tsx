@@ -1362,10 +1362,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
-  async function recalculateScheduledHours(projectId: string) {
+  async function recalculateScheduledHours(projectId: string, recalculateAll = false) {
     try {
       const { recalculateProductionHours } = await import("@/lib/recalculateProductionHours");
-      const updated = await recalculateProductionHours(supabase, [projectId]);
+      const updated = await recalculateProductionHours(supabase, [projectId], undefined, recalculateAll);
       qc.invalidateQueries({ queryKey: ["analytics"] });
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
