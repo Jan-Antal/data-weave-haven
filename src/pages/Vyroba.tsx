@@ -2941,7 +2941,6 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
           onFutureOnly={() => { const pid = recalcDetailProjectId!; setRecalcDetailProjectId(null); recalculateScheduledHours(pid, false); }}
           onAll={() => { const pid = recalcDetailProjectId!; setRecalcDetailProjectId(null); recalculateScheduledHours(pid, true); }}
         />
-        )}
 
         {/* ═══ MOBILE PROJECT DETAIL SHEET ═══ */}
         {isMobile && (
