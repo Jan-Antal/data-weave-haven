@@ -352,6 +352,12 @@ export default function Analytics() {
         open={!!detailProjectId}
         onOpenChange={(open) => { if (!open) setDetailProjectId(null); }}
       />
+      <RecalculateDialog
+        open={recalcDialogOpen}
+        onClose={() => setRecalcDialogOpen(false)}
+        onFutureOnly={() => doRecalculate(false)}
+        onAll={() => doRecalculate(true)}
+      />
     </div>
   );
 }
