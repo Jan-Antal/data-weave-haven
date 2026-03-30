@@ -417,12 +417,25 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
 
   const visibleColCount = renderKeys.length + 2; // +checkbox +actions
 
-  const toggleSelect = (id: string) => {
+  const lastClickedRef = useRef<string | null>(null);
+
+  const toggleSelect = (id: string, e?: React.MouseEvent) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (e?.shiftKey && lastClickedRef.current) {
+        const ids = sortedItems.map((i) => i.id);
+        const startIdx = ids.indexOf(lastClickedRef.current);
+        const endIdx = ids.indexOf(id);
+        if (startIdx !== -1 && endIdx !== -1) {
+          const [from, to] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+          for (let i = from; i <= to; i++) next.add(ids[i]);
+        }
+      } else {
+        next.has(id) ? next.delete(id) : next.add(id);
+      }
       return next;
     });
+    lastClickedRef.current = id;
   };
 
   const toggleAll = () => {
@@ -784,7 +797,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                   >
                     <TableCell>
                       {canManageTPV && (
-                        <Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} />
+                        <Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} onClick={(e: React.MouseEvent) => { if (e.shiftKey) { e.preventDefault(); toggleSelect(item.id, e); } }} />
                       )}
                     </TableCell>
                     {renderKeys.map((key) => {
