@@ -13,7 +13,8 @@ function getCurrentWeekKey(): string {
 export async function recalculateProductionHours(
   supabaseClient: SupabaseClient,
   projectIds: string[] | "all",
-  currentWeekKey?: string
+  currentWeekKey?: string,
+  recalculateAll?: boolean
 ): Promise<number> {
   const weekKey = currentWeekKey || getCurrentWeekKey();
 
