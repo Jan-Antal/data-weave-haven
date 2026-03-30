@@ -124,8 +124,7 @@ export async function recalculateProductionHours(
       const rawCena = Number(tpv.cena) || 0;
       const cenaCzk = isEur ? rawCena * eurRate : rawCena;
       const itemCostCzk = cenaCzk * (Number(tpv.pocet) || 1);
-      const itemShare = totalCostCzk > 0 ? itemCostCzk / totalCostCzk : 0;
-      const correctCzk = Math.floor(itemShare * prodejniCena);
+      const correctCzk = Math.floor(itemCostCzk);
       const totalHours =
         itemCostCzk > 0
           ? Math.floor((itemCostCzk * (1 - result.marze_used) * result.prodpct_used) / hourlyRate)
