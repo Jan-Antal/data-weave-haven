@@ -76,8 +76,20 @@ export async function recalculateProductionHours(
 
     if (!tpvItems?.length && result.hodiny_plan === 0) continue;
 
+    // EUR conversion for this project
+    const isEur = proj.currency === 'EUR';
+    const eurRate = (() => {
+      const projYear = proj.created_at ? new Date(proj.created_at).getFullYear() : new Date().getFullYear();
+      const sorted = [...exchangeRates].sort((a, b) => b.year - a.year);
+      return sorted.find(r => r.year === projYear)?.eur_czk ?? sorted[0]?.eur_czk ?? 25;
+    })();
+
     // Precompute total cost and selling price for proportional share
-    const totalCostCzk = (tpvItems || []).reduce((sum: number, t: any) => sum + (Number(t.cena) || 0) * (Number(t.pocet) || 1), 0);
+    const totalCostCzk = (tpvItems || []).reduce((sum: number, t: any) => {
+      const raw = Number(t.cena) || 0;
+      const czk = isEur ? raw * eurRate : raw;
+      return sum + czk * (Number(t.pocet) || 1);
+    }, 0);
     const prodejniCena = Number(proj.prodejni_cena) || 0;
 
     // Update schedule items (current + future weeks only)
@@ -89,10 +101,13 @@ export async function recalculateProductionHours(
       .gte("scheduled_week", weekKey);
 
     for (const item of schedItems || []) {
+      if (item.item_code?.startsWith('HIST_')) continue;
       const tpv = (tpvItems || []).find((t: any) => t.item_name === item.item_code);
       if (!tpv) continue;
 
-      const itemCostCzk = (Number(tpv.cena) || 0) * (Number(tpv.pocet) || 1);
+      const rawCena = Number(tpv.cena) || 0;
+      const cenaCzk = isEur ? rawCena * eurRate : rawCena;
+      const itemCostCzk = cenaCzk * (Number(tpv.pocet) || 1);
       const itemShare = totalCostCzk > 0 ? itemCostCzk / totalCostCzk : 0;
       const correctCzk = Math.floor(itemShare * prodejniCena);
       const totalHours =
@@ -122,10 +137,13 @@ export async function recalculateProductionHours(
       .eq("status", "pending");
 
     for (const item of inboxItems || []) {
+      if (item.item_code?.startsWith('HIST_')) continue;
       const tpv = (tpvItems || []).find((t: any) => t.item_name === item.item_code);
       if (!tpv) continue;
 
-      const itemCostCzk = (Number(tpv.cena) || 0) * (Number(tpv.pocet) || 1);
+      const rawCena = Number(tpv.cena) || 0;
+      const cenaCzk = isEur ? rawCena * eurRate : rawCena;
+      const itemCostCzk = cenaCzk * (Number(tpv.pocet) || 1);
       const itemShare = totalCostCzk > 0 ? itemCostCzk / totalCostCzk : 0;
       const correctCzk = Math.floor(itemShare * prodejniCena);
       const totalHours =
