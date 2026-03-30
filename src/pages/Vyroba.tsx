@@ -642,6 +642,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   // Project detail dialog
   const [detailProject, setDetailProject] = useState<any | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [recalcDetailProjectId, setRecalcDetailProjectId] = useState<string | null>(null);
   // Mobile project detail sheet
   const [mobileDetailProjectId, setMobileDetailProjectId] = useState<string | null>(null);
 
