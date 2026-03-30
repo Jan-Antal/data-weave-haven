@@ -100,13 +100,21 @@ export async function recalculateProductionHours(
     // Update schedule items
     let schedQuery = supabaseClient
       .from("production_schedule")
-      .select("id, item_code, scheduled_czk, scheduled_hours, scheduled_week, split_part, split_total")
+      .select("id, item_code, scheduled_czk, scheduled_hours, scheduled_week, split_part, split_total, split_group_id")
       .eq("project_id", proj.project_id)
       .in("status", ["scheduled", "in_progress"]);
     if (!recalculateAll) {
       schedQuery = schedQuery.gte("scheduled_week", weekKey);
     }
     const { data: schedItems } = await schedQuery;
+
+    // Build ratio map for split groups (preserve proportional distribution)
+    const splitGroupTotals: Record<string, number> = {};
+    for (const item of schedItems || []) {
+      if (item.split_group_id) {
+        splitGroupTotals[item.split_group_id] = (splitGroupTotals[item.split_group_id] || 0) + Number(item.scheduled_hours);
+      }
+    }
 
     for (const item of schedItems || []) {
       if (item.item_code?.startsWith('HIST_')) continue;
@@ -122,8 +130,14 @@ export async function recalculateProductionHours(
         itemCostCzk > 0
           ? Math.floor((itemCostCzk * (1 - result.marze_used) * result.prodpct_used) / hourlyRate)
           : 0;
-      const splitTotal = Number(item.split_total) || 1;
-      const correctHours = Math.floor(totalHours / splitTotal);
+      const splitGroupId = item.split_group_id;
+      const correctHours = (() => {
+        if (!splitGroupId || !splitGroupTotals[splitGroupId]) {
+          return Math.floor(totalHours / (Number(item.split_total) || 1));
+        }
+        const ratio = Number(item.scheduled_hours) / splitGroupTotals[splitGroupId];
+        return Math.floor(totalHours * ratio);
+      })();
 
       if (
         correctCzk !== Number(item.scheduled_czk) ||
