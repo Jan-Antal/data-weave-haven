@@ -75,6 +75,7 @@ import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
 import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
 import { PauseItemDialog } from "@/components/production/PauseItemDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { RecalculateDialog } from "@/components/RecalculateDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
