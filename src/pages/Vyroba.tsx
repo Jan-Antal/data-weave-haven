@@ -2927,13 +2927,20 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             }}
             extraFooter={!isMobile && (isAdmin || isOwner) ? (
               <button
-                onClick={() => recalculateScheduledHours(detailProject.project_id)}
+                onClick={() => setRecalcDetailProjectId(detailProject.project_id)}
                 className="text-xs px-3 py-1.5 rounded border border-border hover:bg-muted transition-colors"
               >
                 🔄 Přepočítat hodiny
               </button>
             ) : undefined}
           />
+        )}
+        <RecalculateDialog
+          open={!!recalcDetailProjectId}
+          onClose={() => setRecalcDetailProjectId(null)}
+          onFutureOnly={() => { const pid = recalcDetailProjectId!; setRecalcDetailProjectId(null); recalculateScheduledHours(pid, false); }}
+          onAll={() => { const pid = recalcDetailProjectId!; setRecalcDetailProjectId(null); recalculateScheduledHours(pid, true); }}
+        />
         )}
 
         {/* ═══ MOBILE PROJECT DETAIL SHEET ═══ */}
