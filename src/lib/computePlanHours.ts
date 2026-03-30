@@ -107,7 +107,7 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
   const projCenaCzk = isEur ? projCenaRaw * eurRate : projCenaRaw;
   const project_hours =
     projCenaCzk > 0
-      ? Math.floor((projCenaCzk * (1 - marze) * normalizedProdPct) / hourlyRate)
+      ? Math.floor((projCenaCzk * (1 - marze) * prodPct) / hourlyRate)
       : 0;
 
   // Warning: TPV sum < 60% of project price
