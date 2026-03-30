@@ -143,7 +143,7 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
     source,
     warning_low_tpv,
     marze_used: marze,
-    prodpct_used: normalizedProdPct,
+    prodpct_used: prodPct,
     eur_rate_used: eurRate,
     item_hours,
   };
