@@ -154,9 +154,17 @@ export async function recalculateProductionHours(
     // Update inbox items (pending)
     const { data: inboxItems } = await supabaseClient
       .from("production_inbox")
-      .select("id, item_code, estimated_czk, estimated_hours, split_part, split_total")
+      .select("id, item_code, estimated_czk, estimated_hours, split_part, split_total, split_group_id")
       .eq("project_id", proj.project_id)
       .eq("status", "pending");
+
+    // Build ratio map for inbox split groups
+    const inboxSplitGroupTotals: Record<string, number> = {};
+    for (const item of inboxItems || []) {
+      if (item.split_group_id) {
+        inboxSplitGroupTotals[item.split_group_id] = (inboxSplitGroupTotals[item.split_group_id] || 0) + Number(item.estimated_hours);
+      }
+    }
 
     for (const item of inboxItems || []) {
       if (item.item_code?.startsWith('HIST_')) continue;
@@ -172,8 +180,14 @@ export async function recalculateProductionHours(
         itemCostCzk > 0
           ? Math.floor((itemCostCzk * (1 - result.marze_used) * result.prodpct_used) / hourlyRate)
           : 0;
-      const splitTotal = Number(item.split_total) || 1;
-      const correctHours = Math.floor(totalHours / splitTotal);
+      const splitGroupId = item.split_group_id;
+      const correctHours = (() => {
+        if (!splitGroupId || !inboxSplitGroupTotals[splitGroupId]) {
+          return Math.floor(totalHours / (Number(item.split_total) || 1));
+        }
+        const ratio = Number(item.estimated_hours) / inboxSplitGroupTotals[splitGroupId];
+        return Math.floor(totalHours * ratio);
+      })();
 
       if (
         correctCzk !== Number(item.estimated_czk) ||
