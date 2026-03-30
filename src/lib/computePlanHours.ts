@@ -15,7 +15,7 @@ export interface PlanHoursInput {
     created_at?: string | null;
     plan_use_project_price?: boolean;
   };
-  preset?: { production_pct?: number | null } | null;
+  preset?: { production_pct?: number | null; material_pct?: number | null; overhead_pct?: number | null } | null;
   hourlyRate: number;
   exchangeRates: Array<{ year: number; eur_czk: number }>;
   fallbackEurToCzk?: number;
@@ -65,13 +65,15 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
       ? Number(project.marze) / 100
       : 0.15;
 
-  // Production pct: project override → preset → 30%
-  const prodPct =
+  // Production pct: normalized share of (material + vyroba + rezie)
+  const rawMaterialPct = preset?.material_pct ?? 0;
+  const rawVyrobaPct =
     project.cost_production_pct != null
-      ? Number(project.cost_production_pct) / 100
-      : preset?.production_pct != null
-        ? Number(preset.production_pct) / 100
-        : 0.3;
+      ? Number(project.cost_production_pct)
+      : preset?.production_pct ?? 30;
+  const rawReziaPct = preset?.overhead_pct ?? 25;
+  const totalPct = rawMaterialPct + rawVyrobaPct + rawReziaPct;
+  const normalizedProdPct = totalPct > 0 ? rawVyrobaPct / totalPct : rawVyrobaPct / 100;
 
   const isEur = project.currency === "EUR";
 
@@ -88,7 +90,7 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
     const itemCzk = cenaCzk * (Number(item.pocet) || 1);
     const itemHours =
       itemCzk > 0
-        ? Math.floor((itemCzk * (1 - marze) * prodPct) / hourlyRate)
+        ? Math.floor((itemCzk * (1 - marze) * normalizedProdPct) / hourlyRate)
         : 0;
     tpvSumCzk += itemCzk;
     if (item.id) {
@@ -107,7 +109,7 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
   const projCenaCzk = isEur ? projCenaRaw * eurRate : projCenaRaw;
   const project_hours =
     projCenaCzk > 0
-      ? Math.floor((projCenaCzk * (1 - marze) * prodPct) / hourlyRate)
+      ? Math.floor((projCenaCzk * (1 - marze) * normalizedProdPct) / hourlyRate)
       : 0;
 
   // Warning: TPV sum < 60% of project price
@@ -143,7 +145,7 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
     source,
     warning_low_tpv,
     marze_used: marze,
-    prodpct_used: prodPct,
+    prodpct_used: normalizedProdPct,
     eur_rate_used: eurRate,
     item_hours,
   };

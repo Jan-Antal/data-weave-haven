@@ -33,7 +33,7 @@ export async function recalculateProductionHours(
       .single(),
     supabaseClient
       .from("cost_breakdown_presets")
-      .select("id, is_default, production_pct"),
+      .select("id, is_default, production_pct, material_pct, overhead_pct"),
     supabaseClient
       .from("exchange_rates")
       .select("year, eur_czk")
