@@ -85,17 +85,8 @@ export async function recalculateProductionHours(
       return sorted.find(r => r.year === projYear)?.eur_czk ?? sorted[0]?.eur_czk ?? 25;
     })();
 
-    // Precompute total cost and selling price for proportional share
-    const totalCostCzk = (tpvItems || [])
-      .filter((t: any) => t.status !== 'Zrušeno' && Number(t.cena) > 0)
-      .reduce((sum: number, t: any) => {
-        const raw = Number(t.cena) || 0;
-        const czk = isEur ? raw * eurRate : raw;
-        return sum + czk * (Number(t.pocet) || 1);
-      }, 0);
-    const prodejniCena = isEur
-      ? (Number(proj.prodejni_cena) || 0) * eurRate
-      : (Number(proj.prodejni_cena) || 0);
+
+
 
     // Update schedule items
     let schedQuery = supabaseClient
@@ -124,8 +115,7 @@ export async function recalculateProductionHours(
       const rawCena = Number(tpv.cena) || 0;
       const cenaCzk = isEur ? rawCena * eurRate : rawCena;
       const itemCostCzk = cenaCzk * (Number(tpv.pocet) || 1);
-      const itemShare = totalCostCzk > 0 ? itemCostCzk / totalCostCzk : 0;
-      const correctCzk = Math.floor(itemShare * prodejniCena);
+      const correctCzk = Math.floor(itemCostCzk);
       const totalHours =
         itemCostCzk > 0
           ? Math.floor((itemCostCzk * (1 - result.marze_used) * result.prodpct_used) / hourlyRate)
@@ -174,8 +164,7 @@ export async function recalculateProductionHours(
       const rawCena = Number(tpv.cena) || 0;
       const cenaCzk = isEur ? rawCena * eurRate : rawCena;
       const itemCostCzk = cenaCzk * (Number(tpv.pocet) || 1);
-      const itemShare = totalCostCzk > 0 ? itemCostCzk / totalCostCzk : 0;
-      const correctCzk = Math.floor(itemShare * prodejniCena);
+      const correctCzk = Math.floor(itemCostCzk);
       const totalHours =
         itemCostCzk > 0
           ? Math.floor((itemCostCzk * (1 - result.marze_used) * result.prodpct_used) / hourlyRate)
