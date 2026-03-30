@@ -796,7 +796,7 @@ export default function PlanVyroby() {
           onOverbookBadgeClick={() => setOverbookDialogOpen(true)}
           isAdmin={isAdmin}
           recalculating={recalculating}
-          onRecalculateHours={handleRecalculateHours}
+          onRecalculateHours={() => setRecalcDialogOpen(true)}
           midflightRunning={midflightRunning}
           onMidflightImport={() => setMidflightConfirmOpen(true)}
         />
