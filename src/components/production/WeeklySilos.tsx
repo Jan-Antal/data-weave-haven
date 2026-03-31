@@ -1015,6 +1015,7 @@ interface SiloProps {
   projectLookup: ProjectLookup;
   planHoursMap?: Map<string, number>;
   realHoursMap?: Map<string, number>;
+  exchangeRates?: Array<{ year: number; eur_czk: number }>;
   spillDismissed: boolean;
   onDismissSpill: () => void;
   onReopenSpill: () => void;
