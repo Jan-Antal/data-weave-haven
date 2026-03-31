@@ -1464,7 +1464,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
         <div className="flex items-center justify-between mt-0.5">
           <span className="text-[9px] rounded-full px-1.5 py-0.5" style={{ backgroundColor: "#374151", color: "#9ca3af", fontWeight: 600 }}>⏳ Rezerva</span>
           <span className="font-sans text-[11px] font-bold" style={{ color: "#6b7280" }}>
-            ~{displayMode === "czk" ? formatCompactCzk(calcProdejValue(bundle.total_hours, bundle.project_id, projectLookup, planHoursMap, realHoursMap)) : `${Math.round(bundle.total_hours)}h`}
+            ~{displayMode === "czk" ? formatCompactCzk(calcProdejValue(bundle.total_hours, bundle.project_id, projectLookup, planHoursMap, realHoursMap, exchangeRates)) : `${Math.round(bundle.total_hours)}h`}
           </span>
         </div>
         {tpvWeekLabel && (
