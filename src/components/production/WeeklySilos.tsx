@@ -881,6 +881,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
                   projectLookup={projectLookup}
                   planHoursMap={planHoursData}
                   realHoursMap={realHoursData}
+                  exchangeRates={exchangeRates}
                   spillDismissed={dismissedSpillWeeks.has(week.key)}
                   onDismissSpill={() => handleDismissSpill(week.key)}
                   onReopenSpill={() => handleReopenSpill(week.key)}
