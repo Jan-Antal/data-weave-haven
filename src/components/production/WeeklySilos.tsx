@@ -970,7 +970,7 @@ function ToolbarButton({ active, disabled, label, onClick }: { active?: boolean;
   );
 }
 
-type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null; cost_production_pct?: number | null; marze?: string | null; prodejni_cena?: number | null }>;
+type ProjectLookup = Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null; cost_production_pct?: number | null; marze?: string | null; prodejni_cena?: number | null; currency?: string | null; created_at?: string | null }>;
 
 /** FIX 6: Calculate prodej value for a project's hours in a week silo */
 function calcProdejValue(
@@ -979,10 +979,18 @@ function calcProdejValue(
   projectLookup: ProjectLookup,
   planHoursMap: Map<string, number> | undefined,
   realHoursMap: Map<string, number> | undefined,
+  exchangeRates?: Array<{ year: number; eur_czk: number }>,
 ): number {
   const proj = projectLookup.get(projectId);
-  const prodejniCena = proj?.prodejni_cena ?? 0;
+  let prodejniCena = proj?.prodejni_cena ?? 0;
   if (!prodejniCena || prodejniCena <= 0 || scheduledHours <= 0) return 0;
+  // Convert EUR projects to CZK
+  if (proj?.currency === 'EUR' && exchangeRates && exchangeRates.length > 0) {
+    const projYear = proj.created_at ? new Date(proj.created_at).getFullYear() : new Date().getFullYear();
+    const sorted = [...exchangeRates].sort((a, b) => b.year - a.year);
+    const eurRate = sorted.find(r => r.year === projYear)?.eur_czk ?? sorted[0]?.eur_czk ?? 25;
+    prodejniCena = prodejniCena * eurRate;
+  }
   const planHours = planHoursMap?.get(projectId) ?? 0;
   const realHours = realHoursMap?.get(projectId) ?? 0;
   const effectiveHours = Math.max(planHours, realHours);
