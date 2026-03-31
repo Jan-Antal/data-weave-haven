@@ -108,7 +108,22 @@ export async function recalculateProductionHours(
     }
 
     for (const item of schedItems || []) {
-      if (item.item_code?.startsWith('HIST_')) continue;
+      if (item.item_code?.startsWith('HIST_')) {
+        const histHours = Number(item.scheduled_hours) || 0;
+        const totalPlanHours = result.hodiny_plan || 0;
+        if (histHours > 0 && totalPlanHours > 0) {
+          const histShare = histHours / totalPlanHours;
+          const correctCzk = Math.floor(histShare * prodejniCena);
+          if (correctCzk !== Number(item.scheduled_czk)) {
+            await supabaseClient
+              .from("production_schedule")
+              .update({ scheduled_czk: correctCzk })
+              .eq("id", item.id);
+            updated++;
+          }
+        }
+        continue;
+      }
       const tpv = (tpvItems || []).find((t: any) => t.item_name === item.item_code);
       if (!tpv) continue;
 
