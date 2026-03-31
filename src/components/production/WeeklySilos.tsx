@@ -17,6 +17,7 @@ import { PauseItemDialog } from "./PauseItemDialog";
 import { CancelItemDialog } from "./CancelItemDialog";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 import { useProjects } from "@/hooks/useProjects";
+import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { getTerminalStatuses } from "@/lib/statusHelpers";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
