@@ -1038,7 +1038,7 @@ interface SiloProps {
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, planHoursMap, realHoursMap, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive, isWeekLocked, onToggleLock }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, planHoursMap, realHoursMap, exchangeRates, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive, isWeekLocked, onToggleLock }: SiloProps) {
   // Capacity calculation: exclude paused items
   // Active hours (excl. paused), split into blocker and non-blocker
   const { activeHours, blockerHours, activeSellingCzk, blockerSellingCzk } = useMemo(() => {
