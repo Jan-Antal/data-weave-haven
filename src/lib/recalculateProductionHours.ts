@@ -85,7 +85,9 @@ export async function recalculateProductionHours(
       return sorted.find(r => r.year === projYear)?.eur_czk ?? sorted[0]?.eur_czk ?? 25;
     })();
 
-
+    const prodejniCena = isEur
+      ? (Number(proj.prodejni_cena) || 0) * eurRate
+      : (Number(proj.prodejni_cena) || 0);
 
 
     // Update schedule items
