@@ -1243,7 +1243,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
                 isFocusedMatch={focusedMatchKey === `${weekKey}::${bundle.project_id}`}
                 searchMatchedProjectIds={searchMatchedProjectIds}
                 searchActive={searchActive}
-                isWeekLocked={isWeekLocked} />
+                isWeekLocked={isWeekLocked} exchangeRates={exchangeRates} />
             ))}
           </>
         )}
