@@ -408,7 +408,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
     }
   }, [searchMatchWeekKey, focusedMatchKey]);
 
-  const currentWeekKey = useMemo(() => getMonday(new Date()).toISOString().split("T")[0], []);
+  const currentWeekKey = useMemo(() => toLocalDateStr(getMonday(new Date())), []);
 
   const weekOptions = useMemo(() => {
     return weeks.map(w => {
