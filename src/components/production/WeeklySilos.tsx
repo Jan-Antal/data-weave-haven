@@ -1121,15 +1121,18 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
   const combinedRef = useCallback((el: HTMLDivElement | null) => { setNodeRef(el); registerRef(weekKey, el); }, [setNodeRef, registerRef, weekKey]);
 
   return (
-    <div ref={combinedRef} data-week-key={weekKey} className={`w-[252px] shrink-0 flex flex-col h-full transition-all ${isCurrent && !highlighted ? "ring-2 ring-green-500 ring-inset" : ""}`}
+    <div ref={combinedRef} data-week-key={weekKey} className="w-[252px] shrink-0 flex flex-col h-full transition-all"
       style={{
         backgroundColor: forecastDarkMode ? "#1f2e2c" : "#ffffff", borderRadius: 9,
-        border: highlighted ? `2px solid ${dropBorderColor}`
-          : isUnlockedPast ? "1.5px solid #d97706"
-          : isOverloaded && !isPast ? (forecastDarkMode ? "1px solid rgba(192,57,43,0.5)" : "1px solid rgba(220,53,69,0.4)")
+        border: highlighted ? `2.5px solid ${dropBorderColor}`
+          : isCurrent ? (forecastDarkMode ? "2.5px solid #4a9e96" : "2.5px solid #3a8a36")
+          : isUnlockedPast ? "2.5px solid #d97706"
+          : isOverloaded && !isPast ? (forecastDarkMode ? "2.5px solid rgba(192,57,43,0.7)" : "2.5px solid #DC2626")
           : forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #ece8e2",
-        boxShadow: isCurrent ? (forecastDarkMode ? "0 0 12px rgba(74,158,150,0.15)" : "0 0 14px rgba(58,138,54,0.18)")
-          : isUnlockedPast ? "0 0 8px rgba(217,119,6,0.12)" : undefined,
+        boxShadow: isCurrent ? (forecastDarkMode ? "0 0 12px rgba(74,158,150,0.2)" : "0 0 14px rgba(58,138,54,0.22)")
+          : isUnlockedPast ? "0 0 8px rgba(217,119,6,0.15)"
+          : isOverloaded && !isPast ? (forecastDarkMode ? "0 0 8px rgba(192,57,43,0.15)" : "0 0 10px rgba(220,38,38,0.15)")
+          : undefined,
       }}
     >
       {/* Header */}
