@@ -1060,11 +1060,11 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
     }
     // FIX 6: Use MAX(plan_hours, real_hours) for prodej calculation
     for (const [pid, hours] of projectHoursInWeek) {
-      if (hours.active > 0) activeSelling += calcProdejValue(hours.active, pid, projectLookup, planHoursMap, realHoursMap);
-      if (hours.blocker > 0) blockerSelling += calcProdejValue(hours.blocker, pid, projectLookup, planHoursMap, realHoursMap);
+      if (hours.active > 0) activeSelling += calcProdejValue(hours.active, pid, projectLookup, planHoursMap, realHoursMap, exchangeRates);
+      if (hours.blocker > 0) blockerSelling += calcProdejValue(hours.blocker, pid, projectLookup, planHoursMap, realHoursMap, exchangeRates);
     }
     return { activeHours: active, blockerHours: blocker, activeSellingCzk: activeSelling, blockerSellingCzk: blockerSelling };
-  }, [silo, projectLookup, hourlyRate, planHoursMap, realHoursMap]);
+  }, [silo, projectLookup, hourlyRate, planHoursMap, realHoursMap, exchangeRates]);
 
   // Forecast layer is isolated and read-only, rendered separately per week
   const weekForecastBlocks = useMemo(() => {
