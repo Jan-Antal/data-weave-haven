@@ -186,6 +186,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts), [statusOpts]);
   const qc = useQueryClient();
   const getWeekCapacity = useWeekCapacityLookup();
+  const { data: exchangeRatesData } = useExchangeRates();
+  const exchangeRates = useMemo(() => (exchangeRatesData || []).map(r => ({ year: r.year, eur_czk: r.eur_czk })), [exchangeRatesData]);
 
   // FIX 6: Fetch plan hours and real hours for prodej calculation
   const { data: planHoursData } = useQuery({
