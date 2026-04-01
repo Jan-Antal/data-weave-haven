@@ -60,10 +60,12 @@ const VAR_DESCRIPTIONS: Record<string, string> = {
   past_hours: "SUM hodín zo všetkých týždňov pred aktuálnym",
   current_hours: "SUM hodín z aktuálneho týždňa",
   day_idx: "Index dňa v týždni (0=Pondelok, 4=Piatok)",
-  tpv_cena: "Predajná cena TPV položky (v mene projektu)",
-  pocet: "Počet kusov TPV položky",
-  percent: "Aktuálne % hotovosti zadané vedúcim výroby",
+  tpv_cena: "Predajná cena TPV položky v mene projektu (tpv_items.cena)",
+  pocet: "Počet kusov TPV položky (tpv_items.pocet)",
+  percent: "Aktuálne % hotovosti zadané vedúcim výroby v dennom logu",
   totalCostCzk: "Súčet nákladových cien všetkých TPV položiek v CZK",
+  preset_production_pct: "Hodnota production_pct z cost_breakdown_presets (napr. 20.5 pre Komerční interiér)",
+  weekly_goal_pct: "Očakávané % hotovosti k dnešnému dňu — výstup vzorca Týdenní cíl %",
 };
 
 // ─── Preset formulas as HTML ────────────────────────────────
