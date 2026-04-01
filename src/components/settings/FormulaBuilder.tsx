@@ -258,13 +258,9 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
 
   // Saved formulas (in-memory only)
   const [savedFormulas, setSavedFormulas] = useState<Record<string, PresetDef>>(() => {
-    // Deep clone PRESETS
     const clone: Record<string, PresetDef> = {};
     for (const [k, v] of Object.entries(PRESETS)) {
-      clone[k] = {
-        ...v,
-        subVariants: v.subVariants ? v.subVariants.map((sv) => ({ ...sv })) : undefined,
-      };
+      clone[k] = { ...v };
     }
     return clone;
   });
