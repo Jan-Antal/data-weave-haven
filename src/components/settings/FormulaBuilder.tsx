@@ -1,8 +1,10 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -39,9 +41,10 @@ const AC_ITEMS: AutocompleteItem[] = [
 // ─── Preset formulas as HTML ────────────────────────────────
 
 function tok(label: string, type: "var" | "fn"): string {
-  const bg = type === "var" ? "#e8f4ff" : "#faeeda";
-  const color = type === "var" ? "#0c447c" : "#633806";
-  return `<span contenteditable="false" draggable="true" data-token="true" data-var="${label}" data-type="${type}" style="background:${bg};color:${color};border-radius:4px;padding:2px 6px;margin:0 2px;font-size:13px;cursor:grab;user-select:none;display:inline-block;vertical-align:baseline;line-height:1.6">${label}</span>`;
+  const cls = type === "var"
+    ? "fb-token-var"
+    : "fb-token-fn";
+  return `<span contenteditable="false" draggable="true" data-token="true" data-var="${label}" data-type="${type}" class="${cls}">${label}</span>`;
 }
 
 const PRESETS: Record<string, { label: string; html: string }> = {
@@ -251,9 +254,7 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     span.dataset.token = "true";
     span.dataset.var = item.insert;
     span.dataset.type = item.type;
-    span.style.cssText = item.type === "var"
-      ? "background:#e8f4ff;color:#0c447c;border-radius:4px;padding:2px 6px;margin:0 2px;font-size:13px;cursor:grab;user-select:none;display:inline-block;vertical-align:baseline;line-height:1.6"
-      : "background:#faeeda;color:#633806;border-radius:4px;padding:2px 6px;margin:0 2px;font-size:13px;cursor:grab;user-select:none;display:inline-block;vertical-align:baseline;line-height:1.6";
+    span.className = item.type === "var" ? "fb-token-var" : "fb-token-fn";
     span.textContent = item.insert;
 
     const sel = window.getSelection();
@@ -430,47 +431,38 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-[780px] max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden border-0"
-        style={{ zIndex: 99999 }}
-      >
+      <DialogContent className="max-w-[780px] max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
         {/* Header */}
-        <div className="px-5 pt-5 pb-3 border-b border-gray-800" style={{ background: "#0a1209" }}>
-          <h2 className="text-lg font-semibold text-gray-100">Výpočetní logika</h2>
-        </div>
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
+          <DialogTitle className="text-lg font-semibold text-foreground">Výpočetní logika</DialogTitle>
+        </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto" style={{ background: "#0f1a0f" }}>
+        <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-background">
           {/* Warning banner */}
-          <div
-            className="mx-4 mt-4 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium"
-            style={{ background: "rgba(234,175,60,0.12)", color: "#eaaf3c", border: "1px solid rgba(234,175,60,0.25)" }}
-          >
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            Experimentálny režim — zmeny vzorcov sa zatiaľ nepremietajú do výpočtov. Slúži len na overenie logiky.
-          </div>
+          <Alert className="border-warning/30 bg-warning/10">
+            <AlertTriangle className="h-4 w-4 text-warning" />
+            <AlertDescription className="text-xs text-warning">
+              Experimentálny režim — zmeny vzorcov sa zatiaľ nepremietajú do výpočtov. Slúži len na overenie logiky.
+            </AlertDescription>
+          </Alert>
 
           {/* Preset tabs */}
-          <div className="flex gap-1.5 px-4 mt-4">
-            {Object.entries(PRESETS).map(([key, p]) => (
-              <button
-                key={key}
-                onClick={() => loadPreset(key)}
-                className={cn(
-                  "px-3 py-1.5 rounded-md text-xs font-medium transition-colors border",
-                  activePreset === key
-                    ? "text-white border-[#e8692a]"
-                    : "text-gray-400 border-gray-700/50 hover:text-gray-200 hover:border-gray-600"
-                )}
-                style={activePreset === key ? { background: "rgba(232,105,42,0.2)", borderColor: "#e8692a" } : {}}
-              >
-                {p.label}
-              </button>
-            ))}
+          <div>
+            <Label className="text-xs text-muted-foreground mb-2 block">Vzorec</Label>
+            <Tabs value={activePreset} onValueChange={(v) => loadPreset(v)}>
+              <TabsList className="w-auto">
+                {Object.entries(PRESETS).map(([key, p]) => (
+                  <TabsTrigger key={key} value={key} className="text-xs font-medium">
+                    {p.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
           </div>
 
           {/* Formula editor */}
-          <div className="mx-4 mt-3 relative">
-            <Label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5 block">Vzorec</Label>
+          <div className="relative">
+            <Label className="text-xs text-muted-foreground mb-1.5 block">Editor vzorca</Label>
             <div
               ref={editorRef}
               contentEditable
@@ -481,18 +473,13 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
               onDragOver={handleDragOver}
               onDrop={handleDrop}
               onDragEnd={handleDragEnd}
-              className="outline-none"
+              className="fb-editor outline-none w-full rounded-lg border border-input bg-card text-card-foreground"
               style={{
-                background: "#ffffff",
-                border: "1px solid #d1d5db",
-                borderRadius: 8,
-                padding: 12,
-                minHeight: 56,
+                padding: "10px 12px",
+                minHeight: 52,
                 fontFamily: "monospace",
-                fontSize: 14,
+                fontSize: 13,
                 lineHeight: "1.8",
-                color: "#1a1a1a",
-                position: "relative",
                 cursor: "text",
               }}
             />
@@ -500,15 +487,13 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
             {/* Drag insertion line */}
             {dragOverPos && (
               <div
+                className="absolute pointer-events-none bg-accent"
                 style={{
-                  position: "absolute",
                   left: dragOverPos.left,
                   top: dragOverPos.top,
                   width: 2,
                   height: dragOverPos.height,
-                  background: "#e8692a",
                   borderRadius: 1,
-                  pointerEvents: "none",
                   zIndex: 10,
                 }}
               />
@@ -518,18 +503,10 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
             {acVisible && acItems.length > 0 && (
               <div
                 ref={acRef}
+                className="absolute bg-popover border border-border rounded-lg shadow-md z-50 max-h-[260px] overflow-y-auto min-w-[220px]"
                 style={{
-                  position: "absolute",
                   top: acPos.top + 40,
                   left: Math.max(0, Math.min(acPos.left, 500)),
-                  background: "#ffffff",
-                  border: "1px solid #d1d5db",
-                  borderRadius: 8,
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                  zIndex: 50,
-                  maxHeight: 260,
-                  overflowY: "auto",
-                  minWidth: 220,
                 }}
               >
                 {acItems.map((item, idx) => (
@@ -539,25 +516,21 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
                       e.preventDefault();
                       insertToken(item);
                     }}
-                    className="w-full text-left flex items-center gap-2 px-3 py-1.5 text-sm transition-colors"
-                    style={{
-                      background: idx === acIndex ? "#f3f4f6" : "transparent",
-                      color: "#1a1a1a",
-                      fontFamily: "monospace",
-                      fontSize: 13,
-                    }}
+                    className={cn(
+                      "w-full text-left flex items-center gap-2 px-3 py-2 text-sm transition-colors",
+                      idx === acIndex ? "bg-muted" : "hover:bg-muted/50"
+                    )}
+                    style={{ fontFamily: "monospace", fontSize: 13 }}
                   >
                     <span
-                      className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
-                      style={
-                        item.type === "var"
-                          ? { background: "#e8f4ff", color: "#0c447c" }
-                          : { background: "#faeeda", color: "#633806" }
-                      }
+                      className={cn(
+                        "text-[10px] font-semibold px-1.5 py-0.5 rounded",
+                        item.type === "var" ? "fb-token-var" : "fb-token-fn"
+                      )}
                     >
                       {item.type === "var" ? "var" : "fn"}
                     </span>
-                    <span>{item.label}</span>
+                    <span className="text-popover-foreground">{item.label}</span>
                   </button>
                 ))}
               </div>
@@ -566,17 +539,17 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
 
           {/* Variable values */}
           {usedVars.length > 0 && (
-            <div className="mx-4 mt-5">
-              <Label className="text-[10px] uppercase tracking-wider text-gray-500 mb-2 block">Hodnoty premenných</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div>
+              <Label className="text-xs text-muted-foreground mb-2 block">Hodnoty premenných</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
                 {usedVars.map((v) => (
                   <div key={v} className="flex items-center gap-2">
-                    <span className="text-[11px] font-mono text-blue-300 truncate min-w-0 flex-1">{v}</span>
+                    <span className="text-[11px] font-medium text-primary truncate min-w-0 flex-1" style={{ fontFamily: "monospace" }}>{v}</span>
                     <Input
                       type="number"
                       value={varValues[v] ?? 0}
                       onChange={(e) => setVarValues((prev) => ({ ...prev, [v]: Number(e.target.value) || 0 }))}
-                      className="h-7 w-24 text-xs bg-[#0a1209] border-gray-700/50 text-gray-200"
+                      className="h-8 w-28 text-xs"
                     />
                   </div>
                 ))}
@@ -585,18 +558,18 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
           )}
 
           {/* Live result */}
-          <div className="mx-4 mt-5 mb-5 rounded-lg p-3 border border-gray-700/50" style={{ background: "#0a1209" }}>
-            <Label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5 block">Výsledok</Label>
-            <p className="text-xs font-mono text-gray-400 break-all leading-relaxed">{formulaResult.formula || "—"}</p>
-            <p className="mt-2 text-lg font-bold font-mono" style={{ color: "#e8692a" }}>
+          <div className="rounded-lg border border-border bg-muted/30 p-4">
+            <Label className="text-xs text-muted-foreground mb-1.5 block">Výsledok</Label>
+            <p className="text-xs text-muted-foreground break-all leading-relaxed" style={{ fontFamily: "monospace" }}>{formulaResult.formula || "—"}</p>
+            <p className="mt-2 text-2xl font-semibold text-accent" style={{ fontFamily: "monospace" }}>
               = {typeof formulaResult.result === "number" ? formulaResult.result.toLocaleString("cs-CZ") : formulaResult.result}
             </p>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-gray-800 flex justify-end" style={{ background: "#0a1209" }}>
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="border-gray-700 text-gray-300 hover:text-white">
+        <div className="px-6 py-3 border-t border-border flex justify-end bg-background">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Zavrieť
           </Button>
         </div>
