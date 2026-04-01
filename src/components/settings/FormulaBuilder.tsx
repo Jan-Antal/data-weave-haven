@@ -683,7 +683,7 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
   return (
     <>
       <Dialog open={open} onOpenChange={(v) => { if (!v) tryClose(); }}>
-        <DialogContent className="max-w-[780px] max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
+        <DialogContent className="max-w-[780px] h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
           {/* Header */}
           <DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
             <DialogTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
@@ -759,7 +759,9 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
                 className="fb-editor outline-none w-full rounded-lg border border-input bg-card text-card-foreground"
                 style={{
                   padding: "10px 12px",
-                  minHeight: 52,
+                  height: 120,
+                  minHeight: 120,
+                  overflowY: 'auto' as const,
                   fontFamily: "monospace",
                   fontSize: 13,
                   lineHeight: "1.8",
