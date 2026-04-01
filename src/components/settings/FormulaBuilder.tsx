@@ -824,7 +824,12 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
             <div className="rounded-lg border border-border bg-muted/30 p-4">
               <Label className="text-xs text-muted-foreground mb-1.5 block">Výsledok</Label>
               <p className="text-xs text-muted-foreground break-all leading-relaxed" style={{ fontFamily: "monospace" }}>{formulaResult.formula || "—"}</p>
-              <p className="mt-2 text-2xl font-semibold text-accent" style={{ fontFamily: "monospace" }}>
+              <p className={cn(
+                "mt-2 text-2xl font-semibold",
+                typeof formulaResult.result === "string" && formulaResult.result.startsWith("Informačný")
+                  ? "text-muted-foreground text-sm font-normal"
+                  : "text-accent"
+              )} style={{ fontFamily: "monospace" }}>
                 = {typeof formulaResult.result === "number" ? formulaResult.result.toLocaleString("cs-CZ") : formulaResult.result}
               </p>
             </div>
