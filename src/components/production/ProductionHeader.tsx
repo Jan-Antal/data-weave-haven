@@ -325,6 +325,13 @@ export function ProductionHeader({
                       Koš
                     </DropdownMenuItem>
                   )}
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => setFormulaBuilderOpen(true)}>
+                      Výpočetní logika
+                    </DropdownMenuItem>
+                  )}
+                    </DropdownMenuItem>
+                  )}
                   {module === "vyroba" && isAdmin && onOpenVyrobaReset && (
                     <>
                       <DropdownMenuSeparator />
