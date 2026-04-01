@@ -1,150 +1,145 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// ─── Token types ────────────────────────────────────────────
+// ─── Autocomplete items ─────────────────────────────────────
 
-type TokenType = "variable" | "operator" | "function" | "number";
-
-interface Token {
-  id: string;
+interface AutocompleteItem {
   label: string;
-  type: TokenType;
+  type: "var" | "fn";
+  insert: string; // what gets stored in data-var
 }
 
-let _tokenId = 0;
-const makeToken = (label: string, type: TokenType): Token => ({
-  id: `tok-${++_tokenId}-${Date.now()}`,
-  label,
-  type,
-});
-
-// ─── Palette items ──────────────────────────────────────────
-
-const VARIABLES = [
-  "scheduled_hours", "hodiny_plan", "prodejni_cena", "eur_czk",
-  "marze", "production_pct", "hourly_rate", "itemCostCzk",
-  "past_hours", "current_hours", "day_idx",
+const AC_ITEMS: AutocompleteItem[] = [
+  { label: "scheduled_hours", type: "var", insert: "scheduled_hours" },
+  { label: "hodiny_plan", type: "var", insert: "hodiny_plan" },
+  { label: "prodejni_cena", type: "var", insert: "prodejni_cena" },
+  { label: "eur_czk", type: "var", insert: "eur_czk" },
+  { label: "marze", type: "var", insert: "marze" },
+  { label: "production_pct", type: "var", insert: "production_pct" },
+  { label: "hourly_rate", type: "var", insert: "hourly_rate" },
+  { label: "itemCostCzk", type: "var", insert: "itemCostCzk" },
+  { label: "past_hours", type: "var", insert: "past_hours" },
+  { label: "current_hours", type: "var", insert: "current_hours" },
+  { label: "day_idx", type: "var", insert: "day_idx" },
+  { label: "FLOOR()", type: "fn", insert: "FLOOR(" },
+  { label: "MIN()", type: "fn", insert: "MIN(" },
+  { label: "MAX()", type: "fn", insert: "MAX(" },
+  { label: "ROUND()", type: "fn", insert: "ROUND(" },
+  { label: "ABS()", type: "fn", insert: "ABS(" },
+  { label: "IF(,,)", type: "fn", insert: "IF(" },
+  { label: "SUM()", type: "fn", insert: "SUM(" },
+  { label: "AVG()", type: "fn", insert: "AVG(" },
 ];
 
-const OPERATORS = ["×", "÷", "+", "−", "(", ")"];
-const FUNCTIONS = ["FLOOR(", "MIN(", "MAX("];
-const NUMBERS = ["1", "5", "100", "0"];
+// ─── Preset formulas as HTML ────────────────────────────────
 
-// ─── Preset formulas ────────────────────────────────────────
+function tok(label: string, type: "var" | "fn"): string {
+  const bg = type === "var" ? "#e8f4ff" : "#faeeda";
+  const color = type === "var" ? "#0c447c" : "#633806";
+  return `<span contenteditable="false" draggable="true" data-token="true" data-var="${label}" data-type="${type}" style="background:${bg};color:${color};border-radius:4px;padding:2px 6px;margin:0 2px;font-size:13px;cursor:grab;user-select:none;display:inline-block;vertical-align:baseline;line-height:1.6">${label}</span>`;
+}
 
-const PRESETS: Record<string, { label: string; tokens: [string, TokenType][] }> = {
+const PRESETS: Record<string, { label: string; html: string }> = {
   scheduled_czk: {
     label: "scheduled_czk",
-    tokens: [
-      ["FLOOR(", "function"], ["(", "operator"],
-      ["scheduled_hours", "variable"], ["÷", "operator"], ["hodiny_plan", "variable"],
-      [")", "operator"], ["×", "operator"], ["(", "operator"],
-      ["prodejni_cena", "variable"], ["×", "operator"], ["eur_czk", "variable"],
-      [")", "operator"], [")", "operator"],
-    ],
+    html: `${tok("FLOOR(", "fn")} ${tok("scheduled_hours", "var")} ÷ ${tok("hodiny_plan", "var")} × ${tok("prodejni_cena", "var")} × ${tok("eur_czk", "var")} )`,
   },
   scheduled_hours: {
     label: "scheduled_hours",
-    tokens: [
-      ["FLOOR(", "function"],
-      ["itemCostCzk", "variable"], ["×", "operator"], ["(", "operator"],
-      ["1", "number"], ["−", "operator"], ["marze", "variable"],
-      [")", "operator"], ["×", "operator"], ["production_pct", "variable"],
-      ["÷", "operator"], ["hourly_rate", "variable"],
-      [")", "operator"],
-    ],
+    html: `${tok("FLOOR(", "fn")} ${tok("itemCostCzk", "var")} × ( 1 - ${tok("marze", "var")} ) × ${tok("production_pct", "var")} ÷ ${tok("hourly_rate", "var")} )`,
   },
   weekly_goal_pct: {
     label: "weekly_goal_pct",
-    tokens: [
-      ["MIN(", "function"],
-      ["FLOOR(", "function"], ["(", "operator"],
-      ["past_hours", "variable"], ["+", "operator"],
-      ["current_hours", "variable"], ["×", "operator"], ["(", "operator"],
-      ["day_idx", "variable"], ["+", "operator"], ["1", "number"],
-      [")", "operator"], ["÷", "operator"], ["5", "number"],
-      [")", "operator"], ["÷", "operator"], ["hodiny_plan", "variable"],
-      ["×", "operator"], ["100", "number"],
-      [")", "operator"],
-      [",", "operator"], ["100", "number"], [")", "operator"],
-    ],
+    html: `${tok("MIN(", "fn")} ${tok("FLOOR(", "fn")} ( ${tok("past_hours", "var")} + ${tok("current_hours", "var")} × ( ${tok("day_idx", "var")} + 1 ) ÷ 5 ) ÷ ${tok("hodiny_plan", "var")} × 100 ) , 100 )`,
   },
 };
-
-// ─── Token style helper ─────────────────────────────────────
-
-function tokenColor(type: TokenType) {
-  switch (type) {
-    case "variable":
-      return "bg-blue-900/60 text-blue-200 border-blue-700/50";
-    case "operator":
-      return "bg-[#1a2a1a] text-gray-300 border-gray-700/50";
-    case "function":
-      return "bg-amber-900/50 text-amber-200 border-amber-700/50";
-    case "number":
-      return "bg-green-900/50 text-green-200 border-green-700/50";
-  }
-}
-
-function palettePillColor(type: TokenType) {
-  switch (type) {
-    case "variable":
-      return "bg-blue-900/40 text-blue-300 border-blue-700/40 hover:bg-blue-800/50";
-    case "operator":
-      return "bg-[#1a2a1a] text-gray-400 border-gray-700/40 hover:bg-gray-700/40";
-    case "function":
-      return "bg-amber-900/30 text-amber-300 border-amber-700/40 hover:bg-amber-800/40";
-    case "number":
-      return "bg-green-900/30 text-green-300 border-green-700/40 hover:bg-green-800/40";
-  }
-}
-
-// ─── Evaluator ──────────────────────────────────────────────
-
-function evaluateFormula(tokens: Token[], vars: Record<string, number>): { text: string; result: number | string } {
-  const text = tokens.map((t) => {
-    if (t.type === "variable") return vars[t.label] ?? 0;
-    if (t.type === "number") return t.label;
-    if (t.label === "×") return "*";
-    if (t.label === "÷") return "/";
-    if (t.label === "−") return "-";
-    if (t.label === "FLOOR(") return "Math.floor(";
-    if (t.label === "MIN(") return "Math.min(";
-    if (t.label === "MAX(") return "Math.max(";
-    return t.label;
-  }).join(" ");
-
-  try {
-    // eslint-disable-next-line no-new-func
-    const fn = new Function(`"use strict"; return (${text});`);
-    const r = fn();
-    return { text: tokens.map((t) => t.label).join(" "), result: typeof r === "number" && !isNaN(r) ? r : "—" };
-  } catch {
-    return { text: tokens.map((t) => t.label).join(" "), result: "Chyba syntaxe" };
-  }
-}
 
 // ─── Default variable values ────────────────────────────────
 
 const DEFAULT_VALUES: Record<string, number> = {
-  scheduled_hours: 40,
-  hodiny_plan: 200,
-  prodejni_cena: 500000,
+  scheduled_hours: 34.5,
+  hodiny_plan: 1375,
+  prodejni_cena: 1833885,
   eur_czk: 25,
   marze: 0.15,
-  production_pct: 0.3,
-  hourly_rate: 650,
-  itemCostCzk: 120000,
-  past_hours: 30,
-  current_hours: 8,
-  day_idx: 2,
+  production_pct: 0.205,
+  hourly_rate: 280,
+  itemCostCzk: 922081,
+  past_hours: 62,
+  current_hours: 192,
+  day_idx: 3,
 };
+
+// ─── Evaluate ───────────────────────────────────────────────
+
+function evaluateFromEditor(
+  editorEl: HTMLDivElement | null,
+  vars: Record<string, number>
+): { formula: string; result: number | string } {
+  if (!editorEl) return { formula: "", result: "—" };
+
+  let formula = "";
+  let expr = "";
+
+  const walk = (node: Node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const t = node.textContent || "";
+      formula += t;
+      expr += t.replace(/×/g, "*").replace(/÷/g, "/").replace(/−/g, "-");
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const el = node as HTMLElement;
+      if (el.dataset.token === "true") {
+        const v = el.dataset.var || "";
+        formula += v;
+        if (el.dataset.type === "fn") {
+          // Map function names
+          const fnMap: Record<string, string> = {
+            "FLOOR(": "Math.floor(",
+            "MIN(": "Math.min(",
+            "MAX(": "Math.max(",
+            "ROUND(": "Math.round(",
+            "ABS(": "Math.abs(",
+            "IF(": "(",
+            "SUM(": "(",
+            "AVG(": "(",
+          };
+          expr += fnMap[v] ?? v;
+        } else {
+          expr += vars[v] ?? 0;
+        }
+      } else {
+        node.childNodes.forEach(walk);
+      }
+    }
+  };
+
+  editorEl.childNodes.forEach(walk);
+
+  try {
+    // eslint-disable-next-line no-new-func
+    const fn = new Function(`"use strict"; return (${expr});`);
+    const r = fn();
+    return { formula, result: typeof r === "number" && !isNaN(r) ? r : "—" };
+  } catch {
+    return { formula, result: "Chyba syntaxe" };
+  }
+}
+
+function getUsedVars(editorEl: HTMLDivElement | null): string[] {
+  if (!editorEl) return [];
+  const spans = editorEl.querySelectorAll('span[data-type="var"]');
+  const set = new Set<string>();
+  spans.forEach((s) => {
+    const v = (s as HTMLElement).dataset.var;
+    if (v) set.add(v);
+  });
+  return [...set];
+}
 
 // ─── Component ──────────────────────────────────────────────
 
@@ -154,61 +149,284 @@ interface FormulaBuilderProps {
 }
 
 export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
-  const [activePreset, setActivePreset] = useState<string>("scheduled_czk");
-  const [tokens, setTokens] = useState<Token[]>(() =>
-    PRESETS.scheduled_czk.tokens.map(([l, t]) => makeToken(l, t))
-  );
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activePreset, setActivePreset] = useState("scheduled_czk");
   const [varValues, setVarValues] = useState<Record<string, number>>({ ...DEFAULT_VALUES });
-  const [customLabel, setCustomLabel] = useState("");
-  const [customType, setCustomType] = useState<"number" | "variable">("number");
+  const [usedVars, setUsedVars] = useState<string[]>([]);
+  const [formulaResult, setFormulaResult] = useState<{ formula: string; result: number | string }>({ formula: "", result: "—" });
 
+  // Autocomplete state
+  const [acVisible, setAcVisible] = useState(false);
+  const [acFilter, setAcFilter] = useState("");
+  const [acIndex, setAcIndex] = useState(0);
+  const [acPos, setAcPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [searchStart, setSearchStart] = useState<{ node: Node; offset: number } | null>(null);
+
+  // Drag state
+  const [dragOverPos, setDragOverPos] = useState<{ left: number; top: number; height: number } | null>(null);
+
+  const editorRef = useRef<HTMLDivElement>(null);
+  const acRef = useRef<HTMLDivElement>(null);
+
+  const recalc = useCallback(() => {
+    const el = editorRef.current;
+    setUsedVars(getUsedVars(el));
+    setFormulaResult(evaluateFromEditor(el, varValues));
+  }, [varValues]);
+
+  // Load preset
   const loadPreset = useCallback((key: string) => {
     setActivePreset(key);
-    setTokens(PRESETS[key].tokens.map(([l, t]) => makeToken(l, t)));
-    setSelectedId(null);
+    if (editorRef.current) {
+      editorRef.current.innerHTML = PRESETS[key].html;
+    }
+    setAcVisible(false);
+    setAcFilter("");
+    setTimeout(() => recalc(), 0);
+  }, [recalc]);
+
+  // Init on open
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => {
+        loadPreset(activePreset);
+      }, 50);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Recalc when varValues change
+  useEffect(() => {
+    recalc();
+  }, [varValues, recalc]);
+
+  // Filtered AC items
+  const acItems = useMemo(() => {
+    if (!acFilter) return AC_ITEMS.slice(0, 8);
+    const lower = acFilter.toLowerCase();
+    return AC_ITEMS.filter((i) => i.label.toLowerCase().includes(lower)).slice(0, 8);
+  }, [acFilter]);
+
+  // Clamp acIndex
+  useEffect(() => {
+    if (acIndex >= acItems.length) setAcIndex(Math.max(0, acItems.length - 1));
+  }, [acItems, acIndex]);
+
+  // Get cursor position for dropdown
+  const getCursorPos = useCallback((): { top: number; left: number } => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return { top: 0, left: 0 };
+    const range = sel.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    const editorRect = editorRef.current?.getBoundingClientRect();
+    if (!editorRect) return { top: 0, left: 0 };
+    return {
+      top: rect.bottom - editorRect.top + 4,
+      left: rect.left - editorRect.left,
+    };
   }, []);
 
-  const insertToken = useCallback((label: string, type: TokenType) => {
-    const newTok = makeToken(label, type);
-    setTokens((prev) => {
-      if (!selectedId) return [...prev, newTok];
-      const idx = prev.findIndex((t) => t.id === selectedId);
-      if (idx === -1) return [...prev, newTok];
-      const copy = [...prev];
-      copy.splice(idx + 1, 0, newTok);
-      return copy;
-    });
-    setSelectedId(newTok.id);
-  }, [selectedId]);
+  // Insert token at cursor
+  const insertToken = useCallback((item: AutocompleteItem) => {
+    const el = editorRef.current;
+    if (!el) return;
 
-  const removeToken = useCallback((id: string) => {
-    setTokens((prev) => prev.filter((t) => t.id !== id));
-    if (selectedId === id) setSelectedId(null);
-  }, [selectedId]);
+    // Remove the typed search text first
+    if (searchStart) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const range = document.createRange();
+        try {
+          range.setStart(searchStart.node, searchStart.offset);
+          range.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset);
+          range.deleteContents();
+        } catch {
+          // fallback: just proceed
+        }
+      }
+    }
 
-  const clearAll = useCallback(() => {
-    setTokens([]);
-    setSelectedId(null);
+    const span = document.createElement("span");
+    span.contentEditable = "false";
+    span.draggable = true;
+    span.dataset.token = "true";
+    span.dataset.var = item.insert;
+    span.dataset.type = item.type;
+    span.style.cssText = item.type === "var"
+      ? "background:#e8f4ff;color:#0c447c;border-radius:4px;padding:2px 6px;margin:0 2px;font-size:13px;cursor:grab;user-select:none;display:inline-block;vertical-align:baseline;line-height:1.6"
+      : "background:#faeeda;color:#633806;border-radius:4px;padding:2px 6px;margin:0 2px;font-size:13px;cursor:grab;user-select:none;display:inline-block;vertical-align:baseline;line-height:1.6";
+    span.textContent = item.insert;
+
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      range.collapse(false);
+      range.insertNode(span);
+      // Move cursor after token
+      const after = document.createTextNode("\u200B");
+      span.after(after);
+      range.setStartAfter(after);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } else {
+      el.appendChild(span);
+      el.appendChild(document.createTextNode("\u200B"));
+    }
+
+    setAcVisible(false);
+    setAcFilter("");
+    setSearchStart(null);
+    setTimeout(() => recalc(), 0);
+  }, [recalc, searchStart]);
+
+  // Handle input
+  const handleInput = useCallback(() => {
+    setTimeout(() => recalc(), 0);
+  }, [recalc]);
+
+  // Handle keydown
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (acVisible) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setAcIndex((i) => Math.min(i + 1, acItems.length - 1));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setAcIndex((i) => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        if (acItems[acIndex]) insertToken(acItems[acIndex]);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setAcVisible(false);
+        setAcFilter("");
+        setSearchStart(null);
+        return;
+      }
+    }
+
+    // On letter key, start/continue autocomplete
+    if (e.key.length === 1 && /[a-zA-Z_]/.test(e.key)) {
+      // If not already in AC mode, record search start
+      if (!acVisible) {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          setSearchStart({ node: range.startContainer, offset: range.startOffset });
+        }
+      }
+      setTimeout(() => {
+        // Read text from searchStart to cursor
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0 && searchStart) {
+          try {
+            const range = document.createRange();
+            range.setStart(searchStart.node, searchStart.offset);
+            range.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset);
+            const typed = range.toString();
+            setAcFilter(typed + e.key);
+          } catch {
+            setAcFilter(e.key);
+          }
+        } else {
+          setAcFilter(e.key);
+        }
+        setAcPos(getCursorPos());
+        setAcVisible(true);
+        setAcIndex(0);
+      }, 0);
+    } else if (acVisible && e.key === "Backspace") {
+      setTimeout(() => {
+        if (searchStart) {
+          const sel = window.getSelection();
+          if (sel && sel.rangeCount > 0) {
+            try {
+              const range = document.createRange();
+              range.setStart(searchStart.node, searchStart.offset);
+              range.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset);
+              const typed = range.toString();
+              if (typed.length === 0) {
+                setAcVisible(false);
+                setAcFilter("");
+                setSearchStart(null);
+              } else {
+                setAcFilter(typed);
+              }
+            } catch {
+              setAcVisible(false);
+              setSearchStart(null);
+            }
+          }
+        }
+      }, 0);
+    } else if (acVisible && e.key.length === 1 && !/[a-zA-Z_]/.test(e.key)) {
+      // Non-letter typed while AC open → close AC
+      setAcVisible(false);
+      setAcFilter("");
+      setSearchStart(null);
+    }
+  }, [acVisible, acItems, acIndex, insertToken, getCursorPos, searchStart]);
+
+  // Drag handlers
+  const handleDragStart = useCallback((e: React.DragEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.dataset.token === "true") {
+      e.dataTransfer.setData("text/plain", "token-drag");
+      e.dataTransfer.effectAllowed = "move";
+      target.style.opacity = "0.4";
+      (target as any)._dragSource = true;
+    }
   }, []);
 
-  // Detect variables used in formula
-  const usedVars = useMemo(
-    () => [...new Set(tokens.filter((t) => t.type === "variable").map((t) => t.label))],
-    [tokens]
-  );
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const editorRect = editorRef.current?.getBoundingClientRect();
+    if (editorRect) {
+      setDragOverPos({
+        left: e.clientX - editorRect.left,
+        top: e.clientY - editorRect.top - 4,
+        height: 24,
+      });
+    }
+  }, []);
 
-  const { text: formulaText, result } = useMemo(
-    () => evaluateFormula(tokens, varValues),
-    [tokens, varValues]
-  );
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverPos(null);
+    const el = editorRef.current;
+    if (!el) return;
 
-  const handleAddCustom = () => {
-    const trimmed = customLabel.trim();
-    if (!trimmed) return;
-    insertToken(trimmed, customType);
-    setCustomLabel("");
-  };
+    // Find the dragged token
+    const draggedToken = el.querySelector('[style*="opacity: 0.4"]') as HTMLElement | null;
+    if (!draggedToken) return;
+    draggedToken.style.opacity = "1";
+
+    // Insert at drop position using caretRangeFromPoint
+    const range = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+    if (range) {
+      // Remove from old position
+      draggedToken.remove();
+      range.insertNode(draggedToken);
+      // Add zero-width space after if needed
+      if (!draggedToken.nextSibling || (draggedToken.nextSibling as Text).textContent !== "\u200B") {
+        draggedToken.after(document.createTextNode("\u200B"));
+      }
+    }
+
+    setTimeout(() => recalc(), 0);
+  }, [recalc]);
+
+  const handleDragEnd = useCallback((e: React.DragEvent) => {
+    (e.target as HTMLElement).style.opacity = "1";
+    setDragOverPos(null);
+  }, []);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -223,10 +441,12 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
 
         <div className="flex-1 overflow-y-auto" style={{ background: "#0f1a0f" }}>
           {/* Warning banner */}
-          <div className="mx-4 mt-4 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium"
-            style={{ background: "rgba(234,175,60,0.12)", color: "#eaaf3c", border: "1px solid rgba(234,175,60,0.25)" }}>
+          <div
+            className="mx-4 mt-4 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium"
+            style={{ background: "rgba(234,175,60,0.12)", color: "#eaaf3c", border: "1px solid rgba(234,175,60,0.25)" }}
+          >
             <AlertTriangle className="h-4 w-4 shrink-0" />
-            Experimentálny režim — zmeny vzorcov sa zatiaľ nepremietajú do výpočtov
+            Experimentálny režim — zmeny vzorcov sa zatiaľ nepremietajú do výpočtov. Slúži len na overenie logiky.
           </div>
 
           {/* Preset tabs */}
@@ -248,128 +468,100 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
             ))}
           </div>
 
-          {/* Formula canvas */}
-          <div className="mx-4 mt-3">
+          {/* Formula editor */}
+          <div className="mx-4 mt-3 relative">
             <Label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5 block">Vzorec</Label>
             <div
-              className="flex flex-wrap gap-1.5 min-h-[48px] p-2.5 rounded-lg border border-gray-700/50"
-              style={{ background: "#0a1209" }}
-            >
-              {tokens.length === 0 && (
-                <span className="text-gray-600 text-xs italic">Klikni na položku z palety…</span>
-              )}
-              {tokens.map((tok) => (
-                <button
-                  key={tok.id}
-                  onClick={() => setSelectedId(selectedId === tok.id ? null : tok.id)}
-                  className={cn(
-                    "relative flex items-center gap-1 px-2 py-1 rounded text-xs font-mono border transition-all",
-                    tokenColor(tok.type),
-                    selectedId === tok.id && "ring-2 ring-[#e8692a] ring-offset-1 ring-offset-[#0a1209]"
-                  )}
-                >
-                  {tok.label}
-                  <span
-                    onClick={(e) => { e.stopPropagation(); removeToken(tok.id); }}
-                    className="ml-0.5 opacity-40 hover:opacity-100 cursor-pointer"
-                  >
-                    <X className="h-3 w-3" />
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
+              ref={editorRef}
+              contentEditable
+              suppressContentEditableWarning
+              onInput={handleInput}
+              onKeyDown={handleKeyDown}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              onDragEnd={handleDragEnd}
+              className="outline-none"
+              style={{
+                background: "#ffffff",
+                border: "1px solid #d1d5db",
+                borderRadius: 8,
+                padding: 12,
+                minHeight: 56,
+                fontFamily: "monospace",
+                fontSize: 14,
+                lineHeight: "1.8",
+                color: "#1a1a1a",
+                position: "relative",
+                cursor: "text",
+              }}
+            />
 
-          {/* Palette */}
-          <div className="mx-4 mt-4 space-y-3">
-            <Label className="text-[10px] uppercase tracking-wider text-gray-500">Paleta</Label>
+            {/* Drag insertion line */}
+            {dragOverPos && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: dragOverPos.left,
+                  top: dragOverPos.top,
+                  width: 2,
+                  height: dragOverPos.height,
+                  background: "#e8692a",
+                  borderRadius: 1,
+                  pointerEvents: "none",
+                  zIndex: 10,
+                }}
+              />
+            )}
 
-            {/* Variables */}
-            <div>
-              <span className="text-[10px] text-blue-400 font-medium uppercase tracking-wide">Premenné</span>
-              <div className="flex flex-wrap gap-1.5 mt-1">
-                {VARIABLES.map((v) => (
+            {/* Autocomplete dropdown */}
+            {acVisible && acItems.length > 0 && (
+              <div
+                ref={acRef}
+                style={{
+                  position: "absolute",
+                  top: acPos.top + 40,
+                  left: Math.max(0, Math.min(acPos.left, 500)),
+                  background: "#ffffff",
+                  border: "1px solid #d1d5db",
+                  borderRadius: 8,
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                  zIndex: 50,
+                  maxHeight: 260,
+                  overflowY: "auto",
+                  minWidth: 220,
+                }}
+              >
+                {acItems.map((item, idx) => (
                   <button
-                    key={v}
-                    onClick={() => insertToken(v, "variable")}
-                    className={cn("px-2 py-1 rounded text-xs font-mono border transition-colors", palettePillColor("variable"))}
+                    key={item.label}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      insertToken(item);
+                    }}
+                    className="w-full text-left flex items-center gap-2 px-3 py-1.5 text-sm transition-colors"
+                    style={{
+                      background: idx === acIndex ? "#f3f4f6" : "transparent",
+                      color: "#1a1a1a",
+                      fontFamily: "monospace",
+                      fontSize: 13,
+                    }}
                   >
-                    {v}
+                    <span
+                      className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                      style={
+                        item.type === "var"
+                          ? { background: "#e8f4ff", color: "#0c447c" }
+                          : { background: "#faeeda", color: "#633806" }
+                      }
+                    >
+                      {item.type === "var" ? "var" : "fn"}
+                    </span>
+                    <span>{item.label}</span>
                   </button>
                 ))}
               </div>
-            </div>
-
-            {/* Operators & functions */}
-            <div>
-              <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Operátory & funkcie</span>
-              <div className="flex flex-wrap gap-1.5 mt-1">
-                {OPERATORS.map((o) => (
-                  <button
-                    key={o}
-                    onClick={() => insertToken(o, "operator")}
-                    className={cn("px-2.5 py-1 rounded text-xs font-mono border transition-colors", palettePillColor("operator"))}
-                  >
-                    {o}
-                  </button>
-                ))}
-                {FUNCTIONS.map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => insertToken(f, "function")}
-                    className={cn("px-2 py-1 rounded text-xs font-mono border transition-colors", palettePillColor("function"))}
-                  >
-                    {f}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Numbers */}
-            <div>
-              <span className="text-[10px] text-green-400 font-medium uppercase tracking-wide">Čísla</span>
-              <div className="flex flex-wrap gap-1.5 mt-1">
-                {NUMBERS.map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => insertToken(n, "number")}
-                    className={cn("px-2.5 py-1 rounded text-xs font-mono border transition-colors", palettePillColor("number"))}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Custom input */}
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <Label className="text-[10px] text-gray-500">Vlastný token</Label>
-                <Input
-                  value={customLabel}
-                  onChange={(e) => setCustomLabel(e.target.value)}
-                  placeholder="napr. 0.85"
-                  className="h-8 text-xs bg-[#0a1209] border-gray-700/50 text-gray-200"
-                />
-              </div>
-              <Select value={customType} onValueChange={(v) => setCustomType(v as "number" | "variable")}>
-                <SelectTrigger className="h-8 w-[110px] text-xs bg-[#0a1209] border-gray-700/50 text-gray-300">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="number">Číslo</SelectItem>
-                  <SelectItem value="variable">Premenná</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button size="sm" className="h-8 text-xs" onClick={handleAddCustom}
-                style={{ background: "#e8692a" }}>
-                Pridať
-              </Button>
-            </div>
-
-            <Button variant="ghost" size="sm" className="text-xs text-gray-500 hover:text-red-400" onClick={clearAll}>
-              Vymazať všetko
-            </Button>
+            )}
           </div>
 
           {/* Variable values */}
@@ -395,9 +587,9 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
           {/* Live result */}
           <div className="mx-4 mt-5 mb-5 rounded-lg p-3 border border-gray-700/50" style={{ background: "#0a1209" }}>
             <Label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5 block">Výsledok</Label>
-            <p className="text-xs font-mono text-gray-400 break-all leading-relaxed">{formulaText || "—"}</p>
+            <p className="text-xs font-mono text-gray-400 break-all leading-relaxed">{formulaResult.formula || "—"}</p>
             <p className="mt-2 text-lg font-bold font-mono" style={{ color: "#e8692a" }}>
-              = {typeof result === "number" ? result.toLocaleString("cs-CZ") : result}
+              = {typeof formulaResult.result === "number" ? formulaResult.result.toLocaleString("cs-CZ") : formulaResult.result}
             </p>
           </div>
         </div>
