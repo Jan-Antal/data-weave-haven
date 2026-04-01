@@ -77,46 +77,60 @@ function tok(label: string, type: "var" | "fn"): string {
 
 interface PresetDef {
   label: string;
+  subtitle: string;
+  description: string;
   html: string;
   subVariants?: { key: string; label: string; html: string }[];
 }
 
 const PRESETS: Record<string, PresetDef> = {
-  scheduled_czk: {
-    label: "scheduled_czk",
-    html: "",
-    subVariants: [
-      {
-        key: "tpv",
-        label: "TPV položky",
-        html: `${tok("FLOOR(", "fn")} ${tok("tpv_cena", "var")} × ${tok("pocet", "var")} × ${tok("eur_czk", "var")} )`,
-      },
-      {
-        key: "hist",
-        label: "HIST bundles",
-        html: `${tok("FLOOR(", "fn")} ${tok("scheduled_hours", "var")} ÷ ${tok("hodiny_plan", "var")} × ${tok("prodejni_cena", "var")} × ${tok("eur_czk", "var")} )`,
-      },
-    ],
+  scheduled_czk_hist: {
+    label: "Hodnota bundle — HIST",
+    subtitle: "(scheduled_czk pre historické HIST_ položky)",
+    description: "Koľko Kč predstavuje historický bundle v Pláne Výroby. Používa sa pre týždne importované z Alvena (kód začína HIST_), kde nie sú TPV položky — hodnota sa dopočíta z podielu odpracovaných hodín voči celkovému plánu projektu.",
+    html: `${tok("FLOOR(","fn")} ( ${tok("scheduled_hours","var")} ÷ ${tok("hodiny_plan","var")} ) × ${tok("prodejni_cena","var")} × ${tok("eur_czk","var")} )`,
+  },
+  scheduled_czk_tpv: {
+    label: "Hodnota bundle — TPV",
+    subtitle: "(scheduled_czk pre normálne TPV položky)",
+    description: "Koľko Kč predstavuje bundle v Pláne Výroby pre štandardné TPV položky. Zobrazuje sa v stĺpci Prodej. Hodnota = predajná cena položky z TPV prepočítaná na CZK — pre EUR projekty sa násobí kurzom.",
+    html: `${tok("FLOOR(","fn")} ${tok("tpv_cena","var")} × ${tok("pocet","var")} × ${tok("eur_czk","var")} )`,
   },
   scheduled_hours: {
-    label: "scheduled_hours",
-    html: `${tok("FLOOR(", "fn")} ${tok("itemCostCzk", "var")} × ( 1 - ${tok("marze", "var")} ) × ${tok("production_pct", "var")} ÷ ${tok("hourly_rate", "var")} )`,
-  },
-  weekly_goal_pct: {
-    label: "weekly_goal_pct",
-    html: `${tok("MIN(", "fn")} ${tok("FLOOR(", "fn")} ( ${tok("past_hours", "var")} + ${tok("current_hours", "var")} × ( ${tok("day_idx", "var")} + 1 ) ÷ 5 ) ÷ ${tok("hodiny_plan", "var")} × 100 ) , 100 )`,
+    label: "Hodiny bundle",
+    subtitle: "(scheduled_hours)",
+    description: "Koľko výrobných hodín zaberie jedna naplánovaná položka v Pláne Výroby. Počíta sa z predajnej ceny položky — od nej sa odráta marža, vezme sa len výrobný podiel a vydelí hodinovou sadzbou. Pre rozdelené bundles (split) sa výsledok ešte škáluje pomerom daného týždňa voči celku.",
+    html: `${tok("FLOOR(","fn")} ${tok("itemCostCzk","var")} × ( 1 - ${tok("marze","var")} ) × ${tok("production_pct","var")} ÷ ${tok("hourly_rate","var")} )`,
   },
   hodiny_plan_projekt: {
-    label: "hodiny_plan (projekt)",
-    html: `${tok("FLOOR(", "fn")} ${tok("prodejni_cena", "var")} × ${tok("eur_czk", "var")} × ( 1 - ${tok("marze", "var")} ) × ${tok("production_pct", "var")} ÷ ${tok("hourly_rate", "var")} )`,
+    label: "Hodiny projektu — z ceny",
+    subtitle: "(hodiny_plan zo zdroja Project / prodejni_cena)",
+    description: "Celkový počet plánovaných hodín projektu vypočítaný z predajnej ceny celého projektu. Používa sa ako fallback keď TPV nie je kompletné (suma TPV < 60 % predajnej ceny) alebo je zapnutá voľba 'Použiť cenu projektu'.",
+    html: `${tok("FLOOR(","fn")} ${tok("prodejni_cena","var")} × ${tok("eur_czk","var")} × ( 1 - ${tok("marze","var")} ) × ${tok("production_pct","var")} ÷ ${tok("hourly_rate","var")} )`,
   },
   hodiny_plan_tpv: {
-    label: "hodiny_plan (TPV item)",
-    html: `${tok("FLOOR(", "fn")} ${tok("tpv_cena", "var")} × ${tok("pocet", "var")} × ${tok("eur_czk", "var")} × ( 1 - ${tok("marze", "var")} ) × ${tok("production_pct", "var")} ÷ ${tok("hourly_rate", "var")} )`,
+    label: "Hodiny projektu — z TPV",
+    subtitle: "(hodiny_plan zo zdroja TPV / tpv_items)",
+    description: "Celkový počet plánovaných hodín projektu vypočítaný zo súčtu všetkých TPV položiek. Toto je primárny zdroj — používa sa pokiaľ TPV pokrýva aspoň 60 % predajnej ceny. Výsledok sa ukladá do project_plan_hours.hodiny_plan.",
+    html: `${tok("SUM(","fn")} ${tok("FLOOR(","fn")} ${tok("tpv_cena","var")} × ${tok("pocet","var")} × ${tok("eur_czk","var")} × ( 1 - ${tok("marze","var")} ) × ${tok("production_pct","var")} ÷ ${tok("hourly_rate","var")} ) )`,
+  },
+  production_pct: {
+    label: "Production PCT",
+    subtitle: "(production_pct — podiel výroby bez normalizácie)",
+    description: "Podiel výrobných nákladov z predajnej ceny. Berie sa priamo z cost_breakdown_presets a delí sa 100. Keďže všetky kategórie v presete (materiál + výroba + réžia + montáž + ...) spolu vždy dávajú 100 %, normalizácia sa NEROBÍ — číslo sa použije priamo.",
+    html: `${tok("production_pct","var")} = ${tok("preset_production_pct","var")} ÷ 100`,
+  },
+  weekly_goal_pct: {
+    label: "Týdenní cíl %",
+    subtitle: "(weekly_goal_pct — očakávané % hotovosti k dnešku)",
+    description: "Kde by mal byť projekt k dnešnému dňu v týždni. Počíta kumulatívne: hodiny z minulých týždňov sa berú 100%, z aktuálneho týždňa len pomerná časť podľa dňa (pondelok = 1/5, piatok = 5/5). Výsledok je cappovaný na maximum 100%.",
+    html: `${tok("MIN(","fn")} ${tok("FLOOR(","fn")} ( ${tok("past_hours","var")} + ${tok("current_hours","var")} × ( ${tok("day_idx","var")} + 1 ) ÷ 5 ) ÷ ${tok("hodiny_plan","var")} × 100 ) , 100 )`,
   },
   is_on_track: {
-    label: "is_on_track",
-    html: `${tok("percent", "var")} >= ${tok("weekly_goal_pct", "var")}`,
+    label: "On track?",
+    subtitle: "(is_on_track — je projekt na správnej ceste?)",
+    description: "Porovnáva aktuálne % hotovosti (zadané vedúcim výroby v dennom logu) s očakávaným % k dnešnému dňu. Ak je skutočný stav rovnaký alebo vyšší ako cieľ → projekt je on track (zelená). Používa sa v module Výroba aj v dennom Slack reporte.",
+    html: `${tok("percent","var")} ≥ ${tok("weekly_goal_pct","var")}`,
   },
 };
 
