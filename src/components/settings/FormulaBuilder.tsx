@@ -385,14 +385,11 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
       setSavedFormulas((prev) => {
         const updated = { ...prev };
         const original = PRESETS[activePreset];
-        updated[activePreset] = {
-          ...original,
-          subVariants: original.subVariants ? original.subVariants.map((sv) => ({ ...sv })) : undefined,
-        };
+        updated[activePreset] = { ...original };
         return updated;
       });
       // Load from original PRESETS
-      loadFromSource(activePreset, PRESETS, PRESETS[activePreset]?.subVariants?.[0]?.key);
+      loadFromSource(activePreset, PRESETS);
       toast({ title: "Vzorec obnovený", description: "Predvolený vzorec bol obnovený." });
     }
   }, [confirmAction, pendingTabKey, loadPreset, loadFromSource, activePreset, onOpenChange, toast]);
