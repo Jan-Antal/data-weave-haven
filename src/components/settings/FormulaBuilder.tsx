@@ -80,7 +80,6 @@ interface PresetDef {
   subtitle: string;
   description: string;
   html: string;
-  subVariants?: { key: string; label: string; html: string }[];
 }
 
 const PRESETS: Record<string, PresetDef> = {
