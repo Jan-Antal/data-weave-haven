@@ -759,7 +759,9 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
                 className="fb-editor outline-none w-full rounded-lg border border-input bg-card text-card-foreground"
                 style={{
                   padding: "10px 12px",
-                  minHeight: 52,
+                  height: 120,
+                  minHeight: 120,
+                  overflowY: 'auto' as const,
                   fontFamily: "monospace",
                   fontSize: 13,
                   lineHeight: "1.8",
