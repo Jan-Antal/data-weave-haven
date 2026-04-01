@@ -41,9 +41,10 @@ const AC_ITEMS: AutocompleteItem[] = [
 // ─── Preset formulas as HTML ────────────────────────────────
 
 function tok(label: string, type: "var" | "fn"): string {
-  const bg = type === "var" ? "#e8f4ff" : "#faeeda";
-  const color = type === "var" ? "#0c447c" : "#633806";
-  return `<span contenteditable="false" draggable="true" data-token="true" data-var="${label}" data-type="${type}" style="background:${bg};color:${color};border-radius:4px;padding:2px 6px;margin:0 2px;font-size:13px;cursor:grab;user-select:none;display:inline-block;vertical-align:baseline;line-height:1.6">${label}</span>`;
+  const cls = type === "var"
+    ? "fb-token-var"
+    : "fb-token-fn";
+  return `<span contenteditable="false" draggable="true" data-token="true" data-var="${label}" data-type="${type}" class="${cls}">${label}</span>`;
 }
 
 const PRESETS: Record<string, { label: string; html: string }> = {
