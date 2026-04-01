@@ -628,8 +628,14 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
       e.dataTransfer.setData("text/plain", "token-drag");
       e.dataTransfer.effectAllowed = "move";
       target.style.opacity = "0.4";
+      // Also select the token
+      if (selectedToken && selectedToken !== target) {
+        selectedToken.classList.remove("fb-token-selected");
+      }
+      target.classList.add("fb-token-selected");
+      setSelectedToken(target);
     }
-  }, []);
+  }, [selectedToken]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
