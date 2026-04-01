@@ -34,6 +34,8 @@ const AC_ITEMS: AutocompleteItem[] = [
   { label: "pocet", type: "var", insert: "pocet" },
   { label: "percent", type: "var", insert: "percent" },
   { label: "totalCostCzk", type: "var", insert: "totalCostCzk" },
+  { label: "preset_production_pct", type: "var", insert: "preset_production_pct" },
+  { label: "weekly_goal_pct", type: "var", insert: "weekly_goal_pct" },
   { label: "FLOOR()", type: "fn", insert: "FLOOR(" },
   { label: "MIN()", type: "fn", insert: "MIN(" },
   { label: "MAX()", type: "fn", insert: "MAX(" },
