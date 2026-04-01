@@ -370,6 +370,7 @@ export function ProductionHeader({
       <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
       <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
       <CostBreakdownPresetsDialog open={costPresetsOpen} onOpenChange={setCostPresetsOpen} />
+      <FormulaBuilder open={formulaBuilderOpen} onOpenChange={setFormulaBuilderOpen} />
     </>
   );
 }
