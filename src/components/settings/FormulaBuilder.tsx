@@ -307,6 +307,10 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     setAcVisible(false);
     setAcFilter("");
     setIsDirty(false);
+    if (selectedToken) {
+      selectedToken.classList.remove("fb-token-selected");
+      setSelectedToken(null);
+    }
     setTimeout(() => recalc(), 0);
   }, [recalc]);
 
