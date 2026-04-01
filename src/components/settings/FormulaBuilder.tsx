@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 interface AutocompleteItem {
   label: string;
   type: "var" | "fn";
-  insert: string; // what gets stored in data-var
+  insert: string;
 }
 
 const AC_ITEMS: AutocompleteItem[] = [
@@ -28,6 +28,10 @@ const AC_ITEMS: AutocompleteItem[] = [
   { label: "past_hours", type: "var", insert: "past_hours" },
   { label: "current_hours", type: "var", insert: "current_hours" },
   { label: "day_idx", type: "var", insert: "day_idx" },
+  { label: "tpv_cena", type: "var", insert: "tpv_cena" },
+  { label: "pocet", type: "var", insert: "pocet" },
+  { label: "percent", type: "var", insert: "percent" },
+  { label: "totalCostCzk", type: "var", insert: "totalCostCzk" },
   { label: "FLOOR()", type: "fn", insert: "FLOOR(" },
   { label: "MIN()", type: "fn", insert: "MIN(" },
   { label: "MAX()", type: "fn", insert: "MAX(" },
@@ -38,19 +42,55 @@ const AC_ITEMS: AutocompleteItem[] = [
   { label: "AVG()", type: "fn", insert: "AVG(" },
 ];
 
+// ─── Variable descriptions ──────────────────────────────────
+
+const VAR_DESCRIPTIONS: Record<string, string> = {
+  scheduled_hours: "Naplánované hodiny v danom bundle",
+  hodiny_plan: "Celkové plánované hodiny projektu (z project_plan_hours)",
+  prodejni_cena: "Predajná cena projektu (v mene projektu)",
+  eur_czk: "Kurz EUR/CZK podľa roku vytvorenia projektu",
+  marze: "Marža projektu (desatinné, napr. 0.15 = 15%)",
+  production_pct: "Podiel výroby z predajnej ceny (desatinné, napr. 0.205)",
+  hourly_rate: "Hodinová sadzba výroby v Kč (z production_settings)",
+  itemCostCzk: "Nákladová cena položky prepočítaná na CZK",
+  past_hours: "SUM hodín zo všetkých týždňov pred aktuálnym",
+  current_hours: "SUM hodín z aktuálneho týždňa",
+  day_idx: "Index dňa v týždni (0=Pondelok, 4=Piatok)",
+  tpv_cena: "Predajná cena TPV položky (v mene projektu)",
+  pocet: "Počet kusov TPV položky",
+  percent: "Aktuálne % hotovosti zadané vedúcim výroby",
+  totalCostCzk: "Súčet nákladových cien všetkých TPV položiek v CZK",
+};
+
 // ─── Preset formulas as HTML ────────────────────────────────
 
 function tok(label: string, type: "var" | "fn"): string {
-  const cls = type === "var"
-    ? "fb-token-var"
-    : "fb-token-fn";
+  const cls = type === "var" ? "fb-token-var" : "fb-token-fn";
   return `<span contenteditable="false" draggable="true" data-token="true" data-var="${label}" data-type="${type}" class="${cls}">${label}</span>`;
 }
 
-const PRESETS: Record<string, { label: string; html: string }> = {
+interface PresetDef {
+  label: string;
+  html: string;
+  subVariants?: { key: string; label: string; html: string }[];
+}
+
+const PRESETS: Record<string, PresetDef> = {
   scheduled_czk: {
     label: "scheduled_czk",
-    html: `${tok("FLOOR(", "fn")} ${tok("scheduled_hours", "var")} ÷ ${tok("hodiny_plan", "var")} × ${tok("prodejni_cena", "var")} × ${tok("eur_czk", "var")} )`,
+    html: "", // will use subVariants
+    subVariants: [
+      {
+        key: "tpv",
+        label: "TPV položky",
+        html: `${tok("FLOOR(", "fn")} ${tok("tpv_cena", "var")} × ${tok("pocet", "var")} × ${tok("eur_czk", "var")} )`,
+      },
+      {
+        key: "hist",
+        label: "HIST bundles",
+        html: `${tok("FLOOR(", "fn")} ${tok("scheduled_hours", "var")} ÷ ${tok("hodiny_plan", "var")} × ${tok("prodejni_cena", "var")} × ${tok("eur_czk", "var")} )`,
+      },
+    ],
   },
   scheduled_hours: {
     label: "scheduled_hours",
@@ -59,6 +99,18 @@ const PRESETS: Record<string, { label: string; html: string }> = {
   weekly_goal_pct: {
     label: "weekly_goal_pct",
     html: `${tok("MIN(", "fn")} ${tok("FLOOR(", "fn")} ( ${tok("past_hours", "var")} + ${tok("current_hours", "var")} × ( ${tok("day_idx", "var")} + 1 ) ÷ 5 ) ÷ ${tok("hodiny_plan", "var")} × 100 ) , 100 )`,
+  },
+  hodiny_plan_projekt: {
+    label: "hodiny_plan (projekt)",
+    html: `${tok("FLOOR(", "fn")} ${tok("prodejni_cena", "var")} × ${tok("eur_czk", "var")} × ( 1 - ${tok("marze", "var")} ) × ${tok("production_pct", "var")} ÷ ${tok("hourly_rate", "var")} )`,
+  },
+  hodiny_plan_tpv: {
+    label: "hodiny_plan (TPV item)",
+    html: `${tok("FLOOR(", "fn")} ${tok("tpv_cena", "var")} × ${tok("pocet", "var")} × ${tok("eur_czk", "var")} × ( 1 - ${tok("marze", "var")} ) × ${tok("production_pct", "var")} ÷ ${tok("hourly_rate", "var")} )`,
+  },
+  is_on_track: {
+    label: "is_on_track",
+    html: `${tok("percent", "var")} >= ${tok("weekly_goal_pct", "var")}`,
   },
 };
 
@@ -76,6 +128,11 @@ const DEFAULT_VALUES: Record<string, number> = {
   past_hours: 62,
   current_hours: 192,
   day_idx: 3,
+  tpv_cena: 36720,
+  pocet: 2,
+  percent: 60,
+  totalCostCzk: 922081,
+  weekly_goal_pct: 45,
 };
 
 // ─── Evaluate ───────────────────────────────────────────────
@@ -100,7 +157,6 @@ function evaluateFromEditor(
         const v = el.dataset.var || "";
         formula += v;
         if (el.dataset.type === "fn") {
-          // Map function names
           const fnMap: Record<string, string> = {
             "FLOOR(": "Math.floor(",
             "MIN(": "Math.min(",
@@ -123,10 +179,14 @@ function evaluateFromEditor(
 
   editorEl.childNodes.forEach(walk);
 
+  // Handle >= and <= as JS comparisons
+  expr = expr.replace(/>=/g, ">=").replace(/<=/g, "<=");
+
   try {
     // eslint-disable-next-line no-new-func
     const fn = new Function(`"use strict"; return (${expr});`);
     const r = fn();
+    if (typeof r === "boolean") return { formula, result: r ? "true ✓" : "false ✗" };
     return { formula, result: typeof r === "number" && !isNaN(r) ? r : "—" };
   } catch {
     return { formula, result: "Chyba syntaxe" };
@@ -153,6 +213,7 @@ interface FormulaBuilderProps {
 
 export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
   const [activePreset, setActivePreset] = useState("scheduled_czk");
+  const [activeSubVariant, setActiveSubVariant] = useState("tpv");
   const [varValues, setVarValues] = useState<Record<string, number>>({ ...DEFAULT_VALUES });
   const [usedVars, setUsedVars] = useState<string[]>([]);
   const [formulaResult, setFormulaResult] = useState<{ formula: string; result: number | string }>({ formula: "", result: "—" });
@@ -176,16 +237,43 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     setFormulaResult(evaluateFromEditor(el, varValues));
   }, [varValues]);
 
+  // Get the HTML for the current preset + sub-variant
+  const getPresetHtml = useCallback((presetKey: string, subKey?: string): string => {
+    const preset = PRESETS[presetKey];
+    if (!preset) return "";
+    if (preset.subVariants) {
+      const variant = preset.subVariants.find((v) => v.key === subKey) ?? preset.subVariants[0];
+      return variant.html;
+    }
+    return preset.html;
+  }, []);
+
   // Load preset
-  const loadPreset = useCallback((key: string) => {
+  const loadPreset = useCallback((key: string, subKey?: string) => {
     setActivePreset(key);
+    const preset = PRESETS[key];
+    if (preset?.subVariants) {
+      const sk = subKey ?? preset.subVariants[0].key;
+      setActiveSubVariant(sk);
+    }
     if (editorRef.current) {
-      editorRef.current.innerHTML = PRESETS[key].html;
+      editorRef.current.innerHTML = getPresetHtml(key, subKey ?? (preset?.subVariants?.[0]?.key));
     }
     setAcVisible(false);
     setAcFilter("");
     setTimeout(() => recalc(), 0);
-  }, [recalc]);
+  }, [recalc, getPresetHtml]);
+
+  // Load sub-variant
+  const loadSubVariant = useCallback((subKey: string) => {
+    setActiveSubVariant(subKey);
+    if (editorRef.current) {
+      editorRef.current.innerHTML = getPresetHtml(activePreset, subKey);
+    }
+    setAcVisible(false);
+    setAcFilter("");
+    setTimeout(() => recalc(), 0);
+  }, [activePreset, recalc, getPresetHtml]);
 
   // Init on open
   useEffect(() => {
@@ -233,7 +321,6 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     const el = editorRef.current;
     if (!el) return;
 
-    // Remove the typed search text first
     if (searchStart) {
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0) {
@@ -243,7 +330,7 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
           range.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset);
           range.deleteContents();
         } catch {
-          // fallback: just proceed
+          // fallback
         }
       }
     }
@@ -262,7 +349,6 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
       const range = sel.getRangeAt(0);
       range.collapse(false);
       range.insertNode(span);
-      // Move cursor after token
       const after = document.createTextNode("\u200B");
       span.after(after);
       range.setStartAfter(after);
@@ -280,12 +366,10 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     setTimeout(() => recalc(), 0);
   }, [recalc, searchStart]);
 
-  // Handle input
   const handleInput = useCallback(() => {
     setTimeout(() => recalc(), 0);
   }, [recalc]);
 
-  // Handle keydown
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (acVisible) {
       if (e.key === "ArrowDown") {
@@ -312,9 +396,7 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
       }
     }
 
-    // On letter key, start/continue autocomplete
     if (e.key.length === 1 && /[a-zA-Z_]/.test(e.key)) {
-      // If not already in AC mode, record search start
       if (!acVisible) {
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0) {
@@ -323,7 +405,6 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
         }
       }
       setTimeout(() => {
-        // Read text from searchStart to cursor
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0 && searchStart) {
           try {
@@ -367,7 +448,6 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
         }
       }, 0);
     } else if (acVisible && e.key.length === 1 && !/[a-zA-Z_]/.test(e.key)) {
-      // Non-letter typed while AC open → close AC
       setAcVisible(false);
       setAcFilter("");
       setSearchStart(null);
@@ -381,7 +461,6 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
       e.dataTransfer.setData("text/plain", "token-drag");
       e.dataTransfer.effectAllowed = "move";
       target.style.opacity = "0.4";
-      (target as any)._dragSource = true;
     }
   }, []);
 
@@ -404,18 +483,14 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     const el = editorRef.current;
     if (!el) return;
 
-    // Find the dragged token
     const draggedToken = el.querySelector('[style*="opacity: 0.4"]') as HTMLElement | null;
     if (!draggedToken) return;
     draggedToken.style.opacity = "1";
 
-    // Insert at drop position using caretRangeFromPoint
     const range = document.caretRangeFromPoint?.(e.clientX, e.clientY);
     if (range) {
-      // Remove from old position
       draggedToken.remove();
       range.insertNode(draggedToken);
-      // Add zero-width space after if needed
       if (!draggedToken.nextSibling || (draggedToken.nextSibling as Text).textContent !== "\u200B") {
         draggedToken.after(document.createTextNode("\u200B"));
       }
@@ -428,6 +503,8 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     (e.target as HTMLElement).style.opacity = "1";
     setDragOverPos(null);
   }, []);
+
+  const currentPreset = PRESETS[activePreset];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -450,7 +527,7 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
           <div>
             <Label className="text-xs text-muted-foreground mb-2 block">Vzorec</Label>
             <Tabs value={activePreset} onValueChange={(v) => loadPreset(v)}>
-              <TabsList className="w-auto">
+              <TabsList className="w-auto flex-wrap h-auto gap-1 p-1">
                 {Object.entries(PRESETS).map(([key, p]) => (
                   <TabsTrigger key={key} value={key} className="text-xs font-medium">
                     {p.label}
@@ -459,6 +536,24 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
               </TabsList>
             </Tabs>
           </div>
+
+          {/* Sub-variant selector for scheduled_czk */}
+          {currentPreset?.subVariants && (
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground mr-1">Varianta:</Label>
+              {currentPreset.subVariants.map((sv) => (
+                <Button
+                  key={sv.key}
+                  variant={activeSubVariant === sv.key ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 text-xs px-3"
+                  onClick={() => loadSubVariant(sv.key)}
+                >
+                  {sv.label}
+                </Button>
+              ))}
+            </div>
+          )}
 
           {/* Formula editor */}
           <div className="relative">
@@ -541,16 +636,21 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
           {usedVars.length > 0 && (
             <div>
               <Label className="text-xs text-muted-foreground mb-2 block">Hodnoty premenných</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
                 {usedVars.map((v) => (
-                  <div key={v} className="flex items-center gap-2">
-                    <span className="text-[11px] font-medium text-primary truncate min-w-0 flex-1" style={{ fontFamily: "monospace" }}>{v}</span>
-                    <Input
-                      type="number"
-                      value={varValues[v] ?? 0}
-                      onChange={(e) => setVarValues((prev) => ({ ...prev, [v]: Number(e.target.value) || 0 }))}
-                      className="h-8 w-28 text-xs"
-                    />
+                  <div key={v}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-medium text-primary truncate min-w-0 flex-1" style={{ fontFamily: "monospace" }}>{v}</span>
+                      <Input
+                        type="number"
+                        value={varValues[v] ?? 0}
+                        onChange={(e) => setVarValues((prev) => ({ ...prev, [v]: Number(e.target.value) || 0 }))}
+                        className="h-8 w-28 text-xs"
+                      />
+                    </div>
+                    {VAR_DESCRIPTIONS[v] && (
+                      <p className="text-xs text-muted-foreground mt-0.5 ml-0.5 leading-tight">{VAR_DESCRIPTIONS[v]}</p>
+                    )}
                   </div>
                 ))}
               </div>
