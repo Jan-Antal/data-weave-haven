@@ -226,13 +226,9 @@ function getUsedVars(editorEl: HTMLDivElement | null): string[] {
 
 // ─── Helper: get HTML for a preset key + sub-variant ────────
 
-function getPresetHtml(presetKey: string, presets: Record<string, PresetDef>, subKey?: string): string {
+function getPresetHtml(presetKey: string, presets: Record<string, PresetDef>): string {
   const preset = presets[presetKey];
   if (!preset) return "";
-  if (preset.subVariants) {
-    const variant = preset.subVariants.find((v) => v.key === subKey) ?? preset.subVariants[0];
-    return variant.html;
-  }
   return preset.html;
 }
 
