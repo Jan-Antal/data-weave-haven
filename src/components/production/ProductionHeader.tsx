@@ -123,6 +123,7 @@ export function ProductionHeader({
   const [costPresetsOpen, setCostPresetsOpen] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
+  const [formulaBuilderOpen, setFormulaBuilderOpen] = useState(false);
 
   const undoPage = (module === "index" || module === "analytics") ? undefined : module;
   const hasUndo = undoPage ? canUndo(undoPage) : canUndo();
