@@ -200,16 +200,16 @@ function evaluateFromEditor(
 
   editorEl.childNodes.forEach(walk);
 
-  expr = expr.replace(/>=/g, ">=").replace(/<=/g, "<=");
+  expr = expr.replace(/≥/g, ">=").replace(/>=/g, ">=").replace(/<=/g, "<=");
 
   try {
     // eslint-disable-next-line no-new-func
     const fn = new Function(`"use strict"; return (${expr});`);
     const r = fn();
     if (typeof r === "boolean") return { formula, result: r ? "true ✓" : "false ✗" };
-    return { formula, result: typeof r === "number" && !isNaN(r) ? r : "—" };
+    return { formula, result: typeof r === "number" && !isNaN(r) ? r : "Informačný vzorec — nie je matematický výraz" };
   } catch {
-    return { formula, result: "Chyba syntaxe" };
+    return { formula, result: "Informačný vzorec — nie je matematický výraz" };
   }
 }
 
