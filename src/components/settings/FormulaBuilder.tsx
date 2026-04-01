@@ -660,18 +660,21 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
               </AlertDescription>
             </Alert>
 
-            {/* Preset tabs */}
+            {/* Preset selector */}
             <div>
               <Label className="text-xs text-muted-foreground mb-2 block">Vzorec</Label>
-              <Tabs value={activePreset} onValueChange={(v) => tryLoadPreset(v)}>
-                <TabsList className="w-auto flex-wrap h-auto gap-1 p-1">
+              <Select value={activePreset} onValueChange={(v) => tryLoadPreset(v)}>
+                <SelectTrigger className="w-full max-w-[320px] h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
                   {Object.entries(PRESETS).map(([key, p]) => (
-                    <TabsTrigger key={key} value={key} className="text-xs font-medium">
+                    <SelectItem key={key} value={key} className="text-sm">
                       {p.label}
-                    </TabsTrigger>
+                    </SelectItem>
                   ))}
-                </TabsList>
-              </Tabs>
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Sub-variant selector for scheduled_czk */}
