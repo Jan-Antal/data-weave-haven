@@ -619,7 +619,7 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
       setAcFilter("");
       setSearchStart(null);
     }
-  }, [acVisible, acItems, acIndex, insertToken, getCursorPos, searchStart]);
+  }, [acVisible, acItems, acIndex, insertToken, getCursorPos, searchStart, selectedToken, recalc]);
 
   // Drag handlers
   const handleDragStart = useCallback((e: React.DragEvent) => {
