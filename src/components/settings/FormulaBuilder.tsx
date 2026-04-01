@@ -238,6 +238,9 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
   // Dirty state
   const [isDirty, setIsDirty] = useState(false);
 
+  // Selected token state
+  const [selectedToken, setSelectedToken] = useState<HTMLElement | null>(null);
+
   // Saved formulas (in-memory only)
   const [savedFormulas, setSavedFormulas] = useState<Record<string, PresetDef>>(() => {
     // Deep clone PRESETS
