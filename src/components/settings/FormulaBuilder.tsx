@@ -309,15 +309,10 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
   }, []);
 
   // Load preset from a source (savedFormulas or PRESETS)
-  const loadFromSource = useCallback((key: string, source: Record<string, PresetDef>, subKey?: string) => {
+  const loadFromSource = useCallback((key: string, source: Record<string, PresetDef>) => {
     setActivePreset(key);
-    const preset = source[key];
-    if (preset?.subVariants) {
-      const sk = subKey ?? preset.subVariants[0].key;
-      setActiveSubVariant(sk);
-    }
     if (editorRef.current) {
-      editorRef.current.innerHTML = getPresetHtml(key, source, subKey ?? source[key]?.subVariants?.[0]?.key);
+      editorRef.current.innerHTML = getPresetHtml(key, source);
     }
     setAcVisible(false);
     setAcFilter("");
@@ -327,11 +322,11 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
       setSelectedToken(null);
     }
     setTimeout(() => recalc(), 0);
-  }, [recalc]);
+  }, [recalc, selectedToken]);
 
   // Load preset (from savedFormulas)
-  const loadPreset = useCallback((key: string, subKey?: string) => {
-    loadFromSource(key, savedFormulas, subKey);
+  const loadPreset = useCallback((key: string) => {
+    loadFromSource(key, savedFormulas);
   }, [loadFromSource, savedFormulas]);
 
   // Try switching tab — check dirty first
@@ -342,18 +337,6 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
       loadPreset(key);
     }
   }, [isDirty, loadPreset, showConfirm]);
-
-  // Load sub-variant
-  const loadSubVariant = useCallback((subKey: string) => {
-    setActiveSubVariant(subKey);
-    if (editorRef.current) {
-      editorRef.current.innerHTML = getPresetHtml(activePreset, savedFormulas, subKey);
-    }
-    setAcVisible(false);
-    setAcFilter("");
-    setIsDirty(false);
-    setTimeout(() => recalc(), 0);
-  }, [activePreset, recalc, savedFormulas]);
 
   // Save current editor content to savedFormulas
   const handleSave = useCallback(() => {
