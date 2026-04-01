@@ -739,26 +739,14 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
                     </SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+            </Select>
+              {PRESETS[activePreset] && (
+                <>
+                  <p className="text-[11px] font-mono text-muted-foreground mt-1">{PRESETS[activePreset].subtitle}</p>
+                  <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{PRESETS[activePreset].description}</p>
+                </>
+              )}
             </div>
-
-            {/* Sub-variant selector for scheduled_czk */}
-            {currentPreset?.subVariants && (
-              <div className="flex items-center gap-2">
-                <Label className="text-xs text-muted-foreground mr-1">Varianta:</Label>
-                {currentPreset.subVariants.map((sv) => (
-                  <Button
-                    key={sv.key}
-                    variant={activeSubVariant === sv.key ? "default" : "outline"}
-                    size="sm"
-                    className="h-7 text-xs px-3"
-                    onClick={() => loadSubVariant(sv.key)}
-                  >
-                    {sv.label}
-                  </Button>
-                ))}
-              </div>
-            )}
 
             {/* Formula editor */}
             <div className="relative">
