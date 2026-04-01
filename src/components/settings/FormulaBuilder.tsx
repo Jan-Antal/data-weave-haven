@@ -254,9 +254,7 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     span.dataset.token = "true";
     span.dataset.var = item.insert;
     span.dataset.type = item.type;
-    span.style.cssText = item.type === "var"
-      ? "background:#e8f4ff;color:#0c447c;border-radius:4px;padding:2px 6px;margin:0 2px;font-size:13px;cursor:grab;user-select:none;display:inline-block;vertical-align:baseline;line-height:1.6"
-      : "background:#faeeda;color:#633806;border-radius:4px;padding:2px 6px;margin:0 2px;font-size:13px;cursor:grab;user-select:none;display:inline-block;vertical-align:baseline;line-height:1.6";
+    span.className = item.type === "var" ? "fb-token-var" : "fb-token-fn";
     span.textContent = item.insert;
 
     const sel = window.getSelection();
