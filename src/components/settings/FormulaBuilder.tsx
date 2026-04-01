@@ -344,20 +344,12 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     const html = editorRef.current.innerHTML;
     setSavedFormulas((prev) => {
       const updated = { ...prev };
-      const preset = { ...updated[activePreset] };
-      if (preset.subVariants) {
-        preset.subVariants = preset.subVariants.map((sv) =>
-          sv.key === activeSubVariant ? { ...sv, html } : { ...sv }
-        );
-      } else {
-        preset.html = html;
-      }
-      updated[activePreset] = preset;
+      updated[activePreset] = { ...updated[activePreset], html };
       return updated;
     });
     setIsDirty(false);
     toast({ title: "Vzorec uložený", description: "Zmeny boli uložené (len v pamäti)." });
-  }, [activePreset, activeSubVariant, toast]);
+  }, [activePreset, toast]);
 
   // Restore to original PRESETS default
   const handleRestoreDefault = useCallback(() => {
