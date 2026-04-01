@@ -330,8 +330,6 @@ export function ProductionHeader({
                       Výpočetní logika
                     </DropdownMenuItem>
                   )}
-                    </DropdownMenuItem>
-                  )}
                   {module === "vyroba" && isAdmin && onOpenVyrobaReset && (
                     <>
                       <DropdownMenuSeparator />
