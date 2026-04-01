@@ -238,6 +238,9 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
   // Dirty state
   const [isDirty, setIsDirty] = useState(false);
 
+  // Selected token state
+  const [selectedToken, setSelectedToken] = useState<HTMLElement | null>(null);
+
   // Saved formulas (in-memory only)
   const [savedFormulas, setSavedFormulas] = useState<Record<string, PresetDef>>(() => {
     // Deep clone PRESETS
@@ -304,6 +307,10 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     setAcVisible(false);
     setAcFilter("");
     setIsDirty(false);
+    if (selectedToken) {
+      selectedToken.classList.remove("fb-token-selected");
+      setSelectedToken(null);
+    }
     setTimeout(() => recalc(), 0);
   }, [recalc]);
 
@@ -497,7 +504,40 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     setTimeout(() => recalc(), 0);
   }, [recalc]);
 
+  // Click handler for tokens
+  const handleEditorClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.dataset.token === "true") {
+      if (selectedToken && selectedToken !== target) {
+        selectedToken.classList.remove("fb-token-selected");
+      }
+      if (selectedToken === target) {
+        target.classList.remove("fb-token-selected");
+        setSelectedToken(null);
+      } else {
+        target.classList.add("fb-token-selected");
+        setSelectedToken(target);
+      }
+      e.preventDefault();
+    } else {
+      if (selectedToken) {
+        selectedToken.classList.remove("fb-token-selected");
+        setSelectedToken(null);
+      }
+    }
+  }, [selectedToken]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Delete selected token
+    if ((e.key === "Delete" || e.key === "Backspace") && selectedToken) {
+      e.preventDefault();
+      selectedToken.remove();
+      setSelectedToken(null);
+      setIsDirty(true);
+      setTimeout(() => recalc(), 0);
+      return;
+    }
+
     if (acVisible) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -579,7 +619,7 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
       setAcFilter("");
       setSearchStart(null);
     }
-  }, [acVisible, acItems, acIndex, insertToken, getCursorPos, searchStart]);
+  }, [acVisible, acItems, acIndex, insertToken, getCursorPos, searchStart, selectedToken, recalc]);
 
   // Drag handlers
   const handleDragStart = useCallback((e: React.DragEvent) => {
@@ -588,8 +628,14 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
       e.dataTransfer.setData("text/plain", "token-drag");
       e.dataTransfer.effectAllowed = "move";
       target.style.opacity = "0.4";
+      // Also select the token
+      if (selectedToken && selectedToken !== target) {
+        selectedToken.classList.remove("fb-token-selected");
+      }
+      target.classList.add("fb-token-selected");
+      setSelectedToken(target);
     }
-  }, []);
+  }, [selectedToken]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -698,12 +744,14 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
             {/* Formula editor */}
             <div className="relative">
               <Label className="text-xs text-muted-foreground mb-1.5 block">Editor vzorca</Label>
+              <style>{`.fb-token-selected { outline: 2px solid hsl(var(--accent)) !important; outline-offset: 1px; border-radius: 3px; }`}</style>
               <div
                 ref={editorRef}
                 contentEditable
                 suppressContentEditableWarning
                 onInput={handleInput}
                 onKeyDown={handleKeyDown}
+                onClick={handleEditorClick}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
