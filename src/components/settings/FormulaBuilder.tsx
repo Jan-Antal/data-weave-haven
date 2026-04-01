@@ -152,7 +152,8 @@ const DEFAULT_VALUES: Record<string, number> = {
   pocet: 2,
   percent: 60,
   totalCostCzk: 922081,
-  weekly_goal_pct: 45,
+  preset_production_pct: 20.5,
+  weekly_goal_pct: 75,
 };
 
 // ─── Evaluate ───────────────────────────────────────────────
