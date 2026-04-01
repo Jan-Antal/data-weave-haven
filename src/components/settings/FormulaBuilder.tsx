@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 // ─── Autocomplete items ─────────────────────────────────────
 
@@ -78,7 +80,7 @@ interface PresetDef {
 const PRESETS: Record<string, PresetDef> = {
   scheduled_czk: {
     label: "scheduled_czk",
-    html: "", // will use subVariants
+    html: "",
     subVariants: [
       {
         key: "tpv",
@@ -179,7 +181,6 @@ function evaluateFromEditor(
 
   editorEl.childNodes.forEach(walk);
 
-  // Handle >= and <= as JS comparisons
   expr = expr.replace(/>=/g, ">=").replace(/<=/g, "<=");
 
   try {
@@ -204,6 +205,18 @@ function getUsedVars(editorEl: HTMLDivElement | null): string[] {
   return [...set];
 }
 
+// ─── Helper: get HTML for a preset key + sub-variant ────────
+
+function getPresetHtml(presetKey: string, presets: Record<string, PresetDef>, subKey?: string): string {
+  const preset = presets[presetKey];
+  if (!preset) return "";
+  if (preset.subVariants) {
+    const variant = preset.subVariants.find((v) => v.key === subKey) ?? preset.subVariants[0];
+    return variant.html;
+  }
+  return preset.html;
+}
+
 // ─── Component ──────────────────────────────────────────────
 
 interface FormulaBuilderProps {
@@ -211,12 +224,41 @@ interface FormulaBuilderProps {
   onOpenChange: (open: boolean) => void;
 }
 
+type ConfirmAction = "close" | "switch-tab" | "restore-default";
+
 export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
+  const { toast } = useToast();
+
   const [activePreset, setActivePreset] = useState("scheduled_czk");
   const [activeSubVariant, setActiveSubVariant] = useState("tpv");
   const [varValues, setVarValues] = useState<Record<string, number>>({ ...DEFAULT_VALUES });
   const [usedVars, setUsedVars] = useState<string[]>([]);
   const [formulaResult, setFormulaResult] = useState<{ formula: string; result: number | string }>({ formula: "", result: "—" });
+
+  // Dirty state
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Saved formulas (in-memory only)
+  const [savedFormulas, setSavedFormulas] = useState<Record<string, PresetDef>>(() => {
+    // Deep clone PRESETS
+    const clone: Record<string, PresetDef> = {};
+    for (const [k, v] of Object.entries(PRESETS)) {
+      clone[k] = {
+        ...v,
+        subVariants: v.subVariants ? v.subVariants.map((sv) => ({ ...sv })) : undefined,
+      };
+    }
+    return clone;
+  });
+
+  // Confirm dialog state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction>("close");
+  const [pendingTabKey, setPendingTabKey] = useState<string | null>(null);
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [confirmDesc, setConfirmDesc] = useState("");
+  const [confirmOk, setConfirmOk] = useState("");
+  const [confirmCancel, setConfirmCancel] = useState("");
 
   // Autocomplete state
   const [acVisible, setAcVisible] = useState(false);
@@ -237,43 +279,126 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     setFormulaResult(evaluateFromEditor(el, varValues));
   }, [varValues]);
 
-  // Get the HTML for the current preset + sub-variant
-  const getPresetHtml = useCallback((presetKey: string, subKey?: string): string => {
-    const preset = PRESETS[presetKey];
-    if (!preset) return "";
-    if (preset.subVariants) {
-      const variant = preset.subVariants.find((v) => v.key === subKey) ?? preset.subVariants[0];
-      return variant.html;
-    }
-    return preset.html;
+  // Show a confirm dialog
+  const showConfirm = useCallback((action: ConfirmAction, title: string, desc: string, ok: string, cancel: string, tabKey?: string) => {
+    setConfirmAction(action);
+    setConfirmTitle(title);
+    setConfirmDesc(desc);
+    setConfirmOk(ok);
+    setConfirmCancel(cancel);
+    setPendingTabKey(tabKey ?? null);
+    setConfirmOpen(true);
   }, []);
 
-  // Load preset
-  const loadPreset = useCallback((key: string, subKey?: string) => {
+  // Load preset from a source (savedFormulas or PRESETS)
+  const loadFromSource = useCallback((key: string, source: Record<string, PresetDef>, subKey?: string) => {
     setActivePreset(key);
-    const preset = PRESETS[key];
+    const preset = source[key];
     if (preset?.subVariants) {
       const sk = subKey ?? preset.subVariants[0].key;
       setActiveSubVariant(sk);
     }
     if (editorRef.current) {
-      editorRef.current.innerHTML = getPresetHtml(key, subKey ?? (preset?.subVariants?.[0]?.key));
+      editorRef.current.innerHTML = getPresetHtml(key, source, subKey ?? source[key]?.subVariants?.[0]?.key);
     }
     setAcVisible(false);
     setAcFilter("");
+    setIsDirty(false);
     setTimeout(() => recalc(), 0);
-  }, [recalc, getPresetHtml]);
+  }, [recalc]);
+
+  // Load preset (from savedFormulas)
+  const loadPreset = useCallback((key: string, subKey?: string) => {
+    loadFromSource(key, savedFormulas, subKey);
+  }, [loadFromSource, savedFormulas]);
+
+  // Try switching tab — check dirty first
+  const tryLoadPreset = useCallback((key: string) => {
+    if (isDirty) {
+      showConfirm("switch-tab", "Máte neuložené zmeny", "Máte neuložené zmeny v aktuálnom vzorci. Zahodiť zmeny?", "Zahodiť", "Zostať", key);
+    } else {
+      loadPreset(key);
+    }
+  }, [isDirty, loadPreset, showConfirm]);
 
   // Load sub-variant
   const loadSubVariant = useCallback((subKey: string) => {
     setActiveSubVariant(subKey);
     if (editorRef.current) {
-      editorRef.current.innerHTML = getPresetHtml(activePreset, subKey);
+      editorRef.current.innerHTML = getPresetHtml(activePreset, savedFormulas, subKey);
     }
     setAcVisible(false);
     setAcFilter("");
+    setIsDirty(false);
     setTimeout(() => recalc(), 0);
-  }, [activePreset, recalc, getPresetHtml]);
+  }, [activePreset, recalc, savedFormulas]);
+
+  // Save current editor content to savedFormulas
+  const handleSave = useCallback(() => {
+    if (!editorRef.current) return;
+    const html = editorRef.current.innerHTML;
+    setSavedFormulas((prev) => {
+      const updated = { ...prev };
+      const preset = { ...updated[activePreset] };
+      if (preset.subVariants) {
+        preset.subVariants = preset.subVariants.map((sv) =>
+          sv.key === activeSubVariant ? { ...sv, html } : { ...sv }
+        );
+      } else {
+        preset.html = html;
+      }
+      updated[activePreset] = preset;
+      return updated;
+    });
+    setIsDirty(false);
+    toast({ title: "Vzorec uložený", description: "Zmeny boli uložené (len v pamäti)." });
+  }, [activePreset, activeSubVariant, toast]);
+
+  // Restore to original PRESETS default
+  const handleRestoreDefault = useCallback(() => {
+    showConfirm(
+      "restore-default",
+      "Obnoviť predvolený vzorec",
+      "Naozaj obnoviť predvolený vzorec? Vaše uložené zmeny pre tento vzorec budú stratené.",
+      "Obnoviť",
+      "Zrušiť"
+    );
+  }, [showConfirm]);
+
+  // Try close — check dirty
+  const tryClose = useCallback(() => {
+    if (isDirty) {
+      showConfirm("close", "Máte neuložené zmeny", "Chcete zahodiť zmeny a zavrieť?", "Zahodiť zmeny", "Pokračovať v úpravách");
+    } else {
+      onOpenChange(false);
+    }
+  }, [isDirty, onOpenChange, showConfirm]);
+
+  // Handle confirm action
+  const handleConfirmOk = useCallback(() => {
+    setConfirmOpen(false);
+    if (confirmAction === "close") {
+      setIsDirty(false);
+      onOpenChange(false);
+    } else if (confirmAction === "switch-tab" && pendingTabKey) {
+      setIsDirty(false);
+      loadPreset(pendingTabKey);
+    } else if (confirmAction === "restore-default") {
+      // Reset savedFormulas for this preset to original PRESETS
+      setSavedFormulas((prev) => {
+        const updated = { ...prev };
+        const original = PRESETS[activePreset];
+        updated[activePreset] = {
+          ...original,
+          subVariants: original.subVariants ? original.subVariants.map((sv) => ({ ...sv })) : undefined,
+        };
+        return updated;
+      });
+      // Load from original PRESETS
+      loadFromSource(activePreset, PRESETS, PRESETS[activePreset]?.subVariants?.[0]?.key);
+      toast({ title: "Vzorec obnovený", description: "Predvolený vzorec bol obnovený." });
+    }
+  }, [confirmAction, pendingTabKey, loadPreset, loadFromSource, activePreset, onOpenChange, toast]);
 
   // Init on open
   useEffect(() => {
@@ -363,10 +488,12 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     setAcVisible(false);
     setAcFilter("");
     setSearchStart(null);
+    setIsDirty(true);
     setTimeout(() => recalc(), 0);
   }, [recalc, searchStart]);
 
   const handleInput = useCallback(() => {
+    setIsDirty(true);
     setTimeout(() => recalc(), 0);
   }, [recalc]);
 
@@ -496,6 +623,7 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
       }
     }
 
+    setIsDirty(true);
     setTimeout(() => recalc(), 0);
   }, [recalc]);
 
@@ -507,173 +635,208 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
   const currentPreset = PRESETS[activePreset];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[780px] max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
-        {/* Header */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
-          <DialogTitle className="text-lg font-semibold text-foreground">Výpočetní logika</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={(v) => { if (!v) tryClose(); }}>
+        <DialogContent className="max-w-[780px] max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
+          {/* Header */}
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
+            <DialogTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+              Výpočetní logika
+              {isDirty && (
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-accent">
+                  <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                  Neuložené zmeny
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-background">
-          {/* Warning banner */}
-          <Alert className="border-warning/30 bg-warning/10">
-            <AlertTriangle className="h-4 w-4 text-warning" />
-            <AlertDescription className="text-xs text-warning">
-              Experimentálny režim — zmeny vzorcov sa zatiaľ nepremietajú do výpočtov. Slúži len na overenie logiky.
-            </AlertDescription>
-          </Alert>
+          <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-background">
+            {/* Warning banner */}
+            <Alert className="border-warning/30 bg-warning/10">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              <AlertDescription className="text-xs text-warning">
+                Experimentálny režim — zmeny vzorcov sa zatiaľ nepremietajú do výpočtov. Slúži len na overenie logiky.
+              </AlertDescription>
+            </Alert>
 
-          {/* Preset tabs */}
-          <div>
-            <Label className="text-xs text-muted-foreground mb-2 block">Vzorec</Label>
-            <Tabs value={activePreset} onValueChange={(v) => loadPreset(v)}>
-              <TabsList className="w-auto flex-wrap h-auto gap-1 p-1">
-                {Object.entries(PRESETS).map(([key, p]) => (
-                  <TabsTrigger key={key} value={key} className="text-xs font-medium">
-                    {p.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          </div>
-
-          {/* Sub-variant selector for scheduled_czk */}
-          {currentPreset?.subVariants && (
-            <div className="flex items-center gap-2">
-              <Label className="text-xs text-muted-foreground mr-1">Varianta:</Label>
-              {currentPreset.subVariants.map((sv) => (
-                <Button
-                  key={sv.key}
-                  variant={activeSubVariant === sv.key ? "default" : "outline"}
-                  size="sm"
-                  className="h-7 text-xs px-3"
-                  onClick={() => loadSubVariant(sv.key)}
-                >
-                  {sv.label}
-                </Button>
-              ))}
+            {/* Preset tabs */}
+            <div>
+              <Label className="text-xs text-muted-foreground mb-2 block">Vzorec</Label>
+              <Tabs value={activePreset} onValueChange={(v) => tryLoadPreset(v)}>
+                <TabsList className="w-auto flex-wrap h-auto gap-1 p-1">
+                  {Object.entries(PRESETS).map(([key, p]) => (
+                    <TabsTrigger key={key} value={key} className="text-xs font-medium">
+                      {p.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
             </div>
-          )}
 
-          {/* Formula editor */}
-          <div className="relative">
-            <Label className="text-xs text-muted-foreground mb-1.5 block">Editor vzorca</Label>
-            <div
-              ref={editorRef}
-              contentEditable
-              suppressContentEditableWarning
-              onInput={handleInput}
-              onKeyDown={handleKeyDown}
-              onDragStart={handleDragStart}
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-              onDragEnd={handleDragEnd}
-              className="fb-editor outline-none w-full rounded-lg border border-input bg-card text-card-foreground"
-              style={{
-                padding: "10px 12px",
-                minHeight: 52,
-                fontFamily: "monospace",
-                fontSize: 13,
-                lineHeight: "1.8",
-                cursor: "text",
-              }}
-            />
+            {/* Sub-variant selector for scheduled_czk */}
+            {currentPreset?.subVariants && (
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground mr-1">Varianta:</Label>
+                {currentPreset.subVariants.map((sv) => (
+                  <Button
+                    key={sv.key}
+                    variant={activeSubVariant === sv.key ? "default" : "outline"}
+                    size="sm"
+                    className="h-7 text-xs px-3"
+                    onClick={() => loadSubVariant(sv.key)}
+                  >
+                    {sv.label}
+                  </Button>
+                ))}
+              </div>
+            )}
 
-            {/* Drag insertion line */}
-            {dragOverPos && (
+            {/* Formula editor */}
+            <div className="relative">
+              <Label className="text-xs text-muted-foreground mb-1.5 block">Editor vzorca</Label>
               <div
-                className="absolute pointer-events-none bg-accent"
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={handleInput}
+                onKeyDown={handleKeyDown}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                onDragEnd={handleDragEnd}
+                className="fb-editor outline-none w-full rounded-lg border border-input bg-card text-card-foreground"
                 style={{
-                  left: dragOverPos.left,
-                  top: dragOverPos.top,
-                  width: 2,
-                  height: dragOverPos.height,
-                  borderRadius: 1,
-                  zIndex: 10,
+                  padding: "10px 12px",
+                  minHeight: 52,
+                  fontFamily: "monospace",
+                  fontSize: 13,
+                  lineHeight: "1.8",
+                  cursor: "text",
                 }}
               />
-            )}
 
-            {/* Autocomplete dropdown */}
-            {acVisible && acItems.length > 0 && (
-              <div
-                ref={acRef}
-                className="absolute bg-popover border border-border rounded-lg shadow-md z-50 max-h-[260px] overflow-y-auto min-w-[220px]"
-                style={{
-                  top: acPos.top + 40,
-                  left: Math.max(0, Math.min(acPos.left, 500)),
-                }}
-              >
-                {acItems.map((item, idx) => (
-                  <button
-                    key={item.label}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      insertToken(item);
-                    }}
-                    className={cn(
-                      "w-full text-left flex items-center gap-2 px-3 py-2 text-sm transition-colors",
-                      idx === acIndex ? "bg-muted" : "hover:bg-muted/50"
-                    )}
-                    style={{ fontFamily: "monospace", fontSize: 13 }}
-                  >
-                    <span
+              {/* Drag insertion line */}
+              {dragOverPos && (
+                <div
+                  className="absolute pointer-events-none bg-accent"
+                  style={{
+                    left: dragOverPos.left,
+                    top: dragOverPos.top,
+                    width: 2,
+                    height: dragOverPos.height,
+                    borderRadius: 1,
+                    zIndex: 10,
+                  }}
+                />
+              )}
+
+              {/* Autocomplete dropdown */}
+              {acVisible && acItems.length > 0 && (
+                <div
+                  ref={acRef}
+                  className="absolute bg-popover border border-border rounded-lg shadow-md z-50 max-h-[260px] overflow-y-auto min-w-[220px]"
+                  style={{
+                    top: acPos.top + 40,
+                    left: Math.max(0, Math.min(acPos.left, 500)),
+                  }}
+                >
+                  {acItems.map((item, idx) => (
+                    <button
+                      key={item.label}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertToken(item);
+                      }}
                       className={cn(
-                        "text-[10px] font-semibold px-1.5 py-0.5 rounded",
-                        item.type === "var" ? "fb-token-var" : "fb-token-fn"
+                        "w-full text-left flex items-center gap-2 px-3 py-2 text-sm transition-colors",
+                        idx === acIndex ? "bg-muted" : "hover:bg-muted/50"
                       )}
+                      style={{ fontFamily: "monospace", fontSize: 13 }}
                     >
-                      {item.type === "var" ? "var" : "fn"}
-                    </span>
-                    <span className="text-popover-foreground">{item.label}</span>
-                  </button>
-                ))}
+                      <span
+                        className={cn(
+                          "text-[10px] font-semibold px-1.5 py-0.5 rounded",
+                          item.type === "var" ? "fb-token-var" : "fb-token-fn"
+                        )}
+                      >
+                        {item.type === "var" ? "var" : "fn"}
+                      </span>
+                      <span className="text-popover-foreground">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Variable values */}
+            {usedVars.length > 0 && (
+              <div>
+                <Label className="text-xs text-muted-foreground mb-2 block">Hodnoty premenných</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+                  {usedVars.map((v) => (
+                    <div key={v}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-medium text-primary truncate min-w-0 flex-1" style={{ fontFamily: "monospace" }}>{v}</span>
+                        <Input
+                          type="number"
+                          value={varValues[v] ?? 0}
+                          onChange={(e) => {
+                            setVarValues((prev) => ({ ...prev, [v]: Number(e.target.value) || 0 }));
+                            setIsDirty(true);
+                          }}
+                          className="h-8 w-28 text-xs"
+                        />
+                      </div>
+                      {VAR_DESCRIPTIONS[v] && (
+                        <p className="text-xs text-muted-foreground mt-0.5 ml-0.5 leading-tight">{VAR_DESCRIPTIONS[v]}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-          </div>
 
-          {/* Variable values */}
-          {usedVars.length > 0 && (
-            <div>
-              <Label className="text-xs text-muted-foreground mb-2 block">Hodnoty premenných</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
-                {usedVars.map((v) => (
-                  <div key={v}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-medium text-primary truncate min-w-0 flex-1" style={{ fontFamily: "monospace" }}>{v}</span>
-                      <Input
-                        type="number"
-                        value={varValues[v] ?? 0}
-                        onChange={(e) => setVarValues((prev) => ({ ...prev, [v]: Number(e.target.value) || 0 }))}
-                        className="h-8 w-28 text-xs"
-                      />
-                    </div>
-                    {VAR_DESCRIPTIONS[v] && (
-                      <p className="text-xs text-muted-foreground mt-0.5 ml-0.5 leading-tight">{VAR_DESCRIPTIONS[v]}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
+            {/* Live result */}
+            <div className="rounded-lg border border-border bg-muted/30 p-4">
+              <Label className="text-xs text-muted-foreground mb-1.5 block">Výsledok</Label>
+              <p className="text-xs text-muted-foreground break-all leading-relaxed" style={{ fontFamily: "monospace" }}>{formulaResult.formula || "—"}</p>
+              <p className="mt-2 text-2xl font-semibold text-accent" style={{ fontFamily: "monospace" }}>
+                = {typeof formulaResult.result === "number" ? formulaResult.result.toLocaleString("cs-CZ") : formulaResult.result}
+              </p>
             </div>
-          )}
-
-          {/* Live result */}
-          <div className="rounded-lg border border-border bg-muted/30 p-4">
-            <Label className="text-xs text-muted-foreground mb-1.5 block">Výsledok</Label>
-            <p className="text-xs text-muted-foreground break-all leading-relaxed" style={{ fontFamily: "monospace" }}>{formulaResult.formula || "—"}</p>
-            <p className="mt-2 text-2xl font-semibold text-accent" style={{ fontFamily: "monospace" }}>
-              = {typeof formulaResult.result === "number" ? formulaResult.result.toLocaleString("cs-CZ") : formulaResult.result}
-            </p>
           </div>
-        </div>
 
-        {/* Footer */}
-        <div className="px-6 py-3 border-t border-border flex justify-end bg-background">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Zavrieť
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          {/* Footer */}
+          <div className="px-6 py-3 border-t border-border flex items-center justify-between bg-background">
+            <Button variant="outline" size="sm" onClick={handleRestoreDefault}>
+              Obnoviť predvolený
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={tryClose}>
+                Zavrieť
+              </Button>
+              <Button size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground" onClick={handleSave}>
+                Uložiť
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation AlertDialog */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmDesc}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{confirmCancel}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmOk}>{confirmOk}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
