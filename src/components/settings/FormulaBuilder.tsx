@@ -744,12 +744,14 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
             {/* Formula editor */}
             <div className="relative">
               <Label className="text-xs text-muted-foreground mb-1.5 block">Editor vzorca</Label>
+              <style>{`.fb-token-selected { outline: 2px solid hsl(var(--accent)) !important; outline-offset: 1px; border-radius: 3px; }`}</style>
               <div
                 ref={editorRef}
                 contentEditable
                 suppressContentEditableWarning
                 onInput={handleInput}
                 onKeyDown={handleKeyDown}
+                onClick={handleEditorClick}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
