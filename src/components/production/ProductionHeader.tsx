@@ -17,6 +17,7 @@ import { StatusManagement } from "@/components/StatusManagement";
 import { RecycleBin } from "@/components/RecycleBin";
 import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDialog";
 import { CapacitySettings } from "@/components/production/CapacitySettings";
+import { FormulaBuilder } from "@/components/settings/FormulaBuilder";
 import { cn } from "@/lib/utils";
 
 type HeaderModule = "index" | "plan-vyroby" | "vyroba" | "analytics";
