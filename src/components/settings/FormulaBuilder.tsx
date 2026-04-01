@@ -665,7 +665,7 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     setDragOverPos(null);
   }, []);
 
-  const currentPreset = PRESETS[activePreset];
+  
 
   return (
     <>
