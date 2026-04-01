@@ -17,6 +17,7 @@ import { StatusManagement } from "@/components/StatusManagement";
 import { RecycleBin } from "@/components/RecycleBin";
 import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDialog";
 import { CapacitySettings } from "@/components/production/CapacitySettings";
+import { FormulaBuilder } from "@/components/settings/FormulaBuilder";
 import { cn } from "@/lib/utils";
 
 type HeaderModule = "index" | "plan-vyroby" | "vyroba" | "analytics";
@@ -122,6 +123,7 @@ export function ProductionHeader({
   const [costPresetsOpen, setCostPresetsOpen] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
+  const [formulaBuilderOpen, setFormulaBuilderOpen] = useState(false);
 
   const undoPage = (module === "index" || module === "analytics") ? undefined : module;
   const hasUndo = undoPage ? canUndo(undoPage) : canUndo();
@@ -323,6 +325,11 @@ export function ProductionHeader({
                       Koš
                     </DropdownMenuItem>
                   )}
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => setFormulaBuilderOpen(true)}>
+                      Výpočetní logika
+                    </DropdownMenuItem>
+                  )}
                   {module === "vyroba" && isAdmin && onOpenVyrobaReset && (
                     <>
                       <DropdownMenuSeparator />
@@ -363,6 +370,7 @@ export function ProductionHeader({
       <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
       <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
       <CostBreakdownPresetsDialog open={costPresetsOpen} onOpenChange={setCostPresetsOpen} />
+      <FormulaBuilder open={formulaBuilderOpen} onOpenChange={setFormulaBuilderOpen} />
     </>
   );
 }
