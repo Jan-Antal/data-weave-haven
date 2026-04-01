@@ -504,7 +504,40 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     setTimeout(() => recalc(), 0);
   }, [recalc]);
 
+  // Click handler for tokens
+  const handleEditorClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.dataset.token === "true") {
+      if (selectedToken && selectedToken !== target) {
+        selectedToken.classList.remove("fb-token-selected");
+      }
+      if (selectedToken === target) {
+        target.classList.remove("fb-token-selected");
+        setSelectedToken(null);
+      } else {
+        target.classList.add("fb-token-selected");
+        setSelectedToken(target);
+      }
+      e.preventDefault();
+    } else {
+      if (selectedToken) {
+        selectedToken.classList.remove("fb-token-selected");
+        setSelectedToken(null);
+      }
+    }
+  }, [selectedToken]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Delete selected token
+    if ((e.key === "Delete" || e.key === "Backspace") && selectedToken) {
+      e.preventDefault();
+      selectedToken.remove();
+      setSelectedToken(null);
+      setIsDirty(true);
+      setTimeout(() => recalc(), 0);
+      return;
+    }
+
     if (acVisible) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
