@@ -245,7 +245,7 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
   const { toast } = useToast();
 
   const [activePreset, setActivePreset] = useState("scheduled_czk_hist");
-  const [activeSubVariant, setActiveSubVariant] = useState("");
+  
   const [varValues, setVarValues] = useState<Record<string, number>>({ ...DEFAULT_VALUES });
   const [usedVars, setUsedVars] = useState<string[]>([]);
   const [formulaResult, setFormulaResult] = useState<{ formula: string; result: number | string }>({ formula: "", result: "—" });
