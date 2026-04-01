@@ -683,7 +683,7 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
   return (
     <>
       <Dialog open={open} onOpenChange={(v) => { if (!v) tryClose(); }}>
-        <DialogContent className="max-w-[780px] max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
+        <DialogContent className="max-w-[780px] h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
           {/* Header */}
           <DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
             <DialogTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
