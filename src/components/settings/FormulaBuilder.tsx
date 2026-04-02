@@ -466,12 +466,26 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     }
   }, [confirmAction, pendingTabKey, loadPreset, loadFromSource, activePreset, onOpenChange, toast]);
 
-  // Init on open
+  // Init on open — load formulas from DB
   useEffect(() => {
     if (open) {
-      setTimeout(() => {
-        loadPreset(activePreset);
-      }, 50);
+      // Load current formulas from DB
+      supabase.from("formula_config").select("key, expression").then(({ data }: any) => {
+        if (data && data.length > 0) {
+          setSavedFormulas((prev) => {
+            const updated = { ...prev };
+            for (const row of data) {
+              if (updated[row.key]) {
+                updated[row.key] = { ...updated[row.key], html: expressionToHtml(row.expression) };
+              }
+            }
+            return updated;
+          });
+        }
+        setTimeout(() => {
+          loadPreset(activePreset);
+        }, 50);
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
