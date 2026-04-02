@@ -395,17 +395,32 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     }
   }, [isDirty, loadPreset, showConfirm]);
 
-  // Save current editor content to savedFormulas
-  const handleSave = useCallback(() => {
+  // Save current editor content to savedFormulas + DB
+  const handleSave = useCallback(async () => {
     if (!editorRef.current) return;
     const html = editorRef.current.innerHTML;
+    const plainExpr = extractPlainExpression(editorRef.current);
     setSavedFormulas((prev) => {
       const updated = { ...prev };
       updated[activePreset] = { ...updated[activePreset], html };
       return updated;
     });
     setIsDirty(false);
-    toast({ title: "Vzorec uložený", description: "Zmeny boli uložené (len v pamäti)." });
+
+    // Save to DB
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      await (supabase.from("formula_config") as any).upsert({
+        key: activePreset,
+        expression: plainExpr,
+        updated_at: new Date().toISOString(),
+        updated_by: userData.user?.id,
+      }, { onConflict: "key" });
+      invalidateFormulaCache();
+      toast({ title: "Vzorec uložený", description: "Zmeny boli uložené do databázy." });
+    } catch {
+      toast({ title: "Vzorec uložený", description: "Uložené lokálne, zápis do DB zlyhal." });
+    }
   }, [activePreset, toast]);
 
   // Restore to original PRESETS default
