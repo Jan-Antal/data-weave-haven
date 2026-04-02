@@ -192,10 +192,16 @@ export async function recalculateProductionHours(
       const rawCena = Number(tpv.cena) || 0;
       const cenaCzk = isEur ? rawCena * eurRate : rawCena;
       const itemCostCzk = cenaCzk * (Number(tpv.pocet) || 1);
-      const correctCzk = Math.floor(itemCostCzk);
+      const correctCzk = Math.floor(evaluateFormula(
+        formulas['scheduled_czk_tpv'] ?? FORMULA_DEFAULTS['scheduled_czk_tpv'],
+        { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
+      ));
       const totalHours =
         itemCostCzk > 0
-          ? Math.floor((itemCostCzk * (1 - result.marze_used) * result.prodpct_used) / hourlyRate)
+          ? Math.floor(evaluateFormula(
+              formulas['scheduled_hours'] ?? FORMULA_DEFAULTS['scheduled_hours'],
+              { itemCostCzk, marze: result.marze_used, production_pct: result.prodpct_used, hourly_rate: hourlyRate }
+            ))
           : 0;
       const splitGroupId = item.split_group_id;
       const correctHours = (() => {
