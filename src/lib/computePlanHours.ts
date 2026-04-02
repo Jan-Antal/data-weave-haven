@@ -115,7 +115,11 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
   const projCenaCzk = isEur ? projCenaRaw * eurRate : projCenaRaw;
   const project_hours =
     projCenaCzk > 0
-      ? Math.floor((projCenaCzk * (1 - marze) * prodPct) / hourlyRate)
+      ? formulas
+        ? Math.floor(evaluateFormula(formulas['hodiny_plan_projekt'] ?? FORMULA_DEFAULTS['hodiny_plan_projekt'], {
+            prodejni_cena: projCenaCzk, eur_czk: 1, marze, production_pct: prodPct, hourly_rate: hourlyRate
+          }))
+        : Math.floor((projCenaCzk * (1 - marze) * prodPct) / hourlyRate)
       : 0;
 
   // Warning: TPV sum < 60% of project price
