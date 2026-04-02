@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { FORMULA_DEFAULTS, invalidateFormulaCache } from "@/lib/formulaEngine";
 
 // ─── Autocomplete items ─────────────────────────────────────
 
