@@ -92,7 +92,11 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
     const itemCzk = cenaCzk * (Number(item.pocet) || 1);
     const itemHours =
       itemCzk > 0
-        ? Math.floor((itemCzk * (1 - marze) * prodPct) / hourlyRate)
+        ? formulas
+          ? Math.floor(evaluateFormula(formulas['scheduled_hours'] ?? FORMULA_DEFAULTS['scheduled_hours'], {
+              itemCostCzk: itemCzk, marze, production_pct: prodPct, hourly_rate: hourlyRate
+            }))
+          : Math.floor((itemCzk * (1 - marze) * prodPct) / hourlyRate)
         : 0;
     tpvSumCzk += itemCzk;
     if (item.id) {
