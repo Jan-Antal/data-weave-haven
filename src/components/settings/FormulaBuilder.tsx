@@ -233,6 +233,66 @@ function getPresetHtml(presetKey: string, presets: Record<string, PresetDef>): s
   return preset.html;
 }
 
+// ─── Helper: extract plain expression from editor DOM ───────
+
+function extractPlainExpression(editorEl: HTMLDivElement | null): string {
+  if (!editorEl) return "";
+  let result = "";
+  const walk = (node: Node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      result += node.textContent || "";
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const el = node as HTMLElement;
+      if (el.dataset.token === "true") {
+        result += el.dataset.var || "";
+      } else {
+        node.childNodes.forEach(walk);
+      }
+    }
+  };
+  editorEl.childNodes.forEach(walk);
+  // Clean up whitespace
+  return result.replace(/\s+/g, " ").trim();
+}
+
+// ─── Helper: convert plain expression to HTML with tokens ───
+
+const ALL_VAR_NAMES = AC_ITEMS.filter(i => i.type === "var").map(i => i.label).sort((a, b) => b.length - a.length);
+const ALL_FN_NAMES = AC_ITEMS.filter(i => i.type === "fn").map(i => i.insert).sort((a, b) => b.length - a.length);
+
+function expressionToHtml(expression: string): string {
+  // Tokenize: find variable and function names, wrap them in spans
+  let html = expression;
+  const placeholders: Array<{ ph: string; span: string }> = [];
+  let idx = 0;
+
+  // Replace functions first
+  for (const fn of ALL_FN_NAMES) {
+    const escaped = fn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    html = html.replace(new RegExp(escaped, "g"), () => {
+      const ph = `__PH${idx++}__`;
+      placeholders.push({ ph, span: tok(fn, "fn") });
+      return ph;
+    });
+  }
+
+  // Replace variables
+  for (const v of ALL_VAR_NAMES) {
+    html = html.replace(new RegExp(`\\b${v}\\b`, "g"), () => {
+      const ph = `__PH${idx++}__`;
+      placeholders.push({ ph, span: tok(v, "var") });
+      return ph;
+    });
+  }
+
+  // Replace placeholders with actual spans
+  for (const { ph, span } of placeholders) {
+    html = html.replace(ph, span);
+  }
+
+  return html;
+}
+
 // ─── Component ──────────────────────────────────────────────
 
 interface FormulaBuilderProps {
