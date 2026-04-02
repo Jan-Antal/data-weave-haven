@@ -21,6 +21,7 @@ export interface PlanHoursInput {
   hourlyRate: number;
   exchangeRates: Array<{ year: number; eur_czk: number }>;
   fallbackEurToCzk?: number;
+  formulas?: Record<string, string>;
 }
 
 export interface ItemPlanHours {
