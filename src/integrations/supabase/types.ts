@@ -269,6 +269,33 @@ export type Database = {
         }
         Relationships: []
       }
+      formula_config: {
+        Row: {
+          description: string | null
+          expression: string
+          is_default: boolean | null
+          key: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          description?: string | null
+          expression: string
+          is_default?: boolean | null
+          key: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          description?: string | null
+          expression?: string
+          is_default?: boolean | null
+          key?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           actor_initials: string | null

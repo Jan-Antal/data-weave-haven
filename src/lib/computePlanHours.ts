@@ -1,3 +1,5 @@
+import { evaluateFormula, FORMULA_DEFAULTS } from "./formulaEngine";
+
 export interface PlanHoursInput {
   tpvItems: Array<{
     id?: string;
@@ -19,6 +21,7 @@ export interface PlanHoursInput {
   hourlyRate: number;
   exchangeRates: Array<{ year: number; eur_czk: number }>;
   fallbackEurToCzk?: number;
+  formulas?: Record<string, string>;
 }
 
 export interface ItemPlanHours {
@@ -47,6 +50,7 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
     hourlyRate,
     exchangeRates,
     fallbackEurToCzk = 25,
+    formulas,
   } = input;
 
   // EUR rate: by project creation year → latest year → fallback
@@ -88,7 +92,11 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
     const itemCzk = cenaCzk * (Number(item.pocet) || 1);
     const itemHours =
       itemCzk > 0
-        ? Math.floor((itemCzk * (1 - marze) * prodPct) / hourlyRate)
+        ? formulas
+          ? Math.floor(evaluateFormula(formulas['scheduled_hours'] ?? FORMULA_DEFAULTS['scheduled_hours'], {
+              itemCostCzk: itemCzk, marze, production_pct: prodPct, hourly_rate: hourlyRate
+            }))
+          : Math.floor((itemCzk * (1 - marze) * prodPct) / hourlyRate)
         : 0;
     tpvSumCzk += itemCzk;
     if (item.id) {
@@ -107,7 +115,11 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
   const projCenaCzk = isEur ? projCenaRaw * eurRate : projCenaRaw;
   const project_hours =
     projCenaCzk > 0
-      ? Math.floor((projCenaCzk * (1 - marze) * prodPct) / hourlyRate)
+      ? formulas
+        ? Math.floor(evaluateFormula(formulas['hodiny_plan_projekt'] ?? FORMULA_DEFAULTS['hodiny_plan_projekt'], {
+            prodejni_cena: projCenaCzk, eur_czk: 1, marze, production_pct: prodPct, hourly_rate: hourlyRate
+          }))
+        : Math.floor((projCenaCzk * (1 - marze) * prodPct) / hourlyRate)
       : 0;
 
   // Warning: TPV sum < 60% of project price

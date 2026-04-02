@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { FORMULA_DEFAULTS, invalidateFormulaCache } from "@/lib/formulaEngine";
 
 // ─── Autocomplete items ─────────────────────────────────────
 
@@ -231,6 +233,66 @@ function getPresetHtml(presetKey: string, presets: Record<string, PresetDef>): s
   return preset.html;
 }
 
+// ─── Helper: extract plain expression from editor DOM ───────
+
+function extractPlainExpression(editorEl: HTMLDivElement | null): string {
+  if (!editorEl) return "";
+  let result = "";
+  const walk = (node: Node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      result += node.textContent || "";
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const el = node as HTMLElement;
+      if (el.dataset.token === "true") {
+        result += el.dataset.var || "";
+      } else {
+        node.childNodes.forEach(walk);
+      }
+    }
+  };
+  editorEl.childNodes.forEach(walk);
+  // Clean up whitespace
+  return result.replace(/\s+/g, " ").trim();
+}
+
+// ─── Helper: convert plain expression to HTML with tokens ───
+
+const ALL_VAR_NAMES = AC_ITEMS.filter(i => i.type === "var").map(i => i.label).sort((a, b) => b.length - a.length);
+const ALL_FN_NAMES = AC_ITEMS.filter(i => i.type === "fn").map(i => i.insert).sort((a, b) => b.length - a.length);
+
+function expressionToHtml(expression: string): string {
+  // Tokenize: find variable and function names, wrap them in spans
+  let html = expression;
+  const placeholders: Array<{ ph: string; span: string }> = [];
+  let idx = 0;
+
+  // Replace functions first
+  for (const fn of ALL_FN_NAMES) {
+    const escaped = fn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    html = html.replace(new RegExp(escaped, "g"), () => {
+      const ph = `__PH${idx++}__`;
+      placeholders.push({ ph, span: tok(fn, "fn") });
+      return ph;
+    });
+  }
+
+  // Replace variables
+  for (const v of ALL_VAR_NAMES) {
+    html = html.replace(new RegExp(`\\b${v}\\b`, "g"), () => {
+      const ph = `__PH${idx++}__`;
+      placeholders.push({ ph, span: tok(v, "var") });
+      return ph;
+    });
+  }
+
+  // Replace placeholders with actual spans
+  for (const { ph, span } of placeholders) {
+    html = html.replace(ph, span);
+  }
+
+  return html;
+}
+
 // ─── Component ──────────────────────────────────────────────
 
 interface FormulaBuilderProps {
@@ -333,17 +395,32 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
     }
   }, [isDirty, loadPreset, showConfirm]);
 
-  // Save current editor content to savedFormulas
-  const handleSave = useCallback(() => {
+  // Save current editor content to savedFormulas + DB
+  const handleSave = useCallback(async () => {
     if (!editorRef.current) return;
     const html = editorRef.current.innerHTML;
+    const plainExpr = extractPlainExpression(editorRef.current);
     setSavedFormulas((prev) => {
       const updated = { ...prev };
       updated[activePreset] = { ...updated[activePreset], html };
       return updated;
     });
     setIsDirty(false);
-    toast({ title: "Vzorec uložený", description: "Zmeny boli uložené (len v pamäti)." });
+
+    // Save to DB
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      await (supabase.from("formula_config") as any).upsert({
+        key: activePreset,
+        expression: plainExpr,
+        updated_at: new Date().toISOString(),
+        updated_by: userData.user?.id,
+      }, { onConflict: "key" });
+      invalidateFormulaCache();
+      toast({ title: "Vzorec uložený", description: "Zmeny boli uložené do databázy." });
+    } catch {
+      toast({ title: "Vzorec uložený", description: "Uložené lokálne, zápis do DB zlyhal." });
+    }
   }, [activePreset, toast]);
 
   // Restore to original PRESETS default
@@ -376,25 +453,53 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
       setIsDirty(false);
       loadPreset(pendingTabKey);
     } else if (confirmAction === "restore-default") {
-      // Reset savedFormulas for this preset to original PRESETS
+      // Reset savedFormulas for this preset to hardcoded FORMULA_DEFAULTS
+      const defaultExpr = FORMULA_DEFAULTS[activePreset];
+      const defaultHtml = defaultExpr ? expressionToHtml(defaultExpr) : PRESETS[activePreset]?.html || "";
       setSavedFormulas((prev) => {
         const updated = { ...prev };
         const original = PRESETS[activePreset];
-        updated[activePreset] = { ...original };
+        updated[activePreset] = { ...original, html: defaultHtml };
         return updated;
       });
       // Load from original PRESETS
-      loadFromSource(activePreset, PRESETS);
+      loadFromSource(activePreset, { ...PRESETS, [activePreset]: { ...PRESETS[activePreset], html: defaultHtml } });
+      // Also reset in DB
+      if (defaultExpr) {
+        supabase.auth.getUser().then(({ data: userData }) => {
+          (supabase.from("formula_config") as any).upsert({
+            key: activePreset,
+            expression: defaultExpr,
+            is_default: true,
+            updated_at: new Date().toISOString(),
+            updated_by: userData.user?.id,
+          }, { onConflict: "key" }).then(() => invalidateFormulaCache());
+        });
+      }
       toast({ title: "Vzorec obnovený", description: "Predvolený vzorec bol obnovený." });
     }
   }, [confirmAction, pendingTabKey, loadPreset, loadFromSource, activePreset, onOpenChange, toast]);
 
-  // Init on open
+  // Init on open — load formulas from DB
   useEffect(() => {
     if (open) {
-      setTimeout(() => {
-        loadPreset(activePreset);
-      }, 50);
+      // Load current formulas from DB
+      supabase.from("formula_config").select("key, expression").then(({ data }: any) => {
+        if (data && data.length > 0) {
+          setSavedFormulas((prev) => {
+            const updated = { ...prev };
+            for (const row of data) {
+              if (updated[row.key]) {
+                updated[row.key] = { ...updated[row.key], html: expressionToHtml(row.expression) };
+              }
+            }
+            return updated;
+          });
+        }
+        setTimeout(() => {
+          loadPreset(activePreset);
+        }, 50);
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -837,9 +942,12 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
 
           {/* Footer */}
           <div className="px-6 py-3 border-t border-border flex items-center justify-between bg-background">
-            <Button variant="outline" size="sm" onClick={handleRestoreDefault}>
-              Obnoviť predvolený
-            </Button>
+            <div className="flex flex-col gap-0.5">
+              <Button variant="outline" size="sm" onClick={handleRestoreDefault}>
+                Obnoviť predvolený
+              </Button>
+              <span className="text-[10px] text-muted-foreground">Predvolené hodnoty sú pevne zakódované v aplikácii</span>
+            </div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" onClick={tryClose}>
                 Zavrieť

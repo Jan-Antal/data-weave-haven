@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { computePlanHours, type PlanHoursResult } from "./computePlanHours";
 import { createNotification, getUserIdsByRole } from "./createNotification";
+import { loadFormulas, evaluateFormula, FORMULA_DEFAULTS } from "./formulaEngine";
 
 function getCurrentWeekKey(): string {
   const now = new Date();
@@ -17,6 +18,7 @@ export async function recalculateProductionHours(
   recalculateAll?: boolean
 ): Promise<number> {
   const weekKey = currentWeekKey || getCurrentWeekKey();
+  const formulas = await loadFormulas(supabaseClient);
 
   const [
     { data: projectsData },
@@ -70,6 +72,7 @@ export async function recalculateProductionHours(
       preset,
       hourlyRate,
       exchangeRates,
+      formulas,
     });
 
     projectResults.push({ project_id: proj.project_id, result });
@@ -114,8 +117,10 @@ export async function recalculateProductionHours(
         const histHours = Number(item.scheduled_hours) || 0;
         const totalPlanHours = result.hodiny_plan || 0;
         if (histHours > 0 && totalPlanHours > 0) {
-          const histShare = histHours / totalPlanHours;
-          const correctCzk = Math.floor(histShare * prodejniCena);
+          const correctCzk = Math.floor(evaluateFormula(
+            formulas['scheduled_czk_hist'] ?? FORMULA_DEFAULTS['scheduled_czk_hist'],
+            { scheduled_hours: histHours, hodiny_plan: totalPlanHours, prodejni_cena: prodejniCena, eur_czk: 1 }
+          ));
           if (correctCzk !== Number(item.scheduled_czk)) {
             await supabaseClient
               .from("production_schedule")
@@ -132,10 +137,16 @@ export async function recalculateProductionHours(
       const rawCena = Number(tpv.cena) || 0;
       const cenaCzk = isEur ? rawCena * eurRate : rawCena;
       const itemCostCzk = cenaCzk * (Number(tpv.pocet) || 1);
-      const correctCzk = Math.floor(itemCostCzk);
+      const correctCzk = Math.floor(evaluateFormula(
+        formulas['scheduled_czk_tpv'] ?? FORMULA_DEFAULTS['scheduled_czk_tpv'],
+        { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
+      ));
       const totalHours =
         itemCostCzk > 0
-          ? Math.floor((itemCostCzk * (1 - result.marze_used) * result.prodpct_used) / hourlyRate)
+          ? Math.floor(evaluateFormula(
+              formulas['scheduled_hours'] ?? FORMULA_DEFAULTS['scheduled_hours'],
+              { itemCostCzk, marze: result.marze_used, production_pct: result.prodpct_used, hourly_rate: hourlyRate }
+            ))
           : 0;
       const splitGroupId = item.split_group_id;
       const correctHours = (() => {
@@ -181,10 +192,16 @@ export async function recalculateProductionHours(
       const rawCena = Number(tpv.cena) || 0;
       const cenaCzk = isEur ? rawCena * eurRate : rawCena;
       const itemCostCzk = cenaCzk * (Number(tpv.pocet) || 1);
-      const correctCzk = Math.floor(itemCostCzk);
+      const correctCzk = Math.floor(evaluateFormula(
+        formulas['scheduled_czk_tpv'] ?? FORMULA_DEFAULTS['scheduled_czk_tpv'],
+        { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
+      ));
       const totalHours =
         itemCostCzk > 0
-          ? Math.floor((itemCostCzk * (1 - result.marze_used) * result.prodpct_used) / hourlyRate)
+          ? Math.floor(evaluateFormula(
+              formulas['scheduled_hours'] ?? FORMULA_DEFAULTS['scheduled_hours'],
+              { itemCostCzk, marze: result.marze_used, production_pct: result.prodpct_used, hourly_rate: hourlyRate }
+            ))
           : 0;
       const splitGroupId = item.split_group_id;
       const correctHours = (() => {
