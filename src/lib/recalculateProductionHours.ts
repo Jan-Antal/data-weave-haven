@@ -18,6 +18,7 @@ export async function recalculateProductionHours(
   recalculateAll?: boolean
 ): Promise<number> {
   const weekKey = currentWeekKey || getCurrentWeekKey();
+  const formulas = await loadFormulas(supabaseClient);
 
   const [
     { data: projectsData },
