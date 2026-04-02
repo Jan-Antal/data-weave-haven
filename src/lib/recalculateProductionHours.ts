@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { computePlanHours, type PlanHoursResult } from "./computePlanHours";
 import { createNotification, getUserIdsByRole } from "./createNotification";
+import { loadFormulas, evaluateFormula, FORMULA_DEFAULTS } from "./formulaEngine";
 
 function getCurrentWeekKey(): string {
   const now = new Date();
