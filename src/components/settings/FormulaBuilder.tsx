@@ -942,9 +942,12 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
 
           {/* Footer */}
           <div className="px-6 py-3 border-t border-border flex items-center justify-between bg-background">
-            <Button variant="outline" size="sm" onClick={handleRestoreDefault}>
-              Obnoviť predvolený
-            </Button>
+            <div className="flex flex-col gap-0.5">
+              <Button variant="outline" size="sm" onClick={handleRestoreDefault}>
+                Obnoviť predvolený
+              </Button>
+              <span className="text-[10px] text-muted-foreground">Predvolené hodnoty sú pevne zakódované v aplikácii</span>
+            </div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" onClick={tryClose}>
                 Zavrieť
