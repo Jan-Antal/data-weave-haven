@@ -72,6 +72,7 @@ export async function recalculateProductionHours(
       preset,
       hourlyRate,
       exchangeRates,
+      formulas,
     });
 
     projectResults.push({ project_id: proj.project_id, result });
