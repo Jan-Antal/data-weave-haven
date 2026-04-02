@@ -453,15 +453,29 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
       setIsDirty(false);
       loadPreset(pendingTabKey);
     } else if (confirmAction === "restore-default") {
-      // Reset savedFormulas for this preset to original PRESETS
+      // Reset savedFormulas for this preset to hardcoded FORMULA_DEFAULTS
+      const defaultExpr = FORMULA_DEFAULTS[activePreset];
+      const defaultHtml = defaultExpr ? expressionToHtml(defaultExpr) : PRESETS[activePreset]?.html || "";
       setSavedFormulas((prev) => {
         const updated = { ...prev };
         const original = PRESETS[activePreset];
-        updated[activePreset] = { ...original };
+        updated[activePreset] = { ...original, html: defaultHtml };
         return updated;
       });
       // Load from original PRESETS
-      loadFromSource(activePreset, PRESETS);
+      loadFromSource(activePreset, { ...PRESETS, [activePreset]: { ...PRESETS[activePreset], html: defaultHtml } });
+      // Also reset in DB
+      if (defaultExpr) {
+        supabase.auth.getUser().then(({ data: userData }) => {
+          (supabase.from("formula_config") as any).upsert({
+            key: activePreset,
+            expression: defaultExpr,
+            is_default: true,
+            updated_at: new Date().toISOString(),
+            updated_by: userData.user?.id,
+          }, { onConflict: "key" }).then(() => invalidateFormulaCache());
+        });
+      }
       toast({ title: "Vzorec obnovený", description: "Predvolený vzorec bol obnovený." });
     }
   }, [confirmAction, pendingTabKey, loadPreset, loadFromSource, activePreset, onOpenChange, toast]);
