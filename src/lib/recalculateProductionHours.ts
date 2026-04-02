@@ -117,8 +117,10 @@ export async function recalculateProductionHours(
         const histHours = Number(item.scheduled_hours) || 0;
         const totalPlanHours = result.hodiny_plan || 0;
         if (histHours > 0 && totalPlanHours > 0) {
-          const histShare = histHours / totalPlanHours;
-          const correctCzk = Math.floor(histShare * prodejniCena);
+          const correctCzk = Math.floor(evaluateFormula(
+            formulas['scheduled_czk_hist'] ?? FORMULA_DEFAULTS['scheduled_czk_hist'],
+            { scheduled_hours: histHours, hodiny_plan: totalPlanHours, prodejni_cena: prodejniCena, eur_czk: 1 }
+          ));
           if (correctCzk !== Number(item.scheduled_czk)) {
             await supabaseClient
               .from("production_schedule")
