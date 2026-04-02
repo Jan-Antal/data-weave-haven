@@ -50,6 +50,7 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
     hourlyRate,
     exchangeRates,
     fallbackEurToCzk = 25,
+    formulas,
   } = input;
 
   // EUR rate: by project creation year → latest year → fallback
