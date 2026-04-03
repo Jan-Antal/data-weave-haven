@@ -24,7 +24,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { useVyrobniEmployees, computeWeekCapacity, fetchAbsencesForYear, isEmployeeActiveInWeek, getWeekStartFromNumber } from "@/hooks/useCapacityCalc";
+import { useVyrobniEmployees, computeWeekCapacity, fetchAbsencesForYear, getWeekStartFromNumber } from "@/hooks/useCapacityCalc";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
