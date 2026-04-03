@@ -37,9 +37,7 @@ export function computeWeekCapacity(
   for (const emp of employees) {
     const usek = emp.usek?.toLowerCase();
     if (!VYROBNE_USEKY.includes(usek as any)) continue;
-    const hours = emp.uvazok_hodiny ?? 8;
-    // Weekly hours = daily hours × 5 (standard work week)
-    const weeklyHours = hours * 5;
+    const weeklyHours = emp.uvazok_hodiny ?? 40; // already weekly contract hours
     byUsek[usek] = (byUsek[usek] || 0) + weeklyHours;
     bruttoHodiny += weeklyHours;
     totalEmployees++;

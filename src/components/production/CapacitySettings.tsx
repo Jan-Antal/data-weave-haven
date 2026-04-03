@@ -148,47 +148,50 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     }
   }, [open, dbStandardCapacity, dbUtilizationPct]);
 
-  // Auto-recalculate non-override weeks on open
-  useEffect(() => {
-    if (!open || vyrobniEmployees.length === 0 || weekMap.size === 0) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const empIds = vyrobniEmployees.map(e => e.id);
-        const absMap = await fetchAbsencesForYear(selectedYear, empIds);
-        const upserts: Array<Record<string, any>> = [];
-        for (let wn = 1; wn <= 52; wn++) {
-          const week = weekMap.get(wn);
-          if (!week || week.is_manual_override) continue;
-          const absCount = absMap.get(week.week_start) ?? 0;
-          const calc = computeWeekCapacity(vyrobniEmployees, absCount, week.working_days, localUtilizationPct);
-          if (Math.round(calc.capacity) !== Math.round(week.capacity_hours)) {
-            upserts.push({
-              week_year: selectedYear,
-              week_number: wn,
-              week_start: week.week_start,
-              capacity_hours: calc.capacity,
-              working_days: week.working_days,
-              is_manual_override: false,
-              holiday_name: week.holiday_name,
-              company_holiday_name: week.company_holiday_name,
-              utilization_pct: localUtilizationPct,
-              dilna1_hodiny: calc.dilna1,
-              dilna2_hodiny: calc.dilna2,
-              dilna3_hodiny: calc.dilna3,
-              sklad_hodiny: calc.sklad,
-              total_employees: calc.totalEmployees,
-              absence_days: calc.absenceDays,
-            });
-          }
+  // Auto-recalculate non-override weeks
+  const triggerAutoRecalc = useCallback(async () => {
+    if (vyrobniEmployees.length === 0 || weekMap.size === 0) return;
+    try {
+      const empIds = vyrobniEmployees.map(e => e.id);
+      const absMap = await fetchAbsencesForYear(selectedYear, empIds);
+      const upserts: Array<Record<string, any>> = [];
+      for (let wn = 1; wn <= 52; wn++) {
+        const week = weekMap.get(wn);
+        if (!week || week.is_manual_override) continue;
+        const absCount = absMap.get(week.week_start) ?? 0;
+        const calc = computeWeekCapacity(vyrobniEmployees, absCount, week.working_days, localUtilizationPct);
+        if (Math.round(calc.capacity) !== Math.round(week.capacity_hours)) {
+          upserts.push({
+            week_year: selectedYear,
+            week_number: wn,
+            week_start: week.week_start,
+            capacity_hours: calc.capacity,
+            working_days: week.working_days,
+            is_manual_override: false,
+            holiday_name: week.holiday_name,
+            company_holiday_name: week.company_holiday_name,
+            utilization_pct: localUtilizationPct,
+            dilna1_hodiny: calc.dilna1,
+            dilna2_hodiny: calc.dilna2,
+            dilna3_hodiny: calc.dilna3,
+            sklad_hodiny: calc.sklad,
+            total_employees: calc.totalEmployees,
+            absence_days: calc.absenceDays,
+          });
         }
-        if (cancelled || upserts.length === 0) return;
-        await supabase.from("production_capacity" as any).upsert(upserts as any, { onConflict: "week_year,week_number" });
-        queryClient.invalidateQueries({ queryKey: ["production-capacity", selectedYear] });
-      } catch { /* silent */ }
-    })();
-    return () => { cancelled = true; };
-  }, [open, vyrobniEmployees, weekMap.size, selectedYear]);
+      }
+      if (upserts.length === 0) return;
+      await supabase.from("production_capacity" as any).upsert(upserts as any, { onConflict: "week_year,week_number" });
+      queryClient.invalidateQueries({ queryKey: ["production-capacity", selectedYear] });
+    } catch { /* silent */ }
+  }, [vyrobniEmployees, weekMap, selectedYear, localUtilizationPct, queryClient]);
+
+  // Trigger auto-recalc when data is ready
+  useEffect(() => {
+    if (open && vyrobniEmployees.length > 0 && weekMap.size > 0) {
+      triggerAutoRecalc();
+    }
+  }, [vyrobniEmployees.length, weekMap.size, open]);
 
   // Safe math expression evaluator
   const safeEvalExpr = (expr: string): number | null => {
@@ -573,12 +576,65 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               {isRecalculating ? "Přepočítávám…" : "Přepočítat vše"}
             </Button>
           </div>
-          {vyrobniEmployees.length > 0 && (
-            <p className="text-[10px] text-muted-foreground">
-              📊 Výrobní zaměstnanci: {vyrobniEmployees.length} · Brutto: {vyrobniEmployees.reduce((s, e) => s + (e.uvazok_hodiny ?? 8) * 5, 0)} h/týden
-            </p>
-          )}
         </div>
+
+        {/* Dílny breakdown panel */}
+        {vyrobniEmployees.length > 0 && (() => {
+          const groups: Record<string, {count: number, weeklyHours: number}> = {
+            dilna1: {count:0, weeklyHours:0},
+            dilna2: {count:0, weeklyHours:0},
+            dilna3: {count:0, weeklyHours:0},
+            sklad:  {count:0, weeklyHours:0},
+          };
+          for (const emp of vyrobniEmployees) {
+            const usek = emp.usek?.toLowerCase();
+            if (groups[usek]) {
+              groups[usek].count++;
+              groups[usek].weeklyHours += emp.uvazok_hodiny ?? 40;
+            }
+          }
+          const totalCount = Object.values(groups).reduce((s, g) => s + g.count, 0);
+          const totalWeekly = Object.values(groups).reduce((s, g) => s + g.weeklyHours, 0);
+          const totalMonthly = Math.round(totalWeekly * 52 / 12);
+          const labels: Record<string, string> = { dilna1: "Dílna 1", dilna2: "Dílna 2", dilna3: "Dílna 3", sklad: "Sklad" };
+          return (
+            <div className="border border-border rounded-lg p-4 space-y-2">
+              <h3 className="text-sm font-semibold text-foreground">Složení výrobní kapacity</h3>
+              <p className="text-xs text-muted-foreground">
+                📊 Výrobní zaměstnanci: {totalCount} celkem · Brutto fond: {totalWeekly} h/týden · Měsíčně: {totalMonthly} h
+              </p>
+              <div className="overflow-hidden rounded border border-border">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-muted/50 border-b border-border">
+                      <th className="text-left px-3 py-1.5 font-medium text-muted-foreground">Úsek</th>
+                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Zaměstnanci</th>
+                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">H/týden</th>
+                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">H/měsíc</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(["dilna1","dilna2","dilna3","sklad"] as const).map(key => (
+                      <tr key={key} className="border-b border-border last:border-0">
+                        <td className="px-3 py-1 text-foreground">{labels[key]}</td>
+                        <td className="px-3 py-1 text-right font-sans text-foreground">{groups[key].count}</td>
+                        <td className="px-3 py-1 text-right font-sans text-foreground">{groups[key].weeklyHours}</td>
+                        <td className="px-3 py-1 text-right font-sans text-muted-foreground">{Math.round(groups[key].weeklyHours * 52 / 12)}</td>
+                      </tr>
+                    ))}
+                    <tr className="bg-muted/30 font-semibold">
+                      <td className="px-3 py-1.5 text-foreground">Celkem</td>
+                      <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalCount}</td>
+                      <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalWeekly}</td>
+                      <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalMonthly}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[10px] text-muted-foreground italic">Pracovní fond bez využití. Skutečná kapacita = fond × využití ({localUtilizationPct} %)</p>
+            </div>
+          );
+        })()}
 
         {/* Year Bar Chart */}
         <div className="border border-border rounded-lg p-4 space-y-3">
