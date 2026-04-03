@@ -438,39 +438,60 @@ export type Database = {
       }
       production_capacity: {
         Row: {
+          absence_days: number | null
           capacity_hours: number
           company_holiday_name: string | null
           created_at: string
+          dilna1_hodiny: number | null
+          dilna2_hodiny: number | null
+          dilna3_hodiny: number | null
           holiday_name: string | null
           id: string
           is_manual_override: boolean
+          sklad_hodiny: number | null
+          total_employees: number | null
           updated_at: string
+          utilization_pct: number
           week_number: number
           week_start: string
           week_year: number
           working_days: number
         }
         Insert: {
+          absence_days?: number | null
           capacity_hours?: number
           company_holiday_name?: string | null
           created_at?: string
+          dilna1_hodiny?: number | null
+          dilna2_hodiny?: number | null
+          dilna3_hodiny?: number | null
           holiday_name?: string | null
           id?: string
           is_manual_override?: boolean
+          sklad_hodiny?: number | null
+          total_employees?: number | null
           updated_at?: string
+          utilization_pct?: number
           week_number: number
           week_start: string
           week_year: number
           working_days?: number
         }
         Update: {
+          absence_days?: number | null
           capacity_hours?: number
           company_holiday_name?: string | null
           created_at?: string
+          dilna1_hodiny?: number | null
+          dilna2_hodiny?: number | null
+          dilna3_hodiny?: number | null
           holiday_name?: string | null
           id?: string
           is_manual_override?: boolean
+          sklad_hodiny?: number | null
+          total_employees?: number | null
           updated_at?: string
+          utilization_pct?: number
           week_number?: number
           week_start?: string
           week_year?: number
@@ -881,6 +902,7 @@ export type Database = {
           monthly_capacity_hours: number
           updated_at: string
           updated_by: string | null
+          utilization_pct: number
           weekly_capacity_hours: number
         }
         Insert: {
@@ -889,6 +911,7 @@ export type Database = {
           monthly_capacity_hours?: number
           updated_at?: string
           updated_by?: string | null
+          utilization_pct?: number
           weekly_capacity_hours?: number
         }
         Update: {
@@ -897,6 +920,7 @@ export type Database = {
           monthly_capacity_hours?: number
           updated_at?: string
           updated_by?: string | null
+          utilization_pct?: number
           weekly_capacity_hours?: number
         }
         Relationships: []
