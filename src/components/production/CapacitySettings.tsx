@@ -24,7 +24,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { useVyrobniEmployees, computeWeekCapacity, fetchAbsencesForYear } from "@/hooks/useCapacityCalc";
+import { useVyrobniEmployees, computeWeekCapacity, fetchAbsencesForYear, getWeekStartFromNumber } from "@/hooks/useCapacityCalc";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -150,26 +150,29 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
   // Auto-recalculate non-override weeks
   const triggerAutoRecalc = useCallback(async () => {
-    if (vyrobniEmployees.length === 0 || weekMap.size === 0) return;
+    if (vyrobniEmployees.length === 0) return;
     try {
       const empIds = vyrobniEmployees.map(e => e.id);
       const absMap = await fetchAbsencesForYear(selectedYear, empIds);
       const upserts: Array<Record<string, any>> = [];
       for (let wn = 1; wn <= 52; wn++) {
         const week = weekMap.get(wn);
-        if (!week || week.is_manual_override) continue;
-        const absCount = absMap.get(week.week_start) ?? 0;
-        const calc = computeWeekCapacity(vyrobniEmployees, absCount, week.working_days, localUtilizationPct);
-        if (Math.round(calc.capacity) !== Math.round(week.capacity_hours)) {
+        if (week?.is_manual_override) continue;
+        const weekStart = week?.week_start ?? getWeekStartFromNumber(selectedYear, wn);
+        const workingDays = week?.working_days ?? 5;
+        const absCount = absMap.get(weekStart) ?? 0;
+        const calc = computeWeekCapacity(vyrobniEmployees, absCount, workingDays, localUtilizationPct, weekStart);
+        const shouldUpsert = !week || Math.round(calc.capacity) !== Math.round(week.capacity_hours);
+        if (shouldUpsert) {
           upserts.push({
             week_year: selectedYear,
             week_number: wn,
-            week_start: week.week_start,
+            week_start: weekStart,
             capacity_hours: calc.capacity,
-            working_days: week.working_days,
+            working_days: workingDays,
             is_manual_override: false,
-            holiday_name: week.holiday_name,
-            company_holiday_name: week.company_holiday_name,
+            holiday_name: week?.holiday_name ?? null,
+            company_holiday_name: week?.company_holiday_name ?? null,
             utilization_pct: localUtilizationPct,
             dilna1_hodiny: calc.dilna1,
             dilna2_hodiny: calc.dilna2,
@@ -352,18 +355,20 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       const upserts: Array<Record<string, any>> = [];
       for (let wn = 1; wn <= 52; wn++) {
         const week = weekMap.get(wn);
-        if (!week || week.is_manual_override) continue;
-        const absCount = absMap.get(week.week_start) ?? 0;
-        const calc = computeWeekCapacity(vyrobniEmployees, absCount, week.working_days, localUtilizationPct);
+        if (week?.is_manual_override) continue;
+        const weekStart = week?.week_start ?? getWeekStartFromNumber(selectedYear, wn);
+        const workingDays = week?.working_days ?? 5;
+        const absCount = absMap.get(weekStart) ?? 0;
+        const calc = computeWeekCapacity(vyrobniEmployees, absCount, workingDays, localUtilizationPct, weekStart);
         upserts.push({
           week_year: selectedYear,
           week_number: wn,
-          week_start: week.week_start,
+          week_start: weekStart,
           capacity_hours: calc.capacity,
-          working_days: week.working_days,
+          working_days: workingDays,
           is_manual_override: false,
-          holiday_name: week.holiday_name,
-          company_holiday_name: week.company_holiday_name,
+          holiday_name: week?.holiday_name ?? null,
+          company_holiday_name: week?.company_holiday_name ?? null,
           utilization_pct: localUtilizationPct,
           dilna1_hodiny: calc.dilna1,
           dilna2_hodiny: calc.dilna2,
