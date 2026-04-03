@@ -15,37 +15,55 @@ export interface CapacityCalcResult {
   utilizationPct: number;
 }
 
-interface EmployeeRow {
+export interface EmployeeRow {
   id: string;
   usek: string;
   uvazok_hodiny: number | null;
+  activated_at?: string | null;
+  deactivated_at?: string | null;
+}
+
+/**
+ * Check if employee was active during a given week.
+ */
+export function isEmployeeActiveInWeek(emp: EmployeeRow, weekStart: string): boolean {
+  const wStart = new Date(weekStart + "T00:00:00");
+  const wEnd = new Date(wStart);
+  wEnd.setDate(wStart.getDate() + 7);
+  if (emp.activated_at && new Date(emp.activated_at) >= wEnd) return false;
+  if (emp.deactivated_at && new Date(emp.deactivated_at) <= wStart) return false;
+  return true;
 }
 
 /**
  * Compute live capacity for a single week based on employees, absences, holidays, and utilization.
+ * uvazok_hodiny = daily contract hours (e.g. 8 = full time 8h/day).
+ * weeklyHours = dailyHours × workingDays (accounts for holidays reducing working days).
  */
 export function computeWeekCapacity(
   employees: EmployeeRow[],
   absenceDays: number,
   workingDays: number,
   utilizationPct: number,
+  weekStart: string,
 ): CapacityCalcResult {
   const byUsek: Record<string, number> = { dilna1: 0, dilna2: 0, dilna3: 0, sklad: 0 };
   let totalEmployees = 0;
   let bruttoHodiny = 0;
 
   for (const emp of employees) {
+    if (!isEmployeeActiveInWeek(emp, weekStart)) continue;
     const usek = emp.usek?.toLowerCase();
     if (!VYROBNE_USEKY.includes(usek as any)) continue;
-    const weeklyHours = emp.uvazok_hodiny ?? 40; // already weekly contract hours
+    const dailyHours = emp.uvazok_hodiny ?? 8;
+    const weeklyHours = dailyHours * workingDays;
     byUsek[usek] = (byUsek[usek] || 0) + weeklyHours;
     bruttoHodiny += weeklyHours;
     totalEmployees++;
   }
 
   const absenceHours = absenceDays * 8;
-  const holidayFactor = workingDays / 5;
-  const capacity = Math.round((bruttoHodiny - absenceHours) * holidayFactor * utilizationPct / 100);
+  const capacity = Math.round((bruttoHodiny - absenceHours) * utilizationPct / 100);
 
   return {
     capacity: Math.max(0, capacity),
@@ -69,7 +87,7 @@ export function useVyrobniEmployees() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ami_employees")
-        .select("id, usek, uvazok_hodiny")
+        .select("id, usek, uvazok_hodiny, activated_at, deactivated_at")
         .eq("aktivny", true)
         .in("usek", ["dilna1", "dilna2", "dilna3", "sklad"]);
       if (error) throw error;
@@ -140,4 +158,16 @@ export async function fetchAbsencesForYear(
   }
 
   return result;
+}
+
+/**
+ * Get the ISO Monday date string for a given year and week number.
+ */
+export function getWeekStartFromNumber(year: number, weekNum: number): string {
+  const jan4 = new Date(year, 0, 4);
+  const startOfWeek1 = new Date(jan4);
+  startOfWeek1.setDate(jan4.getDate() - (jan4.getDay() || 7) + 1);
+  const result = new Date(startOfWeek1);
+  result.setDate(startOfWeek1.getDate() + (weekNum - 1) * 7);
+  return result.toISOString().split("T")[0];
 }
