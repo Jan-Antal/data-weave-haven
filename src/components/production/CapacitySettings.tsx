@@ -148,47 +148,50 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     }
   }, [open, dbStandardCapacity, dbUtilizationPct]);
 
-  // Auto-recalculate non-override weeks on open
-  useEffect(() => {
-    if (!open || vyrobniEmployees.length === 0 || weekMap.size === 0) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const empIds = vyrobniEmployees.map(e => e.id);
-        const absMap = await fetchAbsencesForYear(selectedYear, empIds);
-        const upserts: Array<Record<string, any>> = [];
-        for (let wn = 1; wn <= 52; wn++) {
-          const week = weekMap.get(wn);
-          if (!week || week.is_manual_override) continue;
-          const absCount = absMap.get(week.week_start) ?? 0;
-          const calc = computeWeekCapacity(vyrobniEmployees, absCount, week.working_days, localUtilizationPct);
-          if (Math.round(calc.capacity) !== Math.round(week.capacity_hours)) {
-            upserts.push({
-              week_year: selectedYear,
-              week_number: wn,
-              week_start: week.week_start,
-              capacity_hours: calc.capacity,
-              working_days: week.working_days,
-              is_manual_override: false,
-              holiday_name: week.holiday_name,
-              company_holiday_name: week.company_holiday_name,
-              utilization_pct: localUtilizationPct,
-              dilna1_hodiny: calc.dilna1,
-              dilna2_hodiny: calc.dilna2,
-              dilna3_hodiny: calc.dilna3,
-              sklad_hodiny: calc.sklad,
-              total_employees: calc.totalEmployees,
-              absence_days: calc.absenceDays,
-            });
-          }
+  // Auto-recalculate non-override weeks
+  const triggerAutoRecalc = useCallback(async () => {
+    if (vyrobniEmployees.length === 0 || weekMap.size === 0) return;
+    try {
+      const empIds = vyrobniEmployees.map(e => e.id);
+      const absMap = await fetchAbsencesForYear(selectedYear, empIds);
+      const upserts: Array<Record<string, any>> = [];
+      for (let wn = 1; wn <= 52; wn++) {
+        const week = weekMap.get(wn);
+        if (!week || week.is_manual_override) continue;
+        const absCount = absMap.get(week.week_start) ?? 0;
+        const calc = computeWeekCapacity(vyrobniEmployees, absCount, week.working_days, localUtilizationPct);
+        if (Math.round(calc.capacity) !== Math.round(week.capacity_hours)) {
+          upserts.push({
+            week_year: selectedYear,
+            week_number: wn,
+            week_start: week.week_start,
+            capacity_hours: calc.capacity,
+            working_days: week.working_days,
+            is_manual_override: false,
+            holiday_name: week.holiday_name,
+            company_holiday_name: week.company_holiday_name,
+            utilization_pct: localUtilizationPct,
+            dilna1_hodiny: calc.dilna1,
+            dilna2_hodiny: calc.dilna2,
+            dilna3_hodiny: calc.dilna3,
+            sklad_hodiny: calc.sklad,
+            total_employees: calc.totalEmployees,
+            absence_days: calc.absenceDays,
+          });
         }
-        if (cancelled || upserts.length === 0) return;
-        await supabase.from("production_capacity" as any).upsert(upserts as any, { onConflict: "week_year,week_number" });
-        queryClient.invalidateQueries({ queryKey: ["production-capacity", selectedYear] });
-      } catch { /* silent */ }
-    })();
-    return () => { cancelled = true; };
-  }, [open, vyrobniEmployees, weekMap.size, selectedYear]);
+      }
+      if (upserts.length === 0) return;
+      await supabase.from("production_capacity" as any).upsert(upserts as any, { onConflict: "week_year,week_number" });
+      queryClient.invalidateQueries({ queryKey: ["production-capacity", selectedYear] });
+    } catch { /* silent */ }
+  }, [vyrobniEmployees, weekMap, selectedYear, localUtilizationPct, queryClient]);
+
+  // Trigger auto-recalc when data is ready
+  useEffect(() => {
+    if (open && vyrobniEmployees.length > 0 && weekMap.size > 0) {
+      triggerAutoRecalc();
+    }
+  }, [vyrobniEmployees.length, weekMap.size, open]);
 
   // Safe math expression evaluator
   const safeEvalExpr = (expr: string): number | null => {
