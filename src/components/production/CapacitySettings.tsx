@@ -657,6 +657,10 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   weekEnd.setDate(weekStart.getDate() + 4);
                   const fmtDate = (d: Date) => `${d.getDate()}.${d.getMonth() + 1}.`;
 
+                  // Read live calc columns (cast to any since types may not be regenerated yet)
+                  const wAny = week as any;
+                  const hasDilna = wAny.total_employees > 0;
+
                   return (
                     <Tooltip key={wn}>
                       <TooltipTrigger asChild>
@@ -673,8 +677,16 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                       <TooltipContent side="top" className="text-xs space-y-0.5 font-sans">
                         <div className="font-bold">T{wn}</div>
                         <div>{fmtDate(weekStart)} – {fmtDate(weekEnd)}{selectedYear}</div>
-                        <div>{Math.round(cap)} h</div>
+                        <div>{Math.round(cap)} h {!week.is_manual_override && <span className="text-muted-foreground text-[10px] ml-1">Auto</span>}</div>
                         <div className="text-muted-foreground">{typeLabel}{week.holiday_name ? ` · ${week.holiday_name}` : ""}</div>
+                        {hasDilna && (
+                          <div className="border-t border-border/50 pt-0.5 mt-0.5 space-y-0">
+                            <div>Dílna 1: {wAny.dilna1_hodiny ?? 0}h · Dílna 2: {wAny.dilna2_hodiny ?? 0}h</div>
+                            <div>Dílna 3: {wAny.dilna3_hodiny ?? 0}h · Sklad: {wAny.sklad_hodiny ?? 0}h</div>
+                            <div>Zaměstnanci: {wAny.total_employees} · Absence: {wAny.absence_days ?? 0} dní</div>
+                            <div>Využití: {wAny.utilization_pct ?? 83}%</div>
+                          </div>
+                        )}
                       </TooltipContent>
                     </Tooltip>
                   );
