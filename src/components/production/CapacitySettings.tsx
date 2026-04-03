@@ -522,7 +522,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
         {/* Standard Capacity */}
         <div className="border border-border rounded-lg p-4 space-y-3">
           <h3 className="text-sm font-semibold text-foreground">Standardní kapacita</h3>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <div>
               <label className="text-xs text-muted-foreground">Kapacita (h/týden)</label>
               <Input
@@ -553,8 +553,31 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               <label className="text-xs text-muted-foreground">Hodin za den</label>
               <Input type="number" value={calculatedHoursPerDay} disabled className="h-8 text-sm font-sans bg-muted" />
             </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Využití kapacity (%)</label>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={localUtilizationPct}
+                onChange={e => setLocalUtilizationPct(Math.max(1, Math.min(100, Number(e.target.value) || 83)))}
+                className="h-8 text-sm font-sans"
+              />
+              <p className="text-[10px] text-muted-foreground mt-0.5">Efektivní využití pracovní doby. Výchozí: 83 %</p>
+            </div>
           </div>
-          <p className="text-[10px] text-muted-foreground">Změna kapacity ovlivní pouze týdny od dneška vpřed. Minulé týdny zůstanou nezměněny.</p>
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] text-muted-foreground">Změna kapacity ovlivní pouze týdny od dneška vpřed. Minulé týdny zůstanou nezměněny.</p>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleRecalculateAll} disabled={isRecalculating || vyrobniEmployees.length === 0}>
+              <RotateCcw className={cn("h-3 w-3 mr-1", isRecalculating && "animate-spin")} />
+              {isRecalculating ? "Přepočítávám…" : "Přepočítat vše"}
+            </Button>
+          </div>
+          {vyrobniEmployees.length > 0 && (
+            <p className="text-[10px] text-muted-foreground">
+              📊 Výrobní zaměstnanci: {vyrobniEmployees.length} · Brutto: {vyrobniEmployees.reduce((s, e) => s + (e.uvazok_hodiny ?? 8) * 5, 0)} h/týden
+            </p>
+          )}
         </div>
 
         {/* Year Bar Chart */}
