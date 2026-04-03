@@ -590,10 +590,10 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             sklad:  {count:0, weeklyHours:0},
           };
           for (const emp of vyrobniEmployees) {
-            const usek = emp.usek?.toLowerCase();
-            if (groups[usek]) {
-              groups[usek].count++;
-              groups[usek].weeklyHours += emp.uvazok_hodiny ?? 40;
+            const usekKey = normalizeUsek(emp.usek);
+            if (usekKey && groups[usekKey]) {
+              groups[usekKey].count++;
+              groups[usekKey].weeklyHours += (emp.uvazok_hodiny ?? 8) * 5;
             }
           }
           const totalCount = Object.values(groups).reduce((s, g) => s + g.count, 0);
