@@ -92,6 +92,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const [cleanupConfirmOpen, setCleanupConfirmOpen] = useState(false);
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
+  const [expandedUsek, setExpandedUsek] = useState<string | null>(null);
   const { role } = useAuth();
   const isAdmin = role === "admin" || role === "owner";
   const VISIBLE_WEEKS = 12;
