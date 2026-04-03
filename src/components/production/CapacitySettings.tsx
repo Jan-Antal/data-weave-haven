@@ -355,18 +355,20 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       const upserts: Array<Record<string, any>> = [];
       for (let wn = 1; wn <= 52; wn++) {
         const week = weekMap.get(wn);
-        if (!week || week.is_manual_override) continue;
-        const absCount = absMap.get(week.week_start) ?? 0;
-        const calc = computeWeekCapacity(vyrobniEmployees, absCount, week.working_days, localUtilizationPct);
+        if (week?.is_manual_override) continue;
+        const weekStart = week?.week_start ?? getWeekStartFromNumber(selectedYear, wn);
+        const workingDays = week?.working_days ?? 5;
+        const absCount = absMap.get(weekStart) ?? 0;
+        const calc = computeWeekCapacity(vyrobniEmployees, absCount, workingDays, localUtilizationPct, weekStart);
         upserts.push({
           week_year: selectedYear,
           week_number: wn,
-          week_start: week.week_start,
+          week_start: weekStart,
           capacity_hours: calc.capacity,
-          working_days: week.working_days,
+          working_days: workingDays,
           is_manual_override: false,
-          holiday_name: week.holiday_name,
-          company_holiday_name: week.company_holiday_name,
+          holiday_name: week?.holiday_name ?? null,
+          company_holiday_name: week?.company_holiday_name ?? null,
           utilization_pct: localUtilizationPct,
           dilna1_hodiny: calc.dilna1,
           dilna2_hodiny: calc.dilna2,
