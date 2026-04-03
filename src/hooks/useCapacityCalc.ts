@@ -15,6 +15,7 @@ export interface CapacityCalcResult {
 
 export interface EmployeeRow {
   id: string;
+  meno?: string;
   usek: string;
   uvazok_hodiny: number | null;
   activated_at?: string | null;
@@ -124,7 +125,7 @@ export function useVyrobniEmployees() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ami_employees")
-        .select("id, usek, uvazok_hodiny, activated_at, deactivated_at")
+        .select("id, meno, usek, uvazok_hodiny, activated_at, deactivated_at")
         .eq("aktivny", true);
       if (error) throw error;
       return ((data || []) as EmployeeRow[]).filter(e => normalizeUsek(e.usek) !== null);

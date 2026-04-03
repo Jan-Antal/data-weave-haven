@@ -1,10 +1,10 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, X, Plus, RotateCcw, CalendarDays, CalendarIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, Plus, RotateCcw, CalendarDays, CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -92,6 +92,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const [cleanupConfirmOpen, setCleanupConfirmOpen] = useState(false);
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
+  const [expandedUsek, setExpandedUsek] = useState<string | null>(null);
   const { role } = useAuth();
   const isAdmin = role === "admin" || role === "owner";
   const VISIBLE_WEEKS = 12;
@@ -195,6 +196,16 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     }
   }, [vyrobniEmployees.length, weekMap.size, open]);
 
+  // CHANGE 3: Trigger recalc when utilization changes
+  const utilizationRef = useRef(localUtilizationPct);
+  useEffect(() => {
+    if (!open || vyrobniEmployees.length === 0 || weekMap.size === 0) return;
+    if (utilizationRef.current === localUtilizationPct) return;
+    utilizationRef.current = localUtilizationPct;
+    const timer = setTimeout(() => triggerAutoRecalc(), 800);
+    return () => clearTimeout(timer);
+  }, [localUtilizationPct, open, vyrobniEmployees.length, weekMap.size, triggerAutoRecalc]);
+
   // Safe math expression evaluator
   const safeEvalExpr = (expr: string): number | null => {
     try {
@@ -293,6 +304,11 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     return { min, max };
   }, [weekMap, viewStart, selectedYear, currentYear, currentWeek, standardCapacity]);
 
+  // Actual daily hours based on employees (for holiday impact)
+  const actualDailyHours = useMemo(() => {
+    return vyrobniEmployees.reduce((s, e) => s + (e.uvazok_hodiny ?? 8), 0);
+  }, [vyrobniEmployees]);
+
   // Holiday impact summary
   const holidayImpacts = useMemo(() => {
     const impacts: Array<{ date: string; name: string; weekNum: number; reducedHours: number; workingDays: number }> = [];
@@ -306,12 +322,12 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
         date: `${d.getDate()}. ${d.getMonth() + 1}.`,
         name: h.localName,
         weekNum: wn,
-        reducedHours: calculatedHoursPerDay,
+        reducedHours: actualDailyHours,
         workingDays: week?.working_days ?? 4,
       });
     }
     return impacts;
-  }, [holidays, weekMap, calculatedHoursPerDay]);
+  }, [holidays, weekMap, actualDailyHours]);
 
   // Buffer week capacity changes locally
   const handleWeekCapacityUpdate = (weeks: number[], capacity: number, workingDays: number) => {
@@ -581,24 +597,26 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
           </div>
         </div>
 
-        {/* Dílny breakdown panel */}
+        {/* Dílny breakdown panel with expandable employee lists */}
         {vyrobniEmployees.length > 0 && (() => {
-          const groups: Record<string, {count: number, weeklyHours: number}> = {
-            dilna1: {count:0, weeklyHours:0},
-            dilna2: {count:0, weeklyHours:0},
-            dilna3: {count:0, weeklyHours:0},
-            sklad:  {count:0, weeklyHours:0},
+          const groups: Record<string, {count: number, weeklyHours: number, employees: typeof vyrobniEmployees}> = {
+            dilna1: {count:0, weeklyHours:0, employees:[]},
+            dilna2: {count:0, weeklyHours:0, employees:[]},
+            dilna3: {count:0, weeklyHours:0, employees:[]},
+            sklad:  {count:0, weeklyHours:0, employees:[]},
           };
           for (const emp of vyrobniEmployees) {
             const usekKey = normalizeUsek(emp.usek);
             if (usekKey && groups[usekKey]) {
               groups[usekKey].count++;
               groups[usekKey].weeklyHours += (emp.uvazok_hodiny ?? 8) * 5;
+              groups[usekKey].employees.push(emp);
             }
           }
           const totalCount = Object.values(groups).reduce((s, g) => s + g.count, 0);
           const totalWeekly = Object.values(groups).reduce((s, g) => s + g.weeklyHours, 0);
           const totalMonthly = Math.round(totalWeekly * 52 / 12);
+          const totalNetto = Math.round(totalWeekly * localUtilizationPct / 100);
           const labels: Record<string, string> = { dilna1: "Dílna 1", dilna2: "Dílna 2", dilna3: "Dílna 3", sklad: "Sklad" };
           return (
             <div className="border border-border rounded-lg p-4 space-y-2">
@@ -612,29 +630,62 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                     <tr className="bg-muted/50 border-b border-border">
                       <th className="text-left px-3 py-1.5 font-medium text-muted-foreground">Úsek</th>
                       <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Zaměstnanci</th>
-                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">H/týden</th>
-                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">H/měsíc</th>
+                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Fond (brutto)</th>
+                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Kapacita (netto)</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {(["dilna1","dilna2","dilna3","sklad"] as const).map(key => (
-                      <tr key={key} className="border-b border-border last:border-0">
-                        <td className="px-3 py-1 text-foreground">{labels[key]}</td>
-                        <td className="px-3 py-1 text-right font-sans text-foreground">{groups[key].count}</td>
-                        <td className="px-3 py-1 text-right font-sans text-foreground">{groups[key].weeklyHours}</td>
-                        <td className="px-3 py-1 text-right font-sans text-muted-foreground">{Math.round(groups[key].weeklyHours * 52 / 12)}</td>
-                      </tr>
-                    ))}
+                    {(["dilna1","dilna2","dilna3","sklad"] as const).map(key => {
+                      const g = groups[key];
+                      const isExpanded = expandedUsek === key;
+                      const netto = Math.round(g.weeklyHours * localUtilizationPct / 100);
+                      const threeMonthsAgo = new Date();
+                      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+                      return (
+                        <React.Fragment key={key}>
+                          <tr
+                            className="border-b border-border last:border-0 cursor-pointer hover:bg-muted/30 transition-colors"
+                            onClick={() => setExpandedUsek(isExpanded ? null : key)}
+                          >
+                            <td className="px-3 py-1 text-foreground flex items-center gap-1">
+                              {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+                              {labels[key]}
+                            </td>
+                            <td className="px-3 py-1 text-right font-sans text-foreground">{g.count}</td>
+                            <td className="px-3 py-1 text-right font-sans text-foreground">{g.weeklyHours} h</td>
+                            <td className="px-3 py-1 text-right font-sans text-foreground">{netto} h</td>
+                          </tr>
+                          {isExpanded && g.employees.length > 0 && g.employees.map(emp => {
+                            const isRecent = emp.activated_at && new Date(emp.activated_at) > threeMonthsAgo;
+                            return (
+                              <tr key={emp.id} className="bg-muted/20 border-b border-border/30">
+                                <td className="pl-8 pr-3 py-0.5 text-muted-foreground">
+                                  {emp.meno || emp.id.slice(0, 8)}
+                                  {isRecent && (
+                                    <span className="ml-1.5 text-[10px] text-emerald-600">od {emp.activated_at?.split("T")[0]}</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-0.5 text-right font-sans text-muted-foreground"></td>
+                                <td className="px-3 py-0.5 text-right font-sans text-muted-foreground">{(emp.uvazok_hodiny ?? 8)} h/den</td>
+                                <td className="px-3 py-0.5 text-right font-sans text-muted-foreground">{(emp.uvazok_hodiny ?? 8) * 5} h/týd</td>
+                              </tr>
+                            );
+                          })}
+                        </React.Fragment>
+                      );
+                    })}
                     <tr className="bg-muted/30 font-semibold">
                       <td className="px-3 py-1.5 text-foreground">Celkem</td>
                       <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalCount}</td>
-                      <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalWeekly}</td>
-                      <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalMonthly}</td>
+                      <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalWeekly} h</td>
+                      <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalNetto} h</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-              <p className="text-[10px] text-muted-foreground italic">Pracovní fond bez využití. Skutečná kapacita = fond × využití ({localUtilizationPct} %)</p>
+              <p className="text-[10px] text-muted-foreground italic">
+                Skutečná kapacita = {totalNetto} h/týden (fond {totalWeekly}h × využití {localUtilizationPct}%)
+              </p>
             </div>
           );
         })()}
@@ -826,7 +877,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                       <td className="py-1 pr-2 font-sans">{h.date}</td>
                       <td className="py-1 pr-2">{h.name}</td>
                       <td className="py-1 pr-2 font-sans">T{h.weekNum}</td>
-                      <td className="py-1 font-sans text-amber-600">-{h.reducedHours}h ({h.workingDays} dny)</td>
+                      <td className="py-1 font-sans text-amber-600">-{h.reducedHours}h · kapacita týdne: {Math.round((actualDailyHours * h.workingDays) * localUtilizationPct / 100)}h</td>
                     </tr>
                   ))}
                 </tbody>
