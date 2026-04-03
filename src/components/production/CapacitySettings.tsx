@@ -304,6 +304,11 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     return { min, max };
   }, [weekMap, viewStart, selectedYear, currentYear, currentWeek, standardCapacity]);
 
+  // Actual daily hours based on employees (for holiday impact)
+  const actualDailyHours = useMemo(() => {
+    return vyrobniEmployees.reduce((s, e) => s + (e.uvazok_hodiny ?? 8), 0);
+  }, [vyrobniEmployees]);
+
   // Holiday impact summary
   const holidayImpacts = useMemo(() => {
     const impacts: Array<{ date: string; name: string; weekNum: number; reducedHours: number; workingDays: number }> = [];
@@ -317,12 +322,12 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
         date: `${d.getDate()}. ${d.getMonth() + 1}.`,
         name: h.localName,
         weekNum: wn,
-        reducedHours: calculatedHoursPerDay,
+        reducedHours: actualDailyHours,
         workingDays: week?.working_days ?? 4,
       });
     }
     return impacts;
-  }, [holidays, weekMap, calculatedHoursPerDay]);
+  }, [holidays, weekMap, actualDailyHours]);
 
   // Buffer week capacity changes locally
   const handleWeekCapacityUpdate = (weeks: number[], capacity: number, workingDays: number) => {
