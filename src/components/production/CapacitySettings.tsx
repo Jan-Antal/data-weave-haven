@@ -121,6 +121,10 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const upsertWeek = useUpsertWeekCapacity();
   const bulkUpdate = useBulkUpdateFutureCapacity();
   const queryClient = useQueryClient();
+  const { data: vyrobniEmployees = [] } = useVyrobniEmployees();
+
+  const dbUtilizationPct = settings?.utilization_pct ?? 83;
+  const [localUtilizationPct, setLocalUtilizationPct] = useState(dbUtilizationPct);
 
   const dbStandardCapacity = settings?.weekly_capacity_hours ?? 875;
   const [localStandardCapacity, setLocalStandardCapacity] = useState(dbStandardCapacity);
