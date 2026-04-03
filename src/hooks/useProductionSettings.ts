@@ -6,6 +6,7 @@ export interface ProductionSettings {
   weekly_capacity_hours: number;
   monthly_capacity_hours: number;
   hourly_rate: number;
+  utilization_pct: number;
   updated_at: string;
   updated_by: string | null;
 }
