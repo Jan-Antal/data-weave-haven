@@ -349,16 +349,15 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     if (vyrobniEmployees.length === 0) return;
     setIsRecalculating(true);
     try {
-      const empIds = vyrobniEmployees.map(e => e.id);
-      const absMap = await fetchAbsencesForYear(selectedYear, empIds);
+      const absMap = await fetchAbsencesForYear(selectedYear, vyrobniEmployees);
       const upserts: Array<Record<string, any>> = [];
       for (let wn = 1; wn <= 52; wn++) {
         const week = weekMap.get(wn);
         if (week?.is_manual_override) continue;
         const weekStart = week?.week_start ?? getWeekStartFromNumber(selectedYear, wn);
         const workingDays = week?.working_days ?? 5;
-        const absCount = absMap.get(weekStart) ?? 0;
-        const calc = computeWeekCapacity(vyrobniEmployees, absCount, workingDays, localUtilizationPct, weekStart);
+        const absHours = absMap.get(weekStart) ?? 0;
+        const calc = computeWeekCapacity(vyrobniEmployees, absHours, workingDays, localUtilizationPct, weekStart);
         upserts.push({
           week_year: selectedYear,
           week_number: wn,
@@ -374,7 +373,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
           dilna3_hodiny: calc.dilna3,
           sklad_hodiny: calc.sklad,
           total_employees: calc.totalEmployees,
-          absence_days: calc.absenceDays,
+          absence_days: Math.round(calc.absenceHours / 8),
         });
       }
       if (upserts.length > 0) {
