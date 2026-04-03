@@ -339,15 +339,68 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     setSelectedWeeks(new Set());
   };
 
+  // Recalculate all non-override weeks
+  const handleRecalculateAll = async () => {
+    if (vyrobniEmployees.length === 0) return;
+    setIsRecalculating(true);
+    try {
+      const empIds = vyrobniEmployees.map(e => e.id);
+      const absMap = await fetchAbsencesForYear(selectedYear, empIds);
+      const upserts: Array<Record<string, any>> = [];
+      for (let wn = 1; wn <= 52; wn++) {
+        const week = weekMap.get(wn);
+        if (!week || week.is_manual_override) continue;
+        const absCount = absMap.get(week.week_start) ?? 0;
+        const calc = computeWeekCapacity(vyrobniEmployees, absCount, week.working_days, localUtilizationPct);
+        upserts.push({
+          week_year: selectedYear,
+          week_number: wn,
+          week_start: week.week_start,
+          capacity_hours: calc.capacity,
+          working_days: week.working_days,
+          is_manual_override: false,
+          holiday_name: week.holiday_name,
+          company_holiday_name: week.company_holiday_name,
+          utilization_pct: localUtilizationPct,
+          dilna1_hodiny: calc.dilna1,
+          dilna2_hodiny: calc.dilna2,
+          dilna3_hodiny: calc.dilna3,
+          sklad_hodiny: calc.sklad,
+          total_employees: calc.totalEmployees,
+          absence_days: calc.absenceDays,
+        });
+      }
+      if (upserts.length > 0) {
+        await supabase.from("production_capacity" as any).upsert(upserts as any, { onConflict: "week_year,week_number" });
+      }
+      await queryClient.invalidateQueries({ queryKey: ["production-capacity", selectedYear] });
+      toast({ title: `✓ Přepočteno ${upserts.length} týdnů` });
+    } catch (e: any) {
+      toast({ title: "Chyba při přepočtu", description: e.message, variant: "destructive" });
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
+
   // Save ALL pending changes to DB
   const handleSaveAll = async () => {
     try {
-      // 1. Save standard capacity if changed
+      // 1. Save standard capacity + utilization if changed
+      const settingsUpdates: Record<string, any> = {};
       if (localStandardCapacity !== dbStandardCapacity) {
-        await updateSettings.mutateAsync({ weekly_capacity_hours: localStandardCapacity, monthly_capacity_hours: localStandardCapacity * 4 });
-        const futureFromWeek = selectedYear < currentYear ? 53 : (selectedYear === currentYear ? currentWeek + 1 : 1);
-        if (futureFromWeek <= 52) {
-          await bulkUpdate.mutateAsync({ year: selectedYear, fromWeek: futureFromWeek, capacity: localStandardCapacity, workingDays: workingDaysPerWeek });
+        settingsUpdates.weekly_capacity_hours = localStandardCapacity;
+        settingsUpdates.monthly_capacity_hours = localStandardCapacity * 4;
+      }
+      if (localUtilizationPct !== dbUtilizationPct) {
+        settingsUpdates.utilization_pct = localUtilizationPct;
+      }
+      if (Object.keys(settingsUpdates).length > 0) {
+        await updateSettings.mutateAsync(settingsUpdates as any);
+        if (settingsUpdates.weekly_capacity_hours) {
+          const futureFromWeek = selectedYear < currentYear ? 53 : (selectedYear === currentYear ? currentWeek + 1 : 1);
+          if (futureFromWeek <= 52) {
+            await bulkUpdate.mutateAsync({ year: selectedYear, fromWeek: futureFromWeek, capacity: localStandardCapacity, workingDays: workingDaysPerWeek });
+          }
         }
       }
 
@@ -390,6 +443,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const handleCancel = () => {
     setLocalStandardCapacity(dbStandardCapacity);
     setStandardCapacityInput(String(dbStandardCapacity));
+    setLocalUtilizationPct(dbUtilizationPct);
     setPendingWeekOverrides(new Map());
     setPendingWeekResets(new Set());
     onOpenChange(false);
