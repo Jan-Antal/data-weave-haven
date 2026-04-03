@@ -6,6 +6,46 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+/** Check if today is a Czech public holiday via Nager.Date API */
+async function isCzechPublicHoliday(dateStr: string, year: number): Promise<boolean> {
+  try {
+    const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/CZ`);
+    if (!res.ok) return false;
+    const holidays = await res.json();
+    return holidays.some((h: { date: string }) => h.date === dateStr);
+  } catch {
+    return false;
+  }
+}
+
+/** Check if today falls within a company holiday (from production capacity settings) */
+async function isCompanyHoliday(supabase: any, dateStr: string): Promise<boolean> {
+  const { data } = await supabase
+    .from("company_holidays")
+    .select("start_date, end_date")
+    .lte("start_date", dateStr)
+    .gte("end_date", dateStr);
+  return (data && data.length > 0);
+}
+
+/** Check if today's capacity is 0 (holiday override in production_capacity) */
+async function isZeroCapacityDay(supabase: any, weekKey: string, dayOfWeek: number): Promise<boolean> {
+  // Check if the week has capacity_hours = 0 or a holiday_name set
+  const { data } = await supabase
+    .from("production_capacity")
+    .select("capacity_hours, holiday_name, company_holiday_name")
+    .eq("week_start", weekKey)
+    .limit(1)
+    .maybeSingle();
+
+  if (!data) return false;
+  // If the entire week has 0 capacity, skip
+  if (Number(data.capacity_hours) === 0) return true;
+  // If it has a holiday name, it's a reduced week but not necessarily today — 
+  // the company_holidays check above handles specific dates
+  return false;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -25,6 +65,27 @@ Deno.serve(async (req) => {
       });
     }
 
+    const year = now.getFullYear();
+    const todayStr = now.toISOString().split("T")[0]; // YYYY-MM-DD
+
+    // Check Czech public holidays and company holidays in parallel
+    const [publicHoliday, companyHoliday] = await Promise.all([
+      isCzechPublicHoliday(todayStr, year),
+      isCompanyHoliday(supabase, todayStr),
+    ]);
+
+    if (publicHoliday) {
+      return new Response(JSON.stringify({ message: "Czech public holiday, skipping" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (companyHoliday) {
+      return new Response(JSON.stringify({ message: "Company holiday, skipping" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const dayIndex = dayOfWeek - 1; // 0=Mon...4=Fri
 
     // Calculate week_key (ISO week start date)
@@ -32,6 +93,14 @@ Deno.serve(async (req) => {
     const day = d.getDay() || 7;
     d.setDate(d.getDate() - day + 1);
     const weekKey = d.toISOString().split("T")[0];
+
+    // Check if the week has zero capacity (fully blocked)
+    const zeroCapacity = await isZeroCapacityDay(supabase, weekKey, dayOfWeek);
+    if (zeroCapacity) {
+      return new Response(JSON.stringify({ message: "Zero capacity week, skipping" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Get all scheduled items for this week
     const { data: scheduleItems } = await supabase
