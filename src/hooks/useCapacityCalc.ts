@@ -1,8 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-const VYROBNE_USEKY = ["dilna1", "dilna2", "dilna3", "sklad"] as const;
-
 export interface CapacityCalcResult {
   capacity: number;
   dilna1: number;
@@ -10,7 +8,7 @@ export interface CapacityCalcResult {
   dilna3: number;
   sklad: number;
   totalEmployees: number;
-  absenceDays: number;
+  absenceHours: number;
   bruttoHodiny: number;
   utilizationPct: number;
 }
@@ -23,47 +21,86 @@ export interface EmployeeRow {
   deactivated_at?: string | null;
 }
 
+type UsekKey = "dilna1" | "dilna2" | "dilna3" | "sklad";
+
 /**
- * Check if employee was active during a given week.
+ * Normalize DB usek values (e.g. 'Dílna_1. skupina', 'Sklad') to short keys.
  */
-export function isEmployeeActiveInWeek(emp: EmployeeRow, weekStart: string): boolean {
+export function normalizeUsek(usek: string): UsekKey | null {
+  const u = usek ?? "";
+  if (u.includes("Dílna_1") || u.toLowerCase().includes("dilna_1") || u.toLowerCase().includes("dilna1")) return "dilna1";
+  if (u.includes("Dílna_2") || u.toLowerCase().includes("dilna_2") || u.toLowerCase().includes("dilna2")) return "dilna2";
+  if (u.includes("Dílna_3") || u.toLowerCase().includes("dilna_3") || u.toLowerCase().includes("dilna3")) return "dilna3";
+  if (u.toLowerCase().includes("sklad")) return "sklad";
+  return null;
+}
+
+/**
+ * Count how many working days an employee was active during a given week.
+ * Handles mid-week activation/deactivation proportionally.
+ */
+export function getActiveWorkingDays(emp: EmployeeRow, weekStart: string, workingDays: number): number {
   const wStart = new Date(weekStart + "T00:00:00");
   const wEnd = new Date(wStart);
-  wEnd.setDate(wStart.getDate() + 7);
-  if (emp.activated_at && new Date(emp.activated_at) >= wEnd) return false;
-  if (emp.deactivated_at && new Date(emp.deactivated_at) <= wStart) return false;
-  return true;
+  wEnd.setDate(wStart.getDate() + 5); // Friday end (5 working days span)
+
+  let effectiveStart = wStart;
+  let effectiveEnd = wEnd;
+
+  if (emp.activated_at) {
+    const actDate = new Date(emp.activated_at);
+    if (actDate >= wEnd) return 0; // not active yet
+    if (actDate > wStart) effectiveStart = actDate;
+  }
+
+  if (emp.deactivated_at) {
+    const deactDate = new Date(emp.deactivated_at);
+    if (deactDate <= wStart) return 0; // already gone
+    if (deactDate < wEnd) effectiveEnd = deactDate;
+  }
+
+  const daysActive = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / 86400000);
+  return Math.max(0, Math.min(workingDays, daysActive));
+}
+
+/**
+ * Check if employee was active during a given week (at least 1 day).
+ */
+export function isEmployeeActiveInWeek(emp: EmployeeRow, weekStart: string): boolean {
+  return getActiveWorkingDays(emp, weekStart, 5) > 0;
 }
 
 /**
  * Compute live capacity for a single week based on employees, absences, holidays, and utilization.
  * uvazok_hodiny = daily contract hours (e.g. 8 = full time 8h/day).
- * weeklyHours = dailyHours × workingDays (accounts for holidays reducing working days).
+ * weeklyHours = dailyHours × activeDays (accounts for holidays and mid-week joins/leaves).
+ * absenceHours = total hours lost to absences (each absence day = that employee's uvazok_hodiny).
  */
 export function computeWeekCapacity(
   employees: EmployeeRow[],
-  absenceDays: number,
+  absenceHours: number,
   workingDays: number,
   utilizationPct: number,
   weekStart: string,
 ): CapacityCalcResult {
-  const byUsek: Record<string, number> = { dilna1: 0, dilna2: 0, dilna3: 0, sklad: 0 };
+  const byUsek: Record<UsekKey, number> = { dilna1: 0, dilna2: 0, dilna3: 0, sklad: 0 };
   let totalEmployees = 0;
   let bruttoHodiny = 0;
 
   for (const emp of employees) {
-    if (!isEmployeeActiveInWeek(emp, weekStart)) continue;
-    const usek = emp.usek?.toLowerCase();
-    if (!VYROBNE_USEKY.includes(usek as any)) continue;
+    const usekKey = normalizeUsek(emp.usek);
+    if (!usekKey) continue;
+    const activeDays = getActiveWorkingDays(emp, weekStart, workingDays);
+    if (activeDays === 0) continue;
     const dailyHours = emp.uvazok_hodiny ?? 8;
-    const weeklyHours = dailyHours * workingDays;
-    byUsek[usek] = (byUsek[usek] || 0) + weeklyHours;
+    const weeklyHours = dailyHours * activeDays;
+    byUsek[usekKey] += weeklyHours;
     bruttoHodiny += weeklyHours;
     totalEmployees++;
   }
 
-  const absenceHours = absenceDays * 8;
-  const capacity = Math.round((bruttoHodiny - absenceHours) * utilizationPct / 100);
+  const nettoHours = bruttoHodiny - absenceHours;
+  const capacity = Math.round(nettoHours * utilizationPct / 100);
 
   return {
     capacity: Math.max(0, capacity),
@@ -72,14 +109,14 @@ export function computeWeekCapacity(
     dilna3: byUsek.dilna3,
     sklad: byUsek.sklad,
     totalEmployees,
-    absenceDays,
+    absenceHours,
     bruttoHodiny,
     utilizationPct,
   };
 }
 
 /**
- * Hook: fetch active výrobní employees
+ * Hook: fetch active výrobní employees (all active, filtered in JS by usek)
  */
 export function useVyrobniEmployees() {
   return useQuery({
@@ -88,19 +125,20 @@ export function useVyrobniEmployees() {
       const { data, error } = await supabase
         .from("ami_employees")
         .select("id, usek, uvazok_hodiny, activated_at, deactivated_at")
-        .eq("aktivny", true)
-        .in("usek", ["dilna1", "dilna2", "dilna3", "sklad"]);
+        .eq("aktivny", true);
       if (error) throw error;
-      return (data || []) as EmployeeRow[];
+      return ((data || []) as EmployeeRow[]).filter(e => normalizeUsek(e.usek) !== null);
     },
     staleTime: 5 * 60 * 1000,
   });
 }
 
 /**
- * Hook: fetch absence count for a date range (week)
+ * Hook: fetch absence hours for a date range (week).
+ * Returns total absence hours (each absence day = employee's uvazok_hodiny).
  */
-export function useWeekAbsences(weekStart: string | null, employeeIds: string[]) {
+export function useWeekAbsences(weekStart: string | null, employees: EmployeeRow[]) {
+  const employeeIds = employees.map(e => e.id);
   return useQuery({
     queryKey: ["week-absences", weekStart, employeeIds.length],
     queryFn: async () => {
@@ -110,14 +148,21 @@ export function useWeekAbsences(weekStart: string | null, employeeIds: string[])
       end.setDate(start.getDate() + 7);
       const endStr = end.toISOString().split("T")[0];
 
-      const { count, error } = await supabase
+      const { data, error } = await supabase
         .from("ami_absences")
-        .select("id", { count: "exact", head: true })
+        .select("datum, employee_id")
         .gte("datum", weekStart)
         .lt("datum", endStr)
         .in("employee_id", employeeIds);
       if (error) throw error;
-      return count ?? 0;
+
+      const empMap = new Map(employees.map(e => [e.id, e]));
+      let totalHours = 0;
+      for (const row of (data || [])) {
+        const emp = empMap.get(row.employee_id);
+        totalHours += emp?.uvazok_hodiny ?? 8;
+      }
+      return totalHours;
     },
     enabled: !!weekStart && employeeIds.length > 0,
     staleTime: 5 * 60 * 1000,
@@ -125,22 +170,24 @@ export function useWeekAbsences(weekStart: string | null, employeeIds: string[])
 }
 
 /**
- * Fetch absences for a range of weeks in a single query (for bulk recalc)
+ * Fetch absences for a range of weeks in a single query (for bulk recalc).
+ * Returns Map<weekStart, absenceHours> where absenceHours = SUM(employee uvazok_hodiny per absence day).
  */
 export async function fetchAbsencesForYear(
   year: number,
-  employeeIds: string[],
+  employees: EmployeeRow[],
 ): Promise<Map<string, number>> {
-  // Map: weekStart (YYYY-MM-DD, Monday) → absence day count
   const result = new Map<string, number>();
-  if (employeeIds.length === 0) return result;
+  if (employees.length === 0) return result;
 
+  const employeeIds = employees.map(e => e.id);
+  const empMap = new Map(employees.map(e => [e.id, e]));
   const startDate = `${year}-01-01`;
   const endDate = `${year}-12-31`;
 
   const { data, error } = await supabase
     .from("ami_absences")
-    .select("datum")
+    .select("datum, employee_id")
     .gte("datum", startDate)
     .lte("datum", endDate)
     .in("employee_id", employeeIds);
@@ -154,7 +201,9 @@ export async function fetchAbsencesForYear(
     const monday = new Date(d);
     monday.setDate(d.getDate() - day + 1);
     const key = monday.toISOString().split("T")[0];
-    result.set(key, (result.get(key) || 0) + 1);
+    const emp = empMap.get(row.employee_id);
+    const hours = emp?.uvazok_hodiny ?? 8;
+    result.set(key, (result.get(key) || 0) + hours);
   }
 
   return result;

@@ -24,7 +24,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { useVyrobniEmployees, computeWeekCapacity, fetchAbsencesForYear, getWeekStartFromNumber } from "@/hooks/useCapacityCalc";
+import { useVyrobniEmployees, computeWeekCapacity, fetchAbsencesForYear, getWeekStartFromNumber, normalizeUsek } from "@/hooks/useCapacityCalc";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -152,16 +152,15 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const triggerAutoRecalc = useCallback(async () => {
     if (vyrobniEmployees.length === 0) return;
     try {
-      const empIds = vyrobniEmployees.map(e => e.id);
-      const absMap = await fetchAbsencesForYear(selectedYear, empIds);
+      const absMap = await fetchAbsencesForYear(selectedYear, vyrobniEmployees);
       const upserts: Array<Record<string, any>> = [];
       for (let wn = 1; wn <= 52; wn++) {
         const week = weekMap.get(wn);
         if (week?.is_manual_override) continue;
         const weekStart = week?.week_start ?? getWeekStartFromNumber(selectedYear, wn);
         const workingDays = week?.working_days ?? 5;
-        const absCount = absMap.get(weekStart) ?? 0;
-        const calc = computeWeekCapacity(vyrobniEmployees, absCount, workingDays, localUtilizationPct, weekStart);
+        const absHours = absMap.get(weekStart) ?? 0;
+        const calc = computeWeekCapacity(vyrobniEmployees, absHours, workingDays, localUtilizationPct, weekStart);
         const shouldUpsert = !week || Math.round(calc.capacity) !== Math.round(week.capacity_hours);
         if (shouldUpsert) {
           upserts.push({
@@ -179,7 +178,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             dilna3_hodiny: calc.dilna3,
             sklad_hodiny: calc.sklad,
             total_employees: calc.totalEmployees,
-            absence_days: calc.absenceDays,
+            absence_days: Math.round(calc.absenceHours / 8),
           });
         }
       }
@@ -350,16 +349,15 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     if (vyrobniEmployees.length === 0) return;
     setIsRecalculating(true);
     try {
-      const empIds = vyrobniEmployees.map(e => e.id);
-      const absMap = await fetchAbsencesForYear(selectedYear, empIds);
+      const absMap = await fetchAbsencesForYear(selectedYear, vyrobniEmployees);
       const upserts: Array<Record<string, any>> = [];
       for (let wn = 1; wn <= 52; wn++) {
         const week = weekMap.get(wn);
         if (week?.is_manual_override) continue;
         const weekStart = week?.week_start ?? getWeekStartFromNumber(selectedYear, wn);
         const workingDays = week?.working_days ?? 5;
-        const absCount = absMap.get(weekStart) ?? 0;
-        const calc = computeWeekCapacity(vyrobniEmployees, absCount, workingDays, localUtilizationPct, weekStart);
+        const absHours = absMap.get(weekStart) ?? 0;
+        const calc = computeWeekCapacity(vyrobniEmployees, absHours, workingDays, localUtilizationPct, weekStart);
         upserts.push({
           week_year: selectedYear,
           week_number: wn,
@@ -375,7 +373,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
           dilna3_hodiny: calc.dilna3,
           sklad_hodiny: calc.sklad,
           total_employees: calc.totalEmployees,
-          absence_days: calc.absenceDays,
+          absence_days: Math.round(calc.absenceHours / 8),
         });
       }
       if (upserts.length > 0) {
@@ -592,10 +590,10 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             sklad:  {count:0, weeklyHours:0},
           };
           for (const emp of vyrobniEmployees) {
-            const usek = emp.usek?.toLowerCase();
-            if (groups[usek]) {
-              groups[usek].count++;
-              groups[usek].weeklyHours += emp.uvazok_hodiny ?? 40;
+            const usekKey = normalizeUsek(emp.usek);
+            if (usekKey && groups[usekKey]) {
+              groups[usekKey].count++;
+              groups[usekKey].weeklyHours += (emp.uvazok_hodiny ?? 8) * 5;
             }
           }
           const totalCount = Object.values(groups).reduce((s, g) => s + g.count, 0);
