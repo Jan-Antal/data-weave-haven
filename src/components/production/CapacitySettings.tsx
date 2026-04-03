@@ -576,12 +576,65 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               {isRecalculating ? "Přepočítávám…" : "Přepočítat vše"}
             </Button>
           </div>
-          {vyrobniEmployees.length > 0 && (
-            <p className="text-[10px] text-muted-foreground">
-              📊 Výrobní zaměstnanci: {vyrobniEmployees.length} · Brutto: {vyrobniEmployees.reduce((s, e) => s + (e.uvazok_hodiny ?? 8) * 5, 0)} h/týden
-            </p>
-          )}
         </div>
+
+        {/* Dílny breakdown panel */}
+        {vyrobniEmployees.length > 0 && (() => {
+          const groups: Record<string, {count: number, weeklyHours: number}> = {
+            dilna1: {count:0, weeklyHours:0},
+            dilna2: {count:0, weeklyHours:0},
+            dilna3: {count:0, weeklyHours:0},
+            sklad:  {count:0, weeklyHours:0},
+          };
+          for (const emp of vyrobniEmployees) {
+            const usek = emp.usek?.toLowerCase();
+            if (groups[usek]) {
+              groups[usek].count++;
+              groups[usek].weeklyHours += emp.uvazok_hodiny ?? 40;
+            }
+          }
+          const totalCount = Object.values(groups).reduce((s, g) => s + g.count, 0);
+          const totalWeekly = Object.values(groups).reduce((s, g) => s + g.weeklyHours, 0);
+          const totalMonthly = Math.round(totalWeekly * 52 / 12);
+          const labels: Record<string, string> = { dilna1: "Dílna 1", dilna2: "Dílna 2", dilna3: "Dílna 3", sklad: "Sklad" };
+          return (
+            <div className="border border-border rounded-lg p-4 space-y-2">
+              <h3 className="text-sm font-semibold text-foreground">Složení výrobní kapacity</h3>
+              <p className="text-xs text-muted-foreground">
+                📊 Výrobní zaměstnanci: {totalCount} celkem · Brutto fond: {totalWeekly} h/týden · Měsíčně: {totalMonthly} h
+              </p>
+              <div className="overflow-hidden rounded border border-border">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-muted/50 border-b border-border">
+                      <th className="text-left px-3 py-1.5 font-medium text-muted-foreground">Úsek</th>
+                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Zaměstnanci</th>
+                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">H/týden</th>
+                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">H/měsíc</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(["dilna1","dilna2","dilna3","sklad"] as const).map(key => (
+                      <tr key={key} className="border-b border-border last:border-0">
+                        <td className="px-3 py-1 text-foreground">{labels[key]}</td>
+                        <td className="px-3 py-1 text-right font-sans text-foreground">{groups[key].count}</td>
+                        <td className="px-3 py-1 text-right font-sans text-foreground">{groups[key].weeklyHours}</td>
+                        <td className="px-3 py-1 text-right font-sans text-muted-foreground">{Math.round(groups[key].weeklyHours * 52 / 12)}</td>
+                      </tr>
+                    ))}
+                    <tr className="bg-muted/30 font-semibold">
+                      <td className="px-3 py-1.5 text-foreground">Celkem</td>
+                      <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalCount}</td>
+                      <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalWeekly}</td>
+                      <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalMonthly}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[10px] text-muted-foreground italic">Pracovní fond bez využití. Skutečná kapacita = fond × využití ({localUtilizationPct} %)</p>
+            </div>
+          );
+        })()}
 
         {/* Year Bar Chart */}
         <div className="border border-border rounded-lg p-4 space-y-3">
