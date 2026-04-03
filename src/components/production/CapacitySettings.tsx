@@ -877,7 +877,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                       <td className="py-1 pr-2 font-sans">{h.date}</td>
                       <td className="py-1 pr-2">{h.name}</td>
                       <td className="py-1 pr-2 font-sans">T{h.weekNum}</td>
-                      <td className="py-1 font-sans text-amber-600">-{h.reducedHours}h ({h.workingDays} dny)</td>
+                      <td className="py-1 font-sans text-amber-600">-{h.reducedHours}h · kapacita týdne: {Math.round((actualDailyHours * h.workingDays) * localUtilizationPct / 100)}h</td>
                     </tr>
                   ))}
                 </tbody>
