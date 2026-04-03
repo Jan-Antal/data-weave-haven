@@ -15,6 +15,7 @@ export interface CapacityCalcResult {
 
 export interface EmployeeRow {
   id: string;
+  meno?: string;
   usek: string;
   uvazok_hodiny: number | null;
   activated_at?: string | null;
