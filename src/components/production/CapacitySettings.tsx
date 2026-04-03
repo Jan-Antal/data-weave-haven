@@ -196,6 +196,16 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     }
   }, [vyrobniEmployees.length, weekMap.size, open]);
 
+  // CHANGE 3: Trigger recalc when utilization changes
+  const utilizationRef = useRef(localUtilizationPct);
+  useEffect(() => {
+    if (!open || vyrobniEmployees.length === 0 || weekMap.size === 0) return;
+    if (utilizationRef.current === localUtilizationPct) return;
+    utilizationRef.current = localUtilizationPct;
+    const timer = setTimeout(() => triggerAutoRecalc(), 800);
+    return () => clearTimeout(timer);
+  }, [localUtilizationPct, open, vyrobniEmployees.length, weekMap.size, triggerAutoRecalc]);
+
   // Safe math expression evaluator
   const safeEvalExpr = (expr: string): number | null => {
     try {
