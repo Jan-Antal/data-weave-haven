@@ -135,7 +135,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   // Pending local changes for week overrides/resets
   const [pendingWeekOverrides, setPendingWeekOverrides] = useState<Map<number, { cap: number; days: number }>>(new Map());
   const [pendingWeekResets, setPendingWeekResets] = useState<Set<number>>(new Set());
-  const hasPendingChanges = localStandardCapacity !== dbStandardCapacity || pendingWeekOverrides.size > 0 || pendingWeekResets.size > 0;
+  const hasPendingChanges = localStandardCapacity !== dbStandardCapacity || localUtilizationPct !== dbUtilizationPct || pendingWeekOverrides.size > 0 || pendingWeekResets.size > 0;
 
   // Reset local state when dialog opens
   useEffect(() => {
