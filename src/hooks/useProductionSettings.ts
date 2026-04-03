@@ -29,7 +29,7 @@ export function useProductionSettings() {
 export function useUpdateProductionSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (updates: Partial<Pick<ProductionSettings, "weekly_capacity_hours" | "monthly_capacity_hours" | "hourly_rate">>) => {
+    mutationFn: async (updates: Partial<Pick<ProductionSettings, "weekly_capacity_hours" | "monthly_capacity_hours" | "hourly_rate" | "utilization_pct">>) => {
       const { data: settings } = await supabase
         .from("production_settings")
         .select("id")
