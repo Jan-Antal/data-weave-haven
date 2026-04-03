@@ -14,6 +14,77 @@ export type Database = {
   }
   public: {
     Tables: {
+      ami_absences: {
+        Row: {
+          absencia_kod: string | null
+          created_at: string | null
+          datum: string
+          employee_id: string | null
+          id: string
+          mesiac: string
+          source: string | null
+        }
+        Insert: {
+          absencia_kod?: string | null
+          created_at?: string | null
+          datum: string
+          employee_id?: string | null
+          id?: string
+          mesiac: string
+          source?: string | null
+        }
+        Update: {
+          absencia_kod?: string | null
+          created_at?: string | null
+          datum?: string
+          employee_id?: string | null
+          id?: string
+          mesiac?: string
+          source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ami_absences_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "ami_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ami_employees: {
+        Row: {
+          activated_at: string | null
+          aktivny: boolean | null
+          created_at: string | null
+          deactivated_at: string | null
+          id: string
+          meno: string
+          usek: string
+          uvazok_hodiny: number | null
+        }
+        Insert: {
+          activated_at?: string | null
+          aktivny?: boolean | null
+          created_at?: string | null
+          deactivated_at?: string | null
+          id?: string
+          meno: string
+          usek: string
+          uvazok_hodiny?: number | null
+        }
+        Update: {
+          activated_at?: string | null
+          aktivny?: boolean | null
+          created_at?: string | null
+          deactivated_at?: string | null
+          id?: string
+          meno?: string
+          usek?: string
+          uvazok_hodiny?: number | null
+        }
+        Relationships: []
+      }
       column_labels: {
         Row: {
           column_key: string
