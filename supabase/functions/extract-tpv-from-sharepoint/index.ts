@@ -52,21 +52,32 @@ async function parseXlsxToTextAsync(bytes: Uint8Array): Promise<string> {
   for (const rm of rowMatches) {
     const rowNum = parseInt(rm[1]);
     const cells: string[] = [];
-    // Parse cells with their column reference (e.g., r="B19")
-    const cellMatches = rm[2].matchAll(/<c\s+r="([A-Z]+)\d+"[^>]*?(t="([^"]*)")?[^>]*?>([\s\S]*?)<\/c>/g);
+    // Parse each <c> element individually
+    const cellMatches = rm[2].matchAll(/<c\s([^>]*)>([\s\S]*?)<\/c>/g);
     
     const rowCells: [number, string][] = [];
     for (const cm of cellMatches) {
-      const colRef = cm[1];
-      const cellType = cm[3] || "";
-      const valMatch = cm[4].match(/<v>([\s\S]*?)<\/v>/);
+      const attrs = cm[1];
+      const body = cm[2];
+      
+      // Extract r="XX" attribute for column reference
+      const rMatch = attrs.match(/r="([A-Z]+)\d+"/);
+      if (!rMatch) continue;
+      const colRef = rMatch[1];
+      
+      // Extract t="s" or t="inlineStr" attribute for cell type
+      const tMatch = attrs.match(/t="([^"]*)"/);
+      const cellType = tMatch ? tMatch[1] : "";
+      
+      // Extract value
+      const valMatch = body.match(/<v>([\s\S]*?)<\/v>/);
       let val = valMatch ? valMatch[1] : "";
       
       if (cellType === "s") {
         const idx = parseInt(val);
         val = (idx >= 0 && idx < sharedStrings.length) ? sharedStrings[idx] : val;
       } else if (cellType === "inlineStr") {
-        const isMatch = cm[4].match(/<is>[\s\S]*?<t[^>]*>([\s\S]*?)<\/t>[\s\S]*?<\/is>/);
+        const isMatch = body.match(/<t[^>]*>([\s\S]*?)<\/t>/);
         if (isMatch) val = isMatch[1];
       }
       
