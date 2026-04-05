@@ -431,9 +431,26 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
         {/* Phase: Done — review table */}
         {phase === "done" && items.length > 0 && (
           <>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-              <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
-              Extrahováno z: <strong>{foundFileName}</strong>
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                Extrahováno z: <strong>{foundFileName}</strong>
+              </div>
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-muted-foreground mr-1">Popis:</span>
+                <button
+                  onClick={() => setPopisMode("short")}
+                  className={`px-2 py-0.5 rounded-l border text-xs transition-colors ${popisMode === "short" ? "bg-primary text-primary-foreground border-primary" : "bg-background border-input hover:bg-accent"}`}
+                >
+                  Short
+                </button>
+                <button
+                  onClick={() => setPopisMode("full")}
+                  className={`px-2 py-0.5 rounded-r border-t border-b border-r text-xs transition-colors ${popisMode === "full" ? "bg-primary text-primary-foreground border-primary" : "bg-background border-input hover:bg-accent"}`}
+                >
+                  Full
+                </button>
+              </div>
             </div>
             <div className="flex-1 overflow-auto border rounded-lg">
               <Table>
