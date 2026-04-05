@@ -184,7 +184,11 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
         const workingDays = getWorkingDaysForWeek(wn);
         const absHours = absMap.get(weekStart) ?? 0;
         const calc = computeWeekCapacity(filteredEmployees, absHours, workingDays, localUtilizationPct, weekStart);
-        const shouldUpsert = !week || Math.round(calc.capacity) !== Math.round(week.capacity_hours);
+        const dbAbsenceDays = (week as any)?.absence_days ?? 0;
+        const calcAbsenceDays = Math.round(calc.absenceHours / 8);
+        const shouldUpsert = !week 
+          || Math.round(calc.capacity) !== Math.round(week.capacity_hours)
+          || calcAbsenceDays !== dbAbsenceDays;
         if (shouldUpsert) {
           upserts.push({
             week_year: selectedYear,
@@ -214,7 +218,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   // Trigger auto-recalc when data is ready
   useEffect(() => {
     if (open && vyrobniEmployees.length > 0 && weekMap.size > 0) {
-      triggerAutoRecalc();
+      handleRecalculateAll();
     }
   }, [vyrobniEmployees.length, weekMap.size, open]);
 
