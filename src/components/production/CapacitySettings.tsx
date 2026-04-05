@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { useVyrobniEmployees, computeWeekCapacity, fetchAbsencesForYear, getWeekStartFromNumber, normalizeUsek, getActiveWorkingDays } from "@/hooks/useCapacityCalc";
+import { useVyrobniEmployees, useAbsencesForYear, computeWeekCapacity, getWeekStartFromNumber, normalizeUsek, getActiveWorkingDays } from "@/hooks/useCapacityCalc";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -172,19 +172,15 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   }, [autoApplyHolidays, weekMap]);
 
   // Absences loaded independently via React Query
-  const absencesQuery = useQuery({
-    queryKey: ["all-absences-year", selectedYear, vyrobniEmployees.map(e => e.id).sort().join(",")],
-    queryFn: () => fetchAbsencesForYear(selectedYear, vyrobniEmployees),
-    enabled: vyrobniEmployees.length > 0,
-    staleTime: 2 * 60 * 1000,
-  });
+  const absencesQuery = useAbsencesForYear(selectedYear, vyrobniEmployees);
   const EMPTY_ABS_MAP = useMemo(() => new Map<string, number>(), []);
   const absMap = absencesQuery.data ?? EMPTY_ABS_MAP;
+
 
   const triggerAutoRecalc = useCallback(async () => {
     if (vyrobniEmployees.length === 0) return;
     try {
-      const recalcAbsMap = absMap.size > 0 ? absMap : await fetchAbsencesForYear(selectedYear, vyrobniEmployees);
+      const recalcAbsMap = absMap;
       const upserts: Array<Record<string, any>> = [];
       for (let wn = 1; wn <= 52; wn++) {
         const week = weekMap.get(wn);
@@ -486,7 +482,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     console.log("[recalc] start — employees:", filteredEmployees.length, "weeks:", weekMap.size);
     try {
       // Use absences from React Query (already loaded)
-      const recalcAbsMap = absMap.size > 0 ? absMap : await fetchAbsencesForYear(selectedYear, filteredEmployees);
+      const recalcAbsMap = absMap;
       const upserts: Array<Record<string, any>> = [];
       for (let wn = 1; wn <= 52; wn++) {
         const week = weekMap.get(wn);
@@ -953,7 +949,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                           <div className="border-t border-border/50 pt-0.5 mt-0.5 space-y-0">
                             <div>Dílna 1: {wAny.dilna1_hodiny ?? 0}h · Dílna 2: {wAny.dilna2_hodiny ?? 0}h</div>
                             <div>Dílna 3: {wAny.dilna3_hodiny ?? 0}h · Sklad: {wAny.sklad_hodiny ?? 0}h</div>
-                            <div>Zaměstnanci: {wAny.total_employees} · Absence: {wAny.absence_days ?? 0} dní</div>
+                            <div>Zaměstnanci: {wAny.total_employees} · Absence: {Math.round((absMap.get(wAny.week_start) ?? 0) / 8)} dní</div>
                             <div>Využití: {wAny.utilization_pct ?? 83}%</div>
                           </div>
                         )}
