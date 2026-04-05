@@ -398,7 +398,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       const dow = d.getDay();
       if (dow === 0 || dow === 6) continue;
       const wn = getISOWeekNumber(d);
-      const week = weekMap.get(wn);
+      const week = liveWeekMap.get(wn);
       impacts.push({
         date: `${d.getDate()}. ${d.getMonth() + 1}.`,
         name: h.localName,
