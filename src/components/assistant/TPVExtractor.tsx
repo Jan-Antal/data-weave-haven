@@ -1,11 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Upload, Trash2, Plus, Loader2, FileText, CheckCircle2 } from "lucide-react";
+import { Upload, Trash2, Plus, Loader2, FileText, CheckCircle2, Search, AlertCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import * as XLSX from "xlsx";
 
@@ -16,6 +16,14 @@ interface ExtractedItem {
   pocet: number;
 }
 
+interface SPMatch {
+  itemId: string;
+  name: string;
+  size: number;
+}
+
+type Phase = "searching" | "found" | "multiple" | "not-found" | "extracting" | "done" | "error";
+
 interface TPVExtractorProps {
   projectId: string;
   onSuccess: () => void;
@@ -24,27 +32,108 @@ interface TPVExtractorProps {
 }
 
 export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtractorProps) {
-  const [file, setFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [phase, setPhase] = useState<Phase>("searching");
+  const [matches, setMatches] = useState<SPMatch[]>([]);
+  const [foundFileName, setFoundFileName] = useState("");
   const [items, setItems] = useState<ExtractedItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [spUploaded, setSpUploaded] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const autoExtractTriggered = useRef(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (f) {
-      setFile(f);
+  // Manual upload fallback
+  const [manualFile, setManualFile] = useState<File | null>(null);
+  const [manualLoading, setManualLoading] = useState(false);
+
+  // Search SharePoint on open
+  useEffect(() => {
+    if (!open) {
+      // Reset state when closing
+      setPhase("searching");
+      setMatches([]);
+      setFoundFileName("");
       setItems([]);
+      setSpUploaded(false);
+      setErrorMsg("");
+      autoExtractTriggered.current = false;
+      setManualFile(null);
+      setManualLoading(false);
+      return;
+    }
+
+    searchSharePoint();
+  }, [open, projectId]);
+
+  const searchSharePoint = async () => {
+    setPhase("searching");
+    try {
+      const { data, error } = await supabase.functions.invoke("extract-tpv-from-sharepoint", {
+        body: { projectId, action: "search" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const found: SPMatch[] = data.matches || [];
+      setMatches(found);
+
+      if (found.length === 1) {
+        setPhase("found");
+        setFoundFileName(found[0].name);
+        // Auto-trigger extraction
+        autoExtractTriggered.current = true;
+        extractFromSharePoint(found[0].itemId, found[0].name);
+      } else if (found.length > 1) {
+        setPhase("multiple");
+      } else {
+        setPhase("not-found");
+      }
+    } catch (err: any) {
+      console.error("SharePoint search error:", err);
+      setPhase("not-found");
+      setErrorMsg(err.message || "Chyba při hledání dokumentů");
     }
   };
 
+  const extractFromSharePoint = async (fileItemId: string, fileName: string) => {
+    setPhase("extracting");
+    setFoundFileName(fileName);
+    try {
+      const { data, error } = await supabase.functions.invoke("extract-tpv-from-sharepoint", {
+        body: { projectId, action: "extract", fileItemId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const extracted = (data.items || []).map((item: any) => ({
+        item_name: item.item_name || "",
+        popis: item.popis || "",
+        cena: Number(item.cena) || 0,
+        pocet: Number(item.pocet) || 1,
+      }));
+
+      setItems(extracted);
+      setPhase("done");
+      toast({
+        title: "Extrakce dokončena",
+        description: `Nalezeno ${extracted.length} položek z ${fileName}`,
+      });
+    } catch (err: any) {
+      console.error("Extract error:", err);
+      setPhase("error");
+      setErrorMsg(err.message || "Nepodařilo se extrahovat položky");
+      toast({
+        title: "Chyba extrakce",
+        description: err.message || "Nepodařilo se extrahovat položky",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Manual file upload fallback
   const fileToBase64 = (f: File): Promise<string> =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        resolve(result.split(",")[1]);
-      };
+      reader.onload = () => resolve((reader.result as string).split(",")[1]);
       reader.onerror = reject;
       reader.readAsDataURL(f);
     });
@@ -66,50 +155,42 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       reader.readAsArrayBuffer(f);
     });
 
-  const handleExtract = useCallback(async () => {
-    if (!file) return;
-    setLoading(true);
-    setSpUploaded(false);
+  const handleManualExtract = useCallback(async () => {
+    if (!manualFile) return;
+    setManualLoading(true);
+    setPhase("extracting");
     try {
-      const isPdf = file.name.toLowerCase().endsWith(".pdf");
+      const isPdf = manualFile.name.toLowerCase().endsWith(".pdf");
+      const base64Content = await fileToBase64(manualFile);
       let content: string;
       let fileType: string;
-
-      const base64Content = await fileToBase64(file);
 
       if (isPdf) {
         content = base64Content;
         fileType = "pdf";
       } else {
-        content = await excelToCSV(file);
+        content = await excelToCSV(manualFile);
         fileType = "excel";
       }
 
-      // Start extraction
       const extractionPromise = supabase.functions.invoke("extract-tpv", {
         body: { content, fileType },
       });
 
-      // Upload to SharePoint in background (don't block extraction)
+      // Upload to SharePoint in background
       supabase.functions.invoke("upload-to-sharepoint", {
         body: {
           projectId,
           fileBase64: base64Content,
-          fileName: file.name,
-          mimeType: file.type || "application/octet-stream",
+          fileName: manualFile.name,
+          mimeType: manualFile.type || "application/octet-stream",
         },
       }).then((res) => {
-        if (!res.error && res.data?.success) {
-          setSpUploaded(true);
-        } else {
-          console.warn("SharePoint upload failed:", res.error || res.data?.error);
-        }
-      }).catch((err) => {
-        console.warn("SharePoint upload error:", err);
-      });
+        if (!res.error && res.data?.success) setSpUploaded(true);
+        else console.warn("SP upload failed:", res.error || res.data?.error);
+      }).catch((err) => console.warn("SP upload error:", err));
 
       const { data, error } = await extractionPromise;
-
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
@@ -121,28 +202,28 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       }));
 
       setItems(extracted);
+      setFoundFileName(manualFile.name);
+      setPhase("done");
       toast({
         title: "Extrakce dokončena",
         description: `Nalezeno ${extracted.length} položek`,
       });
     } catch (err: any) {
-      console.error("Extract error:", err);
+      console.error("Manual extract error:", err);
+      setPhase("error");
+      setErrorMsg(err.message || "Nepodařilo se extrahovat položky");
       toast({
         title: "Chyba extrakce",
-        description: err.message || "Nepodařilo se extrahovat položky",
+        description: err.message,
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setManualLoading(false);
     }
-  }, [file, projectId]);
+  }, [manualFile, projectId]);
 
   const updateItem = (index: number, field: keyof ExtractedItem, value: string | number) => {
-    setItems((prev) =>
-      prev.map((item, i) =>
-        i === index ? { ...item, [field]: value } : item,
-      ),
-    );
+    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
   };
 
   const removeItem = (index: number) => {
@@ -191,44 +272,143 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
     }
   };
 
+  const handleManualFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) {
+      setManualFile(f);
+      setItems([]);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
-            <FileText className="h-5 w-5" style={{ color: "#e8692a" }} />
-            Nahrát cenovou nabídku
+            <FileText className="h-5 w-5 text-primary" />
+            Extrakce cenové nabídky
           </DialogTitle>
         </DialogHeader>
 
-        {/* File upload */}
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background hover:bg-accent cursor-pointer text-sm transition-colors">
-            <Upload className="h-4 w-4" />
-            {file ? file.name : "Vybrat soubor"}
-            <input
-              type="file"
-              accept=".pdf,.xlsx,.xls"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-          </label>
-          <Button
-            size="sm"
-            onClick={handleExtract}
-            disabled={!file || loading}
-            style={{ backgroundColor: "#e8692a" }}
-            className="text-white hover:opacity-90"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Extrahuji…
-              </>
-            ) : (
-              "Extrahovat položky"
-            )}
-          </Button>
-        </div>
+        {/* Phase: Searching */}
+        {phase === "searching" && (
+          <div className="flex items-center gap-2 py-8 justify-center text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm">Hledám cenovou nabídku v dokumentech projektu…</span>
+          </div>
+        )}
+
+        {/* Phase: Found — auto-extracting */}
+        {phase === "found" && (
+          <div className="flex items-center gap-2 py-4">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <span className="text-sm">
+              Nalezena cenová nabídka: <strong>{foundFileName}</strong>
+            </span>
+          </div>
+        )}
+
+        {/* Phase: Extracting */}
+        {phase === "extracting" && (
+          <div className="flex flex-col items-center gap-3 py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <span className="text-sm text-muted-foreground">AI extrahuje položky z {foundFileName || "dokumentu"}…</span>
+          </div>
+        )}
+
+        {/* Phase: Multiple matches */}
+        {phase === "multiple" && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Search className="h-4 w-4" />
+              Nalezeno {matches.length} cenových nabídek — vyberte jednu:
+            </div>
+            <div className="space-y-1">
+              {matches.map((m) => (
+                <button
+                  key={m.itemId}
+                  onClick={() => extractFromSharePoint(m.itemId, m.name)}
+                  className="w-full text-left px-3 py-2 rounded-md border border-input hover:bg-accent transition-colors text-sm flex items-center gap-2"
+                >
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  {m.name}
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {(m.size / 1024).toFixed(0)} KB
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Phase: Not found — manual upload fallback */}
+        {phase === "not-found" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <AlertCircle className="h-4 w-4" />
+              Nebyla nalezena cenová nabídka v dokumentech projektu
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background hover:bg-accent cursor-pointer text-sm transition-colors">
+                <Upload className="h-4 w-4" />
+                {manualFile ? manualFile.name : "Nahrát soubor"}
+                <input
+                  type="file"
+                  accept=".pdf,.xlsx,.xls"
+                  onChange={handleManualFileChange}
+                  className="hidden"
+                />
+              </label>
+              <Button
+                size="sm"
+                onClick={handleManualExtract}
+                disabled={!manualFile || manualLoading}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {manualLoading ? (
+                  <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Extrahuji…</>
+                ) : (
+                  "Extrahovat položky"
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Phase: Error — allow retry or manual */}
+        {phase === "error" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              {errorMsg || "Nepodařilo se extrahovat položky"}
+            </div>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" onClick={searchSharePoint}>
+                Zkusit znovu
+              </Button>
+              <label className="flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background hover:bg-accent cursor-pointer text-sm transition-colors">
+                <Upload className="h-4 w-4" />
+                {manualFile ? manualFile.name : "Nahrát ručně"}
+                <input
+                  type="file"
+                  accept=".pdf,.xlsx,.xls"
+                  onChange={handleManualFileChange}
+                  className="hidden"
+                />
+              </label>
+              {manualFile && (
+                <Button
+                  size="sm"
+                  onClick={handleManualExtract}
+                  disabled={manualLoading}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  Extrahovat
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* SharePoint upload note */}
         {spUploaded && (
@@ -238,96 +418,103 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
           </div>
         )}
 
-        {/* Items table */}
-        {items.length > 0 && (
-          <div className="flex-1 overflow-auto border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[140px]">Název</TableHead>
-                  <TableHead>Popis</TableHead>
-                  <TableHead className="w-[110px] text-right">Cena/ks</TableHead>
-                  <TableHead className="w-[70px] text-right">Počet</TableHead>
-                  <TableHead className="w-[110px] text-right">Celkem</TableHead>
-                  <TableHead className="w-[40px]" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item, i) => (
-                  <TableRow key={i}>
-                    <TableCell>
-                      <Input
-                        value={item.item_name}
-                        onChange={(e) => updateItem(i, "item_name", e.target.value)}
-                        className="h-7 text-xs"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={item.popis}
-                        onChange={(e) => updateItem(i, "popis", e.target.value)}
-                        className="h-7 text-xs"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={item.cena}
-                        onChange={(e) => updateItem(i, "cena", Number(e.target.value))}
-                        className="h-7 text-xs text-right"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={item.pocet}
-                        onChange={(e) => updateItem(i, "pocet", Number(e.target.value))}
-                        className="h-7 text-xs text-right w-16"
-                      />
-                    </TableCell>
-                    <TableCell className="text-right text-xs font-medium">
-                      {formatCurrency(item.cena * item.pocet)}
-                    </TableCell>
-                    <TableCell>
-                      <button
-                        onClick={() => removeItem(i)}
-                        className="text-muted-foreground hover:text-destructive transition-colors"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <div className="flex items-center justify-between px-3 py-2 border-t bg-muted/30">
-              <Button variant="ghost" size="sm" onClick={addRow}>
-                <Plus className="h-3 w-3 mr-1" /> Přidat řádek
-              </Button>
-              <span className="text-sm font-semibold">
-                Celkem: {formatCurrency(totalSum)}
-              </span>
+        {/* Phase: Done — review table */}
+        {phase === "done" && items.length > 0 && (
+          <>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+              Extrahováno z: <strong>{foundFileName}</strong>
             </div>
-          </div>
+            <div className="flex-1 overflow-auto border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[140px]">Název</TableHead>
+                    <TableHead>Popis</TableHead>
+                    <TableHead className="w-[110px] text-right">Cena/ks</TableHead>
+                    <TableHead className="w-[70px] text-right">Počet</TableHead>
+                    <TableHead className="w-[110px] text-right">Celkem</TableHead>
+                    <TableHead className="w-[40px]" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {items.map((item, i) => (
+                    <TableRow key={i}>
+                      <TableCell>
+                        <Input
+                          value={item.item_name}
+                          onChange={(e) => updateItem(i, "item_name", e.target.value)}
+                          className="h-7 text-xs"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={item.popis}
+                          onChange={(e) => updateItem(i, "popis", e.target.value)}
+                          className="h-7 text-xs"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={item.cena}
+                          onChange={(e) => updateItem(i, "cena", Number(e.target.value))}
+                          className="h-7 text-xs text-right"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={item.pocet}
+                          onChange={(e) => updateItem(i, "pocet", Number(e.target.value))}
+                          className="h-7 text-xs text-right w-16"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right text-xs font-medium">
+                        {formatCurrency(item.cena * item.pocet)}
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          onClick={() => removeItem(i)}
+                          className="text-muted-foreground hover:text-destructive transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <div className="flex items-center justify-between px-3 py-2 border-t bg-muted/30">
+                <Button variant="ghost" size="sm" onClick={addRow}>
+                  <Plus className="h-3 w-3 mr-1" /> Přidat řádek
+                </Button>
+                <span className="text-sm font-semibold">
+                  Celkem: {formatCurrency(totalSum)}
+                </span>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={onClose}>
+                Zrušit
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={saving}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+                Uložit do TPV ({items.filter((i) => i.item_name.trim()).length})
+              </Button>
+            </DialogFooter>
+          </>
         )}
 
-        {items.length > 0 && (
-          <DialogFooter>
-            <Button variant="outline" onClick={onClose}>
-              Zrušit
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              style={{ backgroundColor: "#e8692a" }}
-              className="text-white hover:opacity-90"
-            >
-              {saving ? (
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-              ) : null}
-              Uložit do TPV ({items.filter((i) => i.item_name.trim()).length})
-            </Button>
-          </DialogFooter>
+        {phase === "done" && items.length === 0 && (
+          <div className="py-6 text-center text-sm text-muted-foreground">
+            Nebyly nalezeny žádné položky v dokumentu.
+          </div>
         )}
       </DialogContent>
     </Dialog>

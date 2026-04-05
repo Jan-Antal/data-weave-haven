@@ -1,0 +1,243 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const TENANT_ID = "596710ac-cabd-4bd2-8360-f7252eef3064";
+const CLIENT_ID = "eb6c5989-f35c-4e41-b094-363f4e74383e";
+const GRAPH = "https://graph.microsoft.com/v1.0";
+const LIB_ROOT = "AMI-Project-Info-App-Data";
+
+async function getAccessToken(): Promise<string> {
+  const clientSecret = Deno.env.get("SHAREPOINT_CLIENT_SECRET");
+  if (!clientSecret) throw new Error("SHAREPOINT_CLIENT_SECRET is not configured");
+  const url = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`;
+  const body = new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: CLIENT_ID,
+    client_secret: clientSecret,
+    scope: "https://graph.microsoft.com/.default",
+  });
+  const res = await fetch(url, { method: "POST", body });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Token error [${res.status}]: ${t}`);
+  }
+  return (await res.json()).access_token;
+}
+
+async function getDriveId(token: string): Promise<string> {
+  const siteRes = await fetch(`${GRAPH}/sites/amincz.sharepoint.com:/sites/AMI-Project-Info`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!siteRes.ok) { const t = await siteRes.text(); throw new Error(`Site error [${siteRes.status}]: ${t}`); }
+  const site = await siteRes.json();
+  const drivesRes = await fetch(`${GRAPH}/sites/${site.id}/drives`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!drivesRes.ok) { const t = await drivesRes.text(); throw new Error(`Drives error [${drivesRes.status}]: ${t}`); }
+  const drives = await drivesRes.json();
+  const drive = drives.value.find((d: any) => d.name === "Shared Documents" || d.name === "Documents") ?? drives.value[0];
+  if (!drive) throw new Error("No drive found");
+  return drive.id;
+}
+
+// List all files recursively in a project folder (flat)
+async function listAllFiles(token: string, driveId: string, projectId: string) {
+  const path = `${LIB_ROOT}/${projectId}`;
+  const url = `${GRAPH}/drives/${driveId}/root:/${path}:/children?$select=id,name,size,file,@microsoft.graph.downloadUrl&$top=200`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (res.status === 404) { await res.text(); return []; }
+  if (!res.ok) { const t = await res.text(); throw new Error(`List error [${res.status}]: ${t}`); }
+  const json = await res.json();
+  const topFiles = (json.value ?? []).filter((f: any) => f.file);
+
+  // Also check subfolders one level deep
+  const subfolders = (json.value ?? []).filter((f: any) => f.folder);
+  const subFiles: any[] = [];
+  for (const folder of subfolders) {
+    const subUrl = `${GRAPH}/drives/${driveId}/items/${folder.id}/children?$select=id,name,size,file,@microsoft.graph.downloadUrl&$top=100`;
+    const subRes = await fetch(subUrl, { headers: { Authorization: `Bearer ${token}` } });
+    if (subRes.ok) {
+      const subJson = await subRes.json();
+      subFiles.push(...(subJson.value ?? []).filter((f: any) => f.file));
+    } else {
+      await subRes.text();
+    }
+  }
+
+  return [...topFiles, ...subFiles].map((f: any) => ({
+    itemId: f.id,
+    name: f.name,
+    size: f.size,
+    downloadUrl: f["@microsoft.graph.downloadUrl"] ?? null,
+  }));
+}
+
+function isCenovaNabidka(name: string): boolean {
+  const lower = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return lower.includes("cenov") || lower.includes("cn_") || lower.startsWith("cn.");
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  try {
+    const { projectId, action, fileItemId } = await req.json();
+
+    if (!projectId) {
+      return new Response(JSON.stringify({ error: "Missing projectId" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const token = await getAccessToken();
+    const driveId = await getDriveId(token);
+
+    // Action: search — find cenová nabídka files
+    if (action === "search") {
+      const allFiles = await listAllFiles(token, driveId, projectId);
+      const matches = allFiles.filter((f: any) => isCenovaNabidka(f.name));
+
+      return new Response(JSON.stringify({ matches, totalFiles: allFiles.length }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Action: extract — download file and send to AI
+    if (action === "extract") {
+      // Get file download URL
+      let downloadUrl: string;
+      let fileName: string;
+
+      if (fileItemId) {
+        const itemRes = await fetch(`${GRAPH}/drives/${driveId}/items/${fileItemId}?$select=name,@microsoft.graph.downloadUrl`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!itemRes.ok) { const t = await itemRes.text(); throw new Error(`Item error [${itemRes.status}]: ${t}`); }
+        const item = await itemRes.json();
+        downloadUrl = item["@microsoft.graph.downloadUrl"];
+        fileName = item.name;
+      } else {
+        return new Response(JSON.stringify({ error: "Missing fileItemId" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!downloadUrl) throw new Error("No download URL available");
+
+      // Download file content
+      const fileRes = await fetch(downloadUrl);
+      if (!fileRes.ok) throw new Error(`Download failed [${fileRes.status}]`);
+      const fileBuffer = await fileRes.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)));
+
+      const isPdf = fileName.toLowerCase().endsWith(".pdf");
+      const fileType = isPdf ? "pdf" : "excel";
+
+      // For Excel files, we send raw base64 — the extract-tpv function handles it
+      // But extract-tpv expects CSV for excel. We'll send as pdf-like base64 for both
+      // and let the AI handle it. Actually for Excel we need to convert.
+      // Since we can't use SheetJS in Deno easily, send Excel as base64 too with pdf type
+      // The AI (Gemini) can handle both formats as document input.
+
+      // Call extract-tpv internally
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+      const SYSTEM_PROMPT = `You are extracting line items from a price offer (cenová nabídka) for a furniture/interior design company.
+
+Extract ALL line items and return ONLY valid JSON array, no other text:
+
+[
+  {
+    "item_name": "short item code or name, max 50 chars",
+    "popis": "full description of the item",
+    "cena": 12500.00,
+    "pocet": 2
+  }
+]
+
+Rules:
+- cena = unit price (NOT total). If only total given, divide by quantity.
+- pocet = quantity (default 1 if not specified)
+- Skip subtotals, headers, totals rows
+- item_name should be a short code or abbreviation
+- All prices in CZK (convert EUR × 25 if needed)
+- Return ONLY the JSON array, no markdown fences, no explanation`;
+
+      const mimeType = isPdf ? "application/pdf" : 
+        fileName.toLowerCase().endsWith(".xlsx") ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" :
+        "application/vnd.ms-excel";
+
+      const userContent: any[] = [
+        {
+          type: "image_url",
+          image_url: { url: `data:${mimeType};base64,${base64}` },
+        },
+        {
+          type: "text",
+          text: "Extract all line items from this price offer document. Return ONLY the JSON array.",
+        },
+      ];
+
+      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-pro",
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: userContent },
+          ],
+        }),
+      });
+
+      if (!aiRes.ok) {
+        const t = await aiRes.text();
+        console.error("AI error:", aiRes.status, t);
+        throw new Error(aiRes.status === 429 ? "Příliš mnoho požadavků" : "Chyba AI služby");
+      }
+
+      const aiData = await aiRes.json();
+      const rawText = aiData.choices?.[0]?.message?.content || "[]";
+      let cleaned = rawText.trim();
+      if (cleaned.startsWith("```")) {
+        cleaned = cleaned.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+      }
+
+      let items;
+      try {
+        items = JSON.parse(cleaned);
+      } catch {
+        console.error("Failed to parse AI response:", cleaned);
+        return new Response(JSON.stringify({ error: "AI vrátilo neplatný formát", raw: cleaned }), {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ items, fileName }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ error: "Unknown action" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    console.error("extract-tpv-from-sharepoint error:", e);
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
