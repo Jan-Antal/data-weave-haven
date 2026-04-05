@@ -295,16 +295,18 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
       const weekStart = dbWeek?.week_start ?? getWeekStartFromNumber(selectedYear, wn);
 
-      // Working days: start from base 5, subtract Czech holidays
+      // Working days: start from base 5, subtract Czech holidays only if autoApplyHolidays
       let workingDays = 5;
-      const weekStartDate = new Date(weekStart + 'T00:00:00');
-      const weekEndDate = new Date(weekStartDate);
-      weekEndDate.setDate(weekStartDate.getDate() + 5);
-      const holidayCount = (holidays ?? []).filter(h => {
-        const d = new Date(h.date + 'T00:00:00');
-        return d >= weekStartDate && d < weekEndDate && d.getDay() !== 0 && d.getDay() !== 6;
-      }).length;
-      workingDays = Math.max(0, 5 - holidayCount);
+      if (autoApplyHolidays) {
+        const weekStartDate = new Date(weekStart + 'T00:00:00');
+        const weekEndDate = new Date(weekStartDate);
+        weekEndDate.setDate(weekStartDate.getDate() + 5);
+        const holidayCount = (holidays ?? []).filter(h => {
+          const d = new Date(h.date + 'T00:00:00');
+          return d >= weekStartDate && d < weekEndDate && d.getDay() !== 0 && d.getDay() !== 6;
+        }).length;
+        workingDays = Math.max(0, 5 - holidayCount);
+      }
 
       // Apply company holidays if autoApplyHolidays is checked
       let effectiveWorkingDays = workingDays;
