@@ -261,7 +261,7 @@ Rules:
         // Since Gemini doesn't accept Excel MIME types, we extract text content
         let textContent: string;
         try {
-          textContent = parseXlsxToText(bytes);
+          textContent = await parseXlsxToTextAsync(bytes);
         } catch (e) {
           console.warn("XLSX parse failed, sending raw base64 as text hint:", e);
           textContent = `[Binary Excel file: ${fileName}, ${bytes.length} bytes. Could not parse locally.]`;
