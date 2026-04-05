@@ -110,6 +110,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const { data: allProjects = [] } = useProjects();
   const { statusMap: productionStatusMap } = useProductionStatuses(projectId);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [extractorOpen, setExtractorOpen] = useState(false);
   const currentProject = useMemo(() => allProjects.find((p) => p.project_id === projectId), [allProjects, projectId]);
   const queryClient = useQueryClient();
 
@@ -716,6 +717,11 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         {canManageTPV && (
           <Button size="sm" variant="outline" onClick={() => setWizardOpen(true)}>
             <Upload className="h-3 w-3 mr-1" /> Import z Excelu
+          </Button>
+        )}
+        {canManageTPV && (
+          <Button size="sm" variant="outline" onClick={() => setExtractorOpen(true)}>
+            <FileText className="h-3 w-3 mr-1" /> Nahrát cenovou nabídku
           </Button>
         )}
         {canManageTPV && (
