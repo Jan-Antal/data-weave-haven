@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { ZipReader, BlobReader, TextWriter } from "https://deno.land/x/zipjs@v2.7.34/index.js";
 
-// Simple XLSX parser: unzips the xlsx, reads shared strings + sheet1 XML, outputs CSV-like text
+// XLSX parser: unzips xlsx, reads shared strings + sheet XML, outputs structured tab-separated text
+// Preserves column positions so AI sees proper table structure
 async function parseXlsxToTextAsync(bytes: Uint8Array): Promise<string> {
   const blob = new Blob([bytes]);
   const reader = new ZipReader(new BlobReader(blob));
@@ -13,13 +14,18 @@ async function parseXlsxToTextAsync(bytes: Uint8Array): Promise<string> {
     return await entry.getData(new TextWriter());
   };
 
-  // Read shared strings
+  // Read shared strings (handles <si> with multiple <t> fragments)
   const ssXml = await readEntry("xl/sharedStrings.xml");
   const sharedStrings: string[] = [];
   if (ssXml) {
-    const matches = ssXml.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g);
-    for (const m of matches) {
-      sharedStrings.push(m[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">"));
+    const siMatches = ssXml.matchAll(/<si>([\s\S]*?)<\/si>/g);
+    for (const si of siMatches) {
+      const tParts: string[] = [];
+      const tMatches = si[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g);
+      for (const t of tMatches) {
+        tParts.push(t[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"'));
+      }
+      sharedStrings.push(tParts.join(""));
     }
   }
 
@@ -30,32 +36,69 @@ async function parseXlsxToTextAsync(bytes: Uint8Array): Promise<string> {
     return "[Could not read sheet1]";
   }
 
-  const rows: string[][] = [];
-  const rowMatches = sheetXml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g);
-  for (const rm of rowMatches) {
-    const cells: string[] = [];
-    const cellMatches = rm[1].matchAll(/<c[^>]*?(t="([^"]*)")?[^>]*>([\s\S]*?)<\/c>/g);
-    for (const cm of cellMatches) {
-      const cellType = cm[2] || "";
-      const valMatch = cm[3].match(/<v>([\s\S]*?)<\/v>/);
-      let val = valMatch ? valMatch[1] : "";
-      if (cellType === "s" && sharedStrings[parseInt(val)]) {
-        val = sharedStrings[parseInt(val)];
-      }
-      cells.push(val);
+  // Helper: convert column letters to 0-based index (A=0, B=1, ..., AA=26, etc.)
+  function colToIndex(col: string): number {
+    let idx = 0;
+    for (let i = 0; i < col.length; i++) {
+      idx = idx * 26 + (col.charCodeAt(i) - 64);
     }
-    if (cells.some(c => c.trim())) rows.push(cells);
+    return idx - 1;
+  }
+
+  const rows: Map<number, string[]> = new Map();
+  let maxCol = 0;
+
+  const rowMatches = sheetXml.matchAll(/<row[^>]*?r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g);
+  for (const rm of rowMatches) {
+    const rowNum = parseInt(rm[1]);
+    const cells: string[] = [];
+    // Parse cells with their column reference (e.g., r="B19")
+    const cellMatches = rm[2].matchAll(/<c\s+r="([A-Z]+)\d+"[^>]*?(t="([^"]*)")?[^>]*?>([\s\S]*?)<\/c>/g);
+    
+    const rowCells: [number, string][] = [];
+    for (const cm of cellMatches) {
+      const colRef = cm[1];
+      const cellType = cm[3] || "";
+      const valMatch = cm[4].match(/<v>([\s\S]*?)<\/v>/);
+      let val = valMatch ? valMatch[1] : "";
+      
+      if (cellType === "s") {
+        const idx = parseInt(val);
+        val = (idx >= 0 && idx < sharedStrings.length) ? sharedStrings[idx] : val;
+      } else if (cellType === "inlineStr") {
+        const isMatch = cm[4].match(/<is>[\s\S]*?<t[^>]*>([\s\S]*?)<\/t>[\s\S]*?<\/is>/);
+        if (isMatch) val = isMatch[1];
+      }
+      
+      const colIdx = colToIndex(colRef);
+      if (colIdx > maxCol) maxCol = colIdx;
+      rowCells.push([colIdx, val.trim()]);
+    }
+
+    if (rowCells.length > 0) {
+      // Build sparse row array
+      const arr: string[] = new Array(maxCol + 1).fill("");
+      for (const [ci, v] of rowCells) arr[ci] = v;
+      rows.set(rowNum, arr);
+    }
   }
 
   await reader.close();
 
-  // Convert to tab-separated text (max 200 rows to keep token count manageable)
-  return rows.slice(0, 200).map(r => r.join("\t")).join("\n");
-}
+  // Normalize all rows to same width and output
+  const sortedKeys = [...rows.keys()].sort((a, b) => a - b);
+  const finalWidth = maxCol + 1;
+  const lines: string[] = [];
+  
+  for (const key of sortedKeys.slice(0, 250)) {
+    const row = rows.get(key)!;
+    // Pad to full width
+    while (row.length < finalWidth) row.push("");
+    const line = row.join("\t");
+    if (line.trim()) lines.push(line);
+  }
 
-function parseXlsxToText(bytes: Uint8Array): string {
-  // This is called synchronously but returns a placeholder; we'll use the async version
-  throw new Error("Use parseXlsxToTextAsync instead");
+  return lines.join("\n");
 }
 
 const corsHeaders = {
