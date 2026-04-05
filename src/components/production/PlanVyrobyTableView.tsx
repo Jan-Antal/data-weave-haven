@@ -5,6 +5,7 @@ import { useProductionExpediceData } from "@/hooks/useProductionExpedice";
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
+import { useVyrobniEmployees } from "@/hooks/useCapacityCalc";
 import { useProjects } from "@/hooks/useProjects";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { getTerminalStatuses } from "@/lib/statusHelpers";
@@ -152,7 +153,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   const { data: allProjects = [] } = useProjects();
   const { data: statusOpts = [] } = useProjectStatusOptions();
   const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts), [statusOpts]);
-  const getWeekCapacity = useWeekCapacityLookup();
+  const { data: vyrobniEmps = [] } = useVyrobniEmployees();
+  const bruttoPerDay = vyrobniEmps.reduce((s, e) => s + (e.uvazok_hodiny ?? 8), 0);
+  const getWeekCapacity = useWeekCapacityLookup(bruttoPerDay || undefined);
   const { moveScheduleItemToWeek, moveItemBackToInbox, completeItems, moveInboxItemToWeek, returnBundleToInbox, returnToProduction, mergeSplitItems, mergeBundleSplitGroups } = useProductionDragDrop();
   const qc = useQueryClient();
   const [sortMode, setSortMode] = useState<SortMode>("project");

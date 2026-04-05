@@ -3,6 +3,7 @@ import { productionCzkToSellingPrice } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
+import { useVyrobniEmployees } from "@/hooks/useCapacityCalc";
 import { Search, X, Sparkles, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -1075,7 +1076,9 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
   const { data: scheduleData } = useProductionSchedule();
   const { data: inboxProjects = [] } = useProductionInbox();
   const { data: allProjects = [] } = useProjects();
-  const getWeekCapacity = useWeekCapacityLookup();
+  const { data: vyrobniEmps = [] } = useVyrobniEmployees();
+  const bruttoPerDay = vyrobniEmps.reduce((s, e) => s + (e.uvazok_hodiny ?? 8), 0);
+  const getWeekCapacity = useWeekCapacityLookup(bruttoPerDay || undefined);
 
   const MONTHS_CZ = ["Leden", "Únor", "Březen", "Duben", "Květen", "Červen", "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec"];
 
