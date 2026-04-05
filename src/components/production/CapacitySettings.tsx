@@ -137,27 +137,21 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const dbUtilizationPct = settings?.utilization_pct ?? 83;
   const [localUtilizationPct, setLocalUtilizationPct] = useState(dbUtilizationPct);
 
-  const dbStandardCapacity = settings?.weekly_capacity_hours ?? 875;
-  const [localStandardCapacity, setLocalStandardCapacity] = useState(dbStandardCapacity);
-  const standardCapacity = localStandardCapacity;
-  const [standardCapacityInput, setStandardCapacityInput] = useState<string>(String(dbStandardCapacity));
-  const [capacityInputFocused, setCapacityInputFocused] = useState(false);
+  const totalBruttoWeekly = useMemo(() => totalBruttoDaily * 5, [totalBruttoDaily]);
 
   // Pending local changes for week overrides/resets
   const [pendingWeekOverrides, setPendingWeekOverrides] = useState<Map<number, { cap: number; days: number }>>(new Map());
   const [pendingWeekResets, setPendingWeekResets] = useState<Set<number>>(new Set());
-  const hasPendingChanges = localStandardCapacity !== dbStandardCapacity || localUtilizationPct !== dbUtilizationPct || pendingWeekOverrides.size > 0 || pendingWeekResets.size > 0;
+  const hasPendingChanges = localUtilizationPct !== dbUtilizationPct || pendingWeekOverrides.size > 0 || pendingWeekResets.size > 0;
 
   // Reset local state when dialog opens
   useEffect(() => {
     if (open) {
-      setLocalStandardCapacity(dbStandardCapacity);
-      setStandardCapacityInput(String(dbStandardCapacity));
       setLocalUtilizationPct(dbUtilizationPct);
       setPendingWeekOverrides(new Map());
       setPendingWeekResets(new Set());
     }
-  }, [open, dbStandardCapacity, dbUtilizationPct]);
+  }, [open, dbUtilizationPct]);
 
   // Filtered employees based on toggle state
   const filteredEmployees = useMemo(() => {
@@ -245,37 +239,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     return () => clearTimeout(timer);
   }, [disabledUseky.size, disabledEmployees.size, autoApplyHolidays, open, vyrobniEmployees.length, weekMap.size, triggerAutoRecalc]);
 
-  // Safe math expression evaluator
-  const safeEvalExpr = (expr: string): number | null => {
-    try {
-      if (!/^[\d\s+\-*/().]+$/.test(expr)) return null;
-      const result = Function('"use strict"; return (' + expr + ')')();
-      if (typeof result !== "number" || !isFinite(result) || isNaN(result)) return null;
-      return Math.round(result);
-    } catch { return null; }
-  };
-
-  const isExpr = /[*/()]/.test(standardCapacityInput);
-  const exprPreview = isExpr ? safeEvalExpr(standardCapacityInput) : null;
-
-  const commitCapacityInput = () => {
-    const evaluated = safeEvalExpr(standardCapacityInput);
-    if (evaluated !== null && evaluated > 0) {
-      setLocalStandardCapacity(evaluated);
-      setStandardCapacityInput(String(evaluated));
-    } else {
-      const v = parseInt(standardCapacityInput);
-      if (v > 0) {
-        setLocalStandardCapacity(v);
-        setStandardCapacityInput(String(v));
-      } else {
-        setStandardCapacityInput(String(standardCapacity));
-      }
-    }
-    setCapacityInputFocused(false);
-  };
-  const workingDaysPerWeek = 5;
-  const calculatedHoursPerDay = workingDaysPerWeek > 0 ? Math.round(standardCapacity / workingDaysPerWeek) : 175;
+  const nettoCapacity = Math.round(totalBruttoWeekly * localUtilizationPct / 100);
 
   // Get month for a week number
   const getWeekMonth = useCallback((wn: number): number => {
@@ -290,10 +254,10 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const getWeekTypeLabel = useCallback((week: WeekCapacity, past: boolean): string => {
     if (past) return "Minulý";
     if (week.company_holiday_name) return "Firemní dovolená";
-    if (week.is_manual_override && Math.round(week.capacity_hours) !== Math.round(standardCapacity)) return "Ručně upraveno";
+    if (week.is_manual_override && Math.round(week.capacity_hours) !== Math.round(nettoCapacity)) return "Ručně upraveno";
     if (week.holiday_name) return "Svátek";
     return "Standard";
-  }, [standardCapacity]);
+  }, [nettoCapacity]);
 
   // Visible month range label
   const visibleMonthRange = useMemo(() => {
@@ -319,17 +283,17 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   }, [viewStart, getWeekMonth]);
 
   const maxCapacity = useMemo(() => {
-    let max = standardCapacity;
+    let max = nettoCapacity;
     for (const [, w] of weekMap) {
       if (w.capacity_hours > max) max = w.capacity_hours;
     }
     return max;
-  }, [weekMap, standardCapacity]);
+  }, [weekMap, nettoCapacity]);
 
   // Visible window min/max for dynamic color scaling (excluding past weeks)
   const visibleRange = useMemo(() => {
-    let min = standardCapacity;
-    let max = standardCapacity;
+    let min = nettoCapacity;
+    let max = nettoCapacity;
     const end = Math.min(52, viewStart + VISIBLE_WEEKS - 1);
     for (let wn = viewStart; wn <= end; wn++) {
       const week = weekMap.get(wn);
@@ -341,7 +305,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       if (cap > max) max = cap;
     }
     return { min, max };
-  }, [weekMap, viewStart, selectedYear, currentYear, currentWeek, standardCapacity]);
+  }, [weekMap, viewStart, selectedYear, currentYear, currentWeek, nettoCapacity]);
 
   // Actual daily hours based on employees (for holiday impact)
   const actualDailyHours = useMemo(() => {
@@ -446,30 +410,16 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   // Save ALL pending changes to DB
   const handleSaveAll = async () => {
     try {
-      // 1. Save standard capacity + utilization if changed
-      const settingsUpdates: Record<string, any> = {};
-      if (localStandardCapacity !== dbStandardCapacity) {
-        settingsUpdates.weekly_capacity_hours = localStandardCapacity;
-        settingsUpdates.monthly_capacity_hours = localStandardCapacity * 4;
-      }
+      // 1. Save utilization if changed
       if (localUtilizationPct !== dbUtilizationPct) {
-        settingsUpdates.utilization_pct = localUtilizationPct;
-      }
-      if (Object.keys(settingsUpdates).length > 0) {
-        await updateSettings.mutateAsync(settingsUpdates as any);
-        if (settingsUpdates.weekly_capacity_hours) {
-          const futureFromWeek = selectedYear < currentYear ? 53 : (selectedYear === currentYear ? currentWeek + 1 : 1);
-          if (futureFromWeek <= 52) {
-            await bulkUpdate.mutateAsync({ year: selectedYear, fromWeek: futureFromWeek, capacity: localStandardCapacity, workingDays: workingDaysPerWeek });
-          }
-        }
+        await updateSettings.mutateAsync({ utilization_pct: localUtilizationPct } as any);
       }
 
       // 2. Apply week overrides
       for (const [wn, { cap, days }] of pendingWeekOverrides) {
         const week = weekMap.get(wn);
         if (!week) continue;
-        const isActuallyDifferent = cap !== localStandardCapacity || week.holiday_name;
+        const isActuallyDifferent = cap !== nettoCapacity || week.holiday_name;
         await upsertWeek.mutateAsync({
           week_year: selectedYear,
           week_number: wn,
@@ -502,8 +452,6 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   };
 
   const handleCancel = () => {
-    setLocalStandardCapacity(dbStandardCapacity);
-    setStandardCapacityInput(String(dbStandardCapacity));
     setLocalUtilizationPct(dbUtilizationPct);
     setPendingWeekOverrides(new Map());
     setPendingWeekResets(new Set());
@@ -580,60 +528,54 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
         <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-4">
 
-        {/* Standard Capacity */}
+        {/* Standard Capacity — informational with live data */}
         <div className="border border-border rounded-lg p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-foreground">Standardní kapacita</h3>
-          <div className="grid grid-cols-4 gap-4">
-            <div>
-              <label className="text-xs text-muted-foreground">Kapacita (h/týden)</label>
-              <Input
-                type="text"
-                inputMode="numeric"
-                value={capacityInputFocused ? standardCapacityInput : String(standardCapacity)}
-                onFocus={() => {
-                  setCapacityInputFocused(true);
-                  setStandardCapacityInput(String(standardCapacity));
-                }}
-                onChange={e => setStandardCapacityInput(e.target.value)}
-                onBlur={commitCapacityInput}
-                onKeyDown={e => {
-                  if (e.key === "Enter") { e.preventDefault(); commitCapacityInput(); (e.target as HTMLInputElement).blur(); }
-                  if (e.key === "Escape") { setStandardCapacityInput(String(standardCapacity)); setCapacityInputFocused(false); (e.target as HTMLInputElement).blur(); }
-                }}
-                className="h-8 text-sm font-sans"
-              />
-              {capacityInputFocused && isExpr && exprPreview !== null && (
-                <div className="text-[10px] text-muted-foreground mt-0.5 font-sans">= {exprPreview}</div>
-              )}
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Pracovní dny</label>
-              <Input type="number" value={workingDaysPerWeek} disabled className="h-8 text-sm font-sans bg-muted" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Hodin za den</label>
-              <Input type="number" value={calculatedHoursPerDay} disabled className="h-8 text-sm font-sans bg-muted" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Využití kapacity (%)</label>
-              <Input
-                type="number"
-                min={1}
-                max={100}
-                value={localUtilizationPct}
-                onChange={e => setLocalUtilizationPct(Math.max(1, Math.min(100, Number(e.target.value) || 83)))}
-                className="h-8 text-sm font-sans"
-              />
-              <p className="text-[10px] text-muted-foreground mt-0.5">Efektivní využití pracovní doby. Výchozí: 83 %</p>
-            </div>
-          </div>
           <div className="flex items-center justify-between">
-            <p className="text-[10px] text-muted-foreground">Změna kapacity ovlivní pouze týdny od dneška vpřed. Minulé týdny zůstanou nezměněny.</p>
+            <h3 className="text-sm font-semibold text-foreground">Kapacita výroby</h3>
             <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleRecalculateAll} disabled={isRecalculating || vyrobniEmployees.length === 0}>
               <RotateCcw className={cn("h-3 w-3 mr-1", isRecalculating && "animate-spin")} />
               {isRecalculating ? "Přepočítávám…" : "Přepočítat vše"}
             </Button>
           </div>
+          <div className="grid grid-cols-4 gap-3">
+            {/* Column 1 — Zaměstnanci */}
+            <div className="bg-muted/40 rounded-lg p-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Výrobní zaměstnanci</div>
+              <div className="text-2xl font-semibold font-sans mt-1">{vyrobniEmployees.length} <span className="text-sm font-normal text-muted-foreground">osob</span></div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">Z tabulky zaměstnanců</div>
+            </div>
+            {/* Column 2 — Brutto fond */}
+            <div className="bg-muted/40 rounded-lg p-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Brutto fond</div>
+              <div className="text-2xl font-semibold font-sans mt-1">{totalBruttoWeekly} <span className="text-sm font-normal text-muted-foreground">h/týden</span></div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">{totalBruttoDaily} h/den × 5 dní</div>
+            </div>
+            {/* Column 3 — Využití (editable) */}
+            <div className="bg-muted/40 rounded-lg p-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Využití kapacity</div>
+              <div className="flex items-baseline gap-1 mt-1">
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={localUtilizationPct}
+                  onChange={e => setLocalUtilizationPct(Math.max(1, Math.min(100, Number(e.target.value) || 83)))}
+                  className="h-8 w-20 text-lg font-semibold font-sans"
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+              </div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">Výchozí: 83 %</div>
+            </div>
+            {/* Column 4 — Čistá kapacita */}
+            <div className="bg-muted/40 rounded-lg p-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Čistá kapacita</div>
+              <div className="text-2xl font-semibold font-sans mt-1 text-amber-600">{nettoCapacity} <span className="text-sm font-normal">h/týden</span></div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">{Math.round(nettoCapacity * 52 / 12)} h/měsíc</div>
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Kapacita se přepočítává automaticky ze zaměstnanců v sekcích Složení výrobní kapacity. Upravte pouze využití kapacity.
+          </p>
         </div>
 
         {/* Dílny breakdown panel with expandable employee lists */}
@@ -833,7 +775,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               <div
                 className="absolute left-0 right-0 border-t-2 border-dashed z-10 pointer-events-none"
                 style={{
-                  top: `${Math.max(0, 140 - (standardCapacity / (maxCapacity * 1.1)) * 140)}px`,
+                  top: `${Math.max(0, 140 - (nettoCapacity / (maxCapacity * 1.1)) * 140)}px`,
                   borderColor: "hsl(var(--destructive) / 0.4)",
                 }}
               />
@@ -848,7 +790,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   const isBarSelected = selectedWeeks.has(wn);
                   const typeLabel = getWeekTypeLabel(week, past);
 
-                  const barColor = past ? PAST_WEEK_COLOR : getCapacityColorDynamic(cap, standardCapacity, visibleRange.min, visibleRange.max);
+                  const barColor = past ? PAST_WEEK_COLOR : getCapacityColorDynamic(cap, nettoCapacity, visibleRange.min, visibleRange.max);
 
                   const weekStart = new Date(week.week_start + "T00:00:00");
                   const weekEnd = new Date(weekStart);
@@ -924,8 +866,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               weekNum={firstEditingWeek}
               selectedCount={editingWeeks.length}
               isPast={isPastWeek(firstEditingWeek)}
-              standardCapacity={standardCapacity}
-              hoursPerDay={calculatedHoursPerDay}
+              standardCapacity={nettoCapacity}
+              hoursPerDay={8}
               onSave={(cap, days) => handleWeekCapacityUpdate(editingWeeks, cap, days)}
               onReset={() => handleResetWeeks(editingWeeks)}
               onClose={() => setSelectedWeeks(new Set())}
