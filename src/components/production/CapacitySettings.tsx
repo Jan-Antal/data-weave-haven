@@ -1033,7 +1033,7 @@ function WeekEditor({ week, weekNum, selectedCount, isPast, standardCapacity, ho
   weekEnd.setDate(weekStart.getDate() + 6);
 
   const formatDate = (d: Date) => `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
-  const step = hoursPerDay || 8;
+  const step = 8;
 
   const save = () => {
     const v = parseInt(cap);
