@@ -94,23 +94,29 @@ serve(async (req) => {
 
     // Action: search — find cenová nabídka files
     if (action === "search") {
-      // Primary: look in the dedicated Cenova-nabidka folder
+      const allFiles: any[] = [];
+
+      // 1. Look in the dedicated Cenova-nabidka folder
       const cnPath = `${LIB_ROOT}/${projectId}/${CN_FOLDER}`;
       const cnFiles = await listFilesInFolder(token, driveId, cnPath);
+      for (const f of cnFiles) allFiles.push({ ...f, source: "cn_folder" });
 
-      if (cnFiles.length > 0) {
-        // All files in the CN folder are candidates
-        return new Response(JSON.stringify({ matches: cnFiles, totalFiles: cnFiles.length }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // Fallback: check root project folder for files matching CN pattern
+      // 2. Also check root project folder
       const rootPath = `${LIB_ROOT}/${projectId}`;
       const rootFiles = await listFilesInFolder(token, driveId, rootPath);
-      const rootMatches = rootFiles.filter((f: any) => isCenovaNabidka(f.name));
+      const seenIds = new Set(allFiles.map((f: any) => f.itemId));
+      for (const f of rootFiles) {
+        if (!seenIds.has(f.itemId)) allFiles.push({ ...f, source: "root" });
+      }
 
-      return new Response(JSON.stringify({ matches: rootMatches, totalFiles: rootFiles.length }), {
+      // Auto-match: files that look like cenová nabídka
+      const autoMatches = allFiles.filter((f: any) => isCenovaNabidka(f.name) || f.source === "cn_folder");
+
+      return new Response(JSON.stringify({
+        autoMatches,
+        allFiles,
+        totalFiles: allFiles.length,
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

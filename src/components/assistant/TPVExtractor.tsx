@@ -22,7 +22,7 @@ interface SPMatch {
   size: number;
 }
 
-type Phase = "searching" | "found" | "multiple" | "not-found" | "extracting" | "done" | "error";
+type Phase = "searching" | "found" | "multiple" | "not-found" | "extracting" | "done" | "error" | "pick-or-upload";
 
 interface TPVExtractorProps {
   projectId: string;
@@ -34,6 +34,7 @@ interface TPVExtractorProps {
 export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtractorProps) {
   const [phase, setPhase] = useState<Phase>("searching");
   const [matches, setMatches] = useState<SPMatch[]>([]);
+  const [allSpFiles, setAllSpFiles] = useState<SPMatch[]>([]);
   const [foundFileName, setFoundFileName] = useState("");
   const [items, setItems] = useState<ExtractedItem[]>([]);
   const [saving, setSaving] = useState(false);
@@ -73,19 +74,21 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      const found: SPMatch[] = data.matches || [];
-      setMatches(found);
+      const autoMatches: SPMatch[] = data.autoMatches || [];
+      const allFiles: SPMatch[] = data.allFiles || [];
+      setMatches(autoMatches);
+      setAllSpFiles(allFiles);
 
-      if (found.length === 1) {
+      if (autoMatches.length === 1) {
         setPhase("found");
-        setFoundFileName(found[0].name);
-        // Auto-trigger extraction
+        setFoundFileName(autoMatches[0].name);
         autoExtractTriggered.current = true;
-        extractFromSharePoint(found[0].itemId, found[0].name);
-      } else if (found.length > 1) {
+        extractFromSharePoint(autoMatches[0].itemId, autoMatches[0].name);
+      } else if (autoMatches.length > 1) {
         setPhase("multiple");
       } else {
-        setPhase("not-found");
+        // No auto-match — offer pick from SP or upload
+        setPhase(allFiles.length > 0 ? "pick-or-upload" : "not-found");
       }
     } catch (err: any) {
       console.error("SharePoint search error:", err);
@@ -341,35 +344,59 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
           </div>
         )}
 
-        {/* Phase: Not found — manual upload fallback */}
+        {/* Phase: Pick from SharePoint or upload */}
+        {phase === "pick-or-upload" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Search className="h-4 w-4" />
+              Cenová nabídka nebyla rozpoznána automaticky. Vyberte soubor ze SharePointu nebo nahrajte nový:
+            </div>
+            <div className="space-y-1 max-h-48 overflow-auto">
+              {allSpFiles.map((m) => (
+                <button
+                  key={m.itemId}
+                  onClick={() => extractFromSharePoint(m.itemId, m.name)}
+                  className="w-full text-left px-3 py-2 rounded-md border border-input hover:bg-accent transition-colors text-sm flex items-center gap-2"
+                >
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  {m.name}
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {(m.size / 1024).toFixed(0)} KB
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 pt-2 border-t">
+              <span className="text-xs text-muted-foreground">nebo</span>
+              <label className="flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background hover:bg-accent cursor-pointer text-sm transition-colors">
+                <Upload className="h-4 w-4" />
+                {manualFile ? manualFile.name : "Nahrát nový soubor"}
+                <input type="file" accept=".pdf,.xlsx,.xls" onChange={handleManualFileChange} className="hidden" />
+              </label>
+              {manualFile && (
+                <Button size="sm" onClick={handleManualExtract} disabled={manualLoading} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                  {manualLoading ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Extrahuji…</> : "Extrahovat"}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Phase: Not found — no SP files at all */}
         {phase === "not-found" && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <AlertCircle className="h-4 w-4" />
-              Nebyla nalezena cenová nabídka v dokumentech projektu
+              V SharePointu nebyly nalezeny žádné dokumenty projektu
             </div>
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background hover:bg-accent cursor-pointer text-sm transition-colors">
                 <Upload className="h-4 w-4" />
                 {manualFile ? manualFile.name : "Nahrát soubor"}
-                <input
-                  type="file"
-                  accept=".pdf,.xlsx,.xls"
-                  onChange={handleManualFileChange}
-                  className="hidden"
-                />
+                <input type="file" accept=".pdf,.xlsx,.xls" onChange={handleManualFileChange} className="hidden" />
               </label>
-              <Button
-                size="sm"
-                onClick={handleManualExtract}
-                disabled={!manualFile || manualLoading}
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                {manualLoading ? (
-                  <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Extrahuji…</>
-                ) : (
-                  "Extrahovat položky"
-                )}
+              <Button size="sm" onClick={handleManualExtract} disabled={!manualFile || manualLoading} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                {manualLoading ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Extrahuji…</> : "Extrahovat položky"}
               </Button>
             </div>
           </div>
