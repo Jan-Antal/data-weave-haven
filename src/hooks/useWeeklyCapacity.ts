@@ -202,23 +202,33 @@ export function useWeeklyCapacity(year: number) {
       }
     }
 
-    // Apply company holidays
+    // Apply company holidays — reduce by actual working days in range, not set to 0
     if (companyHolidays) {
       for (const ch of companyHolidays) {
-        const start = new Date(ch.start_date + "T00:00:00");
-        const end = new Date(ch.end_date + "T00:00:00");
-        // Find all weeks that overlap
+        const chStart = new Date(ch.start_date + "T00:00:00");
+        const chEnd = new Date(ch.end_date + "T00:00:00");
         for (let wn = 1; wn <= 52; wn++) {
           const entry = map.get(wn);
           if (!entry) continue;
           const weekMon = new Date(entry.week_start + "T00:00:00");
-          const weekSun = new Date(weekMon);
-          weekSun.setDate(weekMon.getDate() + 6);
+          const weekFri = new Date(weekMon);
+          weekFri.setDate(weekMon.getDate() + 4);
           // Check overlap
-          if (weekMon <= end && weekSun >= start) {
-            // If not manually overridden in DB
+          if (weekMon <= chEnd && weekFri >= chStart) {
             if (!entry.is_manual_override) {
-              entry.capacity_hours = ch.capacity_override;
+              // Count working days within the company holiday range
+              let holidayDays = 0;
+              const cur = new Date(weekMon);
+              for (let d = 0; d < 5; d++) {
+                const dow = cur.getDay();
+                if (dow !== 0 && dow !== 6 && cur >= chStart && cur <= chEnd) {
+                  holidayDays++;
+                }
+                cur.setDate(cur.getDate() + 1);
+              }
+              const effectiveWorkingDays = Math.max(0, entry.working_days - holidayDays);
+              entry.capacity_hours = Math.round(effectiveWorkingDays * hoursPerDay);
+              entry.working_days = effectiveWorkingDays;
               entry.company_holiday_name = ch.name;
             }
           }

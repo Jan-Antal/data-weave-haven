@@ -93,6 +93,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [expandedUsek, setExpandedUsek] = useState<string | null>(null);
+  const [disabledUseky, setDisabledUseky] = useState<Set<string>>(new Set());
+  const [disabledEmployees, setDisabledEmployees] = useState<Set<string>>(new Set());
   const { role } = useAuth();
   const isAdmin = role === "admin" || role === "owner";
   const VISIBLE_WEEKS = 12;
@@ -149,19 +151,37 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     }
   }, [open, dbStandardCapacity, dbUtilizationPct]);
 
+  // Filtered employees based on toggle state
+  const filteredEmployees = useMemo(() => {
+    return vyrobniEmployees.filter(emp => {
+      if (disabledEmployees.has(emp.id)) return false;
+      const key = normalizeUsek(emp.usek);
+      if (key && disabledUseky.has(key)) return false;
+      return true;
+    });
+  }, [vyrobniEmployees, disabledEmployees, disabledUseky]);
+
+  // Working days helper respecting autoApplyHolidays toggle
+  const getWorkingDaysForWeek = useCallback((wn: number): number => {
+    if (!autoApplyHolidays) return 5;
+    const week = weekMap.get(wn);
+    if (week?.working_days != null) return week.working_days;
+    return 5;
+  }, [autoApplyHolidays, weekMap]);
+
   // Auto-recalculate non-override weeks
   const triggerAutoRecalc = useCallback(async () => {
-    if (vyrobniEmployees.length === 0) return;
+    if (filteredEmployees.length === 0) return;
     try {
-      const absMap = await fetchAbsencesForYear(selectedYear, vyrobniEmployees);
+      const absMap = await fetchAbsencesForYear(selectedYear, filteredEmployees);
       const upserts: Array<Record<string, any>> = [];
       for (let wn = 1; wn <= 52; wn++) {
         const week = weekMap.get(wn);
         if (week?.is_manual_override) continue;
         const weekStart = week?.week_start ?? getWeekStartFromNumber(selectedYear, wn);
-        const workingDays = week?.working_days ?? 5;
+        const workingDays = getWorkingDaysForWeek(wn);
         const absHours = absMap.get(weekStart) ?? 0;
-        const calc = computeWeekCapacity(vyrobniEmployees, absHours, workingDays, localUtilizationPct, weekStart);
+        const calc = computeWeekCapacity(filteredEmployees, absHours, workingDays, localUtilizationPct, weekStart);
         const shouldUpsert = !week || Math.round(calc.capacity) !== Math.round(week.capacity_hours);
         if (shouldUpsert) {
           upserts.push({
@@ -187,7 +207,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       await supabase.from("production_capacity" as any).upsert(upserts as any, { onConflict: "week_year,week_number" });
       queryClient.invalidateQueries({ queryKey: ["production-capacity", selectedYear] });
     } catch { /* silent */ }
-  }, [vyrobniEmployees, weekMap, selectedYear, localUtilizationPct, queryClient]);
+  }, [filteredEmployees, weekMap, selectedYear, localUtilizationPct, queryClient, getWorkingDaysForWeek]);
 
   // Trigger auto-recalc when data is ready
   useEffect(() => {
@@ -199,12 +219,23 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   // CHANGE 3: Trigger recalc when utilization changes
   const utilizationRef = useRef(localUtilizationPct);
   useEffect(() => {
-    if (!open || vyrobniEmployees.length === 0 || weekMap.size === 0) return;
+    if (!open || filteredEmployees.length === 0 || weekMap.size === 0) return;
     if (utilizationRef.current === localUtilizationPct) return;
     utilizationRef.current = localUtilizationPct;
     const timer = setTimeout(() => triggerAutoRecalc(), 800);
     return () => clearTimeout(timer);
-  }, [localUtilizationPct, open, vyrobniEmployees.length, weekMap.size, triggerAutoRecalc]);
+  }, [localUtilizationPct, open, filteredEmployees.length, weekMap.size, triggerAutoRecalc]);
+
+  // BUG 3+4: Trigger recalc when disabled toggles or autoApplyHolidays change
+  const disabledRef = useRef({ useky: disabledUseky.size, emps: disabledEmployees.size, holidays: autoApplyHolidays });
+  useEffect(() => {
+    if (!open || vyrobniEmployees.length === 0 || weekMap.size === 0) return;
+    const prev = disabledRef.current;
+    if (prev.useky === disabledUseky.size && prev.emps === disabledEmployees.size && prev.holidays === autoApplyHolidays) return;
+    disabledRef.current = { useky: disabledUseky.size, emps: disabledEmployees.size, holidays: autoApplyHolidays };
+    const timer = setTimeout(() => triggerAutoRecalc(), 500);
+    return () => clearTimeout(timer);
+  }, [disabledUseky.size, disabledEmployees.size, autoApplyHolidays, open, vyrobniEmployees.length, weekMap.size, triggerAutoRecalc]);
 
   // Safe math expression evaluator
   const safeEvalExpr = (expr: string): number | null => {
@@ -362,18 +393,18 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
   // Recalculate all non-override weeks
   const handleRecalculateAll = async () => {
-    if (vyrobniEmployees.length === 0) return;
+    if (filteredEmployees.length === 0) return;
     setIsRecalculating(true);
     try {
-      const absMap = await fetchAbsencesForYear(selectedYear, vyrobniEmployees);
+      const absMap = await fetchAbsencesForYear(selectedYear, filteredEmployees);
       const upserts: Array<Record<string, any>> = [];
       for (let wn = 1; wn <= 52; wn++) {
         const week = weekMap.get(wn);
         if (week?.is_manual_override) continue;
         const weekStart = week?.week_start ?? getWeekStartFromNumber(selectedYear, wn);
-        const workingDays = week?.working_days ?? 5;
+        const workingDays = getWorkingDaysForWeek(wn);
         const absHours = absMap.get(weekStart) ?? 0;
-        const calc = computeWeekCapacity(vyrobniEmployees, absHours, workingDays, localUtilizationPct, weekStart);
+        const calc = computeWeekCapacity(filteredEmployees, absHours, workingDays, localUtilizationPct, weekStart);
         upserts.push({
           week_year: selectedYear,
           week_number: wn,
@@ -613,8 +644,20 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               groups[usekKey].employees.push(emp);
             }
           }
-          const totalCount = Object.values(groups).reduce((s, g) => s + g.count, 0);
-          const totalWeekly = Object.values(groups).reduce((s, g) => s + g.weeklyHours, 0);
+          // Filtered totals
+          const filteredGroups: Record<string, {count: number, weeklyHours: number}> = {
+            dilna1: {count:0, weeklyHours:0}, dilna2: {count:0, weeklyHours:0},
+            dilna3: {count:0, weeklyHours:0}, sklad: {count:0, weeklyHours:0},
+          };
+          for (const emp of filteredEmployees) {
+            const usekKey = normalizeUsek(emp.usek);
+            if (usekKey && filteredGroups[usekKey]) {
+              filteredGroups[usekKey].count++;
+              filteredGroups[usekKey].weeklyHours += (emp.uvazok_hodiny ?? 8) * 5;
+            }
+          }
+          const totalCount = Object.values(filteredGroups).reduce((s, g) => s + g.count, 0);
+          const totalWeekly = Object.values(filteredGroups).reduce((s, g) => s + g.weeklyHours, 0);
           const totalMonthly = Math.round(totalWeekly * 52 / 12);
           const totalNetto = Math.round(totalWeekly * localUtilizationPct / 100);
           const labels: Record<string, string> = { dilna1: "Dílna 1", dilna2: "Dílna 2", dilna3: "Dílna 3", sklad: "Sklad" };
@@ -628,6 +671,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="bg-muted/50 border-b border-border">
+                      <th className="text-left px-3 py-1.5 font-medium text-muted-foreground w-5"></th>
                       <th className="text-left px-3 py-1.5 font-medium text-muted-foreground">Úsek</th>
                       <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Zaměstnanci</th>
                       <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Fond (brutto)</th>
@@ -637,8 +681,10 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   <tbody>
                     {(["dilna1","dilna2","dilna3","sklad"] as const).map(key => {
                       const g = groups[key];
+                      const fg = filteredGroups[key];
                       const isExpanded = expandedUsek === key;
-                      const netto = Math.round(g.weeklyHours * localUtilizationPct / 100);
+                      const isUsekDisabled = disabledUseky.has(key);
+                      const netto = Math.round(fg.weeklyHours * localUtilizationPct / 100);
                       const threeMonthsAgo = new Date();
                       threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
                       return (
@@ -647,19 +693,51 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                             className="border-b border-border last:border-0 cursor-pointer hover:bg-muted/30 transition-colors"
                             onClick={() => setExpandedUsek(isExpanded ? null : key)}
                           >
-                            <td className="px-3 py-1 text-foreground flex items-center gap-1">
+                            <td className="px-1 py-1">
+                              <input
+                                type="checkbox"
+                                checked={!isUsekDisabled}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  setDisabledUseky(prev => {
+                                    const next = new Set(prev);
+                                    if (next.has(key)) next.delete(key); else next.add(key);
+                                    return next;
+                                  });
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="rounded"
+                              />
+                            </td>
+                            <td className={cn("px-3 py-1 flex items-center gap-1", isUsekDisabled && "text-muted-foreground line-through")}>
                               {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
                               {labels[key]}
                             </td>
-                            <td className="px-3 py-1 text-right font-sans text-foreground">{g.count}</td>
-                            <td className="px-3 py-1 text-right font-sans text-foreground">{g.weeklyHours} h</td>
-                            <td className="px-3 py-1 text-right font-sans text-foreground">{netto} h</td>
+                            <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-foreground")}>{g.count}</td>
+                            <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-foreground")}>{fg.weeklyHours} h</td>
+                            <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-foreground")}>{netto} h</td>
                           </tr>
                           {isExpanded && g.employees.length > 0 && g.employees.map(emp => {
+                            const isEmpDisabled = disabledEmployees.has(emp.id) || isUsekDisabled;
                             const isRecent = emp.activated_at && new Date(emp.activated_at) > threeMonthsAgo;
                             return (
                               <tr key={emp.id} className="bg-muted/20 border-b border-border/30">
-                                <td className="pl-8 pr-3 py-0.5 text-muted-foreground">
+                                <td className="px-1 py-0.5">
+                                  <input
+                                    type="checkbox"
+                                    checked={!disabledEmployees.has(emp.id) && !isUsekDisabled}
+                                    disabled={isUsekDisabled}
+                                    onChange={() => {
+                                      setDisabledEmployees(prev => {
+                                        const next = new Set(prev);
+                                        if (next.has(emp.id)) next.delete(emp.id); else next.add(emp.id);
+                                        return next;
+                                      });
+                                    }}
+                                    className="rounded"
+                                  />
+                                </td>
+                                <td className={cn("pl-8 pr-3 py-0.5", isEmpDisabled ? "text-muted-foreground line-through" : "text-muted-foreground")}>
                                   {emp.meno || emp.id.slice(0, 8)}
                                   {isRecent && (
                                     <span className="ml-1.5 text-[10px] text-emerald-600">od {emp.activated_at?.split("T")[0]}</span>
@@ -675,6 +753,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                       );
                     })}
                     <tr className="bg-muted/30 font-semibold">
+                      <td className="px-1 py-1.5"></td>
                       <td className="px-3 py-1.5 text-foreground">Celkem</td>
                       <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalCount}</td>
                       <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalWeekly} h</td>
@@ -686,6 +765,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               <p className="text-[10px] text-muted-foreground italic">
                 Skutečná kapacita = {totalNetto} h/týden (fond {totalWeekly}h × využití {localUtilizationPct}%)
               </p>
+              <p className="text-[10px] text-muted-foreground">Změny ovlivní výpočet kapacity po přepočtení.</p>
             </div>
           );
         })()}
@@ -1033,7 +1113,7 @@ function WeekEditor({ week, weekNum, selectedCount, isPast, standardCapacity, ho
   weekEnd.setDate(weekStart.getDate() + 6);
 
   const formatDate = (d: Date) => `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
-  const step = hoursPerDay || 8;
+  const step = 8;
 
   const save = () => {
     const v = parseInt(cap);

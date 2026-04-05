@@ -38,37 +38,29 @@ export function normalizeUsek(usek: string): UsekKey | null {
 
 /**
  * Count how many working days an employee was active during a given week.
- * Handles mid-week activation/deactivation proportionally.
+ * activated_at is treated as import date, not hire date — employees existed before import.
+ * Only deactivated_at matters for exclusion.
  */
 export function getActiveWorkingDays(emp: EmployeeRow, weekStart: string, workingDays: number): number {
+  if (!emp.deactivated_at) return workingDays; // still active, full week
   const wStart = new Date(weekStart + "T00:00:00");
+  const deactDate = new Date(emp.deactivated_at);
+  if (deactDate <= wStart) return 0; // already gone before this week
+  // Partial week: deactivated mid-week
   const wEnd = new Date(wStart);
-  wEnd.setDate(wStart.getDate() + 5); // Friday end (5 working days span)
-
-  let effectiveStart = wStart;
-  let effectiveEnd = wEnd;
-
-  if (emp.activated_at) {
-    const actDate = new Date(emp.activated_at);
-    if (actDate >= wEnd) return 0; // not active yet
-    if (actDate > wStart) effectiveStart = actDate;
-  }
-
-  if (emp.deactivated_at) {
-    const deactDate = new Date(emp.deactivated_at);
-    if (deactDate <= wStart) return 0; // already gone
-    if (deactDate < wEnd) effectiveEnd = deactDate;
-  }
-
-  const daysActive = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / 86400000);
+  wEnd.setDate(wStart.getDate() + workingDays);
+  if (deactDate >= wEnd) return workingDays; // active whole week
+  const daysActive = Math.ceil((deactDate.getTime() - wStart.getTime()) / 86400000);
   return Math.max(0, Math.min(workingDays, daysActive));
 }
 
 /**
- * Check if employee was active during a given week (at least 1 day).
+ * Check if employee was active during a given week.
+ * activated_at is import date — employees existed before. Only deactivated_at excludes.
  */
 export function isEmployeeActiveInWeek(emp: EmployeeRow, weekStart: string): boolean {
-  return getActiveWorkingDays(emp, weekStart, 5) > 0;
+  if (!emp.deactivated_at) return true;
+  return new Date(emp.deactivated_at) > new Date(weekStart + "T00:00:00");
 }
 
 /**
