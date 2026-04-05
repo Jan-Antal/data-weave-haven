@@ -5,6 +5,7 @@ import { useProductionExpediceData } from "@/hooks/useProductionExpedice";
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
+import { useVyrobniEmployees } from "@/hooks/useCapacityCalc";
 import { useProjects } from "@/hooks/useProjects";
 import { useProjectStatusOptions } from "@/hooks/useProjectStatusOptions";
 import { getTerminalStatuses } from "@/lib/statusHelpers";

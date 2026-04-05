@@ -6,6 +6,7 @@ import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useProductionSchedule } from "@/hooks/useProductionSchedule";
 import { useProjects } from "@/hooks/useProjects";
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
+import { useVyrobniEmployees } from "@/hooks/useCapacityCalc";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 import { getProjectColor } from "@/lib/projectColors";
 import { supabase } from "@/integrations/supabase/client";

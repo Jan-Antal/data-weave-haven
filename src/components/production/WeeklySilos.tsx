@@ -6,6 +6,7 @@ import { differenceInDays, format } from "date-fns";
 import { useProductionSchedule, getISOWeekNumber, type WeekSilo, type ScheduleBundle, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
+import { useVyrobniEmployees } from "@/hooks/useCapacityCalc";
 import { getProjectColor } from "@/lib/projectColors";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
