@@ -215,15 +215,22 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     } catch { /* silent */ }
   }, [filteredEmployees, weekMap, selectedYear, localUtilizationPct, queryClient, getWorkingDaysForWeek]);
 
-  // Trigger auto-recalc when data is ready (ref-based, fires once)
-  const hasRecalcedRef = useRef(false);
+  // Reset flag when dialog closes
+  const hasAutoRecalced = useRef(false);
   useEffect(() => {
-    if (!open) { hasRecalcedRef.current = false; return; }
-    if (hasRecalcedRef.current) return;
-    if (vyrobniEmployees.length > 0 && weekMap.size > 0) {
-      hasRecalcedRef.current = true;
-      handleRecalculateAll();
-    }
+    if (!open) hasAutoRecalced.current = false;
+  }, [open]);
+
+  // Fire recalc once when dialog opens AND both data sources are ready
+  useEffect(() => {
+    if (!open) return;
+    if (hasAutoRecalced.current) return;
+    if (vyrobniEmployees.length === 0) return;
+    if (weekMap.size === 0) return;
+    hasAutoRecalced.current = true;
+    const t = setTimeout(() => handleRecalculateAll(), 100);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, vyrobniEmployees.length, weekMap.size]);
 
   // CHANGE 3: Trigger recalc when utilization changes
@@ -315,10 +322,10 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     return { min, max };
   }, [weekMap, viewStart, selectedYear, currentYear, currentWeek, nettoCapacity]);
 
-  // Actual daily hours based on employees (for holiday impact)
-  const actualDailyHours = useMemo(() => {
-    return vyrobniEmployees.reduce((s, e) => s + (e.uvazok_hodiny ?? 8), 0);
-  }, [vyrobniEmployees]);
+  // Selected (filtered) daily hours for holiday impact — respects disabled úseky/employees
+  const totalBruttoSelectedDaily = useMemo(() => {
+    return filteredEmployees.reduce((s, e) => s + (e.uvazok_hodiny ?? 8), 0);
+  }, [filteredEmployees]);
 
   // Holiday impact summary
   const holidayImpacts = useMemo(() => {
@@ -333,12 +340,12 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
         date: `${d.getDate()}. ${d.getMonth() + 1}.`,
         name: h.localName,
         weekNum: wn,
-        reducedHours: actualDailyHours,
+        reducedHours: totalBruttoSelectedDaily,
         workingDays: week?.working_days ?? 4,
       });
     }
     return impacts;
-  }, [holidays, weekMap, actualDailyHours]);
+  }, [holidays, weekMap, totalBruttoSelectedDaily]);
 
   // Buffer week capacity changes locally
   const handleWeekCapacityUpdate = (weeks: number[], capacity: number, workingDays: number) => {
@@ -911,7 +918,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                       <td className="py-1 pr-2 font-sans">{h.date}</td>
                       <td className="py-1 pr-2">{h.name}</td>
                       <td className="py-1 pr-2 font-sans">T{h.weekNum}</td>
-                      <td className="py-1 font-sans text-amber-600">-{h.reducedHours}h · kapacita týdne: {Math.round((actualDailyHours * h.workingDays) * localUtilizationPct / 100)}h</td>
+                      <td className="py-1 font-sans text-amber-600">-{h.reducedHours}h · kapacita týdne: {Math.round((totalBruttoSelectedDaily * h.workingDays) * localUtilizationPct / 100)}h</td>
                     </tr>
                   ))}
                 </tbody>
