@@ -7,16 +7,25 @@ const corsHeaders = {
 };
 
 const SYSTEM_PROMPT = `You extract line items from Czech furniture price offers (cenová nabídka).
-Return ONLY a valid JSON array, no markdown, no explanation:
-[{"item_name":"T01","nazev":"Kuchyňská linka","popis":"full description with materials, dimensions, hardware","cena":12500.00,"pocet":1}]
-Rules:
-- item_name = short code from the document (T01, K01, D-01, etc.). If no code, generate a short code (max 10 chars).
-- nazev = short item name / title (e.g. "Kuchyňská linka", "Skříň rohová", "Pracovní deska"). Max 50 chars.
-- popis = full item description including material details, dimensions, hardware specs. Merge sub-rows into parent.
+Return ONLY a valid JSON array, no markdown, no explanation.
+
+Example output:
+[{"item_name":"T01","nazev":"Kuchyňská linka","popis_short":"Kuchyň 5920×700×2650, dýha dub, Blum","popis_full":"Kuchyňská sestava 5920×700×2650mm, korpus DTD lamino bílá, čela MDF lakovaná RAL 9010 mat, pracovní deska kompakt 12mm, kování Blum Aventos HK-S, Tandembox antaro, dřez nerez","cena":258397,"pocet":1}]
+
+Field definitions:
+- item_name = short code exactly as in the document (T01, K01, D-01, etc.). If no code exists, create one from first letter + number (max 10 chars).
+- nazev = SHORT item name, what the item IS (e.g. "Kuchyňská linka", "Ostrůvek", "TV stěna", "Skříň rohová", "Pracovní deska", "Postel"). This is the human-readable name WITHOUT dimensions, materials, or specs. Max 40 chars.
+- popis_short = name + key dimensions + 1-2 most important specs (e.g. "Kuchyň 5920×700×2650, dýha dub, Blum"). Max 80 chars.
+- popis_full = COMPLETE detailed description: all materials (korpus, čela, povrch), dimensions, hardware brands (Blum, Hettich, Häfele...), edge banding, finishes, accessories. Merge ALL sub-rows/details into this field. Should be as detailed as possible from the source document.
 - cena = unit price in CZK (if EUR, multiply by 25). NOT total — divide by quantity if needed.
 - pocet = quantity, default 1
-- Skip totals, subtotals, section headers, notes
-- Include ALL line items with prices, nothing missing`;
+
+CRITICAL rules:
+- nazev must NEVER contain dimensions like "5920*700*2650" — those go into popis fields
+- nazev must NEVER contain material specs — those go into popis fields  
+- popis_full must include ALL technical details: materials, hardware, finishes, dimensions
+- Skip totals, subtotals, section headers, transport, montáž, notes
+- Include ALL line items that have prices, nothing missing`;
 
 // Parse XLSX to tab-separated text for non-PDF files
 async function parseXlsxToText(bytes: Uint8Array): Promise<string> {

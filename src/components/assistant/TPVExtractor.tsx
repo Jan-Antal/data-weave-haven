@@ -12,10 +12,13 @@ import { formatCurrency } from "@/lib/currency";
 interface ExtractedItem {
   item_name: string;
   nazev: string;
-  popis: string;
+  popis_short: string;
+  popis_full: string;
   cena: number;
   pocet: number;
 }
+
+type PopisMode = "short" | "full";
 
 interface SPMatch {
   itemId: string;
@@ -39,6 +42,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   const [foundFileName, setFoundFileName] = useState("");
   const [items, setItems] = useState<ExtractedItem[]>([]);
   const [saving, setSaving] = useState(false);
+  const [popisMode, setPopisMode] = useState<PopisMode>("short");
   const [spUploaded, setSpUploaded] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const autoExtractTriggered = useRef(false);
@@ -111,7 +115,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       const extracted = (data.items || []).map((item: any) => ({
         item_name: item.item_name || "",
         nazev: item.nazev || "",
-        popis: item.popis || "",
+        popis_short: item.popis_short || item.popis || "",
+        popis_full: item.popis_full || item.popis || "",
         cena: Number(item.cena) || 0,
         pocet: Number(item.pocet) || 1,
       }));
@@ -179,7 +184,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       const extracted = (data.items || []).map((item: any) => ({
         item_name: item.item_name || "",
         nazev: item.nazev || "",
-        popis: item.popis || "",
+        popis_short: item.popis_short || item.popis || "",
+        popis_full: item.popis_full || item.popis || "",
         cena: Number(item.cena) || 0,
         pocet: Number(item.pocet) || 1,
       }));
@@ -210,7 +216,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   };
 
   const addRow = () => {
-    setItems((prev) => [...prev, { item_name: "", nazev: "", popis: "", cena: 0, pocet: 1 }]);
+    setItems((prev) => [...prev, { item_name: "", nazev: "", popis_short: "", popis_full: "", cena: 0, pocet: 1 }]);
   };
 
   const totalSum = items.reduce((sum, item) => sum + item.cena * item.pocet, 0);
@@ -228,7 +234,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
           project_id: projectId,
           item_name: item.item_name,
           item_type: item.nazev || item.item_name,
-          nazev_prvku: item.popis || null,
+          nazev_prvku: popisMode === "full" ? item.popis_full : item.popis_short || null,
           cena: item.cena,
           pocet: item.pocet,
           status: "Ke zpracování",
@@ -425,9 +431,26 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
         {/* Phase: Done — review table */}
         {phase === "done" && items.length > 0 && (
           <>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-              <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
-              Extrahováno z: <strong>{foundFileName}</strong>
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                Extrahováno z: <strong>{foundFileName}</strong>
+              </div>
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-muted-foreground mr-1">Popis:</span>
+                <button
+                  onClick={() => setPopisMode("short")}
+                  className={`px-2 py-0.5 rounded-l border text-xs transition-colors ${popisMode === "short" ? "bg-primary text-primary-foreground border-primary" : "bg-background border-input hover:bg-accent"}`}
+                >
+                  Short
+                </button>
+                <button
+                  onClick={() => setPopisMode("full")}
+                  className={`px-2 py-0.5 rounded-r border-t border-b border-r text-xs transition-colors ${popisMode === "full" ? "bg-primary text-primary-foreground border-primary" : "bg-background border-input hover:bg-accent"}`}
+                >
+                  Full
+                </button>
+              </div>
             </div>
             <div className="flex-1 overflow-auto border rounded-lg">
               <Table>
@@ -461,8 +484,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
                       </TableCell>
                       <TableCell>
                         <Input
-                          value={item.popis}
-                          onChange={(e) => updateItem(i, "popis", e.target.value)}
+                          value={popisMode === "full" ? item.popis_full : item.popis_short}
+                          onChange={(e) => updateItem(i, popisMode === "full" ? "popis_full" : "popis_short", e.target.value)}
                           className="h-7 text-xs"
                         />
                       </TableCell>
