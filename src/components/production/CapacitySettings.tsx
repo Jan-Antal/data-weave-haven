@@ -408,7 +408,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       });
     }
     return impacts;
-  }, [holidays, weekMap, totalBruttoSelectedDaily]);
+  }, [holidays, liveWeekMap, totalBruttoSelectedDaily]);
 
   // Buffer week capacity changes locally
   const handleWeekCapacityUpdate = (weeks: number[], capacity: number, workingDays: number) => {
@@ -448,6 +448,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     console.log("[recalc] start — employees:", filteredEmployees.length, "weeks:", weekMap.size);
     try {
       const absMap = await fetchAbsencesForYear(selectedYear, filteredEmployees);
+      cachedAbsMap.current = absMap;
       const upserts: Array<Record<string, any>> = [];
       for (let wn = 1; wn <= 52; wn++) {
         const week = weekMap.get(wn);
@@ -587,8 +588,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   // First selected week data for editor
   const editingWeeks = Array.from(selectedWeeks).sort((a, b) => a - b);
   const firstEditingWeek = editingWeeks.length > 0 ? editingWeeks[0] : null;
-  const firstEditingWeekData = firstEditingWeek !== null ? weekMap.get(firstEditingWeek) : null;
-  const anyManualOverride = editingWeeks.some(wn => weekMap.get(wn)?.is_manual_override);
+  const firstEditingWeekData = firstEditingWeek !== null ? liveWeekMap.get(firstEditingWeek) : null;
+  const anyManualOverride = editingWeeks.some(wn => liveWeekMap.get(wn)?.is_manual_override);
 
   return (
     <Dialog open={open} onOpenChange={(val) => {
