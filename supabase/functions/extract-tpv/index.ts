@@ -6,48 +6,27 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `You extract line items from Czech furniture price offers.
+const SYSTEM_PROMPT = `You extract line items from Czech furniture price offers (cenová nabídka).
+Return ONLY a valid JSON array, no markdown, no explanation.
 
-EXACT FILE STRUCTURE:
-Each item has TWO parts spanning multiple rows:
-  ROW 1 (main row): | Kód | Název | Rozměr | Cena |
-  ROW 2+ (spec rows): | (empty) | specification text | (empty) | (empty) |
-  
-Example:
-  K01 | Pracovní deska | 3200×650×20mm | 48500
-      | Keramica Bianco matt, hrana ABS 2mm černá
-      | Lepení, montáž included
-  K02 | Dvířka | 400×720mm | 8200
-      | MDF lakovaný bílý mat RAL9003, závěsy Blum
+Each priced item in the Excel file has:
+- A MAIN ROW with: Kód (code), Název (name), sometimes Rozměr (dimensions), Cena (price), Počet (quantity)
+- FOLLOWING ROWS below it with technical specifications: materials, hardware, finishes, electrical, dimensions
 
-Between items there are GROUP HEADER rows like:
-  T01 | Kuchyň | | (no price → skip as item)
+You MUST read ALL rows between two item codes and merge them.
 
-EXTRACTION RULES:
-1. item_name = Kód from ROW 1 (K01, K02, D-01, etc.)
-2. nazev = Název from ROW 1 (short name, no dimensions)
-3. rozmer = Rozměr from ROW 1 (dimensions only, e.g. "3200×650×20mm")
-4. cena = price from ROW 1 (unit price in CZK, number only)
-5. pocet = quantity if present, default 1
-6. jednotka = unit (ks, m², bm), default "ks"
-7. popis_short = nazev + rozmer in one line
-   Example: "Pracovní deska 3200×650×20mm"
-8. popis_full = ALL specification rows concatenated after the main row
-   Example: "Keramica Bianco matt, hrana ABS 2mm černá. Lepení, montáž included."
-   Include group context: "[Kuchyň] Pracovní deska 3200×650×20mm. Keramica Bianco..."
+Output fields:
+- item_name = short code exactly as in document (T01, K01, D-01, etc.)
+- nazev = SHORT name of the item (e.g. "Kuchyňská linka", "Pracovní deska", "Skříň"). Max 40 chars. NO dimensions, NO materials.
+- popis = COMPLETE technical description built from ALL specification rows below the item. Include materials (Materiál, Korpus, Dvířka, LTD, MDF, dýha, lak), hardware (kování, Blum, Hettich, pojezdy, panty), electrical (elektrika, zámek), finishes (povrch, hrana), and dimensions. Use pipe separator: "Materiál: Korpus LTD Egger W1000 ST9, Dvířka Polyrey G120 | Vybavení: nábytkové kování | Elektrika: čipový zámek | Rozměr: 5920×700×2650"
+  CRITICAL: popis must NEVER be just the item name or just dimensions. It must contain the actual technical details from the rows below.
+- cena = unit price in CZK (number only). If EUR, multiply by 25.
+- pocet = quantity, default 1
 
-SKIP: Group header rows (T01, T02 etc. with no price), totals, empty rows.
+SKIP: section headers without price, totals, subtotals, transport, montáž rows.
 
-Return ONLY valid JSON, no markdown:
-[{
-  "item_name": "K01",
-  "nazev": "Pracovní deska",
-  "popis_short": "Pracovní deska 3200×650×20mm",
-  "popis_full": "[Kuchyň] Pracovní deska 3200×650×20mm. Keramica Bianco matt, hrana ABS 2mm černá.",
-  "cena": 48500,
-  "pocet": 1,
-  "jednotka": "ks"
-}]`;
+Example output:
+[{"item_name":"K01","nazev":"Pracovní deska","popis":"Materiál: Keramika Bianco matt | Hrana: ABS 2mm černá | Rozměr: 3200×650×20mm","cena":48500,"pocet":1}]`;
 
 function normalizeWhitespace(text: string): string {
   return text.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
