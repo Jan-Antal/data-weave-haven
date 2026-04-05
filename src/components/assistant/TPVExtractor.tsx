@@ -116,10 +116,6 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
 
       setItems(extracted);
       setPhase("done");
-      toast({
-        title: "Extrakce dokončena",
-        description: `Nalezeno ${extracted.length} položek z ${fileName}`,
-      });
     } catch (err: any) {
       console.error("Extract error:", err);
       setPhase("error");
@@ -188,10 +184,6 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       setItems(extracted);
       setFoundFileName(manualFile.name);
       setPhase("done");
-      toast({
-        title: "Extrakce dokončena",
-        description: `Nalezeno ${extracted.length} položek`,
-      });
     } catch (err: any) {
       console.error("Manual extract error:", err);
       setPhase("error");
