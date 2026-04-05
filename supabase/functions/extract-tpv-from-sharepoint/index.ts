@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { ZipReader, BlobReader, TextWriter } from "https://deno.land/x/zipjs@v2.7.34/index.js";
 
-// Simple XLSX parser: unzips the xlsx, reads shared strings + sheet1 XML, outputs CSV-like text
+// XLSX parser: unzips xlsx, reads shared strings + sheet XML, outputs structured tab-separated text
+// Preserves column positions so AI sees proper table structure
 async function parseXlsxToTextAsync(bytes: Uint8Array): Promise<string> {
   const blob = new Blob([bytes]);
   const reader = new ZipReader(new BlobReader(blob));
@@ -13,13 +14,18 @@ async function parseXlsxToTextAsync(bytes: Uint8Array): Promise<string> {
     return await entry.getData(new TextWriter());
   };
 
-  // Read shared strings
+  // Read shared strings (handles <si> with multiple <t> fragments)
   const ssXml = await readEntry("xl/sharedStrings.xml");
   const sharedStrings: string[] = [];
   if (ssXml) {
-    const matches = ssXml.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g);
-    for (const m of matches) {
-      sharedStrings.push(m[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">"));
+    const siMatches = ssXml.matchAll(/<si>([\s\S]*?)<\/si>/g);
+    for (const si of siMatches) {
+      const tParts: string[] = [];
+      const tMatches = si[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g);
+      for (const t of tMatches) {
+        tParts.push(t[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"'));
+      }
+      sharedStrings.push(tParts.join(""));
     }
   }
 
@@ -30,32 +36,80 @@ async function parseXlsxToTextAsync(bytes: Uint8Array): Promise<string> {
     return "[Could not read sheet1]";
   }
 
-  const rows: string[][] = [];
-  const rowMatches = sheetXml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g);
-  for (const rm of rowMatches) {
-    const cells: string[] = [];
-    const cellMatches = rm[1].matchAll(/<c[^>]*?(t="([^"]*)")?[^>]*>([\s\S]*?)<\/c>/g);
-    for (const cm of cellMatches) {
-      const cellType = cm[2] || "";
-      const valMatch = cm[3].match(/<v>([\s\S]*?)<\/v>/);
-      let val = valMatch ? valMatch[1] : "";
-      if (cellType === "s" && sharedStrings[parseInt(val)]) {
-        val = sharedStrings[parseInt(val)];
-      }
-      cells.push(val);
+  // Helper: convert column letters to 0-based index (A=0, B=1, ..., AA=26, etc.)
+  function colToIndex(col: string): number {
+    let idx = 0;
+    for (let i = 0; i < col.length; i++) {
+      idx = idx * 26 + (col.charCodeAt(i) - 64);
     }
-    if (cells.some(c => c.trim())) rows.push(cells);
+    return idx - 1;
+  }
+
+  const rows: Map<number, string[]> = new Map();
+  let maxCol = 0;
+
+  const rowMatches = sheetXml.matchAll(/<row[^>]*?r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g);
+  for (const rm of rowMatches) {
+    const rowNum = parseInt(rm[1]);
+    const cells: string[] = [];
+    // Parse each <c> element individually
+    const cellMatches = rm[2].matchAll(/<c\s([^>]*)>([\s\S]*?)<\/c>/g);
+    
+    const rowCells: [number, string][] = [];
+    for (const cm of cellMatches) {
+      const attrs = cm[1];
+      const body = cm[2];
+      
+      // Extract r="XX" attribute for column reference
+      const rMatch = attrs.match(/r="([A-Z]+)\d+"/);
+      if (!rMatch) continue;
+      const colRef = rMatch[1];
+      
+      // Extract t="s" or t="inlineStr" attribute for cell type
+      const tMatch = attrs.match(/t="([^"]*)"/);
+      const cellType = tMatch ? tMatch[1] : "";
+      
+      // Extract value
+      const valMatch = body.match(/<v>([\s\S]*?)<\/v>/);
+      let val = valMatch ? valMatch[1] : "";
+      
+      if (cellType === "s") {
+        const idx = parseInt(val);
+        val = (idx >= 0 && idx < sharedStrings.length) ? sharedStrings[idx] : val;
+      } else if (cellType === "inlineStr") {
+        const isMatch = body.match(/<t[^>]*>([\s\S]*?)<\/t>/);
+        if (isMatch) val = isMatch[1];
+      }
+      
+      const colIdx = colToIndex(colRef);
+      if (colIdx > maxCol) maxCol = colIdx;
+      rowCells.push([colIdx, val.trim()]);
+    }
+
+    if (rowCells.length > 0) {
+      // Build sparse row array
+      const arr: string[] = new Array(maxCol + 1).fill("");
+      for (const [ci, v] of rowCells) arr[ci] = v;
+      rows.set(rowNum, arr);
+    }
   }
 
   await reader.close();
 
-  // Convert to tab-separated text (max 200 rows to keep token count manageable)
-  return rows.slice(0, 200).map(r => r.join("\t")).join("\n");
-}
+  // Normalize all rows to same width and output
+  const sortedKeys = [...rows.keys()].sort((a, b) => a - b);
+  const finalWidth = maxCol + 1;
+  const lines: string[] = [];
+  
+  for (const key of sortedKeys.slice(0, 250)) {
+    const row = rows.get(key)!;
+    // Pad to full width
+    while (row.length < finalWidth) row.push("");
+    const line = row.join("\t");
+    if (line.trim()) lines.push(line);
+  }
 
-function parseXlsxToText(bytes: Uint8Array): string {
-  // This is called synchronously but returns a placeholder; we'll use the async version
-  throw new Error("Use parseXlsxToTextAsync instead");
+  return lines.join("\n");
 }
 
 const corsHeaders = {
@@ -229,31 +283,40 @@ serve(async (req) => {
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-      const SYSTEM_PROMPT = `You are extracting line items from a price offer (cenová nabídka) for a furniture/interior design company.
+      const SYSTEM_PROMPT = `You are extracting line items from a Czech furniture/interior design price offer (cenová nabídka).
 
-Extract ALL line items and return ONLY valid JSON array, no other text:
+The document typically has this structure:
+- Item code (e.g. T01, T02, K01, S01, D01...) in one column
+- Item name (e.g. "Kuchyň", "Ostrůvek", "TV stěna", "Šatní skříň") next to the code
+- Sometimes dimensions (e.g. 5920*700*2650)
+- Quantity (e.g. "1 ks")
+- Unit price (e.g. "á 258,397 Kč")
+- Total price
+- Below each main item there may be material descriptions, hardware details etc. — these are the DESCRIPTION, not separate items.
+
+Extract ONLY the main priced line items. Return a JSON array:
 
 [
   {
-    "item_name": "short item code or name, max 50 chars",
-    "popis": "full description of the item",
-    "cena": 12500.00,
-    "pocet": 2
+    "item_name": "T01",
+    "popis": "Kuchyň 5920*700*2650 — nepohledové části DTDL Egger W960 SM bílá, pohledové boky+dvířka DTDL W1200 ST9 Porcelánově bílá...",
+    "cena": 258397,
+    "pocet": 1
   }
 ]
 
 Rules:
-- cena = unit price (NOT total). If only total given, divide by quantity.
-- pocet = quantity (default 1 if not specified)
-- Skip subtotals, headers, totals rows
-- item_name should be a short code or abbreviation
-- All prices in CZK (convert EUR × 25 if needed)
-- Return ONLY the JSON array, no markdown fences, no explanation`;
+- item_name = the SHORT CODE (T01, T02, K01, S01, D01, etc.). If no code exists, use a short name (max 10 chars).
+- popis = the item NAME + key material/specification details merged into one description string. Include dimensions if present.
+- cena = UNIT price in CZK (NOT total). If price is in EUR, multiply by 25.
+- pocet = quantity (default 1)
+- SKIP: subtotals, totals, headers, notes like "Součástí CN nejsou spotřebiče"
+- SKIP: rows that are just material descriptions without their own price — merge them into the parent item's popis
+- Return ONLY the JSON array, no markdown, no explanation`;
 
       let userContent: any[];
 
       if (isPdf) {
-        // PDFs can be sent as image_url with base64
         userContent = [
           {
             type: "image_url",
@@ -261,24 +324,30 @@ Rules:
           },
           {
             type: "text",
-            text: "Extract all line items from this price offer document. Return ONLY the JSON array.",
+            text: "Extract all priced line items from this Czech furniture price offer (cenová nabídka). Each item has a code like T01, K01, etc. Return ONLY the JSON array.",
           },
         ];
       } else {
-        // Excel files: parse to CSV-like text using a simple binary reader
-        // Since Gemini doesn't accept Excel MIME types, we extract text content
         let textContent: string;
         try {
           textContent = await parseXlsxToTextAsync(bytes);
         } catch (e) {
-          console.warn("XLSX parse failed, sending raw base64 as text hint:", e);
+          console.warn("XLSX parse failed:", e);
           textContent = `[Binary Excel file: ${fileName}, ${bytes.length} bytes. Could not parse locally.]`;
         }
+
+        console.log("Parsed XLSX preview (first 500 chars):", textContent.substring(0, 500));
         
         userContent = [
           {
             type: "text",
-            text: `This is the content of an Excel price offer file "${fileName}":\n\n${textContent}\n\nExtract all line items from this price offer. Return ONLY the JSON array.`,
+            text: `Below is the tab-separated content of a Czech furniture price offer Excel file "${fileName}".
+Each row is tab-separated. Look for the pattern: CODE (T01, K01...) | NAME | DIMENSIONS | QTY | UNIT PRICE | TOTAL PRICE.
+Rows without a price that follow a priced item are material/specification details — merge them into that item's description.
+
+${textContent}
+
+Extract all priced line items. Return ONLY the JSON array.`,
           },
         ];
       }
