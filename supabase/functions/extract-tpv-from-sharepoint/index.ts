@@ -1,4 +1,62 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { ZipReader, BlobReader, TextWriter } from "https://deno.land/x/zipjs@v2.7.34/index.js";
+
+// Simple XLSX parser: unzips the xlsx, reads shared strings + sheet1 XML, outputs CSV-like text
+async function parseXlsxToTextAsync(bytes: Uint8Array): Promise<string> {
+  const blob = new Blob([bytes]);
+  const reader = new ZipReader(new BlobReader(blob));
+  const entries = await reader.getEntries();
+
+  const readEntry = async (name: string): Promise<string | null> => {
+    const entry = entries.find(e => e.filename === name);
+    if (!entry || !entry.getData) return null;
+    return await entry.getData(new TextWriter());
+  };
+
+  // Read shared strings
+  const ssXml = await readEntry("xl/sharedStrings.xml");
+  const sharedStrings: string[] = [];
+  if (ssXml) {
+    const matches = ssXml.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g);
+    for (const m of matches) {
+      sharedStrings.push(m[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">"));
+    }
+  }
+
+  // Read sheet1
+  const sheetXml = await readEntry("xl/worksheets/sheet1.xml");
+  if (!sheetXml) {
+    await reader.close();
+    return "[Could not read sheet1]";
+  }
+
+  const rows: string[][] = [];
+  const rowMatches = sheetXml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g);
+  for (const rm of rowMatches) {
+    const cells: string[] = [];
+    const cellMatches = rm[1].matchAll(/<c[^>]*?(t="([^"]*)")?[^>]*>([\s\S]*?)<\/c>/g);
+    for (const cm of cellMatches) {
+      const cellType = cm[2] || "";
+      const valMatch = cm[3].match(/<v>([\s\S]*?)<\/v>/);
+      let val = valMatch ? valMatch[1] : "";
+      if (cellType === "s" && sharedStrings[parseInt(val)]) {
+        val = sharedStrings[parseInt(val)];
+      }
+      cells.push(val);
+    }
+    if (cells.some(c => c.trim())) rows.push(cells);
+  }
+
+  await reader.close();
+
+  // Convert to tab-separated text (max 200 rows to keep token count manageable)
+  return rows.slice(0, 200).map(r => r.join("\t")).join("\n");
+}
+
+function parseXlsxToText(bytes: Uint8Array): string {
+  // This is called synchronously but returns a placeholder; we'll use the async version
+  throw new Error("Use parseXlsxToTextAsync instead");
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -131,7 +189,7 @@ serve(async (req) => {
         });
       }
 
-      // Get file info (without $select to ensure downloadUrl is included)
+      // Get file info
       const itemRes = await fetch(`${GRAPH}/drives/${driveId}/items/${fileItemId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -140,7 +198,7 @@ serve(async (req) => {
       const downloadUrl = item["@microsoft.graph.downloadUrl"];
       const fileName = item.name;
 
-      // If no downloadUrl, use /content endpoint directly
+      // Download file content - try downloadUrl first, fallback to /content endpoint
       let fileBuffer: ArrayBuffer;
       if (downloadUrl) {
         const fileRes = await fetch(downloadUrl);
@@ -166,6 +224,7 @@ serve(async (req) => {
       base64 = btoa(base64);
 
       const isPdf = fileName.toLowerCase().endsWith(".pdf");
+      const isExcel = /\.(xlsx?|xls)$/i.test(fileName);
 
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
@@ -191,22 +250,40 @@ Rules:
 - All prices in CZK (convert EUR × 25 if needed)
 - Return ONLY the JSON array, no markdown fences, no explanation`;
 
-      const mimeType = isPdf ? "application/pdf" :
-        fileName.toLowerCase().endsWith(".xlsx") ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" :
-        "application/vnd.ms-excel";
+      let userContent: any[];
 
-      const userContent: any[] = [
-        {
-          type: "image_url",
-          image_url: { url: `data:${mimeType};base64,${base64}` },
-        },
-        {
-          type: "text",
-          text: "Extract all line items from this price offer document. Return ONLY the JSON array.",
-        },
-      ];
+      if (isPdf) {
+        // PDFs can be sent as image_url with base64
+        userContent = [
+          {
+            type: "image_url",
+            image_url: { url: `data:application/pdf;base64,${base64}` },
+          },
+          {
+            type: "text",
+            text: "Extract all line items from this price offer document. Return ONLY the JSON array.",
+          },
+        ];
+      } else {
+        // Excel files: parse to CSV-like text using a simple binary reader
+        // Since Gemini doesn't accept Excel MIME types, we extract text content
+        let textContent: string;
+        try {
+          textContent = await parseXlsxToTextAsync(bytes);
+        } catch (e) {
+          console.warn("XLSX parse failed, sending raw base64 as text hint:", e);
+          textContent = `[Binary Excel file: ${fileName}, ${bytes.length} bytes. Could not parse locally.]`;
+        }
+        
+        userContent = [
+          {
+            type: "text",
+            text: `This is the content of an Excel price offer file "${fileName}":\n\n${textContent}\n\nExtract all line items from this price offer. Return ONLY the JSON array.`,
+          },
+        ];
+      }
 
-      console.log(`Extracting from ${fileName} (${bytes.length} bytes, type: ${mimeType})`);
+      console.log(`Extracting from ${fileName} (${bytes.length} bytes, isPdf: ${isPdf})`);
 
       const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -215,7 +292,7 @@ Rules:
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-pro",
+          model: "google/gemini-2.5-flash",
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: userContent },
