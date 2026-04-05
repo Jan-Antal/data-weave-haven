@@ -40,6 +40,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { logActivity } from "@/lib/activityLog";
+import { TPVExtractor } from "./assistant/TPVExtractor";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
   { key: "item_name", label: "Kód prvku" },
@@ -109,6 +110,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const { data: allProjects = [] } = useProjects();
   const { statusMap: productionStatusMap } = useProductionStatuses(projectId);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [extractorOpen, setExtractorOpen] = useState(false);
   const currentProject = useMemo(() => allProjects.find((p) => p.project_id === projectId), [allProjects, projectId]);
   const queryClient = useQueryClient();
 
@@ -718,6 +720,11 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           </Button>
         )}
         {canManageTPV && (
+          <Button size="sm" variant="outline" onClick={() => setExtractorOpen(true)}>
+            <FileText className="h-3 w-3 mr-1" /> Nahrát cenovou nabídku
+          </Button>
+        )}
+        {canManageTPV && (
           <Button size="sm" variant="outline" onClick={handleSendToProduction} disabled={isSending}>
             <Cog className="h-3 w-3 mr-1" /> Odeslat do výroby
           </Button>
@@ -1232,6 +1239,13 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           portrait
         />
       )}
+
+      <TPVExtractor
+        projectId={projectId}
+        open={extractorOpen}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["tpv_items", projectId] })}
+        onClose={() => setExtractorOpen(false)}
+      />
     </div>
   );
 }
