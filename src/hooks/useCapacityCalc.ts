@@ -187,6 +187,8 @@ export async function fetchAbsencesForYear(
 
   if (error || !data) return result;
 
+  console.log("[absences] fetched:", data?.length, "for", employees.length, "employees, year:", year);
+
   for (const row of data) {
     const d = new Date(row.datum + "T00:00:00");
     // Get Monday of this week
@@ -198,6 +200,8 @@ export async function fetchAbsencesForYear(
     const hours = emp?.uvazok_hodiny ?? 8;
     result.set(key, (result.get(key) || 0) + hours);
   }
+
+  console.log("[absences] map:", Array.from(result.entries()).slice(0,5).map(([k,v])=>`${k}:${v}h`).join(", "));
 
   return result;
 }

@@ -215,12 +215,16 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     } catch { /* silent */ }
   }, [filteredEmployees, weekMap, selectedYear, localUtilizationPct, queryClient, getWorkingDaysForWeek]);
 
-  // Trigger auto-recalc when data is ready
+  // Trigger auto-recalc when data is ready (ref-based, fires once)
+  const hasRecalcedRef = useRef(false);
   useEffect(() => {
-    if (open && vyrobniEmployees.length > 0 && weekMap.size > 0) {
+    if (!open) { hasRecalcedRef.current = false; return; }
+    if (hasRecalcedRef.current) return;
+    if (vyrobniEmployees.length > 0 && weekMap.size > 0) {
+      hasRecalcedRef.current = true;
       handleRecalculateAll();
     }
-  }, [vyrobniEmployees.length, weekMap.size, open]);
+  }, [open, vyrobniEmployees.length, weekMap.size]);
 
   // CHANGE 3: Trigger recalc when utilization changes
   const utilizationRef = useRef(localUtilizationPct);
@@ -371,6 +375,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const handleRecalculateAll = async () => {
     if (filteredEmployees.length === 0) return;
     setIsRecalculating(true);
+    console.log("[recalc] start — employees:", filteredEmployees.length, "weeks:", weekMap.size);
     try {
       const absMap = await fetchAbsencesForYear(selectedYear, filteredEmployees);
       const upserts: Array<Record<string, any>> = [];
@@ -399,6 +404,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
           absence_days: Math.round(calc.absenceHours / 8),
         });
       }
+      console.log("[recalc] upserts:", upserts.length, 
+        upserts.filter(u=>u.absence_days>0).map(u=>`T${u.week_number}:abs${u.absence_days}d`).join(","));
       if (upserts.length > 0) {
         await supabase.from("production_capacity" as any).upsert(upserts as any, { onConflict: "week_year,week_number" });
       }
