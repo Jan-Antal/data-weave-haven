@@ -136,7 +136,9 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   const { data: settings } = useProductionSettings();
   const { data: allDbProjects = [] } = useProjects();
   const { data: scheduleData } = useProductionSchedule();
-  const getWeekCapacity = useWeekCapacityLookup();
+  const { data: vyrobniEmps = [] } = useVyrobniEmployees();
+  const bruttoPerDay = vyrobniEmps.reduce((s, e) => s + (e.uvazok_hodiny ?? 8), 0);
+  const getWeekCapacity = useWeekCapacityLookup(bruttoPerDay || undefined);
   const { moveInboxItemToWeek } = useProductionDragDrop();
   const qc = useQueryClient();
   const [loading, setLoading] = useState(false);

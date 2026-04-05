@@ -186,7 +186,9 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const { data: statusOpts = [] } = useProjectStatusOptions();
   const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts), [statusOpts]);
   const qc = useQueryClient();
-  const getWeekCapacity = useWeekCapacityLookup();
+  const { data: vyrobniEmps = [] } = useVyrobniEmployees();
+  const bruttoPerDay = vyrobniEmps.reduce((s, e) => s + (e.uvazok_hodiny ?? 8), 0);
+  const getWeekCapacity = useWeekCapacityLookup(bruttoPerDay || undefined);
   const { data: exchangeRatesData } = useExchangeRates();
   const exchangeRates = useMemo(() => (exchangeRatesData || []).map(r => ({ year: r.year, eur_czk: r.eur_czk })), [exchangeRatesData]);
 
