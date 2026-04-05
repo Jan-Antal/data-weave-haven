@@ -857,7 +857,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
               <div className="flex items-end gap-1 h-[140px]">
                 {Array.from({ length: VISIBLE_WEEKS }, (_, i) => viewStart + i).filter(wn => wn >= 1 && wn <= 52).map(wn => {
-                  const week = weekMap.get(wn);
+                  const week = liveWeekMap.get(wn);
                   if (!week) return null;
                   const cap = week.capacity_hours;
                   const barH = maxCapacity > 0 ? Math.max(4, (cap / (maxCapacity * 1.1)) * 140) : 4;
