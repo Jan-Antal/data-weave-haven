@@ -24,7 +24,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { useVyrobniEmployees, computeWeekCapacity, fetchAbsencesForYear, getWeekStartFromNumber, normalizeUsek } from "@/hooks/useCapacityCalc";
+import { useVyrobniEmployees, computeWeekCapacity, fetchAbsencesForYear, getWeekStartFromNumber, normalizeUsek, getActiveWorkingDays } from "@/hooks/useCapacityCalc";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -256,14 +256,77 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
   const nettoCapacity = Math.round(totalBruttoWeekly * localUtilizationPct / 100);
 
+  // Cached absence map from last recalc
+  const cachedAbsMap = useRef<Map<string, number> | null>(null);
+
+  // Fully reactive liveWeekMap computed from local state
+  const liveWeekMap = useMemo(() => {
+    if (vyrobniEmployees.length === 0) return weekMap;
+    const map = new Map<number, any>();
+
+    for (let wn = 1; wn <= 52; wn++) {
+      const dbWeek = weekMap.get(wn);
+
+      if (dbWeek?.is_manual_override) {
+        map.set(wn, dbWeek);
+        continue;
+      }
+
+      const weekStart = dbWeek?.week_start ?? getWeekStartFromNumber(selectedYear, wn);
+
+      // Working days from DB week (already includes Czech holidays)
+      let workingDays = dbWeek?.working_days ?? 5;
+
+      // Apply company holidays if autoApplyHolidays is checked
+      let companyHolidayName: string | null = dbWeek?.company_holiday_name ?? null;
+      // Company holidays are already baked into dbWeek by useWeeklyCapacity,
+      // but if autoApplyHolidays is toggled OFF, restore to base working days
+      if (!autoApplyHolidays && dbWeek?.company_holiday_name) {
+        // Undo company holiday reduction — use base working days from holiday count only
+        workingDays = 5;
+        const weekStartDate = new Date(weekStart + 'T00:00:00');
+        const weekEndDate = new Date(weekStartDate);
+        weekEndDate.setDate(weekStartDate.getDate() + 5);
+        const holidayCount = (holidays ?? []).filter(h => {
+          const d = new Date(h.date + 'T00:00:00');
+          return d >= weekStartDate && d < weekEndDate && d.getDay() !== 0 && d.getDay() !== 6;
+        }).length;
+        workingDays = Math.max(0, 5 - holidayCount);
+        companyHolidayName = null;
+      }
+
+      // Compute brutto from filtered employees only
+      const brutto = filteredEmployees.reduce((s, e) => {
+        const activeDays = getActiveWorkingDays(e, weekStart, workingDays);
+        return s + (e.uvazok_hodiny ?? 8) * activeDays;
+      }, 0);
+
+      const absHours = cachedAbsMap.current?.get(weekStart) ?? 0;
+      const capacity = Math.max(0, Math.round((brutto - absHours) * localUtilizationPct / 100));
+
+      map.set(wn, {
+        ...(dbWeek ?? {}),
+        week_year: selectedYear,
+        week_number: wn,
+        week_start: weekStart,
+        capacity_hours: capacity,
+        working_days: workingDays,
+        is_manual_override: false,
+        holiday_name: dbWeek?.holiday_name ?? null,
+        company_holiday_name: companyHolidayName,
+      });
+    }
+    return map;
+  }, [vyrobniEmployees, filteredEmployees, weekMap, selectedYear, localUtilizationPct, holidays, autoApplyHolidays]);
+
   // Get month for a week number
   const getWeekMonth = useCallback((wn: number): number => {
-    const week = weekMap.get(wn);
+    const week = liveWeekMap.get(wn);
     if (!week) return 0;
     const d = new Date(week.week_start + "T00:00:00");
     d.setDate(d.getDate() + 3);
     return d.getMonth();
-  }, [weekMap]);
+  }, [liveWeekMap]);
 
   // Get type label for a week
   const getWeekTypeLabel = useCallback((week: WeekCapacity, past: boolean): string => {
@@ -299,11 +362,11 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
   const maxCapacity = useMemo(() => {
     let max = nettoCapacity;
-    for (const [, w] of weekMap) {
+    for (const [, w] of liveWeekMap) {
       if (w.capacity_hours > max) max = w.capacity_hours;
     }
     return max;
-  }, [weekMap, nettoCapacity]);
+  }, [liveWeekMap, nettoCapacity]);
 
   // Visible window min/max for dynamic color scaling (excluding past weeks)
   const visibleRange = useMemo(() => {
@@ -311,7 +374,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     let max = nettoCapacity;
     const end = Math.min(52, viewStart + VISIBLE_WEEKS - 1);
     for (let wn = viewStart; wn <= end; wn++) {
-      const week = weekMap.get(wn);
+      const week = liveWeekMap.get(wn);
       if (!week) continue;
       const past = selectedYear < currentYear || (selectedYear === currentYear && wn < currentWeek);
       if (past) continue;
@@ -320,7 +383,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       if (cap > max) max = cap;
     }
     return { min, max };
-  }, [weekMap, viewStart, selectedYear, currentYear, currentWeek, nettoCapacity]);
+  }, [liveWeekMap, viewStart, selectedYear, currentYear, currentWeek, nettoCapacity]);
 
   // Selected (filtered) daily hours for holiday impact — respects disabled úseky/employees
   const totalBruttoSelectedDaily = useMemo(() => {
@@ -335,7 +398,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       const dow = d.getDay();
       if (dow === 0 || dow === 6) continue;
       const wn = getISOWeekNumber(d);
-      const week = weekMap.get(wn);
+      const week = liveWeekMap.get(wn);
       impacts.push({
         date: `${d.getDate()}. ${d.getMonth() + 1}.`,
         name: h.localName,
@@ -345,7 +408,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       });
     }
     return impacts;
-  }, [holidays, weekMap, totalBruttoSelectedDaily]);
+  }, [holidays, liveWeekMap, totalBruttoSelectedDaily]);
 
   // Buffer week capacity changes locally
   const handleWeekCapacityUpdate = (weeks: number[], capacity: number, workingDays: number) => {
@@ -385,6 +448,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     console.log("[recalc] start — employees:", filteredEmployees.length, "weeks:", weekMap.size);
     try {
       const absMap = await fetchAbsencesForYear(selectedYear, filteredEmployees);
+      cachedAbsMap.current = absMap;
       const upserts: Array<Record<string, any>> = [];
       for (let wn = 1; wn <= 52; wn++) {
         const week = weekMap.get(wn);
@@ -524,8 +588,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   // First selected week data for editor
   const editingWeeks = Array.from(selectedWeeks).sort((a, b) => a - b);
   const firstEditingWeek = editingWeeks.length > 0 ? editingWeeks[0] : null;
-  const firstEditingWeekData = firstEditingWeek !== null ? weekMap.get(firstEditingWeek) : null;
-  const anyManualOverride = editingWeeks.some(wn => weekMap.get(wn)?.is_manual_override);
+  const firstEditingWeekData = firstEditingWeek !== null ? liveWeekMap.get(firstEditingWeek) : null;
+  const anyManualOverride = editingWeeks.some(wn => liveWeekMap.get(wn)?.is_manual_override);
 
   return (
     <Dialog open={open} onOpenChange={(val) => {
@@ -793,7 +857,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
               <div className="flex items-end gap-1 h-[140px]">
                 {Array.from({ length: VISIBLE_WEEKS }, (_, i) => viewStart + i).filter(wn => wn >= 1 && wn <= 52).map(wn => {
-                  const week = weekMap.get(wn);
+                  const week = liveWeekMap.get(wn);
                   if (!week) return null;
                   const cap = week.capacity_hours;
                   const barH = maxCapacity > 0 ? Math.max(4, (cap / (maxCapacity * 1.1)) * 140) : 4;
