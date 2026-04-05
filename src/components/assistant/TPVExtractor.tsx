@@ -12,10 +12,13 @@ import { formatCurrency } from "@/lib/currency";
 interface ExtractedItem {
   item_name: string;
   nazev: string;
-  popis: string;
+  popis_short: string;
+  popis_full: string;
   cena: number;
   pocet: number;
 }
+
+type PopisMode = "short" | "full";
 
 interface SPMatch {
   itemId: string;
