@@ -254,10 +254,10 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const getWeekTypeLabel = useCallback((week: WeekCapacity, past: boolean): string => {
     if (past) return "Minulý";
     if (week.company_holiday_name) return "Firemní dovolená";
-    if (week.is_manual_override && Math.round(week.capacity_hours) !== Math.round(standardCapacity)) return "Ručně upraveno";
+    if (week.is_manual_override && Math.round(week.capacity_hours) !== Math.round(nettoCapacity)) return "Ručně upraveno";
     if (week.holiday_name) return "Svátek";
     return "Standard";
-  }, [standardCapacity]);
+  }, [nettoCapacity]);
 
   // Visible month range label
   const visibleMonthRange = useMemo(() => {
@@ -283,17 +283,17 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   }, [viewStart, getWeekMonth]);
 
   const maxCapacity = useMemo(() => {
-    let max = standardCapacity;
+    let max = nettoCapacity;
     for (const [, w] of weekMap) {
       if (w.capacity_hours > max) max = w.capacity_hours;
     }
     return max;
-  }, [weekMap, standardCapacity]);
+  }, [weekMap, nettoCapacity]);
 
   // Visible window min/max for dynamic color scaling (excluding past weeks)
   const visibleRange = useMemo(() => {
-    let min = standardCapacity;
-    let max = standardCapacity;
+    let min = nettoCapacity;
+    let max = nettoCapacity;
     const end = Math.min(52, viewStart + VISIBLE_WEEKS - 1);
     for (let wn = viewStart; wn <= end; wn++) {
       const week = weekMap.get(wn);
@@ -305,7 +305,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       if (cap > max) max = cap;
     }
     return { min, max };
-  }, [weekMap, viewStart, selectedYear, currentYear, currentWeek, standardCapacity]);
+  }, [weekMap, viewStart, selectedYear, currentYear, currentWeek, nettoCapacity]);
 
   // Actual daily hours based on employees (for holiday impact)
   const actualDailyHours = useMemo(() => {
@@ -410,30 +410,16 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   // Save ALL pending changes to DB
   const handleSaveAll = async () => {
     try {
-      // 1. Save standard capacity + utilization if changed
-      const settingsUpdates: Record<string, any> = {};
-      if (localStandardCapacity !== dbStandardCapacity) {
-        settingsUpdates.weekly_capacity_hours = localStandardCapacity;
-        settingsUpdates.monthly_capacity_hours = localStandardCapacity * 4;
-      }
+      // 1. Save utilization if changed
       if (localUtilizationPct !== dbUtilizationPct) {
-        settingsUpdates.utilization_pct = localUtilizationPct;
-      }
-      if (Object.keys(settingsUpdates).length > 0) {
-        await updateSettings.mutateAsync(settingsUpdates as any);
-        if (settingsUpdates.weekly_capacity_hours) {
-          const futureFromWeek = selectedYear < currentYear ? 53 : (selectedYear === currentYear ? currentWeek + 1 : 1);
-          if (futureFromWeek <= 52) {
-            await bulkUpdate.mutateAsync({ year: selectedYear, fromWeek: futureFromWeek, capacity: localStandardCapacity, workingDays: workingDaysPerWeek });
-          }
-        }
+        await updateSettings.mutateAsync({ utilization_pct: localUtilizationPct } as any);
       }
 
       // 2. Apply week overrides
       for (const [wn, { cap, days }] of pendingWeekOverrides) {
         const week = weekMap.get(wn);
         if (!week) continue;
-        const isActuallyDifferent = cap !== localStandardCapacity || week.holiday_name;
+        const isActuallyDifferent = cap !== nettoCapacity || week.holiday_name;
         await upsertWeek.mutateAsync({
           week_year: selectedYear,
           week_number: wn,
@@ -466,8 +452,6 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   };
 
   const handleCancel = () => {
-    setLocalStandardCapacity(dbStandardCapacity);
-    setStandardCapacityInput(String(dbStandardCapacity));
     setLocalUtilizationPct(dbUtilizationPct);
     setPendingWeekOverrides(new Map());
     setPendingWeekResets(new Set());
