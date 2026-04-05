@@ -528,60 +528,54 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
         <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-4">
 
-        {/* Standard Capacity */}
+        {/* Standard Capacity — informational with live data */}
         <div className="border border-border rounded-lg p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-foreground">Standardní kapacita</h3>
-          <div className="grid grid-cols-4 gap-4">
-            <div>
-              <label className="text-xs text-muted-foreground">Kapacita (h/týden)</label>
-              <Input
-                type="text"
-                inputMode="numeric"
-                value={capacityInputFocused ? standardCapacityInput : String(standardCapacity)}
-                onFocus={() => {
-                  setCapacityInputFocused(true);
-                  setStandardCapacityInput(String(standardCapacity));
-                }}
-                onChange={e => setStandardCapacityInput(e.target.value)}
-                onBlur={commitCapacityInput}
-                onKeyDown={e => {
-                  if (e.key === "Enter") { e.preventDefault(); commitCapacityInput(); (e.target as HTMLInputElement).blur(); }
-                  if (e.key === "Escape") { setStandardCapacityInput(String(standardCapacity)); setCapacityInputFocused(false); (e.target as HTMLInputElement).blur(); }
-                }}
-                className="h-8 text-sm font-sans"
-              />
-              {capacityInputFocused && isExpr && exprPreview !== null && (
-                <div className="text-[10px] text-muted-foreground mt-0.5 font-sans">= {exprPreview}</div>
-              )}
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Pracovní dny</label>
-              <Input type="number" value={workingDaysPerWeek} disabled className="h-8 text-sm font-sans bg-muted" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Hodin za den</label>
-              <Input type="number" value={calculatedHoursPerDay} disabled className="h-8 text-sm font-sans bg-muted" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Využití kapacity (%)</label>
-              <Input
-                type="number"
-                min={1}
-                max={100}
-                value={localUtilizationPct}
-                onChange={e => setLocalUtilizationPct(Math.max(1, Math.min(100, Number(e.target.value) || 83)))}
-                className="h-8 text-sm font-sans"
-              />
-              <p className="text-[10px] text-muted-foreground mt-0.5">Efektivní využití pracovní doby. Výchozí: 83 %</p>
-            </div>
-          </div>
           <div className="flex items-center justify-between">
-            <p className="text-[10px] text-muted-foreground">Změna kapacity ovlivní pouze týdny od dneška vpřed. Minulé týdny zůstanou nezměněny.</p>
+            <h3 className="text-sm font-semibold text-foreground">Kapacita výroby</h3>
             <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleRecalculateAll} disabled={isRecalculating || vyrobniEmployees.length === 0}>
               <RotateCcw className={cn("h-3 w-3 mr-1", isRecalculating && "animate-spin")} />
               {isRecalculating ? "Přepočítávám…" : "Přepočítat vše"}
             </Button>
           </div>
+          <div className="grid grid-cols-4 gap-3">
+            {/* Column 1 — Zaměstnanci */}
+            <div className="bg-muted/40 rounded-lg p-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Výrobní zaměstnanci</div>
+              <div className="text-2xl font-semibold font-sans mt-1">{vyrobniEmployees.length} <span className="text-sm font-normal text-muted-foreground">osob</span></div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">Z tabulky zaměstnanců</div>
+            </div>
+            {/* Column 2 — Brutto fond */}
+            <div className="bg-muted/40 rounded-lg p-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Brutto fond</div>
+              <div className="text-2xl font-semibold font-sans mt-1">{totalBruttoWeekly} <span className="text-sm font-normal text-muted-foreground">h/týden</span></div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">{totalBruttoDaily} h/den × 5 dní</div>
+            </div>
+            {/* Column 3 — Využití (editable) */}
+            <div className="bg-muted/40 rounded-lg p-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Využití kapacity</div>
+              <div className="flex items-baseline gap-1 mt-1">
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={localUtilizationPct}
+                  onChange={e => setLocalUtilizationPct(Math.max(1, Math.min(100, Number(e.target.value) || 83)))}
+                  className="h-8 w-20 text-lg font-semibold font-sans"
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+              </div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">Výchozí: 83 %</div>
+            </div>
+            {/* Column 4 — Čistá kapacita */}
+            <div className="bg-muted/40 rounded-lg p-3">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Čistá kapacita</div>
+              <div className="text-2xl font-semibold font-sans mt-1 text-amber-600">{nettoCapacity} <span className="text-sm font-normal">h/týden</span></div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">{Math.round(nettoCapacity * 52 / 12)} h/měsíc</div>
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Kapacita se přepočítává automaticky ze zaměstnanců v sekcích Složení výrobní kapacity. Upravte pouze využití kapacity.
+          </p>
         </div>
 
         {/* Dílny breakdown panel with expandable employee lists */}
@@ -781,7 +775,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               <div
                 className="absolute left-0 right-0 border-t-2 border-dashed z-10 pointer-events-none"
                 style={{
-                  top: `${Math.max(0, 140 - (standardCapacity / (maxCapacity * 1.1)) * 140)}px`,
+                  top: `${Math.max(0, 140 - (nettoCapacity / (maxCapacity * 1.1)) * 140)}px`,
                   borderColor: "hsl(var(--destructive) / 0.4)",
                 }}
               />
@@ -796,7 +790,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   const isBarSelected = selectedWeeks.has(wn);
                   const typeLabel = getWeekTypeLabel(week, past);
 
-                  const barColor = past ? PAST_WEEK_COLOR : getCapacityColorDynamic(cap, standardCapacity, visibleRange.min, visibleRange.max);
+                  const barColor = past ? PAST_WEEK_COLOR : getCapacityColorDynamic(cap, nettoCapacity, visibleRange.min, visibleRange.max);
 
                   const weekStart = new Date(week.week_start + "T00:00:00");
                   const weekEnd = new Date(weekStart);
@@ -872,8 +866,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               weekNum={firstEditingWeek}
               selectedCount={editingWeeks.length}
               isPast={isPastWeek(firstEditingWeek)}
-              standardCapacity={standardCapacity}
-              hoursPerDay={calculatedHoursPerDay}
+              standardCapacity={nettoCapacity}
+              hoursPerDay={8}
               onSave={(cap, days) => handleWeekCapacityUpdate(editingWeeks, cap, days)}
               onReset={() => handleResetWeeks(editingWeeks)}
               onClose={() => setSelectedWeeks(new Set())}
