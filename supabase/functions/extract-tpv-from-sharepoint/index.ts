@@ -272,31 +272,40 @@ serve(async (req) => {
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-      const SYSTEM_PROMPT = `You are extracting line items from a price offer (cenová nabídka) for a furniture/interior design company.
+      const SYSTEM_PROMPT = `You are extracting line items from a Czech furniture/interior design price offer (cenová nabídka).
 
-Extract ALL line items and return ONLY valid JSON array, no other text:
+The document typically has this structure:
+- Item code (e.g. T01, T02, K01, S01, D01...) in one column
+- Item name (e.g. "Kuchyň", "Ostrůvek", "TV stěna", "Šatní skříň") next to the code
+- Sometimes dimensions (e.g. 5920*700*2650)
+- Quantity (e.g. "1 ks")
+- Unit price (e.g. "á 258,397 Kč")
+- Total price
+- Below each main item there may be material descriptions, hardware details etc. — these are the DESCRIPTION, not separate items.
+
+Extract ONLY the main priced line items. Return a JSON array:
 
 [
   {
-    "item_name": "short item code or name, max 50 chars",
-    "popis": "full description of the item",
-    "cena": 12500.00,
-    "pocet": 2
+    "item_name": "T01",
+    "popis": "Kuchyň 5920*700*2650 — nepohledové části DTDL Egger W960 SM bílá, pohledové boky+dvířka DTDL W1200 ST9 Porcelánově bílá...",
+    "cena": 258397,
+    "pocet": 1
   }
 ]
 
 Rules:
-- cena = unit price (NOT total). If only total given, divide by quantity.
-- pocet = quantity (default 1 if not specified)
-- Skip subtotals, headers, totals rows
-- item_name should be a short code or abbreviation
-- All prices in CZK (convert EUR × 25 if needed)
-- Return ONLY the JSON array, no markdown fences, no explanation`;
+- item_name = the SHORT CODE (T01, T02, K01, S01, D01, etc.). If no code exists, use a short name (max 10 chars).
+- popis = the item NAME + key material/specification details merged into one description string. Include dimensions if present.
+- cena = UNIT price in CZK (NOT total). If price is in EUR, multiply by 25.
+- pocet = quantity (default 1)
+- SKIP: subtotals, totals, headers, notes like "Součástí CN nejsou spotřebiče"
+- SKIP: rows that are just material descriptions without their own price — merge them into the parent item's popis
+- Return ONLY the JSON array, no markdown, no explanation`;
 
       let userContent: any[];
 
       if (isPdf) {
-        // PDFs can be sent as image_url with base64
         userContent = [
           {
             type: "image_url",
@@ -304,24 +313,30 @@ Rules:
           },
           {
             type: "text",
-            text: "Extract all line items from this price offer document. Return ONLY the JSON array.",
+            text: "Extract all priced line items from this Czech furniture price offer (cenová nabídka). Each item has a code like T01, K01, etc. Return ONLY the JSON array.",
           },
         ];
       } else {
-        // Excel files: parse to CSV-like text using a simple binary reader
-        // Since Gemini doesn't accept Excel MIME types, we extract text content
         let textContent: string;
         try {
           textContent = await parseXlsxToTextAsync(bytes);
         } catch (e) {
-          console.warn("XLSX parse failed, sending raw base64 as text hint:", e);
+          console.warn("XLSX parse failed:", e);
           textContent = `[Binary Excel file: ${fileName}, ${bytes.length} bytes. Could not parse locally.]`;
         }
+
+        console.log("Parsed XLSX preview (first 500 chars):", textContent.substring(0, 500));
         
         userContent = [
           {
             type: "text",
-            text: `This is the content of an Excel price offer file "${fileName}":\n\n${textContent}\n\nExtract all line items from this price offer. Return ONLY the JSON array.`,
+            text: `Below is the tab-separated content of a Czech furniture price offer Excel file "${fileName}".
+Each row is tab-separated. Look for the pattern: CODE (T01, K01...) | NAME | DIMENSIONS | QTY | UNIT PRICE | TOTAL PRICE.
+Rows without a price that follow a priced item are material/specification details — merge them into that item's description.
+
+${textContent}
+
+Extract all priced line items. Return ONLY the JSON array.`,
           },
         ];
       }
