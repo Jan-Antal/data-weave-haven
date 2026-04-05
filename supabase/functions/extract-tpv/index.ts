@@ -8,9 +8,10 @@ const corsHeaders = {
 
 const SYSTEM_PROMPT = `You extract line items from Czech furniture price offers (cenová nabídka).
 Return ONLY a valid JSON array, no markdown, no explanation:
-[{"item_name":"T01","popis":"full description","cena":12500.00,"pocet":1}]
+[{"item_name":"T01","nazev":"Kuchyňská linka","popis":"full description with materials, dimensions, hardware","cena":12500.00,"pocet":1}]
 Rules:
-- item_name = short code from the document (T01, K01, D-01, etc.). If no code, use short name (max 10 chars).
+- item_name = short code from the document (T01, K01, D-01, etc.). If no code, generate a short code (max 10 chars).
+- nazev = short item name / title (e.g. "Kuchyňská linka", "Skříň rohová", "Pracovní deska"). Max 50 chars.
 - popis = full item description including material details, dimensions, hardware specs. Merge sub-rows into parent.
 - cena = unit price in CZK (if EUR, multiply by 25). NOT total — divide by quantity if needed.
 - pocet = quantity, default 1

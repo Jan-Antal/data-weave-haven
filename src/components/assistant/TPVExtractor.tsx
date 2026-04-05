@@ -11,6 +11,7 @@ import { formatCurrency } from "@/lib/currency";
 
 interface ExtractedItem {
   item_name: string;
+  nazev: string;
   popis: string;
   cena: number;
   pocet: number;
@@ -109,6 +110,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
 
       const extracted = (data.items || []).map((item: any) => ({
         item_name: item.item_name || "",
+        nazev: item.nazev || "",
         popis: item.popis || "",
         cena: Number(item.cena) || 0,
         pocet: Number(item.pocet) || 1,
@@ -176,6 +178,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
 
       const extracted = (data.items || []).map((item: any) => ({
         item_name: item.item_name || "",
+        nazev: item.nazev || "",
         popis: item.popis || "",
         cena: Number(item.cena) || 0,
         pocet: Number(item.pocet) || 1,
@@ -207,7 +210,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   };
 
   const addRow = () => {
-    setItems((prev) => [...prev, { item_name: "", popis: "", cena: 0, pocet: 1 }]);
+    setItems((prev) => [...prev, { item_name: "", nazev: "", popis: "", cena: 0, pocet: 1 }]);
   };
 
   const totalSum = items.reduce((sum, item) => sum + item.cena * item.pocet, 0);
@@ -224,7 +227,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
         valid.map((item) => ({
           project_id: projectId,
           item_name: item.item_name,
-          item_type: item.popis || "Material",
+          item_type: item.nazev || item.item_name,
+          nazev_prvku: item.popis || null,
           cena: item.cena,
           pocet: item.pocet,
           status: "Ke zpracování",
@@ -429,7 +433,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[140px]">Název</TableHead>
+                    <TableHead className="w-[100px]">Kód</TableHead>
+                    <TableHead className="w-[160px]">Název</TableHead>
                     <TableHead>Popis</TableHead>
                     <TableHead className="w-[110px] text-right">Cena/ks</TableHead>
                     <TableHead className="w-[70px] text-right">Počet</TableHead>
@@ -444,6 +449,13 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
                         <Input
                           value={item.item_name}
                           onChange={(e) => updateItem(i, "item_name", e.target.value)}
+                          className="h-7 text-xs"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={item.nazev}
+                          onChange={(e) => updateItem(i, "nazev", e.target.value)}
                           className="h-7 text-xs"
                         />
                       </TableCell>
