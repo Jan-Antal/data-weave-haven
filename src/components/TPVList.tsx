@@ -1239,6 +1239,13 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           portrait
         />
       )}
+
+      <TPVExtractor
+        projectId={projectId}
+        open={extractorOpen}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["tpv_items", projectId] })}
+        onClose={() => setExtractorOpen(false)}
+      />
     </div>
   );
 }
