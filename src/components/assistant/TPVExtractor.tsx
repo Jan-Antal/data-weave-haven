@@ -11,6 +11,7 @@ import { formatCurrency } from "@/lib/currency";
 
 interface ExtractedItem {
   item_name: string;
+  nazev: string;
   popis: string;
   cena: number;
   pocet: number;
@@ -109,6 +110,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
 
       const extracted = (data.items || []).map((item: any) => ({
         item_name: item.item_name || "",
+        nazev: item.nazev || "",
         popis: item.popis || "",
         cena: Number(item.cena) || 0,
         pocet: Number(item.pocet) || 1,
@@ -176,6 +178,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
 
       const extracted = (data.items || []).map((item: any) => ({
         item_name: item.item_name || "",
+        nazev: item.nazev || "",
         popis: item.popis || "",
         cena: Number(item.cena) || 0,
         pocet: Number(item.pocet) || 1,
@@ -207,7 +210,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   };
 
   const addRow = () => {
-    setItems((prev) => [...prev, { item_name: "", popis: "", cena: 0, pocet: 1 }]);
+    setItems((prev) => [...prev, { item_name: "", nazev: "", popis: "", cena: 0, pocet: 1 }]);
   };
 
   const totalSum = items.reduce((sum, item) => sum + item.cena * item.pocet, 0);
@@ -224,7 +227,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
         valid.map((item) => ({
           project_id: projectId,
           item_name: item.item_name,
-          item_type: item.popis || "Material",
+          item_type: item.nazev || item.item_name,
+          nazev_prvku: item.popis || null,
           cena: item.cena,
           pocet: item.pocet,
           status: "Ke zpracování",
