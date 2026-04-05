@@ -17,115 +17,36 @@ const SYSTEM_PROMPT = `You extract line items from Czech furniture price offers 
 Return ONLY a valid JSON array, no markdown, no explanation.
 
 Example output:
-[{"item_name":"T01","nazev":"Kuchyňská linka","popis_short":"5920×700×2650 | LTD Egger W1000 ST9 | Blum","popis_full":"Materiál: Korpus LTD Egger W1000 ST9 | Dvířka a viditelné části: Polyrey G120 TCH | Akustická záda: EchoBoard24 204 | Vybavení: nábytkové kování | Elektrika: Čipový zámek SAFE-O-TRONIC LS LS300 | Rozměr: 5920×700×2650","cena":258397,"pocet":1}]
+[{"item_name":"T01","nazev":"Kuchyňská linka","popis":"Materiál: Korpus LTD Egger W1000 ST9 | Dvířka a viditelné části: Polyrey G120 TCH | Akustická záda: EchoBoard24 204 | Vybavení: nábytkové kování | Elektrika: Čipový zámek SAFE-O-TRONIC LS LS300 | Rozměr: 5920×700×2650","cena":258397,"pocet":1}]
 
 Field definitions:
 - item_name = short code exactly as in the document (T01, K01, D-01, etc.). If no code exists, create one from first letter + number (max 10 chars).
 - nazev = SHORT item name, what the item IS (e.g. "Kuchyňská linka", "Ostrůvek", "TV stěna", "Skříň rohová", "Pracovní deska", "Postel"). This is the human-readable name WITHOUT dimensions, materials, or specs. Max 40 chars.
-- popis_short = concise TECHNICAL description for the description column. Do NOT repeat nazev. Prefer dimensions + 1-2 key technical specs (material, hardware, equipment, finish).
-- popis_full = complete TECHNICAL description for the description column. Do NOT repeat nazev. Prefer labelled details like "Materiál: ... | Vybavení: ... | Elektrika: ...".
+- popis = complete TECHNICAL description. Do NOT repeat nazev. Include labelled details like "Materiál: ... | Vybavení: ... | Elektrika: ... | Rozměr: ...". Combine ALL technical information from multiple rows that belong to the same item.
 - cena = unit price in CZK (if EUR, multiply by 25). NOT total — divide by quantity if needed.
 - pocet = quantity, default 1.
 
 CRITICAL rules:
-- In Excel workbooks, the priced item is often on one row and its technical details are in the following rows. You MUST merge those following rows into the same item.
-- If rows below the item contain materials, hardware, finishes, equipment, or electrical details, popis_full MUST use them.
-- Since nazev is a separate field, popis_short and popis_full must NOT be just a duplicate of the item title.
-- nazev must NEVER contain dimensions like "5920×700×2650".
-- If technical details exist, popis_short must not be only dimensions.
+- In Excel workbooks, the priced item is often on one row and its technical details (materials, hardware, finishes, dimensions, electrical) are in the FOLLOWING rows below it. You MUST merge those following rows into the same item's popis field.
+- Look at ALL rows between two item codes — everything between them belongs to the first item.
+- popis must contain materials (Materiál, Korpus, Dvířka, LTD, MDF, dýha, lak, polyrey, egger), hardware (kování, Blum, Hettich, Häfele, pojezdy, panty), equipment (vybavení, zámky, úchyty), electrical (elektrika, zámek, SAFE-O-TRONIC), finishes (povrch, hrana, čalounění), and dimensions.
+- nazev must NEVER contain dimensions or materials.
+- popis must NEVER be just a repeat of the item name or just dimensions.
 - Skip totals, subtotals, section headers, transport, montáž, and notes.
 - Include ALL priced line items, nothing missing.`;
-
-type ParsedRow = {
-  rowNum: number;
-  cells: string[];
-  text: string;
-};
-
-type ItemContext = {
-  header: string;
-  dimension: string | null;
-  detailLines: string[];
-  contextLines: string[];
-};
-
-const ITEM_CODE_RE = /^[A-Z]{1,3}-?\d{1,3}[A-Z]?$/i;
-const DIMENSION_RE = /\d{2,5}\s*[x×*]\s*\d{2,5}(?:\s*[x×*\/]\s*\d{2,5})?/i;
-const DETAIL_HINT_RE = /(materi|korpus|dvíř|dv[ií]řk|viditeln|akust|z[áa]da|vybaven|kov[aá]n|elektr|z[aá]mek|úchyt|uchyt|pant|pojezd|zásuv|zasuv|blum|hettich|h[aä]fele|egger|polyrey|lamino|ltd|mdf|d[ýy]h|lak|sklo|nerez|čaloun|caloun|povrch|hrana|safe-o-tronic)/i;
 
 function normalizeWhitespace(text: string): string {
   return text.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function normalizeDimension(text: string | null): string | null {
-  if (!text) return null;
-  return normalizeWhitespace(text.replace(/\*/g, "×").replace(/\s*×\s*/g, "×").replace(/\s*\/\s*/g, "/"));
-}
-
-function limitText(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return `${text.slice(0, max - 1).trimEnd()}…`;
-}
-
-function uniqueStrings(values: string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const value of values) {
-    const normalized = normalizeWhitespace(value);
-    if (!normalized || seen.has(normalized)) continue;
-    seen.add(normalized);
-    result.push(normalized);
-  }
-  return result;
-}
-
-function parseNumericCell(cell: string): number | null {
-  const cleaned = cell.replace(/\s/g, "").replace(/[^\d,.-]/g, "");
-  if (!cleaned || !/\d/.test(cleaned)) return null;
-  const normalized = cleaned.includes(",") && cleaned.includes(".")
-    ? cleaned.replace(/\./g, "").replace(",", ".")
-    : cleaned.replace(",", ".");
-  const value = Number(normalized);
-  return Number.isFinite(value) ? value : null;
-}
-
-function extractPrimaryCode(cells: string[]): string | null {
-  for (const cell of cells.slice(0, 3)) {
-    const text = normalizeWhitespace(cell);
-    if (!text) continue;
-    if (ITEM_CODE_RE.test(text)) return text.toUpperCase();
-    const match = text.match(/^([A-Z]{1,3}-?\d{1,3}[A-Z]?)\b/i);
-    if (match) return match[1].toUpperCase();
-  }
-  return null;
-}
-
-function looksLikeTechnicalDetail(text: string): boolean {
-  const normalized = normalizeWhitespace(text);
-  return DETAIL_HINT_RE.test(normalized) || /^(materi[aá]l|vybaven[íi]|elektrika|korpus|dvířka|akustick[aá] z[aá]da|povrch|hrana)\s*:/i.test(normalized);
-}
-
-function looksLikeItemRow(row: ParsedRow): boolean {
-  const code = extractPrimaryCode(row.cells);
-  if (!code) return false;
-  if (looksLikeTechnicalDetail(row.text)) return false;
-  const nonEmpty = row.cells.filter((cell) => normalizeWhitespace(cell).length > 0);
-  const hasDimension = DIMENSION_RE.test(row.text);
-  const hasPrice = nonEmpty.some((cell) => {
-    const value = parseNumericCell(cell);
-    return value !== null && value >= 1000;
-  });
-  return hasPrice || hasDimension || nonEmpty.length >= 3;
-}
-
-function parseWorksheetRows(xml: string, sharedStrings: string[]): ParsedRow[] {
+function parseWorksheetRows(xml: string, sharedStrings: string[]): { rowNum: number; text: string }[] {
   function colToIndex(col: string): number {
     let idx = 0;
     for (let i = 0; i < col.length; i++) idx = idx * 26 + (col.charCodeAt(i) - 64);
     return idx - 1;
   }
 
-  const rows: ParsedRow[] = [];
+  const rows: { rowNum: number; text: string }[] = [];
 
   for (const rm of xml.matchAll(/<row[^>]*?r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g)) {
     const rowNum = parseInt(rm[1], 10);
@@ -171,90 +92,13 @@ function parseWorksheetRows(xml: string, sharedStrings: string[]): ParsedRow[] {
 
     const text = normalizeWhitespace(cells.filter(Boolean).join(" | "));
     if (!text) continue;
-    rows.push({ rowNum, cells, text });
+    rows.push({ rowNum, text });
   }
 
   return rows;
 }
 
-function mergeItemContext(target: Record<string, ItemContext>, code: string, incoming: ItemContext) {
-  const existing = target[code];
-  if (!existing) {
-    target[code] = {
-      header: incoming.header,
-      dimension: incoming.dimension,
-      detailLines: uniqueStrings(incoming.detailLines),
-      contextLines: uniqueStrings(incoming.contextLines),
-    };
-    return;
-  }
-
-  existing.header = existing.header || incoming.header;
-  existing.dimension = existing.dimension || incoming.dimension;
-  existing.detailLines = uniqueStrings([...existing.detailLines, ...incoming.detailLines]);
-  existing.contextLines = uniqueStrings([...existing.contextLines, ...incoming.contextLines]);
-}
-
-function collectItemContexts(rows: ParsedRow[]): Record<string, ItemContext> {
-  const contexts: Record<string, ItemContext> = {};
-
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const code = extractPrimaryCode(row.cells);
-    if (!code || !looksLikeItemRow(row)) continue;
-
-    const detailLines: string[] = [];
-    const contextLines: string[] = [];
-
-    for (let j = i + 1; j < rows.length && j <= i + 10; j++) {
-      const next = rows[j];
-      if (looksLikeItemRow(next)) break;
-      if (!next.text || next.text === row.text) continue;
-      contextLines.push(next.text);
-      if (looksLikeTechnicalDetail(next.text)) detailLines.push(next.text);
-    }
-
-    mergeItemContext(contexts, code, {
-      header: row.text,
-      dimension: normalizeDimension(row.text.match(DIMENSION_RE)?.[0] ?? null),
-      detailLines,
-      contextLines,
-    });
-  }
-
-  return contexts;
-}
-
-function stripCategoryPrefix(line: string): string {
-  return normalizeWhitespace(line.replace(/^(materi[aá]l|vybaven[íi]|elektrika|korpus|dvířka(?: a viditelné části)?|akustick[aá] z[aá]da|povrch|hrana|rozměr)\s*:\s*/i, ""));
-}
-
-function pickTechnicalLines(context: ItemContext): string[] {
-  const source = context.detailLines.length > 0
-    ? context.detailLines
-    : context.contextLines.filter((line) => looksLikeTechnicalDetail(line) || line.length > 18);
-  return uniqueStrings(source).slice(0, 6);
-}
-
-function buildDescriptionsFromContext(context: ItemContext) {
-  const dimension = context.dimension;
-  const technicalLines = pickTechnicalLines(context);
-
-  const fullParts = [...technicalLines];
-  if (dimension && !fullParts.some((line) => DIMENSION_RE.test(line))) fullParts.push(`Rozměr: ${dimension}`);
-
-  const shortParts = [
-    dimension,
-    ...technicalLines.map(stripCategoryPrefix).filter(Boolean).slice(0, 2),
-  ].filter(Boolean) as string[];
-
-  return {
-    popis_short: limitText(normalizeWhitespace(shortParts.join(" | ")), 140),
-    popis_full: limitText(normalizeWhitespace(fullParts.join(" | ")), 500),
-  };
-}
-
-async function parseXlsxToText(bytes: Uint8Array): Promise<{ text: string; contexts: Record<string, ItemContext> }> {
+async function parseXlsxToText(bytes: Uint8Array): Promise<string> {
   const blob = new Blob([bytes]);
   const reader = new ZipReader(new BlobReader(blob));
   const entries = await reader.getEntries();
@@ -289,10 +133,9 @@ async function parseXlsxToText(bytes: Uint8Array): Promise<{ text: string; conte
 
   if (sheetEntries.length === 0) {
     await reader.close();
-    return { text: "[Could not read workbook worksheets]", contexts: {} };
+    return "[Could not read workbook worksheets]";
   }
 
-  const contexts: Record<string, ItemContext> = {};
   const worksheetDump: string[] = [];
 
   for (const sheetEntry of sheetEntries) {
@@ -301,40 +144,25 @@ async function parseXlsxToText(bytes: Uint8Array): Promise<{ text: string; conte
     const rows = parseWorksheetRows(xml, sharedStrings);
     const sheetName = sheetEntry.filename.replace("xl/worksheets/", "").replace(/\.xml$/i, "");
 
-    worksheetDump.push(`Sheet ${sheetName}`);
-    for (const row of rows.slice(0, 350)) worksheetDump.push(`R${row.rowNum}: ${row.text}`);
-
-    const sheetContexts = collectItemContexts(rows);
-    for (const [code, context] of Object.entries(sheetContexts)) mergeItemContext(contexts, code, context);
+    worksheetDump.push(`\n=== Sheet: ${sheetName} ===`);
+    // Send ALL rows — no truncation
+    for (const row of rows) worksheetDump.push(`R${row.rowNum}: ${row.text}`);
   }
 
   await reader.close();
 
-  const contextLines: string[] = [];
-  for (const [code, context] of Object.entries(contexts)) {
-    contextLines.push(`Item ${code}`);
-    contextLines.push(`Header: ${context.header}`);
-    const technicalLines = pickTechnicalLines(context);
-    if (technicalLines.length > 0) {
-      contextLines.push("Technical rows:");
-      for (const line of technicalLines) contextLines.push(`- ${line}`);
-    }
-    if (context.dimension) contextLines.push(`Detected dimension: ${context.dimension}`);
-    contextLines.push("");
-  }
-
-  const text = [
-    "IMPORTANT: In Excel offers, the priced item is often on one row and its technical details are in the following rows.",
-    "Use the ITEM CONTEXTS first. If technical rows exist, use them for popis_short and popis_full instead of repeating the title.",
+  return [
+    "IMPORTANT: In Excel price offers, each priced item (with a code like T01, K01) is on one row.",
+    "The FOLLOWING rows below it contain technical details: materials, hardware, finishes, electrical, dimensions.",
+    "You MUST read ALL rows between two item codes and merge the technical details into the popis field of the preceding item.",
+    "Do NOT just use the item header row — look at the detail rows below it for Materiál, Korpus, Dvířka, Vybavení, Elektrika, etc.",
     "",
-    "ITEM CONTEXTS:",
-    ...contextLines.slice(0, 1200),
-    "WORKSHEET DUMP:",
-    ...worksheetDump.slice(0, 1200),
+    "FULL WORKSHEET DATA:",
+    ...worksheetDump,
   ].join("\n");
-
-  return { text, contexts };
 }
+
+// --- SharePoint / Graph helpers ---
 
 async function getAccessToken(): Promise<string> {
   const clientSecret = Deno.env.get("SHAREPOINT_CLIENT_SECRET");
@@ -422,7 +250,7 @@ function buildClaudeContent(isPdf: boolean, fileBase64: string, excelText?: stri
   return [
     {
       type: "text",
-      text: `Below is structured workbook context from a Czech furniture price offer spreadsheet. Technical details are often stored in following rows under each priced item. Use those rows for popis_short and popis_full. Return ONLY the JSON array.\n\n${excelText}`,
+      text: `Below is the COMPLETE content of a Czech furniture price offer Excel spreadsheet. Technical details (materials, hardware, finishes, electrical) are stored in rows BELOW each priced item. You must use ALL of those detail rows when building the popis field. Return ONLY the JSON array.\n\n${excelText}`,
     },
   ];
 }
@@ -441,7 +269,7 @@ async function callClaude(isPdf: boolean, fileBase64: string, excelText?: string
     },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: buildClaudeContent(isPdf, fileBase64, excelText) }],
     }),
@@ -462,36 +290,6 @@ async function callClaude(isPdf: boolean, fileBase64: string, excelText?: string
     const match = text.match(/\[[\s\S]*\]/);
     return match ? JSON.parse(match[0]) : [];
   }
-}
-
-function enrichExtractedItems(items: any[], contexts: Record<string, ItemContext>): any[] {
-  return items.map((item) => {
-    const code = normalizeWhitespace(String(item?.item_name ?? "")).toUpperCase();
-    const context = contexts[code];
-    if (!context) {
-      return {
-        ...item,
-        popis_short: item?.popis_short || item?.popis || "",
-        popis_full: item?.popis_full || item?.popis || "",
-      };
-    }
-
-    const technicalLines = pickTechnicalLines(context);
-    if (technicalLines.length === 0) {
-      return {
-        ...item,
-        popis_short: item?.popis_short || item?.popis || "",
-        popis_full: item?.popis_full || item?.popis || "",
-      };
-    }
-
-    const fallback = buildDescriptionsFromContext(context);
-    return {
-      ...item,
-      popis_short: fallback.popis_short || item?.popis_short || item?.popis || "",
-      popis_full: fallback.popis_full || item?.popis_full || item?.popis || "",
-    };
-  });
 }
 
 serve(async (req) => {
@@ -571,14 +369,11 @@ serve(async (req) => {
 
       const isPdf = fileName.toLowerCase().endsWith(".pdf");
       let excelText: string | undefined;
-      let itemContexts: Record<string, ItemContext> = {};
 
       if (!isPdf) {
         try {
-          const parsed = await parseXlsxToText(bytes);
-          excelText = parsed.text;
-          itemContexts = parsed.contexts;
-          console.log("Parsed XLSX item contexts:", Object.keys(itemContexts).length);
+          excelText = await parseXlsxToText(bytes);
+          console.log("Parsed XLSX, text length:", excelText.length);
         } catch (error) {
           console.warn("XLSX parse failed:", error);
           excelText = `[Binary Excel file: ${fileName}, ${bytes.length} bytes]`;
@@ -586,8 +381,7 @@ serve(async (req) => {
       }
 
       console.log(`Extracting ${fileName} (${bytes.length} bytes, isPdf: ${isPdf})`);
-      const rawItems = await callClaude(isPdf, fileBase64, excelText);
-      const items = enrichExtractedItems(rawItems, itemContexts);
+      const items = await callClaude(isPdf, fileBase64, excelText);
 
       return new Response(JSON.stringify({ items, fileName }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

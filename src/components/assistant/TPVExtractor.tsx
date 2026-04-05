@@ -12,13 +12,10 @@ import { formatCurrency } from "@/lib/currency";
 interface ExtractedItem {
   item_name: string;
   nazev: string;
-  popis_short: string;
-  popis_full: string;
+  popis: string;
   cena: number;
   pocet: number;
 }
-
-type PopisMode = "short" | "full";
 
 interface SPMatch {
   itemId: string;
@@ -42,7 +39,6 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   const [foundFileName, setFoundFileName] = useState("");
   const [items, setItems] = useState<ExtractedItem[]>([]);
   const [saving, setSaving] = useState(false);
-  const [popisMode, setPopisMode] = useState<PopisMode>("short");
   const [spUploaded, setSpUploaded] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const autoExtractTriggered = useRef(false);
@@ -54,7 +50,6 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   // Search SharePoint on open
   useEffect(() => {
     if (!open) {
-      // Reset state when closing
       setPhase("searching");
       setMatches([]);
       setFoundFileName("");
@@ -92,7 +87,6 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       } else if (autoMatches.length > 1) {
         setPhase("multiple");
       } else {
-        // No auto-match — offer pick from SP or upload
         setPhase(allFiles.length > 0 ? "pick-or-upload" : "not-found");
       }
     } catch (err: any) {
@@ -115,8 +109,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       const extracted = (data.items || []).map((item: any) => ({
         item_name: item.item_name || "",
         nazev: item.nazev || "",
-        popis_short: item.popis_short || item.popis || "",
-        popis_full: item.popis_full || item.popis || "",
+        popis: item.popis || item.popis_full || item.popis_short || "",
         cena: Number(item.cena) || 0,
         pocet: Number(item.pocet) || 1,
       }));
@@ -184,8 +177,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       const extracted = (data.items || []).map((item: any) => ({
         item_name: item.item_name || "",
         nazev: item.nazev || "",
-        popis_short: item.popis_short || item.popis || "",
-        popis_full: item.popis_full || item.popis || "",
+        popis: item.popis || item.popis_full || item.popis_short || "",
         cena: Number(item.cena) || 0,
         pocet: Number(item.pocet) || 1,
       }));
@@ -199,7 +191,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       setErrorMsg(err.message || "Nepodařilo se extrahovat položky");
       toast({
         title: "Chyba extrakce",
-        description: err.message,
+        description: err.message || "Nepodařilo se extrahovat položky",
         variant: "destructive",
       });
     } finally {
@@ -216,7 +208,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   };
 
   const addRow = () => {
-    setItems((prev) => [...prev, { item_name: "", nazev: "", popis_short: "", popis_full: "", cena: 0, pocet: 1 }]);
+    setItems((prev) => [...prev, { item_name: "", nazev: "", popis: "", cena: 0, pocet: 1 }]);
   };
 
   const totalSum = items.reduce((sum, item) => sum + item.cena * item.pocet, 0);
@@ -234,7 +226,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
           project_id: projectId,
           item_name: item.item_name,
           item_type: item.nazev || item.item_name,
-          nazev_prvku: popisMode === "full" ? item.popis_full : item.popis_short || null,
+          nazev_prvku: item.popis || null,
           cena: item.cena,
           pocet: item.pocet,
           status: "Ke zpracování",
@@ -358,24 +350,24 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
               </label>
               {manualFile && (
                 <Button size="sm" onClick={handleManualExtract} disabled={manualLoading} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                  {manualLoading ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Extrahuji…</> : "Extrahovat"}
+                  {manualLoading ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Extrahuji…</> : "Extrahovat položky"}
                 </Button>
               )}
             </div>
           </div>
         )}
 
-        {/* Phase: Not found — no SP files at all */}
+        {/* Phase: Not found — manual upload only */}
         {phase === "not-found" && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <AlertCircle className="h-4 w-4" />
-              V SharePointu nebyly nalezeny žádné dokumenty projektu
+              Cenová nabídka nebyla nalezena v SharePointu. Nahrajte soubor ručně:
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <label className="flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background hover:bg-accent cursor-pointer text-sm transition-colors">
                 <Upload className="h-4 w-4" />
-                {manualFile ? manualFile.name : "Nahrát soubor"}
+                {manualFile ? manualFile.name : "Vybrat soubor"}
                 <input type="file" accept=".pdf,.xlsx,.xls" onChange={handleManualFileChange} className="hidden" />
               </label>
               <Button size="sm" onClick={handleManualExtract} disabled={!manualFile || manualLoading} className="bg-primary text-primary-foreground hover:bg-primary/90">
@@ -431,26 +423,9 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
         {/* Phase: Done — review table */}
         {phase === "done" && items.length > 0 && (
           <>
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
-                Extrahováno z: <strong>{foundFileName}</strong>
-              </div>
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-muted-foreground mr-1">Popis:</span>
-                <button
-                  onClick={() => setPopisMode("short")}
-                  className={`px-2 py-0.5 rounded-l border text-xs transition-colors ${popisMode === "short" ? "bg-primary text-primary-foreground border-primary" : "bg-background border-input hover:bg-accent"}`}
-                >
-                  Short
-                </button>
-                <button
-                  onClick={() => setPopisMode("full")}
-                  className={`px-2 py-0.5 rounded-r border-t border-b border-r text-xs transition-colors ${popisMode === "full" ? "bg-primary text-primary-foreground border-primary" : "bg-background border-input hover:bg-accent"}`}
-                >
-                  Full
-                </button>
-              </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+              Extrahováno z: <strong>{foundFileName}</strong>
             </div>
             <div className="flex-1 overflow-auto border rounded-lg">
               <Table>
@@ -484,8 +459,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
                       </TableCell>
                       <TableCell>
                         <Input
-                          value={popisMode === "full" ? item.popis_full : item.popis_short}
-                          onChange={(e) => updateItem(i, popisMode === "full" ? "popis_full" : "popis_short", e.target.value)}
+                          value={item.popis}
+                          onChange={(e) => updateItem(i, "popis", e.target.value)}
                           className="h-7 text-xs"
                         />
                       </TableCell>
