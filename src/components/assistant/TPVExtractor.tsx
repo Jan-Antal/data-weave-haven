@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Upload, Trash2, Plus, Loader2, FileText, CheckCircle2, Search, AlertCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
-import * as XLSX from "xlsx";
+
 
 interface ExtractedItem {
   item_name: string;
