@@ -131,8 +131,8 @@ serve(async (req) => {
         });
       }
 
-      // Get file info + download URL
-      const itemRes = await fetch(`${GRAPH}/drives/${driveId}/items/${fileItemId}?$select=name,size,@microsoft.graph.downloadUrl`, {
+      // Get file info (without $select to ensure downloadUrl is included)
+      const itemRes = await fetch(`${GRAPH}/drives/${driveId}/items/${fileItemId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!itemRes.ok) { const t = await itemRes.text(); throw new Error(`Item error [${itemRes.status}]: ${t}`); }
@@ -140,12 +140,20 @@ serve(async (req) => {
       const downloadUrl = item["@microsoft.graph.downloadUrl"];
       const fileName = item.name;
 
-      if (!downloadUrl) throw new Error("No download URL available");
-
-      // Download file content
-      const fileRes = await fetch(downloadUrl);
-      if (!fileRes.ok) throw new Error(`Download failed [${fileRes.status}]`);
-      const fileBuffer = await fileRes.arrayBuffer();
+      // If no downloadUrl, use /content endpoint directly
+      let fileBuffer: ArrayBuffer;
+      if (downloadUrl) {
+        const fileRes = await fetch(downloadUrl);
+        if (!fileRes.ok) throw new Error(`Download failed [${fileRes.status}]`);
+        fileBuffer = await fileRes.arrayBuffer();
+      } else {
+        const contentRes = await fetch(`${GRAPH}/drives/${driveId}/items/${fileItemId}/content`, {
+          headers: { Authorization: `Bearer ${token}` },
+          redirect: "follow",
+        });
+        if (!contentRes.ok) throw new Error(`Content download failed [${contentRes.status}]`);
+        fileBuffer = await contentRes.arrayBuffer();
+      }
       const bytes = new Uint8Array(fileBuffer);
 
       // Convert to base64 in chunks to avoid stack overflow on large files
