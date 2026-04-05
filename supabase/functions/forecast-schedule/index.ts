@@ -351,46 +351,40 @@ serve(async (req) => {
     }
 
     // --- STEP 5: AGGREGATE INTO BLOCKS ---
-    // Merge chunks by (projectId, week)
-    const blockMap = new Map<string, { hours: number; overDeadline: boolean }>();
+    // Merge chunks by (projectId, week) — use "::" separator to avoid dash conflicts with project IDs
+    const blockMap = new Map<string, { projectId: string; week: string; hours: number; overDeadline: boolean }>();
     for (const chunk of scheduledChunks) {
-      const key = `${chunk.projectId}-${chunk.week}`;
+      const key = `${chunk.projectId}::${chunk.week}`;
       const existing = blockMap.get(key);
       if (existing) {
         existing.hours += chunk.hours;
         existing.overDeadline = existing.overDeadline || chunk.overDeadline;
       } else {
-        blockMap.set(key, { hours: chunk.hours, overDeadline: chunk.overDeadline });
+        blockMap.set(key, { projectId: chunk.projectId, week: chunk.week, hours: chunk.hours, overDeadline: chunk.overDeadline });
       }
     }
 
     const blocks: any[] = [];
     const weekTotalHours = new Map<string, number>();
 
-    for (const [key, val] of blockMap.entries()) {
-      const [pid, wk] = [key.substring(0, key.lastIndexOf("-")), key.substring(key.lastIndexOf("-") + 1)];
-      // Fix: key format is "projectId-YYYY-MM-DD", need to parse correctly
-      const dashParts = key.split("-");
-      const weekStr = dashParts.slice(-3).join("-");
-      const projId = dashParts.slice(0, -3).join("-");
-
+    for (const [, val] of blockMap.entries()) {
       if (val.hours < 0.5) continue;
-      const w = projectMeta.get(projId);
+      const w = projectMeta.get(val.projectId);
       if (!w) continue;
 
-      weekTotalHours.set(weekStr, (weekTotalHours.get(weekStr) || 0) + val.hours);
+      weekTotalHours.set(val.week, (weekTotalHours.get(val.week) || 0) + val.hours);
 
-      const totalChunksForProject = [...blockMap.entries()].filter(([k]) => k.startsWith(projId + "-")).length;
+      const totalChunksForProject = [...blockMap.values()].filter(v => v.projectId === val.projectId).length;
       let desc = `${w.tpvCount} položek`;
       if (totalChunksForProject > 1) desc += ` (rozděleno do ${totalChunksForProject} týdnů)`;
       if (val.overDeadline) desc += " ⚠ po termínu";
 
       blocks.push({
-        id: `${projId}-${weekStr}`,
-        project_id: projId,
+        id: `${val.projectId}-${val.week}`,
+        project_id: val.projectId,
         project_name: w.projectName,
         bundle_description: desc,
-        week: weekStr,
+        week: val.week,
         estimated_hours: Math.round(val.hours),
         tpv_item_count: w.tpvCount,
         confidence: val.overDeadline ? "low" : (w.base === "tpv_items" ? "high" : "medium"),
