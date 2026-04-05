@@ -283,18 +283,6 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     Math.round(totalBruttoSelectedWeekly * localUtilizationPct / 100),
     [totalBruttoSelectedWeekly, localUtilizationPct]);
 
-  // Absences loaded independently via React Query
-  const absencesQuery = useQuery({
-    queryKey: ["all-absences-year", selectedYear, vyrobniEmployees.map(e => e.id).join(",")],
-    queryFn: async () => {
-      if (vyrobniEmployees.length === 0) return new Map<string, number>();
-      return fetchAbsencesForYear(selectedYear, vyrobniEmployees);
-    },
-    enabled: vyrobniEmployees.length > 0,
-    staleTime: 2 * 60 * 1000,
-  });
-  const EMPTY_ABS_MAP = useMemo(() => new Map<string, number>(), []);
-  const absMap = absencesQuery.data ?? EMPTY_ABS_MAP;
 
   // Fully reactive liveWeekMap computed from local state
   const liveWeekMap = useMemo(() => {
