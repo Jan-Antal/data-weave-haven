@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -173,7 +173,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
   // Absences loaded independently via React Query
   const absencesQuery = useAbsencesForYear(selectedYear, vyrobniEmployees);
-  const absMap = absencesQuery.data ?? new Map<string, number>();
+  const EMPTY_ABS_MAP = useMemo(() => new Map<string, number>(), []);
+  const absMap = absencesQuery.data ?? EMPTY_ABS_MAP;
 
 
   const triggerAutoRecalc = useCallback(async () => {
