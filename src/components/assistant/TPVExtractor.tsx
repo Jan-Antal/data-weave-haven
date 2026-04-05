@@ -42,6 +42,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   const [foundFileName, setFoundFileName] = useState("");
   const [items, setItems] = useState<ExtractedItem[]>([]);
   const [saving, setSaving] = useState(false);
+  const [popisMode, setPopisMode] = useState<PopisMode>("short");
   const [spUploaded, setSpUploaded] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const autoExtractTriggered = useRef(false);
@@ -114,7 +115,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       const extracted = (data.items || []).map((item: any) => ({
         item_name: item.item_name || "",
         nazev: item.nazev || "",
-        popis: item.popis || "",
+        popis_short: item.popis_short || item.popis || "",
+        popis_full: item.popis_full || item.popis || "",
         cena: Number(item.cena) || 0,
         pocet: Number(item.pocet) || 1,
       }));
@@ -182,7 +184,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       const extracted = (data.items || []).map((item: any) => ({
         item_name: item.item_name || "",
         nazev: item.nazev || "",
-        popis: item.popis || "",
+        popis_short: item.popis_short || item.popis || "",
+        popis_full: item.popis_full || item.popis || "",
         cena: Number(item.cena) || 0,
         pocet: Number(item.pocet) || 1,
       }));
@@ -213,7 +216,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   };
 
   const addRow = () => {
-    setItems((prev) => [...prev, { item_name: "", nazev: "", popis: "", cena: 0, pocet: 1 }]);
+    setItems((prev) => [...prev, { item_name: "", nazev: "", popis_short: "", popis_full: "", cena: 0, pocet: 1 }]);
   };
 
   const totalSum = items.reduce((sum, item) => sum + item.cena * item.pocet, 0);
@@ -231,7 +234,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
           project_id: projectId,
           item_name: item.item_name,
           item_type: item.nazev || item.item_name,
-          nazev_prvku: item.popis || null,
+          nazev_prvku: popisMode === "full" ? item.popis_full : item.popis_short || null,
           cena: item.cena,
           pocet: item.pocet,
           status: "Ke zpracování",
@@ -464,8 +467,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
                       </TableCell>
                       <TableCell>
                         <Input
-                          value={item.popis}
-                          onChange={(e) => updateItem(i, "popis", e.target.value)}
+                          value={popisMode === "full" ? item.popis_full : item.popis_short}
+                          onChange={(e) => updateItem(i, popisMode === "full" ? "popis_full" : "popis_short", e.target.value)}
                           className="h-7 text-xs"
                         />
                       </TableCell>
