@@ -284,7 +284,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     enabled: vyrobniEmployees.length > 0,
     staleTime: 2 * 60 * 1000,
   });
-  const absMap = absencesQuery.data ?? new Map<string, number>();
+  const EMPTY_ABS_MAP = useMemo(() => new Map<string, number>(), []);
+  const absMap = absencesQuery.data ?? EMPTY_ABS_MAP;
 
   // Fully reactive liveWeekMap computed from local state
   const liveWeekMap = useMemo(() => {
