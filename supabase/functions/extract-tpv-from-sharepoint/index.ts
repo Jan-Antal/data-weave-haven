@@ -9,6 +9,8 @@ const TENANT_ID = "596710ac-cabd-4bd2-8360-f7252eef3064";
 const CLIENT_ID = "eb6c5989-f35c-4e41-b094-363f4e74383e";
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const LIB_ROOT = "AMI-Project-Info-App-Data";
+const SITE_HOST = "amincz.sharepoint.com";
+const SITE_PATH = "/sites/AMI-Project-Info";
 
 async function getAccessToken(): Promise<string> {
   const clientSecret = Deno.env.get("SHAREPOINT_CLIENT_SECRET");
@@ -29,7 +31,7 @@ async function getAccessToken(): Promise<string> {
 }
 
 async function getDriveId(token: string): Promise<string> {
-  const siteRes = await fetch(`${GRAPH}/sites/amincz.sharepoint.com:/sites/AMI-Project-Info`, {
+  const siteRes = await fetch(`${GRAPH}/sites/${SITE_HOST}:${SITE_PATH}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!siteRes.ok) { const t = await siteRes.text(); throw new Error(`Site error [${siteRes.status}]: ${t}`); }
@@ -44,41 +46,34 @@ async function getDriveId(token: string): Promise<string> {
   return drive.id;
 }
 
-// List all files recursively in a project folder (flat)
-async function listAllFiles(token: string, driveId: string, projectId: string) {
-  const path = `${LIB_ROOT}/${projectId}`;
-  const url = `${GRAPH}/drives/${driveId}/root:/${path}:/children?$select=id,name,size,file,@microsoft.graph.downloadUrl&$top=200`;
+// List files in a specific folder path
+async function listFilesInFolder(token: string, driveId: string, folderPath: string) {
+  const url = `${GRAPH}/drives/${driveId}/root:/${folderPath}:/children?$select=id,name,size,file,@microsoft.graph.downloadUrl&$top=200`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (res.status === 404) { await res.text(); return []; }
   if (!res.ok) { const t = await res.text(); throw new Error(`List error [${res.status}]: ${t}`); }
   const json = await res.json();
-  const topFiles = (json.value ?? []).filter((f: any) => f.file);
-
-  // Also check subfolders one level deep
-  const subfolders = (json.value ?? []).filter((f: any) => f.folder);
-  const subFiles: any[] = [];
-  for (const folder of subfolders) {
-    const subUrl = `${GRAPH}/drives/${driveId}/items/${folder.id}/children?$select=id,name,size,file,@microsoft.graph.downloadUrl&$top=100`;
-    const subRes = await fetch(subUrl, { headers: { Authorization: `Bearer ${token}` } });
-    if (subRes.ok) {
-      const subJson = await subRes.json();
-      subFiles.push(...(subJson.value ?? []).filter((f: any) => f.file));
-    } else {
-      await subRes.text();
-    }
-  }
-
-  return [...topFiles, ...subFiles].map((f: any) => ({
-    itemId: f.id,
-    name: f.name,
-    size: f.size,
-    downloadUrl: f["@microsoft.graph.downloadUrl"] ?? null,
-  }));
+  return (json.value ?? [])
+    .filter((f: any) => f.file)
+    .map((f: any) => ({
+      itemId: f.id,
+      name: f.name,
+      size: f.size,
+      downloadUrl: f["@microsoft.graph.downloadUrl"] ?? null,
+    }));
 }
 
+// The CN folder name used in SharePoint (matches CATEGORY_FOLDER_MAP)
+const CN_FOLDER = "Cenova-nabidka";
+
+// Check if a file name looks like a cenová nabídka
 function isCenovaNabidka(name: string): boolean {
-  const lower = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  return lower.includes("cenov") || lower.includes("cn_") || lower.startsWith("cn.");
+  const lower = name.toLowerCase();
+  const normalized = lower.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  // Match: cenov*, CN_, CN-, CN., -CN_, -CN-
+  if (normalized.includes("cenov")) return true;
+  if (/(\b|[-_])cn(\b|[-_.])/i.test(name)) return true;
+  return false;
 }
 
 serve(async (req) => {
@@ -99,34 +94,44 @@ serve(async (req) => {
 
     // Action: search — find cenová nabídka files
     if (action === "search") {
-      const allFiles = await listAllFiles(token, driveId, projectId);
-      const matches = allFiles.filter((f: any) => isCenovaNabidka(f.name));
+      // Primary: look in the dedicated Cenova-nabidka folder
+      const cnPath = `${LIB_ROOT}/${projectId}/${CN_FOLDER}`;
+      const cnFiles = await listFilesInFolder(token, driveId, cnPath);
 
-      return new Response(JSON.stringify({ matches, totalFiles: allFiles.length }), {
+      if (cnFiles.length > 0) {
+        // All files in the CN folder are candidates
+        return new Response(JSON.stringify({ matches: cnFiles, totalFiles: cnFiles.length }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Fallback: check root project folder for files matching CN pattern
+      const rootPath = `${LIB_ROOT}/${projectId}`;
+      const rootFiles = await listFilesInFolder(token, driveId, rootPath);
+      const rootMatches = rootFiles.filter((f: any) => isCenovaNabidka(f.name));
+
+      return new Response(JSON.stringify({ matches: rootMatches, totalFiles: rootFiles.length }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // Action: extract — download file and send to AI
     if (action === "extract") {
-      // Get file download URL
-      let downloadUrl: string;
-      let fileName: string;
-
-      if (fileItemId) {
-        const itemRes = await fetch(`${GRAPH}/drives/${driveId}/items/${fileItemId}?$select=name,@microsoft.graph.downloadUrl`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!itemRes.ok) { const t = await itemRes.text(); throw new Error(`Item error [${itemRes.status}]: ${t}`); }
-        const item = await itemRes.json();
-        downloadUrl = item["@microsoft.graph.downloadUrl"];
-        fileName = item.name;
-      } else {
+      if (!fileItemId) {
         return new Response(JSON.stringify({ error: "Missing fileItemId" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+
+      // Get file info + download URL
+      const itemRes = await fetch(`${GRAPH}/drives/${driveId}/items/${fileItemId}?$select=name,size,@microsoft.graph.downloadUrl`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!itemRes.ok) { const t = await itemRes.text(); throw new Error(`Item error [${itemRes.status}]: ${t}`); }
+      const item = await itemRes.json();
+      const downloadUrl = item["@microsoft.graph.downloadUrl"];
+      const fileName = item.name;
 
       if (!downloadUrl) throw new Error("No download URL available");
 
@@ -134,18 +139,19 @@ serve(async (req) => {
       const fileRes = await fetch(downloadUrl);
       if (!fileRes.ok) throw new Error(`Download failed [${fileRes.status}]`);
       const fileBuffer = await fileRes.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)));
+      const bytes = new Uint8Array(fileBuffer);
+
+      // Convert to base64 in chunks to avoid stack overflow on large files
+      let base64 = "";
+      const chunkSize = 8192;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        base64 += String.fromCharCode(...chunk);
+      }
+      base64 = btoa(base64);
 
       const isPdf = fileName.toLowerCase().endsWith(".pdf");
-      const fileType = isPdf ? "pdf" : "excel";
 
-      // For Excel files, we send raw base64 — the extract-tpv function handles it
-      // But extract-tpv expects CSV for excel. We'll send as pdf-like base64 for both
-      // and let the AI handle it. Actually for Excel we need to convert.
-      // Since we can't use SheetJS in Deno easily, send Excel as base64 too with pdf type
-      // The AI (Gemini) can handle both formats as document input.
-
-      // Call extract-tpv internally
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -170,7 +176,7 @@ Rules:
 - All prices in CZK (convert EUR × 25 if needed)
 - Return ONLY the JSON array, no markdown fences, no explanation`;
 
-      const mimeType = isPdf ? "application/pdf" : 
+      const mimeType = isPdf ? "application/pdf" :
         fileName.toLowerCase().endsWith(".xlsx") ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" :
         "application/vnd.ms-excel";
 
@@ -184,6 +190,8 @@ Rules:
           text: "Extract all line items from this price offer document. Return ONLY the JSON array.",
         },
       ];
+
+      console.log(`Extracting from ${fileName} (${bytes.length} bytes, type: ${mimeType})`);
 
       const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
