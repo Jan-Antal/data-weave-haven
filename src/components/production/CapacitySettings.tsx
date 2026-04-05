@@ -137,27 +137,21 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const dbUtilizationPct = settings?.utilization_pct ?? 83;
   const [localUtilizationPct, setLocalUtilizationPct] = useState(dbUtilizationPct);
 
-  const dbStandardCapacity = settings?.weekly_capacity_hours ?? 875;
-  const [localStandardCapacity, setLocalStandardCapacity] = useState(dbStandardCapacity);
-  const standardCapacity = localStandardCapacity;
-  const [standardCapacityInput, setStandardCapacityInput] = useState<string>(String(dbStandardCapacity));
-  const [capacityInputFocused, setCapacityInputFocused] = useState(false);
+  const totalBruttoWeekly = useMemo(() => totalBruttoDaily * 5, [totalBruttoDaily]);
 
   // Pending local changes for week overrides/resets
   const [pendingWeekOverrides, setPendingWeekOverrides] = useState<Map<number, { cap: number; days: number }>>(new Map());
   const [pendingWeekResets, setPendingWeekResets] = useState<Set<number>>(new Set());
-  const hasPendingChanges = localStandardCapacity !== dbStandardCapacity || localUtilizationPct !== dbUtilizationPct || pendingWeekOverrides.size > 0 || pendingWeekResets.size > 0;
+  const hasPendingChanges = localUtilizationPct !== dbUtilizationPct || pendingWeekOverrides.size > 0 || pendingWeekResets.size > 0;
 
   // Reset local state when dialog opens
   useEffect(() => {
     if (open) {
-      setLocalStandardCapacity(dbStandardCapacity);
-      setStandardCapacityInput(String(dbStandardCapacity));
       setLocalUtilizationPct(dbUtilizationPct);
       setPendingWeekOverrides(new Map());
       setPendingWeekResets(new Set());
     }
-  }, [open, dbStandardCapacity, dbUtilizationPct]);
+  }, [open, dbUtilizationPct]);
 
   // Filtered employees based on toggle state
   const filteredEmployees = useMemo(() => {
@@ -245,37 +239,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     return () => clearTimeout(timer);
   }, [disabledUseky.size, disabledEmployees.size, autoApplyHolidays, open, vyrobniEmployees.length, weekMap.size, triggerAutoRecalc]);
 
-  // Safe math expression evaluator
-  const safeEvalExpr = (expr: string): number | null => {
-    try {
-      if (!/^[\d\s+\-*/().]+$/.test(expr)) return null;
-      const result = Function('"use strict"; return (' + expr + ')')();
-      if (typeof result !== "number" || !isFinite(result) || isNaN(result)) return null;
-      return Math.round(result);
-    } catch { return null; }
-  };
-
-  const isExpr = /[*/()]/.test(standardCapacityInput);
-  const exprPreview = isExpr ? safeEvalExpr(standardCapacityInput) : null;
-
-  const commitCapacityInput = () => {
-    const evaluated = safeEvalExpr(standardCapacityInput);
-    if (evaluated !== null && evaluated > 0) {
-      setLocalStandardCapacity(evaluated);
-      setStandardCapacityInput(String(evaluated));
-    } else {
-      const v = parseInt(standardCapacityInput);
-      if (v > 0) {
-        setLocalStandardCapacity(v);
-        setStandardCapacityInput(String(v));
-      } else {
-        setStandardCapacityInput(String(standardCapacity));
-      }
-    }
-    setCapacityInputFocused(false);
-  };
-  const workingDaysPerWeek = 5;
-  const calculatedHoursPerDay = workingDaysPerWeek > 0 ? Math.round(standardCapacity / workingDaysPerWeek) : 175;
+  const nettoCapacity = Math.round(totalBruttoWeekly * localUtilizationPct / 100);
 
   // Get month for a week number
   const getWeekMonth = useCallback((wn: number): number => {
