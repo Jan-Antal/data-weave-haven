@@ -141,43 +141,24 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       reader.readAsDataURL(f);
     });
 
-  const excelToCSV = (f: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target!.result as ArrayBuffer);
-          const wb = XLSX.read(data, { type: "array" });
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          resolve(XLSX.utils.sheet_to_csv(ws));
-        } catch (err) {
-          reject(err);
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(f);
-    });
+  const getMimeType = (fileName: string): string => {
+    const lower = fileName.toLowerCase();
+    if (lower.endsWith(".pdf")) return "application/pdf";
+    if (lower.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    if (lower.endsWith(".xls")) return "application/vnd.ms-excel";
+    return "application/octet-stream";
+  };
 
   const handleManualExtract = useCallback(async () => {
     if (!manualFile) return;
     setManualLoading(true);
     setPhase("extracting");
     try {
-      const isPdf = manualFile.name.toLowerCase().endsWith(".pdf");
       const base64Content = await fileToBase64(manualFile);
-      let content: string;
-      let fileType: string;
-
-      if (isPdf) {
-        content = base64Content;
-        fileType = "pdf";
-      } else {
-        content = await excelToCSV(manualFile);
-        fileType = "excel";
-      }
+      const mimeType = getMimeType(manualFile.name);
 
       const extractionPromise = supabase.functions.invoke("extract-tpv", {
-        body: { content, fileType },
+        body: { fileBase64: base64Content, mimeType },
       });
 
       // Upload to SharePoint in background
