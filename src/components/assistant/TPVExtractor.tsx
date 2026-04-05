@@ -433,7 +433,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[140px]">Název</TableHead>
+                    <TableHead className="w-[100px]">Kód</TableHead>
+                    <TableHead className="w-[160px]">Název</TableHead>
                     <TableHead>Popis</TableHead>
                     <TableHead className="w-[110px] text-right">Cena/ks</TableHead>
                     <TableHead className="w-[70px] text-right">Počet</TableHead>
@@ -448,6 +449,13 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
                         <Input
                           value={item.item_name}
                           onChange={(e) => updateItem(i, "item_name", e.target.value)}
+                          className="h-7 text-xs"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={item.nazev}
+                          onChange={(e) => updateItem(i, "nazev", e.target.value)}
                           className="h-7 text-xs"
                         />
                       </TableCell>
