@@ -218,17 +218,19 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   // Reset flag when dialog closes
   const hasAutoRecalced = useRef(false);
   useEffect(() => {
-    if (!open) hasAutoRecalced.current = false;
-  }, [open]);
-
-  // Fire recalc once when dialog opens AND both data sources are ready
-  useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      hasAutoRecalced.current = false;
+      return;
+    }
     if (hasAutoRecalced.current) return;
-    if (vyrobniEmployees.length === 0) return;
-    if (weekMap.size === 0) return;
+    if (vyrobniEmployees.length === 0 || weekMap.size === 0) return;
+    
     hasAutoRecalced.current = true;
-    const t = setTimeout(() => handleRecalculateAll(true), 100);
+    // Delay to ensure data is fully loaded
+    const t = setTimeout(() => {
+      console.log('[auto-recalc] firing with', vyrobniEmployees.length, 'employees');
+      handleRecalculateAll(true);
+    }, 500);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, vyrobniEmployees.length, weekMap.size]);

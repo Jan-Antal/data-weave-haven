@@ -178,12 +178,16 @@ export async function fetchAbsencesForYear(
   const startDate = `${year}-01-01`;
   const endDate = `${year}-12-31`;
 
+  console.log('[fetchAbsencesForYear] called with', employees.length, 'employees, year:', year);
+
   const { data, error } = await supabase
     .from("ami_absences")
     .select("datum, employee_id")
     .gte("datum", startDate)
     .lte("datum", endDate)
     .in("employee_id", employeeIds);
+
+  console.log('[fetchAbsencesForYear] result:', data?.length, 'rows, error:', error?.message);
 
   if (error || !data) return result;
 
