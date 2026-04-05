@@ -230,6 +230,14 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
           </Button>
         </div>
 
+        {/* SharePoint upload note */}
+        {spUploaded && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+            Dokument byl uložen do SharePointu
+          </div>
+        )}
+
         {/* Items table */}
         {items.length > 0 && (
           <div className="flex-1 overflow-auto border rounded-lg">
