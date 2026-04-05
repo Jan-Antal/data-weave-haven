@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, Plus, RotateCcw, CalendarDays, CalendarIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, Plus, RotateCcw, CalendarDays, CalendarIcon, Check } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -93,6 +93,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [expandedUsek, setExpandedUsek] = useState<string | null>(null);
+  const [disabledUseky, setDisabledUseky] = useState<Set<string>>(new Set());
+  const [disabledEmployees, setDisabledEmployees] = useState<Set<string>>(new Set());
   const { role } = useAuth();
   const isAdmin = role === "admin" || role === "owner";
   const VISIBLE_WEEKS = 12;
