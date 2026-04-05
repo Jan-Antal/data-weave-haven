@@ -173,16 +173,16 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
   // Auto-recalculate non-override weeks
   const triggerAutoRecalc = useCallback(async () => {
-    if (filteredEmployees.length === 0) return;
+    if (vyrobniEmployees.length === 0) return;
     try {
-      const absMap = await fetchAbsencesForYear(selectedYear, filteredEmployees);
+      const recalcAbsMap = absMap.size > 0 ? absMap : await fetchAbsencesForYear(selectedYear, vyrobniEmployees);
       const upserts: Array<Record<string, any>> = [];
       for (let wn = 1; wn <= 52; wn++) {
         const week = weekMap.get(wn);
         if (week?.is_manual_override) continue;
         const weekStart = week?.week_start ?? getWeekStartFromNumber(selectedYear, wn);
         const workingDays = getWorkingDaysForWeek(wn);
-        const absHours = absMap.get(weekStart) ?? 0;
+        const absHours = recalcAbsMap.get(weekStart) ?? 0;
         const calc = computeWeekCapacity(filteredEmployees, absHours, workingDays, localUtilizationPct, weekStart);
         const dbAbsenceDays = (week as any)?.absence_days ?? 0;
         const calcAbsenceDays = Math.round(calc.absenceHours / 8);
@@ -213,7 +213,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       await supabase.from("production_capacity" as any).upsert(upserts as any, { onConflict: "week_year,week_number" });
       queryClient.invalidateQueries({ queryKey: ["production-capacity", selectedYear] });
     } catch { /* silent */ }
-  }, [filteredEmployees, weekMap, selectedYear, localUtilizationPct, queryClient, getWorkingDaysForWeek]);
+  }, [vyrobniEmployees, filteredEmployees, weekMap, selectedYear, localUtilizationPct, queryClient, getWorkingDaysForWeek, absMap]);
 
   // Reset flag when dialog closes
   const hasAutoRecalced = useRef(false);
@@ -484,7 +484,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
   // Recalculate all non-override weeks
   const handleRecalculateAll = async (silent = false) => {
-    if (filteredEmployees.length === 0) return;
+    if (vyrobniEmployees.length === 0) return;
     setIsRecalculating(true);
     console.log("[recalc] start — employees:", filteredEmployees.length, "weeks:", weekMap.size);
     try {
