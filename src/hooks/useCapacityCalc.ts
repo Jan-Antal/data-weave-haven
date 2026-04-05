@@ -24,6 +24,17 @@ export interface EmployeeRow {
 
 type UsekKey = "dilna1" | "dilna2" | "dilna3" | "sklad";
 
+/**
+ * Format a Date as YYYY-MM-DD using LOCAL time (not UTC).
+ * This avoids the timezone shift that toISOString() causes.
+ */
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function normalizeUsek(usek: string): UsekKey | null {
   const u = usek ?? "";
   if (u.includes("Dílna_1") || u.toLowerCase().includes("dilna_1") || u.toLowerCase().includes("dilna1")) return "dilna1";
@@ -34,7 +45,6 @@ export function normalizeUsek(usek: string): UsekKey | null {
 }
 
 export function getActiveWorkingDays(emp: EmployeeRow, weekStart: string, workingDays: number): number {
-  // activated_at = import date only, not hire date — treat all past weeks as active
   if (!emp.deactivated_at) return workingDays;
   const wStart = new Date(weekStart + "T00:00:00");
   const deactDate = new Date(emp.deactivated_at);
@@ -105,6 +115,17 @@ export function useVyrobniEmployees() {
   });
 }
 
+/**
+ * Get Monday of the week for a given date, as YYYY-MM-DD local string.
+ */
+function getMondayKey(datum: string): string {
+  const d = new Date(datum + "T00:00:00");
+  const dow = d.getDay() || 7; // Sunday=7, Mon=1..Sat=6
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - dow + 1);
+  return toLocalDateStr(monday);
+}
+
 export function useAbsencesForYear(year: number, employees: EmployeeRow[]) {
   return useQuery({
     queryKey: ["absences-year", year, employees.length],
@@ -121,11 +142,7 @@ export function useAbsencesForYear(year: number, employees: EmployeeRow[]) {
       if (error) throw error;
       const result = new Map<string, number>();
       for (const row of (data || [])) {
-        const d = new Date(row.datum + "T00:00:00");
-        const day = d.getDay() || 7;
-        const monday = new Date(d);
-        monday.setDate(d.getDate() - day + 1);
-        const key = monday.toISOString().split("T")[0];
+        const key = getMondayKey(row.datum);
         const emp = empMap.get(row.employee_id);
         const hours = emp?.uvazok_hodiny ?? 8;
         result.set(key, (result.get(key) || 0) + hours);
@@ -153,11 +170,7 @@ export async function fetchAbsencesForYear(
   if (error || !data) return new Map();
   const result = new Map<string, number>();
   for (const row of data) {
-    const d = new Date(row.datum + "T00:00:00");
-    const day = d.getDay() || 7;
-    const monday = new Date(d);
-    monday.setDate(d.getDate() - day + 1);
-    const key = monday.toISOString().split("T")[0];
+    const key = getMondayKey(row.datum);
     const emp = empMap.get(row.employee_id);
     const hours = emp?.uvazok_hodiny ?? 8;
     result.set(key, (result.get(key) || 0) + hours);
@@ -171,5 +184,5 @@ export function getWeekStartFromNumber(year: number, weekNum: number): string {
   startOfWeek1.setDate(jan4.getDate() - (jan4.getDay() || 7) + 1);
   const result = new Date(startOfWeek1);
   result.setDate(startOfWeek1.getDate() + (weekNum - 1) * 7);
-  return result.toISOString().split("T")[0];
+  return toLocalDateStr(result);
 }
