@@ -151,19 +151,37 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     }
   }, [open, dbStandardCapacity, dbUtilizationPct]);
 
+  // Filtered employees based on toggle state
+  const filteredEmployees = useMemo(() => {
+    return vyrobniEmployees.filter(emp => {
+      if (disabledEmployees.has(emp.id)) return false;
+      const key = normalizeUsek(emp.usek);
+      if (key && disabledUseky.has(key)) return false;
+      return true;
+    });
+  }, [vyrobniEmployees, disabledEmployees, disabledUseky]);
+
+  // Working days helper respecting autoApplyHolidays toggle
+  const getWorkingDaysForWeek = useCallback((wn: number): number => {
+    if (!autoApplyHolidays) return 5;
+    const week = weekMap.get(wn);
+    if (week?.working_days != null) return week.working_days;
+    return 5;
+  }, [autoApplyHolidays, weekMap]);
+
   // Auto-recalculate non-override weeks
   const triggerAutoRecalc = useCallback(async () => {
-    if (vyrobniEmployees.length === 0) return;
+    if (filteredEmployees.length === 0) return;
     try {
-      const absMap = await fetchAbsencesForYear(selectedYear, vyrobniEmployees);
+      const absMap = await fetchAbsencesForYear(selectedYear, filteredEmployees);
       const upserts: Array<Record<string, any>> = [];
       for (let wn = 1; wn <= 52; wn++) {
         const week = weekMap.get(wn);
         if (week?.is_manual_override) continue;
         const weekStart = week?.week_start ?? getWeekStartFromNumber(selectedYear, wn);
-        const workingDays = week?.working_days ?? 5;
+        const workingDays = getWorkingDaysForWeek(wn);
         const absHours = absMap.get(weekStart) ?? 0;
-        const calc = computeWeekCapacity(vyrobniEmployees, absHours, workingDays, localUtilizationPct, weekStart);
+        const calc = computeWeekCapacity(filteredEmployees, absHours, workingDays, localUtilizationPct, weekStart);
         const shouldUpsert = !week || Math.round(calc.capacity) !== Math.round(week.capacity_hours);
         if (shouldUpsert) {
           upserts.push({
@@ -189,7 +207,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       await supabase.from("production_capacity" as any).upsert(upserts as any, { onConflict: "week_year,week_number" });
       queryClient.invalidateQueries({ queryKey: ["production-capacity", selectedYear] });
     } catch { /* silent */ }
-  }, [vyrobniEmployees, weekMap, selectedYear, localUtilizationPct, queryClient]);
+  }, [filteredEmployees, weekMap, selectedYear, localUtilizationPct, queryClient, getWorkingDaysForWeek]);
 
   // Trigger auto-recalc when data is ready
   useEffect(() => {
