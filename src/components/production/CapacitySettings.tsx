@@ -228,7 +228,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     if (vyrobniEmployees.length === 0) return;
     if (weekMap.size === 0) return;
     hasAutoRecalced.current = true;
-    const t = setTimeout(() => handleRecalculateAll(), 100);
+    const t = setTimeout(() => handleRecalculateAll(true), 100);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, vyrobniEmployees.length, weekMap.size]);
@@ -442,7 +442,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   };
 
   // Recalculate all non-override weeks
-  const handleRecalculateAll = async () => {
+  const handleRecalculateAll = async (silent = false) => {
     if (filteredEmployees.length === 0) return;
     setIsRecalculating(true);
     console.log("[recalc] start — employees:", filteredEmployees.length, "weeks:", weekMap.size);
@@ -457,23 +457,33 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
         const workingDays = getWorkingDaysForWeek(wn);
         const absHours = absMap.get(weekStart) ?? 0;
         const calc = computeWeekCapacity(filteredEmployees, absHours, workingDays, localUtilizationPct, weekStart);
-        upserts.push({
-          week_year: selectedYear,
-          week_number: wn,
-          week_start: weekStart,
-          capacity_hours: calc.capacity,
-          working_days: workingDays,
-          is_manual_override: false,
-          holiday_name: week?.holiday_name ?? null,
-          company_holiday_name: week?.company_holiday_name ?? null,
-          utilization_pct: localUtilizationPct,
-          dilna1_hodiny: calc.dilna1,
-          dilna2_hodiny: calc.dilna2,
-          dilna3_hodiny: calc.dilna3,
-          sklad_hodiny: calc.sklad,
-          total_employees: calc.totalEmployees,
-          absence_days: Math.round(calc.absenceHours / 8),
-        });
+
+        const dbCap = week?.capacity_hours ?? -1;
+        const dbAbsDays = (week as any)?.absence_days ?? -1;
+        const calcAbsDays = Math.round(calc.absenceHours / 8);
+        const changed = !weekMap.has(wn)
+          || Math.round(calc.capacity) !== Math.round(dbCap)
+          || calcAbsDays !== dbAbsDays;
+
+        if (changed) {
+          upserts.push({
+            week_year: selectedYear,
+            week_number: wn,
+            week_start: weekStart,
+            capacity_hours: calc.capacity,
+            working_days: workingDays,
+            is_manual_override: false,
+            holiday_name: week?.holiday_name ?? null,
+            company_holiday_name: week?.company_holiday_name ?? null,
+            utilization_pct: localUtilizationPct,
+            dilna1_hodiny: calc.dilna1,
+            dilna2_hodiny: calc.dilna2,
+            dilna3_hodiny: calc.dilna3,
+            sklad_hodiny: calc.sklad,
+            total_employees: calc.totalEmployees,
+            absence_days: calcAbsDays,
+          });
+        }
       }
       console.log("[recalc] upserts:", upserts.length, 
         upserts.filter(u=>u.absence_days>0).map(u=>`T${u.week_number}:abs${u.absence_days}d`).join(","));
@@ -481,7 +491,14 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
         await supabase.from("production_capacity" as any).upsert(upserts as any, { onConflict: "week_year,week_number" });
       }
       await queryClient.invalidateQueries({ queryKey: ["production-capacity", selectedYear] });
-      toast({ title: `✓ Přepočteno ${upserts.length} týdnů` });
+      if (!silent) {
+        toast({
+          title: `✓ Přepočteno ${upserts.length} týdnů`,
+          description: upserts.filter(u => u.absence_days > 0)
+            .map(u => `T${u.week_number}: ${u.absence_days} dní absence`)
+            .slice(0, 5).join(" · ") || undefined,
+        });
+      }
     } catch (e: any) {
       toast({ title: "Chyba při přepočtu", description: e.message, variant: "destructive" });
     } finally {
