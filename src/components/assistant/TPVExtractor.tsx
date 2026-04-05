@@ -28,6 +28,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<ExtractedItem[]>([]);
   const [saving, setSaving] = useState(false);
+  const [spUploaded, setSpUploaded] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
