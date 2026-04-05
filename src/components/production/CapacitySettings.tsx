@@ -219,12 +219,23 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   // CHANGE 3: Trigger recalc when utilization changes
   const utilizationRef = useRef(localUtilizationPct);
   useEffect(() => {
-    if (!open || vyrobniEmployees.length === 0 || weekMap.size === 0) return;
+    if (!open || filteredEmployees.length === 0 || weekMap.size === 0) return;
     if (utilizationRef.current === localUtilizationPct) return;
     utilizationRef.current = localUtilizationPct;
     const timer = setTimeout(() => triggerAutoRecalc(), 800);
     return () => clearTimeout(timer);
-  }, [localUtilizationPct, open, vyrobniEmployees.length, weekMap.size, triggerAutoRecalc]);
+  }, [localUtilizationPct, open, filteredEmployees.length, weekMap.size, triggerAutoRecalc]);
+
+  // BUG 3+4: Trigger recalc when disabled toggles or autoApplyHolidays change
+  const disabledRef = useRef({ useky: disabledUseky.size, emps: disabledEmployees.size, holidays: autoApplyHolidays });
+  useEffect(() => {
+    if (!open || vyrobniEmployees.length === 0 || weekMap.size === 0) return;
+    const prev = disabledRef.current;
+    if (prev.useky === disabledUseky.size && prev.emps === disabledEmployees.size && prev.holidays === autoApplyHolidays) return;
+    disabledRef.current = { useky: disabledUseky.size, emps: disabledEmployees.size, holidays: autoApplyHolidays };
+    const timer = setTimeout(() => triggerAutoRecalc(), 500);
+    return () => clearTimeout(timer);
+  }, [disabledUseky.size, disabledEmployees.size, autoApplyHolidays, open, vyrobniEmployees.length, weekMap.size, triggerAutoRecalc]);
 
   // Safe math expression evaluator
   const safeEvalExpr = (expr: string): number | null => {
