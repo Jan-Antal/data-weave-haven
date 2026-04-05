@@ -40,6 +40,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { logActivity } from "@/lib/activityLog";
+import { TPVExtractor } from "./assistant/TPVExtractor";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
   { key: "item_name", label: "Kód prvku" },
