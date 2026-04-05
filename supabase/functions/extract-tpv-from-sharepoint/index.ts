@@ -1,116 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { ZipReader, BlobReader, TextWriter } from "https://deno.land/x/zipjs@v2.7.34/index.js";
-
-// XLSX parser: unzips xlsx, reads shared strings + sheet XML, outputs structured tab-separated text
-// Preserves column positions so AI sees proper table structure
-async function parseXlsxToTextAsync(bytes: Uint8Array): Promise<string> {
-  const blob = new Blob([bytes]);
-  const reader = new ZipReader(new BlobReader(blob));
-  const entries = await reader.getEntries();
-
-  const readEntry = async (name: string): Promise<string | null> => {
-    const entry = entries.find(e => e.filename === name);
-    if (!entry || !entry.getData) return null;
-    return await entry.getData(new TextWriter());
-  };
-
-  // Read shared strings (handles <si> with multiple <t> fragments)
-  const ssXml = await readEntry("xl/sharedStrings.xml");
-  const sharedStrings: string[] = [];
-  if (ssXml) {
-    const siMatches = ssXml.matchAll(/<si>([\s\S]*?)<\/si>/g);
-    for (const si of siMatches) {
-      const tParts: string[] = [];
-      const tMatches = si[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g);
-      for (const t of tMatches) {
-        tParts.push(t[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"'));
-      }
-      sharedStrings.push(tParts.join(""));
-    }
-  }
-
-  // Read sheet1
-  const sheetXml = await readEntry("xl/worksheets/sheet1.xml");
-  if (!sheetXml) {
-    await reader.close();
-    return "[Could not read sheet1]";
-  }
-
-  // Helper: convert column letters to 0-based index (A=0, B=1, ..., AA=26, etc.)
-  function colToIndex(col: string): number {
-    let idx = 0;
-    for (let i = 0; i < col.length; i++) {
-      idx = idx * 26 + (col.charCodeAt(i) - 64);
-    }
-    return idx - 1;
-  }
-
-  const rows: Map<number, string[]> = new Map();
-  let maxCol = 0;
-
-  const rowMatches = sheetXml.matchAll(/<row[^>]*?r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g);
-  for (const rm of rowMatches) {
-    const rowNum = parseInt(rm[1]);
-    const cells: string[] = [];
-    // Parse each <c> element individually
-    const cellMatches = rm[2].matchAll(/<c\s([^>]*)>([\s\S]*?)<\/c>/g);
-    
-    const rowCells: [number, string][] = [];
-    for (const cm of cellMatches) {
-      const attrs = cm[1];
-      const body = cm[2];
-      
-      // Extract r="XX" attribute for column reference
-      const rMatch = attrs.match(/r="([A-Z]+)\d+"/);
-      if (!rMatch) continue;
-      const colRef = rMatch[1];
-      
-      // Extract t="s" or t="inlineStr" attribute for cell type
-      const tMatch = attrs.match(/t="([^"]*)"/);
-      const cellType = tMatch ? tMatch[1] : "";
-      
-      // Extract value
-      const valMatch = body.match(/<v>([\s\S]*?)<\/v>/);
-      let val = valMatch ? valMatch[1] : "";
-      
-      if (cellType === "s") {
-        const idx = parseInt(val);
-        val = (idx >= 0 && idx < sharedStrings.length) ? sharedStrings[idx] : val;
-      } else if (cellType === "inlineStr") {
-        const isMatch = body.match(/<t[^>]*>([\s\S]*?)<\/t>/);
-        if (isMatch) val = isMatch[1];
-      }
-      
-      const colIdx = colToIndex(colRef);
-      if (colIdx > maxCol) maxCol = colIdx;
-      rowCells.push([colIdx, val.trim()]);
-    }
-
-    if (rowCells.length > 0) {
-      // Build sparse row array
-      const arr: string[] = new Array(maxCol + 1).fill("");
-      for (const [ci, v] of rowCells) arr[ci] = v;
-      rows.set(rowNum, arr);
-    }
-  }
-
-  await reader.close();
-
-  // Normalize all rows to same width and output
-  const sortedKeys = [...rows.keys()].sort((a, b) => a - b);
-  const finalWidth = maxCol + 1;
-  const lines: string[] = [];
-  
-  for (const key of sortedKeys.slice(0, 250)) {
-    const row = rows.get(key)!;
-    // Pad to full width
-    while (row.length < finalWidth) row.push("");
-    const line = row.join("\t");
-    if (line.trim()) lines.push(line);
-  }
-
-  return lines.join("\n");
-}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -135,10 +23,7 @@ async function getAccessToken(): Promise<string> {
     scope: "https://graph.microsoft.com/.default",
   });
   const res = await fetch(url, { method: "POST", body });
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`Token error [${res.status}]: ${t}`);
-  }
+  if (!res.ok) { const t = await res.text(); throw new Error(`Token error [${res.status}]: ${t}`); }
   return (await res.json()).access_token;
 }
 
@@ -158,7 +43,6 @@ async function getDriveId(token: string): Promise<string> {
   return drive.id;
 }
 
-// List files in a specific folder path
 async function listFilesInFolder(token: string, driveId: string, folderPath: string) {
   const url = `${GRAPH}/drives/${driveId}/root:/${folderPath}:/children?$select=id,name,size,file,@microsoft.graph.downloadUrl&$top=200`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -176,17 +60,23 @@ async function listFilesInFolder(token: string, driveId: string, folderPath: str
     }));
 }
 
-// The CN folder name used in SharePoint (matches CATEGORY_FOLDER_MAP)
 const CN_FOLDER = "Cenova-nabidka";
 
-// Check if a file name looks like a cenová nabídka
 function isCenovaNabidka(name: string): boolean {
   const lower = name.toLowerCase();
   const normalized = lower.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  // Match: cenov*, CN_, CN-, CN., -CN_, -CN-
   if (normalized.includes("cenov")) return true;
   if (/(\b|[-_])cn(\b|[-_.])/i.test(name)) return true;
   return false;
+}
+
+function getMimeType(fileName: string): string {
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith(".pdf")) return "application/pdf";
+  if (lower.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  if (lower.endsWith(".xls")) return "application/vnd.ms-excel";
+  if (lower.endsWith(".csv")) return "text/csv";
+  return "application/octet-stream";
 }
 
 serve(async (req) => {
@@ -197,24 +87,20 @@ serve(async (req) => {
 
     if (!projectId) {
       return new Response(JSON.stringify({ error: "Missing projectId" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const token = await getAccessToken();
     const driveId = await getDriveId(token);
 
-    // Action: search — find cenová nabídka files
+    // Action: search
     if (action === "search") {
       const allFiles: any[] = [];
-
-      // 1. Look in the dedicated Cenova-nabidka folder
       const cnPath = `${LIB_ROOT}/${projectId}/${CN_FOLDER}`;
       const cnFiles = await listFilesInFolder(token, driveId, cnPath);
       for (const f of cnFiles) allFiles.push({ ...f, source: "cn_folder" });
 
-      // 2. Also check root project folder
       const rootPath = `${LIB_ROOT}/${projectId}`;
       const rootFiles = await listFilesInFolder(token, driveId, rootPath);
       const seenIds = new Set(allFiles.map((f: any) => f.itemId));
@@ -222,28 +108,22 @@ serve(async (req) => {
         if (!seenIds.has(f.itemId)) allFiles.push({ ...f, source: "root" });
       }
 
-      // Auto-match: files that look like cenová nabídka
       const autoMatches = allFiles.filter((f: any) => isCenovaNabidka(f.name) || f.source === "cn_folder");
 
-      return new Response(JSON.stringify({
-        autoMatches,
-        allFiles,
-        totalFiles: allFiles.length,
-      }), {
+      return new Response(JSON.stringify({ autoMatches, allFiles, totalFiles: allFiles.length }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Action: extract — download file and send to AI
+    // Action: extract — download file, convert to base64, call extract-tpv
     if (action === "extract") {
       if (!fileItemId) {
         return new Response(JSON.stringify({ error: "Missing fileItemId" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Get file info
+      // Get file metadata
       const itemRes = await fetch(`${GRAPH}/drives/${driveId}/items/${fileItemId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -252,7 +132,7 @@ serve(async (req) => {
       const downloadUrl = item["@microsoft.graph.downloadUrl"];
       const fileName = item.name;
 
-      // Download file content - try downloadUrl first, fallback to /content endpoint
+      // Download file
       let fileBuffer: ArrayBuffer;
       if (downloadUrl) {
         const fileRes = await fetch(downloadUrl);
@@ -266,131 +146,80 @@ serve(async (req) => {
         if (!contentRes.ok) throw new Error(`Content download failed [${contentRes.status}]`);
         fileBuffer = await contentRes.arrayBuffer();
       }
-      const bytes = new Uint8Array(fileBuffer);
 
-      // Convert to base64 in chunks to avoid stack overflow on large files
-      let base64 = "";
+      // Convert to base64
+      const bytes = new Uint8Array(fileBuffer);
+      let binary = "";
       const chunkSize = 8192;
       for (let i = 0; i < bytes.length; i += chunkSize) {
         const chunk = bytes.subarray(i, i + chunkSize);
-        base64 += String.fromCharCode(...chunk);
+        binary += String.fromCharCode(...chunk);
       }
-      base64 = btoa(base64);
+      const fileBase64 = btoa(binary);
+      const mimeType = getMimeType(fileName);
 
-      const isPdf = fileName.toLowerCase().endsWith(".pdf");
-      const isExcel = /\.(xlsx?|xls)$/i.test(fileName);
+      console.log(`Extracting ${fileName} (${bytes.length} bytes, mime: ${mimeType})`);
 
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+      // Call extract-tpv function directly via Anthropic Claude API
+      const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+      if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured");
 
-      const SYSTEM_PROMPT = `You are extracting line items from a Czech furniture/interior design price offer (cenová nabídka).
-
-The document typically has this structure:
-- Item code (e.g. T01, T02, K01, S01, D01...) in one column
-- Item name (e.g. "Kuchyň", "Ostrůvek", "TV stěna", "Šatní skříň") next to the code
-- Sometimes dimensions (e.g. 5920*700*2650)
-- Quantity (e.g. "1 ks")
-- Unit price (e.g. "á 258,397 Kč")
-- Total price
-- Below each main item there may be material descriptions, hardware details etc. — these are the DESCRIPTION, not separate items.
-
-Extract ONLY the main priced line items. Return a JSON array:
-
-[
-  {
-    "item_name": "T01",
-    "popis": "Kuchyň 5920*700*2650 — nepohledové části DTDL Egger W960 SM bílá, pohledové boky+dvířka DTDL W1200 ST9 Porcelánově bílá...",
-    "cena": 258397,
-    "pocet": 1
-  }
-]
-
-Rules:
-- item_name = the SHORT CODE (T01, T02, K01, S01, D01, etc.). If no code exists, use a short name (max 10 chars).
-- popis = the item NAME + key material/specification details merged into one description string. Include dimensions if present.
-- cena = UNIT price in CZK (NOT total). If price is in EUR, multiply by 25.
-- pocet = quantity (default 1)
-- SKIP: subtotals, totals, headers, notes like "Součástí CN nejsou spotřebiče"
-- SKIP: rows that are just material descriptions without their own price — merge them into the parent item's popis
-- Return ONLY the JSON array, no markdown, no explanation`;
-
-      let userContent: any[];
-
-      if (isPdf) {
-        userContent = [
-          {
-            type: "image_url",
-            image_url: { url: `data:application/pdf;base64,${base64}` },
-          },
-          {
-            type: "text",
-            text: "Extract all priced line items from this Czech furniture price offer (cenová nabídka). Each item has a code like T01, K01, etc. Return ONLY the JSON array.",
-          },
-        ];
-      } else {
-        let textContent: string;
-        try {
-          textContent = await parseXlsxToTextAsync(bytes);
-        } catch (e) {
-          console.warn("XLSX parse failed:", e);
-          textContent = `[Binary Excel file: ${fileName}, ${bytes.length} bytes. Could not parse locally.]`;
-        }
-
-        console.log("Parsed XLSX preview (first 500 chars):", textContent.substring(0, 500));
-        
-        userContent = [
-          {
-            type: "text",
-            text: `Below is the tab-separated content of a Czech furniture price offer Excel file "${fileName}".
-Each row is tab-separated. Look for the pattern: CODE (T01, K01...) | NAME | DIMENSIONS | QTY | UNIT PRICE | TOTAL PRICE.
-Rows without a price that follow a priced item are material/specification details — merge them into that item's description.
-
-${textContent}
-
-Extract all priced line items. Return ONLY the JSON array.`,
-          },
-        ];
-      }
-
-      console.log(`Extracting from ${fileName} (${bytes.length} bytes, isPdf: ${isPdf})`);
-
-      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
           "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "anthropic-beta": "pdfs-2024-09-25",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: userContent },
-          ],
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 4096,
+          system: `You extract line items from Czech furniture price offers (cenová nabídka).
+Return ONLY a valid JSON array, no markdown, no explanation:
+[{"item_name":"T01","popis":"full description","cena":12500.00,"pocet":1}]
+Rules:
+- item_name = short code from the document (T01, K01, D-01, etc.). If no code, use short name (max 10 chars).
+- popis = full item description including material details, dimensions, hardware specs. Merge sub-rows into parent.
+- cena = unit price in CZK (if EUR, multiply by 25). NOT total — divide by quantity if needed.
+- pocet = quantity, default 1
+- Skip totals, subtotals, section headers, notes
+- Include ALL line items with prices, nothing missing`,
+          messages: [{
+            role: "user",
+            content: [
+              {
+                type: "document",
+                source: {
+                  type: "base64",
+                  media_type: mimeType,
+                  data: fileBase64,
+                },
+              },
+              {
+                type: "text",
+                text: "Extract all line items from this price offer. Return only the JSON array.",
+              },
+            ],
+          }],
         }),
       });
 
       if (!aiRes.ok) {
-        const t = await aiRes.text();
-        console.error("AI error:", aiRes.status, t);
-        throw new Error(aiRes.status === 429 ? "Příliš mnoho požadavků" : "Chyba AI služby");
+        const errText = await aiRes.text();
+        console.error("Claude API error:", aiRes.status, errText);
+        throw new Error(`Claude API error [${aiRes.status}]`);
       }
 
       const aiData = await aiRes.json();
-      const rawText = aiData.choices?.[0]?.message?.content || "[]";
-      let cleaned = rawText.trim();
-      if (cleaned.startsWith("```")) {
-        cleaned = cleaned.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
-      }
+      const rawText = aiData.content?.[0]?.text ?? "";
 
       let items;
       try {
-        items = JSON.parse(cleaned);
+        items = JSON.parse(rawText);
       } catch {
-        console.error("Failed to parse AI response:", cleaned);
-        return new Response(JSON.stringify({ error: "AI vrátilo neplatný formát", raw: cleaned }), {
-          status: 422,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        const match = rawText.match(/\[[\s\S]*\]/);
+        items = match ? JSON.parse(match[0]) : [];
       }
 
       return new Response(JSON.stringify({ items, fileName }), {
@@ -399,14 +228,12 @@ Extract all priced line items. Return ONLY the JSON array.`,
     }
 
     return new Response(JSON.stringify({ error: "Unknown action" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("extract-tpv-from-sharepoint error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
