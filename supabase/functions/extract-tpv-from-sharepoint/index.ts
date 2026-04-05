@@ -158,6 +158,7 @@ serve(async (req) => {
       base64 = btoa(base64);
 
       const isPdf = fileName.toLowerCase().endsWith(".pdf");
+      const isExcel = /\.(xlsx?|xls)$/i.test(fileName);
 
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
@@ -183,22 +184,40 @@ Rules:
 - All prices in CZK (convert EUR × 25 if needed)
 - Return ONLY the JSON array, no markdown fences, no explanation`;
 
-      const mimeType = isPdf ? "application/pdf" :
-        fileName.toLowerCase().endsWith(".xlsx") ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" :
-        "application/vnd.ms-excel";
+      let userContent: any[];
 
-      const userContent: any[] = [
-        {
-          type: "image_url",
-          image_url: { url: `data:${mimeType};base64,${base64}` },
-        },
-        {
-          type: "text",
-          text: "Extract all line items from this price offer document. Return ONLY the JSON array.",
-        },
-      ];
+      if (isPdf) {
+        // PDFs can be sent as image_url with base64
+        userContent = [
+          {
+            type: "image_url",
+            image_url: { url: `data:application/pdf;base64,${base64}` },
+          },
+          {
+            type: "text",
+            text: "Extract all line items from this price offer document. Return ONLY the JSON array.",
+          },
+        ];
+      } else {
+        // Excel files: parse to CSV-like text using a simple binary reader
+        // Since Gemini doesn't accept Excel MIME types, we extract text content
+        let textContent: string;
+        try {
+          textContent = parseXlsxToText(bytes);
+        } catch (e) {
+          console.warn("XLSX parse failed, sending raw base64 as text hint:", e);
+          textContent = `[Binary Excel file: ${fileName}, ${bytes.length} bytes. Could not parse locally.]`;
+        }
+        
+        userContent = [
+          {
+            type: "text",
+            text: `This is the content of an Excel price offer file "${fileName}":\n\n${textContent}\n\nExtract all line items from this price offer. Return ONLY the JSON array.`,
+          },
+        ];
+      }
 
-      console.log(`Extracting from ${fileName} (${bytes.length} bytes, type: ${mimeType})`);
+      console.log(`Extracting from ${fileName} (${bytes.length} bytes, isPdf: ${isPdf})`);
 
       const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -207,7 +226,7 @@ Rules:
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-pro",
+          model: "google/gemini-2.5-flash",
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: userContent },
