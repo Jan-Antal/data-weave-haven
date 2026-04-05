@@ -6,27 +6,48 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `You extract line items from Czech furniture price offers (cenová nabídka).
-Return ONLY a valid JSON array, no markdown, no explanation.
+const SYSTEM_PROMPT = `You extract line items from Czech furniture price offers.
 
-Example output:
-[{"item_name":"T01","nazev":"Kuchyňská linka","popis":"Materiál: Korpus LTD Egger W1000 ST9 | Dvířka a viditelné části: Polyrey G120 TCH | Akustická záda: EchoBoard24 204 | Vybavení: nábytkové kování | Elektrika: Čipový zámek SAFE-O-TRONIC LS LS300 | Rozměr: 5920×700×2650","cena":258397,"pocet":1}]
+EXACT FILE STRUCTURE:
+Each item has TWO parts spanning multiple rows:
+  ROW 1 (main row): | Kód | Název | Rozměr | Cena |
+  ROW 2+ (spec rows): | (empty) | specification text | (empty) | (empty) |
+  
+Example:
+  K01 | Pracovní deska | 3200×650×20mm | 48500
+      | Keramica Bianco matt, hrana ABS 2mm černá
+      | Lepení, montáž included
+  K02 | Dvířka | 400×720mm | 8200
+      | MDF lakovaný bílý mat RAL9003, závěsy Blum
 
-Field definitions:
-- item_name = short code exactly as in the document (T01, K01, D-01, etc.). If no code exists, create one from first letter + number (max 10 chars).
-- nazev = SHORT item name, what the item IS (e.g. "Kuchyňská linka", "Ostrůvek", "TV stěna", "Skříň rohová", "Pracovní deska", "Postel"). This is the human-readable name WITHOUT dimensions, materials, or specs. Max 40 chars.
-- popis = complete TECHNICAL description. Do NOT repeat nazev. Include labelled details like "Materiál: ... | Vybavení: ... | Elektrika: ... | Rozměr: ...". Combine ALL technical information from multiple rows that belong to the same item.
-- cena = unit price in CZK (if EUR, multiply by 25). NOT total — divide by quantity if needed.
-- pocet = quantity, default 1.
+Between items there are GROUP HEADER rows like:
+  T01 | Kuchyň | | (no price → skip as item)
 
-CRITICAL rules:
-- In Excel workbooks, the priced item is often on one row and its technical details (materials, hardware, finishes, dimensions, electrical) are in the FOLLOWING rows below it. You MUST merge those following rows into the same item's popis field.
-- Look at ALL rows between two item codes — everything between them belongs to the first item.
-- popis must contain materials (Materiál, Korpus, Dvířka, LTD, MDF, dýha, lak, polyrey, egger), hardware (kování, Blum, Hettich, Häfele, pojezdy, panty), equipment (vybavení, zámky, úchyty), electrical (elektrika, zámek, SAFE-O-TRONIC), finishes (povrch, hrana, čalounění), and dimensions.
-- nazev must NEVER contain dimensions or materials.
-- popis must NEVER be just a repeat of the item name or just dimensions.
-- Skip totals, subtotals, section headers, transport, montáž, and notes.
-- Include ALL priced line items, nothing missing.`;
+EXTRACTION RULES:
+1. item_name = Kód from ROW 1 (K01, K02, D-01, etc.)
+2. nazev = Název from ROW 1 (short name, no dimensions)
+3. rozmer = Rozměr from ROW 1 (dimensions only, e.g. "3200×650×20mm")
+4. cena = price from ROW 1 (unit price in CZK, number only)
+5. pocet = quantity if present, default 1
+6. jednotka = unit (ks, m², bm), default "ks"
+7. popis_short = nazev + rozmer in one line
+   Example: "Pracovní deska 3200×650×20mm"
+8. popis_full = ALL specification rows concatenated after the main row
+   Example: "Keramica Bianco matt, hrana ABS 2mm černá. Lepení, montáž included."
+   Include group context: "[Kuchyň] Pracovní deska 3200×650×20mm. Keramica Bianco..."
+
+SKIP: Group header rows (T01, T02 etc. with no price), totals, empty rows.
+
+Return ONLY valid JSON, no markdown:
+[{
+  "item_name": "K01",
+  "nazev": "Pracovní deska",
+  "popis_short": "Pracovní deska 3200×650×20mm",
+  "popis_full": "[Kuchyň] Pracovní deska 3200×650×20mm. Keramica Bianco matt, hrana ABS 2mm černá.",
+  "cena": 48500,
+  "pocet": 1,
+  "jednotka": "ks"
+}]`;
 
 function normalizeWhitespace(text: string): string {
   return text.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
@@ -164,14 +185,14 @@ function buildClaudeContent(isPdf: boolean, fileBase64: string, mimeType: string
         type: "document",
         source: { type: "base64", media_type: "application/pdf", data: fileBase64 },
       },
-      { type: "text", text: "Extract all line items from this price offer. Return only the JSON array." },
+      { type: "text", text: "Extract all priced line items. For each item combine the main row (Kód, Název, Rozměr, Cena) with ALL following specification rows into popis_full. Skip group headers without prices." },
     ];
   }
 
   return [
     {
       type: "text",
-      text: `Below is the COMPLETE content of a Czech furniture price offer Excel spreadsheet. Technical details (materials, hardware, finishes, electrical) are stored in rows BELOW each priced item. You must use ALL of those detail rows when building the popis field. Return ONLY the JSON array.\n\n${excelText}`,
+      text: `Below is the COMPLETE content of a Czech furniture price offer Excel spreadsheet. Extract all priced line items. For each item combine the main row (Kód, Název, Rozměr, Cena) with ALL following specification rows into popis_full. Skip group headers without prices.\n\n${excelText}`,
     },
   ];
 }
