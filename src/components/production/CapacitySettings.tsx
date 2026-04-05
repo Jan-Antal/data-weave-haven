@@ -311,8 +311,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
         companyHolidayName = null;
       }
 
-      // Compute brutto from filtered employees only
-      const brutto = filteredEmployees.reduce((s, e) => {
+      // Compute brutto from selected employees only (respects enabledUseky)
+      const brutto = selectedEmployees.reduce((s, e) => {
         const activeDays = getActiveWorkingDays(e, weekStart, workingDays);
         return s + (e.uvazok_hodiny ?? 8) * activeDays;
       }, 0);
@@ -335,7 +335,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       });
     }
     return map;
-  }, [vyrobniEmployees, filteredEmployees, weekMap, selectedYear, localUtilizationPct, holidays, autoApplyHolidays]);
+  }, [vyrobniEmployees, selectedEmployees, weekMap, selectedYear, localUtilizationPct, holidays, companyHolidays, autoApplyHolidays]);
 
   // Get month for a week number
   const getWeekMonth = useCallback((wn: number): number => {
@@ -405,8 +405,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
   // Selected (filtered) daily hours for holiday impact — respects disabled úseky/employees
   const totalBruttoSelectedDaily = useMemo(() => {
-    return filteredEmployees.reduce((s, e) => s + (e.uvazok_hodiny ?? 8), 0);
-  }, [filteredEmployees]);
+    return selectedEmployees.reduce((s, e) => s + (e.uvazok_hodiny ?? 8), 0);
+  }, [selectedEmployees]);
 
   // Holiday impact summary
   const holidayImpacts = useMemo(() => {
