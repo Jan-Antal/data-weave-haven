@@ -1,4 +1,62 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { ZipReader, BlobReader, TextWriter } from "https://deno.land/x/zipjs@v2.7.34/index.js";
+
+// Simple XLSX parser: unzips the xlsx, reads shared strings + sheet1 XML, outputs CSV-like text
+async function parseXlsxToTextAsync(bytes: Uint8Array): Promise<string> {
+  const blob = new Blob([bytes]);
+  const reader = new ZipReader(new BlobReader(blob));
+  const entries = await reader.getEntries();
+
+  const readEntry = async (name: string): Promise<string | null> => {
+    const entry = entries.find(e => e.filename === name);
+    if (!entry || !entry.getData) return null;
+    return await entry.getData(new TextWriter());
+  };
+
+  // Read shared strings
+  const ssXml = await readEntry("xl/sharedStrings.xml");
+  const sharedStrings: string[] = [];
+  if (ssXml) {
+    const matches = ssXml.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g);
+    for (const m of matches) {
+      sharedStrings.push(m[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">"));
+    }
+  }
+
+  // Read sheet1
+  const sheetXml = await readEntry("xl/worksheets/sheet1.xml");
+  if (!sheetXml) {
+    await reader.close();
+    return "[Could not read sheet1]";
+  }
+
+  const rows: string[][] = [];
+  const rowMatches = sheetXml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g);
+  for (const rm of rowMatches) {
+    const cells: string[] = [];
+    const cellMatches = rm[1].matchAll(/<c[^>]*?(t="([^"]*)")?[^>]*>([\s\S]*?)<\/c>/g);
+    for (const cm of cellMatches) {
+      const cellType = cm[2] || "";
+      const valMatch = cm[3].match(/<v>([\s\S]*?)<\/v>/);
+      let val = valMatch ? valMatch[1] : "";
+      if (cellType === "s" && sharedStrings[parseInt(val)]) {
+        val = sharedStrings[parseInt(val)];
+      }
+      cells.push(val);
+    }
+    if (cells.some(c => c.trim())) rows.push(cells);
+  }
+
+  await reader.close();
+
+  // Convert to tab-separated text (max 200 rows to keep token count manageable)
+  return rows.slice(0, 200).map(r => r.join("\t")).join("\n");
+}
+
+function parseXlsxToText(bytes: Uint8Array): string {
+  // This is called synchronously but returns a placeholder; we'll use the async version
+  throw new Error("Use parseXlsxToTextAsync instead");
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
