@@ -134,13 +134,13 @@ export function useDeleteCompanyHoliday() {
   });
 }
 
-export function useWeeklyCapacity(year: number) {
+export function useWeeklyCapacity(year: number, bruttoHodinyPerDay?: number) {
   const { data: settings } = useProductionSettings();
   const { data: holidays } = useCzechHolidays(year);
   const { data: companyHolidays } = useCompanyHolidays();
   const defaultCapacity = settings?.weekly_capacity_hours ?? 875;
   const defaultDays = 5;
-  const hoursPerDay = defaultDays > 0 ? defaultCapacity / defaultDays : 175;
+  const hoursPerDay = bruttoHodinyPerDay ?? (defaultDays > 0 ? defaultCapacity / defaultDays : 175);
 
   const dbQuery = useQuery({
     queryKey: ["production-capacity", year],
@@ -183,21 +183,24 @@ export function useWeeklyCapacity(year: number) {
       const weekStart = monday.toISOString().split("T")[0];
       const dbRow = dbMap.get(wn);
 
-      if (dbRow) {
+      if (dbRow?.is_manual_override) {
+        // Manual override — use exactly as stored
         map.set(wn, dbRow);
       } else {
+        // Auto row (from DB or computed) — always recompute working_days and capacity
         const hol = holidayMap.get(wn);
         const workDays = Math.max(0, defaultDays - (hol?.reducedDays ?? 0));
         const cap = Math.round(workDays * hoursPerDay);
         map.set(wn, {
+          ...(dbRow ?? {}),  // preserve id, dilna columns etc. from DB if exists
           week_year: year,
           week_number: wn,
-          week_start: weekStart,
+          week_start: dbRow?.week_start ?? weekStart,
           capacity_hours: cap,
           working_days: workDays,
           is_manual_override: false,
           holiday_name: hol?.names.join(", ") ?? null,
-          company_holiday_name: null,
+          company_holiday_name: null,  // reset — will be set in company holiday loop below
         });
       }
     }
@@ -243,11 +246,11 @@ export function useWeeklyCapacity(year: number) {
 }
 
 // Hook for Kanban/Tabulka views: returns capacity for a given week key (YYYY-MM-DD)
-export function useWeekCapacityLookup() {
+export function useWeekCapacityLookup(bruttoHodinyPerDay?: number) {
   const currentYear = new Date().getFullYear();
-  const { weekMap: currentYearMap, defaultCapacity } = useWeeklyCapacity(currentYear);
-  const { weekMap: nextYearMap } = useWeeklyCapacity(currentYear + 1);
-  const { weekMap: prevYearMap } = useWeeklyCapacity(currentYear - 1);
+  const { weekMap: currentYearMap, defaultCapacity } = useWeeklyCapacity(currentYear, bruttoHodinyPerDay);
+  const { weekMap: nextYearMap } = useWeeklyCapacity(currentYear + 1, bruttoHodinyPerDay);
+  const { weekMap: prevYearMap } = useWeeklyCapacity(currentYear - 1, bruttoHodinyPerDay);
 
   return useCallback((weekKey: string): number => {
     const d = new Date(weekKey + "T00:00:00");

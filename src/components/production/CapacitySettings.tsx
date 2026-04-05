@@ -116,7 +116,6 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
   const { data: settings } = useProductionSettings();
   const updateSettings = useUpdateProductionSettings();
-  const { weekMap, defaultCapacity, hoursPerDay } = useWeeklyCapacity(selectedYear);
   const { data: holidays = [] } = useCzechHolidays(selectedYear);
   const { data: companyHolidays = [] } = useCompanyHolidays();
   const addCompanyHoliday = useAddCompanyHoliday();
@@ -125,6 +124,15 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const bulkUpdate = useBulkUpdateFutureCapacity();
   const queryClient = useQueryClient();
   const { data: vyrobniEmployees = [] } = useVyrobniEmployees();
+
+  const totalBruttoDaily = useMemo(() =>
+    vyrobniEmployees.reduce((s, e) => s + (e.uvazok_hodiny ?? 8), 0),
+    [vyrobniEmployees]);
+
+  const { weekMap, defaultCapacity, hoursPerDay } = useWeeklyCapacity(
+    selectedYear,
+    totalBruttoDaily > 0 ? totalBruttoDaily : undefined
+  );
 
   const dbUtilizationPct = settings?.utilization_pct ?? 83;
   const [localUtilizationPct, setLocalUtilizationPct] = useState(dbUtilizationPct);
@@ -983,7 +991,13 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                     <span className="mx-2 text-muted-foreground">|</span>
                     <span className="font-sans text-amber-600">{ch.capacity_override}h</span>
                   </div>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={() => deleteCompanyHoliday.mutate(ch.id)}>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={async () => {
+                    await deleteCompanyHoliday.mutateAsync(ch.id);
+                    if (vyrobniEmployees.length > 0) {
+                      await queryClient.invalidateQueries({ queryKey: ["company-holidays"] });
+                      setTimeout(() => triggerAutoRecalc(), 200);
+                    }
+                  }}>
                     <X className="h-3 w-3" />
                   </Button>
                 </div>
