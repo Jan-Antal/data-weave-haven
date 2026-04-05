@@ -171,7 +171,16 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     return 5;
   }, [autoApplyHolidays, weekMap]);
 
-  // Auto-recalculate non-override weeks
+  // Absences loaded independently via React Query
+  const absencesQuery = useQuery({
+    queryKey: ["all-absences-year", selectedYear, vyrobniEmployees.map(e => e.id).sort().join(",")],
+    queryFn: () => fetchAbsencesForYear(selectedYear, vyrobniEmployees),
+    enabled: vyrobniEmployees.length > 0,
+    staleTime: 2 * 60 * 1000,
+  });
+  const EMPTY_ABS_MAP = useMemo(() => new Map<string, number>(), []);
+  const absMap = absencesQuery.data ?? EMPTY_ABS_MAP;
+
   const triggerAutoRecalc = useCallback(async () => {
     if (vyrobniEmployees.length === 0) return;
     try {
