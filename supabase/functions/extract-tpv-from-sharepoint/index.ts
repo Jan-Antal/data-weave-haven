@@ -53,8 +53,9 @@ async function listFilesInFolder(token: string, driveId: string, folderPath: str
   if (res.status === 404) { await res.text(); return []; }
   if (!res.ok) { const t = await res.text(); throw new Error(`List error [${res.status}]: ${t}`); }
   const json = await res.json();
+  const IMAGE_EXT = /\.(jpg|jpeg|png|gif|bmp|tiff|tif|webp|svg|heic|heif)$/i;
   return (json.value ?? [])
-    .filter((f: any) => f.file)
+    .filter((f: any) => f.file && !IMAGE_EXT.test(f.name))
     .map((f: any) => ({
       itemId: f.id,
       name: f.name,
