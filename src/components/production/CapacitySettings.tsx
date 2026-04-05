@@ -533,14 +533,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
         <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-4">
 
         {/* Standard Capacity — informational with live data */}
-        <div className="border border-border rounded-lg p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground">Kapacita výroby</h3>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleRecalculateAll} disabled={isRecalculating || vyrobniEmployees.length === 0}>
-              <RotateCcw className={cn("h-3 w-3 mr-1", isRecalculating && "animate-spin")} />
-              {isRecalculating ? "Přepočítávám…" : "Přepočítat vše"}
-            </Button>
-          </div>
+        <div className="border border-border rounded-lg p-4">
           <div className="grid grid-cols-4 gap-3">
             {/* Column 1 — Zaměstnanci */}
             <div className="bg-muted/40 rounded-lg p-3">
@@ -569,6 +562,9 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                 <span className="text-sm text-muted-foreground">%</span>
               </div>
               <div className="text-[10px] text-muted-foreground mt-0.5">Výchozí: 83 %</div>
+              {localUtilizationPct !== dbUtilizationPct && (
+                <span className="text-[10px] text-amber-500">● neuloženo</span>
+              )}
             </div>
             {/* Column 4 — Čistá kapacita */}
             <div className="bg-muted/40 rounded-lg p-3">
@@ -577,9 +573,6 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               <div className="text-[10px] text-muted-foreground mt-0.5">{Math.round(nettoCapacity * 52 / 12)} h/měsíc</div>
             </div>
           </div>
-          <p className="text-[10px] text-muted-foreground">
-            Kapacita se přepočítává automaticky ze zaměstnanců v sekcích Složení výrobní kapacity. Upravte pouze využití kapacity.
-          </p>
         </div>
 
         {/* Dílny breakdown panel with expandable employee lists */}
@@ -628,8 +621,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                       <th className="text-left px-3 py-1.5 font-medium text-muted-foreground w-5"></th>
                       <th className="text-left px-3 py-1.5 font-medium text-muted-foreground">Úsek</th>
                       <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Zaměstnanci</th>
-                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Fond (brutto)</th>
-                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Kapacita (netto)</th>
+                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">H/týden</th>
+                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Čistá kapacita (h/týden)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -669,7 +662,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                             </td>
                             <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-foreground")}>{g.count}</td>
                             <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-foreground")}>{fg.weeklyHours} h</td>
-                            <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-foreground")}>{netto} h</td>
+                            <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-accent")}>{netto} h</td>
                           </tr>
                           {isExpanded && g.employees.length > 0 && g.employees.map(emp => {
                             const isEmpDisabled = disabledEmployees.has(emp.id) || isUsekDisabled;
@@ -711,7 +704,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                       <td className="px-3 py-1.5 text-foreground">Celkem</td>
                       <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalCount}</td>
                       <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalWeekly} h</td>
-                      <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalNetto} h</td>
+                      <td className="px-3 py-1.5 text-right font-sans text-accent font-bold">{totalNetto} h</td>
                     </tr>
                   </tbody>
                 </table>
