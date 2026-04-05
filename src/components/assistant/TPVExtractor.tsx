@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Upload, Trash2, Plus, Loader2, FileText } from "lucide-react";
+import { Upload, Trash2, Plus, Loader2, FileText, CheckCircle2 } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import * as XLSX from "xlsx";
 
@@ -28,6 +28,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<ExtractedItem[]>([]);
   const [saving, setSaving] = useState(false);
+  const [spUploaded, setSpUploaded] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -68,22 +69,46 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   const handleExtract = useCallback(async () => {
     if (!file) return;
     setLoading(true);
+    setSpUploaded(false);
     try {
       const isPdf = file.name.toLowerCase().endsWith(".pdf");
       let content: string;
       let fileType: string;
 
+      const base64Content = await fileToBase64(file);
+
       if (isPdf) {
-        content = await fileToBase64(file);
+        content = base64Content;
         fileType = "pdf";
       } else {
         content = await excelToCSV(file);
         fileType = "excel";
       }
 
-      const { data, error } = await supabase.functions.invoke("extract-tpv", {
+      // Start extraction
+      const extractionPromise = supabase.functions.invoke("extract-tpv", {
         body: { content, fileType },
       });
+
+      // Upload to SharePoint in background (don't block extraction)
+      supabase.functions.invoke("upload-to-sharepoint", {
+        body: {
+          projectId,
+          fileBase64: base64Content,
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+        },
+      }).then((res) => {
+        if (!res.error && res.data?.success) {
+          setSpUploaded(true);
+        } else {
+          console.warn("SharePoint upload failed:", res.error || res.data?.error);
+        }
+      }).catch((err) => {
+        console.warn("SharePoint upload error:", err);
+      });
+
+      const { data, error } = await extractionPromise;
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -110,7 +135,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
     } finally {
       setLoading(false);
     }
-  }, [file]);
+  }, [file, projectId]);
 
   const updateItem = (index: number, field: keyof ExtractedItem, value: string | number) => {
     setItems((prev) =>
@@ -204,6 +229,14 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
             )}
           </Button>
         </div>
+
+        {/* SharePoint upload note */}
+        {spUploaded && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+            Dokument byl uložen do SharePointu
+          </div>
+        )}
 
         {/* Items table */}
         {items.length > 0 && (
