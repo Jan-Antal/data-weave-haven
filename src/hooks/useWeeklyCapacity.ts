@@ -139,6 +139,7 @@ export function useWeeklyCapacity(year: number, bruttoHodinyPerDay?: number) {
   const { data: holidays } = useCzechHolidays(year);
   const { data: companyHolidays } = useCompanyHolidays();
   const defaultCapacity = settings?.weekly_capacity_hours ?? 875;
+  const utilizationPct = (settings?.utilization_pct ?? 83) / 100;
   const defaultDays = 5;
   const hoursPerDay = bruttoHodinyPerDay ?? (defaultDays > 0 ? defaultCapacity / defaultDays : 175);
 
@@ -186,61 +187,62 @@ export function useWeeklyCapacity(year: number, bruttoHodinyPerDay?: number) {
       if (dbRow?.is_manual_override) {
         // Manual override — use exactly as stored
         map.set(wn, dbRow);
+      } else if (dbRow) {
+        // Non-override DB row — use DB capacity_hours directly
+        // (already computed with correct utilization by handleRecalculateAll)
+        map.set(wn, { ...dbRow });
       } else {
-        // Auto row (from DB or computed) — always recompute working_days and capacity
+        // No DB row — compute from brutto with utilization
         const hol = holidayMap.get(wn);
         const workDays = Math.max(0, defaultDays - (hol?.reducedDays ?? 0));
-        const cap = Math.round(workDays * hoursPerDay);
+        const cap = Math.round(workDays * hoursPerDay * utilizationPct);
         map.set(wn, {
-          ...(dbRow ?? {}),  // preserve id, dilna columns etc. from DB if exists
           week_year: year,
           week_number: wn,
-          week_start: dbRow?.week_start ?? weekStart,
+          week_start: weekStart,
           capacity_hours: cap,
           working_days: workDays,
           is_manual_override: false,
           holiday_name: hol?.names.join(", ") ?? null,
-          company_holiday_name: null,  // reset — will be set in company holiday loop below
+          company_holiday_name: null,
         });
       }
     }
 
-    // Apply company holidays — reduce by actual working days in range, not set to 0
+    // Apply company holidays — reduce by actual working days in range
     if (companyHolidays) {
       for (const ch of companyHolidays) {
         const chStart = new Date(ch.start_date + "T00:00:00");
         const chEnd = new Date(ch.end_date + "T00:00:00");
         for (let wn = 1; wn <= 52; wn++) {
           const entry = map.get(wn);
-          if (!entry) continue;
+          if (!entry || entry.is_manual_override) continue;
           const weekMon = new Date(entry.week_start + "T00:00:00");
           const weekFri = new Date(weekMon);
           weekFri.setDate(weekMon.getDate() + 4);
           // Check overlap
           if (weekMon <= chEnd && weekFri >= chStart) {
-            if (!entry.is_manual_override) {
-              // Count working days within the company holiday range
-              let holidayDays = 0;
-              const cur = new Date(weekMon);
-              for (let d = 0; d < 5; d++) {
-                const dow = cur.getDay();
-                if (dow !== 0 && dow !== 6 && cur >= chStart && cur <= chEnd) {
-                  holidayDays++;
-                }
-                cur.setDate(cur.getDate() + 1);
+            // Count working days within the company holiday range
+            let holidayDays = 0;
+            const cur = new Date(weekMon);
+            for (let d = 0; d < 5; d++) {
+              const dow = cur.getDay();
+              if (dow !== 0 && dow !== 6 && cur >= chStart && cur <= chEnd) {
+                holidayDays++;
               }
-              const effectiveWorkingDays = Math.max(0, entry.working_days - holidayDays);
-              entry.capacity_hours = Math.round(effectiveWorkingDays * hoursPerDay);
-              entry.working_days = effectiveWorkingDays;
-              entry.company_holiday_name = ch.name;
+              cur.setDate(cur.getDate() + 1);
             }
+            const effectiveWorkingDays = Math.max(0, entry.working_days - holidayDays);
+            entry.capacity_hours = Math.round(effectiveWorkingDays * hoursPerDay * utilizationPct);
+            entry.working_days = effectiveWorkingDays;
+            entry.company_holiday_name = ch.name;
           }
         }
       }
     }
 
     return map;
-  }, [dbQuery.data, holidays, companyHolidays, year, defaultCapacity, defaultDays, hoursPerDay]);
+  }, [dbQuery.data, holidays, companyHolidays, year, defaultCapacity, defaultDays, hoursPerDay, utilizationPct]);
 
   return { weekMap, isLoading: dbQuery.isLoading, defaultCapacity, hoursPerDay };
 }
