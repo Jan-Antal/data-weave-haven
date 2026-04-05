@@ -256,6 +256,22 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
 
   const nettoCapacity = Math.round(totalBruttoWeekly * localUtilizationPct / 100);
 
+  // Selected employees (respecting enabledUseky checkboxes) for reactive metrics
+  const selectedEmployees = useMemo(() =>
+    vyrobniEmployees.filter(e => {
+      const key = normalizeUsek(e.usek);
+      return key !== null && !disabledUseky.has(key) && !disabledEmployees.has(e.id);
+    }),
+    [vyrobniEmployees, disabledUseky, disabledEmployees]);
+
+  const totalBruttoSelectedWeekly = useMemo(() =>
+    selectedEmployees.reduce((s, e) => s + (e.uvazok_hodiny ?? 8), 0) * 5,
+    [selectedEmployees]);
+
+  const netStandardCapacity = useMemo(() =>
+    Math.round(totalBruttoSelectedWeekly * localUtilizationPct / 100),
+    [totalBruttoSelectedWeekly, localUtilizationPct]);
+
   // Cached absence map from last recalc
   const cachedAbsMap = useRef<Map<string, number> | null>(null);
 
@@ -301,7 +317,9 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
         return s + (e.uvazok_hodiny ?? 8) * activeDays;
       }, 0);
 
-      const absHours = cachedAbsMap.current?.get(weekStart) ?? 0;
+      const absHours = cachedAbsMap.current !== null
+        ? (cachedAbsMap.current.get(weekStart) ?? 0)
+        : ((weekMap.get(wn) as any)?.absence_days ?? 0) * 8;
       const capacity = Math.max(0, Math.round((brutto - absHours) * localUtilizationPct / 100));
 
       map.set(wn, {
@@ -332,10 +350,10 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const getWeekTypeLabel = useCallback((week: WeekCapacity, past: boolean): string => {
     if (past) return "Minulý";
     if (week.company_holiday_name) return "Firemní dovolená";
-    if (week.is_manual_override && Math.round(week.capacity_hours) !== Math.round(nettoCapacity)) return "Ručně upraveno";
+    if (week.is_manual_override && Math.round(week.capacity_hours) !== Math.round(netStandardCapacity)) return "Ručně upraveno";
     if (week.holiday_name) return "Svátek";
     return "Standard";
-  }, [nettoCapacity]);
+  }, [netStandardCapacity]);
 
   // Visible month range label
   const visibleMonthRange = useMemo(() => {
@@ -361,17 +379,17 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   }, [viewStart, getWeekMonth]);
 
   const maxCapacity = useMemo(() => {
-    let max = nettoCapacity;
+    let max = netStandardCapacity;
     for (const [, w] of liveWeekMap) {
       if (w.capacity_hours > max) max = w.capacity_hours;
     }
     return max;
-  }, [liveWeekMap, nettoCapacity]);
+  }, [liveWeekMap, netStandardCapacity]);
 
   // Visible window min/max for dynamic color scaling (excluding past weeks)
   const visibleRange = useMemo(() => {
-    let min = nettoCapacity;
-    let max = nettoCapacity;
+    let min = netStandardCapacity;
+    let max = netStandardCapacity;
     const end = Math.min(52, viewStart + VISIBLE_WEEKS - 1);
     for (let wn = viewStart; wn <= end; wn++) {
       const week = liveWeekMap.get(wn);
@@ -383,7 +401,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       if (cap > max) max = cap;
     }
     return { min, max };
-  }, [liveWeekMap, viewStart, selectedYear, currentYear, currentWeek, nettoCapacity]);
+  }, [liveWeekMap, viewStart, selectedYear, currentYear, currentWeek, netStandardCapacity]);
 
   // Selected (filtered) daily hours for holiday impact — respects disabled úseky/employees
   const totalBruttoSelectedDaily = useMemo(() => {
@@ -633,14 +651,14 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             {/* Column 1 — Zaměstnanci */}
             <div className="bg-muted/40 rounded-lg p-3">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Výrobní zaměstnanci</div>
-              <div className="text-2xl font-semibold font-sans mt-1">{vyrobniEmployees.length} <span className="text-sm font-normal text-muted-foreground">osob</span></div>
-              <div className="text-[10px] text-muted-foreground mt-0.5">Z tabulky zaměstnanců</div>
+              <div className="text-2xl font-semibold font-sans mt-1">{selectedEmployees.length} / {vyrobniEmployees.length} <span className="text-sm font-normal text-muted-foreground">osob</span></div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">aktivní z celkového počtu</div>
             </div>
             {/* Column 2 — Brutto fond */}
             <div className="bg-muted/40 rounded-lg p-3">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Brutto fond</div>
-              <div className="text-2xl font-semibold font-sans mt-1">{totalBruttoWeekly} <span className="text-sm font-normal text-muted-foreground">h/týden</span></div>
-              <div className="text-[10px] text-muted-foreground mt-0.5">{totalBruttoDaily} h/den × 5 dní</div>
+              <div className="text-2xl font-semibold font-sans mt-1">{totalBruttoSelectedWeekly} <span className="text-sm font-normal text-muted-foreground">h/týden</span></div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">{Math.round(totalBruttoSelectedWeekly / 5)} h/den × 5 dní</div>
             </div>
             {/* Column 3 — Využití (editable) */}
             <div className="bg-muted/40 rounded-lg p-3">
@@ -664,8 +682,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             {/* Column 4 — Čistá kapacita */}
             <div className="bg-muted/40 rounded-lg p-3">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Čistá kapacita</div>
-              <div className="text-2xl font-semibold font-sans mt-1 text-amber-600">{nettoCapacity} <span className="text-sm font-normal">h/týden</span></div>
-              <div className="text-[10px] text-muted-foreground mt-0.5">{Math.round(nettoCapacity * 52 / 12)} h/měsíc</div>
+              <div className="text-2xl font-semibold font-sans mt-1 text-amber-600">{netStandardCapacity} <span className="text-sm font-normal">h/týden</span></div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">{Math.round(netStandardCapacity * 52 / 12)} h/měsíc</div>
             </div>
           </div>
         </div>
@@ -867,7 +885,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               <div
                 className="absolute left-0 right-0 border-t-2 border-dashed z-10 pointer-events-none"
                 style={{
-                  top: `${Math.max(0, 140 - (nettoCapacity / (maxCapacity * 1.1)) * 140)}px`,
+                  top: `${Math.max(0, 140 - (netStandardCapacity / (maxCapacity * 1.1)) * 140)}px`,
                   borderColor: "hsl(var(--destructive) / 0.4)",
                 }}
               />
@@ -882,7 +900,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                   const isBarSelected = selectedWeeks.has(wn);
                   const typeLabel = getWeekTypeLabel(week, past);
 
-                  const barColor = past ? PAST_WEEK_COLOR : getCapacityColorDynamic(cap, nettoCapacity, visibleRange.min, visibleRange.max);
+                  const barColor = past ? PAST_WEEK_COLOR : getCapacityColorDynamic(cap, netStandardCapacity, visibleRange.min, visibleRange.max);
 
                   const weekStart = new Date(week.week_start + "T00:00:00");
                   const weekEnd = new Date(weekStart);
@@ -958,7 +976,7 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
               weekNum={firstEditingWeek}
               selectedCount={editingWeeks.length}
               isPast={isPastWeek(firstEditingWeek)}
-              standardCapacity={nettoCapacity}
+              standardCapacity={netStandardCapacity}
               hoursPerDay={8}
               onSave={(cap, days) => handleWeekCapacityUpdate(editingWeeks, cap, days)}
               onReset={() => handleResetWeeks(editingWeeks)}
