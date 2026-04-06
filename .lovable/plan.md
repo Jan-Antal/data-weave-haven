@@ -1,60 +1,64 @@
 
 
-# Oprava CN kontroly — trigger jen po uploadu + lepší warning banner
+# Fix XLSX extrakce — čtení všech listů, nejen sheet1
 
-## Problémy
+## Problém
 
-1. **Auto-check běží vždy** — `useEffect` spouští `checkCN()` při každém otevření TPV Listu. Má běžet **jen po nahrání souboru do složky "Cenová nabídka"**.
-2. **Warning badge je malý** — jen číslo vedle názvu projektu. Má být větší banner s popisem, umístěný vlevo vedle tlačítek (Import/Načíst z CN).
-3. **Warning zmizí po zavření dialogu** — `onClose` volá `clearCNDiff()`, takže po zavření bez aplikování změn se warning smaže. Má zůstat dokud uživatel nepotvrdí změny nebo neklikne "Ignorovat".
+Oba edge funkce (`extract-tpv` i `extract-tpv-from-sharepoint`) čtou pouze `xl/worksheets/sheet1.xml`. Pokud má Excel víc záložek (např. "Rekapitulace" na sheet1 a skutečné položky na "Atypy"), extraktor najde jen prázdnou rekapitulaci a vrátí 0 položek.
 
-## Změny
+## Řešení
 
-### 1. `src/components/TPVList.tsx`
+Číst **všechny sheety** z XLSX, spojit je do jednoho TSV (s oddělovačem názvu listu) a poslat celý obsah do AI. AI pak najde položky bez ohledu na to, na kterém listu jsou.
 
-**Odstranit auto-check `useEffect`** (řádky 125-131) — žádné automatické spuštění na mount.
+### Jak XLSX interně mapuje sheety
 
-**Trigger CN check jen po uploadu do "cenová nabídka"**:
-- Po úspěšné extrakci přes TPVExtractor (řádek 1274) — zachovat stávající `setTimeout(() => checkCN(), 1500)`
-- Přidat nový trigger: poslouchat custom event `cn-file-uploaded` (dispatch z ProjectDetailDialog po uploadu do `cenova_nabidka`)
-- `useEffect` s event listener na `cn-file-uploaded` → zavolá `checkCN()`
+XLSX soubor obsahuje `xl/workbook.xml` s názvy listů a `xl/worksheets/sheet1.xml`, `sheet2.xml`, atd. Potřebujeme:
+1. Najít všechny `xl/worksheets/sheet*.xml` soubory v ZIP archivu
+2. Parsovat každý sheet zvlášť
+3. Spojit TSV výstupy s hlavičkou `=== Sheet: sheet1 ===` atd.
 
-**Warning banner místo malého badge** (řádky 725-741):
-- Nahradit malý `button` za plný řádek warning banner pod toolbarem
-- Žluto-oranžový pruh s ikonou `AlertTriangle`, textem "Cenová nabídka byla změněna — nalezeno X rozdílů oproti TPV seznamu", a dvěma tlačítky: "Zobrazit změny" (otevře dialog) + "Ignorovat" (clearCNDiff)
-- Banner se zobrazuje jen když `cnHasDiff === true`
+## Soubory k úpravě
 
-**Fix zavření dialogu** (řádky 1283-1285):
-- `onClose` pouze zavře dialog (`setCnDiffOpen(false)`) — **nemazat** diff data
-- Diff data se smažou jen po:
-  - Úspěšném aplikování změn (v `CNDiffDialog` po apply)
-  - Kliknutí na "Ignorovat" v warning banneru
+### 1. `supabase/functions/extract-tpv-from-sharepoint/index.ts`
 
-### 2. `src/components/ProjectDetailDialog.tsx`
+Funkce `extractFromExcel` (řádky 177-193):
+- Místo hledání pouze `sheet1.xml`, iterovat přes všechny entries matchující `xl/worksheets/sheet*.xml`
+- Pro každý sheet parsovat cells → TSV
+- Spojit všechny sheety do jednoho textu s oddělovači
+- Pokud sheet1 TSV je krátký (< 500 znaků) a existují další sheety, logovat info
 
-**Dispatch event po uploadu do cenová nabídka**:
-- Po úspěšném `uploadFile` kde `categoryKey === "cenova_nabidka"`:
-  ```typescript
-  window.dispatchEvent(new CustomEvent("cn-file-uploaded", { detail: { projectId } }));
-  ```
-- Přidat na oba upload paths (normal + chunked, řádky ~464 a ~474)
+### 2. `supabase/functions/extract-tpv/index.ts`
 
-### 3. `src/components/mobile/MobileDetailProjektSheet.tsx`
+Funkce `extractFromXLSX` (řádky 170-186) — identická změna:
+- Číst všechny sheety místo jen `sheet1.xml`
+- Spojit do jednoho TSV pro AI
 
-**Stejný dispatch** pro upload do `cenova_nabidka` v mobilním detail sheetu (řádek ~559).
+### Změna v obou funkcích (stejná logika)
 
-### 4. `src/components/CNDiffDialog.tsx`
+```text
+Před:  let ssXml = '', wsXml = '';
+       for (e of entries) {
+         if (e.filename === 'xl/sharedStrings.xml') ...
+         if (e.filename === 'xl/worksheets/sheet1.xml') ...
+       }
+       // parse one sheet → TSV → AI
 
-**Přidat `onApplied` callback**:
-- Po úspěšném apply (řádek ~95 po `onClose()`), zavolat nový prop `onApplied?.()` který vyčistí diff data v rodiči
+Po:    let ssXml = '';
+       const sheetEntries: { name: string; entry: ZipEntry }[] = [];
+       for (e of entries) {
+         if (e.filename === 'xl/sharedStrings.xml') ...
+         if (e.filename.match(/^xl\/worksheets\/sheet\d+\.xml$/)) 
+           sheetEntries.push({ name: e.filename, entry: e });
+       }
+       // sort by sheet number
+       // parse each sheet → TSV
+       // combine: "=== List 1 ===\n{tsv1}\n=== List 2 ===\n{tsv2}"
+       // send combined to AI
+```
 
-## Výsledný UX
+## Výsledek
 
-- Otevřu TPV List → žádná automatická kontrola, žádný spinner
-- Nahraju CN soubor v detailu projektu → na pozadí se spustí porovnání
-- Pokud jsou rozdíly → pod toolbarem se zobrazí oranžový banner: "⚠ Cenová nabídka byla změněna — nalezeno 5 rozdílů | [Zobrazit změny] [Ignorovat]"
-- Kliknu "Zobrazit změny" → otevře se CNDiffDialog
-- Zavřu dialog bez akce → banner zůstává
-- Aplikuji změny → banner zmizí
-- Kliknu "Ignorovat" → banner zmizí
+- Excel s jedním listem — chování beze změny
+- Excel s více listy (Rekapitulace + Atypy) — AI dostane obsah všech listů a extrahuje položky odkudkoliv
+- Žádné změny ve frontendu ani promptu
 
