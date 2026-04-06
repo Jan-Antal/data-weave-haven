@@ -100,6 +100,14 @@ async function parseXlsxItems(buffer: ArrayBuffer): Promise<ParsedItem[]> {
   const ss = parseSharedStrings(ssXml);
   const rows = parseWorksheetCells(wsXml, ss);
 
+  console.log('Total rows parsed:', rows.length);
+  for (let i = 0; i < Math.min(30, rows.length); i++) {
+    const r = rows[i];
+    if (r && (r[0] || r[1])) {
+      console.log(`Row ${i}: col0="${r[0]}" col1="${r[1]?.substring(0,50)}" col3="${r[3]}" col4="${r[4]}"`);
+    }
+  }
+
   const items: ParsedItem[] = [];
   let current: ParsedItem | null = null;
   let collecting = true;
