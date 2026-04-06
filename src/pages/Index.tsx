@@ -402,15 +402,23 @@ const Index = () => {
               <div className="flex items-center justify-between mb-3 shrink-0">
                 <div className="flex items-center">
                   <TabsList className="bg-card border">
-                    <TabsTrigger value="project-info" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    <TabsTrigger value="project-info" className={cn(
+                      anyTpvListActive
+                        ? "text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-muted-foreground data-[state=active]:shadow-none"
+                        : "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                    )}>
                       Project Info
                     </TabsTrigger>
-                    <TabsTrigger value="pm-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    <TabsTrigger value="pm-status" className={cn(
+                      anyTpvListActive
+                        ? "text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-muted-foreground data-[state=active]:shadow-none"
+                        : "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                    )}>
                       PM Status
                     </TabsTrigger>
                     <TabsTrigger value="tpv-status" className={cn(
                       anyTpvListActive
-                        ? "text-muted-foreground"
+                        ? "text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-muted-foreground data-[state=active]:shadow-none"
                         : "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                     )} onClick={() => tpvCloseDetailRef.current?.()}>
                       TPV Status
