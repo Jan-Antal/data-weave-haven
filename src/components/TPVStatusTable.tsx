@@ -352,6 +352,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
 
 // ── Expand arrow ────────────────────────────────────────────────────
 function ExpandArrow({ isExpanded, stageCount }: { isExpanded: boolean; stageCount: number }) {
+  if (stageCount <= 1) return <span className="w-5 h-5" />;
   const hasStages = stageCount > 0;
   if (isExpanded) return <ChevronDown className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent" : "text-muted-foreground"}`} />;
   return <ChevronRight className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent fill-accent/20" : "text-muted-foreground/50"}`} />;
@@ -411,7 +412,7 @@ const TPVProjectRow = memo(function TPVProjectRow({
         <TPVListIcon projectId={p.project_id} itemCount={tpvItemCount} onClick={handleOpenList} />
       </TableCell>
       {/* Col 2 — Chevron slot */}
-      <TableCell style={COL_CHEVRON_STYLE} className="px-0 cursor-pointer relative" onClick={() => onToggleExpand(p.project_id)}>
+      <TableCell style={COL_CHEVRON_STYLE} className="px-0 cursor-pointer relative" onClick={() => stageCount > 1 ? onToggleExpand(p.project_id) : undefined}>
         {tpvHighlight.dotColor && (
           <span className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full" style={{ width: 6, height: 6, backgroundColor: tpvHighlight.dotColor }} />
         )}
@@ -711,7 +712,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                     isFieldReadOnly={isFieldReadOnly}
                     onEditProject={(p) => setEditProject(p)}
                   />
-                  {expanded.has(p.project_id) && (
+                  {expanded.has(p.project_id) && (stagesByProject.get(p.project_id)?.length ?? 0) > 1 && (
                     <StagesSection
                       projectId={p.project_id}
                       project={p}
