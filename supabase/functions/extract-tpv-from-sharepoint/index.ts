@@ -134,6 +134,8 @@ async function parseXlsxItems(buffer: ArrayBuffer): Promise<ParsedItem[]> {
   }
   if (current) items.push(current);
 
+  console.log('Parsed items sample:', JSON.stringify(items.slice(0, 3)));
+
   return items.filter(i => i.cena !== null);
 }
 
