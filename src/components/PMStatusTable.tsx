@@ -759,10 +759,12 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                 <Fragment key={p.id}>
                   <PMProjectRow
                     project={p}
+                    stages={stagesByProject.get(p.project_id)}
                     tpvCount={(tpvItemsByProject.get(p.project_id) ?? []).length}
                     isExpanded={expanded.has(p.project_id)}
                     stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
                     onToggleExpand={toggleExpand}
+                    onAddStage={handleAddStage}
                     isVisible={v}
                     renderKeys={renderKeys}
                     save={save}
