@@ -1,4 +1,4 @@
-import React, { useState, Fragment, useMemo, useEffect, useCallback, memo, useRef } from "react";
+import React, { useState, Fragment, useMemo, useEffect, useCallback, memo, useRef, MutableRefObject } from "react";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { logActivity } from "@/lib/activityLog";
 import { useDataLogRowHighlight } from "@/hooks/useDataLogRowHighlight";
@@ -433,9 +433,11 @@ interface PMStatusTableProps {
   statusFilter: string[];
   search: string;
   riskHighlight?: import("@/hooks/useRiskHighlight").RiskHighlightType;
+  closeDetailRef?: MutableRefObject<(() => void) | null>;
+  onActiveProjectChange?: (active: boolean) => void;
 }
 
-export function PMStatusTable({ personFilter, statusFilter, search: externalSearch, riskHighlight }: PMStatusTableProps) {
+export function PMStatusTable({ personFilter, statusFilter, search: externalSearch, riskHighlight, closeDetailRef, onActiveProjectChange }: PMStatusTableProps) {
   useDataLogRowHighlight();
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
@@ -466,6 +468,19 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const handleOpenTPVList = useCallback((projectId: string, projectName: string, autoImport?: boolean) => {
     setActiveTPVProject({ projectId, projectName, autoImport });
   }, []);
+
+  // Expose close-detail callback to parent
+  useEffect(() => {
+    if (closeDetailRef) {
+      closeDetailRef.current = () => setActiveTPVProject(null);
+      return () => { closeDetailRef.current = null; };
+    }
+  }, [closeDetailRef]);
+
+  // Notify parent when TPV List is active/inactive
+  useEffect(() => {
+    onActiveProjectChange?.(!!activeTPVProject);
+  }, [activeTPVProject, onActiveProjectChange]);
 
   // Memoize filter Sets to avoid re-creation on every render
   const statusFilterSet = useMemo(

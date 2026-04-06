@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, memo, Fragment, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, memo, Fragment, useRef, MutableRefObject } from "react";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { logActivity } from "@/lib/activityLog";
 import { createNotification, getUserIdsByRole } from "@/lib/createNotification";
@@ -464,9 +464,11 @@ interface ProjectInfoTableProps {
   statusFilter: string[];
   search: string;
   riskHighlight?: import("@/hooks/useRiskHighlight").RiskHighlightType;
+  closeDetailRef?: MutableRefObject<(() => void) | null>;
+  onActiveProjectChange?: (active: boolean) => void;
 }
 
-export function ProjectInfoTable({ personFilter, statusFilter, search: externalSearch, riskHighlight }: ProjectInfoTableProps) {
+export function ProjectInfoTable({ personFilter, statusFilter, search: externalSearch, riskHighlight, closeDetailRef, onActiveProjectChange }: ProjectInfoTableProps) {
   useDataLogRowHighlight();
   const { data: projects = [], isLoading } = useProjects();
   const { data: statusOptions = [] } = useProjectStatusOptions();
@@ -497,6 +499,19 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const handleOpenTPVList = useCallback((projectId: string, projectName: string, autoImport?: boolean) => {
     setActiveTPVProject({ projectId, projectName, autoImport });
   }, []);
+
+  // Expose close-detail callback to parent
+  useEffect(() => {
+    if (closeDetailRef) {
+      closeDetailRef.current = () => setActiveTPVProject(null);
+      return () => { closeDetailRef.current = null; };
+    }
+  }, [closeDetailRef]);
+
+  // Notify parent when TPV List is active/inactive
+  useEffect(() => {
+    onActiveProjectChange?.(!!activeTPVProject);
+  }, [activeTPVProject, onActiveProjectChange]);
   const { projectInfo: { isVisible } } = useAllColumnVisibility();
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck();
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("project-info");
