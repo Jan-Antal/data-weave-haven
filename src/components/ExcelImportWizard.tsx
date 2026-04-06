@@ -853,7 +853,9 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
             {!requiredMapped && (
               <div className="flex items-center gap-2 px-3 py-2 bg-destructive/5 border border-destructive/20 rounded-md text-xs text-destructive">
                 <AlertTriangle className="h-3.5 w-3.5" />
-                Povinná pole (Kód Prvku, Název Prvku) musí být namapována pro pokračování
+                {importMode === "update"
+                  ? "Kód Prvku musí být namapován pro aktualizaci"
+                  : "Povinná pole (Kód Prvku, Název Prvku) musí být namapována pro pokračování"}
               </div>
             )}
 
