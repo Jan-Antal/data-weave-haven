@@ -83,7 +83,11 @@ const Index = () => {
     try { return sessionStorage.getItem("dashboard-collapsed") === "true"; } catch { return false; }
   });
   const tpvCloseDetailRef = useRef<(() => void) | null>(null);
+  const projectInfoCloseRef = useRef<(() => void) | null>(null);
+  const pmStatusCloseRef = useRef<(() => void) | null>(null);
   const [tpvListActive, setTpvListActive] = useState(false);
+  const [projectInfoTPVActive, setProjectInfoTPVActive] = useState(false);
+  const [pmStatusTPVActive, setPmStatusTPVActive] = useState(false);
   const [mobileDetailProject, setMobileDetailProject] = useState<any>(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [mobileTPVProject, setMobileTPVProject] = useState<any>(null);
@@ -91,15 +95,17 @@ const Index = () => {
   const scrollPositions = useRef<Record<string, number>>({});
   const { setCurrentPage, undo, redo, canUndo, canRedo, lastUndoDescription, lastRedoDescription } = useUndoRedo();
 
+  const anyTpvListActive = tpvListActive || projectInfoTPVActive || pmStatusTPVActive;
+
   // Set undo page context based on active tab/view
   useEffect(() => {
-    if (tpvListActive) {
+    if (anyTpvListActive) {
       setCurrentPage("tpv-list");
     } else {
       setCurrentPage("project-table");
     }
     return () => setCurrentPage(null);
-  }, [tpvListActive, setCurrentPage]);
+  }, [anyTpvListActive, setCurrentPage]);
 
   const TPV_ACTIVE_STATUSES = ["Příprava", "Engineering", "TPV"];
 
@@ -146,6 +152,8 @@ const Index = () => {
   const handleTabChange = useCallback((tab: string) => {
     scrollPositions.current[activeTab] = window.scrollY;
     tpvCloseDetailRef.current?.();
+    projectInfoCloseRef.current?.();
+    pmStatusCloseRef.current?.();
 
     if (tab === "tpv-status" && activeTab !== "tpv-status") {
       setSavedStatusFilter(filters.statusFilter);
@@ -403,7 +411,7 @@ const Index = () => {
                     <TabsTrigger value="tpv-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" onClick={() => tpvCloseDetailRef.current?.()}>
                       TPV Status
                     </TabsTrigger>
-                    {tpvListActive && activeTab === "tpv-status" && (
+                    {anyTpvListActive && (
                       <>
                         <span className="text-muted-foreground/50 text-xs mx-1 select-none">›</span>
                         <span className="text-xs font-medium text-primary px-2 py-1 rounded-sm bg-primary/10">TPV List</span>
@@ -456,10 +464,10 @@ const Index = () => {
               </div>
 
               <TabsContent value="project-info" forceMount className={cn("flex-1 min-h-0 overflow-hidden", activeTab !== "project-info" ? "hidden" : "")}>
-                <ProjectInfoTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
+                <ProjectInfoTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} closeDetailRef={projectInfoCloseRef} onActiveProjectChange={setProjectInfoTPVActive} />
               </TabsContent>
               <TabsContent value="pm-status" forceMount className={cn("flex-1 min-h-0 overflow-hidden", activeTab !== "pm-status" ? "hidden" : "")}>
-                <PMStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} />
+                <PMStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} closeDetailRef={pmStatusCloseRef} onActiveProjectChange={setPmStatusTPVActive} />
               </TabsContent>
               <TabsContent value="tpv-status" forceMount className={cn("flex-1 min-h-0 overflow-hidden", activeTab !== "tpv-status" ? "hidden" : "")}>
                 <TPVStatusTable personFilter={filters.personFilter} statusFilter={filters.statusFilter} search={filters.search} riskHighlight={riskHighlight} onRequestTab={() => handleTabChange("tpv-status")} closeDetailRef={tpvCloseDetailRef} onActiveProjectChange={setTpvListActive} />
