@@ -14,13 +14,19 @@ export interface ProjectDisplayOverrides {
   singleStage: ProjectStage | null;
   /** Summary status text for multi-stage (e.g. "Výroba (+2)") */
   statusSummary: string | null;
+  /** Base status label (without "+N" suffix) for color lookup */
+  statusBase: string | null;
   /** Total prodejni_cena across stages */
   totalPrice: number | null;
   /** Latest datum_smluvni across stages */
   latestDatumSmluvni: string | null;
-  /** PM summary for multi-stage */
+  /** PM summary for multi-stage (names joined by " / ") */
   pmSummary: string | null;
-  /** Weighted average margin across stages (1 decimal) */
+  /** Kalkulant summary for multi-stage (names joined by " / ") */
+  kalkulantSummary: string | null;
+  /** Konstruktér summary for multi-stage (names joined by " / ") */
+  konstrukterSummary: string | null;
+  /** Weighted average margin across stages in STORAGE format (decimal, e.g. 0.25 = 25%) */
   weightedMarze: number | null;
 }
 
@@ -37,9 +43,12 @@ export function getProjectDisplayOverrides(
       isSingleStage: true,
       singleStage: stageList[0] ?? null,
       statusSummary: null,
+      statusBase: null,
       totalPrice: null,
       latestDatumSmluvni: null,
       pmSummary: null,
+      kalkulantSummary: null,
+      konstrukterSummary: null,
       weightedMarze: null,
     };
   }
@@ -47,11 +56,13 @@ export function getProjectDisplayOverrides(
   // Multi-stage: compute summaries
   const statuses = new Set(stageList.map(s => s.status).filter(Boolean));
   let statusSummary: string | null = null;
+  let statusBase: string | null = null;
   if (statuses.size === 1) {
-    statusSummary = [...statuses][0]!;
+    statusBase = [...statuses][0]!;
+    statusSummary = statusBase;
   } else if (statuses.size > 1) {
-    const first = stageList.find(s => s.status)?.status ?? "";
-    statusSummary = `${first} (+${statuses.size - 1})`;
+    statusBase = stageList.find(s => s.status)?.status ?? "";
+    statusSummary = `${statusBase} (+${statuses.size - 1})`;
   }
 
   // Total price
@@ -70,36 +81,43 @@ export function getProjectDisplayOverrides(
     }
   }
 
-  // PM summary
-  const pms = new Set(stageList.map(s => s.pm).filter(Boolean));
-  let pmSummary: string | null = null;
-  if (pms.size === 1) {
-    pmSummary = [...pms][0]!;
-  } else if (pms.size > 1) {
-    pmSummary = `${pms.size} PM`;
-  }
+  // Helper to join unique non-empty values with " / "
+  const joinUnique = (vals: (string | null | undefined)[]) => {
+    const unique = [...new Set(vals.filter(Boolean))];
+    if (unique.length === 0) return null;
+    return unique.join(" / ");
+  };
+
+  const pmSummary = joinUnique(stageList.map(s => s.pm));
+  const kalkulantSummary = joinUnique(stageList.map(s => s.kalkulant));
+  const konstrukterSummary = joinUnique(stageList.map(s => s.konstrukter));
 
   // Weighted average margin: Σ(price_i × margin_i) / Σ(price_i)
+  // Result is in STORAGE/decimal format (e.g. 0.25 = 25%)
   const totalWeight = stageList.reduce((acc, s) => acc + (s.prodejni_cena ?? 0), 0);
   let weightedMarze: number | null = null;
   if (totalWeight > 0) {
     const weightedSum = stageList.reduce((acc, s) => {
       const price = s.prodejni_cena ?? 0;
-      const marze = s.marze ? parseFloat(String(s.marze).replace(",", ".")) : 0;
-      // Normalize: if > 1, treat as percentage already in decimal-ish form
-      const normalizedMarze = marze > 1 ? marze : marze * 100;
-      return acc + price * normalizedMarze;
+      // marze is stored as decimal (0.25) or percentage (25) — normalize to decimal
+      const raw = s.marze ? parseFloat(String(s.marze).replace(",", ".")) : 0;
+      const decimal = raw > 1 ? raw / 100 : raw;
+      return acc + price * decimal;
     }, 0);
-    weightedMarze = Math.round((weightedSum / totalWeight) * 10) / 10;
+    // Result in decimal, rounded to 3 decimal places (e.g. 0.253)
+    weightedMarze = Math.round((weightedSum / totalWeight) * 1000) / 1000;
   }
 
   return {
     isSingleStage: false,
     singleStage: null,
     statusSummary,
+    statusBase,
     totalPrice,
     latestDatumSmluvni,
     pmSummary,
+    kalkulantSummary,
+    konstrukterSummary,
     weightedMarze,
   };
 }
