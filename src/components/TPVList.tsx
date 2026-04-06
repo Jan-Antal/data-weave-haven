@@ -19,7 +19,7 @@ import {
   useBulkInsertTPVItems,
 } from "@/hooks/useTPVItems";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
-import { ArrowLeft, Plus, Upload, Trash2, FileText, Cog, Printer } from "lucide-react";
+import { ArrowLeft, Plus, Upload, Trash2, FileText, Cog, Printer, AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 import { buildPruvodkaHtml } from "@/lib/exportPdf";
 import { PdfPreviewModal } from "./PdfPreviewModal";
 import { ProjectDetailDialog } from "./ProjectDetailDialog";
@@ -41,6 +41,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { logActivity } from "@/lib/activityLog";
 import { TPVExtractor } from "./assistant/TPVExtractor";
+import { useCNDiff } from "@/hooks/useCNDiff";
+import { CNDiffDialog } from "./CNDiffDialog";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
   { key: "item_name", label: "Kód prvku" },
@@ -111,8 +113,12 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const { statusMap: productionStatusMap } = useProductionStatuses(projectId);
   const [detailOpen, setDetailOpen] = useState(false);
   const [extractorOpen, setExtractorOpen] = useState(false);
+  const [cnDiffOpen, setCnDiffOpen] = useState(false);
   const currentProject = useMemo(() => allProjects.find((p) => p.project_id === projectId), [allProjects, projectId]);
   const queryClient = useQueryClient();
+
+  // CN diff detection
+  const { diff: cnDiff, isChecking: cnChecking, hasDifferences: cnHasDiff, checkCN, clearDiff: clearCNDiff } = useCNDiff(projectId, items);
 
   const updateItem = useUpdateTPVItem();
   const addItem = useAddTPVItem();
@@ -737,6 +743,34 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           <Printer className="h-4 w-4" />
           <span className="hidden sm:inline">Průvodka</span>
         </button>
+        {/* CN diff check */}
+        {canManageTPV && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant={cnHasDiff ? "destructive" : "outline"}
+                onClick={() => cnHasDiff ? setCnDiffOpen(true) : checkCN()}
+                disabled={cnChecking}
+                className="relative"
+              >
+                {cnChecking ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : cnHasDiff ? (
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                ) : (
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                )}
+                {cnHasDiff ? `CN rozdíly (${cnDiff!.entries.length})` : "Kontrola CN"}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {cnHasDiff
+                ? "CN byla změněna — kliknutím zobrazíte rozdíly"
+                : "Porovnat cenovou nabídku s aktuálním TPV seznamem"}
+            </TooltipContent>
+          </Tooltip>
+        )}
         {selected.size > 0 && canManageTPV && (
           <div className="flex items-center gap-2 ml-4 border-l pl-4">
             <span className="text-sm text-muted-foreground">{selected.size} vybráno</span>
@@ -1235,9 +1269,27 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       <TPVExtractor
         projectId={projectId}
         open={extractorOpen}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["tpv_items", projectId] })}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["tpv_items", projectId] });
+          // Auto-trigger CN diff check in background after extraction
+          setTimeout(() => checkCN(), 1500);
+        }}
         onClose={() => setExtractorOpen(false)}
       />
+
+      {/* CN Diff Dialog */}
+      {cnDiff && (
+        <CNDiffDialog
+          open={cnDiffOpen}
+          onClose={() => {
+            setCnDiffOpen(false);
+            clearCNDiff();
+          }}
+          diff={cnDiff}
+          projectId={projectId}
+          currency={currency}
+        />
+      )}
     </div>
   );
 }
