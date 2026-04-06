@@ -24,7 +24,7 @@ import {
 
 // ── Target fields (TPV List columns — fixed) ─────────────────────
 const TARGET_FIELDS = [
-  { key: "item_name", label: "Kód Prvku", required: true },
+  { key: "item_code", label: "Kód Prvku", required: true },
   { key: "nazev", label: "Název Prvku", required: true },
   { key: "popis", label: "Popis", required: false },
   { key: "pocet", label: "Počet", required: false },
@@ -42,7 +42,7 @@ type TargetKey = (typeof TARGET_FIELDS)[number]["key"];
 // Each entry has exact phrases tried first, then loose keywords as fallback.
 // Order matters: more specific entries should come first.
 const FUZZY_MAP: { exact: string[]; contains: string[]; target: TargetKey }[] = [
-  { exact: ["kod prvku", "kod", "kod polozky", "item code", "element code", "id prvku"], contains: ["code"], target: "item_name" },
+  { exact: ["kod prvku", "kod", "kod polozky", "item code", "element code", "id prvku"], contains: ["code"], target: "item_code" },
   { exact: ["nazev prvku", "nazev polozky", "nazev", "element name", "item name"], contains: ["name"], target: "nazev" },
   { exact: ["popis", "description", "detail", "specifikace", "spec"], contains: ["descript", "specif"], target: "popis" },
   { exact: ["pocet", "qty", "quantity", "ks", "mnozstvi", "pcs"], contains: ["quantit"], target: "pocet" },
@@ -269,10 +269,10 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
 
     const { data: existingItems } = await supabase
       .from("tpv_items")
-      .select("item_name")
+      .select("item_code")
       .eq("project_id", projectId)
       .is("deleted_at", null);
-    const codes = new Set((existingItems || []).map(i => i.item_name).filter(Boolean) as string[]);
+    const codes = new Set((existingItems || []).map(i => i.item_code).filter(Boolean) as string[]);
     setExistingCodes(codes);
 
     const built: RowData[] = [];
@@ -293,9 +293,9 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
       }
       if (!hasAnyData) continue;
 
-      const hasCode = !!values.item_name;
+      const hasCode = !!values.item_code;
       const hasName = !!values.nazev;
-      const isDuplicate = hasCode && codes.has(values.item_name);
+      const isDuplicate = hasCode && codes.has(values.item_code);
       const status: "valid" | "warning" | "error" =
         (!hasCode || !hasName) ? "error" : isDuplicate ? "warning" : "valid";
 
@@ -340,7 +340,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
       if (newItems.length > 0) {
         const items = newItems.map(r => ({
           project_id: projectId,
-          item_name: r.values.item_name || "Bez kódu",
+          item_name: r.values.item_code || "Bez kódu",
           nazev: r.values.nazev || null,
           popis: r.values.popis || null,
           konstrukter: r.values.konstrukter || null,
@@ -372,7 +372,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
               accepted_date: r.values.accepted_date || null,
             } as any)
             .eq("project_id", projectId)
-            .eq("item_name", r.values.item_name)
+            .eq("item_code", r.values.item_code)
             .is("deleted_at", null);
         }
       }
@@ -826,7 +826,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                         </TableCell>
                         {TARGET_FIELDS.map(f => (
                           <TableCell key={f.key} className={cn(
-                            (f.key === "popis" || f.key === "item_name") && "font-semibold",
+                            (f.key === "popis" || f.key === "item_code") && "font-semibold",
                             f.key === "notes" && "max-w-[300px] truncate font-normal",
                           )}>
                             {row.values[f.key] ?? ""}

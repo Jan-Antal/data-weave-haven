@@ -45,7 +45,7 @@ import { useCNDiff } from "@/hooks/useCNDiff";
 import { CNDiffDialog } from "./CNDiffDialog";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
-  { key: "item_name", label: "Kód prvku" },
+  { key: "item_code", label: "Kód prvku" },
   { key: "nazev", label: "Název prvku" },
   { key: "popis", label: "Popis prvku" },
   { key: "konstrukter", label: "Konstruktér" },
@@ -67,7 +67,7 @@ function getTPVListColumnStyle(key: string, customWidth?: number | null): React.
     case "sent_date":
     case "accepted_date":
       return { width: 100, minWidth: 100, maxWidth: 100 };
-    case "item_name":
+    case "item_code":
       return { minWidth: 100, maxWidth: 140 };
     case "nazev":
       return { minWidth: 180 };
@@ -191,7 +191,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const renderKeys = editMode ? localOrder : allVisibleKeys;
 
   // ── Sort state ──────────────────────────────────────────────────
-  const [sortCol, setSortCol] = useState<string | null>("item_name");
+  const [sortCol, setSortCol] = useState<string | null>("item_code");
   const [sortDir, setSortDir] = useState<"asc" | "desc" | null>("asc");
   const toggleSort = (col: string) => {
     if (sortCol === col) {
@@ -247,8 +247,8 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     const hasUnapproved = itemsToPrint.some(item => item.status !== "Schváleno");
     const rows = itemsToPrint.map((item, idx) => ({
       rowNum: idx + 1,
-      kodPrvku: item.item_name || "",
-      nazevPrvku: item.nazev || item.item_name || "",
+      kodPrvku: item.item_code || "",
+      nazevPrvku: item.nazev || item.item_code || "",
       konstrukter: item.konstrukter || "",
       pocet: item.pocet ?? "",
       notes: item.notes || "",
@@ -351,12 +351,12 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             .from("production_inbox")
             .select("id")
             .eq("project_id", projectId)
-            .eq("item_code", item.item_name)
+            .eq("item_code", item.item_code)
             .eq("status", "pending")
             .limit(1);
 
           if (existing && existing.length > 0) {
-            skipped.push(item.item_name);
+            skipped.push(item.item_code);
             continue;
           }
 
@@ -369,8 +369,8 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           // Insert into production_inbox
           const { error } = await supabase.from("production_inbox").insert({
             project_id: projectId,
-            item_name: item.nazev || item.item_name,
-            item_code: item.item_name,
+            item_name: item.nazev || item.item_code,
+            item_code: item.item_code,
             estimated_hours: estimatedHours,
             estimated_czk: itemCenaConverted,
             status: "pending",
@@ -388,7 +388,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           logActivity({
             projectId,
             actionType: "item_scheduled",
-            newValue: item.item_name,
+            newValue: item.item_code,
             detail: "Odesláno do výroby z TPV",
           });
 
@@ -490,14 +490,14 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       if (newPocet !== oldPocetNum) {
         // Check if this item exists in production_inbox or production_schedule
         const item = items.find((i) => i.id === itemId);
-        const itemCode = item?.item_name || "";
-        const itemName = item?.nazev || item?.item_name || "";
+        const itemCode = item?.item_code || "";
+        const itemName = item?.nazev || item?.item_code || "";
 
         const { data: inboxHits } = await supabase
           .from("production_inbox")
           .select("id")
           .eq("project_id", projectId)
-          .eq("item_name", itemCode)
+          .eq("item_code", itemCode)
           .in("status", ["pending", "scheduled"])
           .limit(1);
 
@@ -505,7 +505,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           .from("production_schedule")
           .select("id")
           .eq("project_id", projectId)
-          .eq("item_name", itemCode)
+          .eq("item_code", itemCode)
           .in("status", ["scheduled", "in_progress"])
           .limit(1);
 
@@ -529,7 +529,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     if (!pocetWarning) return;
     const { itemId, itemCode, itemName, oldPocet, newPocet } = pocetWarning;
     const item = items.find((i) => i.id === itemId);
-    const itemKey = item?.item_name || "";
+    const itemKey = item?.item_code || "";
 
     // 1. Save the new pocet to tpv_items
     updateItem.mutate({ id: itemId, field: "pocet", value: String(newPocet), projectId, oldValue: String(oldPocet) });
@@ -539,7 +539,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       .from("production_inbox")
       .select("id, estimated_hours")
       .eq("project_id", projectId)
-      .eq("item_name", itemKey)
+      .eq("item_code", itemKey)
       .in("status", ["pending", "scheduled"]);
 
     if (inboxRows && inboxRows.length > 0) {
@@ -557,7 +557,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       .from("production_schedule")
       .select("id, scheduled_hours")
       .eq("project_id", projectId)
-      .eq("item_name", itemKey)
+      .eq("item_code", itemKey)
       .in("status", ["scheduled", "in_progress"]);
 
     if (scheduleRows && scheduleRows.length > 0) {
@@ -627,7 +627,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         const rows = sortedItems.map((item) =>
           visKeys.map((k) => {
             if (k === "vyroba_status") {
-              const itemKey = (item as any).item_name || (item as any).nazev;
+              const itemKey = (item as any).item_code || (item as any).nazev;
               const statuses = productionStatusMap.get(itemKey);
               if (!statuses || statuses.length === 0) return "Neodesláno";
               return statuses.map((s: any) => s.label).join(", ");
@@ -843,12 +843,12 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                     </TableCell>
                     {renderKeys.map((key) => {
                       const cellStyle = getTPVListColumnStyle(key, getWidth(key));
-                      if (key === "item_name")
+                      if (key === "item_code")
                         return (
                           <TableCell key={key} style={cellStyle}>
                             <InlineEditableCell
-                              value={item.item_name || ""}
-                              onSave={(v) => saveField(item.id, "item_name", v, item.item_name || "")}
+                              value={item.item_code || ""}
+                              onSave={(v) => saveField(item.id, "item_code", v, item.item_code || "")}
                               className="font-sans text-xs font-bold"
                               readOnly={!canManageTPV}
                             />
@@ -920,7 +920,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                         );
                       }
                       if (key === "vyroba_status") {
-                        const itemKey = item.item_name || item.nazev;
+                        const itemKey = item.item_code || item.nazev;
                         const statuses = productionStatusMap.get(itemKey);
                         if (!statuses || statuses.length === 0) {
                           return (
@@ -1148,7 +1148,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           <div className="space-y-2 py-2 max-h-[300px] overflow-auto">
             {notReadyItems.map((item) => (
               <div key={item.id} className="flex items-center gap-2 text-sm py-1 px-2 rounded bg-destructive/5">
-                <span className="font-sans text-xs font-semibold">{item.item_name}</span>
+                <span className="font-sans text-xs font-semibold">{item.item_code}</span>
                 <span className="text-muted-foreground truncate flex-1">{item.nazev || ""}</span>
                 <span className="text-xs text-destructive font-medium shrink-0">{item.status || "Bez statusu"}</span>
               </div>
@@ -1233,7 +1233,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                 <TableBody>
                   {pruvodkaWarning?.items.map((item) => (
                     <TableRow key={item.id} className="bg-amber-50/50">
-                      <TableCell className="font-semibold text-xs">{item.item_name}</TableCell>
+                      <TableCell className="font-semibold text-xs">{item.item_code}</TableCell>
                       <TableCell className="text-xs">{item.nazev || ""}</TableCell>
                       <TableCell className="text-xs text-amber-600 font-medium">{item.status || "Bez statusu"}</TableCell>
                     </TableRow>
