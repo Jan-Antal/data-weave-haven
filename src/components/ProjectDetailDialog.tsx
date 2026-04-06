@@ -1170,6 +1170,14 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
         )}
       </div>
 
+      {/* ── ETAPY — per-stage cost breakdown (only when 2+ stages) ── */}
+      {(isAdmin || isPM) && (
+        <StagesCostSection
+          projectId={project.project_id}
+          readOnly={isSectionReadOnly("finance")}
+        />
+      )}
+
       {/* ── PM — ŘÍZENÍ PROJEKTU ─────────────────── */}
       <SectionHeader icon="📊" label="PM — ŘÍZENÍ PROJEKTU" />
       <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
