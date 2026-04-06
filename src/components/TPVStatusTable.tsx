@@ -39,6 +39,7 @@ import { getProjectCellValue } from "@/lib/exportExcel";
 import { useStagesByProject } from "@/hooks/useAllProjectStages";
 import { useAllTPVItems } from "@/hooks/useAllTPVItems";
 import { matchesStatusFilter, normalizedIncludes, normalizeSearch } from "@/lib/statusFilter";
+import { getProjectDisplayOverrides } from "@/lib/projectStageDisplay";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...TPV_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
@@ -351,20 +352,31 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
 }
 
 // ── Expand arrow ────────────────────────────────────────────────────
-function ExpandArrow({ isExpanded, stageCount }: { isExpanded: boolean; stageCount: number }) {
-  if (stageCount <= 1) return <span className="w-5 h-5" />;
-  const hasStages = stageCount > 0;
-  if (isExpanded) return <ChevronDown className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent" : "text-muted-foreground"}`} />;
-  return <ChevronRight className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent fill-accent/20" : "text-muted-foreground/50"}`} />;
+function ExpandArrow({ isExpanded, stageCount, onAddStage }: { isExpanded: boolean; stageCount: number; onAddStage?: () => void }) {
+  if (stageCount <= 1) {
+    return (
+      <button
+        className="h-5 w-5 inline-flex items-center justify-center text-muted-foreground/40 hover:text-accent transition-colors"
+        title="Přidat etapu"
+        onClick={(e) => { e.stopPropagation(); onAddStage?.(); }}
+      >
+        <Plus className="h-3.5 w-3.5" />
+      </button>
+    );
+  }
+  if (isExpanded) return <ChevronDown className="h-5 w-5 stroke-[3] text-accent" />;
+  return <ChevronRight className="h-5 w-5 stroke-[3] text-accent" />;
 }
 
 // ── Memoized parent project row for TPV ─────────────────────────────
 interface TPVProjectRowProps {
   project: Project;
+  stages?: ProjectStage[];
   isExpanded: boolean;
   stageCount: number;
   tpvItemCount: number;
   onToggleExpand: (pid: string) => void;
+  onAddStage?: (pid: string) => void;
   onOpenTPVList: (projectId: string, projectName: string) => void;
   isVisible: (key: string) => boolean;
   renderKeys: string[];
@@ -380,10 +392,12 @@ interface TPVProjectRowProps {
 
 const TPVProjectRow = memo(function TPVProjectRow({
   project: p,
+  stages: stagesRaw,
   isExpanded,
   stageCount,
   tpvItemCount,
   onToggleExpand,
+  onAddStage,
   onOpenTPVList,
   isVisible: v,
   renderKeys,
@@ -396,6 +410,18 @@ const TPVProjectRow = memo(function TPVProjectRow({
   isFieldReadOnly,
   onEditProject,
 }: TPVProjectRowProps) {
+  const displayProject = useMemo(() => {
+    const overrides = getProjectDisplayOverrides(stagesRaw);
+    if (overrides.isSingleStage && overrides.singleStage) {
+      const s = overrides.singleStage;
+      return { ...p, status: s.status ?? p.status, datum_smluvni: s.datum_smluvni ?? p.datum_smluvni, pm: s.pm ?? p.pm, konstrukter: s.konstrukter ?? p.konstrukter, prodejni_cena: s.prodejni_cena ?? p.prodejni_cena, marze: s.marze ?? p.marze } as Project;
+    }
+    if (!overrides.isSingleStage) {
+      return { ...p, status: overrides.statusSummary ?? p.status, datum_smluvni: overrides.latestDatumSmluvni ?? p.datum_smluvni, pm: overrides.pmSummary ?? p.pm, prodejni_cena: overrides.totalPrice ?? p.prodejni_cena } as Project;
+    }
+    return p;
+  }, [p, stagesRaw]);
+
   const tpvHighlight = useMemo(
     () => getTPVDashboardRiskColor(p as any, riskHighlight ?? null),
     [p.risk, p.tpv_risk, p.datum_tpv, p.datum_smluvni, riskHighlight]
@@ -407,20 +433,18 @@ const TPVProjectRow = memo(function TPVProjectRow({
 
   return (
     <TableRow className="hover:bg-muted/50 transition-colors h-9" style={tpvHighlight.bg ? { backgroundColor: tpvHighlight.bg } : {}} data-project-id={p.project_id}>
-      {/* Col 1 — Icon slot */}
       <TableCell style={COL_ICON_STYLE} className="text-center px-0">
         <TPVListIcon projectId={p.project_id} itemCount={tpvItemCount} onClick={handleOpenList} />
       </TableCell>
-      {/* Col 2 — Chevron slot */}
       <TableCell style={COL_CHEVRON_STYLE} className="px-0 cursor-pointer relative" onClick={() => stageCount > 1 ? onToggleExpand(p.project_id) : undefined}>
         {tpvHighlight.dotColor && (
           <span className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full" style={{ width: 6, height: 6, backgroundColor: tpvHighlight.dotColor }} />
         )}
-        <ExpandArrow isExpanded={isExpanded} stageCount={stageCount} />
+        <ExpandArrow isExpanded={isExpanded} stageCount={stageCount} onAddStage={() => onAddStage?.(p.project_id)} />
       </TableCell>
       {v("project_id") && <TableCell className="font-sans font-semibold text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => onEditProject(p)}>{p.project_id}</TableCell>}
       {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><span className="font-medium cursor-pointer hover:underline hover:text-primary transition-colors truncate" onClick={() => onEditProject(p)}>{p.project_name}</span></TableCell>}
-      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly }))}
+      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: displayProject, save, canEdit: canEdit && stageCount <= 1, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly: stageCount > 1 ? () => true : isFieldReadOnly }))}
     </TableRow>
   );
 });
@@ -616,6 +640,24 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
     });
   }, []);
 
+  const handleAddStage = useCallback(async (projectId: string) => {
+    const project = projects.find(pr => pr.project_id === projectId);
+    if (!project) return;
+    const existingStages = stagesByProject.get(projectId) ?? [];
+    const letters = existingStages.map(s => { const m = s.stage_name.match(/-([A-Z])$/); return m ? m[1] : null; }).filter(Boolean) as string[];
+    const lastChar = letters.sort().pop();
+    const suffix = lastChar ? String.fromCharCode(lastChar.charCodeAt(0) + 1) : "A";
+    const stageName = `${projectId}-${suffix}`;
+    const inheritedData = buildInheritedStageData(project);
+    const { error } = await supabase.from("project_stages").insert({ project_id: projectId, stage_name: stageName, stage_order: existingStages.length, ...inheritedData, manually_edited_fields: [] } as any);
+    if (error) { toast({ title: "Chyba", variant: "destructive" }); return; }
+    logActivity({ projectId, actionType: "stage_created", detail: stageName });
+    qc.invalidateQueries({ queryKey: ["project_stages", projectId] });
+    qc.invalidateQueries({ queryKey: ["all_project_stages"] });
+    setExpanded(prev => new Set(prev).add(projectId));
+    setShowAddButton(prev => new Set(prev).add(projectId));
+  }, [projects, stagesByProject, qc]);
+
   const save = useCallback((id: string, field: string, value: string, oldValue: string, projectId?: string) => {
     updateProject.mutate({ id, field, value, oldValue, projectId });
   }, [updateProject]);
@@ -696,10 +738,12 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                 <Fragment key={p.id}>
                   <TPVProjectRow
                     project={p}
+                    stages={stagesByProject.get(p.project_id)}
                     isExpanded={expanded.has(p.project_id)}
                     stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
                     tpvItemCount={tpvItemsByProject.get(p.project_id)?.length ?? 0}
                     onToggleExpand={toggleExpand}
+                    onAddStage={handleAddStage}
                     onOpenTPVList={handleOpenTPVList}
                     isVisible={v}
                     renderKeys={renderKeys}
