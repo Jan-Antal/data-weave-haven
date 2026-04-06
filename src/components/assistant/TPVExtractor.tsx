@@ -129,6 +129,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       }));
 
       setItems(extracted);
+      setSourceDoc({ itemId: fileItemId, fileName });
       setPhase("done");
     } catch (err: any) {
       console.error("Extract error:", err);
