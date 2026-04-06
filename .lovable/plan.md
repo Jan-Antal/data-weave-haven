@@ -1,38 +1,32 @@
 
 
-# Document Preview in TPV Extractor
+# Fix TPV List Navigation from Project Info & PM Status Tabs
 
-## What
-Add a "Zobrazit dokument" button in the bottom-left of the TPVExtractor dialog (in the "done" phase) that opens the source CN document in `DocumentPreviewModal`. This lets users cross-reference extracted data against the original file before saving.
+## Problem
+When TPV List is opened from **TPV Status** tab, a "TPV List" breadcrumb appears in the tab bar, and switching to another tab closes it. But when opened from **Project Info** or **PM Status**, there's no breadcrumb and tab switching doesn't close the list — because those tables manage TPV List state internally without reporting it to `Index.tsx`.
 
-## How
+## Solution
+Mirror the same pattern `TPVStatusTable` already uses (`closeDetailRef` + `onActiveProjectChange`) in `ProjectInfoTable` and `PMStatusTable`, then unify the tab bar breadcrumb logic.
 
-### File: `src/components/assistant/TPVExtractor.tsx`
+## Changes
 
-1. **Track source document metadata** — store `fileItemId` when extraction succeeds (from SharePoint path) or the manual file's blob URL (for uploaded files):
-   - Add state: `sourceDoc: { itemId?: string; fileName: string; blobUrl?: string } | null`
-   - In `extractFromSharePoint`: save `{ itemId: fileItemId, fileName }`
-   - In `handleManualExtract`: create a blob URL from `manualFile` and save `{ fileName, blobUrl: URL.createObjectURL(manualFile) }`
+### 1. `src/components/ProjectInfoTable.tsx`
+- Add props: `closeDetailRef?: MutableRefObject<(() => void) | null>` and `onActiveProjectChange?: (active: boolean) => void`
+- Add effects (same as in `TPVStatusTable`):
+  - Expose `closeDetailRef.current = () => setActiveTPVProject(null)`
+  - Call `onActiveProjectChange?.(!!activeTPVProject)` when `activeTPVProject` changes
 
-2. **Add preview state** — `previewOpen`, `previewLoading`, `previewUrl`, `webUrl`, `downloadUrl`
+### 2. `src/components/PMStatusTable.tsx`
+- Same changes as `ProjectInfoTable` — add `closeDetailRef` and `onActiveProjectChange` props + effects.
 
-3. **Import and use `useSharePointDocs`** to call `getPreview(itemId)` for SharePoint files. For manual uploads, use the blob URL directly (PDF renders in iframe, Excel shows a "download" fallback).
+### 3. `src/pages/Index.tsx`
+- Add two more refs and state trackers for Project Info and PM Status TPV list:
+  - `projectInfoCloseRef`, `pmStatusCloseRef`
+  - `projectInfoTPVActive`, `pmStatusTPVActive`
+- Pass these to `<ProjectInfoTable>` and `<PMStatusTable>` as props
+- Update `handleTabChange` to close TPV lists from all three tables (call all close refs)
+- Update the breadcrumb display: show "› TPV List" when **any** of the three tables has an active TPV list (not just `tpv-status` tab)
+- Compute combined `anyTpvListActive` for undo page context
 
-4. **Add preview button** in the `DialogFooter` (left side, before Zrušit):
-   ```
-   <Button variant="ghost" size="sm" onClick={openSourcePreview}>
-     <Eye className="h-4 w-4 mr-1" /> Zobrazit dokument
-   </Button>
-   ```
-
-5. **Render `DocumentPreviewModal`** at the bottom of the component, using the tracked preview URLs.
-
-### File: `src/components/DocumentPreviewModal.tsx`
-No changes needed — it already supports all required props.
-
-### Logic flow
-- User clicks "Zobrazit dokument" → if SharePoint file, call `getPreview(itemId)` to get `previewUrl` → open `DocumentPreviewModal`
-- If manual upload (PDF), use blob URL directly as `previewUrl`
-- If manual upload (XLSX), show download-only fallback (no iframe preview for Excel blobs)
-- Modal opens as a portal overlay on top of the dialog — user reviews, closes, continues editing/saving
+This gives identical behavior across all three tabs — open TPV List as a sub-view, see the breadcrumb, switch tab to dismiss it.
 
