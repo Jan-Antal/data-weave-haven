@@ -399,6 +399,7 @@ const TPVProjectRow = memo(function TPVProjectRow({
   isExpanded,
   stageCount,
   tpvItemCount,
+  tpvItems,
   onToggleExpand,
   onAddStage,
   onOpenTPVList,
@@ -413,17 +414,21 @@ const TPVProjectRow = memo(function TPVProjectRow({
   isFieldReadOnly,
   onEditProject,
 }: TPVProjectRowProps) {
+  const computedPct = useMemo(() => tpvItems ? computeTPVProgress(tpvItems) : null, [tpvItems]);
   const displayProject = useMemo(() => {
     const overrides = getProjectDisplayOverrides(stagesRaw);
+    let base: Project;
     if (overrides.isSingleStage && overrides.singleStage) {
       const s = overrides.singleStage;
-      return { ...p, status: s.status ?? p.status, datum_smluvni: s.datum_smluvni ?? p.datum_smluvni, pm: s.pm ?? p.pm, konstrukter: s.konstrukter ?? p.konstrukter, prodejni_cena: s.prodejni_cena ?? p.prodejni_cena, marze: s.marze ?? p.marze } as Project;
+      base = { ...p, status: s.status ?? p.status, datum_smluvni: s.datum_smluvni ?? p.datum_smluvni, pm: s.pm ?? p.pm, konstrukter: s.konstrukter ?? p.konstrukter, prodejni_cena: s.prodejni_cena ?? p.prodejni_cena, marze: s.marze ?? p.marze } as Project;
+    } else if (!overrides.isSingleStage) {
+      base = { ...p, status: overrides.statusSummary ?? p.status, datum_smluvni: overrides.latestDatumSmluvni ?? p.datum_smluvni, pm: overrides.pmSummary ?? p.pm, kalkulant: overrides.kalkulantSummary ?? p.kalkulant, konstrukter: overrides.konstrukterSummary ?? p.konstrukter, prodejni_cena: overrides.totalPrice ?? p.prodejni_cena, marze: overrides.weightedMarze != null ? String(overrides.weightedMarze) : p.marze } as Project;
+    } else {
+      base = p;
     }
-    if (!overrides.isSingleStage) {
-      return { ...p, status: overrides.statusSummary ?? p.status, datum_smluvni: overrides.latestDatumSmluvni ?? p.datum_smluvni, pm: overrides.pmSummary ?? p.pm, kalkulant: overrides.kalkulantSummary ?? p.kalkulant, konstrukter: overrides.konstrukterSummary ?? p.konstrukter, prodejni_cena: overrides.totalPrice ?? p.prodejni_cena, marze: overrides.weightedMarze != null ? String(overrides.weightedMarze) : p.marze } as Project;
-    }
-    return p;
-  }, [p, stagesRaw]);
+    if (computedPct != null) return { ...base, percent_tpv: computedPct } as Project;
+    return base;
+  }, [p, stagesRaw, computedPct]);
 
   const isSummary = stageCount > 1;
 
