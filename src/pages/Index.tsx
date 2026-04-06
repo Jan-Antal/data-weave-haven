@@ -408,13 +408,19 @@ const Index = () => {
                     <TabsTrigger value="pm-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                       PM Status
                     </TabsTrigger>
-                    <TabsTrigger value="tpv-status" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" onClick={() => tpvCloseDetailRef.current?.()}>
+                    <TabsTrigger value="tpv-status" className={cn(
+                      anyTpvListActive
+                        ? "text-muted-foreground"
+                        : "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                    )} onClick={() => tpvCloseDetailRef.current?.()}>
                       TPV Status
                     </TabsTrigger>
                     {anyTpvListActive && (
                       <>
-                        <span className="text-muted-foreground/50 text-xs mx-1 select-none">›</span>
-                        <span className="text-xs font-medium text-primary px-2 py-1 rounded-sm bg-primary/10">TPV List</span>
+                        <span className="text-muted-foreground/50 mx-1 select-none">›</span>
+                        <span className="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground shadow-sm">
+                          TPV List
+                        </span>
                       </>
                     )}
                   </TabsList>
