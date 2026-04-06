@@ -834,22 +834,14 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                       if (key === "popis")
                         return (
                           <TableCell key={key} style={cellStyle}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div className="max-w-[300px] truncate">
-                                  <InlineEditableCell
-                                    value={(item as any).popis || ""}
-                                    onSave={(v) =>
-                                      saveField(item.id, "popis", v, (item as any).popis || "")
-                                    }
-                                    readOnly={!canManageTPV}
-                                  />
-                                </div>
-                              </TooltipTrigger>
-                              {(item as any).popis && (item as any).popis.length > 40 && (
-                                <TooltipContent className="max-w-[400px]">{(item as any).popis}</TooltipContent>
-                              )}
-                            </Tooltip>
+                            <InlineEditableCell
+                              value={(item as any).popis || ""}
+                              type="textarea"
+                              onSave={(v) =>
+                                saveField(item.id, "popis", v, (item as any).popis || "")
+                              }
+                              readOnly={!canManageTPV}
+                            />
                           </TableCell>
                         );
                       if (key === "konstrukter")
