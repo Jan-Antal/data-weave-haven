@@ -176,11 +176,13 @@ export function StagesCostSection({ projectId, readOnly = false, useProjectPrice
     if (totalWeight <= 0) return null;
     const weightedSum = stages.reduce((acc, s) => {
       const price = s.prodejni_cena ?? 0;
-      const marze = s.marze ? parseFloat(String(s.marze).replace(",", ".")) : 0;
-      const normalizedMarze = marze > 1 ? marze : marze * 100;
-      return acc + price * normalizedMarze;
+      const raw = s.marze ? parseFloat(String(s.marze).replace(",", ".")) : 0;
+      // Normalize to decimal (0.25 = 25%)
+      const decimal = raw > 1 ? raw / 100 : raw;
+      return acc + price * decimal;
     }, 0);
-    return Math.round((weightedSum / totalWeight) * 10) / 10;
+    // Return as percentage for display (e.g. 25.3)
+    return Math.round((weightedSum / totalWeight) * 1000) / 10;
   }, [stages]);
 
   if (stages.length < 2) return null;

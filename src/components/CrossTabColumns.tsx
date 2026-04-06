@@ -153,7 +153,7 @@ function renderCell(
   const s = (field: string, val: string, old: string) => save(p.id, field, val, old, p.project_id);
   const v = (field: keyof Project) => (p as any)[field] ?? "";
   const ro = (field: string) => !canEdit || (isFieldReadOnly?.(field, (p as any)[field] ?? null) ?? false);
-  const summaryClass = isSummaryRow ? "italic text-muted-foreground" : "";
+  const summaryClass = isSummaryRow ? "text-muted-foreground" : "";
 
   switch (key) {
     case "klient":
@@ -190,8 +190,22 @@ function renderCell(
       return <TableCell key={key} className="text-right"><InlineEditableCell value={marzeStorageToInput(p.marze)} onSave={(x) => s("marze", marzeInputToStorage(x) || "", v("marze"))} readOnly={ro("marze")} displayValue={<span className="text-xs font-sans">{formatMarze(p.marze)}</span>} /></TableCell>;
     case "pm":
       return <TableCell key={key}><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(x) => s("pm", x, v("pm"))} readOnly={ro("pm")} /></TableCell>;
-    case "status":
+    case "status": {
+      // For summary rows with "(+N)" suffix, render base status with color + suffix
+      const statusText = p.status || "";
+      const plusMatch = isSummaryRow ? statusText.match(/^(.+?)\s*(\(\+\d+\))$/) : null;
+      if (plusMatch) {
+        return (
+          <TableCell key={key}>
+            <span className="inline-flex items-center gap-1">
+              <StatusBadge status={plusMatch[1].trim()} />
+              <span className="text-[10px] text-muted-foreground">{plusMatch[2]}</span>
+            </span>
+          </TableCell>
+        );
+      }
       return <TableCell key={key}><InlineEditableCell value={p.status} type="select" options={statusLabels} onSave={(x) => s("status", x, v("status"))} displayValue={p.status ? <StatusBadge status={p.status} /> : "—"} readOnly={ro("status")} /></TableCell>;
+    }
     case "risk":
       return <TableCell key={key}><InlineEditableCell value={p.risk} type="select" options={["Low", "Medium", "High"]} onSave={(x) => s("risk", x, v("risk"))} displayValue={<RiskBadge level={p.risk || ""} />} readOnly={ro("risk")} /></TableCell>;
     case "zamereni":

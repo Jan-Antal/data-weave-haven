@@ -460,6 +460,8 @@ const ProjectRow = memo(function ProjectRow({
         status: overrides.statusSummary ?? p.status,
         datum_smluvni: overrides.latestDatumSmluvni ?? p.datum_smluvni,
         pm: overrides.pmSummary ?? p.pm,
+        kalkulant: overrides.kalkulantSummary ?? p.kalkulant,
+        konstrukter: overrides.konstrukterSummary ?? p.konstrukter,
         prodejni_cena: overrides.totalPrice ?? p.prodejni_cena,
         marze: overrides.weightedMarze != null ? String(overrides.weightedMarze) : p.marze,
       } as Project;
@@ -475,7 +477,7 @@ const ProjectRow = memo(function ProjectRow({
   }, [p.risk, p.datum_smluvni, riskHighlight]);
 
   return (
-    <TableRow className={cn("hover:bg-muted/50 transition-colors h-9", isSummary && "border-l-2 border-primary/20")} style={bgStyle} data-project-id={p.project_id}>
+    <TableRow className={cn("hover:bg-muted/50 transition-colors h-9", isSummary && "bg-muted/40")} style={bgStyle} data-project-id={p.project_id}>
       {/* Col 1 — Icon slot */}
       <TableCell style={COL_ICON_STYLE} className="text-center px-0">
         <button
@@ -500,7 +502,7 @@ const ProjectRow = memo(function ProjectRow({
         </TableCell>
       )}
       {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><span className="font-medium cursor-pointer hover:underline hover:text-primary transition-colors truncate" onClick={() => onEditProject(p)}>{p.project_name}</span></TableCell>}
-      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: displayProject, save, canEdit: canEdit && stageCount <= 1, statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly: stageCount > 1 ? () => true : isFieldReadOnly, isSummaryRow: isSummary }))}
+      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: displayProject, save, canEdit: canEdit && (stageCount <= 1 || key === "architekt" || key === "klient"), statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly: stageCount > 1 ? (field) => field !== "architekt" && field !== "klient" : isFieldReadOnly, isSummaryRow: isSummary }))}
     </TableRow>
   );
 });
