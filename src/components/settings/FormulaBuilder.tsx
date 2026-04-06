@@ -808,18 +808,68 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
             {/* Preset selector */}
             <div>
               <Label className="text-xs text-muted-foreground mb-2 block">Vzorec</Label>
+
+              {/* Module filter chips */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <button
+                  onClick={() => setActiveModules(new Set())}
+                  className={cn(
+                    "px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors border",
+                    activeModules.size === 0
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground"
+                  )}
+                >
+                  Všechny
+                </button>
+                {ALL_MODULES.map((mod) => (
+                  <button
+                    key={mod}
+                    onClick={() => {
+                      setActiveModules((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(mod)) next.delete(mod);
+                        else next.add(mod);
+                        return next;
+                      });
+                    }}
+                    className={cn(
+                      "px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors border",
+                      activeModules.has(mod)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground"
+                    )}
+                  >
+                    {mod}
+                  </button>
+                ))}
+              </div>
+
               <Select value={activePreset} onValueChange={(v) => tryLoadPreset(v)}>
-                <SelectTrigger className="w-full max-w-[320px] h-9 text-sm">
+                <SelectTrigger className="w-full max-w-[420px] h-9 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(PRESETS).map(([key, p]) => (
-                    <SelectItem key={key} value={key} className="text-sm">
-                      {p.label}
-                    </SelectItem>
-                  ))}
+                  {Object.entries(PRESETS)
+                    .filter(([_, p]) =>
+                      activeModules.size === 0 || p.modules.some((m) => activeModules.has(m))
+                    )
+                    .map(([key, p]) => (
+                      <SelectItem key={key} value={key} className="text-sm">
+                        <span className="flex items-center gap-2">
+                          {p.label}
+                          <span className="flex gap-1 ml-1">
+                            {p.modules.map((m) => (
+                              <span key={m} className="inline-block px-1.5 py-0.5 rounded text-[9px] bg-muted text-muted-foreground leading-none">
+                                {m}
+                              </span>
+                            ))}
+                          </span>
+                        </span>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
-            </Select>
+              </Select>
               {PRESETS[activePreset] && (
                 <>
                   <p className="text-[11px] font-mono text-muted-foreground mt-1">{PRESETS[activePreset].subtitle}</p>
