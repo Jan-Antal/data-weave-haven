@@ -80,10 +80,18 @@ function parseWorksheetCells(xml: string, ss: string[]): (string | null)[][] {
 const ITEM_CODE_RE = /^[A-Z]\d{2}$/;
 
 const STOP_TEXTS = [
-  'celkem součet', 'celkem bez dph', 'cena celkem', 'dph 21', 'doprava',
-  'montáž', 'manipulace', 'odvoz', 'jiné náklady', 'cenová nabídka platí',
-  'platební podmínky', 'technologická doba', 'součástí cenové nabídky'
+  'celkem součet', 'celkem bez dph', 'cena celkem včetně dph', 'dph',
+  'doprava - nákladní', 'doprava', 'montáž a přesun', 'montáž',
+  'manipulace', 'odvoz a likvidace', 'odvoz',
+  'jiné náklady', 'cenová nabídka platí',
+  'platební podmínky', 'technologická doba', 'součástí cenové nabídky nejsou'
 ];
+
+const ROOM_LABELS = new Set([
+  'Dětský pokoj 1', 'Dětský pokoj 2', 'Dětský pokoj 3',
+  'Ložnice', 'Chodba', 'Koupelna', 'Kuchyň', 'Obývací pokoj',
+  'Pracovna', 'Předsíň', 'Jídelna', 'Šatna', 'Technická místnost',
+]);
 
 function parseCN(rows: (string | null)[][]): any[] {
   const items: any[] = [];
@@ -110,7 +118,7 @@ function parseCN(rows: (string | null)[][]): any[] {
       const t = nazev_popis.toLowerCase();
       if (STOP_TEXTS.some(s => t.includes(s))) {
         collecting = false;
-      } else {
+      } else if (!ROOM_LABELS.has(nazev_popis)) {
         cur._popis.push(nazev_popis);
       }
     }
@@ -120,12 +128,11 @@ function parseCN(rows: (string | null)[][]): any[] {
 }
 
 function finalize(cur: any) {
-  const popis = cur._popis.join(' | ');
+  const popis = cur._popis.join(' ');
   return {
     item_name: cur.kod_prvku,
     nazev: cur.nazev,
-    popis_short: [cur.nazev, cur.rozmer].filter(Boolean).join(' '),
-    popis_full: [cur.nazev, cur.rozmer, popis].filter(Boolean).join(' | '),
+    popis: [cur.rozmer, popis].filter(Boolean).join(' '),
     cena: cur.jcena ?? 0,
     pocet: cur.pocet ?? 1,
     jednotka: 'ks',
