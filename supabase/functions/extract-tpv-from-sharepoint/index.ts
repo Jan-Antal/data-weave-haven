@@ -177,19 +177,37 @@ async function extractViaAI(text: string): Promise<any[]> {
 async function extractFromExcel(fileBuffer: ArrayBuffer, fileName: string): Promise<any[]> {
   const zipReader = new ZipReader(new BlobReader(new Blob([fileBuffer])));
   const entries = await zipReader.getEntries();
-  let ssXml = '', wsXml = '';
+  let ssXml = '';
+  const sheetEntries: { name: string; entry: typeof entries[0] }[] = [];
   for (const e of entries) {
     if (e.filename === 'xl/sharedStrings.xml') ssXml = await e.getData!(new TextWriter());
-    if (e.filename === 'xl/worksheets/sheet1.xml') wsXml = await e.getData!(new TextWriter());
+    if (/^xl\/worksheets\/sheet\d+\.xml$/.test(e.filename)) {
+      sheetEntries.push({ name: e.filename, entry: e });
+    }
+  }
+  sheetEntries.sort((a, b) => {
+    const na = parseInt(a.name.match(/sheet(\d+)/)?.[1] || '0');
+    const nb = parseInt(b.name.match(/sheet(\d+)/)?.[1] || '0');
+    return na - nb;
+  });
+
+  const ss = parseSharedStrings(ssXml);
+  const tsvParts: string[] = [];
+  for (const { name, entry } of sheetEntries) {
+    const xml = await entry.getData!(new TextWriter());
+    const rows = parseWorksheetCells(xml, ss);
+    const tsv = cellsToTSV(rows);
+    if (tsv.trim().length > 0) {
+      tsvParts.push(`=== List ${name.match(/sheet(\d+)/)?.[1] || '?'} ===\n${tsv}`);
+    }
+    console.log(`XLSX ${fileName} ${name}: ${rows.length} rows, TSV ${tsv.length} chars`);
   }
   await zipReader.close();
-  const ss = parseSharedStrings(ssXml);
-  const rows = parseWorksheetCells(wsXml, ss);
-  const tsv = cellsToTSV(rows);
 
-  console.log(`XLSX ${fileName}: ${rows.length} rows, TSV ${tsv.length} chars`);
+  const combined = tsvParts.join('\n\n');
+  console.log(`XLSX ${fileName} total: ${sheetEntries.length} sheets, combined TSV ${combined.length} chars`);
 
-  return await extractViaAI(tsv);
+  return await extractViaAI(combined);
 }
 
 // ─── PDF extraction (Claude — best for visual documents) ──────────────────────
