@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageCircle, X, Send } from "lucide-react";
+import { MessageCircle, X, Send, Copy, Check } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -8,10 +8,13 @@ type Msg = { role: "user" | "assistant"; content: string };
 const QUICK_CHIPS = [
   { emoji: "📊", label: "Jak jsme na tom s projekty?" },
   { emoji: "🔥", label: "Které projekty hoří?" },
-  { emoji: "💬", label: "Napsat zprávu adminovi" },
+  { emoji: "📋", label: "Vytvořit summary projektu" },
 ];
 
 const FEEDBACK_TRIGGERS = ["napsat zprávu", "chci napsat", "mám problém", "feedback", "zprávu adminovi"];
+const SUMMARY_TRIGGERS = ["summary projektu", "vytvořit summary", "shrnutí projektu"];
+
+const SUMMARY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/project-summary`;
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ami-assistant`;
 
