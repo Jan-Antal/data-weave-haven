@@ -29,6 +29,7 @@ import { dispatchDocCountUpdate, migrateDocCountCache, setDocCountAbsolute } fro
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { RozpadCeny } from "./RozpadCeny";
+import { StagesCostSection } from "./StagesCostSection";
 import { PhotoLightbox, PhotoTimelineGrid, isImageFile, generatePhotoFilename } from "./PhotoLightbox";
 import { useFileSelection } from "@/hooks/useFileSelection";
 import { FileSelectionBar, FolderDropTarget, useFileDragVisuals, useDropFlash } from "./DocumentDragDrop";
@@ -1168,6 +1169,14 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
           </div>
         )}
       </div>
+
+      {/* ── ETAPY — per-stage cost breakdown (only when 2+ stages) ── */}
+      {(isAdmin || isPM) && (
+        <StagesCostSection
+          projectId={project.project_id}
+          readOnly={isSectionReadOnly("finance")}
+        />
+      )}
 
       {/* ── PM — ŘÍZENÍ PROJEKTU ─────────────────── */}
       <SectionHeader icon="📊" label="PM — ŘÍZENÍ PROJEKTU" />
