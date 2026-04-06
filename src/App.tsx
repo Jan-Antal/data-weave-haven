@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { UndoRedoProvider } from "@/hooks/useUndoRedo";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
+import { AmiAssistant } from "@/components/AmiAssistant";
 
 import Index from "./pages/Index";
 import Login from "./pages/Login";
