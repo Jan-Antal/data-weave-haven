@@ -5,8 +5,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Upload, Trash2, Plus, Loader2, FileText, CheckCircle2, Search, AlertCircle } from "lucide-react";
+import { Upload, Trash2, Plus, Loader2, FileText, CheckCircle2, Search, AlertCircle, Eye } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
+import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
+import { useSharePointDocs } from "@/hooks/useSharePointDocs";
 
 
 interface ExtractedItem {
@@ -47,6 +49,14 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   const [manualFile, setManualFile] = useState<File | null>(null);
   const [manualLoading, setManualLoading] = useState(false);
 
+  // Source document tracking for preview
+  const [sourceDoc, setSourceDoc] = useState<{ itemId?: string; fileName: string; blobUrl?: string } | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewData, setPreviewData] = useState<{ previewUrl: string | null; webUrl: string | null; downloadUrl: string | null }>({ previewUrl: null, webUrl: null, downloadUrl: null });
+
+  const sp = useSharePointDocs(projectId);
+
   // Search SharePoint on open
   useEffect(() => {
     if (!open) {
@@ -59,6 +69,10 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       autoExtractTriggered.current = false;
       setManualFile(null);
       setManualLoading(false);
+      setSourceDoc(null);
+      setPreviewOpen(false);
+      setPreviewLoading(false);
+      setPreviewData({ previewUrl: null, webUrl: null, downloadUrl: null });
       return;
     }
 
@@ -115,6 +129,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       }));
 
       setItems(extracted);
+      setSourceDoc({ itemId: fileItemId, fileName });
       setPhase("done");
     } catch (err: any) {
       console.error("Extract error:", err);
@@ -184,6 +199,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
 
       setItems(extracted);
       setFoundFileName(manualFile.name);
+      setSourceDoc({ fileName: manualFile.name, blobUrl: URL.createObjectURL(manualFile) });
       setPhase("done");
     } catch (err: any) {
       console.error("Manual extract error:", err);
@@ -212,6 +228,34 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   };
 
   const totalSum = items.reduce((sum, item) => sum + item.cena * item.pocet, 0);
+
+  const openSourcePreview = useCallback(async () => {
+    if (!sourceDoc) return;
+    setPreviewLoading(true);
+    try {
+      if (sourceDoc.itemId) {
+        const data = await sp.getPreview(sourceDoc.itemId);
+        setPreviewData({
+          previewUrl: data?.previewUrl ?? null,
+          webUrl: data?.webUrl ?? null,
+          downloadUrl: data?.downloadUrl ?? null,
+        });
+      } else if (sourceDoc.blobUrl) {
+        const isPdf = sourceDoc.fileName.toLowerCase().endsWith(".pdf");
+        setPreviewData({
+          previewUrl: isPdf ? sourceDoc.blobUrl : null,
+          webUrl: null,
+          downloadUrl: sourceDoc.blobUrl,
+        });
+      }
+      setPreviewOpen(true);
+    } catch (err) {
+      console.error("Preview error:", err);
+      toast({ title: "Nepodařilo se načíst náhled", variant: "destructive" });
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, [sourceDoc, sp]);
 
   const handleSave = async () => {
     const valid = items.filter((i) => i.item_name.trim());
@@ -505,18 +549,33 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
               </div>
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={onClose}>
-                Zrušit
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={saving}
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
-                Uložit do TPV ({items.filter((i) => i.item_name.trim()).length})
-              </Button>
+            <DialogFooter className="flex items-center justify-between sm:justify-between">
+              <div>
+                {sourceDoc && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={openSourcePreview}
+                    disabled={previewLoading}
+                  >
+                    {previewLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Eye className="h-4 w-4 mr-1" />}
+                    Zobrazit dokument
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={onClose}>
+                  Zrušit
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+                  Uložit do TPV ({items.filter((i) => i.item_name.trim()).length})
+                </Button>
+              </div>
             </DialogFooter>
           </>
         )}
@@ -527,6 +586,16 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
           </div>
         )}
       </DialogContent>
+
+      <DocumentPreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        fileName={sourceDoc?.fileName || ""}
+        previewUrl={previewData.previewUrl}
+        webUrl={previewData.webUrl}
+        downloadUrl={previewData.downloadUrl}
+        loading={previewLoading}
+      />
     </Dialog>
   );
 }
