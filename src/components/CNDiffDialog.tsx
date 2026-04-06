@@ -14,6 +14,7 @@ import type { CNDiffResult, CNDiffEntry } from "@/hooks/useCNDiff";
 interface Props {
   open: boolean;
   onClose: () => void;
+  onApplied?: () => void;
   diff: CNDiffResult;
   projectId: string;
   currency?: string;

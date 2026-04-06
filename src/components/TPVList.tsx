@@ -119,16 +119,21 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const currentProject = useMemo(() => allProjects.find((p) => p.project_id === projectId), [allProjects, projectId]);
   const queryClient = useQueryClient();
 
-  // CN diff detection — auto-check on mount
+  // CN diff detection — triggered by file upload events only
   const { diff: cnDiff, isChecking: cnChecking, hasDifferences: cnHasDiff, checkCN, clearDiff: clearCNDiff } = useCNDiff(projectId, items);
 
-  const cnAutoCheckedRef = useRef(false);
+  // Listen for CN file uploads from ProjectDetailDialog / MobileDetailProjektSheet
   useEffect(() => {
-    if (items.length > 0 && !cnAutoCheckedRef.current) {
-      cnAutoCheckedRef.current = true;
-      checkCN();
-    }
-  }, [items.length, checkCN]);
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.projectId === projectId) {
+        // Delay to let SharePoint index the new file
+        setTimeout(() => checkCN(), 2000);
+      }
+    };
+    window.addEventListener("cn-file-uploaded", handler);
+    return () => window.removeEventListener("cn-file-uploaded", handler);
+  }, [projectId, checkCN]);
 
   const updateItem = useUpdateTPVItem();
   const addItem = useAddTPVItem();
@@ -725,20 +730,6 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         {cnChecking && (
           <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
         )}
-        {cnHasDiff && !cnChecking && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => setCnDiffOpen(true)}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/10 text-destructive text-xs font-semibold hover:bg-destructive/20 transition-colors cursor-pointer"
-              >
-                <AlertTriangle className="h-3.5 w-3.5" />
-                {cnDiff!.entries.length}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>CN byla změněna — kliknutím zobrazíte rozdíly</TooltipContent>
-          </Tooltip>
-        )}
         <button
           onClick={() => setDetailOpen(true)}
           className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
@@ -1280,7 +1271,8 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       {cnDiff && (
         <CNDiffDialog
           open={cnDiffOpen}
-          onClose={() => {
+          onClose={() => setCnDiffOpen(false)}
+          onApplied={() => {
             setCnDiffOpen(false);
             clearCNDiff();
           }}
