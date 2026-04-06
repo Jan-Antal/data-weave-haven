@@ -340,7 +340,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
       if (newItems.length > 0) {
         const items = newItems.map(r => ({
           project_id: projectId,
-          item_name: r.values.item_code || "Bez kódu",
+          item_code: r.values.item_code || "Bez kódu",
           nazev: r.values.nazev || null,
           popis: r.values.popis || null,
           konstrukter: r.values.konstrukter || null,

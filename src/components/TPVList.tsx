@@ -457,7 +457,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       setAddingInline(false);
       return;
     }
-    addItem.mutate({ project_id: projectId, item_name: name });
+    addItem.mutate({ project_id: projectId, item_code: name });
     setInlineName("");
     setAddingInline(false);
   };
@@ -671,7 +671,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           productionStatusMap={productionStatusMap}
           onBack={onBack}
           onOpenDetail={() => setDetailOpen(true)}
-          onAddItem={(name) => addItem.mutate({ project_id: projectId, item_name: name })}
+          onAddItem={(name) => addItem.mutate({ project_id: projectId, item_code: name })}
           onOpenImport={() => setWizardOpen(true)}
           canManageTPV={canManageTPV}
         />
