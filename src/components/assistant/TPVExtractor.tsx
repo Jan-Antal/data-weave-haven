@@ -229,6 +229,34 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
 
   const totalSum = items.reduce((sum, item) => sum + item.cena * item.pocet, 0);
 
+  const openSourcePreview = useCallback(async () => {
+    if (!sourceDoc) return;
+    setPreviewLoading(true);
+    try {
+      if (sourceDoc.itemId) {
+        const data = await sp.getPreview(sourceDoc.itemId);
+        setPreviewData({
+          previewUrl: data?.previewUrl ?? null,
+          webUrl: data?.webUrl ?? null,
+          downloadUrl: data?.downloadUrl ?? null,
+        });
+      } else if (sourceDoc.blobUrl) {
+        const isPdf = sourceDoc.fileName.toLowerCase().endsWith(".pdf");
+        setPreviewData({
+          previewUrl: isPdf ? sourceDoc.blobUrl : null,
+          webUrl: null,
+          downloadUrl: sourceDoc.blobUrl,
+        });
+      }
+      setPreviewOpen(true);
+    } catch (err) {
+      console.error("Preview error:", err);
+      toast({ title: "Nepodařilo se načíst náhled", variant: "destructive" });
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, [sourceDoc, sp]);
+
   const handleSave = async () => {
     const valid = items.filter((i) => i.item_name.trim());
     if (valid.length === 0) {
