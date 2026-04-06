@@ -40,6 +40,7 @@ export function getProjectDisplayOverrides(
       totalPrice: null,
       latestDatumSmluvni: null,
       pmSummary: null,
+      weightedMarze: null,
     };
   }
 
@@ -78,6 +79,20 @@ export function getProjectDisplayOverrides(
     pmSummary = `${pms.size} PM`;
   }
 
+  // Weighted average margin: Σ(price_i × margin_i) / Σ(price_i)
+  const totalWeight = stageList.reduce((acc, s) => acc + (s.prodejni_cena ?? 0), 0);
+  let weightedMarze: number | null = null;
+  if (totalWeight > 0) {
+    const weightedSum = stageList.reduce((acc, s) => {
+      const price = s.prodejni_cena ?? 0;
+      const marze = s.marze ? parseFloat(String(s.marze).replace(",", ".")) : 0;
+      // Normalize: if > 1, treat as percentage already in decimal-ish form
+      const normalizedMarze = marze > 1 ? marze : marze * 100;
+      return acc + price * normalizedMarze;
+    }, 0);
+    weightedMarze = Math.round((weightedSum / totalWeight) * 10) / 10;
+  }
+
   return {
     isSingleStage: false,
     singleStage: null,
@@ -85,5 +100,6 @@ export function getProjectDisplayOverrides(
     totalPrice,
     latestDatumSmluvni,
     pmSummary,
+    weightedMarze,
   };
 }
