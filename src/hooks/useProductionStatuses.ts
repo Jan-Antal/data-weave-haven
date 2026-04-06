@@ -10,7 +10,7 @@ export interface ProductionStatus {
   splitTotal?: number;
 }
 
-/** For a given project, compute production status per TPV item_type (code) */
+/** For a given project, compute production status per TPV nazev (code) */
 export function useProductionStatuses(projectId: string) {
   const query = useQuery({
     queryKey: ["production-statuses", projectId],

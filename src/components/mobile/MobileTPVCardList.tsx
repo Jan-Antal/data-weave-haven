@@ -11,8 +11,8 @@ import type { ProductionStatus } from "@/hooks/useProductionStatuses";
 
 interface TPVItem {
   id: string;
-  item_type: string | null;
-  nazev_prvku: string | null;
+  nazev: string | null;
+  popis: string | null;
   item_name: string;
   konstrukter: string | null;
   status: string | null;
@@ -63,7 +63,7 @@ export function MobileTPVCardList({
     if (!q) return items;
     return items.filter(item => {
       const code = (item.item_name || "").toLowerCase();
-      const name = (item.item_type || "").toLowerCase();
+      const name = (item.nazev || "").toLowerCase();
       return code.includes(q) || name.includes(q);
     });
   }, [items, search]);
@@ -119,7 +119,7 @@ export function MobileTPVCardList({
             const statusOpt = statusOptions.find(o => o.label === item.status);
             const statusColor = statusOpt?.color;
             const isExpanded = expandedId === item.id;
-            const vyrobaStatuses = productionStatusMap.get(item.item_name || item.item_type || "") || [];
+            const vyrobaStatuses = productionStatusMap.get(item.item_name || item.nazev || "") || [];
             const vyrobaLabel = vyrobaStatuses[0]?.label || "";
 
             return (
@@ -138,8 +138,8 @@ export function MobileTPVCardList({
                       : <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
                     }
                   </div>
-                  {item.item_type && (
-                    <p className="text-sm font-semibold text-foreground leading-tight truncate max-w-[200px]" title={item.item_type}>{item.item_type}</p>
+                  {item.nazev && (
+                    <p className="text-sm font-semibold text-foreground leading-tight truncate max-w-[200px]" title={item.nazev}>{item.nazev}</p>
                   )}
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {item.status && (
@@ -166,10 +166,10 @@ export function MobileTPVCardList({
                 {/* Expanded details */}
                 {isExpanded && (
                   <div className="border-t border-border bg-muted/20 px-3 py-2 space-y-1.5">
-                    {item.nazev_prvku && (
+                    {item.popis && (
                       <div>
                         <span className="text-[10px] text-muted-foreground uppercase">Popis</span>
-                        <p className="text-xs text-foreground">{item.nazev_prvku}</p>
+                        <p className="text-xs text-foreground">{item.popis}</p>
                       </div>
                     )}
                     {item.konstrukter && (

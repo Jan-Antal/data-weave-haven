@@ -6,7 +6,7 @@ import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useAuth } from "@/hooks/useAuth";
 import { createNotification, createOrUpdateBatchNotification, resolvePersonToUserId, getUserIdsByRole } from "@/lib/createNotification";
 
-export type TPVItem = Tables<"tpv_items"> & { konstrukter?: string | null; nazev_prvku?: string | null };
+export type TPVItem = Tables<"tpv_items"> & { konstrukter?: string | null; popis?: string | null };
 
 export function useTPVItems(projectId: string) {
   return useQuery({
@@ -179,7 +179,7 @@ export function useUpdateTPVItem() {
 export function useAddTPVItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (item: { project_id: string; item_name: string; item_type?: string; status?: string; sent_date?: string; accepted_date?: string; notes?: string }) => {
+    mutationFn: async (item: { project_id: string; item_name: string; nazev?: string; status?: string; sent_date?: string; accepted_date?: string; notes?: string }) => {
       const { data, error } = await supabase.from("tpv_items").insert(item).select().single();
       if (error) throw error;
       return data;
@@ -289,7 +289,7 @@ export function useBulkInsertTPVItems() {
   const { user, profile } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ items, projectId }: { items: { project_id: string; item_name: string; item_type?: string; status?: string; sent_date?: string; accepted_date?: string; notes?: string }[]; projectId: string }) => {
+    mutationFn: async ({ items, projectId }: { items: { project_id: string; item_name: string; nazev?: string; status?: string; sent_date?: string; accepted_date?: string; notes?: string }[]; projectId: string }) => {
       const { error } = await supabase.from("tpv_items").insert(items);
       if (error) throw error;
       return { projectId, count: items.length };
