@@ -19,10 +19,10 @@ Return ONLY a valid JSON array, no markdown, no explanation.
 
 Fields (map exactly):
 - item_name: the code before the first "|" (e.g. "T01")
-- item_type: the text after the first "|" and before "| počet:"
+- nazev: the text after the first "|" and before "| počet:"
 - pocet: the number after "počet:"
 - cena: the number after "cena:" before "Kč"
-- nazev_prvku: ALL text after "popis:" — copy it exactly, do not shorten
+- popis: ALL text after "popis:" — copy it exactly, do not shorten
 
 Return every item. Do not skip any.`;
 
@@ -167,8 +167,8 @@ Return ONLY a valid JSON array, no markdown, no explanation.
 
 Fields:
 - item_name: the code exactly as given (T01, K01, etc.)
-- item_type: short item name, max 40 chars, no dimensions or materials
-- nazev_prvku: the full popis text exactly as given, do not shorten or summarize
+- nazev: short item name, max 40 chars, no dimensions or materials
+- popis: the full popis text exactly as given, do not shorten or summarize
 - cena: unit price as number (CZK)
 - pocet: quantity as number
 
