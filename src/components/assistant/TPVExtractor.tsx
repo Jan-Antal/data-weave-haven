@@ -49,6 +49,14 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   const [manualFile, setManualFile] = useState<File | null>(null);
   const [manualLoading, setManualLoading] = useState(false);
 
+  // Source document tracking for preview
+  const [sourceDoc, setSourceDoc] = useState<{ itemId?: string; fileName: string; blobUrl?: string } | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewData, setPreviewData] = useState<{ previewUrl: string | null; webUrl: string | null; downloadUrl: string | null }>({ previewUrl: null, webUrl: null, downloadUrl: null });
+
+  const sp = useSharePointDocs(projectId);
+
   // Search SharePoint on open
   useEffect(() => {
     if (!open) {
