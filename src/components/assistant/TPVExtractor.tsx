@@ -199,6 +199,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
 
       setItems(extracted);
       setFoundFileName(manualFile.name);
+      setSourceDoc({ fileName: manualFile.name, blobUrl: URL.createObjectURL(manualFile) });
       setPhase("done");
     } catch (err: any) {
       console.error("Manual extract error:", err);
