@@ -13,7 +13,7 @@ const CN_SYSTEM_PROMPT = `Jsi expert na extrakci dat z českých cenových nabí
 Vstup je tabulka (buď text z Excelu, nebo PDF). Extrahuj VŠECHNY řádkové položky nábytku.
 
 Pro každou položku vrať:
-- item_name: kód prvku přesně jak je v dokumentu (např. T01, K01, D-01, SK01, S1 atd.)
+- kod_prvku: kód prvku přesně jak je v dokumentu (např. T01, K01, D-01, SK01, S1 atd.)
 - nazev: krátký název prvku (max 40 znaků, BEZ rozměrů a materiálů)
 - popis: KOMPLETNÍ technický popis — materiály, kování, povrchové úpravy, barvy, typ dřeva, ABS hrany, úchytky, mechanismy. BEZ rozměrů (šířka, výška, hloubka, mm, cm). Spoj VŠECHNY řádky popisu které k položce patří do jednoho textu.
 - cena: jednotková cena v CZK (pouze číslo)
@@ -105,13 +105,13 @@ async function extractViaAI(text: string): Promise<any[]> {
             items: {
               type: "object",
               properties: {
-                item_name: { type: "string", description: "Item code (e.g. T01, K01, D-01)" },
+                kod_prvku: { type: "string", description: "Item code (e.g. T01, K01, D-01)" },
                 nazev: { type: "string", description: "Short item name, max 40 chars" },
                 popis: { type: "string", description: "Complete technical description with materials, hardware, finishes, dimensions" },
                 cena: { type: "number", description: "Unit price in CZK" },
                 pocet: { type: "number", description: "Quantity, default 1" },
               },
-              required: ["item_name", "nazev", "popis", "cena", "pocet"],
+              required: ["kod_prvku", "nazev", "popis", "cena", "pocet"],
               additionalProperties: false,
             },
           },
