@@ -415,12 +415,14 @@ interface ProjectRowProps {
 
 const ProjectRow = memo(function ProjectRow({
   project: p,
+  stages: stagesRaw,
   docCount,
   docFailed,
   isExpanded,
   stageCount,
   tpvCount,
   onToggleExpand,
+  onAddStage,
   onOpenTPVList,
   isVisible: v,
   renderKeys,
@@ -434,6 +436,35 @@ const ProjectRow = memo(function ProjectRow({
   onEditProject,
   isFieldReadOnly,
 }: ProjectRowProps) {
+  // Merge stage data into project display for multi-stage summary
+  const displayProject = useMemo(() => {
+    const overrides = getProjectDisplayOverrides(stagesRaw);
+    if (overrides.isSingleStage && overrides.singleStage) {
+      // Single stage: show stage data directly on project row
+      const s = overrides.singleStage;
+      return {
+        ...p,
+        status: s.status ?? p.status,
+        datum_smluvni: s.datum_smluvni ?? p.datum_smluvni,
+        pm: s.pm ?? p.pm,
+        konstrukter: s.konstrukter ?? p.konstrukter,
+        prodejni_cena: s.prodejni_cena ?? p.prodejni_cena,
+        marze: s.marze ?? p.marze,
+      } as Project;
+    }
+    if (!overrides.isSingleStage) {
+      // Multi-stage: show summary
+      return {
+        ...p,
+        status: overrides.statusSummary ?? p.status,
+        datum_smluvni: overrides.latestDatumSmluvni ?? p.datum_smluvni,
+        pm: overrides.pmSummary ?? p.pm,
+        prodejni_cena: overrides.totalPrice ?? p.prodejni_cena,
+      } as Project;
+    }
+    return p;
+  }, [p, stagesRaw]);
+
   const bgStyle = useMemo(() => {
     const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
     return c ? { backgroundColor: c } : {};
@@ -457,7 +488,7 @@ const ProjectRow = memo(function ProjectRow({
       </TableCell>
       {/* Col 2 — Chevron slot */}
       <TableCell style={COL_CHEVRON_STYLE} className="px-0 cursor-pointer" onClick={() => stageCount > 1 ? onToggleExpand(p.project_id) : undefined}>
-        <ExpandArrow isExpanded={isExpanded} stageCount={stageCount} />
+        <ExpandArrow isExpanded={isExpanded} stageCount={stageCount} onAddStage={() => onAddStage?.(p.project_id)} />
       </TableCell>
       {v("project_id") && (
         <TableCell className="font-sans font-semibold text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => onEditProject(p)}>
@@ -465,7 +496,7 @@ const ProjectRow = memo(function ProjectRow({
         </TableCell>
       )}
       {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><span className="font-medium cursor-pointer hover:underline hover:text-primary transition-colors truncate" onClick={() => onEditProject(p)}>{p.project_name}</span></TableCell>}
-      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly }))}
+      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: displayProject, save, canEdit: canEdit && stageCount <= 1, statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly: stageCount > 1 ? () => true : isFieldReadOnly }))}
     </TableRow>
   );
 });
