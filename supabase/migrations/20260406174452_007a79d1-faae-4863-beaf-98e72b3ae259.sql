@@ -1,0 +1,1 @@
+ALTER TABLE tpv_items RENAME COLUMN item_name TO item_code;
