@@ -1,53 +1,67 @@
 
 
-# Etapy — vizuální a funkční vylepšení
+# Opravy etap — 7 bodů
 
-## Přehled změn
+## Problémy a řešení
 
-1. **Σ znak v tabulkách** — u multi-stage projektů přidat "Σ" prefix před cenu
-2. **Project Detail — auto-suma + přepínač** — finance sekce u multi-stage projektů zobrazí automatický součet cen etap (read-only), s možností přepnout na manuální cenu; stejně tak marže = vážený průměr z etap
-3. **Architekt + Klient** — vždy na úrovni projektu, nepřenáší se do etap (zůstává jak je, jen ověřit)
-4. **Celková marže = vážený průměr** z etap (na 1 desetinné místo)
-5. **Smazání etapy** — přidat delete tlačítko do `StagesCostSection` (v rozbalené etapě)
-6. **Vizuální odlišení summary řádku** — multi-stage projekt v tabulce dostane jemný vizuální styl (např. subtle left border nebo background tint) a read-only pole budou mít jasnou vizuální indikaci
+### 1. Vážená marže je 100× větší
+**Root cause**: `projectStageDisplay.ts` normalizuje marži (0.25 → 25), ale výsledek (`weightedMarze = 25`) se pak v `ProjectRow` uloží jako `String(25)` do `displayProject.marze`. Funkce `formatMarze` pak znovu násobí ×100 → zobrazí 2500%.
 
-## Soubory a detaily
+**Fix**: V `projectStageDisplay.ts` výsledek `weightedMarze` ponechat v **decimal** formátu (0.25), ne v procentech. Změnit normalizaci: vždy pracovat s decimal hodnotami, výsledek nezaokrouhlovat na procenta ale na decimal (1 des. místo v %). Konkrétně: `weightedMarze` vracet jako decimal (např. 0.25), ne 25.
 
-### `src/components/CrossTabColumns.tsx`
-- V `case "prodejni_cena"`: detekovat, že projekt má multi-stage (přidat prop `isMultiStage` nebo kontrolovat přítomnost "(+" v status stringu jako proxy) — jednodušší: přidat `isSummaryRow` boolean do `CellProps`
-- Alternativně: v `projectStageDisplay.ts` přidat prefix "Σ " do `totalPrice` renderingu — ale lepší je v CrossTabColumns přidat Σ prefix v renderingu ceny, protože formátování patří do UI
-- Řešení: rozšířit `CellProps` interface o `isSummaryRow?: boolean`, a v renderCell u `prodejni_cena` pokud `isSummaryRow` → zobrazit "Σ " prefix
+Alternativně a jednodušeji: v `ProjectRow` kde se staví `marze: String(overrides.weightedMarze)` — přeměnit na decimal: `String(overrides.weightedMarze / 100)`. Stejná oprava v `StagesCostSection.tsx`.
 
-### `src/components/ProjectInfoTable.tsx` + `PMStatusTable.tsx` + `TPVStatusTable.tsx`
-- V `renderColumnCell` volání předat `isSummaryRow: stageCount > 1`
-- Multi-stage řádek projektu: přidat jemný vizuální odlišení — `className` s `border-l-2 border-primary/20` nebo `bg-muted/30`
+**Soubory**: `src/lib/projectStageDisplay.ts`, `src/components/StagesCostSection.tsx`
 
-### `src/components/StagesCostSection.tsx`
-- **Auto-suma**: zobrazit celkovou cenu jako auto-sumu (Σ) z etap + toggle na manuální zadání (pomocí `plan_use_project_price` pole na projektu)
-- **Vážený průměr marže**: spočítat z etap — `Σ(cena_i × marže_i) / Σ(cena_i)` — zobrazit jako read-only info
-- **Delete etapy**: v rozbalené `StageCostRow` přidat Trash ikonu s confirm dialogem, volat `useDeleteStage`
-- Props rozšířit o `project` objekt (potřeba pro `plan_use_project_price` a pro uložení celkové ceny)
+### 2. Vizuální odlišení — border-l nahradit podsvícením
+Smazat `border-l-2 border-primary/20`. Místo toho přidat `bg-muted/40` na summary řádky (obdobný styl jako hover). Odstranit `italic` class z `summaryClass` v `CrossTabColumns.tsx` — ponechat jen normální text, případně jen `text-muted-foreground` pro computed pole.
 
-### `src/components/ProjectDetailDialog.tsx`
-- Finance sekce: pokud multi-stage → prodejní cena a marže zobrazit jako **read-only computed** (suma / vážený průměr), s indikací "Σ dopočítáno z etap"
-- Pokud `plan_use_project_price` = true → editovatelná manuální cena (stávající chování)
-- Toggle přepínač (Switch) vedle ceny: "Auto Σ" / "Manuální"
-- Předat `project` do `StagesCostSection`
+**Soubory**: `src/components/ProjectInfoTable.tsx`, `src/components/PMStatusTable.tsx`, `src/components/TPVStatusTable.tsx`, `src/components/CrossTabColumns.tsx`
 
-### `src/lib/projectStageDisplay.ts`
-- Přidat `weightedMarze: number | null` — vážený průměr marže z etap (zaokrouhlený na 1 des. místo)
-- Přidat do `ProjectDisplayOverrides` interface
+### 3. StagesCostSection do ostatních detailů
+`StagesCostSection` se renderuje v `ProjectDetailDialog.tsx`. Potřeba ověřit, že se zobrazuje správně s auto-sum togglem a přidáváním etap.
 
-### `src/hooks/useProjectStages.ts`
-- `useDeleteStage` už existuje — jen ho importovat v `StagesCostSection`
+**Soubor**: `src/components/ProjectDetailDialog.tsx`
 
-## Vizuální odlišení summary řádku
+### 4. Multi-status — barva prvního statusu
+`StatusBadge` hledá přesný match na label. "Výroba (+2)" nenajde shodu → žádná barva.
 
-Multi-stage projekt řádek v tabulce:
-- Jemný `bg-blue-50/50 dark:bg-blue-950/20` background
-- Cena a marže: italic + `text-muted-foreground` protože jsou computed
-- Status badge s "(+N)" suffix
+**Fix**: V `CrossTabColumns.tsx` case `"status"` — pokud `isSummaryRow` a status obsahuje "(+", parsovat base status (před " (+") a renderovat jako `StatusBadge` s base statusem + suffix badge s počtem.
 
-Read-only pole (computed z etap) v Project Detail:
-- Disabled input s textem "Σ z etap" nebo malý label pod inputem
+**Soubor**: `src/components/CrossTabColumns.tsx`
+
+### 5. Architekt + Klient — vždy z projektu, ne z etapy
+V `displayProject` merge logice (single-stage): neměnit `architekt` ani `klient` — ty zůstávají vždy z projektu. V `CrossTabColumns.tsx` `case "architekt"` a `case "klient"` — pokud `isSummaryRow`, nemají být read-only, zůstávají editovatelné na úrovni projektu.
+
+Aktuálně `isFieldReadOnly: stageCount > 1 ? () => true : isFieldReadOnly` → to dělá ALL fields read-only pro multi-stage. Potřeba výjimku pro `architekt`, `klient`.
+
+**Fix**: V `ProjectRow` renderKeys mapping: `isFieldReadOnly` pro multi-stage → `(field) => field !== "architekt" && field !== "klient"`.
+
+**Soubory**: `src/components/ProjectInfoTable.tsx`, `src/components/PMStatusTable.tsx`, `src/components/TPVStatusTable.tsx`
+
+### 6. PM a Kalkulant — zobrazit jména (Adam / Jakub)
+Místo "3 PM" zobrazit `"Adam / Jakub"` (spojit jména lomítkem). Přidat to samé pro `kalkulant`.
+
+**Fix**: V `projectStageDisplay.ts`:
+- `pmSummary`: místo `"${pms.size} PM"` → `[...pms].join(" / ")`
+- Přidat `kalkulantSummary` do `ProjectDisplayOverrides` se stejnou logikou
+- V `ProjectRow` merge: `kalkulant: overrides.kalkulantSummary ?? p.kalkulant`
+
+**Soubory**: `src/lib/projectStageDisplay.ts`, `src/components/ProjectInfoTable.tsx`, `src/components/PMStatusTable.tsx`, `src/components/TPVStatusTable.tsx`
+
+### 7. Konstruktér summary
+Přidat stejnou logiku pro `konstrukter` — zobrazit jména spojená " / ".
+
+**Soubor**: `src/lib/projectStageDisplay.ts` + všechny 3 tabulky
+
+## Soubory ke změně
+
+| Soubor | Změny |
+|--------|-------|
+| `src/lib/projectStageDisplay.ts` | Fix weighted marže (decimal), PM/kalkulant/konstruktér jako jména, přidat `kalkulantSummary` + `konstrukterSummary` |
+| `src/components/CrossTabColumns.tsx` | Odstranit italic, fix status badge barvy pro summary, architekt/klient editovatelné |
+| `src/components/ProjectInfoTable.tsx` | bg-muted/40 místo border-l, architekt/klient výjimka z read-only, kalkulant/konstruktér summary |
+| `src/components/PMStatusTable.tsx` | Stejné jako ProjectInfoTable |
+| `src/components/TPVStatusTable.tsx` | Stejné jako ProjectInfoTable |
+| `src/components/StagesCostSection.tsx` | Fix weighted marže display |
 
