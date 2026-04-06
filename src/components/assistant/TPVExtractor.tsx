@@ -549,18 +549,33 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
               </div>
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={onClose}>
-                Zrušit
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={saving}
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
-                Uložit do TPV ({items.filter((i) => i.item_name.trim()).length})
-              </Button>
+            <DialogFooter className="flex items-center justify-between sm:justify-between">
+              <div>
+                {sourceDoc && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={openSourcePreview}
+                    disabled={previewLoading}
+                  >
+                    {previewLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Eye className="h-4 w-4 mr-1" />}
+                    Zobrazit dokument
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={onClose}>
+                  Zrušit
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+                  Uložit do TPV ({items.filter((i) => i.item_name.trim()).length})
+                </Button>
+              </div>
             </DialogFooter>
           </>
         )}
@@ -571,6 +586,16 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
           </div>
         )}
       </DialogContent>
+
+      <DocumentPreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        fileName={sourceDoc?.fileName || ""}
+        previewUrl={previewData.previewUrl}
+        webUrl={previewData.webUrl}
+        downloadUrl={previewData.downloadUrl}
+        loading={previewLoading}
+      />
     </Dialog>
   );
 }
