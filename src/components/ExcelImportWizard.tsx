@@ -631,6 +631,35 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                       </div>
                     )}
 
+                    {/* Import mode selector */}
+                    <div className="rounded-lg border p-3 space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Režim importu</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          className={cn(
+                            "rounded-lg border-2 p-3 text-left transition-colors",
+                            importMode === "new" ? "border-primary bg-primary/5" : "border-muted hover:border-muted-foreground/30"
+                          )}
+                          onClick={() => setImportMode("new")}
+                        >
+                          <p className="text-sm font-semibold">Nový import</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Vloží nové položky, duplicity volitelně přepíše</p>
+                        </button>
+                        <button
+                          type="button"
+                          className={cn(
+                            "rounded-lg border-2 p-3 text-left transition-colors",
+                            importMode === "update" ? "border-primary bg-primary/5" : "border-muted hover:border-muted-foreground/30"
+                          )}
+                          onClick={() => setImportMode("update")}
+                        >
+                          <p className="text-sm font-semibold">Aktualizovat existující</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Aktualizuje jen změněná pole, zachová status a poznámky</p>
+                        </button>
+                      </div>
+                    </div>
+
                     <div className="flex gap-2">
                       <Button variant="outline" onClick={handleCancel}>Zrušit</Button>
                       <Button className="flex-1" onClick={() => setStep(2)} disabled={sheets.length === 0}>
