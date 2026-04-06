@@ -660,6 +660,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       cost_subcontractors_pct: form.cost_subcontractors_pct,
       cost_montaz_pct: form.cost_montaz_pct,
       cost_is_custom: form.cost_is_custom,
+      plan_use_project_price: form.plan_use_project_price,
     };
 
     // If project ID changed, try to rename SharePoint folder (never blocks DB save)
