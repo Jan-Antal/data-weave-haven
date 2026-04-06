@@ -13,18 +13,18 @@ const LIB_ROOT = "AMI-Project-Info-App-Data";
 const SITE_HOST = "amincz.sharepoint.com";
 const SITE_PATH = "/sites/AMI-Project-Info";
 
-const SYSTEM_PROMPT = `You extract line items from Czech furniture price offers (cenová nabídka).
+const SYSTEM_PROMPT = `You receive pre-parsed furniture line items. Convert them to a JSON array exactly as-is.
+
 Return ONLY a valid JSON array, no markdown, no explanation.
 
-Field definitions:
-- item_name = short code exactly as in the document (T01, K01, D-01, etc.)
-- nazev = SHORT item name (max 40 chars, no dimensions/materials)
-- popis = complete TECHNICAL description with materials, hardware, finishes, dimensions
-- cena = unit price in CZK (number only)
-- pocet = quantity, default 1
+Fields (map exactly):
+- item_name: the code before the first "|" (e.g. "T01")
+- nazev: the text after the first "|" and before "| počet:"
+- pocet: the number after "počet:"
+- cena: the number after "cena:" before "Kč"
+- popis: ALL text after "popis:" — copy it exactly, do not shorten
 
-SKIP: totals, subtotals, section headers, transport, montáž.
-Return ONLY valid JSON array.`;
+Return every item. Do not skip any.`;
 
 // ─── XLSX → structured item list ─────────────────────────────────────────────
 
