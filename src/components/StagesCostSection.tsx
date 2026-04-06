@@ -6,9 +6,10 @@ import { useState, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { RozpadCeny, type CostValues } from "./RozpadCeny";
-import { useProjectStages, useUpdateStage } from "@/hooks/useProjectStages";
+import { useProjectStages, useUpdateStage, useAddStage } from "@/hooks/useProjectStages";
 import { formatCurrency, marzeStorageToInput, marzeInputToStorage, formatMarze } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import type { ProjectStage } from "@/hooks/useProjectStages";
@@ -145,14 +146,24 @@ function StageCostRow({ stage, readOnly }: { stage: ProjectStage; readOnly: bool
 
 export function StagesCostSection({ projectId, readOnly = false }: StagesCostSectionProps) {
   const { data: stages = [] } = useProjectStages(projectId);
+  const addStage = useAddStage();
 
   if (stages.length < 2) return null;
 
   const totalPrice = stages.reduce((sum, s) => sum + (s.prodejni_cena ?? 0), 0);
 
+  const handleAddStage = () => {
+    const letters = stages.map(s => {
+      const m = s.stage_name.match(/-([A-Z])$/);
+      return m ? m[1] : null;
+    }).filter(Boolean) as string[];
+    const lastChar = letters.sort().pop();
+    const suffix = lastChar ? String.fromCharCode(lastChar.charCodeAt(0) + 1) : "A";
+    addStage.mutate({ project_id: projectId, stage_name: `${projectId}-${suffix}`, stage_order: stages.length });
+  };
+
   return (
     <div className="space-y-2">
-      {/* Section header */}
       <div className="relative flex items-center mt-5 mb-3">
         <div className="absolute inset-0 flex items-center" aria-hidden="true">
           <div className="w-full border-t border-border" />
@@ -162,14 +173,12 @@ export function StagesCostSection({ projectId, readOnly = false }: StagesCostSec
         </span>
       </div>
 
-      {/* Stage rows */}
       <div className="space-y-1.5">
         {stages.map((stage) => (
           <StageCostRow key={stage.id} stage={stage} readOnly={readOnly} />
         ))}
       </div>
 
-      {/* Total */}
       {totalPrice > 0 && (
         <div className="flex justify-between items-center pt-2 border-t border-border">
           <span className="text-xs text-muted-foreground">Součet etap:</span>
@@ -177,6 +186,12 @@ export function StagesCostSection({ projectId, readOnly = false }: StagesCostSec
             {Math.round(totalPrice).toLocaleString("cs-CZ")} Kč
           </span>
         </div>
+      )}
+
+      {!readOnly && (
+        <Button variant="ghost" size="sm" className="text-xs h-7 text-muted-foreground hover:text-foreground w-full" onClick={handleAddStage}>
+          <Plus className="h-3 w-3 mr-1" /> Přidat etapu
+        </Button>
       )}
     </div>
   );
